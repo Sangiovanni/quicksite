@@ -1,7 +1,5 @@
 # QuickSite — Locked Design Decisions
 
-_Last updated: 2026-06-11._
-
 > Canonical log of design decisions that have been **locked** during the
 > project's evolution. Each entry captures the *why* — what was chosen,
 > the reasoning behind it, the alternatives weighed and rejected, and
@@ -981,7 +979,7 @@ trade-off).
 host), `public/admin/assets/js/lib/css-refiner/` (shared-candidate
 parser + analyzers). Behaviour: [ADMIN_PANEL.md](ADMIN_PANEL.md).
 
-### Project-to-workflow exporter ships in beta.9 (locked 2026-06-11)
+### Project-to-workflow exporter ships in beta.9 (locked 2026-06-11, superseded 2026-07-19)
 
 **Decision**: The "save the current project state as a replayable
 workflow" tool ships in beta.9 as a self-contained bonus slice
@@ -4262,3 +4260,1693 @@ importer is client-orchestrated; the apply rides existing commands).
 **Source**: `public/admin/assets/js/pages/apis.js` (`_applyImportPrivacy`,
 `_computeImportPrivacy`, `handleImportConfirm`). Behaviour:
 [ADMIN_PANEL.md §9.11](ADMIN_PANEL.md).
+
+---
+
+## Identity and authentication (beta.10)
+
+### Passwords replace the lifetime bearer token as the credential (locked 2026-07-11)
+
+**Decision**: A user logs in with a secret they chose — a password, verified
+against a bcrypt hash on the user record — and receives a session. The
+long-lived `tvt_` API tokens are removed outright, not demoted: the
+token→identity map is deleted from the auth config and the commands that minted,
+listed and revoked tokens are deleted with it.
+
+**Reasoning**: A lifetime bearer token is a credential with none of the password
+ecosystem around it. It cannot be memorised, cannot be stored in a password
+manager, cannot be rotated by the person who holds it, and — critically — a copy
+of it is valid forever unless an administrator notices and revokes it. Every
+property that makes tokens convenient for machines makes them wrong for the
+human sitting in front of an admin panel. A middle option was live for a while
+(keep tokens but call them "login keys" and mint them per user); it was rejected
+once the shape became clear, because a login key is still a lifetime bearer
+secret, and building one while the same release ships a registration page meant
+building a credential the next release would immediately delete. One gap is accepted deliberately: there is no password-reset
+flow, because QuickSite ships no mail infrastructure and the dependency-free
+rule keeps it that way — the escape hatch is a deployer editing the user
+registry directly.
+
+**Alternatives considered**: Keep tokens for beta.10 and add passwords later
+(the original plan — rejected: the identity model was being rebuilt anyway, and
+deferring meant migrating users twice). "Login keys" — per-user minted tokens
+presented at a login form (rejected: a lifetime bearer secret wearing a
+password's clothes). Passkeys / WebAuthn (deferred: real value, but it needs an
+account-recovery story QuickSite does not have yet).
+
+**Source**: `secure/src/functions/AuthManagement.php` (`qs_auth_attempt_login`),
+`secure/src/functions/SessionManagement.php`,
+`secure/management/command/login.php`. Behaviour:
+[ARCHITECTURE.md §3](ARCHITECTURE.md).
+
+### Access token plus refresh token, with rotation and reuse detection (locked 2026-07-11)
+
+**Decision**: A login mints a **pair** — a short-lived access token sent on every
+request (15 minutes) and a longer-lived refresh token accepted only at the
+refresh endpoint (30 days, sliding). Refreshing **rotates**: the presented
+refresh token is retired and a new pair issued. Presenting an already-rotated
+refresh token after a short grace window is treated as a theft signal and revokes
+the entire **session family** — every token descended from that login. Tokens are
+stored hashed; the raw values never touch disk.
+
+**Reasoning**: Short access lifetimes bound the damage of a leaked request
+credential without asking the user to log in every fifteen minutes. Rotation is
+what turns the refresh token from "a lifetime token with extra steps" into a
+detector: once a token may only be used once, a second use is evidence that two
+parties hold it, and the only safe interpretation is that one of them stole it.
+Revoking the family rather than the single token is deliberate — the attacker
+may already have rotated ahead of the victim, so killing one token could well
+kill the victim's session and leave the attacker's alive. The grace window exists
+because honest clients do race: a dropped response or two tabs refreshing
+together must not look like theft.
+
+**Alternatives considered**: A single long-lived session token (rejected — the
+flaw being fixed). Rotation without reuse detection (rejected — rotation alone
+buys almost nothing; the detection is the point). Revoking only the reused token
+(rejected — can punish the victim and spare the thief). HttpOnly-cookie-only
+custody for the access token (deferred as post-1.0 hardening; the refresh token
+already rides an HttpOnly cookie).
+
+**Source**: `secure/src/functions/SessionManagement.php` (`qs_session_issue`,
+`qs_session_rotate`, `qs_session_revoke_family`). Behaviour:
+[ARCHITECTURE.md §3](ARCHITECTURE.md).
+
+### The admin panel holds one session; the access token lives in memory only (locked 2026-07-11)
+
+**Decision**: The admin panel is the single holder of the browser's session. The
+server-side PHP session owns the token pair; the page emits the current access
+token into the in-memory client config, and the client keeps it **only** in
+memory — never in `localStorage`, never in `sessionStorage`. The refresh token
+rides an HttpOnly, SameSite-Strict cookie scoped to `/admin`. The client
+refreshes at 80% of the remaining lifetime and retries a request once on an
+expired-token response.
+
+**Reasoning**: Browser storage is readable by any script that reaches the page,
+which makes it precisely the wrong home for a credential in an application whose
+own threat model treats stored XSS as the primary risk. An in-memory token dies
+with the tab and is invisible to injected script that arrives after page load.
+Making the panel the *single* holder matters as much as the storage choice: when
+two places both believe they own the credential they drift, and a stale copy in
+`localStorage` outlives the logout that was supposed to end the session.
+
+**Alternatives considered**: Keep the `localStorage` token with a shorter TTL
+(rejected — shortens the window without closing it, and left two owners). Put
+the access token in a cookie too (rejected for beta.10 — the panel's many
+hand-built fetch call sites read a config value; moving them all to cookie auth
+is a larger change than the risk justified). Note that the author's *own site*
+keeps `localStorage` as its documented default for visitor auth — see the
+magic-link entry above; that is a different subsystem with a different threat
+profile, and it was not changed.
+
+**Source**: `secure/admin/AdminRouter.php` (`ensureFreshSession`,
+`storeSessionPair`), `public/admin/assets/js/core/api.js`. Behaviour:
+[ADMIN_PANEL.md §7](ADMIN_PANEL.md).
+
+### Identity is a private username; the email field is removed (locked 2026-07-12)
+
+**Decision**: A user record carries a **public display name**, a **private
+username** used only to log in, and an opaque id. The username is lowercase
+`a`–`z`, digits, underscore and hyphen, 3–32 characters, unique
+case-insensitively, and immutable in beta.10. The email field is deleted from
+the record entirely.
+
+**Reasoning**: QuickSite sends no mail — there is no verification, no password
+reset, no notification. An email address that nothing ever uses is not identity,
+it is personal data held for no reason, and holding it makes the installation a
+more attractive target than the projects in it warrant. A chosen username is the
+honest replacement: it is the thing the user actually types, it carries no
+external meaning, and it does not identify the person outside this installation.
+Treating it as **private** — never returned by any command, never rendered on a
+shared surface — is what keeps it from becoming an enumeration target in its own
+right, which is why the public display name exists as a separate field.
+
+**Alternatives considered**: Keep email as the login identifier (rejected —
+personal data with no consumer; also the more valuable secret to leak). Make the
+username public and use it for lookups (rejected — it is the login identifier;
+publishing it hands out half of every credential). Allow username changes
+(deferred — the id is the durable key, so a rename is mechanically possible, but
+it needs a story for anything that cached the old value).
+
+**Source**: `secure/src/functions/AuthManagement.php` (`qs_valid_username`,
+`findUserByUsername`, `qs_public_user_ref`),
+`secure/management/config/users.php.example`. Behaviour:
+[ARCHITECTURE.md §3](ARCHITECTURE.md).
+
+### The public display name must differ from the private username (locked 2026-07-12)
+
+**Decision**: Account creation refuses a display name that equals the username,
+compared case-insensitively and after control characters are stripped. The rule
+is enforced at the single account-creation function, not only at the registration
+form, and returns an honest validation error.
+
+**Reasoning**: The display name is published — rosters, invitations, member
+lists. The username is private because it is half of a credential. If a user
+picks the same string for both, the published name *is* the login identifier,
+and the privacy property the whole identity model rests on quietly evaporates for
+that account. The check is cheap, the failure is loud, and it happens once at
+creation rather than at every read.
+
+**Alternatives considered**: Warn instead of refuse (rejected — a warning that
+can be clicked past is not a guarantee). Enforce at the registration page only
+(rejected — any other creation path would bypass it; the rule belongs at the
+one place that mints an account). Fuzzy matching, so `alice` and `Alice_` also
+collide (rejected — exact-match-after-normalisation is predictable and
+explainable; fuzzy rules reject names users legitimately want).
+
+**Source**: `secure/src/functions/AuthManagement.php` (`qs_user_create`, and
+the shared registration gate). Behaviour: [ARCHITECTURE.md §3](ARCHITECTURE.md).
+
+### Registration answers identically for a duplicate and a success — because the username is private (locked 2026-07-12)
+
+**Decision**: Public registration returns a byte-identical `200` whether the
+requested username was free or already taken, with the work equalised so timing
+does not distinguish the two. A **malformed** username, by contrast, returns an
+honest `400` naming the format rule. Registration never logs the new account in.
+
+**Reasoning**: The uniform response exists for exactly one reason, and it is
+worth stating because it decides the rule: the username is private. If
+registration answered "taken", anyone could test a guessed username and learn
+whether that account exists — which is a probe against a credential, not against
+a directory. A format error leaks nothing, since the rule is published and the
+answer is derivable without the server; refusing to explain it would just make
+the form hostile. This is the inverse of the posture a *public* identifier would
+warrant: when the identifier is public, an honest conflict response is correct
+and a uniform one is theatre. Not auto-logging-in keeps a single
+session-establishing path in the system rather than two.
+
+**Alternatives considered**: Honest `409` on duplicate (adopted briefly while
+usernames were expected to be public, reversed as soon as they were ruled
+private — the identifier's visibility, not the endpoint, decides the posture).
+Uniform response for format errors too (rejected — no secret, real usability
+cost). Auto-login after registration (rejected — a second way to establish a
+session is a second way to get it wrong).
+
+**Source**: `secure/src/functions/AuthManagement.php`
+(`qs_auth_attempt_register`, `qs_user_create`),
+`secure/management/command/register.php`. Behaviour:
+[COMMAND_API.md](COMMAND_API.md).
+
+### Registration is denied by default and flood-controlled on three axes (locked 2026-07-12)
+
+**Decision**: Public self-registration reads a config flag that defaults to
+**deny** — a fresh installation does not let strangers create accounts. When
+enabled, three independent limits apply, each a config knob where `0` disables
+it: a per-IP rate (3 per minute), a global hourly ceiling (30 per hour) and an
+absolute cap on the number of accounts the installation will ever hold. Only
+successful registrations fill the global window. Minimum password length is a
+knob, defaulting to 12.
+
+**Reasoning**: Secure-by-default: the deployer who never reads the config gets
+the closed door, and opening it is a deliberate act. The three limits answer
+three different abuses — one machine hammering the form, a distributed trickle,
+and an installation quietly filling with junk accounts that each get to call
+project-creation. Counting only successes in the global window means a burst of
+failed attempts cannot deny service to a legitimate signup. Making each limit a
+knob with an off value keeps the mechanism honest for the single-user
+installation that finds it pointless.
+
+**Alternatives considered**: Per-IP limiting only (rejected — trivially evaded
+and does nothing about total volume). A hardcoded minimum password length
+(rejected — the deployer, not QuickSite, knows their threat model). Default the
+flag to allow (rejected outright — a public account-creation endpoint on by
+default is a defect, not a convenience).
+
+**Source**: `secure/management/config/auth.php.example`,
+`secure/src/functions/AuthManagement.php` (`qs_auth_attempt_register`).
+Behaviour: [ARCHITECTURE.md §3](ARCHITECTURE.md).
+
+### No `createUser` command — accounts are self-created (locked 2026-07-12)
+
+**Decision**: There is no authenticated command that creates an account for
+somebody else. A proposed `createUser` was dropped before it shipped. The only
+ways an account comes into existence are public registration (when the deployer
+enables it) and the first-run bootstrap described further below.
+
+**Reasoning**: Talked through, an authenticated "create an account for a
+server-to-server caller" endpoint is registration with a bearer token attached —
+same effect, same surface, second implementation. Two ways to mint an identity
+means two places to get the uniqueness rules, the name/username rule, the
+password policy and the caps right, and they will drift. Real platform
+provisioning — one system creating QuickSite accounts on behalf of its own users
+— is a genuine requirement, but it belongs to a designed integration layer, not
+to a command bolted on in a security release.
+
+**Alternatives considered**: Ship `createUser` behind a new global
+"user management" permission (rejected — see the entry on the retirement of
+global owner-level access below: at the time, a global owner-gated category
+resolved to "owns any project at all", and project creation is open to every
+authenticated account, so the gate would have granted itself). Ship it
+unauthenticated for server-to-server use (rejected — that is registration).
+
+**Source**: `secure/management/command/register.php` is the only public creation
+path. Behaviour: [COMMAND_API.md](COMMAND_API.md).
+
+### There is no global user-administration lane (locked 2026-07-18)
+
+**Decision**: No command lists, disables or deletes other people's accounts.
+`listUsers` and `disableUser` were both dropped rather than built. Per-project
+eviction is `removeMember`; suspending an account is an operator action on the
+user registry, outside the API.
+
+**Reasoning**: Account *existence* is global in QuickSite, but *authority* never
+is — every permission in the model is scoped to a project, and there is no
+principal that stands above projects to hold a user-admin power. Inventing one
+would have meant a global owner-gated category, which at the time resolved to
+"owns any project", reachable by anyone who created a project — the exact
+escalation shape the release had just closed elsewhere. `listUsers` was refused
+on separate grounds: a directory dump is the enumeration surface that the private
+username, the uniform registration response and the exact-match-only user lookup
+were all built to prevent. Handing it back through an admin endpoint would undo
+all three. `listMembers`, the project roster and exact-match lookup already serve
+every legitimate need.
+
+**Alternatives considered**: A global "user manager" role (rejected — see above;
+also reintroduces the god-principal the role model deleted). `listUsers`
+restricted to project owners (rejected — every account can become an owner by
+creating a project, so the restriction restricts nobody).
+
+**Source**: `secure/management/config/categories.php`,
+`secure/management/command/listMembers.php`,
+`secure/management/command/getProjectRoster.php`,
+`secure/management/command/findUser.php`. Behaviour:
+[COMMAND_API.md](COMMAND_API.md).
+
+### Account deletion is self-service, hard, and refused while you solely own a project (locked 2026-07-18)
+
+**Decision**: `deleteMyAccount` deletes the caller's own account and nobody
+else's. It requires the current password (on the shared login throttle) plus an
+explicit confirmation, **refuses** while the caller is the sole owner of any
+project and names those projects, and performs a **hard delete** rather than
+marking the record disabled. The cascade removes every membership entry keyed by
+the caller — membership, invitation received, own request, proposal filed about
+them — and deliberately keeps `by`/`sponsor` references inside entries about
+*other* people, which degrade to a null name. If any part of the cascade fails,
+the operation aborts before the record is touched. Sessions are revoked last.
+
+**Reasoning**: Requiring the password means a stolen access token cannot erase an
+account — deletion is the one operation where possession of a session should not
+be enough. Sole ownership blocks deletion because the alternative states are both
+worse: cascading the project's destruction hides a second irreversible act inside
+the first, and leaving the project ownerless leaves it permanently unownable
+*and* undeletable, since ownership transfer requires the caller to be the current
+owner and both deletion and transfer are owner-only. Each project must therefore
+be handed over or destroyed explicitly, keeping its own confirmation. Hard delete
+was chosen over anonymising because the shipped account gates test for the
+literal `disabled` status; a new `deleted` status would **fail open** at every
+one of them unless each call site changed in the same commit — a rule that
+degrades to "allowed" when unrecognised is the wrong shape for a security check.
+Keeping third-party references is the same principle applied outward: stripping
+them would destroy a stranger's pending invitation as a side effect of someone
+else's departure, and the accept-time re-validation already voids anything that
+genuinely depended on the departed user's standing.
+
+**Alternatives considered**: Anonymise instead of delete (rejected — the
+fail-open status enum above). Cascade-delete solely-owned projects (rejected —
+two irreversible acts, one confirmation). Leave the project ownerless (rejected —
+proven to strand it permanently). Purge every reference to the user everywhere
+(rejected — destroys third parties' pending state).
+
+**Source**: `secure/management/command/deleteMyAccount.php`,
+`secure/src/functions/AuthManagement.php` (`qs_members_mutate`). Behaviour:
+[COMMAND_API.md](COMMAND_API.md).
+
+### The forward-compatibility seam for external identity is a configurable token source, not a field (locked 2026-07-05)
+
+**Decision**: The user record carries one id and no external-identity field. An
+external system that wants to drive QuickSite accounts owns the
+`its-user → QuickSite-user` mapping on **its** side. QuickSite's single
+forward-compatible hook is that it reads the access token from a configurable
+source, defaulting to its own login.
+
+**Reasoning**: An `externalId` column is a guess about a system that does not
+exist yet — it fixes a cardinality (one external identity per user), a format,
+and an ownership story before anything has argued for them, and every one of
+those is easier to change on the outside than in a shipped data file. A token
+source, by contrast, is the actual integration point: whatever mints sessions is
+where an external identity provider has to plug in, and pointing that at a
+different implementation needs no schema at all.
+
+**Alternatives considered**: Keep `externalId` as an inert field for later
+(rejected — an unused field in a security-relevant record is a maintenance and
+audit liability, and it is not free to remove once installs have data in it).
+Design the full external-identity bridge now (rejected — no consumer, and the
+bridge is a separate application's concern).
+
+**Source**: `secure/management/config/users.php.example` (six fields, no
+external id); `public/admin/assets/js/core/api.js` (`setTokenSource`).
+
+---
+
+## Authorization model (beta.10)
+
+### No superadmin and no global role tier — authority is per-project (locked 2026-07-05)
+
+**Decision**: There is no superadmin, no `global_role` field, and no principal
+that holds power across projects. Authority is entirely per-project: a user
+belongs to zero or more projects, and `owner` is the top of each one. Every
+hardcoded superadmin remnant was removed, including the synthetic-superadmin
+escape hatch that a disabled-auth flag used to conjure.
+
+**Reasoning**: A global tier is a single credential whose compromise is total. In
+a file-based product that a solo author or a small team runs themselves, it also
+buys very little: the operator who would hold it already has the filesystem, and
+everything a superadmin was for — updating the engine, inspecting an
+installation — is better done from the shell than from a web session. Removing
+the tier deletes a whole class of escalation target rather than hardening it. The
+disabled-auth hatch went with it for the same reason: a development convenience
+that produces a god-principal is a production backdoor waiting for a
+misconfiguration.
+
+**Alternatives considered**: Keep superadmin but require a second factor
+(rejected — still one credential to total compromise, and QuickSite has no second
+factor). Keep the disabled-auth hatch for local development (rejected — the
+failure mode is silent and catastrophic; a developer can create an owner account
+in seconds instead).
+
+**Source**: `secure/src/functions/AuthManagement.php` (`hasPermission`),
+`secure/management/config/roles.php`. Behaviour:
+[ARCHITECTURE.md §3](ARCHITECTURE.md).
+
+### Fixed built-in roles with ranks; custom roles removed (locked 2026-07-06)
+
+**Decision**: Six built-in roles, each with a numeric rank — `viewer` 1,
+`editor` 2, `designer` 3, `developer` 4, `admin` 5, `owner` 6. No per-project
+role files, no custom-role palette, no role-authoring commands: the three
+commands that created, edited and deleted roles were moved to a category granted
+to nobody, including the owner. Exactly one owner per project, transferable, not
+shareable; an admin manages every rank strictly below their own but cannot
+delete the project, manage other admins, or transfer ownership.
+
+**Reasoning**: Custom roles are an authorization surface that has to be audited
+as carefully as the rules it generates, and every installation ends up with a
+slightly different one, so nothing about the model can be reasoned about
+generally. Deleting the feature removes that surface entirely — a straight
+security win — at the cost of flexibility a small-team product does not need.
+Ranks exist so that two rules can be stated once instead of enumerated: manage
+only strictly below yourself, and never grant a role at or above your own. The
+owner/admin split is what makes the hierarchy lockout-proof in both directions:
+an admin cannot nuke the project or evict a peer, and the owner cannot be removed
+by the people they appointed.
+
+**Alternatives considered**: Keep custom roles and audit them (rejected — the
+audit never ends; each installation is its own model). Leave the role-authoring
+commands reachable by the owner (rejected — they were meaningless under a fixed
+role set, and one of them crashed outright on the new config shape; denying them
+is the honest state). Shared ownership (rejected — "who can remove whom" has no
+safe answer with two owners).
+
+**Source**: `secure/management/config/roles.php` + `roles.php.example`,
+`secure/src/functions/AuthManagement.php` (`roleRank`, `canManageRole`).
+Behaviour: [ARCHITECTURE.md §3](ARCHITECTURE.md).
+
+### Permissions are granted by category, never by per-command lists (locked 2026-07-06)
+
+**Decision**: A new file, `secure/management/config/categories.php`, maps every
+command to exactly one category and declares that category's scope (global or
+project) and, for global categories, its access rule. Roles list **categories**,
+not commands. The mapping must be 1:1 in both directions — a routed command with
+no category fails closed, and a categorised command with no route is a stray.
+Categories are designed to be trust-coherent: a bucket that mixes a harmless read
+with a destructive write gets split.
+
+**Reasoning**: The previous shape re-listed roughly a hundred command names under
+each of five roles — around 550 lines of duplication whose only job was to stay
+identical. Duplication in an authorization table does not stay identical; it
+drifts, and a drift means one role silently gained or lost a command. Grouping by
+category makes registering a new command a one-line edit in one file instead of
+an N-role sweep, and it makes the question a reviewer actually needs to answer —
+"what class of authority is this?" — the question the file asks. Enforcing the
+1:1 invariant programmatically rather than by eye is part of the decision: it is
+the property that makes "fails closed" true rather than hoped for.
+
+**Alternatives considered**: Keep the flat per-role command lists (rejected — the
+drift above). Derive categories in code from a naming convention (rejected —
+implicit, and a rename becomes a silent permission change). Allow a command in
+several categories (rejected — the union is then the effective grant, and the
+effective grant becomes unreadable).
+
+**Source**: `secure/management/config/categories.php`,
+`secure/management/config/roles.php`,
+`secure/src/functions/AuthManagement.php` (`getCommandCategory`,
+`hasPermission`). Behaviour: [ARCHITECTURE.md §3](ARCHITECTURE.md).
+
+### Global owner-level access retired outright (locked 2026-07-19)
+
+**Decision**: A **global** category may grant to "any authenticated user" or to
+nobody. The owner-level global access rule is gone, replaced by a single
+allowlist constant that both permission consumers read, so a reintroduced
+`'owner'` — or a typo — falls through to deny.
+
+**Reasoning**: At global scope there is no target project, so an owner check has
+nothing to be owner *of*: it resolved to "owns any project anywhere". Project
+creation is open to every authenticated account, so the check was satisfiable by
+any account willing to create a throwaway project — one call away from being
+granted. That is not a gate, it is a formality, and it was the mechanism behind a
+proven privilege escalation earlier in the release. Leaving the rule in place
+because its last remaining user happened to be harmless would have left a loaded
+mechanism for the next global category to pick up by accident. Two consumers had
+to change, not one: the permission check itself and the union that feeds the
+panel's UI gating — fixing only the first would have left the interface offering
+commands the API refuses.
+
+**Alternatives considered**: Keep the rule and re-gate its last user (rejected —
+no sound token gate exists for it in a model with no global principal). Keep the
+rule unused with a comment warning against it (rejected — a comment is not an
+enforcement mechanism; the constant is).
+
+**Source**: `secure/src/functions/AuthManagement.php`
+(`QS_GLOBAL_ACCESS_GRANTING`, `hasPermission`, `getTokenPermissions`).
+Behaviour: [ARCHITECTURE.md §3](ARCHITECTURE.md).
+
+### Engine self-update is an operator action, not an API command (locked 2026-07-19)
+
+**Decision**: `applyUpdate` — which git-pulls the installation — is removed from
+the routable command list and kept as an operator/CLI file with a header
+explaining why. Operator-level work (updating the engine, deciding what a domain
+serves, inspecting the whole installation) lives outside the token-gated API.
+
+**Reasoning**: With no global tier, there is no principal to gate an
+installation-wide, irreversible, unconfirmed operation on: any rule expressible
+in the model resolves to some project role, and no project role should be able to
+replace the engine under everyone else. The honest answer is that the operation
+has no web-facing home. Removing it cost nothing measurable — it had no callers,
+no interface, no place in the admin listing, and was never granted to a role — so
+the alternative was maintaining a gate for a command nobody could correctly be
+given.
+
+**Alternatives considered**: Gate it on owner-of-every-project (rejected —
+unstable as membership changes, and an installation with one project makes it
+meaningless). Add a confirmation parameter and keep it routed (rejected — a
+confirmation does not fix "who may do this at all"). Delete the file (rejected —
+it is genuinely useful from a shell).
+
+**Source**: `secure/management/command/applyUpdate.php` (present, unrouted),
+`secure/management/routes.php`. Behaviour: [COMMAND_API.md](COMMAND_API.md).
+
+### The per-user selected project is never an authorization input (locked 2026-07-05)
+
+**Decision**: The user record's `selected_project` is a per-user default view —
+which project the panel opens on — and nothing else. It is never read when
+deciding whether a request is allowed. The project a request acts on comes from
+the request itself.
+
+**Reasoning**: A stored pointer that both *routes* an action and *authorises* it
+is a confused deputy waiting to happen: two tabs, a stale page, or a
+concurrently-changed pointer, and the request authorised against one project
+executes against another. Worse, the pointer is user-writable state, so anything
+derived from it is attacker-influenced by construction. Splitting the two makes
+the failure mode benign — a wrong pointer opens the wrong page, which the user
+immediately sees and corrects, instead of silently widening what they may do.
+
+**Alternatives considered**: Authorise against the pointer and validate it on
+write (rejected — validation at write time cannot cover state that changes
+between write and use). Drop the pointer entirely (rejected — it is genuinely
+useful, and harmless once it authorises nothing).
+
+**Source**: `secure/src/functions/AuthManagement.php` (`hasPermission` takes the
+requested project explicitly), `secure/management/command/setSelectedProject.php`.
+Behaviour: [ADMIN_PANEL.md §7](ADMIN_PANEL.md).
+
+### The URL marker is the sole source of a project-scoped target; a body value may only echo it (locked 2026-07-19)
+
+**Decision**: For a project-scoped command, the project comes from the URL marker
+the dispatcher authorised. If the request body also names a project, it must be
+**identical** to the marker; disagreement is a `400`. There is no fallback to any
+stored pointer. One shared helper implements this and every project-scoped
+command uses it.
+
+**Reasoning**: The dispatcher authorises the marker, so anything the command
+subsequently reads from the body is unauthorised input. Left unbound, commands
+"authorised for project A, executing on project B" — reads, writes, duplication
+and deletion into projects the caller was provably not a member of, an export
+archive streamed to a non-member, and one command that enumerated the filenames
+it destroyed. The class is a confused deputy, and the fix has to be structural
+rather than per-command, because it is not one bug but the same bug in however
+many commands forget. Permitting an exact echo, rather than ignoring the body
+outright, keeps existing clients working while making the disagreement loud
+instead of silent. Removing the stored-pointer fallback is the load-bearing half:
+a fallback re-introduces the confused deputy for any request that simply omits
+the marker.
+
+**Alternatives considered**: Ignore the body value silently (rejected — a client
+sending a mismatched value is confused, and silence hides it). Re-authorise the
+body value instead of binding the marker (rejected — it works, but it means every
+command carries its own authorization logic; the point is that they should not).
+Fix the affected commands individually (rejected — the next command reintroduces
+it).
+
+**Source**: `secure/src/functions/projectContainment.php`
+(`qs_bind_marker_project`). Behaviour: [ARCHITECTURE.md §3](ARCHITECTURE.md).
+
+### An in-process execution path must reproduce authorize-then-bind (locked 2026-07-19)
+
+**Decision**: The admin panel's helper endpoints, which execute command functions
+in-process rather than through the HTTP dispatcher, now do exactly what the
+dispatcher does and in the same order: take the project from a URL marker, run
+the permission check, then bind the project context. Each helper arm **inherits
+the category of the command it runs** through an explicit map, rather than
+declaring a permission of its own. Arms are enumerated explicitly, so a newly
+added arm is gated by default. Binding a project means binding **both** the
+project path and the public content path — the asset, style and build arms read
+the second, so binding only the first still serves the wrong project.
+
+**Reasoning**: These endpoints resolved the caller "for role-based permission
+checks" and then never used the result — no authorization ran at all across
+twenty-eight arms, two of which deleted or overwrote files, reachable by any
+account with zero memberships. The correctness bug travelled with it: the arms
+ran under whichever project was globally current, so the panel showed one
+project's data while editing another. Inheriting the command's category is the
+part worth keeping as a rule: a parallel permission model for the same
+underlying operation is guaranteed to disagree with the real one eventually, and
+the disagreement will be discovered as a vulnerability rather than as a bug.
+Enumerating the arms rather than pattern-matching them means the safe default for
+new code is "gated", not "forgotten".
+
+**Alternatives considered**: Give the helper endpoints their own permission table
+(rejected — the parallel model above). Move the arms behind the real dispatcher
+(a good idea, deferred — a larger refactor, and the hole needed closing
+immediately). Trust the marker without authorising it (rejected — the marker is
+client-asserted; it is safe *because* it is authorised, never because it is
+trusted).
+
+**Source**: `public/admin/api/index.php`,
+`public/admin/assets/js/core/api.js` (`helperPath`). Behaviour:
+[ADMIN_PANEL.md §5](ADMIN_PANEL.md).
+
+### Where a bypass allowlist exists, the allowlist is the boundary — and it is capped at the lowest role (locked 2026-07-24)
+
+**Decision**: The in-process command runner does not consult the permission
+system; its hardcoded allowlist **is** the boundary. That allowlist is therefore
+pinned to commands the lowest role already holds, and the rule is asserted
+against the live category-and-role configuration rather than eyeballed. Two
+higher-tier reads that had accumulated in it were evicted. A second re-gate that
+existed on paper is documented as fail-open by construction, so the allowlist's
+floor is the guarantee and a future unconditional re-gate is an improvement
+rather than a silent assumption.
+
+**Reasoning**: A documented bypass is defensible; an *undocumented* one is not,
+and neither is one whose contents nobody re-checks. Because the runner never asks
+who is calling, every entry is effectively granted to everyone who can reach the
+runner — so the only safe invariant is that every entry is something the weakest
+principal could already call. Deriving the tier from the live configuration at
+test time, rather than maintaining a second list of "safe" commands, means the
+check cannot rot when a command is re-categorised.
+
+**Alternatives considered**: Make the runner call the permission check (better,
+and the eventual direction — deferred because the caller does not always have an
+authenticated principal to check). Trust the allowlist as maintained (rejected —
+it had already drifted twice, retaining commands deleted releases earlier).
+
+**Source**: `secure/src/classes/CommandRunner.php`. Behaviour:
+[COMMAND_API.md](COMMAND_API.md).
+
+---
+
+## Membership and consent (beta.10)
+
+### Membership is by consent; invitations live where they cannot grant (locked 2026-07-16)
+
+**Decision**: Nobody is added to a project by another person's action alone. An
+authorised member **invites**; the invitee accepts or declines. Pending
+invitations are stored in a **separate block** of the project's membership file
+from the active members, so every consumer that reads authority reads only the
+members block and a pending invitation is structurally incapable of granting
+access. The membership file is the sole authority for access decisions; the
+per-user project list is a rebuildable mirror, never consulted by a permission
+check.
+
+**Reasoning**: The earlier design let an authorised member add a user directly.
+That is a smaller mechanism, but it means somebody else decides what you are a
+member of, and — more practically — an "add" and a "pending invite" that live in
+the same list are one forgotten status check away from being the same thing. The
+separate block converts that from a discipline into a property: there is no field
+to check, because the pending record is not in the structure authority reads.
+Making the per-user list a mirror rather than a second source means drift is a
+display bug, never an access bug — the worst outcome is a project missing from a
+sidebar, which a reconcile pass repairs.
+
+**Alternatives considered**: Direct add by an authorised member (the previous
+design — rejected: consent, and the status-field fragility above). One list with
+a `pending` flag (rejected — every reader must remember the flag; forgetting it
+grants access). Make the per-user list authoritative for speed (rejected — drift
+becomes an access bug).
+
+**Source**: `secure/projects/<id>/config/members.json`,
+`secure/src/functions/AuthManagement.php` (`qs_members_mutate`),
+`secure/management/command/inviteMember.php`,
+`secure/management/command/acceptInvitation.php`. Behaviour:
+[ARCHITECTURE.md §2](ARCHITECTURE.md).
+
+### Invitations target a user id, never a name or username (locked 2026-07-16)
+
+**Decision**: `inviteMember` takes a `user_id` and nothing else. The id is the
+one *public* unique identifier: the display name is public but not unique, and
+the username is unique but private. Finding the id is a separate exact-match
+lookup that returns `{user_id, name}` and structurally cannot return a username,
+because a single shared builder constructs every user reference the API emits.
+
+**Reasoning**: Any invite that accepts a name has to resolve it, and resolution
+is enumeration — a caller learns which names exist by watching which ones
+resolve. Accepting a username is worse: it makes a private credential half into a
+lookup key. Splitting lookup from invitation means the enumeration surface is one
+command with one deliberate posture (exact match only, no prefix, no list) rather
+than an emergent property of every membership command. Routing every user
+reference through one builder is what makes "the username never appears in shared
+output" a structural claim instead of a review checklist.
+
+**Alternatives considered**: Accept a username (rejected — publishes the login
+identifier). Accept a display name with disambiguation when several match
+(rejected — the disambiguation list is the enumeration). Fuzzy or prefix search
+(rejected — the same surface, wider).
+
+**Source**: `secure/management/command/inviteMember.php`,
+`secure/management/command/findUser.php`,
+`secure/src/functions/AuthManagement.php` (`qs_public_user_ref`). Behaviour:
+[COMMAND_API.md](COMMAND_API.md).
+
+### Standing is re-validated at accept time, inside the lock (locked 2026-07-16)
+
+**Decision**: Accepting an invitation re-checks the **inviter's current
+standing** against fresh state, inside the same lock as the write: if the inviter
+has since been removed, demoted below the invited role, or is now merely a peer
+of it, the invitation is void — the entry is pruned and the accept refused. The
+same rule governs approving a join request.
+
+**Reasoning**: An invitation is an authorization decision made at one moment and
+consumed at another, potentially days later. Without re-validation, demoting
+somebody does not actually remove their reach: everything they issued before the
+demotion still lands. That makes demotion advisory, which is not what an
+authorization change should mean. Doing the check in-lock rather than before it
+closes the race where a concurrent demotion lands between check and write.
+Pruning the void entry rather than leaving it means the queue reflects reality
+instead of accumulating invitations that can never succeed.
+
+**Alternatives considered**: Honour invitations as issued (rejected — demotion
+stops meaning anything). Sweep and cancel invitations when somebody is demoted
+(rejected — a sweep must find every affected entry across every project and is
+wrong the moment it misses one; validating at use time is correct by
+construction). Check before acquiring the lock (rejected — the race).
+
+**Source**: `secure/management/command/acceptInvitation.php`,
+`secure/management/command/approveJoinRequest.php`. Behaviour:
+[ARCHITECTURE.md §2](ARCHITECTURE.md).
+
+### Two consents, or nothing — the join lane and the proposal lane (locked 2026-07-17)
+
+**Decision**: A membership exists only where **both** consents exist: the
+person's and the project's. A self-requested join carries the person's consent
+already, so approval completes it and the membership materialises immediately. A
+**proposal** — any member vouching for somebody who has not asked — carries only
+the project side, so approving it does not create a membership: it **converts**
+into a real invitation addressed to the proposed user, which they must still
+accept. Until then the proposed person is not engaged at all: no entry in their
+mirror, no inbox row, nothing.
+
+**Reasoning**: This is the rule that keeps consent from being quietly optional.
+Without it, a proposal plus an approval is a two-insider path to adding somebody
+who never agreed — the direct-add the model deliberately dropped, reassembled
+from two halves. Making approval produce an invitation rather than a membership
+keeps the ledger honest: the artefact that exists is exactly the consent that has
+been given. It also composes correctly with re-validation above — the converted
+invitation records the approver as its issuer, so the accept re-checks the person
+who actually exercised authority, not the member who merely suggested it. Leaving
+never-engaged targets completely untouched matters too: being proposed and
+rejected should leave no trace for somebody who was never asked.
+
+**Alternatives considered**: Approving a proposal creates the membership directly
+(rejected — direct-add in two steps). Notify the proposed person at proposal time
+(rejected — turns a private "should we ask them?" into an offer the project has
+not agreed to make). Drop proposals entirely (rejected — an admin cannot invite a
+peer admin, since invitation is strictly-below; proposing is the only way to ask
+the owner to sign one off, and deleting it would have removed that path).
+
+**Source**: `secure/management/command/proposeMember.php`,
+`secure/management/command/requestToJoin.php`,
+`secure/management/command/approveJoinRequest.php`. Behaviour:
+[ARCHITECTURE.md §2](ARCHITECTURE.md).
+
+### The approver sets the granted role, capped strictly below their own (locked 2026-07-18)
+
+**Decision**: Approving a join request takes an optional `role`, defaulting to
+the role on record — `viewer` for a self-request, the sponsor's suggestion for a
+proposal. The rank check runs in-lock against the **granted** role, so an
+approver can never mint a member at or above their own rank. A self-request
+materialises directly at the granted role; a proposal converts into an invitation
+for it.
+
+**Reasoning**: The authority to set a member's role already existed as a separate
+command — this only folds it into the same atomic step, so "approve, then
+immediately promote" stops being two writes with a window between them. Checking
+the granted role rather than the stored one is the security-relevant half: without
+it, an approver could accept a request recorded at a low rank and hand out a high
+one, which is exactly the escalation the rank ladder exists to prevent.
+Defaulting to the recorded role means leaving the field alone reproduces the
+previous behaviour.
+
+**Alternatives considered**: No override at all — approval always materialises
+the role on record (adopted earlier in beta.10, then reversed once it was clear
+the approver would immediately follow up with a role change anyway). Approve,
+then call the role-change command from the interface (rejected — two calls, a
+visible window at the wrong role, and a partial failure leaves an unintended
+grant standing). Check the rank against the stored role only (rejected — that is
+the escalation).
+
+**Source**: `secure/management/command/approveJoinRequest.php`. Behaviour:
+[COMMAND_API.md](COMMAND_API.md).
+
+### A proposal may not name a role above the sponsor's own (locked 2026-07-18)
+
+**Decision**: `proposeMember` caps the suggested role at the sponsor's own rank,
+checked in-lock; above it, the call is refused and nothing is written. The bound
+is "at or below", not "strictly below" — a viewer must be able to propose a
+viewer.
+
+**Reasoning**: Even though a proposal grants nothing on its own, letting anyone
+name any role means the queue fills with asks that outrank the people making
+them, and the approver's rank check becomes the only thing standing between a
+suggestion and a grant. Capping at the sponsor's rank keeps the vouch
+proportionate to the standing behind it. "At or below" is the only workable bound
+here, unlike invitation and approval which are strictly-below: strictly-below
+would leave the lowest role unable to propose anybody at all, which is not a
+restriction, it is a broken feature.
+
+**Alternatives considered**: No cap, with rank checked only at approval (adopted
+earlier in beta.10, then reversed — the approve-time check is a backstop, not a
+substitute for proportionate authority, and an uncapped queue fills with asks
+that outrank the people making them). Strictly-below, matching invitation
+(rejected — the lowest role could propose nobody).
+
+**Source**: `secure/management/command/proposeMember.php`. Behaviour:
+[COMMAND_API.md](COMMAND_API.md).
+
+### The join-request posture matrix, including one deliberate knock-oracle (locked 2026-07-17)
+
+**Decision**: How a join request is refused depends on the project's visibility
+and its join policy, and the matrix is deliberate:
+
+- **private + closed** — a `404` byte-identical to the response for a project
+  that does not exist. Nothing is revealed.
+- **private + open** — the request is recorded. This *does* confirm the project
+  exists to any authenticated account that guesses its id, and that is the
+  point: the owner opted in. The setter carries an advisory note saying so.
+- **public + closed** — an honest `403` "requests are closed". Existence is
+  already public.
+- **public + open** — recorded; nothing new revealed.
+
+Responses that reveal only the caller's own state — already a member, your own
+pending invitation, your own pending request — are `409`s and are never
+oracles. A project's display name is withheld until membership: a private
+project's entries carry the id the caller already typed, never the site's name.
+
+**Reasoning**: A uniform refusal is only worth its cost where it hides something.
+On a public project, existence is already discoverable by fetching the site, so a
+uniform `404` would be theatre that an adversary refutes with one request while
+genuinely confusing legitimate users. On a private, closed project it hides
+something real, so it is exact — identical status, identical message. The
+interesting cell is private and open: it is a real, if narrow, existence oracle,
+accepted because the alternative is deleting the "private team, knock to join"
+flow that owners actually want, and because forbidding the combination would
+couple visibility to join policy in a way that the visibility setter would then
+have to unpick. The mitigation is that the disclosure is opt-in, the note says
+what is being traded, and the id is all a knock confirms — never the name.
+
+**Alternatives considered**: Uniform `404` everywhere (rejected — theatre on
+public projects, misleads legitimate users). Forbid private + open (rejected —
+kills a wanted flow and couples two independent settings). Reveal the display
+name in the requester's own pending entry (rejected — a knock may confirm an id
+exists; it must not hand over the site's identity).
+
+**Source**: `secure/management/command/requestToJoin.php`,
+`secure/management/command/setJoinPolicy.php`. Behaviour:
+[COMMAND_API.md](COMMAND_API.md).
+
+### Self-initiated exits leave no trace; other-initiated terminations leave a dismissable notice (locked 2026-07-17)
+
+**Decision**: When a user leaves a project or withdraws their own request, their
+mirror entry is simply removed. When something happens *to* them — removed by an
+admin, refused, or the project deleted — a terminal entry stays in their mirror
+until they dismiss it. Somebody who was never engaged at all, such as the subject
+of a proposal that was denied, gets nothing.
+
+**Reasoning**: A notice exists to tell you about a decision you did not make.
+Leaving a tombstone for your own deliberate exit is noise you then have to clear;
+withholding one for a decision made about you means the project quietly vanishes
+from your list and you never learn why. The never-engaged case is the same
+principle taken to its conclusion: a person who never knew they were being
+discussed should not receive a notice that a discussion about them ended. Making
+the terminal entries dismissable rather than auto-expiring keeps the
+acknowledgement explicit, which the re-request rule then relies on — a standing
+refusal blocks re-asking until it is acknowledged.
+
+**Alternatives considered**: Tombstone every exit uniformly (rejected — noise the
+user must clear for their own actions). Tombstone nothing (rejected — removals
+become silent). Auto-expire notices (rejected — the acknowledgement is
+load-bearing for re-request gating).
+
+**Source**: `secure/management/command/dismissProjectNotice.php`,
+`secure/management/command/listMyInvitations.php`,
+`secure/management/command/leaveProject.php`. Behaviour:
+[COMMAND_API.md](COMMAND_API.md).
+
+### One writer for the membership file, with an invariant backstop that aborts (locked 2026-07-16)
+
+**Decision**: Every write to a project's membership file goes through one
+function: per-project lock, fresh read inside the lock, caller's mutation, then a
+structural invariant check, then an atomic swap. The invariants include exactly
+one owner-role member matching the recorded owner field, valid role names, no
+overlap between the invitation block and the member block, and no invitation at
+or above the owner rank. A mutation that would violate any of them **aborts and
+writes nothing** — it never repairs, and never conjures a file that was missing
+or unreadable.
+
+**Reasoning**: The membership file is the authority every permission check reads,
+so a corrupt one is not a data-quality problem, it is an authorization outcome. A
+single writer is the only way locking means anything — a second, lock-free writer
+makes the first one's lock decorative, which is what the previous duplicated
+writers amounted to. Aborting rather than repairing is the deliberate part: a
+repair path is code that writes authorization state in a situation nobody
+anticipated, which is precisely when it should refuse. Refusing to conjure a
+missing file matters for the same reason — an absent authority file must fail
+closed, not be helpfully recreated with whatever the caller had in hand.
+
+**Alternatives considered**: Repair-on-detect (rejected — writes authority state
+from an unknown state). Validate after writing (rejected — the invalid state has
+already been published). Let each command write the file with its own locking
+(the previous shape — rejected: duplicated and, in places, lock-free).
+
+**Source**: `secure/src/functions/AuthManagement.php` (`qs_members_mutate`).
+Behaviour: [ARCHITECTURE.md §2](ARCHITECTURE.md).
+
+### A cloned or imported project is born with a fresh roster (locked 2026-07-18)
+
+**Decision**: Creating, cloning or importing a project all go through one
+birth-write that discards any inherited or archive-supplied membership file and
+writes a new one naming the caller as sole owner. An import that carried a
+membership file has it dropped and the discard logged. Project exports exclude
+the membership file entirely.
+
+**Reasoning**: A clone copies a project's *content*; copying its access list
+copies other people's memberships into a project they never agreed to join, and
+carries the original owner into a project they do not own. An import is worse,
+because the archive is attacker-supplied: a planted membership file would let the
+uploader write themselves — or anyone — into the new project's roster at any
+rank, which is a roster-hijack shipped inside a zip. Making birth-write the only
+way a project's roster comes into existence closes both, and it is the same
+helper in all three cases, so a fourth creation path inherits the property rather
+than reinventing it. Excluding memberships from the export is the privacy half:
+an archive handed to somebody else should not enumerate who worked on it.
+
+**Alternatives considered**: Validate the imported membership file instead of
+discarding it (rejected — there is no version of "someone else's access list" that
+is correct in a new project). Keep memberships in the export and strip them on
+import (rejected — the archive still discloses the roster to whoever holds it).
+
+**Source**: `secure/src/functions/AuthManagement.php`
+(`qs_project_birth_write_members`), `secure/management/command/cloneProject.php`,
+`secure/management/command/importProject.php`,
+`secure/management/command/exportProject.php`. Behaviour:
+[COMMAND_API.md](COMMAND_API.md).
+
+### Making a project world-visible is owner-only (locked 2026-07-18)
+
+**Decision**: `setProjectVisibility` is owner-only, in its own category. The
+adjacent join-policy setter stays with admins and owners.
+
+**Reasoning**: Visibility is the switch that exposes a project to the entire
+internet, which puts it in the same weight class as deleting the project or
+transferring it — decisions whose consequences the owner cannot delegate away
+and then disown. Join policy is genuinely weaker: admins already adjudicate the
+queue by approving and denying requests, so withholding the on/off switch for
+that queue from them would be incoherent — they could admit anyone yet not close
+the door.
+
+**Alternatives considered**: Both settings owner-only (rejected — the incoherence
+above). Both at admin (rejected — world exposure is not an administrative
+routine). Couple visibility to join policy (rejected — see the posture matrix
+entry above; they are independent and must stay so).
+
+**Source**: `secure/management/command/setProjectVisibility.php`,
+`secure/management/config/categories.php`. Behaviour:
+[COMMAND_API.md](COMMAND_API.md).
+
+---
+
+## Project architecture and serving (beta.10)
+
+### Every request carries its project as a URL marker (locked 2026-07-09)
+
+**Decision**: A project-scoped management call is addressed as
+`/management/p/<projectId>/<command>`; a global call stays
+`/management/<command>`. The dispatcher peels the marker, rejects a malformed id
+before anything touches the filesystem, runs the permission check against *that*
+project, and only then binds the per-request project context — path constants and
+all — for the command to read. A project-scoped command called without a marker
+is a `400`, not a guess.
+
+**Reasoning**: The project has to travel with the request, because it is both
+what the command acts on and what the request is authorised for; anything the
+server derives from stored state instead can disagree with what the caller
+intended. A literal `p` segment is what makes the URL unambiguous — without it,
+a first segment could be either a project id or a command name, and the parser
+has to guess. Parsing it in PHP rather than in rewrite rules keeps the behaviour
+identical on every server the product supports. Binding the context *after*
+authorization, not before, is the ordering that matters: it means an unauthorised
+request never has a project bound at all, so there is nothing for a later mistake
+to act on.
+
+**Alternatives considered**: A request header (rejected — invisible in logs and
+in a browser address bar, and easy for an intermediary to strip or add). No
+marker, disambiguating by whether the first segment matches a known command
+(rejected — ambiguous the day a project is named like a command). A query
+parameter (rejected — the same ambiguity plus caching and logging quirks).
+
+**Source**: `secure/src/classes/TrimParametersManagement.php`,
+`secure/src/functions/projectContext.php` (`qs_load_project_context`),
+`public/management/index.php`. Behaviour:
+[ARCHITECTURE.md §5](ARCHITECTURE.md).
+
+### The "served project" concept is deleted; the web server decides what sits at root (locked 2026-07-19)
+
+**Decision**: QuickSite no longer knows which project is "the" site. There is no
+stored pointer naming a served project, no command to change it, and no mirror
+layer copying a project's assets into the web root. Internally there is exactly
+one serving path, `/p/<id>/`, for every project. Production mapping is a
+**deployment** matter: a vhost maps `example.com/` onto a project, and the
+installation's own web root stays free for the user's own files.
+
+**Reasoning**: The served pointer was not merely redundant, it was a privilege —
+being the served project meant being materialised at the root — and that
+privilege produced five distinct problems over the release, including a proven
+escalation where any account could create a throwaway project, become its owner,
+and repoint the world-facing root at a project it had no membership on,
+publishing it. It also cost a dual-write mirror layer, made two people unable to
+edit two projects at once, and made "which project am I looking at?" ambiguous
+across the panel. Deleting the concept removes the privilege rather than gating
+it. Putting the mapping in the web server is the honest home for it: which
+hostname serves which site is a deployment fact, and holding deployment facts as
+application runtime state is what created the problem. The decisive constraint
+was multi-domain — one installation serving several domains, one project each,
+cannot be expressed by any single "this one is special" pointer, so no amount of
+hardening would have kept the model.
+
+**Alternatives considered**: Keep the pointer and gate the switch to owners of
+the target project (built, then superseded by this decision — it closed the
+escalation but kept the privilege, the mirror layer and the ambiguity). Serve
+everything from `/p/<id>/` with no root serving at all (rejected —
+`example.com/p/mysite/` is not a publishable URL; removing root serving would be
+a product regression). Keep a pointer purely as a default (rejected — a default
+that changes what the world sees is not a default).
+
+**Source**: `secure/src/functions/surfaceB.php`, `public/p/index.php`,
+`secure/deploy/apache-vhosts.conf.example`,
+`secure/deploy/nginx-vhosts.conf.example`. Behaviour:
+[ARCHITECTURE.md §6](ARCHITECTURE.md).
+
+### Generated links are root-relative by default; absolute is reserved for generation-time output (locked 2026-07-24)
+
+**Decision**: In-page links, asset references and script sources are emitted
+against a **root-relative** base — `/`, or `/p/<id>/` when the request came in
+that way. An absolute base is computed separately and used only where a URL has
+to survive outside the page: the sitemap and build output.
+
+**Reasoning**: The whole point of the serving rework is that the same project
+renders correctly under several prefixes — at a mapped domain's root, and under
+`/p/<id>/` on the authoring host — often on the same day. A root-relative base is
+correct under both without knowing which one it is, so a page cached, mirrored or
+previewed under a different prefix keeps working. An absolute base bakes one
+answer into the output and is wrong the moment the project moves, which is
+exactly when nobody re-renders. Where a URL genuinely leaves the page — a search
+engine reading a sitemap — relative is meaningless and absolute is required, so
+the two forms are computed side by side rather than one being derived from the
+other at the point of use.
+
+**Alternatives considered**: Absolute everywhere (the initial recommendation —
+rejected: brittle across prefixes and stale after a domain change). Relative
+everywhere including the sitemap (rejected — a sitemap of relative URLs is not a
+sitemap). Configure the form per project (rejected — a knob for a question that
+has one correct answer per output kind).
+
+**Source**: `secure/src/functions/renderBootstrap.php` (`QS_PUBLIC_BASE`,
+`QS_PUBLIC_BASE_ABS`), `secure/src/classes/JsonToHtmlRenderer.php` (`processUrl`),
+`secure/src/classes/PageManagement.php`. Behaviour:
+[ARCHITECTURE.md §5](ARCHITECTURE.md).
+
+### The public base URL is resolved per request and never stored per project (locked 2026-07-24)
+
+**Decision**: The public base resolves through a short chain, first non-empty
+wins: an explicit per-call parameter where one exists, then a server environment
+variable, then derivation from the request. There is deliberately **no** stored
+per-project base URL and no command to set one. A malformed configured value is
+logged and skipped rather than fatal, and the request-derived tier always
+resolves, so "no base configured" is not a reachable state.
+
+**Reasoning**: A stored absolute base is deployment truth held as QuickSite
+runtime state — the same mistake as the served pointer, in miniature. It goes
+stale the moment a domain changes, in a way nothing detects, and it adds a write
+path and a command whose only job is to restate what the vhost already declares.
+The environment variable puts the value where the deployment already lives,
+including on shared hosting where it can be set from a directory config file.
+Degrading rather than failing on a bad value is the right posture for a rendering
+path: a configuration typo should not take a site down when a well-defined
+fallback exists, and the log line is what makes the degradation discoverable.
+
+**Alternatives considered**: A stored per-project base with a setter command (the
+earlier design — rejected as above; a stored tier can still be added later
+without breaking the chain if a real need appears). Hard-fail on a malformed
+value (rejected — turns a typo into an outage). Derive from the request only
+(rejected — a site behind a proxy that terminates TLS elsewhere needs to be told).
+
+**Source**: `secure/src/functions/renderBootstrap.php`
+(`qs_resolve_public_base`, `qs_public_base_normalize`),
+`secure/deploy/apache-vhosts.conf.example`. Behaviour:
+[ARCHITECTURE.md §6](ARCHITECTURE.md).
+
+### Static sub-resources are served only from a project's `public/` subtree (locked 2026-07-10)
+
+**Decision**: On the `/p/<id>/` path, HTML is live-rendered through the engine
+and every static sub-resource is resolved through a controlled passthrough that
+canonicalises the requested path and refuses anything landing outside
+`secure/projects/<id>/public/`. The project's configuration, its data directory,
+its route file, its templates, translations, backups and exports are unreachable
+by construction rather than by rule. That passthrough is the only static-serving
+path in the product.
+
+**Reasoning**: The naive implementation — map a URL prefix onto the project
+directory — hands out the API secrets, the OAuth secrets, the membership file and
+the API endpoint definitions to anyone who can type a path, and it does so
+silently. The subtree allowlist inverts the default: reaching a secret requires
+escaping the jail, rather than protecting one requiring somebody to have thought
+of it. Canonicalising before the prefix check is what makes the check meaningful,
+since the interesting attacks are all about producing a path that looks inside
+and resolves outside. Being the *only* static path is what turned this from a
+guard into a guarantee when the mirror layer was deleted — there is no second
+route to the same bytes.
+
+**Alternatives considered**: Map the project directory directly and blocklist the
+sensitive subdirectories (rejected — a blocklist is wrong the first time somebody
+adds a directory). Serve statics from a copy in the web root (that was the mirror
+layer — deleted; see the served-project entry above). Rely on the web server's own
+rules (rejected — they differ between Apache and nginx, and a misconfigured
+deployment would silently expose everything).
+
+**Source**: `secure/src/functions/surfaceB.php`
+(`qs_surface_b_resolve_static`). Behaviour:
+[ARCHITECTURE.md §7](ARCHITECTURE.md).
+
+### A private project and a nonexistent project are indistinguishable (locked 2026-07-24)
+
+**Decision**: A request for a project the caller may not see returns exactly what
+a request for a project that does not exist returns — same status, same body,
+same header set, in the same order. Reaching that took closing two residual
+differences beyond the status code: the two refusals were emitted at different
+points in the boot sequence, so one carried baseline headers the other did not,
+and once the sets matched, one header's **position** still differed.
+
+**Reasoning**: An existence oracle on a private project leaks the one fact the
+private setting exists to hide. Status parity alone is not parity — anything an
+attacker can measure is part of the response, and header presence and ordering
+are both measurable with an ordinary HTTP client. The general lesson is worth
+keeping: when a refusal is meant to be indistinguishable, the comparison has to
+be made on the wire and on everything the wire carries, not on the branch in the
+code that looks equivalent.
+
+**Alternatives considered**: Match the status code only (rejected — measured, and
+the header set still distinguished the two). Return `403` for private (rejected —
+that *is* the oracle, stated explicitly). Accept the oracle because a mapped
+production domain refuses the `/p/` prefix anyway (rejected — that narrows it to
+the authoring host, and a deployment that skips the vhost has it everywhere).
+
+**Source**: `secure/src/functions/surfaceB.php` (`qs_sb_deny`). Behaviour:
+[ARCHITECTURE.md §6](ARCHITECTURE.md).
+
+### Generated artifacts live under their own project (locked 2026-07-19)
+
+**Decision**: Anything a project generates — its runtime scripts, its builds, its
+export archives — is written under that project's own directory. Export archives
+moved out of a shared installation-wide directory into
+`secure/projects/<id>/exports/`.
+
+**Reasoning**: A shared namespace makes containment a filter: every reader has to
+remember to restrict itself to its own project's files, and the commands that
+forgot streamed one project's export archive to a non-member and deleted another
+project's archives while helpfully listing the filenames destroyed. Moving the
+files makes containment structural — a caller bound to one project's directory
+cannot see another's, whether or not it remembered to filter. This is the same
+argument as the URL marker binding above, applied to storage instead of to
+targeting: prefer the arrangement where the mistake is impossible over the one
+where it is merely prohibited.
+
+**Alternatives considered**: Keep the shared directory and filter by project on
+every read (rejected — that is the mechanism that failed). Prefix filenames with
+the project id (rejected — still one namespace, still one forgotten filter away).
+
+**Source**: `secure/src/functions/projectPublicArtifacts.php`,
+`secure/management/command/exportProject.php`. Behaviour:
+[PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md).
+
+### Project ids are opaque and minted; the display name lives in the project's own config (locked 2026-07-05)
+
+**Decision**: A project's id is its folder name. New projects mint an opaque
+`prj_<hex>` id; the human-readable name lives in the project's own configuration
+as the site name. There is no central registry mapping ids to names. The
+originally-shipped project keeps its historical readable id.
+
+**Reasoning**: The id appears in URLs, in permission checks and as a filesystem
+path, so it wants to be short, shape-validated and stable. A display name wants
+to be none of those things — it wants to be editable, translated and full of
+punctuation. Deriving one from the other means a rename either breaks every URL
+and every membership reference, or leaves the id lying about what it names.
+Keeping the name inside the project is also what keeps a project self-contained:
+copying the directory copies its name with it, and there is no second file to
+keep in sync. The cost is honest — a rename that changes the *id* is a cascade
+across membership files and per-user mirrors, and is deliberately not offered
+yet.
+
+**Alternatives considered**: Slugify the display name into the id (rejected —
+renames break URLs and references, and the slug space collides). A central
+`{id: name}` registry (rejected — a second source of truth, and a
+whole-installation file that every project read would have to open). Sequential
+numeric ids (rejected — they leak how many projects an installation has).
+
+**Source**: `secure/management/command/createProject.php`,
+`secure/projects/<id>/config.php`. Behaviour:
+[PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md).
+
+### The per-project styled deny page is retired; error pages are configured at the deployment (locked 2026-07-24)
+
+**Decision**: A refused or missing `/p/` request renders a built-in generic page,
+or a static file the deployment names through a `QS_ERROR_PAGE_<status>`
+environment variable. The variable's value must be root-relative, is jailed to
+the document root by canonical-path check, is restricted to `.html`/`.htm`, and is
+served with a plain file read — never an include. The page is returned **at the
+original status code**; there is no redirect. The 401 and 403 special pages stay
+reserved in the page list but dormant.
+
+**Reasoning**: The previous per-project deny page only ever worked by accident:
+it borrowed the served project's template, whose stylesheet was served ungated
+from the mirrored web root. With the mirror gone, every project asset rides the
+same visibility gate that just refused the visitor — so a private project's
+"styled" deny page would render and then have its own stylesheet refused,
+shipping a broken feature. Rebuilding it would have meant re-creating an ungated
+asset path, which is the hole. Serving a static file instead keeps the
+customisation without an authenticated render. Never `include`-ing it is
+deliberate: a configuration value that can become executable code is an
+execution and source-disclosure primitive, and the value comes from the
+environment. Preserving the status code matters because a redirect turns a `404`
+into a `302` followed by a `200`, which misleads crawlers, monitoring and caches
+about what actually happened.
+
+**Alternatives considered**: Rebuild the per-project deny page and serve its
+assets ungated (rejected — reintroduces an unauthenticated asset path into a
+private project). Redirect to a static error page (rejected — destroys the status
+code). Ship QuickSite's own error files at the web root (rejected — the root
+stays free for the user's own site).
+
+**Source**: `secure/src/functions/surfaceB.php` (`qs_sb_deny`),
+`secure/deploy/apache-vhosts.conf.example`. Behaviour:
+[ARCHITECTURE.md §6](ARCHITECTURE.md).
+
+---
+
+## Command surface and audit trail (beta.10)
+
+### Command history is stored per project, in per-project directories (locked 2026-07-24)
+
+**Decision**: The command log is split into one directory per project, plus a
+global bucket for commands that have no project. Every reader and the clearing
+command require a project and bind it from the authorised marker. The directory
+resolver fails closed — a project id that does not pass the shape check returns
+nothing rather than a guessed path, so the caller does not log at all rather than
+logging somewhere unintended.
+
+**Reasoning**: The log used to be one installation-wide store, and the permission
+that reads it is an ordinary project-level administrative grant — which any
+account can hold over a project it creates for itself. With no project dimension
+in the store, there was nothing for that permission to be scoped *against*: a
+self-minted owner could read every project's history and, with the matching
+clear command, erase it. Making the store per-project is what gives the existing
+permission something to mean; the alternative — a project field on each entry,
+filtered at read time — leaves one shared store where a forgotten filter is a
+full disclosure, and where "delete my project's history" has to be an entry-wise
+delete over everyone else's data. Directories make the containment a path, which
+the filesystem enforces whether or not the query remembered to.
+
+**Alternatives considered**: A project field on each log entry, filtered on read
+(rejected — one shared store, one forgotten filter from full disclosure; and
+scoped deletion becomes a rewrite of a shared file). Keep the store global and
+raise the permission (rejected — there is no higher permission; there is no
+global tier). Drop history entirely (rejected — it is the audit trail).
+
+**Source**: `secure/src/functions/LoggingManagement.php` (`qs_log_dir`),
+`secure/management/command/getCommandHistory.php`,
+`secure/management/command/clearCommandHistory.php`. Behaviour:
+[COMMAND_API.md](COMMAND_API.md).
+
+### Log redaction is deny-by-default (locked 2026-07-24)
+
+**Decision**: The log-body sanitiser refuses to record anything it has not been
+told is safe. Per-command rules narrow what is kept, and a universal
+credential-shaped-key gate runs last over whatever survives — the per-command
+cases fall through into it rather than returning early.
+
+**Reasoning**: The sanitiser was allow-by-default: an empty skip list and a
+default branch that returned the body untouched. Its only credential-aware rule
+named a command that had been deleted a release earlier, so the moment
+authentication moved to passwords, plaintext credentials went into the store and
+stayed there. That is the failure mode of allow-by-default in one sentence — it
+does not fail when the rules are wrong, it fails when the *world* changes and
+nobody revisits the rules. Deny-by-default inverts the maintenance burden onto
+the side where forgetting is safe: a new command that nobody teaches the
+sanitiser about logs less than it could, instead of logging a secret. Making the
+universal gate genuinely run last, rather than being skipped by an early return,
+is what stops a per-command rule from accidentally re-opening the general one.
+
+**Alternatives considered**: Extend the skip list to cover the new
+authentication commands (rejected — fixes this instance and leaves the shape that
+produced it). Hash bodies instead of redacting (rejected — destroys the audit
+value the log exists for). Stop logging bodies (rejected — the body is usually the
+useful part).
+
+**Source**: `secure/src/functions/LoggingManagement.php` (`sanitizeLogBody`).
+Behaviour: [COMMAND_API.md](COMMAND_API.md).
+
+### A project-scoped read reports only its own project; installation-wide totals are owner-scoped instead (locked 2026-07-19)
+
+**Decision**: `getSizeInfo` reports the marker project and nothing else, with
+absolute filesystem paths removed. The installation-wide picture is served by a
+separate global command that aggregates **what the caller owns** — no project
+parameter at all, ownership re-resolved from the authoritative membership files
+on every call, and no filenames or paths in the payload.
+
+**Reasoning**: The size command sat at the lowest role in the model and returned
+every project on the installation, a real backup name and absolute server paths —
+undercutting the membership-filtered project list and the deliberate refusal to
+ship a user directory, from a command nobody thinks of as sensitive. The fix has
+two halves and both matter. A project-scoped command reporting on projects other
+than its own is simply mis-scoped, whatever it reports. But the *legitimate* need
+for an overview is real, and the safe inverse of "enumerate what exists" is
+"aggregate what you own": it is a different question with a different answer
+shape, it takes no project parameter so there is nothing to retarget, and it
+follows the same pattern as the project list — global, any authenticated caller,
+with the **output** filtered.
+
+**Alternatives considered**: Extend the per-project command with an "all
+projects" mode (rejected — re-mixes the scopes that were just separated, and a
+marker-bound command cannot honestly answer a question about other projects).
+Keep the enumeration for owners only (rejected — every account can become an
+owner by creating a project). Drop the overview (rejected — the need is real).
+
+**Source**: `secure/management/command/getSizeInfo.php`,
+`secure/management/command/getMySpaceUsage.php`,
+`secure/src/functions/spaceUsage.php`. Behaviour:
+[COMMAND_API.md](COMMAND_API.md).
+
+### A measurement cache may cache sizes, but never the set of projects (locked 2026-07-19)
+
+**Decision**: The owner space overview caches measured byte counts with a short
+expiry, keyed **by project** rather than by user, with an explicit refresh
+parameter and pruning so a measurement cannot outlive its project. The set of
+projects the caller owns is re-resolved from the authoritative membership files
+on every single call — never from the derived per-user mirror.
+
+**Reasoning**: Splitting what may age from what may not is what makes the cache
+safe. A byte count that is five minutes stale is a cosmetic inaccuracy. A
+membership set that is five minutes stale is an authorization answer, and a
+transfer, a removal or a deletion would not take effect until it expired. Keying
+by project rather than by user follows from the same split: a project's size is
+the same fact for everyone who can see it, so per-project keys maximise reuse
+while each request still reads only the projects it just re-resolved as its own.
+Reading membership from the authority rather than the per-user mirror avoids the
+stale-pointer class the mirror already caused once.
+
+**Alternatives considered**: Cache the whole per-user report (rejected — caches
+the membership set, which is the part that must not age). Never cache (the
+initial recommendation — overruled; a cold walk over every owned project is
+measurable, and the cost falls on the dashboard's first paint). Cache with
+invalidation hooks on every membership change (rejected — as many hooks as there
+are ways to change membership, and one missed hook is a stale authorization
+answer).
+
+**Source**: `secure/src/functions/spaceUsage.php`. Behaviour:
+[COMMAND_API.md](COMMAND_API.md).
+
+### The custom-workflow authoring feature is deleted rather than secured (locked 2026-07-19)
+
+**Decision**: The custom-workflow feature is removed: the authoring page, its
+editor script, the folder custom workflows were written into, and the two admin
+endpoints that wrote files. The shipped **core** workflow catalogue remains and
+is the supported surface; the commands that list and lint workflow blocks serve
+it and stay.
+
+**Reasoning**: The feature was an unused authoring artifact carrying a real flaw
+vector. Its save endpoint was one of only two file-writing endpoints on an admin
+surface that performed no authorization at all, and a crafted workflow
+specification could turn the in-process command runner into a proxy for a much
+wider command set than the runner's allowlist was meant to permit. Faced with
+"gate it or delete it", deleting a feature with no users is strictly better than
+maintaining a security boundary around one: the boundary has to stay correct
+forever, and the feature was not earning that. The authorization fix on the
+surrounding surface was made anyway and independently — verified first that
+deletion alone would **not** have closed the hole, since most of the endpoints
+have nothing to do with workflows and shipped core specifications drive the
+runner too. Both changes were needed; neither is a substitute for the other.
+
+**Supersedes**: the entry "Project-to-workflow exporter ships in beta.9" under
+*Release shape (beta.9)* above, whose output landed in the custom-workflow
+folder this decision removes.
+
+**Alternatives considered**: Gate the save endpoint and keep the feature
+(rejected — maintaining a boundary around an unused feature). Keep the folder
+read-only for hand-authored files (rejected — leaves the runner escalation via
+crafted specifications). Delete the workflow system entirely (rejected — the core
+catalogue is used and is not the vector).
+
+**Source**: `secure/admin/workflows/core/`,
+`secure/src/classes/WorkflowManager.php`. Behaviour:
+[WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md).
+
+### Writing the sitemap configuration is its own command, out of the read grant (locked 2026-07-25)
+
+**Decision**: `getSiteMap` is a pure read. Both of its former write branches move
+to a new `setSiteMapConfig` command in the route-writing category, so the write
+requires the editor tier and above. The preview and the published file share
+extracted logic so the two cannot diverge.
+
+**Reasoning**: `getSiteMap` sat in the lowest role's read grant and was the only
+command in that grant containing a filesystem write. What made it more than a
+naming inconsistency is what the written file does: it holds the excluded-route
+list and the custom URLs that the generated sitemap is built from. So the lowest
+tier could persistently change what the **published** sitemap contains — dropping
+real routes, injecting URLs — with the damage surfacing later, when anyone else
+regenerated it. That is live-site content integrity reached from a read
+permission. Splitting the command puts the write where the permission model can
+see it, and the shared logic ensures the preview a user approves is the file that
+gets written.
+
+**Alternatives considered**: Guard the write branch in place (rejected — leaves a
+write inside a command whose category says "read", which is exactly the confusion
+that hid it). Move the whole command to the writing category (rejected — reading
+the sitemap is a legitimate viewer operation and would have been lost).
+
+**Source**: `secure/management/command/setSiteMapConfig.php`,
+`secure/management/command/getSiteMap.php`,
+`secure/src/functions/sitemapHelpers.php`. Behaviour:
+[COMMAND_API.md](COMMAND_API.md).
+
+---
+
+## First run and installation (beta.10)
+
+### The first account is created in the browser, gated by a token written to disk (locked 2026-07-25)
+
+**Decision**: On an installation with an empty user registry, the setup page
+lazily mints a one-time token into a gitignored file and shows the deployer its
+**relative** path. Creating the first account requires reading that file from
+the server's filesystem and submitting the token. The rule lives at the single
+account-creation function as a parameter that **defaults to refusing**, and both
+the token check and the empty-registry check are read inside the same write lock
+as the creation, so the token cannot be spent twice by concurrent submissions.
+The token is verified consumed before its file is removed. Public registration
+**never** bootstraps — it refuses on an empty registry regardless of the
+self-registration flag. There is no auto-login: the deployer lands on the login
+page.
+
+**Reasoning**: Proving filesystem access is the right test for "are you the
+person who installed this?", and it needs no credential to pre-exist. Putting the
+rule at the mint function rather than in the page is the load-bearing choice: the
+default-refuse parameter means any caller that knows nothing about tokens fails
+closed, so a future creation path cannot accidentally bypass first-run
+protection. Reading both conditions inside the write lock closes the obvious race
+— two submissions arriving together must not both see an empty registry. Refusing
+to let public registration bootstrap keeps **one** unauthenticated path to the
+first account instead of two, which is one posture to reason about rather than an
+interaction between two. Showing the path relative rather than absolute matters
+because an anonymous visitor can see that page: an absolute path discloses the
+server's filesystem layout for no benefit to the legitimate deployer, who is
+standing in the directory already.
+
+**Alternatives considered**: Auto-create a default account with a known password
+(rejected — a known credential reachable over the web on every installation).
+Print copy-and-edit instructions and require hand-hashing a password (rejected —
+error-prone, and the deployer ends up pasting a hash they cannot verify). Have the
+installer prompt for a username and password and write the account (built first,
+then replaced — it worked, but it put credential rules in three places, could not
+be exercised without a real interactive console, and shipped a silent
+success-reporting failure that a manual run caught; the browser flow keeps one
+implementation and one testable path). An unauthenticated first-run page with no
+token (rejected — whoever reaches the installation first becomes its owner).
+
+**Source**: `secure/src/functions/setupToken.php`,
+`secure/src/functions/AuthManagement.php` (`qs_user_create`),
+`secure/admin/templates/pages/setup.php`. Behaviour:
+[ADMIN_PANEL.md §9](ADMIN_PANEL.md).
+
+### A login page with no accounts says so and disables its controls (locked 2026-07-25)
+
+**Decision**: The login page detects an **empty registry** — not a missing file —
+and, when it finds one, disables its controls and names the route that creates
+the first account. The form's POST branch is unchanged and still refuses
+uniformly.
+
+**Reasoning**: Detecting emptiness rather than absence is the point: the registry
+file can exist and contain nothing, which is the state a partially-completed
+setup leaves behind, and a missing-file check would send that deployer to a login
+form that can never succeed. Telling them where to go costs nothing here, because
+on an installation with no accounts there is no account to enumerate — the fact
+being disclosed is that setup is incomplete, which the setup page itself
+announces. Leaving the POST branch untouched keeps the uniform-refusal posture
+intact for every other state, so the empty-registry hint cannot become a
+back-door oracle once accounts exist.
+
+**Alternatives considered**: Redirect straight to setup (rejected — a redirect
+from the login route is surprising, and it hides the state instead of explaining
+it). Leave the login page unchanged (rejected — the deployer is left guessing at
+a form that cannot work).
+
+**Source**: `secure/admin/templates/pages/login.php`. Behaviour:
+[ADMIN_PANEL.md §9](ADMIN_PANEL.md).
+
+---
+
+## Render and input hardening (beta.10)
+
+### URL safety is a value-based scheme allowlist on every URL-sink attribute (locked 2026-07-03)
+
+**Decision**: Any attribute whose value is fetched or navigated to is checked
+against an allowlist of `http`, `https`, `mailto` and `tel`, plus relative,
+anchor and protocol-relative forms; anything else is replaced with `#`. Leading
+whitespace and control characters are trimmed before the check and embedded
+control characters reject the value. The check applies by **attribute role**, not
+by a fixed list of attribute names, so namespaced and less-common sinks are
+covered. One shared policy class implements it and both the renderer and the
+compiler consume it.
+
+**Reasoning**: A blocklist of dangerous schemes is a list of the ones somebody
+thought of, and browsers keep supplying more; an allowlist of the four schemes
+authors actually use in content is complete by construction. Checking the value
+rather than trusting the attribute name is what caught the real leak — a
+namespaced link attribute inside inline SVG carried `javascript:` straight
+through a name-based filter. Stripping leading whitespace and control characters
+before deciding matters because that is precisely how the dangerous value is
+disguised. Sharing one class between the two rendering engines is not
+housekeeping: divergence between them means a payload that the live renderer
+blocks and the compiler emits, which is the worst possible split.
+
+**Alternatives considered**: Blocklist `javascript:`, `data:` and `vbscript:`
+(rejected — incomplete by nature; the existing one had already gone stale). Check
+by attribute name (rejected — measured to miss namespaced sinks). Escape rather
+than replace (rejected — an escaped dangerous scheme is still a dangerous
+scheme).
+
+**Source**: `secure/src/classes/UrlPolicy.php`,
+`secure/src/classes/JsonToHtmlRenderer.php`,
+`secure/src/classes/JsonToPhpCompiler.php`. Behaviour:
+[ARCHITECTURE.md §7](ARCHITECTURE.md).
+
+### Share the policy, differ the action: writers reject, renderers neutralise (locked 2026-07-04)
+
+**Decision**: The tag allowlist and the URL policy each live in one place. The
+commands that **store** structure call a shared validator and refuse the write
+with an explicit error. The renderer and the compiler enforce the same rules
+independently and silently drop or neutralise what fails. SVG stays a decorative
+container: the graphic primitives are not authorable, and the allowlist is
+enforced rather than advisory.
+
+**Reasoning**: The render layer is the boundary that must hold, because stored
+structure can arrive by paths no writer controls — an import, a restored backup,
+a hand-edited file, or a future runtime reading the same JSON. So the renderer
+enforces regardless. But a silent drop is a terrible author experience and leaves
+the bad value in storage, exported and backed up, waiting for a consumer with a
+weaker gate. Rejecting at write time keeps stored structure clean and tells the
+author immediately. The two layers need different *actions* precisely because
+they answer different questions — "may this be saved?" versus "may this be
+emitted?" — but they must never differ on the *rules*, which is why both read the
+same registry. Tags lean harder on the writer half than URLs do, because a
+dangerous URL can be sanitised into something inert while a dangerous tag can only
+be dropped, so the edit-time error is the only feedback the author gets.
+
+**Alternatives considered**: Writer checks only (rejected — misses every
+non-writer storage path, which is where imports and backups live). Renderer
+checks only (rejected — silent drops, dirty storage, no author feedback). Make
+SVG primitives authorable with per-element sanitising (rejected as low-value,
+high-surface; if inline SVG matters later, the deliberate feature is uploading a
+whole SVG asset through a sanitiser, not exposing primitives as editor nodes).
+
+**Source**: `secure/src/classes/TagRegistry.php` (`isRenderable`),
+`secure/src/functions/nodeParamPolicy.php` (`firstUnsafeParam`),
+`secure/src/classes/CallTransformer.php`. Behaviour:
+[ARCHITECTURE.md §7](ARCHITECTURE.md).
+
+### The `style` attribute is HTML-escaped only — residual CSS injection accepted for beta.10 (locked 2026-07-03)
+
+**Decision**: Inline `style` values are HTML-escaped and not otherwise parsed or
+filtered. The residual — CSS injection, including `@import` and other
+network-reaching CSS constructs by an author who can already store structure — is
+accepted for beta.10 and recorded here rather than fixed.
+
+**Reasoning**: The value is XSS-inert: no browser executes script from a `style`
+attribute, so this is not the same class as the URL and tag findings, both of
+which were fixed. What remains is an author with structure-writing permission
+being able to make a page reach out over the network from CSS — real, bounded,
+and requiring a permission that already allows far more direct mischief. Filtering
+CSS properly means a CSS parser in the render hot path, which is a meaningful
+correctness and performance risk to take for a threat whose precondition is
+already trusted. Documenting an accepted risk explicitly is the honest posture;
+the alternative is a reader assuming it was considered and handled.
+
+**Alternatives considered**: Parse and filter CSS values, blocking `url()` with
+non-allowlisted schemes and `@import` (deferred — real defence, real cost, and
+the precondition is a trusted author). Strip `style` entirely (rejected — breaks
+legitimate authoring). Say nothing (rejected — an undocumented accepted risk is
+indistinguishable from an oversight).
+
+**Source**: `secure/src/classes/JsonToHtmlRenderer.php` (generic attribute
+branch) and its compiler counterpart. Behaviour:
+[ARCHITECTURE.md §7](ARCHITECTURE.md).
+
+### Path safety is enforced in the shared resolvers, not in each command (locked 2026-07-05)
+
+**Decision**: The guard against traversal in page and project paths lives in the
+shared path resolvers and in one shared project-name validator, which every
+caller already goes through. A route containing a traversal segment resolves to
+nothing, and the caller's existing not-found branch handles it.
+
+**Reasoning**: The traversal findings were the same defect repeated across a
+family of commands — the shape of a bug that comes from every command building
+its own path. Fixing them individually fixes exactly those commands and leaves
+the next one to reintroduce it, because the next author will copy a neighbour
+that predates the fix. Putting the check in the resolver covers every current
+caller and every future one, and it costs nothing in expressiveness: legitimate
+nested routes contain slashes but never traversal segments, so no valid input is
+refused. Returning nothing rather than throwing lets each caller fall into the
+not-found path it already has, so the change is behavioural at the edge only.
+
+**Alternatives considered**: Add the guard to each affected command (rejected —
+more code, misses future callers, and the next copy-paste reintroduces it).
+Canonicalise and compare against a root in each command (rejected — same
+duplication, and easy to get subtly wrong per site).
+
+**Source**: `secure/src/functions/utilsManagement.php` (`routePathIsSafe`,
+`resolvePageJsonPath`, `resolvePagePhpPath`),
+`secure/src/functions/PathManagement.php` (`is_valid_project_name`). Behaviour:
+[ARCHITECTURE.md §7](ARCHITECTURE.md).
+
+### Outbound fetches are checked at fetch time, not at store time (locked 2026-07-05)
+
+**Decision**: One shared policy guards every server-side outbound request —
+registered API fetches, endpoint testing, the OAuth back-channel and
+download-by-URL uploads. It validates the URL, allows only `http` and `https`,
+resolves the host and refuses if **any** resolved address is internal, and pins
+the validated address for the actual connection so DNS cannot change between
+check and connect. Redirect following is disabled on the paths that had it, and
+retained-with-revalidation where redirects are genuinely needed. A `development`
+environment setting lifts the internal-address block — never the scheme
+allowlist — so authors can work against local APIs. Storing an internal or
+otherwise odd URL is deliberately **not** blocked.
+
+**Reasoning**: Checking at fetch time is what makes the guarantee complete: a URL
+can be stored by one path, imported by another, or edited on disk, and only the
+fetch is common to all of them. Store-time validation would additionally have to
+refuse URLs that are perfectly legitimate on a development installation, so it
+buys defence-in-depth at the cost of wrongly rejecting valid configuration.
+Pinning the resolved address closes the rebinding window that makes a check-then-
+connect design defeatable. Following redirects is where an allowed target hands
+control back to the attacker, so the default is not to. The environment gate is
+scoped narrowly on purpose — an author needs to reach `localhost`, they never
+need `file://`.
+
+**Alternatives considered**: Validate at store time as well (rejected as above;
+the shared policy is available to reuse if a later pass wants it). Follow
+redirects with per-hop revalidation everywhere (kept only where redirects are
+required; rejected as the default — more code on a hot path for a feature few
+registered APIs need). A blocklist of known metadata endpoints (rejected — an
+enumeration of today's cloud providers).
+
+**Source**: `secure/src/classes/OutboundUrlPolicy.php`,
+`secure/src/functions/serverFetch.php`,
+`secure/management/config/environment.php.example`. Behaviour:
+[ARCHITECTURE.md §8](ARCHITECTURE.md).
+
+### Deployment targets outside the installation must be declared (locked 2026-07-05)
+
+**Decision**: `deployBuild` writes only inside the server root or into a
+directory listed in a deploy-roots configuration file. The default file is
+empty, which preserves deploying to the installation itself and refuses
+everything else. The prefix comparison is boundary-safe, so a sibling directory
+whose name merely starts with an allowed path is not accepted.
+
+**Reasoning**: A command that copies a built site to an operator-supplied
+absolute path is an arbitrary-write primitive unless something bounds it, and the
+person best placed to say which directories are legitimate deployment targets is
+the deployer, not QuickSite. An empty default keeps the common case — deploy to
+where you already are — working with no configuration, so the guard costs nothing
+to the installation that never needed it. Boundary-safe comparison is called out
+because naive prefix matching is the standard way this class of allowlist is
+defeated.
+
+**Alternatives considered**: Allow any absolute path (the previous behaviour —
+rejected: arbitrary write). Restrict to the server root with no configuration
+(rejected — deploying elsewhere is a real use). Derive allowed roots from the web
+server configuration (rejected — not readable portably, and not the same
+question).
+
+**Source**: `secure/management/command/deployBuild.php`,
+`secure/management/config/deploy-roots.php.example`. Behaviour:
+[COMMAND_API.md](COMMAND_API.md).
+
+---
+
+## Runtime state (beta.10)
+
+### Runtime state is JSON, alongside the author's website data (locked 2026-07-11)
+
+**Decision**: Mutable state the engine writes at runtime — session records,
+login and registration throttles, per-project membership — is stored as JSON,
+not as PHP arrays. Static engine and admin configuration that the operator edits
+by hand stays PHP. Each JSON store is written through a single owner function
+using a lock plus write-to-temp-and-rename, and each is excluded from version
+control.
+
+**Reasoning**: This extends the data-shape rule recorded under project
+conventions above rather than contradicting it. That rule split *the author's
+website data* from *QuickSite plumbing*; runtime state is a third thing, and the
+deciding property is that nothing writes it by hand. A PHP array file has to be
+serialised through a code generator and re-executed to be read, which makes an
+interrupted or concurrent write a **parse error in an executable file** rather
+than a malformed data file — and one of these stores is the authority every
+permission check reads. JSON keeps a corrupt write inert and detectable. The
+supporting observation, learned the hard way during the release: regenerating a
+PHP config file through a serialiser silently destroys the comments that document
+it, so a machine-written PHP file and a human-maintained one are genuinely
+different kinds of file and should not share a format.
+
+**Alternatives considered**: PHP arrays for consistency with the other config
+files (rejected — a corrupt runtime write becomes a fatal parse error, and
+serialised regeneration destroys documentation). SQLite (rejected — a dependency,
+and the file-based model is the product's premise). One combined state file
+(rejected — unrelated write frequencies contending on one lock).
+
+**Source**: `secure/src/functions/SessionManagement.php`,
+`secure/projects/<id>/config/members.json`,
+`secure/src/functions/AuthManagement.php` (`qs_members_mutate`). Behaviour:
+[PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md).
