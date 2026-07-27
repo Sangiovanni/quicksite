@@ -1,8 +1,6 @@
 # QuickSite Workflow System — Complete Reference
 
-> Internal documentation for understanding, creating, and debugging workflows.
->
-> _Last updated: 2026-04-23._
+> Reference for understanding, authoring, and debugging workflows.
 
 ## Table of Contents
 
@@ -33,7 +31,7 @@ A workflow can have steps (manual), a promptTemplate (AI), or both.
 ## Architecture
 
 ```
-User fills parameters in admin UI
+User fills parameters in the AI tools panel
         │
         ▼
 ┌─────────────────────────────────────┐
@@ -43,6 +41,7 @@ User fills parameters in admin UI
 │  2. fetchDataRequirements()         │
 │     → CommandRunner executes        │
 │       read-only API commands        │
+│       (re-gated per command)        │
 │  3a. generateSteps()    [manual]    │
 │  3b. renderPrompt()     [AI]        │
 └─────────────────────────────────────┘
@@ -50,10 +49,15 @@ User fills parameters in admin UI
     [manual]              [AI]
         │                    │
         ▼                    ▼
-  Steps preview        Rendered markdown
-  → Execute batch      → User sends to AI
-                       → Paste JSON response
-                       → Execute batch
+  Steps in the         Rendered markdown
+  Batch panel          → sent browser-direct (BYOK)
+        │                or copied out + pasted back
+        │              → JSON response parsed
+        │                    │
+        └────────┬───────────┘
+                 ▼
+   Each command POSTed to /management/<command>
+   in turn, with the caller's own bearer token
 ```
 
 ---
@@ -74,27 +78,42 @@ User fills parameters in admin UI
 | `secure/admin/workflows/schema.json` | JSON Schema defining the spec format |
 | `secure/admin/workflows/core/*.json` | Core workflow specs (shipped with QuickSite) |
 | `secure/admin/workflows/core/*.md` | Core markdown templates |
-| `secure/admin/workflows/blocks/*.md` | Reusable prompt blocks injected via `{{> name}}` (beta.7) |
-| `secure/admin/workflows/pins/*.md` | Pinned reminders auto-injected at top when listed in `pins: [...]` (beta.7) |
-| `secure/admin/workflows/warnings/*.md` | Warnings auto-injected at top when listed in `warnings: [...]` (beta.7) |
-| `secure/admin/workflows/examples/*.md` | Example fragments referenced via `{{> example.X}}` (beta.7) |
+| `secure/admin/workflows/blocks/*.md` | Reusable prompt blocks injected via `{{> name}}` |
+| `secure/admin/workflows/pins/*.md` | Pinned reminders auto-injected at top when listed in `pins: [...]` |
+| `secure/admin/workflows/warnings/*.md` | Warnings auto-injected at top when listed in `warnings: [...]` |
+| `secure/admin/workflows/examples/*.md` | Example fragments referenced via `{{> example.X}}` |
+
+Workflows are QuickSite's own shipped catalogue. There is no in-app authoring
+surface: specs are files, edited on disk.
 
 ### Admin UI
 
+Workflows are run from the visual editor's **AI tools** mode
+(`/admin/preview` → AI tools). Any `/admin/workflows*` URL redirects there.
+
 | File | Purpose |
 |------|---------|
-| `secure/admin/templates/pages/workflows/index.php` | Workflow browser — lists all workflows by category |
-| `secure/admin/templates/pages/workflows/spec.php` | Workflow executor — parameter form, prompt preview, execution |
-| `secure/admin/templates/pages/workflows/editor.php` | Workflow creator/editor — JSON + markdown side by side |
-| `public/admin/assets/js/pages/ai/ai-spec.js` (~1500 lines) | Client-side execution logic (parameter forms, streaming, batch execution) |
+| `secure/admin/templates/pages/preview/contextual-ai-tools.php` | DOM scaffold — workflow list + runner |
+| `public/admin/assets/js/pages/preview/preview-ai-tools.js` | Client-side logic (list, filters, parameter forms, streaming, batch execution) |
+| `public/admin/assets/js/pages/ai/lib/ai-call.js` | Browser-direct AI dispatch (BYOK) — no PHP proxy |
+
+See [ADMIN_PANEL.md §8.12](ADMIN_PANEL.md) for the runner UX.
 
 ### API Endpoints (via admin router)
 
-| Endpoint | Method | Purpose |
+The helper endpoints live in `public/admin/api/index.php` and are reached at
+`/admin/api/[p/<projectId>/]<action>`:
+
+| Action | Method | Purpose |
 |----------|--------|---------|
-| `/admin/api/workflow/render-prompt` | POST | Render a markdown template with parameters + data |
-| `/admin/api/workflow/resolve` | POST | Resolve steps for manual workflow execution |
-| `/admin/api/batch/execute` | POST | Execute an array of commands (streaming) |
+| `ai-spec/<id>` | GET | Load a spec with its data requirements fetched and its prompt rendered |
+| `ai-spec-raw/<id>` | GET | Load the spec definition itself (parameter schema, metadata) |
+| `workflow-generate-steps` | POST | Resolve steps for deterministic workflow execution |
+
+Resolved commands are **not** executed through a batch endpoint. The client
+runs them one at a time against the Management API (`POST /management/<command>`
+with the caller's bearer token), so every step passes the same authorization
+as any other API call.
 
 ---
 
@@ -209,8 +228,8 @@ Hidden parameters (those failing their own `condition`) skip validation entirely
 - `tag-select` — multi-select (needs `optionsFrom`; backed by an array value)
 - `checkbox` — boolean toggle
 - `number` — numeric input (renders `<input type="number">`)
-- `nodeSelector` — visual node picker from page structures (admin spec page only)
-- `selector` — auto-fills from the visual editor's current iframe selection. Read-only display in the editor's AI tools panel; the param value is a structured object `{ tag, classes, struct, node }`. Workflow steps reference subfields with `{{param.X.tag}}`, `{{param.X.struct}}`, etc. On the standalone workflow spec page (no iframe), it renders a hint that the workflow needs to be run from the editor.
+- `nodeSelector` — visual node picker from page structures
+- `selector` — auto-fills from the visual editor's current iframe selection. Read-only display in the AI tools panel; the param value is a structured object `{ tag, classes, struct, node }`. Workflow steps reference subfields with `{{param.X.tag}}`, `{{param.X.struct}}`, etc.
 - `hidden` — not shown in UI, value set programmatically
 
 **Default values from data**: `default` accepts either a literal value or a template string referencing fetched `dataRequirements`. For example:
@@ -387,7 +406,7 @@ Sub-workflows to run before/after. Can be a simple string ID or an object with `
 
 Templates are processed by `WorkflowManager::renderPrompt()` through a **7-pass rendering engine**.
 
-### Pass 0: Pin/Warning Auto-Injection (beta.7)
+### Pass 0: Pin/Warning Auto-Injection
 
 If the workflow JSON declares `pins: [...]` or `warnings: [...]`, the renderer prepends:
 
@@ -405,7 +424,7 @@ If the workflow JSON declares `pins: [...]` or `warnings: [...]`, the renderer p
 
 at the top of the template before any other pass. Each ID maps to a file under `secure/admin/workflows/pins/` or `secure/admin/workflows/warnings/`. Set `meta.suppressPinsHeader: true` to opt out (rare).
 
-### Pass 0.5: Partials — `{{> name}}` (beta.7)
+### Pass 0.5: Partials — `{{> name}}`
 
 Reusable prompt blocks. Resolved BEFORE conditionals/loops, so an inlined block is itself a first-class template fragment (its `{{#if}}`, `{{param.x}}`, etc. all run normally).
 
@@ -453,17 +472,17 @@ Content shown for single-language workflows.
 **Loop sources:**
 - `data.xxx` — any data from `dataRequirements`
 - Bare names — checked in `fetchedData`
-- `commands` — _legacy_, see deprecation below
+- `commands` — superseded by the partial form, see below
 
 **Loop variables:**
 - `{{@key}}` — current key (index for arrays, key for objects)
 - `{{this}}` — current value (formatted)
 - `{{this.field}}` — access object property
 
-**Deprecated since beta.7:**
+**Superseded form:**
 
 ```markdown
-{{#each commands}}{{formatCommand @key this}}{{/each}}   <!-- DEPRECATED -->
+{{#each commands}}{{formatCommand @key this}}{{/each}}   <!-- deprecated -->
 ```
 
 Use the partial form instead:
@@ -484,7 +503,7 @@ Then wire styles:
 {{> command.editStyles}}
 ```
 
-The partial form routes to `formatCommandFull()` which produces cleaner markdown (description, method, parameters with types, one fenced example). The legacy `{{formatCommand}}` helper still works for back-compat but emits an HTML comment marking it deprecated and writes a deprecation notice to `secure/logs/`.
+The partial form routes to `formatCommandFull()` which produces cleaner markdown (description, method, parameters with types, one fenced example). The `{{formatCommand}}` helper still works, but emits an HTML comment marking it deprecated and writes a notice to `secure/logs/`.
 
 ### Pass 3: JSON Export — `{{json}}`
 
@@ -538,7 +557,7 @@ Fallback: checks `$fetchedData[key]`. Unknown placeholders are left as-is.
 2. **Show the expected format** — `[{ "command": "...", "params": {...} }]`
 3. **Use conditionals** for branches (multilingual vs single-language)
 4. **Include current state** via `{{json dataId}}` so the AI knows what exists
-5. **Show command docs** via `{{> command.$relatedCommands}}` (legacy form `{{#each commands}}{{formatCommand @key this}}{{/each}}` is deprecated since beta.7)
+5. **Show command docs** via `{{> command.$relatedCommands}}` (the `{{#each commands}}{{formatCommand @key this}}{{/each}}` form is deprecated)
 6. **Be explicit about order** — AI needs to know command dependency order
 7. **Add examples** — concrete JSON examples help AI accuracy dramatically
 
@@ -546,37 +565,34 @@ Fallback: checks `$fetchedData[key]`. Unknown placeholders are left as-is.
 
 ## Execution Flow
 
-### AI Workflow Execution (in `ai/ai-spec.js`)
+### AI Workflow Execution (in `preview/preview-ai-tools.js`)
 
 ```
 1. User fills parameter form
-2. Click "Generate Prompt"
-3. POST /admin/api/workflow/render-prompt
+2. Click the primary action button
+3. GET /admin/api/ai-spec/{id}?<params>
    → WorkflowManager.renderPrompt() → returns markdown
-4. User copies rendered prompt
-5. User sends to AI assistant (external)
-6. User pastes AI's JSON response
-7. Client validates JSON structure
-8. Client normalizes commands (ensures correct format)
-9. POST /admin/api/batch/execute
-   → Streaming execution, results shown per-command
+4. Prompt goes to the AI — browser-direct via QSAiCall when a BYOK
+   connection is configured, otherwise copied out and pasted back
+5. Client validates the JSON response structure
+6. Client normalizes commands (ensures correct format)
+7. Each command is POSTed to /management/{command} in turn,
+   results shown per-row in the Batch panel
 ```
 
 ### Manual Workflow Execution
 
 ```
 1. User fills parameter form
-2. Click "Preview Steps"
-3. POST /admin/api/workflow/resolve
+2. POST /admin/api/workflow-generate-steps  { workflowId, params }
    → WorkflowManager resolves phases:
      a. getWorkflowPhases() → [{type: preWorkflow, id}, {type: main}, ...]
      b. For each phase: resolveSubWorkflow() 
         → fetchDataRequirements + generateSteps
    → Returns all expanded steps
-4. Steps shown in preview panel
-5. User clicks "Execute"
-6. POST /admin/api/batch/execute
-   → Same streaming execution
+3. Steps shown in the Batch panel
+4. User clicks "Execute"
+5. Same per-command execution against the Management API
 ```
 
 ### Step Generation Pipeline (manual workflows)
@@ -669,8 +685,9 @@ This generates an array of translation objects, one per language.
 - **Meta section:** `titleKey`/`descriptionKey` (translation keys) are preferred; `name`/`description` (direct strings) are accepted.
 - **Parameters:** Use `label` (direct text) OR `labelKey` (translation key). Non-hidden parameters must have one or the other. `labelKey` is resolved through the admin locale files, then returned as-is.
 
-### 10. Editor validation
-The editor page validates JSON on every keystroke and shows errors immediately. The validation in `WorkflowManager::validateWorkflow()` checks:
+### 10. Spec validation
+Every spec is validated when it loads, and an invalid one is refused with its
+error list rather than half-run. `WorkflowManager::validateWorkflow()` checks:
 - Required fields: `id`, `version`, `meta`
 - Meta must have `titleKey` or `name`, and `category`
 - Category must be valid

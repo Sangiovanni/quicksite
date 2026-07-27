@@ -1,10 +1,6 @@
 # QuickSite Project Structure
 
 > On-disk layout of a QuickSite installation, with notes on which folders are public, which are private, and which are generated.
->
-> _Last updated: 2026-04-23._
-
-> _Maintainers note:_ re-check this doc when adding top-level folders, renaming engine directories, or changing what setup scripts customize.
 
 ## Tree
 
@@ -17,22 +13,9 @@ quicksite/
 │   │   ├── index.php             # Front controller — renders a project from its own folder
 │   │   └── .htaccess             # Routes all /p/* to this index.php
 │   ├── admin/                    # Admin panel UI (HTML/JS/CSS)
-│   ├── management/               # API entry point
-│   │   ├── index.php             # API router — auth, dispatch, logging
-│   │   └── .htaccess             # Routes all /management/* to this index.php
-│   ├── assets/                   # Uploaded files organized by type
-│   │   ├── images/               # Image assets
-│   │   ├── font/                 # Font files
-│   │   ├── audio/                # Audio files
-│   │   └── videos/               # Video files
-│   ├── scripts/                  # Generated client-side config (the qs-*.js trio)
-│   │   └── qs-api-config.js      # Client-side API endpoint configuration
-│   │                             # (the shared qs.js runtime is engine-owned —
-│   │                             #  secure/src/runtime/qs.js, served per project)
-│   ├── style/                    # Site styles
-│   │   ├── style.css             # Main stylesheet (editable via API)
-│   │   └── index.php             # Style route handler
-│   └── build/                    # Production builds output (generated, gitignored)
+│   └── management/               # API entry point
+│       ├── index.php             # API router — auth, dispatch, logging
+│       └── .htaccess             # Routes all /management/* to this index.php
 │
 ├── secure/                       # Backend (outside web root, not publicly accessible)
 │   ├── management/               # API engine (shared across all projects)
@@ -65,14 +48,21 @@ quicksite/
 │   │       ├── routes.php        # Public route definitions
 │   │       ├── templates/        # Page and component JSON structures
 │   │       ├── translate/        # Translation files (en.json, fr.json, etc.)
-│   │       ├── data/             # Project data (aliases, asset metadata)
-│   │       ├── public/           # Project-specific public files
+│   │       ├── data/             # Project data (aliases, asset metadata, API
+│   │       │                     #   endpoints, state stores, route resolvers)
+│   │       ├── public/           # What /p/<id>/ serves — the project's own web files
+│   │       │   ├── assets/       #   images / font / audio / videos
+│   │       │   ├── style/        #   style.css (editable via API)
+│   │       │   ├── scripts/      #   generated qs-api-config / qs-enums / qs-route-schema
+│   │       │   ├── sitemap.txt   #   published sitemap (generated)
+│   │       │   └── build/        #   production builds (generated, gitignored)
 │   │       ├── exports/          # This project's export ZIPs (generated)
 │   │       └── backups/          # Project backups (gitignored)
 │   ├── snippets/                 # Reusable component snippets (nav, cards, forms, etc.)
+│   ├── deploy/                   # Apache + nginx vhost examples for mapped domains
 │   ├── nginx/                    # Auto-generated nginx config (dynamic_routes.conf)
 │   ├── cron/                     # Optional cron scripts (nginx reload fallback)
-│   └── logs/                     # Command execution logs (gitignored)
+│   └── logs/                     # Command execution logs, partitioned per project (gitignored)
 │
 ├── docs/                         # Documentation (this folder)
 ├── tests/                        # Test suite
@@ -80,15 +70,22 @@ quicksite/
 ├── setup.bat                     # Setup script (Windows)
 ├── VERSION                       # Current version
 ├── LICENSE                       # AGPL-3.0
+├── PHILOSOPHY.md                 # Design principles
 └── README.md
 ```
+
+Note what is **not** under `public/`: no site assets, styles, generated scripts,
+sitemap or builds. Those belong to a project and live in that project's own
+`secure/projects/<id>/public/`, reached through `/p/<id>/`. The web root holds
+the two entry points and nothing else, which is what leaves it free for an
+operator's own site.
 
 ## Key concepts
 
 - **`public/`** is the only folder exposed to the web. Everything else is behind the firewall.
 - **`public/management/`** is the API gateway. Any client (admin panel, curl, Flutter app, custom UI) talks to QuickSite through this endpoint.
-- **`public/scripts/`** contains the core JS runtime. `qs.js` handles front-end features like show/hide triggers, sorting, and dynamic behavior.
-- **`secure/management/config/`** holds sensitive files (tokens, auth) that are gitignored. They are auto-created from `.example` templates on first load.
+- **The shared `qs.js` runtime is engine-owned** (`secure/src/runtime/qs.js`) and served to every project. It handles front-end features like show/hide triggers, filtering, fetches, and state stores. What lands in a project's own `public/scripts/` is generated per-project config — the `qs-api-config` / `qs-enums` / `qs-route-schema` trio.
+- **`secure/management/config/`** holds sensitive files (sessions, auth policy, the user registry) that are gitignored. `auth.php` and `roles.php` are auto-created from `.example` templates on first load; `users.php` is written when the first account is created.
 - **Projects** are fully isolated in `secure/projects/`. Each has its own pages, translations, routes, and assets, and each is served from its own folder under its own `/p/<projectId>/` view — no project is privileged. Change which one you are *editing* with `setSelectedProject` (the admin header picker).
 
 ## Folder customization

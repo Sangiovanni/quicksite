@@ -47,7 +47,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <div class="admin-login">
     <div class="admin-login__header">
-        <svg class="admin-login__logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <!-- Intrinsic width/height so the mark stays 64px even if admin.css fails to
+             load; without them an SVG with only a viewBox fills its container and pushes
+             the form below the fold. The CSS rule still wins when it loads, so nothing
+             changes on a healthy install. -->
+        <svg class="admin-login__logo" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 2L2 7l10 5 10-5-10-5z"/>
             <path d="M2 17l10 5 10-5"/>
             <path d="M2 12l10 5 10-5"/>
@@ -107,7 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         placeholder="<?= adminAttr(__admin('register.usernamePlaceholder')) ?>"
                         value="<?= adminAttr((string)($_POST['username'] ?? '')) ?>"
                         maxlength="32"
-                        pattern="[a-z0-9_-]{3,32}"
+                        pattern="[a-zA-Z0-9_-]{3,32}"
                         autocomplete="username"
                         autocapitalize="none"
                         spellcheck="false"

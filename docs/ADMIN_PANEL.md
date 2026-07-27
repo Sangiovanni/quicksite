@@ -96,6 +96,7 @@ File lists are grouped by role. Where useful, the entry point or main exported f
 | `js/core/storage-keys.js` | Constants for every localStorage / sessionStorage key (`window.QuickSiteStorageKeys`). |
 | `js/core/dom.js` | `window.QSDom`: shared `el()` element factory + `svgIcon()` + `clear()` — the createElement/textContent idiom for dynamic DOM. Loaded in `<head>` so page scripts can use it at parse time. |
 | `js/core/members-badge.js` | Membership counts (inbox awaiting me + queue awaiting my adjudication) → the Members nav badge; publishes `window.QSMembershipCounts` + the `quicksite:membership-counts-updated` event; recomputes on `quicksite:memberships-changed`. |
+| `js/core/searchable-select.js` | Type-ahead select widget for long option lists; loaded by `layout.php` and used by the visual editor's pickers. |
 | `admin.js` | Singleton `QuickSiteAdmin`: permissions, user badge, nav, delegation. |
 
 ### 5.2 Shared components
@@ -119,20 +120,25 @@ File lists are grouped by role. Where useful, the entry point or main exported f
 | `pages/settings.js` | User settings + AI config status. |
 | `pages/apis.js` | External API registry CRUD + endpoint test UI. |
 | `pages/assets.js` | Asset browser, upload, edit, delete. |
-| `pages/sitemap.js` | Route tree + reachability graph + sitemap controls. |
-| `pages/embed-security.js` | Embed security configuration UI. |
+| `pages/sitemap.js` | Route tree + reachability graph + sitemap controls + resolver authoring. |
+| `pages/embed-security.js` | Iframe sandbox configuration UI. |
 | `pages/optimize.js` | Admin shell for the CSS Refiner library. |
+| `pages/oauth-providers.js` | OAuth provider preset CRUD (§9.5 Tier 4). |
+| `pages/storage.js` | Browser-storage registry + cookie-consent management (§9.10). |
+| `pages/privacy.js` | Privacy helper — data-sharing registry + policy generation (§9.11). |
+| `pages/api-import/openapi-converter.js` | OpenAPI → native-shape converter for the API registry's import modal (§9.1). |
 
 ### 5.4 AI sub-pages (`pages/ai/`)
 
+There is no workflow browser or spec-runner page: both are subsumed by the visual editor's AI tools mode (§8.12), so this folder holds only the BYOK connection UI and the shared AI-call library.
+
 | File | Purpose |
 |---|---|
-| `pages/ai/ai-index.js` | Workflow / spec listing, search, filters → `/admin/api/ai-spec/list`. |
 | `pages/ai/ai-connections.js` | BYOK connection wizard + connection list (cloud + local). Persists to the v3 store; no PHP roundtrip. |
-| `pages/ai/ai-spec.js` | Workflow execution: resolve → render-prompt → execute. AI dispatch goes browser-direct via `QSAiCall`. |
 | `pages/ai/lib/provider-catalog.js` | Pure data + per-provider HTTP helpers (URL / headers / body / parser). Used by `ai-connections.js` and `ai-call.js`. |
 | `pages/ai/lib/connections-store.js` | v3 storage CRUD (`aiConnectionsV3`), `getActive()`, `recordStatus()`. |
 | `pages/ai/lib/ai-call.js` | Browser-direct AI dispatcher (`QSAiCall.call`) with SSE streaming + abort + typed errors. |
+| `pages/ai/lib/stream-parsers.js` | Per-provider SSE chunk parsers consumed by `ai-call.js`. |
 | `pages/ai/lib/local-presets.js` | Prefill values for the local AI wizard (Ollama, LM Studio) including origin-scoped CORS instructions. |
 
 ### 5.5 Preview subsystem (`pages/preview/`)
@@ -147,11 +153,15 @@ File lists are grouped by role. Where useful, the entry point or main exported f
 | `preview-miniplayer.js` | Preview-page floating player. |
 | `preview-style-selectors.js` | Selector browser. |
 | `preview-style-editor.js` | Property editor (color picker, `var()` support). |
-| `preview-style-animations.js` | Animation / keyframe editor. |
+| `preview-style-motion.js` | Animation / keyframe editor (§8.11). |
+| `preview-style-source.js` | Source view — raw stylesheet editing in CSS mode (§8.10). |
 | `preview-style-theme.js` | Theme variable editor (light / dark scope). |
 | `preview-transition-editor.js` | Transition-property editor. |
-| `preview-js-interactions.js` | Element-level interaction (event) editor. |
+| `preview-js-interactions.js` | Element-level interaction (event) editor + verb picker (§9.9). |
+| `preview-translation.js` | Translation Manager mode (§8.9). |
+| `preview-ai-tools.js` | AI tools mode — workflow list, runner, batch execution (§8.12). |
 | `preview-drag.js` | Drag-mode UX. |
+| `contextual-complex/` | Per-kind complex-element wizards (§8.7). |
 
 ### 5.6 CSS Refiner library (`lib/css-refiner/`)
 
@@ -193,12 +203,12 @@ Authentication uses **no browser storage**: the short-lived access token is page
 | `PREFS` | localStorage | `utils.js`, `admin.js`, `settings.js`, `preview-sidebar-resize.js` |
 | `PENDING_MESSAGE` | sessionStorage | `utils.js`, `admin.js` |
 | `API_AUTH_TOKENS` | localStorage | `apis.js` |
-| `AI_CONNECTIONS_V3` | localStorage | `ai-connections.js`, `ai-spec.js`, `connections-store.js` (canonical) |
-| `AI_KEYS_V2` | localStorage / sessionStorage | `ai-spec.js`, `settings.js` (deprecated, read-only fallback) |
-| `AI_DEFAULT_PROVIDER` | localStorage / sessionStorage | `ai-spec.js`, `settings.js` (legacy v2 selector) |
-| `AI_PERSIST` | localStorage | `ai-spec.js`, `settings.js` |
-| `AI_AUTO_PREVIEW` | localStorage | `settings.js`, `ai-spec.js` |
-| `AI_AUTO_EXECUTE` | localStorage | `settings.js`, `ai-spec.js` |
+| `AI_CONNECTIONS_V3` | localStorage | `connections-store.js` (canonical), `ai-connections.js` |
+| `AI_KEYS_V2` | localStorage / sessionStorage | `connections-store.js`, `settings.js` — read-only, for the v2 → v3 migration |
+| `AI_DEFAULT_PROVIDER` | localStorage / sessionStorage | `connections-store.js`, `settings.js` |
+| `AI_PERSIST` | localStorage | `connections-store.js`, `ai-connections.js`, `settings.js` |
+| `AI_AUTO_PREVIEW` | localStorage | declared; no current reader |
+| `AI_AUTO_EXECUTE` | localStorage | `preview-ai-tools.js`, `ai-connections.js`, `settings.js` |
 | `STYLE_SOURCE_DRAFT` | localStorage | `preview-style-source.js` (visual-editor CSS mode → Source view; debounced draft of unsaved edits, restored on next entry, cleared on save / discard) |
 
 ---
@@ -286,14 +296,16 @@ Menu and footer are global — editing them in any page's preview applies site-w
 
 | Group | Commands |
 |---|---|
-| Routes / structure | `getRoutes`, `getStructure`, `editStructure`, `addElement`, `deleteElement`, `addRoute`, `deleteRoute`, `editRoute`, `setLayout` |
-| Components | `listComponents`, `addComponent`, `editComponent`, `deleteComponent` |
-| Snippets | `saveSnippet`, `listSnippets`, `deleteSnippet` |
-| Translations | `getTranslation`, `getLangList`, `getTranslationKeys`, `getUnusedTranslationKeys`, `validateTranslations`, `setTranslationKeys`, `deleteTranslationKeys`, `editTranslation` |
-| Styles | `getStyles`, `setStyle`, `addStyle`, `deleteStyle`, `listStyleRules` |
-| Theme | `getRootVariables`, `setRootVariables` |
-| Animations | `getKeyframes`, `setKeyframes`, `deleteKeyframes` |
-| Interactions | `getInteractions`, `setInteractions` |
+| Routes / structure | `getRoutes`, `getStructure`, `editStructure`, `addNode`, `editNode`, `deleteNode`, `duplicateNode`, `moveNode`, `addComplexElement`, `addRoute`, `setRouteLayout`, `setRouteResolver` |
+| Components | `listComponents`, `addComponentToNode`, `findComponentUsages` |
+| Snippets | `listSnippets`, `getSnippet`, `createSnippet`, `deleteSnippet`, `insertSnippet`, `injectSnippetCss` |
+| Translations | `getTranslation`, `getTranslations`, `getLangList`, `getTranslationKeys`, `setTranslationKeys`, `deleteTranslationKeys`, `importStructureTranslations` |
+| Styles | `getStyles`, `editStyles`, `listStyleRules`, `setStyleRule` |
+| Theme | `getRootVariables`, `setRootVariables`, `setThemeMode` |
+| Animations | `listKeyframes`, `getKeyframes`, `setKeyframes`, `deleteKeyframes`, `getAnimatedSelectors` |
+| Interactions / events | `listJsFunctions`, `listDataBindings`, `addInteraction`, `editInteraction`, `deleteInteraction`, `addPageEvent`, `editPageEvent`, `deletePageEvent` |
+| State + integrations | `getStateStores`, `setStateStores`, `listApiEndpoints`, `editApi`, `listOAuthProviders`, `listStorageItems`, `addStorageItem` |
+| Assets / misc | `listAssets`, `help`, `backupProject` |
 
 For the full per-command reference see [COMMAND_API.md](COMMAND_API.md).
 
@@ -677,7 +689,7 @@ If the picked selector already has a transition, the form pre-fills from `animat
 | Concern | Where |
 |---|---|
 | Panel template (sections + groups + tooltip) | `secure/admin/templates/pages/preview/contextual-style.php` |
-| JS module | `public/admin/assets/js/pages/preview/preview-style-motion.js` (renamed from `preview-style-animations.js`; window global `PreviewStyleMotion`) |
+| JS module | `public/admin/assets/js/pages/preview/preview-style-motion.js` (window global `PreviewStyleMotion`) |
 | Apply-keyframe modal | `secure/admin/templates/pages/preview/modals/apply-keyframe.php` |
 | Add-transition wizard modal | `secure/admin/templates/pages/preview/modals/add-transition.php` |
 | Easing picker | `public/admin/assets/js/lib/easing-picker/` (see §5.8) |
@@ -700,7 +712,7 @@ A persistent amber-bordered banner sits at the top of the panel: `⚠ AI tools m
 - **Tag chip filter** with a `Match: Any | All` toggle (toggle row appears only when ≥2 chips are active). Chips show the top 6 tags by frequency plus a `+N more` expander; any active chip outside the top 6 stays visible so it can always be deselected
 - **Category grouping** — canonical order `Creation → Template → Modification → Content → Style → Advanced → WIP`. Sub-headers between groups; alphabetical within
 - **`Show 10 more` pagination** at the end of the list — global across categories
-- **Cards** carry the workflow's emoji icon, title, AI 🤖 / Steps 📦 badge, 2-line description, colour-coded difficulty chip (`beginner` green, `intermediate` amber, `advanced` red), and a violet `custom` chip when the workflow is user-authored
+- **Cards** carry the workflow's emoji icon, title, AI 🤖 / Steps 📦 badge, 2-line description, and a colour-coded difficulty chip (`beginner` green, `intermediate` amber, `advanced` red)
 
 #### Runner — INPUTS zone (accent border)
 
@@ -762,7 +774,7 @@ The AI call is browser-direct via `QSAiCall.call(...)` (see `public/admin/assets
 | **APIs** (`apis.js`) | External API registry — see §9.1. Commands: `listApiEndpoints`, `addApi`, `editApi`, `deleteApi`, `getApiEndpoint`, `testApiEndpoint`. |
 | **Assets** (`assets.js`) | Asset browser + uploader: `listAssets`, `uploadAsset`, `editAsset`, `deleteAsset`. |
 | **Sitemap** (`sitemap.js`) | Route tree, reachability, ordering. |
-| **Embed security** (`embed-security.js`) | `getEmbedSecurity` / `setEmbedSecurity`. |
+| **Embed security** (`embed-security.js`) | Iframe sandbox config: `getIframeSandbox` / `setIframeSandbox` / `removeIframeSandbox`. |
 | **Optimize** (`optimize.js`) | UI for the CSS Refiner library; runs analyzers, presents diffs, applies edits via `editStyles` / `setRootVariables`. |
 
 ### 9.1 API Registry (/admin/apis)
@@ -775,7 +787,7 @@ resolves them by ID and substitutes parameters at call time.
 managed by `secure/src/classes/ApiEndpointManager.php`.
 
 **Runtime config** (auto-regenerated on every CRUD): the manager
-writes `public/scripts/qs-api-config.js` which exposes
+writes the project's own `public/scripts/qs-api-config.js` which exposes
 `window.QS_API_ENDPOINTS = { "<apiId>": { baseUrl, auth, endpoints } }`.
 Pages get this script included automatically when at least one API
 is registered (see `PageManagement::render()`).
@@ -784,7 +796,7 @@ is registered (see `PageManagement::render()`).
 
 | Field | Purpose |
 |---|---|
-| `id` | Stable identifier (matches `/^[a-z0-9][a-z0-9\-_]*$/i`). |
+| `id` | Stable identifier: starts with a letter or digit, then letters, digits, hyphens or underscores. Case-insensitive. |
 | `name` | Human label shown in the picker. |
 | `method` | `GET / POST / PUT / PATCH / DELETE`. |
 | `path` | Relative to API `baseUrl`. May contain `:placeholders` (see below). |
@@ -806,7 +818,7 @@ result:     GET <baseUrl>/users/42/posts/7
 
 Validation rules (`ApiEndpointManager::validateEndpoint`):
 - Every `:name` in `path` must appear in `parameters`.
-- Parameter names match `/^[a-zA-Z][a-zA-Z0-9_]*$/`, no duplicates.
+- Parameter names start with a letter, then letters, digits or underscores; no duplicates.
 - Unknown types or shapes are rejected with a clear message.
 
 Missing **required** parameters at runtime → `QS.fetch` rejects
@@ -2155,10 +2167,10 @@ separated.
 ### 9.8 Sitemap (/admin/sitemap)
 
 Visual route tree, reachability analyzer, layout toggles, and `sitemap.txt`
-generator — all backed by `getSiteMap` + `addRoute` / `deleteRoute` /
-`editRoute` + `setRouteLayout` + `analyzeReachability`. The runtime + matching
-algorithm live in [ARCHITECTURE §5.3](ARCHITECTURE.md); this section covers
-the editor UX.
+generator — all backed by `getSiteMap` + `addRoute` / `deleteRoute` +
+`setRouteLayout` + `analyzeReachability` + `setSiteMapConfig`. The runtime +
+matching algorithm live in [ARCHITECTURE §5.3](ARCHITECTURE.md); this section
+covers the editor UX.
 
 **Tree**. One row per route, hierarchical. Each row carries:
 
@@ -2213,13 +2225,17 @@ table. The banner turns red when any orphan is detected.
 button calls `getSiteMap` with the base, lists every route's URLs (with
 ×N langs counts when multilingual), and lets the user toggle rows to
 exclude. A custom-URLs textarea takes one URL per line (for pages outside
-the route system). Save writes the file via `getSiteMap` + `save: true`.
+the route system). Save calls `setSiteMapConfig`, which owns **both**
+writes — the excluded-routes / custom-URLs sidecar and the published
+`sitemap.txt`. Reading and writing are separate commands on purpose:
+`getSiteMap` is a pure read available to every member rank, while what the
+published sitemap contains is a write and needs a write role.
 
 | Concern | Where |
 |---|---|
 | Tree + reachability + add form logic | `public/admin/assets/js/pages/sitemap.js` |
 | Page shell | `secure/admin/templates/pages/sitemap.php` + `sitemap-edit-title.php` partial |
-| Server commands | `addRoute`, `deleteRoute`, `editRoute`, `getSiteMap`, `setRouteLayout`, `analyzeReachability` |
+| Server commands | `addRoute`, `deleteRoute`, `getSiteMap`, `setSiteMapConfig`, `setRouteLayout`, `analyzeReachability` |
 | Route schema | A project's `secure/management/routes.php` (writable via the commands; `varExportNested()` preserves nested string keys) |
 | Param syntax helpers | `secure/src/functions/routeHelpers.php` — single source for the `:name` ↔ `__name` filesystem sanitisation (NTFS reserves `:`) |
 

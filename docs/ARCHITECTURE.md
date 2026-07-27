@@ -43,7 +43,7 @@ QuickSite separates concerns into three top-level layers. Each one has a clear b
                │  src/                │  (Renderer, Compiler, Translator…)
                │  projects/{name}/    │  (sites)
                │  admin/              │  (admin templates + workflows)
-               │  interaction-schemas/│
+               │  snippets/ · logs/   │
                └──────────────────────┘
 ```
 
@@ -58,6 +58,7 @@ A project is a self-contained website on disk. One QuickSite installation can ho
 ```
 secure/projects/{name}/
 ├── config.php           # languages, default lang, multilingual flag, etc.
+├── config/              # members.json — owner, visibility, join policy, roster
 ├── routes.php           # ['home' => …, 'about' => …, 'docs/install' => …]
 ├── templates/
 │   ├── model/json/      # Source of truth: JSON structure per page
@@ -66,12 +67,18 @@ secure/projects/{name}/
 │   ├── footer.json
 │   └── components/      # Reusable JSON components
 ├── translate/           # en.json, fr.json, … (or default.json mono-lang)
-├── data/                # Aliases, metadata
-├── interactions/        # Custom interaction configs (v2)
-├── style/               # Project CSS source
-├── assets/              # Project images / fonts / videos
+├── data/                # Aliases, metadata, API endpoints, state stores, resolvers
+├── public/              # What /p/<name>/ serves
+│   ├── style/           # Project CSS source
+│   ├── assets/          # Project images / fonts / videos
+│   ├── scripts/         # Generated client artifacts (the qs-*.js trio)
+│   ├── sitemap.txt      # Published sitemap
+│   └── build/           # Production builds (generated)
+├── exports/             # Export ZIPs (generated)
 └── backups/
 ```
+
+Interaction behaviour is not a folder: it is declared inline in the page JSON (§8).
 
 ### JSON structure format
 
@@ -186,7 +193,7 @@ Credentials are **username + password** (the username is the private login ident
 
 The **first** account is created on the first-run page: while the user registry is empty, every admin URL renders `/admin/setup`, which asks for a setup token the engine writes under `secure/management/config/`. Reading that file is the authorisation — filesystem access to the install, which is strictly stronger than any account it can mint — so no default credential ships and no command line is required. The rule is enforced at the single account-creation path shared by every route, so a direct call to `register` on an empty registry is refused the same way; the token is consumed on use, and the gate independently requires the registry to be empty, so the path dies permanently once an account exists.
 
-Beyond that, accounts are **self-created only**: the public `register` command (and the matching `/admin/register` page, linked from the login page) creates an account when `auth.php` `registration.allow_self_registration` is true — the default is **false**, meaning a fresh install accepts no registrations and accounts exist from setup only. Registration is flood-controlled (per-IP rate, install-wide hourly cap, optional absolute account cap) and enumeration-safe (a duplicate username is indistinguishable from a success — login identifiers are private). `changePassword` lets an authenticated user rotate their own password — it requires the current password, shares the login throttle, and revokes the user's other sessions on success. `deleteMyAccount` is its destructive counterpart: current password plus an explicit confirmation, every session ended, and the caller detached from every project they belong to. No command creates, disables, or deletes an account **for someone else** — authority in QuickSite is per project, so a person is parted with per project (`removeMember`) or, at the operator level, by editing `users.php`; server-to-project provisioning is deliberately deferred to the platform-integration design. Because a project must always have exactly one owner, self-deletion is refused while the caller solely owns a project — ownership is handed over or the project destroyed first, each an explicit act of its own.
+Beyond that, accounts are **self-created only**: the public `register` command (and the matching `/admin/register` page, linked from the login page) creates an account when `auth.php` `registration.allow_self_registration` is true — the default is **false**, meaning a fresh install accepts no registrations and accounts exist from setup only. Registration is flood-controlled (per-IP rate, install-wide hourly cap, optional absolute account cap) and enumeration-safe (a duplicate username is indistinguishable from a success — login identifiers are private). `changePassword` lets an authenticated user rotate their own password — it requires the current password, shares the login throttle, and revokes the user's other sessions on success. `deleteMyAccount` is its destructive counterpart: current password plus an explicit confirmation, every session ended, and the caller detached from every project they belong to. No command creates, disables, or deletes an account **for someone else** — authority in QuickSite is per project, so a person is parted with per project (`removeMember`) or, at the operator level, by editing `users.php`. Because a project must always have exactly one owner, self-deletion is refused while the caller solely owns a project — ownership is handed over or the project destroyed first, each an explicit act of its own.
 
 Authorization is **per project**. Each project's `config/members.json` assigns its members one of six fixed roles:
 
@@ -201,7 +208,7 @@ Authorization is **per project**. Each project's `config/members.json` assigns i
 
 > AI is not a permissioned column: AI calls happen in the browser via `QSAiCall` against per-user credentials in `aiConnectionsV3` (localStorage). Any authenticated admin can use the AI workspace; gating happens at the connection level, not the role level.
 
-Roles are **fixed** — there is no superadmin and no custom roles. A role is defined as a set of trust-coherent command **categories** in `secure/management/config/categories.php` (e.g. `content.read`, `style.write`, `deploy`, `project.delete`); `roles.php` grants each role a `rank` and its categories, which are expanded to a per-command allowlist at load time. Every command belongs to exactly one category, and its category also fixes its **scope**: *global* (a set any authenticated user may run — `createProject`, `importProject`, `listProjects`, `getMySpaceUsage`, `setSelectedProject`, `changePassword`, `deleteMyAccount`, `findUser`, the membership self-service commands, `listRoles`, `getMyPermissions`, `checkForUpdates`, `listWorkflowBlocks`, `lintWorkflows`) or *project* (requires membership). A global category is either open to any authenticated user or closed to everyone; there is no owner-gated global tier, because "owner" is a fact about one project and cannot authorize an action that has no project. Anything installation-wide — applying an engine update, mapping a domain to a project — is therefore either operator-side or expressed as a project-scoped action on the project it affects. Global reads are still caller-relative: `listProjects` returns only the projects the caller is a member of (with their role on each) and `getMySpaceUsage` aggregates disk usage only across the projects the caller *owns* — there is no all-projects API view, and project-scoped reads report only the project targeted in the URL. `owner` is the top of each project; `rank` orders the roles and governs role management — a granter may only assign a role strictly below their own (the self-escalation guard). Permissions are checked before the command file is included.
+Roles are **fixed** — there is no superadmin and no custom roles. A role is defined as a set of trust-coherent command **categories** in `secure/management/config/categories.php` (e.g. `content.read`, `style.write`, `deploy`, `project.delete`); `roles.php` grants each role a `rank` and its categories, which are expanded to a per-command allowlist at load time. Every command belongs to exactly one category, and its category also fixes its **scope**: *global* (a set any authenticated user may run — `help`, `createProject`, `importProject`, `listProjects`, `getMySpaceUsage`, `setSelectedProject`, `changePassword`, `deleteMyAccount`, `findUser`, the membership self-service commands, `listRoles`, `getMyPermissions`, `checkForUpdates`, `listWorkflowBlocks`, `lintWorkflows`, plus the four session commands) or *project* (requires membership). A global category is either open to any authenticated user or closed to everyone; there is no owner-gated global tier, because "owner" is a fact about one project and cannot authorize an action that has no project. Anything installation-wide — applying an engine update, mapping a domain to a project — is therefore either operator-side or expressed as a project-scoped action on the project it affects. Global reads are still caller-relative: `listProjects` returns only the projects the caller is a member of (with their role on each) and `getMySpaceUsage` aggregates disk usage only across the projects the caller *owns* — there is no all-projects API view, and project-scoped reads report only the project targeted in the URL. `owner` is the top of each project; `rank` orders the roles and governs role management — a granter may only assign a role strictly below their own (the self-escalation guard). Permissions are checked before the command file is included.
 
 Membership itself changes on a **consent model**: an admin or owner *invites* an existing account to a role (rank-checked at send), the invitee sees the offer in their own invitation inbox, and the grant materializes only on `acceptInvitation` — where the inviter's authority is **re-validated** (a demoted or removed inviter's offer is void). Pending invitations live in a separate `invitations` block of `members.json`, so a pending entry is structurally unable to grant access — every permission check reads `members` only. Users are targeted by their opaque `user_id` (discovered by exact public-name lookup, `findUser`); membership output references people as `{user_id, name}` and never exposes the private login username. Ownership rotates atomically via `transferOwnership` (owner-only, member-only target, confirmation required); removals and project deletions leave a dismissable notice in the affected user's own project list, while self-initiated exits (leave, decline, withdraw) leave none.
 
@@ -362,7 +369,7 @@ Captured values are URL-decoded before exposure, matching PHP's `$_GET` conventi
 #### How captured params flow
 
 - **Server (PHP)** — `Page::render()` injects each captured value as a template variable named after the param. Inside a page's PHP template, `$slug`, `$id`, etc. sit alongside `$translator` and other request-scoped variables. Inside renderer-driven JSON pages, a `{{param:NAME}}` placeholder is substituted in both raw text and translated text by `JsonToHtmlRenderer::renderTextNode`. The literal `param:` prefix is required so it doesn't collide with component-variable patterns.
-- **Client (qs.js)** — The build emits `public/scripts/qs-route-schema.js` listing every route's pattern + param shape. qs.js's synchronous IIFE walks the schema against `location.pathname` on load and exposes three globals: `QS.routeParams` (a dict of captured values), `QS.routePath` (the matched pattern), `QS.routeFound` (a boolean). State stores can initialise a field from `init: 'param:slug'` — a fifth source kind alongside the existing `query:` / `localStorage:` / `sessionStorage:` / literal. The matcher is purely client-side; for a deeper URL → live data loop (server-rendered authed pages, SEO) the server data resolver builds on the same schema.
+- **Client (qs.js)** — The build emits the project's own `public/scripts/qs-route-schema.js` listing every route's pattern + param shape. qs.js's synchronous IIFE walks the schema against `location.pathname` on load and exposes three globals: `QS.routeParams` (a dict of captured values), `QS.routePath` (the matched pattern), `QS.routeFound` (a boolean). State stores can initialise a field from `init: 'param:slug'` — a fifth source kind alongside the existing `query:` / `localStorage:` / `sessionStorage:` / literal. The matcher is purely client-side; for a deeper URL → live data loop (server-rendered authed pages, SEO) the server data resolver builds on the same schema.
 
 #### Conflict detection
 
@@ -427,7 +434,7 @@ squatting it (the shipped `.htaccess` also disables directory listings there).
 **Project visibility.** Each project's `config/members.json` carries a `visibility` flag:
 
 - `public` — the `/p/<id>/` view is open to anonymous visitors (a shareable site).
-- `private` — the `/p/<id>/` view requires membership (owner / member / viewer). Membership is presented by a short-lived, HttpOnly `qs_preview` cookie the admin panel sets from the caller's access token (a bearer header is accepted too).
+- `private` — the `/p/<id>/` view requires membership (owner / member / viewer). Membership is presented by a short-lived, HttpOnly `qs_preview` cookie the admin panel sets from the caller's access token. The gate also reads an `Authorization: Bearer` header, but under Apache that header is not forwarded to this surface, so the cookie is the working mechanism there; a deployment that needs the bearer path must forward the header to `public/p/` in its own server configuration.
 
 A refused `/p/<id>/` request answers `404` with a plain, engine-owned status page — the **same status, headers and bytes** an id that names no project at all gets. Whether the visitor is anonymous or signed in as a non-member makes no difference: a private project is indistinguishable from one that does not exist, so `/p/` cannot be used to discover which project ids are real. (The cost is deliberate: a signed-out member of a private project also sees `404` rather than a prompt to sign in.) The page borrows no project's templates — rendering the requested project's own error page would hand a non-member that project's styling — and it names nothing. A deployment can substitute its own static pages for these engine-owned statuses by declaring `QS_ERROR_PAGE_<status>` (e.g. `SetEnv QS_ERROR_PAGE_404 /404.html`): the value must be a root-relative `.html`/`.htm` file inside the document root, is served with the real status code, and an invalid value is logged and ignored. (A missing *page* inside a project that did resolve is different — that renders the project's own 404 template, no configuration involved.)
 
@@ -541,7 +548,7 @@ server-side from per-project `data/api-endpoints.json`.
 |---|---|
 | Storage (per project) | `secure/projects/<project>/data/api-endpoints.json` |
 | Server class | `secure/src/classes/ApiEndpointManager.php` |
-| Public bundle | `public/scripts/qs-api-config.js` (auto-regenerated on every `addApi` / `editApi` / `deleteApi`) |
+| Public bundle | `secure/projects/<project>/public/scripts/qs-api-config.js` (auto-regenerated on every `addApi` / `editApi` / `deleteApi`) |
 | Runtime | `secure/src/runtime/qs.js` → `QS.fetch` |
 | Admin UI | `/admin/apis` — see [ADMIN_PANEL.md §9.1](ADMIN_PANEL.md). |
 
@@ -585,7 +592,7 @@ binding references  ⊆  qs-enums.js contents  ⊆  union of all components' __e
 ```
 
 - Components' `__enums__` blocks (in `<project>/templates/model/json/components/*.json`) are the source of truth. Each entry: `{ source, map: {key: '__RAW__VALUE' | '__LIT__VALUE' | ...} }`.
-- `public/scripts/qs-enums.js` is a project-scoped runtime registry. Contains **exactly** the enums that at least one binding references — no more, no less. Loaded by every page (when present) as `window.QS_ENUMS`.
+- Each project's own `public/scripts/qs-enums.js` is its runtime registry. Contains **exactly** the enums that at least one binding references — no more, no less. Loaded by every page (when present) as `window.QS_ENUMS`.
 - Bindings reference enums by fully-qualified name: `<componentFilename>.<shortKey>` (e.g. `component-command-card.method_text`). Resolved at runtime via `QS.enum(name, value, fallback)`.
 
 **The helper**
@@ -602,7 +609,7 @@ Algorithm (per call):
 3. Validate: every referenced name has a definition. Missing references become **warnings**, not errors — the runtime gracefully degrades via `QS.enum`'s fallback (`fallback ?? value`).
 4. Build output: only entries that are BOTH available AND referenced. Sort keys for stable diffs.
 5. Strip `__RAW__` / `__LIT__` markers from values (renderer-only prefixes; the runtime reads plain strings).
-6. Write `public/scripts/qs-enums.js` with:
+6. Write the project's `public/scripts/qs-enums.js` with:
    ```js
    window.QS_ENUMS = { "component-command-card.method_text": { post: "POST", get: "GET", ... }, ... };
    ```
@@ -619,9 +626,8 @@ the calling command can surface warnings in the API response.
 | serving `/p/<id>/` | when an artifact is missing or stale | Rebuilds that project's registry from its own components + bindings before the page renders. |
 | `build` | after `writeCompiledJs` to the build folder | Writes `qs-enums.js` into the build's `scripts/` so deployed sites have the registry. |
 
-No component CRUD commands exist today, so changes to a component's
+No component CRUD commands exist, so changes to a component's
 `__enums__` refresh on the next binding edit or on the next serve.
-Documented; not a blocker.
 
 **Naming convention**
 
@@ -871,7 +877,7 @@ Build steps, in order:
 7. Copy `assets/` and `style/`.
 8. Sanitise `config.php` (strip credentials).
 9. Generate an `init.php` adjusted for the renamed public/secure folders.
-10. Package into a ZIP under `secure/builds/`.
+10. Package into a ZIP under the project's own `public/build/`.
 11. Return build stats.
 
 Deploy is a separate command (`deployBuild`) that copies the ZIP contents into a target path. The renamed `public/` and `secure/` folders are part of the security model — anyone scanning the deployed server cannot guess paths from the open-source repo layout.

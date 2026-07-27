@@ -2,7 +2,7 @@
 
 A file-based PHP CMS with a built-in visual admin panel. Define page structures in JSON, manage everything through a REST API or the admin UI, and deploy production builds — no database required.
 
-> **Current version: `1.0.0-beta.5`** — Actively developed. _Last updated: 2026-04-23._
+> **Current version: `1.0.0-beta.10`** — Actively developed.
 
 <a href="https://www.youtube.com/watch?v=LHheKkI1rLw">
   <img src="https://img.youtube.com/vi/LHheKkI1rLw/maxresdefault.jpg" alt="Watch the demo" width="50%">
@@ -35,19 +35,19 @@ For a deeper view of how QuickSite is organized:
 ### Key features
 
 - **Visual Admin Panel** — iframe-based page editor with drag-and-drop node management, live preview, and component library
-- **122 API Commands** — RESTful endpoints covering pages, translations, styles, assets, builds, projects, backups, AI integration, and more
+- **177 API Commands** — RESTful endpoints covering pages, translations, styles, assets, builds, projects, backups, membership, and more
 - **JSON-Driven Templates** — page structures defined in JSON, compiled to optimized PHP for production
 - **Multilingual** — built-in translation system with validation, health checks, and mono/multi-language modes
 - **Multi-Project** — host multiple independent sites from one installation
 - **Production Builds** — one-command compilation, optimization, and ZIP packaging
 - **File-Based** — no database, no migrations. JSON + PHP files, deployable anywhere
-- **Role-Based Access** — bearer token auth with granular permissions (viewer, editor, designer, developer, admin, superadmin)
-- **Self-Updating** — built-in update checker and updater via GitHub
-- **AI Integration (BYOK)** — proxy AI requests through the server with your own API keys (OpenAI, Anthropic, Google, Mistral)
+- **Role-Based Access** — username + password login issues a short-lived access token; authority is **per project**, with six fixed roles (viewer, editor, designer, developer, admin, owner)
+- **Self-Updating** — built-in update checker via GitHub
+- **AI Integration (BYOK)** — the admin panel calls AI providers **directly from the browser** with your own API keys (OpenAI, Anthropic, Google, Mistral); no key ever reaches the server
 
 ## Requirements
 
-- **PHP** 7.4+ (tested up to 8.4)
+- **PHP** 8.0+ (tested on 8.0 and 8.4)
 - **Web server**: Apache with `mod_rewrite` **or** nginx
 - **PHP extensions**: json, fileinfo, zip
 
@@ -216,18 +216,18 @@ Open `http://localhost:8000/admin/`. Clean URLs (`/about`, `/en/contact`) won't 
 
 ### First load
 
-On first load, QuickSite auto-creates sensitive config files from `.example` templates:
-- `secure/management/config/auth.php` — API tokens
+On first load, QuickSite auto-creates its config files from `.example` templates:
+- `secure/management/config/auth.php` — session TTLs, registration policy, CORS
 - `secure/management/config/roles.php` — role definitions
 
-> **⚠️ Token setup:** The default installation includes a placeholder token. On first login, the admin panel will prompt you to generate a new secure token. Follow the guided steps: generate a new token → log out → log back in with the new token → revoke the default placeholder. Do this before exposing the site publicly.
+The user registry (`users.php`) is **not** among them: it is written when you create your first account (see *Create your first account* above), so no credential ever ships in the repository.
 
 ## Project structure
 
 QuickSite has a strict public/private split:
 
-- `public/` — web root. Front controller, admin UI, `management/` API gateway, assets.
-- `secure/` — backend, outside the web root. API engine, admin backend, shared `src/`, isolated `projects/`, snippets, logs, exports.
+- `public/` — web root. The `p/` per-project front controller, the admin UI, and the `management/` API gateway. Nothing else — the root itself serves real files only, so it stays free for your own site.
+- `secure/` — backend, outside the web root. API engine, admin backend, shared `src/`, isolated `projects/` (each holding its own public files, builds, exports and backups), snippets, logs.
 - `docs/`, `tests/`, `setup.sh`/`setup.bat`, `VERSION`, `LICENSE`, `README.md` at the repo root.
 
 Full tree, key concepts, and folder-customization details: **[docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md)**.
@@ -249,11 +249,11 @@ All steps support renaming, nesting, un-nesting, and are re-runnable. On nginx, 
 QuickSite exposes a single self-documenting Management API. Once installed:
 
 ```
-GET /management/help              # full docs for all 122 commands
+GET /management/help              # full docs for all 177 commands
 GET /management/help/addRoute     # docs for one command
 ```
 
-All endpoints except `help` require a bearer token (`Authorization: Bearer <token>`), scoped to roles with granular command-level permissions.
+Five commands are public — `help`, `login`, `refreshSession`, `logoutSession`, `register`. Every other endpoint requires the short-lived access token (`Authorization: Bearer <token>`) returned by `login`, and is authorized against the caller's role **on the target project**.
 
 Full reference — endpoint shape, response envelope, command catalogue, auth, internals: **[docs/COMMAND_API.md](docs/COMMAND_API.md)**.
 
