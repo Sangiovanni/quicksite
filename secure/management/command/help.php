@@ -4293,10 +4293,24 @@ $GLOBALS['__help_commands'] = [
                 'files_count' => 45,
                 'site_name' => 'My Website',
                 'routes_count' => 5,
-                'switched_to' => true
+                'switched_to' => true,
+                'security' => [
+                    'skipped_unsafe_paths' => 0,
+                    'skipped_unsafe' => [],
+                    'skipped_disallowed_files' => 1,
+                    'skipped_disallowed' => ['public/assets/logo.png (content is not a valid .png (signature mismatch))']
+                ]
             ]
         ],
+        'notes' => [
+            'An archive is untrusted input. Entries are accepted against an extension ALLOWLIST and each one is checked so its content matches what its name claims (magic bytes for binary formats, valid JSON for .json, no PHP open tag for text, sanitisation for SVG).',
+            'A refused entry is skipped and listed in security.skipped_disallowed with the reason; the rest of the archive still imports. Entries refusing to stay inside the project are listed in security.skipped_unsafe.',
+            'Archive resource limits are enforced from the ZIP headers before anything is extracted: entry count, total and per-entry uncompressed size, and per-entry compression ratio. Exceeding any of them returns 413 and writes nothing.',
+            'The permitted extensions and the limits can be changed by copying secure/management/config/import-policy.php.example to import-policy.php.',
+            'PHP is never imported. config.php and routes.php are rebuilt from the archive JSON, and any members.json in the archive is discarded — the importer becomes the sole owner.'
+        ],
         'error_responses' => [
+            '413.validation.size_limit_exceeded' => 'Archive exceeds an entry-count, size or compression-ratio limit',
             '400.upload.failed' => 'File upload failed',
             '400.validation.invalid_zip' => 'Invalid or corrupted ZIP',
             '400.validation.invalid_structure' => 'ZIP missing required project files',

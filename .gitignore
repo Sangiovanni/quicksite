@@ -82,6 +82,7 @@ secure/management/config/auth.php
 secure/management/config/users.php
 secure/management/config/roles.php
 secure/management/config/deploy-roots.php
+secure/management/config/import-policy.php
 secure/management/config/environment.php
 
 # Session + login/registration-throttle runtime state (C5b/C8) -

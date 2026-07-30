@@ -27,7 +27,8 @@ quicksite/
 │   │   │   ├── *-throttle.json   # Login + registration backoff counters, hashed keys (machine-written, gitignored)
 │   │   │   ├── roles.php         # Role definitions (gitignored)
 │   │   │   ├── environment.php   # production | development — SSRF/error gate (gitignored; default production)
-│   │   │   └── deploy-roots.php  # deployBuild allowed target roots (gitignored; default SERVER_ROOT only)
+│   │   │   ├── deploy-roots.php  # deployBuild allowed target roots (gitignored; default SERVER_ROOT only)
+│   │   │   └── import-policy.php # Archive import + publish allowlists and archive size limits (gitignored; optional, built-in defaults apply without it)
 │   │   └── routes.php            # Command whitelist
 │   ├── admin/                    # Admin panel backend
 │   │   ├── AdminRouter.php       # Admin routing and page rendering

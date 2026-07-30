@@ -1,0 +1,68 @@
+<?php
+/**
+ * Import / Publish Policy — OPTIONAL override
+ *
+ * Copy this file to `import-policy.php` to change what an imported archive may
+ * carry into a project, what a build may copy into a web-served directory, and
+ * the resource limits applied to an uploaded archive.
+ *
+ * You do NOT need this file. Without it the built-in defaults apply (they are
+ * the values shown below). A malformed file is ignored and the defaults stay in
+ * force — the policy never fails open.
+ *
+ * Both extension lists are ALLOWLISTS. Anything not listed is refused. An entry
+ * refused at import is skipped and reported in the import response under
+ * `security.skipped_disallowed`; a file refused at build is reported under
+ * `skipped_unpublishable`. Neither aborts the operation.
+ *
+ * Extensions are compared lowercased, so listing 'png' also covers '.PNG'.
+ * A leading dot is accepted and stripped ('.png' and 'png' are equivalent).
+ *
+ * NOTE: providing either list REPLACES the corresponding default entirely, so
+ * you can narrow as well as widen. Copy the full list below and edit it rather
+ * than listing only your additions.
+ *
+ * WARNING: adding an extension your web server maps to an interpreter (php,
+ * phtml, phar, cgi, pl, asp, aspx, jsp) or treats as configuration (htaccess,
+ * config) re-opens the hole these allowlists exist to close. An archive is
+ * untrusted input: any authenticated user may import one, and becomes the
+ * owner of the resulting project.
+ */
+
+return [
+
+    // What an archive may carry into a project.
+    'import_extensions' => [
+        // structural + text
+        'json', 'css', 'js', 'mjs', 'map', 'txt', 'xml', 'csv', 'pdf',
+        // images
+        'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'ico', 'avif', 'bmp',
+        // fonts
+        'woff', 'woff2', 'ttf', 'otf', 'eot',
+        // media
+        'mp4', 'webm', 'ogv', 'ogg', 'mp3', 'wav',
+    ],
+
+    // What a build may copy into a web-served directory.
+    'publish_extensions' => [
+        'json', 'css', 'js', 'mjs', 'map', 'txt', 'xml', 'csv', 'pdf',
+        'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'ico', 'avif', 'bmp',
+        'woff', 'woff2', 'ttf', 'otf', 'eot',
+        'mp4', 'webm', 'ogv', 'ogg', 'mp3', 'wav',
+    ],
+
+    // Archive resource limits. Reading an archive entry loads it fully into
+    // memory, so an unbounded archive is an unbounded allocation. An archive
+    // exceeding any of these is refused before a single file is written.
+    'limits' => [
+        // Maximum number of entries in the archive.
+        'max_entries'     => 10000,
+        // Maximum total UNCOMPRESSED size of all entries, in bytes (200 MB).
+        'max_total_bytes' => 200 * 1024 * 1024,
+        // Maximum UNCOMPRESSED size of any single entry, in bytes (50 MB).
+        'max_entry_bytes' => 50 * 1024 * 1024,
+        // Maximum uncompressed:compressed ratio for any single entry. A high
+        // ratio is the signature of a decompression bomb.
+        'max_ratio'       => 100,
+    ],
+];

@@ -25,6 +25,7 @@
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/filePolicy.php';
 
 // Allowed keys in config.json import (security: whitelist only)
 const IMPORT_ALLOWED_CONFIG_KEYS = [
@@ -37,8 +38,12 @@ const IMPORT_ALLOWED_CONFIG_KEYS = [
     'FAVICON'
 ];
 
-// Dangerous file extensions to skip
-const DANGEROUS_EXTENSIONS = ['php', 'phtml', 'php3', 'php4', 'php5', 'php7', 'phps', 'phar'];
+// The extension gate is an ALLOWLIST in filePolicy.php, not a blocklist here.
+// A blocklist had to enumerate every dangerous spelling, and missed three: it
+// matched '.htaccess' case-sensitively (so '.HTACCESS' passed, and both name
+// the same file on a case-insensitive filesystem), and it had never heard of
+// '.phtm' or 'web.config'. It also validated no content at all, so an entry
+// named '.png' could hold anything.
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -111,7 +116,19 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
             ->withMessage('Invalid or corrupted ZIP file')
             ->withData(['error_code' => $result]);
     }
-    
+
+    // SECURITY (C11 11.0) — resource limits, enforced from the archive's own
+    // central directory BEFORE a single byte is extracted. getFromIndex()
+    // reads an entry fully into memory, so without a cap an uploaded archive
+    // is an unbounded allocation and an unbounded number of files on disk.
+    $limitBreach = checkArchiveLimits($zip);
+    if ($limitBreach !== null) {
+        $zip->close();
+        return ApiResponse::create(413, 'validation.size_limit_exceeded')
+            ->withMessage($limitBreach['message'])
+            ->withData($limitBreach['data']);
+    }
+
     // Find project folder in ZIP
     $projectFolder = findProjectFolderInZip($zip);
     
@@ -187,8 +204,14 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
         @mkdir($projectPath . $dir, 0755, true);
     }
     
-    // Extract files (secure: skip PHP, track warnings)
-    $stats = ['files' => 0, 'directories' => 0, 'total_size' => 0, 'skipped_php' => [], 'skipped_unsafe' => []];
+    // Extract files (allowlisted extensions + content validation; refusals tracked)
+    // No 'skipped_php' bucket: the allowlist refuses every executable spelling
+    // before a blocklist would have seen it, so a separate PHP counter could
+    // only ever report 0 while files were in fact being refused — a misleading
+    // signal on a security-relevant response. 'skipped_disallowed' replaces it
+    // and names the reason for each refusal.
+    $stats = ['files' => 0, 'directories' => 0, 'total_size' => 0,
+              'skipped_unsafe' => [], 'skipped_disallowed' => []];
     $extractResult = extractProjectFromZipSecure($zip, $projectFolder['prefix'], $projectPath, $stats);
     
     $zip->close();
@@ -260,11 +283,14 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
         'security' => [
             'format' => 'v2.0-secure',
             'php_rebuilt_from_json' => true,
-            'skipped_php_files' => count($stats['skipped_php']),
-            'skipped_files' => $stats['skipped_php'],
             // Entries refused by the zip-slip containment guard (path escape attempts).
             'skipped_unsafe_paths' => count($stats['skipped_unsafe']),
             'skipped_unsafe' => $stats['skipped_unsafe'],
+            // Entries refused by the extension allowlist or by content validation
+            // (C11 11.0). Reported rather than fatal: one stray file must not
+            // block an otherwise legitimate import, but it must never be silent.
+            'skipped_disallowed_files' => count($stats['skipped_disallowed']),
+            'skipped_disallowed' => $stats['skipped_disallowed'],
             'membership' => 'archive members.json discarded; importer set as sole owner'
         ],
         'rebuild_stats' => $rebuildResult['stats'] ?? []
@@ -296,6 +322,64 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
     return ApiResponse::create(201, 'resource.imported')
         ->withMessage("Project '$projectName' imported successfully (secure rebuild)")
         ->withData($result);
+}
+
+/**
+ * Enforce archive resource limits from the ZIP's central directory.
+ *
+ * Reads only the per-entry headers (statIndex), so a bomb is refused without
+ * decompressing anything. Limits and their defaults live in filePolicy.php.
+ *
+ * @return array{message:string, data:array}|null Null when the archive is within limits
+ */
+function checkArchiveLimits(ZipArchive $zip): ?array {
+    $limits = qs_archive_limits();
+
+    if ($zip->numFiles > $limits['max_entries']) {
+        return ['message' => 'Archive contains too many entries', 'data' => [
+            'entries' => $zip->numFiles,
+            'max_entries' => $limits['max_entries'],
+        ]];
+    }
+
+    $total = 0;
+    for ($i = 0; $i < $zip->numFiles; $i++) {
+        $stat = $zip->statIndex($i);
+        if ($stat === false) {
+            continue;
+        }
+        $size = (int)($stat['size'] ?? 0);
+        $comp = (int)($stat['comp_size'] ?? 0);
+
+        if ($size > $limits['max_entry_bytes']) {
+            return ['message' => 'Archive contains an entry that is too large', 'data' => [
+                'entry' => (string)($stat['name'] ?? ''),
+                'uncompressed_bytes' => $size,
+                'max_entry_bytes' => $limits['max_entry_bytes'],
+            ]];
+        }
+
+        // A high uncompressed:compressed ratio is the signature of a
+        // decompression bomb. Tiny entries are exempt: a few hundred bytes
+        // expanding from a dozen is ordinary compression, not an attack.
+        if ($comp > 0 && $size > 1024 && intdiv($size, $comp) > $limits['max_ratio']) {
+            return ['message' => 'Archive contains a suspiciously compressed entry', 'data' => [
+                'entry' => (string)($stat['name'] ?? ''),
+                'ratio' => intdiv($size, $comp) . ':1',
+                'max_ratio' => $limits['max_ratio'] . ':1',
+            ]];
+        }
+
+        $total += $size;
+        if ($total > $limits['max_total_bytes']) {
+            return ['message' => 'Archive total uncompressed size is too large', 'data' => [
+                'uncompressed_bytes_so_far' => $total,
+                'max_total_bytes' => $limits['max_total_bytes'],
+            ]];
+        }
+    }
+
+    return null;
 }
 
 /**
@@ -388,51 +472,64 @@ function extractProjectFromZipSecure(ZipArchive $zip, string $prefix, string $de
             continue;
         }
 
-        // Get file extension
-        $ext = strtolower(pathinfo($relativePath, PATHINFO_EXTENSION));
-        
-        // SECURITY: Skip PHP and other dangerous files
-        if (in_array($ext, DANGEROUS_EXTENSIONS)) {
-            $stats['skipped_php'][] = $relativePath;
-            continue;
-        }
-        
-        // Skip .htaccess files
-        if (basename($relativePath) === '.htaccess') {
-            $stats['skipped_php'][] = $relativePath . ' (htaccess)';
-            continue;
-        }
-        
         $destFilePath = $destPath . '/' . $relativePath;
-        
+
         // If directory (ends with /)
         if (substr($name, -1) === '/') {
-            if (!is_dir($destFilePath) && !mkdir($destFilePath, 0755, true)) {
-                return ['success' => false, 'error' => "Failed to create directory: $relativePath"];
+            // A directory name that the OS refuses (reserved device names, a
+            // segment of only dots, invalid characters) is the archive's
+            // problem, not the import's. Skip and report it the same way an
+            // unsafe path is reported — it must not abort the whole import,
+            // which used to roll the project back with a 500.
+            if (!is_dir($destFilePath) && !@mkdir($destFilePath, 0755, true) && !is_dir($destFilePath)) {
+                $stats['skipped_unsafe'][] = $relativePath . ' (unusable directory name)';
+                continue;
             }
             $stats['directories']++;
-        } else {
-            // Ensure parent directory exists
-            $parentDir = dirname($destFilePath);
-            if (!is_dir($parentDir) && !mkdir($parentDir, 0755, true)) {
-                return ['success' => false, 'error' => "Failed to create parent directory for: $relativePath"];
-            }
-            
-            // Extract file
-            $content = $zip->getFromIndex($i);
-            if ($content === false) {
-                return ['success' => false, 'error' => "Failed to read file from ZIP: $relativePath"];
-            }
-            
-            if (file_put_contents($destFilePath, $content) === false) {
-                return ['success' => false, 'error' => "Failed to write file: $relativePath"];
-            }
-            
-            $stats['files']++;
-            $stats['total_size'] += strlen($content);
+            continue;
         }
+
+        // SECURITY (C11 11.0) — ALLOWLIST. Anything whose extension is not
+        // explicitly permitted is refused, so a spelling nobody predicted
+        // ('.phtm', 'web.config') and a case variant of one that was
+        // ('.HTACCESS') are both refused by default rather than by enumeration.
+        if (!qs_import_allows_extension($relativePath)) {
+            $stats['skipped_disallowed'][] = $relativePath;
+            continue;
+        }
+
+        // Ensure parent directory exists
+        $parentDir = dirname($destFilePath);
+        if (!is_dir($parentDir) && !@mkdir($parentDir, 0755, true) && !is_dir($parentDir)) {
+            $stats['skipped_unsafe'][] = $relativePath . ' (unusable directory name)';
+            continue;
+        }
+
+        // Extract file
+        $content = $zip->getFromIndex($i);
+        if ($content === false) {
+            return ['success' => false, 'error' => "Failed to read file from ZIP: $relativePath"];
+        }
+
+        // SECURITY (C11 11.0) — the name must not lie about the content. An
+        // allowed extension is necessary but not sufficient: '.png' holding
+        // PHP source passes any extension check ever written. SVG comes back
+        // sanitised, so write what the validator returns, not the raw bytes.
+        $verdict = qs_import_validate_content($relativePath, $content);
+        if (!$verdict['ok']) {
+            $stats['skipped_disallowed'][] = $relativePath . ' (' . $verdict['reason'] . ')';
+            continue;
+        }
+        $content = $verdict['content'];
+
+        if (file_put_contents($destFilePath, $content) === false) {
+            return ['success' => false, 'error' => "Failed to write file: $relativePath"];
+        }
+
+        $stats['files']++;
+        $stats['total_size'] += strlen($content);
     }
-    
+
     return ['success' => true];
 }
 

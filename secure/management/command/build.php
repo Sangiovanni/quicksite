@@ -22,6 +22,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/JsonToPhpCompiler.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/filePolicy.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/LockManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/ZipUtilities.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
@@ -377,16 +378,23 @@ foreach ($publicFiles as $file) {
     }
 }
 
-// Copy /style/ directory recursively (using FileSystem utility)
-if (!copyDirectory(PUBLIC_CONTENT_PATH . '/style', $publicContentPath . '/style')) {
+// SECURITY (C11 11.0) — the PUBLISH boundary. These two copies are the point
+// where a file stops being project data and becomes something a web server
+// hands to the public, so this is where the publish allowlist applies. They
+// used to go through FileSystem.php's generic copyDirectory(), which recurses
+// and copies with no filter at all — so an executable or server-config file
+// planted in a project by any means rode an ordinary build into a deploy root.
+// Refusals are reported, not fatal: a stray file must not fail a build.
+$skippedUnpublishable = [];
+
+if (!qs_copy_publishable_directory(PUBLIC_CONTENT_PATH . '/style', $publicContentPath . '/style', $skippedUnpublishable)) {
     release_build_lock();
     ApiResponse::create(500, 'server.file_write_failed')
         ->withMessage("Failed to copy /style/ directory")
         ->send();
 }
 
-// Copy /assets/ directory recursively
-if (!copyDirectory(PUBLIC_CONTENT_PATH . '/assets', $publicContentPath . '/assets')) {
+if (!qs_copy_publishable_directory(PUBLIC_CONTENT_PATH . '/assets', $publicContentPath . '/assets', $skippedUnpublishable)) {
     release_build_lock();
     ApiResponse::create(500, 'server.file_write_failed')
         ->withMessage("Failed to copy /assets/ directory")
@@ -462,7 +470,10 @@ if (!is_dir($translateDestPath)) {
 }
 
 if (MULTILINGUAL_SUPPORT) {
-    // Multilingual: copy all translation files
+    // Multilingual: copy all translation files. Deliberately the generic
+    // copyDirectory() and NOT the publish-filtered copier: translations land in
+    // the SECURE sibling folder, which a deployment never serves, so this is
+    // not a publish boundary and filtering here would drop files for no gain.
     if (!copyDirectory(PROJECT_PATH . '/translate', $translateDestPath)) {
         release_build_lock();
         ApiResponse::create(500, 'server.file_write_failed')
@@ -872,6 +883,10 @@ ApiResponse::create(201, 'operation.success')
         'total_pages' => count($compiledPages),
         'skipped_pages' => $skippedPages,
         'skipped_count' => count($skippedPages),
+        // Files present in the project's public/ but refused by the publish
+        // allowlist, so they never reach a web-served directory (C11 11.0).
+        'skipped_unpublishable' => $skippedUnpublishable,
+        'skipped_unpublishable_count' => count($skippedUnpublishable),
         'page_events_compiled' => $pageEventsCount,
         'public_folder_name' => $buildPublicName,
         'secure_folder_name' => $buildSecureName,
