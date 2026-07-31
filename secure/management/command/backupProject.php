@@ -20,6 +20,7 @@
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
 
 /**
  * Recursively copy a directory
@@ -138,21 +139,11 @@ function __command_backupProject(array $params = [], array $urlParams = []): Api
     // marker (PROJECT_NAME, authorized by the dispatcher — project.data, admin+ —
     // before this runs). A body `name` that disagrees is refused; body is optional
     // (advisory). You cannot back up a project you did not target/authorize.
-    $projectName = trim((string)($params['name'] ?? ''));
-    $markerProject = defined('PROJECT_NAME') ? (string)PROJECT_NAME : '';
-    if ($markerProject !== '') {
-        if ($projectName !== '' && $projectName !== $markerProject) {
-            return ApiResponse::create(400, 'project.mismatch')
-                ->withMessage('The targeted project does not match the project in the request body')
-                ->withErrors(['name' => 'Must match the project in the URL']);
-        }
-        $projectName = $markerProject;
+    $bound = qs_bind_marker_project($params, 'backupProject', ['name']);
+    if ($bound['refusal'] !== null) {
+        return $bound['refusal'];
     }
-
-    if ($projectName === '') {
-        return ApiResponse::create(400, 'project.not_specified')
-            ->withMessage('No project specified');
-    }
+    $projectName = $bound['project'];
 
     // Reject a traversal payload before the backup source/dest path is built
     // (beta.10 C3 F1-e). The active-project fallback is trusted.

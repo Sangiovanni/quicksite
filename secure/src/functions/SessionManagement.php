@@ -374,7 +374,14 @@ function qs_login_throttle_mutate(callable $fn) {
             }
         }
         $tmp = $path . '.tmp' . getmypid();
-        if (file_put_contents($tmp, json_encode($data, JSON_PRETTY_PRINT)) === false || !@rename($tmp, $path)) {
+        // Encode checked separately from the write: `false . ''` writes an EMPTY
+        // file and file_put_contents returns 0, not false, so a check on the
+        // write alone lets a failed encode truncate the store (C11 11.3). This
+        // file holds only hashed keys and integers, so nothing unrepresentable
+        // can reach it today — checked for the same reason the sessions writer
+        // above already does.
+        $json = json_encode($data, JSON_PRETTY_PRINT);
+        if ($json === false || file_put_contents($tmp, $json) === false || !@rename($tmp, $path)) {
             @unlink($tmp);
             return false;
         }
@@ -505,7 +512,10 @@ function qs_registration_throttle_mutate(callable $fn) {
             }
         }
         $tmp = $path . '.tmp' . getmypid();
-        if (file_put_contents($tmp, json_encode($data, JSON_PRETTY_PRINT)) === false || !@rename($tmp, $path)) {
+        // Encode checked before the write — see qs_login_throttle_mutate above.
+        // Hashed IP keys and integers only, so unreachable; consistent anyway.
+        $json = json_encode($data, JSON_PRETTY_PRINT);
+        if ($json === false || file_put_contents($tmp, $json) === false || !@rename($tmp, $path)) {
             @unlink($tmp);
             return false;
         }

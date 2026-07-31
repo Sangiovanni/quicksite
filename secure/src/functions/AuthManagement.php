@@ -210,11 +210,19 @@ function qs_project_birth_write_members(string $projectPath, ?string $ownerId): 
         'visibility' => 'private',
         'members'    => [$ownerId => ['role' => 'owner']],
     ];
-    $bytes = file_put_contents(
-        $configDir . '/members.json',
-        json_encode($membersData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n",
-        LOCK_EX
-    );
+    // Encode checked before the write, same rule as qs_members_mutate. The
+    // owner id is session-derived here, so nothing unrepresentable can reach
+    // this today — it is checked anyway because a birth-write that silently
+    // produced a one-byte roster would mint an inaccessible project, and two
+    // boundaries making the same decision differently is where the next defect
+    // grows (the reasoning that closed F-C11-11.2-1).
+    $json = json_encode($membersData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    if ($json === false) {
+        error_log('qs_project_birth_write_members: refusing to mint an unencodable roster for '
+            . $projectPath . ' (' . json_last_error_msg() . ')');
+        return false;
+    }
+    $bytes = file_put_contents($configDir . '/members.json', $json . "\n", LOCK_EX);
     return $bytes !== false;
 }
 
@@ -241,12 +249,45 @@ function qs_public_user_ref(?string $userId, ?array $usersCfg = null): array {
 }
 
 /**
+ * Is this raw note something JSON cannot store? (C11 11.3)
+ *
+ * members.json is JSON, and json_encode() returns false on invalid UTF-8. The
+ * writer now refuses such a roster outright, but a 400 naming the offending
+ * FIELD is a far better answer than a generic refusal from the storage layer —
+ * so the note-carrying commands check here first and the writer stays a
+ * backstop.
+ *
+ * Deliberately a separate predicate rather than folding the condition into
+ * qs_clean_note: that function returns null for "absent", and conflating
+ * "you sent nothing" with "you sent something unstorable" would answer
+ * 'Required field' for a field that WAS supplied (mandatory-note commands) or
+ * silently drop it (optional-note commands). Both are worse than a specific
+ * error. A non-string is NOT "invalid" here — that is simply an absent note,
+ * which qs_clean_note already handles.
+ */
+function qs_note_encoding_invalid($note): bool {
+    return is_string($note) && $note !== '' && !mb_check_encoding($note, 'UTF-8');
+}
+
+/**
  * Membership notes (invitation note, removal reason, …): trim, strip control
  * bytes (same rule as display names — byte-wise strip is UTF-8-safe), cap at
  * 500 chars. Empty → null (callers omit the key entirely). C8 8.3a.
+ *
+ * NEVER RETURNS INVALID UTF-8 (C11 11.3). Callers should refuse such a note
+ * earlier via qs_note_encoding_invalid() so the caller learns which field was
+ * at fault; this fails closed for any that do not, so the value cannot reach
+ * json_encode. The control-strip alone was not enough: it removes bytes
+ * 0x00-0x1F and 0x7F, and every invalid UTF-8 sequence is made of bytes at or
+ * above 0x80. Note that mb_substr's own handling of such bytes differs by PHP
+ * version — it preserved them through 8.2 and substitutes from 8.3 — so
+ * relying on it would make the behaviour depend on the interpreter.
  */
 function qs_clean_note($note): ?string {
     if (!is_string($note)) {
+        return null;
+    }
+    if ($note !== '' && !mb_check_encoding($note, 'UTF-8')) {
         return null;
     }
     $note = preg_replace('/[\x00-\x1F\x7F]/', '', mb_substr(trim($note), 0, 500));
@@ -342,13 +383,16 @@ function qs_members_invariant_violation(array $data): ?string {
  *    the caller can tell its own abort from an infrastructure failure).
  *  - INVARIANT BACKSTOP before write (qs_members_invariant_violation) —
  *    violation = abort + error_log, never a silent repair.
+ *  - ENCODE CHECK before write — an unrepresentable roster aborts rather than
+ *    truncating the authority file (C11 11.3; see the check itself).
  *  - temp + rename atomic swap; byte format identical to createProject's
  *    birth-write (JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES + trailing \n).
  *
  * @param callable    $fn      function(array &$data): mixed — full decoded
  *                             members.json by reference; false aborts.
  * @param string|null $failure OUT: null | 'invalid_project' | 'missing' |
- *                             'lock' | 'corrupt' | 'invariant' | 'write'
+ *                             'lock' | 'corrupt' | 'invariant' | 'encode' |
+ *                             'write'
  * @return mixed the callback's return value, or false on abort/failure
  */
 function qs_members_mutate(string $project, callable $fn, ?string &$failure = null) {
@@ -385,7 +429,25 @@ function qs_members_mutate(string $project, callable $fn, ?string &$failure = nu
             $failure = 'invariant';
             return false;
         }
-        $content = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n";
+        // The encode MUST be checked before anything is written. json_encode
+        // returns false on a value it cannot represent (invalid UTF-8, or a
+        // structure past the depth limit), and `false . "\n"` is the single
+        // byte "\n" — which file_put_contents writes happily and reports as a
+        // SUCCESS of 1 byte, so a `=== false` check on the write alone does not
+        // catch it. The rename then commits, this function returns the
+        // callback's value, and the caller reports success while members.json —
+        // which IS access control — has been replaced by a newline. Every later
+        // mutation then fails 'corrupt', so the roster cannot even be repaired
+        // through the API. (C11 11.3, F-C11-11.3-1. The sessions writer above
+        // already had this check; the membership writer did not.)
+        $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        if ($json === false) {
+            error_log("qs_members_mutate: refusing to write members.json for '{$project}' — "
+                . 'the roster could not be encoded (' . json_last_error_msg() . ')');
+            $failure = 'encode';
+            return false;
+        }
+        $content = $json . "\n";
         $tmp = $path . '.tmp' . getmypid();
         if (file_put_contents($tmp, $content, LOCK_EX) === false) {
             @unlink($tmp);
@@ -422,6 +484,13 @@ function qs_members_failure_http(?string $failure): array {
     }
     if ($failure === 'missing' || $failure === 'corrupt' || $failure === 'invariant') {
         return [500, 'members.integrity', 'The project membership file is missing or unsound; refusing to operate on it'];
+    }
+    if ($failure === 'encode') {
+        // Caused by request DATA, not by a broken install: a field carried
+        // something JSON cannot represent. 400 so the caller can fix the input
+        // — qs_clean_note refuses these at the boundary, so reaching here means
+        // an unvalidated field found a new way in, and the roster is intact.
+        return [400, 'validation.unencodable', 'A submitted value could not be stored; check the text encoding'];
     }
     return [500, 'server.file_write_failed', 'Failed to persist the membership change'];
 }

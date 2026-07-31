@@ -58,6 +58,12 @@ function __command_denyJoinRequest(array $params = [], array $urlParams = []): A
     }
 
     $targetId = trim((string)($params['user_id'] ?? ''));
+    // C11 11.3 — see requestToJoin.
+    if (qs_note_encoding_invalid($params['note'] ?? null)) {
+        return ApiResponse::create(400, 'validation.unencodable')
+            ->withMessage('The note is not valid UTF-8 text')
+            ->withErrors(['note' => 'Must be valid UTF-8 text']);
+    }
     $note     = qs_clean_note($params['note'] ?? null);
     if ($targetId === '' || $note === null) {
         return ApiResponse::create(400, 'validation.missing_field')

@@ -16,6 +16,7 @@
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
 
 /**
  * Calculate directory size
@@ -86,21 +87,11 @@ function __command_listBackups(array $params = [], array $urlParams = []): ApiRe
     // the URL marker (PROJECT_NAME, authorized by the dispatcher — project.data,
     // admin+). A body `name` that disagrees is refused; body is optional. You
     // cannot enumerate the backups of a project you did not target/authorize.
-    $projectName = trim((string)($params['name'] ?? ''));
-    $markerProject = defined('PROJECT_NAME') ? (string)PROJECT_NAME : '';
-    if ($markerProject !== '') {
-        if ($projectName !== '' && $projectName !== $markerProject) {
-            return ApiResponse::create(400, 'project.mismatch')
-                ->withMessage('The targeted project does not match the project in the request body')
-                ->withErrors(['name' => 'Must match the project in the URL']);
-        }
-        $projectName = $markerProject;
+    $bound = qs_bind_marker_project($params, 'listBackups', ['name']);
+    if ($bound['refusal'] !== null) {
+        return $bound['refusal'];
     }
-
-    if ($projectName === '') {
-        return ApiResponse::create(400, 'project.not_specified')
-            ->withMessage('No project specified');
-    }
+    $projectName = $bound['project'];
 
     // Reject a traversal payload before the backups path is enumerated
     // (beta.10 C3 F1 listBackups). The active-project fallback is trusted.

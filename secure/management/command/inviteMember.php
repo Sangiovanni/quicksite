@@ -56,6 +56,14 @@ function __command_inviteMember(array $params = [], array $urlParams = []): ApiR
 
     $targetId = trim((string)($params['user_id'] ?? ''));
     $role     = trim((string)($params['role'] ?? ''));
+    // C11 11.3 — see requestToJoin. The note is OPTIONAL here, which is exactly
+    // why this cannot be folded into qs_clean_note: a null return would silently
+    // drop the note instead of telling the caller it was unstorable.
+    if (qs_note_encoding_invalid($params['note'] ?? null)) {
+        return ApiResponse::create(400, 'validation.unencodable')
+            ->withMessage('The note is not valid UTF-8 text')
+            ->withErrors(['note' => 'Must be valid UTF-8 text']);
+    }
     $note     = qs_clean_note($params['note'] ?? null);
 
     if ($targetId === '' || $role === '') {

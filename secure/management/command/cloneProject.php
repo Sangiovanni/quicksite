@@ -19,6 +19,7 @@
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -32,21 +33,11 @@ function __command_cloneProject(array $params = [], array $urlParams = []): ApiR
     // URL marker (PROJECT_NAME, authorized by the dispatcher — project.data, admin+
     // on the source — before this runs). A body `source` that disagrees is refused;
     // it is optional. You cannot clone FROM a project you did not target/authorize.
-    $sourceProject = trim((string)($params['source'] ?? ''));
-    $markerProject = defined('PROJECT_NAME') ? (string)PROJECT_NAME : '';
-    if ($markerProject !== '') {
-        if ($sourceProject !== '' && $sourceProject !== $markerProject) {
-            return ApiResponse::create(400, 'project.mismatch')
-                ->withMessage('The clone source does not match the project in the request body')
-                ->withErrors(['source' => 'Must match the project in the URL']);
-        }
-        $sourceProject = $markerProject;
+    $bound = qs_bind_marker_project($params, 'cloneProject', ['source']);
+    if ($bound['refusal'] !== null) {
+        return $bound['refusal'];
     }
-    if ($sourceProject === '') {
-        return ApiResponse::create(400, 'validation.missing_field')
-            ->withMessage('No source project specified')
-            ->withErrors(['source' => 'Specify a source project']);
-    }
+    $sourceProject = $bound['project'];
 
     // Reject a traversal payload in the source name before the recursive copy
     // reads from it (beta.10 C3 F1-c).

@@ -19,6 +19,7 @@
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
 
 /**
@@ -39,21 +40,11 @@ function __command_deleteProject(array $params = [], array $urlParams = []): Api
     // the request body. Bind the target to the authorized marker; a body
     // `name` that disagrees is refused outright (you cannot delete a project
     // you did not target/authorize).
-    $markerProject = defined('PROJECT_NAME') ? (string)PROJECT_NAME : '';
-    if ($markerProject !== '') {
-        if ($projectName !== '' && $projectName !== $markerProject) {
-            return ApiResponse::create(400, 'project.mismatch')
-                ->withMessage('The targeted project does not match the project in the request body')
-                ->withErrors(['name' => 'Must match the project in the URL']);
-        }
-        $projectName = $markerProject;
+    $bound = qs_bind_marker_project($params, 'deleteProject', ['name']);
+    if ($bound['refusal'] !== null) {
+        return $bound['refusal'];
     }
-
-    if (empty($projectName)) {
-        return ApiResponse::create(400, 'validation.missing_field')
-            ->withMessage('Project name is required')
-            ->withErrors(['name' => 'Required field']);
-    }
+    $projectName = $bound['project'];
 
     // Reject a traversal payload before it reaches the delete sink (beta.10 C3 F1-a).
     if (!is_valid_project_name($projectName)) {

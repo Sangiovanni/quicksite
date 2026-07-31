@@ -3471,7 +3471,7 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '400.project.mismatch' => 'The body name does not match the targeted (URL marker) project',
-            '400.validation.missing_field' => 'No project targeted',
+            '400.project.required' => 'No project targeted - use /management/p/<projectId>/deleteProject',
             '400.validation.confirmation_required' => 'Must set confirm=true',
             '400.validation.active_project' => 'Cannot delete the served main project (use force=true)',
             '403.auth.forbidden' => 'Not the owner of this project (owner-only)',
@@ -4244,6 +4244,7 @@ $GLOBALS['__help_commands'] = [
             ]
         ],
         'error_responses' => [
+            '400.project.required' => 'No project targeted - use /management/p/<projectId>/exportProject',
             '400.validation.missing_field' => 'Missing name parameter',
             '400.project.mismatch' => 'A name/project in the request disagreed with the project in the URL',
             '404.resource.not_found' => 'Project not found',
@@ -4384,6 +4385,11 @@ $GLOBALS['__help_commands'] = [
                 'deleted_old_backups' => []
             ]
         ],
+        'error_responses' => [
+            '400.project.required' => 'No project targeted - use /management/p/<projectId>/backupProject',
+            '400.project.mismatch' => 'A name in the request disagreed with the project in the URL',
+            '404.project.not_found' => 'Project not found'
+        ],
         'notes' => 'Backups are stored in project/backups/ folder. Old backups are auto-deleted when max_backups is exceeded. For sharing projects externally, use exportProject instead (JSON-only, secure).'
     ],
     
@@ -4421,6 +4427,11 @@ $GLOBALS['__help_commands'] = [
                 'total_size' => 3703701,
                 'total_size_formatted' => '3.53 MB'
             ]
+        ],
+        'error_responses' => [
+            '400.project.required' => 'No project targeted - use /management/p/<projectId>/listBackups',
+            '400.project.mismatch' => 'A name in the request disagreed with the project in the URL',
+            '404.project.not_found' => 'Project not found'
         ],
         'notes' => 'Backup types: "manual" (created via backupProject), "pre-restore" (auto-created before restore), "auto" (scheduled backups).'
     ],
@@ -4461,6 +4472,7 @@ $GLOBALS['__help_commands'] = [
             ]
         ],
         'error_responses' => [
+            '400.project.required' => 'No project targeted - use /management/p/<projectId>/restoreBackup',
             '400.validation.missing_field' => 'Backup name required',
             '404.resource.not_found' => 'Backup not found'
         ],
@@ -4497,6 +4509,7 @@ $GLOBALS['__help_commands'] = [
             ]
         ],
         'error_responses' => [
+            '400.project.required' => 'No project targeted - use /management/p/<projectId>/deleteBackup',
             '400.validation.missing_field' => 'Backup name required',
             '400.validation.invalid_filename' => 'Invalid backup name (path traversal blocked)',
             '404.resource.not_found' => 'Backup not found'

@@ -58,6 +58,13 @@ require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
  */
 function __command_requestToJoin(array $params = [], array $urlParams = []): ApiResponse {
     $project = trim((string)($params['project'] ?? ''));
+    // C11 11.3: refuse an unstorable note HERE, naming the field, rather than
+    // letting it reach the roster writer (which refuses it too, as a backstop).
+    if (qs_note_encoding_invalid($params['note'] ?? null)) {
+        return ApiResponse::create(400, 'validation.unencodable')
+            ->withMessage('The note is not valid UTF-8 text')
+            ->withErrors(['note' => 'Must be valid UTF-8 text']);
+    }
     $note    = qs_clean_note($params['note'] ?? null);
 
     if ($project === '' || $note === null) {

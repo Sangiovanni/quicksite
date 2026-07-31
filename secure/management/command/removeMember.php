@@ -47,6 +47,14 @@ function __command_removeMember(array $params = [], array $urlParams = []): ApiR
     }
 
     $targetId = trim((string)($params['user_id'] ?? ''));
+    // C11 11.3 — see requestToJoin. Optional note: this reason lands in the
+    // users.php cache notice (var_export, which cannot fail), but the check is
+    // kept uniform so every note-carrying command answers identically.
+    if (qs_note_encoding_invalid($params['note'] ?? null)) {
+        return ApiResponse::create(400, 'validation.unencodable')
+            ->withMessage('The note is not valid UTF-8 text')
+            ->withErrors(['note' => 'Must be valid UTF-8 text']);
+    }
     $note     = qs_clean_note($params['note'] ?? null);
 
     if ($targetId === '') {
