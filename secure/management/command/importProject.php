@@ -489,6 +489,18 @@ function extractProjectFromZipSecure(ZipArchive $zip, string $prefix, string $de
             continue;
         }
 
+        // SECURITY (C11 11.2) — no HIDDEN segment anywhere in the path. An
+        // archive carries a website, not a working tree: `.git/`, `.svn/` and
+        // `.idea/` are tooling leftovers, and a published `.git/` discloses the
+        // whole source history. The extension allowlist alone did not stop them
+        // — `.git/config.json` and `.idea/workspace.xml` have permitted
+        // extensions. Deployment-owned hidden paths (a `/.well-known/` TLS
+        // challenge, server config) belong in the deployment's own web root.
+        if (qs_policy_has_hidden_segment($relativePath)) {
+            $stats['skipped_disallowed'][] = $relativePath . ' (hidden path segment)';
+            continue;
+        }
+
         // SECURITY (C11 11.0) — ALLOWLIST. Anything whose extension is not
         // explicitly permitted is refused, so a spelling nobody predicted
         // ('.phtm', 'web.config') and a case variant of one that was

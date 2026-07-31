@@ -134,6 +134,34 @@ function qs_policy_extension(string $path): string
     return strtolower(pathinfo(str_replace('\\', '/', $path), PATHINFO_EXTENSION));
 }
 
+/**
+ * Does any segment of this path begin with a dot?
+ *
+ * A project's public/ is meant to hold the website AS IT IS. Hidden files and
+ * hidden DIRECTORIES are not website content — they are tooling leftovers
+ * (`.git/`, `.svn/`, `.idea/`) or server configuration, and a published `.git/`
+ * discloses a project's entire source history. Anything a deployment genuinely
+ * needs at a hidden path (a TLS challenge under `/.well-known/`, a server
+ * config file) belongs in the deployment's OWN web root, where the web server
+ * serves it directly without QuickSite ever running.
+ *
+ * Note the rule is "no segment may START with a dot", NOT "no dots": files need
+ * their extensions. `style/style.css` passes; `.git/config.json` does not.
+ *
+ * The one hidden file a project legitimately owns — `public/.htaccess` — is
+ * written by createProject, never imported and never served, so it is content
+ * DIRECTED by a command rather than uploaded.
+ */
+function qs_policy_has_hidden_segment(string $path): bool
+{
+    foreach (explode('/', str_replace('\\', '/', $path)) as $segment) {
+        if ($segment !== '' && $segment[0] === '.') {
+            return true;
+        }
+    }
+    return false;
+}
+
 /** May an archive entry with this path enter a project? (extension gate only) */
 function qs_import_allows_extension(string $path): bool
 {
@@ -289,15 +317,34 @@ function qs_import_validate_content(string $path, string $content): array
  * also avoids `deployBuild.php`, which declares its own global function of the
  * same name — requiring FileSystem.php there would be a fatal redeclare.
  *
- * @param string   $source  Directory to copy from
- * @param string   $dest    Directory to copy into
- * @param string[] $skipped Collects the relative paths that were refused
- * @param string   $prefix  Relative path prefix, for reporting
+ * Entries that resolve OUTSIDE the copy root are refused. `scandir()` and
+ * `is_dir()` report a reparse point (an NTFS junction, a symlink) as an ordinary
+ * directory, so without canonicalisation the recursion follows one straight out
+ * of the project and publishes whatever it finds. The passthrough already jails
+ * exactly this case; this is the same idiom, so both boundaries make the same
+ * decision instead of differing invisibly.
+ *
+ * @param string      $source   Directory to copy from
+ * @param string      $dest     Directory to copy into
+ * @param string[]    $skipped  Collects the relative paths that were refused
+ * @param string      $prefix   Relative path prefix, for reporting (recursion)
+ * @param string|null $jailRoot Canonical copy root, carried through the
+ *                              recursion so the jail stays the ORIGINAL root and
+ *                              not whichever subdirectory is being walked
  * @return bool True on success; false if a directory or file copy failed
  */
-function qs_copy_publishable_directory(string $source, string $dest, array &$skipped, string $prefix = ''): bool
-{
+function qs_copy_publishable_directory(
+    string $source,
+    string $dest,
+    array &$skipped,
+    string $prefix = '',
+    ?string $jailRoot = null
+): bool {
     if (!is_dir($source)) {
+        return false;
+    }
+    $root = $jailRoot ?? realpath($source);
+    if ($root === false) {
         return false;
     }
     if (!is_dir($dest) && !mkdir($dest, 0755, true) && !is_dir($dest)) {
@@ -313,8 +360,28 @@ function qs_copy_publishable_directory(string $source, string $dest, array &$ski
         $destPath   = $dest . '/' . $item;
         $relative   = $prefix === '' ? $item : $prefix . '/' . $item;
 
+        // A hidden DIRECTORY is refused whole — without this the recursion would
+        // walk into `.git/` and publish every non-dotted file inside it.
+        if ($item[0] === '.') {
+            $skipped[] = $relative . (is_dir($sourcePath) ? '/ (hidden directory)' : ' (hidden file)');
+            continue;
+        }
+
+        // The jail check, identical in shape to the passthrough's: canonicalise,
+        // then require the result to sit under the copy root. Trailing separator
+        // on the jail so a sibling whose name merely PREFIXES the root cannot
+        // satisfy it; case-folded on Windows.
+        $real = realpath($sourcePath);
+        $jail = rtrim($root, '/\\') . DIRECTORY_SEPARATOR;
+        $hay  = $real === false ? '' : $real . (is_dir($real) ? DIRECTORY_SEPARATOR : '');
+        if (DIRECTORY_SEPARATOR === '\\') { $jail = strtolower($jail); $hay = strtolower($hay); }
+        if ($real === false || strncmp($hay, $jail, strlen($jail)) !== 0) {
+            $skipped[] = $relative . ' (resolves outside the project)';
+            continue;
+        }
+
         if (is_dir($sourcePath)) {
-            if (!qs_copy_publishable_directory($sourcePath, $destPath, $skipped, $relative)) {
+            if (!qs_copy_publishable_directory($sourcePath, $destPath, $skipped, $relative, $root)) {
                 return false;
             }
             continue;

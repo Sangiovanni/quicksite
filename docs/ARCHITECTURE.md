@@ -305,7 +305,11 @@ exists only where a spec demands one (`sitemap.txt`).
 
 A request for a **static sub-resource** under `/p/<projectId>/` — an image, a stylesheet, or the
 shared `qs.js` runtime — is served by the same entry point through a prefix-checked passthrough
-that cannot escape that project's `public/` folder (§7).
+that cannot escape that project's `public/` folder (§7). The passthrough serves the website as it
+is: **hidden paths are never served** — no path segment may begin with a dot, so neither a hidden
+file nor anything inside a hidden directory is reachable. A deployment that needs to publish
+something at a hidden path, such as a TLS challenge under `/.well-known/`, places it in its own web
+root, where the web server serves it directly.
 
 ### 5.2 Management API request
 

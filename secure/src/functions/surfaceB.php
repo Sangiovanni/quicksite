@@ -273,8 +273,18 @@ function qs_surface_b_resolve_static(string $publicRoot, string $subpath): array
     if (strpos($decoded, "\0") !== false)          return ['status' => 400]; // null byte
     if (preg_match('#%2e|%2f|%5c#i', $subpath))     return ['status' => 400]; // encoded traversal token
 
-    $base = basename($decoded);
-    if ($base !== '' && $base[0] === '.')           return ['status' => 403]; // dotfile (.htaccess…)
+    // No HIDDEN segment anywhere in the path (C11 11.2). This used to inspect
+    // only basename(), which refused `style/.htaccess` but SERVED
+    // `.hidden/x.json` — a hidden DIRECTORY published everything inside it, and
+    // `.git/` is the classic case (source history disclosure). A project's
+    // public/ holds the website as it is; anything a deployment needs at a
+    // hidden path (a `/.well-known/` TLS challenge, server config) is served
+    // from the deployment's OWN web root, which never enters this passthrough.
+    // The rule is "no segment may START with a dot", not "no dots" — files need
+    // their extensions.
+    foreach (explode('/', str_replace('\\', '/', $decoded)) as $segment) {
+        if ($segment !== '' && $segment[0] === '.') return ['status' => 403]; // hidden file or directory
+    }
     $ext = strtolower(pathinfo($decoded, PATHINFO_EXTENSION));
     if ($ext === 'php' || $ext === 'phtml')         return ['status' => 403]; // never serve source
 
