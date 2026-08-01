@@ -124,11 +124,16 @@ class CommandRunner {
         try {
             return $functionName($params, $urlParams);
         } catch (\Throwable $e) {
+            // C12 (F9): this used to return the exception's FILE and LINE in
+            // `errors`, and its raw message in `message`, unconditionally — the
+            // sharpest path-disclosure site in the engine. Both now go to the
+            // error log; the caller gets the command name (which it supplied)
+            // and a fixed message, or the real detail if the install has
+            // declared itself development.
+            require_once __DIR__ . '/../functions/errorHygiene.php';
             return ApiResponse::create(500, 'command.execution_error')
-                ->withMessage("Error executing command '{$command}': " . $e->getMessage())
-                ->withErrors([
-                    ['exception' => get_class($e), 'message' => $e->getMessage(), 'file' => $e->getFile(), 'line' => $e->getLine()]
-                ]);
+                ->withMessage("Error executing command '{$command}': "
+                    . qs_safe_error_message($e, 'CommandRunner:' . $command));
         }
     }
     

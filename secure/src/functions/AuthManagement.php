@@ -1352,10 +1352,18 @@ function handleCors(?string $origin): bool {
         return true;
     }
     
-    // Same-origin check: if Origin matches the current host, it's not cross-origin
-    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-    $host = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? '';
-    $selfOrigin = $scheme . '://' . $host;
+    // Same-origin check: if Origin matches the current host, it's not cross-origin.
+    //
+    // C12: built from the VALIDATED origin, not the raw Host header. Both sides
+    // of this comparison used to come from the request, so a caller sending a
+    // matching Host + Origin pair satisfied it and skipped the allowlist below.
+    // Rated honestly, that was defence-in-depth rather than a live bypass — a
+    // browser sets Host from the URL it navigated to, so only a non-browser
+    // client controls both, and such a client has no CORS to evade. It is
+    // repaired because two request-controlled values should never be compared
+    // against each other, not because an exploit was demonstrated.
+    require_once __DIR__ . '/projectContext.php';
+    $selfOrigin = qs_request_origin();
     if (strcasecmp($origin, $selfOrigin) === 0) {
         return true; // Same-origin, no CORS headers needed
     }

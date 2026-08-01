@@ -37,9 +37,20 @@ return [
             ],
         ],
     ],
+    // Cross-origin access to /management. Same-origin calls — the admin panel,
+    // and any page served by this install — never consult this list: they are
+    // recognised as same-origin and allowed before it is read. It governs OTHER
+    // sites calling this API from a browser.
+    //
+    // SECURITY: 'allowed_origins' ships EMPTY on purpose. It used to ship ['*'],
+    // which made every new install answer any origin that asked. Name the
+    // origins you actually serve — 'https://app.example.com' — one per entry.
+    // A '*' entry is still honoured if you add one, but it means exactly what it
+    // says: every site on the internet may call this API from a visitor's
+    // browser.
     'cors' => [
         'enabled' => true,
-        'allowed_origins' => ['*'],
+        'allowed_origins' => [],
         'allowed_methods' => ['POST', 'OPTIONS'],
         'allowed_headers' => ['Content-Type', 'Authorization', 'Accept-Language'],
         'max_age' => 3600,

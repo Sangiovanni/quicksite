@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 /**
  * CSS Parser Utility Class
  *

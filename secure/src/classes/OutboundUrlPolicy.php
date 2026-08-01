@@ -21,10 +21,11 @@
  *
  * ENVIRONMENT gate: in 'development' the internal-range block (layer 2) is
  * lifted so a local author can call http://localhost:3000 / a LAN API; the
- * scheme allowlist (layer 1) and IP pinning (layer 3) stay on. The default is
- * 'production' (secure) — resolved from secure/management/config/environment.php
- * (see .example), falling back to production when unset. Changing it is a
- * server-side config edit, never a runtime API call.
+ * scheme allowlist (layer 1) and IP pinning (layer 3) stay on. The answer comes
+ * from qs_is_development() (src/functions/environment.php) — the one gate the
+ * whole install shares — which defaults to production and degrades to
+ * production on every malformed input. Changing it is a server-side config
+ * edit, never a runtime API call.
  *
  * Redirect policy is the CALLER's choice, not this class's: serverFetch and
  * testApiEndpoint do NOT follow redirects (a 3xx is returned as-is), while
@@ -149,29 +150,18 @@ class OutboundUrlPolicy
     }
 
     /**
-     * Development mode lifts the internal-range block only. Prefers a
-     * bootstrap-defined ENVIRONMENT constant; otherwise reads the gitignored
-     * secure/management/config/environment.php; defaults to production.
+     * Development mode lifts the internal-range block only.
+     *
+     * C12: this used to resolve the environment itself, with an `@require` that
+     * could not suppress a ParseError (a deployer's typo fatally ended every
+     * request reaching this class) and a `SECURE_FOLDER_PATH` dependency that
+     * silently answered "production" whenever the constant was not yet defined.
+     * Both are now the shared gate's problem, and every other caller gets the
+     * same answer this one does.
      */
     private static function isDevelopment(): bool
     {
-        static $isDev = null;
-        if ($isDev !== null) {
-            return $isDev;
-        }
-        if (defined('ENVIRONMENT')) {
-            return $isDev = (ENVIRONMENT === 'development');
-        }
-        $env = 'production';
-        if (defined('SECURE_FOLDER_PATH')) {
-            $path = SECURE_FOLDER_PATH . '/management/config/environment.php';
-            if (is_file($path)) {
-                $cfg = @require $path;
-                if (is_array($cfg) && isset($cfg['environment']) && is_string($cfg['environment'])) {
-                    $env = $cfg['environment'];
-                }
-            }
-        }
-        return $isDev = ($env === 'development');
+        require_once __DIR__ . '/../functions/environment.php';
+        return qs_is_development();
     }
 }

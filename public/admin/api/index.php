@@ -45,7 +45,17 @@ require_once __DIR__ . '/../../init.php';
 require_once SECURE_FOLDER_PATH . '/admin/AdminRouter.php';
 require_once SECURE_FOLDER_PATH . '/admin/functions/AdminHelper.php';
 
+// C12 (F9): this dispatcher had no fatal handling of any kind — no
+// set_exception_handler, no shutdown function, no catch(Throwable). A fatal
+// anywhere below (a malformed project config.php is enough) left the status at
+// 200 and let PHP print its own error, absolute filesystem path included, as
+// the body. Registered as early as the constants allow, sharing one
+// implementation with /management so the two surfaces cannot drift apart.
+require_once SECURE_FOLDER_PATH . '/src/functions/errorHygiene.php';
+qs_register_fatal_json_handler(QS_FATAL_SHAPE_ERROR);
+
 header('Content-Type: application/json');
+header('Cache-Control: no-store');
 
 // Get the router to check authentication
 $router = new AdminRouter();

@@ -461,12 +461,22 @@ if (!empty($__resolverConfigs)) {
                 header('Location: ' . ($_GET['return'] ?? '/'), true, 302);
                 exit;
             }
+            // C12 (F9): this is the PUBLIC site. It used to echo the raw
+            // exception message plus the names of the secret files to any
+            // anonymous visitor who hit a misconfigured OAuth route. The
+            // operator's diagnosis now goes to the error log; the visitor gets
+            // the fact that it is misconfigured and nothing about the server.
+            require_once SECURE_FOLDER_PATH . '/src/functions/errorHygiene.php';
+            $__oauthSafe = qs_safe_error_message($__oauthErr, 'oauth:' . $routePath);
             http_response_code(500);
             echo "<h1>500 — OAuth misconfigured</h1>\n";
-            echo '<p>Route: <code>' . htmlspecialchars($routePath) . "</code></p>\n";
-            echo '<p>Provider: <code>' . htmlspecialchars((string) $__provider) . "</code></p>\n";
-            echo '<p>Error: ' . htmlspecialchars($__oauthErr->getMessage()) . "</p>\n";
-            echo "<p><small>Fix the OAuth config (oauth-presets.json / oauth-secrets.php) and reload.</small></p>\n";
+            echo "<p>This sign-in route is not correctly configured.</p>\n";
+            if (qs_is_development()) {
+                echo '<p>Route: <code>' . htmlspecialchars($routePath) . "</code></p>\n";
+                echo '<p>Provider: <code>' . htmlspecialchars((string) $__provider) . "</code></p>\n";
+                echo '<p>Error: ' . htmlspecialchars($__oauthSafe) . "</p>\n";
+                echo "<p><small>Fix the OAuth config (oauth-presets.json / oauth-secrets.php) and reload.</small></p>\n";
+            }
             exit;
         }
 

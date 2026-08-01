@@ -61,20 +61,7 @@ function qs_load_project_context(string $projectName, bool $strict = true): void
                 return;
             }
             http_response_code(500);
-            die(
-                "<h1>QuickSite Project Error</h1>" .
-                "<p><strong>Missing file:</strong> <code>" . htmlspecialchars(CONFIG_PATH) . "</code></p>" .
-                "<p><strong>Active project:</strong> <code>" . htmlspecialchars(PROJECT_NAME) . "</code></p>" .
-                "<p><strong>What this means:</strong> The project configuration file <code>config.php</code> is missing for project '<strong>" . htmlspecialchars(PROJECT_NAME) . "</strong>'.</p>" .
-                "<p><strong>Expected structure:</strong><br><code>" . htmlspecialchars(SECURE_FOLDER_PATH) . "/projects/" . htmlspecialchars(PROJECT_NAME) . "/config.php</code></p>" .
-                "<p><strong>Possible causes:</strong></p>" .
-                "<ul>" .
-                "<li>Project '<strong>" . htmlspecialchars(PROJECT_NAME) . "</strong>' does not exist in <code>" . SECURE_FOLDER_NAME . "/projects/</code></li>" .
-                "<li>Project folder exists but <code>config.php</code> was deleted</li>" .
-                "<li>Wrong project id in the request (the <code>/p/&lt;projectId&gt;/</code> path segment, or the server's <code>QS_PROJECT</code> mapping)</li>" .
-                "<li>If paths look wrong, check constants in <code>" . PUBLIC_FOLDER_NAME . "/init.php</code></li>" .
-                "</ul>"
-            );
+            qs_project_context_die('config.php', CONFIG_PATH, PROJECT_NAME);
         }
         define('CONFIG', require CONFIG_PATH);
     }
@@ -105,23 +92,60 @@ function qs_load_project_context(string $projectName, bool $strict = true): void
                 return;
             }
             http_response_code(500);
-            die(
-                "<h1>QuickSite Project Error</h1>" .
-                "<p><strong>Missing file:</strong> <code>" . htmlspecialchars(ROUTES_PATH) . "</code></p>" .
-                "<p><strong>Active project:</strong> <code>" . htmlspecialchars(PROJECT_NAME) . "</code></p>" .
-                "<p><strong>What this means:</strong> The routes definition file <code>routes.php</code> is missing for project '<strong>" . htmlspecialchars(PROJECT_NAME) . "</strong>'.</p>" .
-                "<p><strong>Expected structure:</strong><br><code>" . htmlspecialchars(SECURE_FOLDER_PATH) . "/projects/" . htmlspecialchars(PROJECT_NAME) . "/routes.php</code></p>" .
-                "<p><strong>Possible causes:</strong></p>" .
-                "<ul>" .
-                "<li>Project '<strong>" . htmlspecialchars(PROJECT_NAME) . "</strong>' is incomplete - missing <code>routes.php</code></li>" .
-                "<li>File was accidentally deleted</li>" .
-                "<li>Corrupted project - try recreating with <code>createProject</code> API command</li>" .
-                "<li>If paths look wrong, check constants in <code>" . PUBLIC_FOLDER_NAME . "/init.php</code></li>" .
-                "</ul>"
-            );
+            qs_project_context_die('routes.php', ROUTES_PATH, PROJECT_NAME);
         }
         define('ROUTES', require ROUTES_PATH);
     }
+}
+
+/**
+ * The install-error page for a project that cannot be loaded. Never returns.
+ *
+ * C12 (F9): both call sites used to print the ABSOLUTE path of the missing file
+ * plus SECURE_FOLDER_PATH, to whoever asked. This is reachable from the PUBLIC
+ * `/p/<id>/` renderer, so an anonymous visitor to a half-deleted project got the
+ * server's directory layout. The diagnosis a deployer needs is which FILE is
+ * missing from which PROJECT — the project id is already in the URL they typed,
+ * and the file name is a fixed string — so the page keeps every bit of that and
+ * drops only the part that was never actionable. The absolute path goes to the
+ * error log, where the person who can act on it is already looking.
+ *
+ * In a development install the path is shown, because there the audience for
+ * this page IS the person holding the filesystem.
+ *
+ * @param string $fileName Bare name of the missing file, e.g. 'config.php'.
+ * @param string $absPath  Its absolute path — logged, shown only in development.
+ * @param string $project  Project id (already caller-supplied via the URL).
+ */
+function qs_project_context_die(string $fileName, string $absPath, string $project): void
+{
+    require_once __DIR__ . '/environment.php';
+    error_log("QuickSite: project '{$project}' is missing {$fileName} (expected at {$absPath})");
+
+    $safeProject = htmlspecialchars($project, ENT_QUOTES, 'UTF-8');
+    $safeFile    = htmlspecialchars($fileName, ENT_QUOTES, 'UTF-8');
+
+    $page = '<h1>QuickSite Project Error</h1>'
+          . '<p><strong>Project:</strong> <code>' . $safeProject . '</code></p>'
+          . '<p><strong>Missing file:</strong> <code>' . $safeFile . '</code></p>'
+          . '<p>The project <strong>' . $safeProject . '</strong> cannot be served because its '
+          . '<code>' . $safeFile . '</code> is missing.</p>'
+          . '<p><strong>Possible causes:</strong></p>'
+          . '<ul>'
+          . '<li>The project does not exist, or its folder is incomplete</li>'
+          . '<li><code>' . $safeFile . '</code> was deleted or never written</li>'
+          . '<li>The request names the wrong project id</li>'
+          . '</ul>'
+          . '<p>The full path has been written to the server error log.</p>';
+
+    if (qs_is_development()) {
+        $page .= '<hr><p><strong>Expected at:</strong> <code>'
+               . htmlspecialchars($absPath, ENT_QUOTES, 'UTF-8')
+               . '</code><br><small>Shown because this install is configured as '
+               . '<code>development</code>.</small></p>';
+    }
+
+    die($page);
 }
 
 /**
@@ -152,6 +176,25 @@ function qs_request_origin(): string
     $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
         || ((int) ($_SERVER['SERVER_PORT'] ?? 0) === 443);
 
+    return ($https ? 'https://' : 'http://') . qs_request_host();
+}
+
+/**
+ * The validated host[:port] alone — same validation as qs_request_origin(),
+ * without a scheme.
+ *
+ * C12 split this out for ONE caller: OAuthHandler::makeAbsoluteUrl(), which
+ * builds the OAuth `redirect_uri` and decides its scheme with _oauthIsHttps().
+ * That helper is a SUPERSET of the scheme test above — it also honours
+ * X-Forwarded-Proto — so handing OAuth a whole origin would have silently
+ * regressed every reverse-proxy deployment from https to http. It needs the
+ * validated host and its own scheme, so that is exactly what it now gets. One
+ * validator, two accessors; qs_request_origin() is unchanged in behaviour.
+ *
+ * @return string "host" or "host:port" — never empty, never attacker-shaped.
+ */
+function qs_request_host(): string
+{
     $shapeOk = static function ($host): bool {
         if (!is_string($host) || $host === '' || strlen($host) > 255) {
             return false;
@@ -190,7 +233,7 @@ function qs_request_origin(): string
         }
     }
 
-    return ($https ? 'https://' : 'http://') . $host;
+    return $host;
 }
 
 /**

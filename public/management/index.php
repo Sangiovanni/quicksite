@@ -10,6 +10,11 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/LoggingManagement.php';
+// Loaded HERE, not inside the shutdown handler below: by the time that handler
+// runs a fatal has already happened, and a require issued from inside it would
+// be one more thing that can fail while we are trying to report a failure.
+require_once SECURE_FOLDER_PATH . '/src/functions/environment.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/errorHygiene.php';
 
 // Prevent browsers from caching ANY API response (including 401/404/error responses).
 // Must be set before any output and before any early exit (auth failure, public command, etc.).
@@ -21,46 +26,12 @@ $commandStartTime = microtime(true);
 // ============================================================================
 // Fatal Error Handler - Catches parse errors and other fatal errors
 // ============================================================================
-register_shutdown_function(function() {
-    $error = error_get_last();
-    if ($error && in_array($error['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
-        // Clear any output that was sent
-        if (ob_get_level() > 0) {
-            ob_end_clean();
-        }
-        
-        // Set proper error status
-        http_response_code(500);
-        header('Content-Type: application/json');
-        
-        // Build error response
-        $errorResponse = [
-            'status' => 500,
-            'code' => 'server.internal_error',
-            'message' => 'A fatal error occurred while processing the request',
-            'data' => null
-        ];
-        
-        // In development, include error details
-        if (defined('ENVIRONMENT') && ENVIRONMENT === 'development') {
-            $errorResponse['debug'] = [
-                'type' => match($error['type']) {
-                    E_ERROR => 'E_ERROR',
-                    E_PARSE => 'E_PARSE',
-                    E_CORE_ERROR => 'E_CORE_ERROR',
-                    E_COMPILE_ERROR => 'E_COMPILE_ERROR',
-                    default => 'UNKNOWN'
-                },
-                'message' => $error['message'],
-                'file' => $error['file'],
-                'line' => $error['line']
-            ];
-        }
-        
-        echo json_encode($errorResponse, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-        exit;
-    }
-});
+// C12: this was an inline copy. It now shares one implementation with the
+// admin-api dispatcher, which had NO fatal handling at all and answered the
+// same fatal with HTTP 200 and an absolute filesystem path. Two copies of the
+// same decision is the drift shape C11 spent a slice removing; the debug block
+// is also gated in exactly one place now.
+qs_register_fatal_json_handler(QS_FATAL_SHAPE_ENVELOPE);
 
 // ============================================================================
 // CORS Handling - Must be before any output
@@ -165,11 +136,11 @@ if(!defined('ROUTES_MANAGEMENT_PATH')){
     define('ROUTES_MANAGEMENT_PATH', SERVER_ROOT . '/' . SECURE_FOLDER_NAME . '/management/routes.php');
 }
 if (!file_exists(ROUTES_MANAGEMENT_PATH)) {
+    // C12 (F9): the absolute path used to ride out in `data.expected_path`.
+    // A caller cannot act on it; an operator reads it from the error log.
+    error_log('QuickSite: routes management file not found at ' . ROUTES_MANAGEMENT_PATH);
     ApiResponse::create(500, 'file.not_found')
-        ->withMessage("Routes management file not found")
-        ->withData([
-            'expected_path' => ROUTES_MANAGEMENT_PATH
-        ])
+        ->withMessage('Routes management file not found')
         ->send();
 }
 if(!defined('ROUTES_MANAGEMENT')){
@@ -182,11 +153,16 @@ $trimParametersManagement = new TrimParametersManagement();
 if(in_array($trimParametersManagement->command(), ROUTES_MANAGEMENT)){
     $command = $trimParametersManagement->command();
 } else {
+    // C12 (F9): this used to answer an unknown command with the ENTIRE routable
+    // command list — all 177 names, to any authenticated caller regardless of
+    // role or membership. `help` already exposes the commands a caller is
+    // actually permitted to run, which is the answer they are entitled to; this
+    // handed over the full catalogue. The requested name is echoed back because
+    // the caller supplied it and it makes a typo diagnosable.
     ApiResponse::create(404, 'route.not_found')
-        ->withMessage("Command not found")
+        ->withMessage('Command not found')
         ->withData([
             'requested_command' => $trimParametersManagement->command(),
-            'available_commands' => ROUTES_MANAGEMENT
         ])
         ->send();
 }

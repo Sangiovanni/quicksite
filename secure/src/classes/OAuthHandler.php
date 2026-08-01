@@ -657,8 +657,26 @@ class OAuthHandler
         if (preg_match('#^https?://#i', $url)) {
             return $url;
         }
+        // C12: the host is the VALIDATED one, never the raw header.
+        //
+        // This builds the OAuth `redirect_uri` (see handleStart), so a poisoned
+        // Host used to put an attacker-chosen origin into it. Whether the
+        // provider's registered-redirect allowlist saves you depends on the
+        // provider, and it was worth checking rather than assuming: Google,
+        // Meta and Amazon all require an EXACT match, so an injected host is
+        // simply refused — but GitHub matches the callback's host **excluding
+        // sub-domains**, so `evil.example.com` is accepted for an app
+        // registered at `example.com` and the authorization code lands on the
+        // attacker's host. qs_request_host() shape-validates and honours
+        // QS_TRUSTED_HOSTS, which closes that.
+        //
+        // The scheme deliberately stays with _oauthIsHttps(): it also honours
+        // X-Forwarded-Proto, which the origin helper does not, and taking the
+        // whole origin instead would have downgraded every reverse-proxy
+        // deployment to http.
+        require_once __DIR__ . '/../functions/projectContext.php';
         $scheme = _oauthIsHttps() ? 'https' : 'http';
-        $host = (string) ($_SERVER['HTTP_HOST'] ?? 'localhost');
+        $host = qs_request_host();
         if ($url === '' || $url[0] !== '/') {
             $url = '/' . $url;
         }

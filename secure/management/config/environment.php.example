@@ -5,14 +5,23 @@
  * Copy this file to environment.php to change the environment. If the live
  * file is absent, QuickSite behaves as 'production' (the secure default).
  *
+ * Production is also what you get from every FAILURE path: an unreadable file,
+ * a syntax error, a file that is not PHP at all, a wrong shape, a missing key,
+ * or any value other than the exact string 'development'. Only a well-formed
+ * file saying exactly 'development' opens the gate, and a broken file is
+ * reported to the PHP error log rather than taking the request down.
+ *
  * Values:
  *   'production'   (default) — server-side fetches (resolvers, testApiEndpoint,
  *                  OAuth, URL asset import) MAY NOT reach loopback / private /
  *                  cloud-metadata addresses. This is what a public or shared
- *                  deployment must run as.
+ *                  deployment must run as. API error responses carry no
+ *                  diagnostic detail.
  *   'development'  — lifts the internal-address block so a local author can
  *                  call http://localhost:3000 or a LAN API while building.
  *                  The http/https scheme allowlist and DNS-pinning stay on.
+ *                  Fatal-error responses additionally carry the error type,
+ *                  message, file and line.
  *
  * SECURITY: only ever run 'development' on a machine you fully trust and that
  * is not reachable by untrusted callers. Changing this is a deliberate
