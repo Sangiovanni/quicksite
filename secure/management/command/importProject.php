@@ -716,32 +716,30 @@ function rebuildPageWrappers(string $jsonDir, string $phpDir, array &$stats, str
 
 /**
  * Generate the development page wrapper PHP code.
- * This matches the format used by working projects (quicksite, test-bin).
+ *
+ * SECURITY (C13 F-C13-2): `$routePath`/`$pageName` are ARCHIVE ENTRY NAMES —
+ * `rebuildPageWrappers()` derives them from `scandir()` of the just-extracted
+ * upload, so they are fully attacker-authored. The former body interpolated the
+ * name into an `<<<PHP` (interpolating) heredoc inside a single-quoted literal
+ * (`renderPage('$routePath')`); an entry named `x');<php>;#.json` closed the
+ * literal and the tail became live PHP in a wrapper that `public/p/index.php`
+ * later `require_once`s — authenticated RCE, reachable via the any-auth
+ * importProject. The C11 import gates check an entry's path/extension/content
+ * but never its name's character set, and a name never becomes content, so none
+ * of them caught it.
+ *
+ * The wrapper is route-AGNOSTIC by design: it reads the route from
+ * `TrimParameters` at request time. So there is nothing to bake in — delegate
+ * to the single canonical generator (`generate_page_template`, the one
+ * createProject uses), which is a nowdoc that interpolates NOTHING. This also
+ * retires a stale second copy: importProject's old inline form predated the
+ * Beta.8 route-agnostic bootstrap and omitted the renderer options array.
+ * `$routePath`/`$pageName` are intentionally unused now (the canonical generator
+ * ignores its argument); the signature is kept so the two call sites are
+ * untouched.
  */
 function generatePageWrapper(string $routePath, string $pageName): string {
-    return <<<PHP
-<?php
-
-require_once SECURE_FOLDER_PATH . '/src/classes/TrimParameters.php';
-\$trimParameters = new TrimParameters();
-require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';
-\$translator = new Translator(\$trimParameters->lang());
-\$lang = \$trimParameters->lang();
-
-require_once SECURE_FOLDER_PATH . '/src/classes/JsonToHtmlRenderer.php';
-\$renderer = new JsonToHtmlRenderer(\$translator);
-
-\$content = \$renderer->renderPage('$routePath');
-
-// Now use this constant to include files from your src folder
-require_once SECURE_FOLDER_PATH . '/src/classes/PageManagement.php';
-
-// Get page title from translation
-\$pageTitle = \$translator->translate('page.titles.$routePath');
-
-\$page = new PageManagement(\$pageTitle, \$content, \$lang);
-\$page->render();
-PHP;
+    return generate_page_template($routePath);
 }
 
 /**
