@@ -1,6 +1,11 @@
 <?php
 
 require_once __DIR__ . '/../functions/qsVerbCatalog.php';
+// utilsManagement carries the array_is_list() polyfill compilePage() depends on.
+// Required explicitly rather than relying on build.php's load order: on PHP 8.0.30
+// (the supported floor) the bare call is a fatal, so the dependency has to be
+// stated by the file that uses it.
+require_once __DIR__ . '/../functions/utilsManagement.php';
 require_once __DIR__ . '/Translator.php';
 require_once __DIR__ . '/UrlPolicy.php';
 require_once __DIR__ . '/CallTransformer.php';

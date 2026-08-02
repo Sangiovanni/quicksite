@@ -410,11 +410,21 @@ class RegexPatterns
      * 
      * @param string $patternName The pattern identifier
      * @param string $field The field name being validated
-     * @param string $value The value that failed validation
+     * @param mixed  $value The value that failed validation. Deliberately NOT
+     *        typed `string`: callers reach here precisely because the value was
+     *        the wrong shape, and a `string` type made the ERROR PATH itself
+     *        fatal when handed `?field[]=x` (beta.10 C13 F-C13-11, deployBuild:55
+     *        — its guard was correct and its report died). Non-strings are
+     *        rendered for display rather than echoed back raw.
      * @return array Error data array for API response
      */
-    public static function validationError(string $patternName, string $field, string $value): array
+    public static function validationError(string $patternName, string $field, $value): array
     {
+        if (!is_string($value)) {
+            $value = is_scalar($value) || $value === null
+                ? var_export($value, true)
+                : '(' . gettype($value) . ')';
+        }
         return [
             'field' => $field,
             'value' => $value,

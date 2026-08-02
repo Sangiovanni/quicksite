@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/utilsManagement.php'; // qs_json_write
 /**
  * LoggingManagement.php
  * 
@@ -290,13 +291,7 @@ function writeLogEntry(array $entry, ?string $project = null): bool {
         $logs[] = $entry;
         
         // Write directly to file (we have exclusive lock)
-        $success = @file_put_contents(
-            $logFile, 
-            json_encode($logs, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
-            LOCK_EX
-        ) !== false;
-        
-        return $success;
+        return qs_json_write($logFile, $logs, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES, LOCK_EX);
     } finally {
         // Always release lock and close handle
         flock($lockHandle, LOCK_UN);

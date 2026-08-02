@@ -45,9 +45,9 @@ if (!is_dir($dir)) {
     @mkdir($dir, 0755, true);
 }
 $jsonFlags = JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE;
-$wroteBanner = file_put_contents(consentBannerPath(), json_encode($banner, $jsonFlags) . "\n", LOCK_EX);
-$wrotePopup  = file_put_contents(consentPopupPath(),  json_encode($popup,  $jsonFlags) . "\n", LOCK_EX);
-if ($wroteBanner === false || $wrotePopup === false) {
+$wroteBanner = qs_json_write(consentBannerPath(), $banner, $jsonFlags, LOCK_EX, "\n");
+$wrotePopup  = qs_json_write(consentPopupPath(),  $popup,  $jsonFlags, LOCK_EX, "\n");
+if (!$wroteBanner || !$wrotePopup) {
     ApiResponse::create(500, 'server.operation_failed')
         ->withMessage('Failed to write the consent layer structure files')
         ->send();

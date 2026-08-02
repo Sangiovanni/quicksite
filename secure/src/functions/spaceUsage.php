@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/utilsManagement.php'; // qs_json_write
 /**
  * Owner space usage — per-project disk measurement + a TTL cache (beta.10 C8).
  *
@@ -149,13 +150,13 @@ function qs_project_space(string $project, bool $refresh = false): array {
 
     $dir = qs_space_cache_path();
     if (is_dir($dir) || (@mkdir($dir, 0755, true) || is_dir($dir))) {
-        $written = @file_put_contents($file, json_encode([
+        $written = qs_json_write($file, [
             'project'    => $project,
             'stored_at'  => $now,
             'expires_at' => $now + QS_SPACE_CACHE_TTL,
             'space'      => $space,
-        ], JSON_UNESCAPED_SLASHES), LOCK_EX);
-        if ($written === false) {
+        ], JSON_UNESCAPED_SLASHES, LOCK_EX);
+        if (!$written) {
             error_log('[space-cache] write failed: ' . $file);
         }
     } else {

@@ -1,4 +1,5 @@
 <?php
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_param_string
 /**
  * getComponent - Get a single component by name
  * 
@@ -146,7 +147,8 @@ function loadComponentTranslations(array $textKeys, string $projectPath): array 
  * @return ApiResponse
  */
 function __command_getComponent(array $params = [], array $urlParams = []): ApiResponse {
-    $componentName = $params['name'] ?? null;
+    // qs_param_string: an ARRAY here reached a string-typed sink as a TypeError (F-C13-11).
+    $componentName = qs_param_string($params, 'name');
     
     if (!$componentName) {
         return ApiResponse::create(400, 'components.name_required')

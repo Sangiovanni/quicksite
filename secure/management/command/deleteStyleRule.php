@@ -1,4 +1,5 @@
 <?php
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_param_string
 /**
  * deleteStyleRule - Remove a CSS style rule
  * Method: POST
@@ -15,15 +16,19 @@ require_once SECURE_FOLDER_PATH . '/src/functions/utilsStyleManagement.php';
 // Get parameters
 $params = $trimParametersManagement->params();
 
-// Validate required parameter
-if (!isset($params['selector'])) {
+// Validate required parameter. qs_param_string, not isset: `?selector[]=x` is
+// SET but is an array, and reached trim() as a TypeError (beta.10 C13 F-C13-11).
+// A non-string now reads as absent and takes this same 400.
+$selectorParam = qs_param_string($params, 'selector');
+if ($selectorParam === null) {
     ApiResponse::create(400, 'validation.required')
         ->withMessage('Missing required parameter: selector')
         ->send();
 }
 
-$selector = trim($params['selector']);
-$mediaQuery = isset($params['mediaQuery']) ? trim($params['mediaQuery']) : null;
+$selector = trim($selectorParam);
+$mediaQueryParam = qs_param_string($params, 'mediaQuery');
+$mediaQuery = $mediaQueryParam !== null ? trim($mediaQueryParam) : null;
 
 // Validate selector
 if (empty($selector)) {

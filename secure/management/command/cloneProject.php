@@ -1,4 +1,5 @@
 <?php
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_json_write
 /**
  * cloneProject Command
  * 
@@ -48,7 +49,8 @@ function __command_cloneProject(array $params = [], array $urlParams = []): ApiR
     }
 
     // Validate new project name
-    $newName = trim($params['name'] ?? '');
+    // qs_param_string: `?name[]=x` reached trim() as a TypeError (F-C13-11).
+    $newName = trim(qs_param_string($params, 'name', ''));
     
     if (empty($newName)) {
         return ApiResponse::create(400, 'validation.missing_field')
@@ -122,7 +124,7 @@ function __command_cloneProject(array $params = [], array $urlParams = []): ApiR
             $translations = json_decode(file_get_contents($langFile), true);
             if (is_array($translations) && isset($translations['site']['name'])) {
                 $translations['site']['name'] = $newSiteName;
-                file_put_contents($langFile, json_encode($translations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
+                qs_json_write($langFile, $translations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE, LOCK_EX);
             }
         }
     }

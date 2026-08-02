@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../functions/utilsManagement.php'; // qs_json_write
 /**
  * RouteLayoutManager
  * 
@@ -110,8 +111,7 @@ class RouteLayoutManager {
             $data['routes'] = new \stdClass();
         }
         
-        $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-        return file_put_contents($this->configPath, $json) !== false;
+        return qs_json_write($this->configPath, $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
     }
     
     /**

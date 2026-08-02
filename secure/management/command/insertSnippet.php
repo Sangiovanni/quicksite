@@ -283,7 +283,7 @@ function addSnippetTranslations(array $keyMapping, array $snippetTranslations): 
         }
         
         // Write back
-        file_put_contents($langFile, json_encode($translations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), LOCK_EX);
+        qs_json_write($langFile, $translations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES, LOCK_EX);
     }
     
     return array_keys($addedKeys);
@@ -546,9 +546,15 @@ function __command_insertSnippet(array $params = [], array $urlParams = []): Api
     $structure = $insertResult['structure'];
     $newNodeId = $insertResult['newNodeId'];
     
+    // SECURITY (F-C13-13): depth-check the RESULT of the snippet insert.
+    if (!qs_structure_depth_ok($structure)) {
+        return ApiResponse::create(400, 'validation.invalid_format')
+            ->withMessage('Structure too deeply nested (max 50 levels)')
+            ->withErrors([['field' => 'structure', 'reason' => 'exceeds max depth of 50']]);
+    }
+
     // Save structure
-    $json_content = json_encode($structure, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    if (file_put_contents($json_file, $json_content, LOCK_EX) === false) {
+    if (!qs_json_write($json_file, $structure, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES, LOCK_EX)) {
         return ApiResponse::create(500, 'server.file_write_failed')
             ->withMessage('Failed to write structure file');
     }

@@ -215,8 +215,14 @@ if ($commandScope === 'project') {
 // Execute Command
 // ============================================================================
 
-// Parse request body for logging
-$requestBody = json_decode(REQUEST_BODY_RAW, true) ?? [];
+// Parse request body for logging.
+// is_array, NOT `?? []`: null-coalesce only catches a decode FAILURE. A JSON
+// SCALAR body ('5', '"s"', 'true', '1.5') decodes to a non-null NON-array, which
+// then reached logCommand()'s `array $body` parameter as a TypeError — a fatal
+// raised inside ApiResponse's beforeSend callback, i.e. on the way OUT of an
+// otherwise-successful request (beta.10 C13 F-C13-10, second carrier).
+$decodedBody = json_decode(REQUEST_BODY_RAW, true);
+$requestBody = is_array($decodedBody) ? $decodedBody : [];
 
 // The command log is PER-PROJECT (C10 10.1b). The bucket comes from the command's
 // SCOPE, never from PROJECT_NAME: a global command is given a benign working

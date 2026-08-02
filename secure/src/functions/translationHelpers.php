@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/utilsManagement.php'; // qs_json_write
 /**
  * translationHelpers.php — pure helpers + callable writer for translation files
  *
@@ -349,7 +350,7 @@ function translationSetKey(string $lang, string $dotKey, string $value): void {
     }
     $cur[$leaf] = $value;
     unset($cur);
-    file_put_contents($file, json_encode($decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), LOCK_EX);
+    qs_json_write($file, $decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES, LOCK_EX);
 }
 
 /** Unset a single dot-notation key from translate/<lang>.json (best-effort). */
@@ -368,7 +369,7 @@ function translationUnsetKey(string $lang, string $dotKey): void {
     if (!array_key_exists($leaf, $cur)) return;
     unset($cur[$leaf]);
     unset($cur);
-    file_put_contents($file, json_encode($decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), LOCK_EX);
+    qs_json_write($file, $decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES, LOCK_EX);
 }
 
 } // end if (!function_exists('convertDotNotationToNested'))

@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../functions/utilsManagement.php'; // qs_json_write
 /**
  * ApiEndpointManager
  * 
@@ -179,11 +180,12 @@ class ApiEndpointManager {
             $data['apis'] = new \stdClass();
         }
         
-        return file_put_contents(
+        return qs_json_write(
             $this->configPath,
-            json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            $data,
+            JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES,
             LOCK_EX
-        ) !== false;
+        );
     }
     
     /**

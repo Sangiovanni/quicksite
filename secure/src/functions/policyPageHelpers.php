@@ -62,7 +62,7 @@ function _policyWriteAncestorPage(array $segments): void {
         if (!is_dir($d)) @mkdir($d, 0755, true);
     }
     if (!file_exists($phpPath)) file_put_contents($phpPath, generate_page_template(implode('/', $segments)), LOCK_EX);
-    if (!file_exists($jsonPath)) file_put_contents($jsonPath, json_encode([['tag' => 'main', 'params' => ['class' => 'container'], 'children' => []]], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
+    if (!file_exists($jsonPath)) qs_json_write($jsonPath, [['tag' => 'main', 'params' => ['class' => 'container'], 'children' => []]], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE, LOCK_EX);
 }
 
 /**
@@ -141,5 +141,5 @@ function policyWriteLeaf(array $segments, array $structure): bool {
     if (!file_exists($phpPath)) {
         file_put_contents($phpPath, generate_page_template(implode('/', $segments)), LOCK_EX);
     }
-    return file_put_contents($jsonPath, json_encode($structure, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n", LOCK_EX) !== false;
+    return qs_json_write($jsonPath, $structure, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE, LOCK_EX, "\n");
 }

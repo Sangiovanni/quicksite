@@ -32,7 +32,8 @@ require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
  */
 function __command_createProject(array $params = [], array $urlParams = []): ApiResponse {
     // Validate project name
-    $projectName = trim($params['name'] ?? '');
+    // qs_param_string: `?name[]=x` reached trim() as a TypeError (F-C13-11).
+    $projectName = trim(qs_param_string($params, 'name', ''));
     
     if (empty($projectName)) {
         return ApiResponse::create(400, 'validation.missing_field')
@@ -139,13 +140,12 @@ function __command_createProject(array $params = [], array $urlParams = []): Api
     file_put_contents($projectPath . '/data/assets_metadata.json', '{}', LOCK_EX);
     
     // Create default iframe sandbox config (empty = strictest)
-    $defaultSandbox = json_encode(['tags' => ['iframe' => (object)[]], 'default' => ''], JSON_PRETTY_PRINT);
-    file_put_contents($projectPath . '/data/iframe_sandbox.json', $defaultSandbox, LOCK_EX);
-    
+    qs_json_write($projectPath . '/data/iframe_sandbox.json', ['tags' => ['iframe' => (object)[]], 'default' => ''], JSON_PRETTY_PRINT, LOCK_EX);
+
     // Create default translation file
     $defaultTranslations = createDefaultTranslations($siteName);
-    file_put_contents($projectPath . '/translate/default.json', json_encode($defaultTranslations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
-    file_put_contents($projectPath . '/translate/' . $defaultLang . '.json', json_encode($defaultTranslations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), LOCK_EX);
+    qs_json_write($projectPath . '/translate/default.json', $defaultTranslations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE, LOCK_EX);
+    qs_json_write($projectPath . '/translate/' . $defaultLang . '.json', $defaultTranslations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE, LOCK_EX);
     
     // Create basic page templates
     createBasicPageTemplates($projectPath);
@@ -302,13 +302,13 @@ function createMenuAndFooter(string $projectPath, string $siteName): void {
     $menuJson = [
         ['tag' => 'nav', 'params' => ['class' => 'main-nav'], 'children' => []]
     ];
-    file_put_contents($projectPath . '/templates/model/json/menu.json', json_encode($menuJson, JSON_PRETTY_PRINT), LOCK_EX);
+    qs_json_write($projectPath . '/templates/model/json/menu.json', $menuJson, JSON_PRETTY_PRINT, LOCK_EX);
     
     // footer.json — minimal root, content added by user/workflows
     $footerJson = [
         ['tag' => 'footer', 'params' => ['class' => 'main-footer'], 'children' => []]
     ];
-    file_put_contents($projectPath . '/templates/model/json/footer.json', json_encode($footerJson, JSON_PRETTY_PRINT), LOCK_EX);
+    qs_json_write($projectPath . '/templates/model/json/footer.json', $footerJson, JSON_PRETTY_PRINT, LOCK_EX);
     
     // Note: No menu.php or footer.php needed - PageManagement renders JSON directly
 }

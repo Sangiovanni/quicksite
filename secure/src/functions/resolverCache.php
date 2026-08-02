@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/utilsManagement.php'; // qs_json_write
 /**
  * resolverCache.php — File-based response cache for the server-side
  * data resolver (beta.8 A2 Slice 4).
@@ -116,8 +117,7 @@ function writeResolverCache(string $endpointRef, array $inputs, array $response,
         'expires_at' => $now + $ttl,
         'response'   => $response,
     ];
-    $bytes = @file_put_contents($path, json_encode($entry, JSON_UNESCAPED_SLASHES), LOCK_EX);
-    if ($bytes === false) {
+    if (!qs_json_write($path, $entry, JSON_UNESCAPED_SLASHES, LOCK_EX)) {
         error_log('[resolver-cache] write failed: ' . $path);
         return false;
     }

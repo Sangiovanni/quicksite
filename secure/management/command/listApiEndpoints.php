@@ -1,4 +1,5 @@
 <?php
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_param_string
 /**
  * listApiEndpoints - List all API endpoints
  * 
@@ -26,7 +27,9 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiEndpointManager.php';
  * @return ApiResponse
  */
 function __command_listApiEndpoints(array $params = [], array $urlParams = []): ApiResponse {
-    $apiId = $urlParams[0] ?? $params['apiId'] ?? null;
+    // A non-string apiId reached isset($apis[$apiId]) — "Cannot access offset of
+    // type array" (F-C13-11). Both sources are normalised to string-or-null.
+    $apiId = is_string($urlParams[0] ?? null) ? $urlParams[0] : qs_param_string($params, 'apiId');
     
     $manager = new ApiEndpointManager();
     

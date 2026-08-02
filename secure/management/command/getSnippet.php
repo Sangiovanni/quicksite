@@ -1,4 +1,5 @@
 <?php
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_param_string
 /**
  * getSnippet - Get a single snippet by ID
  * 
@@ -175,7 +176,8 @@ function structureHasComponent(array $node): bool {
  * @return ApiResponse
  */
 function __command_getSnippet(array $params = [], array $urlParams = []): ApiResponse {
-    $snippetId = $params['id'] ?? null;
+    // qs_param_string: an ARRAY here reached a string-typed sink as a TypeError (F-C13-11).
+    $snippetId = qs_param_string($params, 'id');
 
     // C8 8.5 CONTAINMENT: the project read is BOUND to the URL marker the
     // dispatcher authorized; a body `project` is an optional echo that must match

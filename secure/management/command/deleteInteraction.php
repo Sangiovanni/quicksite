@@ -196,9 +196,8 @@ function __command_deleteInteraction(array $params = [], array $urlParams = []):
     // ==========================================================================
     
     $updatedStructure = $updateResult['structure'];
-    $jsonOutput = json_encode($updatedStructure, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    
-    if (file_put_contents($jsonFile, $jsonOutput, LOCK_EX) === false) {
+
+    if (!qs_json_write($jsonFile, $updatedStructure, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES, LOCK_EX)) {
         return ApiResponse::create(500, 'server.file_write_failed')
             ->withMessage('Failed to save structure file');
     }

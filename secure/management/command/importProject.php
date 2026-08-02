@@ -91,10 +91,13 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
         $zipPath = $file['tmp_name'];
         $uploadedFile = $file['name'];
     }
-    // Method 2: Check for file path in params (for internal calls)
-    elseif (!empty($params['file_path']) && file_exists($params['file_path'])) {
-        $zipPath = $params['file_path'];
-        $uploadedFile = basename($params['file_path']);
+    // Method 2: Check for file path in params (for internal calls).
+    // qs_param_string first: `?file_path[]=x` is non-empty but is an array, and
+    // file_exists() is typed for a string — TypeError (beta.10 C13 F-C13-11).
+    elseif (($filePathParam = qs_param_string($params, 'file_path', '')) !== ''
+            && file_exists($filePathParam)) {
+        $zipPath = $filePathParam;
+        $uploadedFile = basename($filePathParam);
     }
     else {
         return ApiResponse::create(400, 'validation.missing_field')

@@ -1,4 +1,5 @@
 <?php
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_json_write
 /**
  * duplicateComponent - Create a copy of an existing component with a new name
  * 
@@ -97,8 +98,7 @@ function __command_duplicateComponent(array $params = [], array $urlParams = [])
     }
     
     // Write to new file (re-encode to ensure consistent formatting)
-    $newContent = json_encode($structure, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    if (file_put_contents($newFile, $newContent) === false) {
+    if (!qs_json_write($newFile, $structure, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) {
         return ApiResponse::create(500, 'server.file_write_failed')
             ->withMessage("Failed to create new component file")
             ->withData(['file' => $newFile]);

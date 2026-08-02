@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../functions/utilsManagement.php'; // qs_json_write
 /**
  * StateStoreManager
  *
@@ -86,12 +87,7 @@ class StateStoreManager {
         if (!is_dir($dir)) {
             mkdir($dir, 0755, true);
         }
-        $written = file_put_contents(
-            $this->configPath,
-            json_encode($all, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
-            LOCK_EX
-        );
-        if ($written === false) {
+        if (!qs_json_write($this->configPath, $all, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES, LOCK_EX)) {
             return ['success' => false, 'error' => 'Failed to save state stores'];
         }
         return ['success' => true, 'route' => $route, 'stores' => $stores];

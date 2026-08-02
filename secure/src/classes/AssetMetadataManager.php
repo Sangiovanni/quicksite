@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../functions/utilsManagement.php'; // qs_json_write
 /**
  * AssetMetadataManager
  * 
@@ -55,10 +56,11 @@ class AssetMetadataManager
         if (!is_dir($dir)) {
             mkdir($dir, 0750, true);
         }
-        return file_put_contents(
+        return qs_json_write(
             $this->metadataPath,
-            json_encode($this->metadata, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
-        ) !== false;
+            $this->metadata,
+            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES
+        );
     }
 
     /**

@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../functions/utilsManagement.php'; // qs_json_write
 
 /**
  * IframeSandbox — Centralized iframe sandbox permission manager
@@ -157,13 +158,12 @@ class IframeSandbox
         $config['tags'] = $tags;
         $config['default'] = self::stripNeverAllowed($config['default'] ?? '');
 
-        $json = json_encode($config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-        $result = file_put_contents($path, $json, LOCK_EX);
+        $result = qs_json_write($path, $config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES, LOCK_EX);
 
         // Clear cache so next read picks up the new data
         self::clearCache();
 
-        return $result !== false;
+        return $result;
     }
 
     /**

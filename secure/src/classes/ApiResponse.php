@@ -209,25 +209,48 @@ class ApiResponse {
         while (ob_get_level() > 0) {
             ob_end_clean();
         }
-        
-        http_response_code($this->status);
-        header('Content-Type: application/json');
-        
+
         $response = [
             'status' => $this->status,
             'code' => $this->code,
             'message' => $this->message,
         ];
-        
+
         if (!empty($this->data)) {
             $response['data'] = $this->data;
         }
-        
+
         if (!empty($this->errors)) {
             $response['errors'] = $this->errors;
         }
-        
-        echo json_encode($response, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+
+        // beta.10 C13 F-C13-14(b): SERIALISE FIRST, WRITE SECOND.
+        //
+        // The status and Content-Type used to be sent before json_encode ran. On a
+        // large payload the encode is exactly where the memory ceiling is reached,
+        // and errorHygiene's fatal handler bails once headers_sent() is true — so a
+        // fatal here landed in a window no handler could cover, and the client got
+        // a 200 whose body was raw PHP error text. Building the body first puts
+        // that failure back BEFORE the first byte, where the handler still works.
+        $body = json_encode($response, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+
+        if ($body === false) {
+            // The envelope itself could not be encoded (malformed UTF-8 in the
+            // data, or depth > 512). Echoing false would have written an EMPTY
+            // body under the original status — a 200 that says nothing. Answer
+            // 500 with a payload that is guaranteed to encode.
+            error_log('ApiResponse::send: response could not be serialised ('
+                . json_last_error_msg() . ') for code ' . $this->code);
+            http_response_code(500);
+            header('Content-Type: application/json');
+            echo '{"status":500,"code":"server.internal_error",'
+               . '"message":"Response could not be serialised"}';
+            exit;
+        }
+
+        http_response_code($this->status);
+        header('Content-Type: application/json');
+        echo $body;
         exit;
     }
 

@@ -810,7 +810,7 @@ $manifest = [
     ],
     'quicksite_version' => '1.4.0'
 ];
-file_put_contents($buildFullPath . '/build_manifest.json', json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+qs_json_write($buildFullPath . '/build_manifest.json', $manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
 
 // Check build size before creating ZIP (prevent resource exhaustion)
 $buildSizeBytes = getDirectorySize($buildFullPath);

@@ -312,12 +312,20 @@ function __command_addComplexElement(array $params = [], array $urlParams = []):
             ->withMessage('Failed to insert subtree: ' . ($insertResult['error'] ?? 'unknown'));
     }
 
+    // SECURITY (F-C13-13): depth-check the RESULT of the subtree insert.
+    if (!qs_structure_depth_ok($insertResult['structure'])) {
+        return ApiResponse::create(400, 'validation.invalid_format')
+            ->withMessage('Structure too deeply nested (max 50 levels)')
+            ->withErrors([['field' => 'structure', 'reason' => 'exceeds max depth of 50']]);
+    }
+
     // ----- Write back -----
-    $jsonOut = json_encode(
+    if (!qs_json_write(
+        $json_file,
         $insertResult['structure'],
-        JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
-    );
-    if (file_put_contents($json_file, $jsonOut, LOCK_EX) === false) {
+        JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES,
+        LOCK_EX
+    )) {
         return ApiResponse::create(500, 'server.file_write_failed')
             ->withMessage('Failed to write structure file');
     }

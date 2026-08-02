@@ -1,4 +1,5 @@
 <?php
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_json_write
 /**
  * renameComponent - Rename a component and update all references
  * 
@@ -82,8 +83,7 @@ function updateFileReferences(string $filePath, string $oldName, string $newName
     }
     
     if ($count > 0) {
-        $newContent = json_encode($structure, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        if (file_put_contents($filePath, $newContent) === false) {
+        if (!qs_json_write($filePath, $structure, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) {
             return ['updated' => false, 'count' => $count, 'error' => 'Could not write file'];
         }
     }

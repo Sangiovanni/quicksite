@@ -48,6 +48,22 @@ function qs_register_fatal_json_handler(string $shape = QS_FATAL_SHAPE_ENVELOPE)
     }
     $registered = true;
 
+    // beta.10 C13 F-C13-14(a). The shutdown handler below deliberately bails once
+    // headers_sent() is true — after that point the status and Content-Type are on
+    // the wire and nothing can be repaired. A fatal raised INSIDE that window is
+    // therefore uncoverable, and with display_errors on the interpreter prints the
+    // error — absolute path included — straight into an already-200 body. Turning
+    // the print off closes the DISCLOSURE even where the handler cannot reach;
+    // the error still goes to the log, which is where it belongs in production.
+    //
+    // Lives here rather than in each dispatcher because both of them enter through
+    // this one call, and C11 spent a slice deleting hand-copied duplicates.
+    require_once __DIR__ . '/environment.php';
+    if (!qs_is_development()) {
+        ini_set('display_errors', '0');
+        ini_set('display_startup_errors', '0');
+    }
+
     register_shutdown_function(static function () use ($shape) {
         $error = error_get_last();
         if ($error === null

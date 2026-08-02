@@ -72,8 +72,7 @@ function __command_deletePageEvent(array $params = [], array $urlParams = []): A
     }
     
     // Save
-    $result = file_put_contents($eventsFile, json_encode($allEvents, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
-    if ($result === false) {
+    if (!qs_json_write($eventsFile, $allEvents, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)) {
         return ApiResponse::create(500, 'server.file_write_failed')
             ->withMessage('Failed to save page events');
     }

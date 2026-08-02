@@ -1,4 +1,5 @@
 <?php
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_param_string
 /**
  * deleteProject Command
  * 
@@ -31,7 +32,8 @@ require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
  */
 function __command_deleteProject(array $params = [], array $urlParams = []): ApiResponse {
     // Validate project name
-    $projectName = trim($params['name'] ?? '');
+    // qs_param_string: `?name[]=x` reached trim() as a TypeError (F-C13-11).
+    $projectName = trim(qs_param_string($params, 'name', ''));
 
     // C8 CONTAINMENT (confused-deputy / F6): a project-scoped command is
     // AUTHORIZED against the URL marker project (PROJECT_NAME, bound by the

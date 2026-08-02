@@ -39,8 +39,11 @@ $params = $trimParametersManagement->params();
 // Support both 'route' (full form) and 'name' (shorthand for simple routes)
 $routePath = $params['route'] ?? $params['name'] ?? null;
 
-// Check for parent parameter - prepend to route if provided
-$parent = $params['parent'] ?? null;
+// Check for parent parameter - prepend to route if provided.
+// qs_param_string, not `?? null`: `?parent[]=x` reached trim() and TypeError'd
+// (beta.10 C13 F-C13-11). A non-string reads as absent, so the existing
+// missing-parameter branch below handles it.
+$parent = qs_param_string($params, 'parent');
 if ($parent !== null && $parent !== '') {
     // Normalize parent (trim slashes)
     $parent = trim(str_replace('\\', '/', $parent), '/');

@@ -140,8 +140,7 @@ function setTranslationKey(string $key, string $value): bool {
         }
     }
     
-    $json = json_encode($translations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    return file_put_contents($translationFile, $json, LOCK_EX) !== false;
+    return qs_json_write($translationFile, $translations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES, LOCK_EX);
 }
 
 /**
@@ -330,6 +329,13 @@ function __command_duplicateNode(array $params = [], array $urlParams = []): Api
             $structure['children'][] = $clonedChild;
         }
         
+        // SECURITY (F-C13-13): depth-check the RESULT of the duplicate.
+        if (!qs_structure_depth_ok($structure)) {
+            return ApiResponse::create(400, 'validation.invalid_format')
+                ->withMessage('Structure too deeply nested (max 50 levels)')
+                ->withErrors([['field' => 'structure', 'reason' => 'exceeds max depth of 50']]);
+        }
+
         // Write back
         $json_content = json_encode($structure, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         if ($json_content === false) {
@@ -398,6 +404,13 @@ function __command_duplicateNode(array $params = [], array $urlParams = []): Api
             ->withMessage("Failed to insert duplicated node: " . ($insertResult['error'] ?? 'Unknown error'));
     }
     
+    // SECURITY (F-C13-13): depth-check the RESULT of the duplicate.
+    if (!qs_structure_depth_ok($insertResult['structure'])) {
+        return ApiResponse::create(400, 'validation.invalid_format')
+            ->withMessage("Structure too deeply nested (max 50 levels)")
+            ->withErrors([['field' => 'structure', 'reason' => 'exceeds max depth of 50']]);
+    }
+
     // Write back to file
     $json_content = json_encode($insertResult['structure'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     if ($json_content === false) {

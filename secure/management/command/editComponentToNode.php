@@ -303,9 +303,16 @@ function __command_editComponentToNode(array $params = [], array $urlParams = []
     
     $updatedStructure = $updateResult['structure'];
     
+    // SECURITY (F-C13-13): depth-check the RESULT of the component edit.
+    if (!qs_structure_depth_ok($updatedStructure)) {
+        return ApiResponse::create(400, 'validation.invalid_format')
+            ->withMessage("Structure too deeply nested (max 50 levels)")
+            ->withErrors([['field' => 'structure', 'reason' => 'exceeds max depth of 50']]);
+    }
+
     // Save structure
     $jsonOptions = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
-    if (file_put_contents($jsonPath, json_encode($updatedStructure, $jsonOptions)) === false) {
+    if (!qs_json_write($jsonPath, $updatedStructure, $jsonOptions)) {
         return ApiResponse::create(500, 'error.fileWrite')
             ->withMessage("Failed to save structure file");
     }

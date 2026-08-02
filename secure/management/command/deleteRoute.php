@@ -246,7 +246,7 @@ if (file_exists($aliasesFile)) {
     }
     
     if (!empty($deletedAliases)) {
-        file_put_contents($aliasesFile, json_encode($aliases, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        qs_json_write($aliasesFile, $aliases, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     }
 }
 

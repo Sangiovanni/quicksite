@@ -1,4 +1,5 @@
 <?php
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_param_string
 /**
  * deleteKeyframes - Remove a @keyframes animation
  * Method: POST
@@ -12,14 +13,16 @@ require_once SECURE_FOLDER_PATH . '/src/functions/utilsStyleManagement.php';
 // Get parameters
 $params = $trimParametersManagement->params();
 
-// Validate required parameter
-if (!isset($params['name'])) {
+// Validate required parameter. qs_param_string, not isset: `?name[]=x` is SET
+// but is an array, and reached trim() as a TypeError (beta.10 C13 F-C13-11).
+$nameParam = qs_param_string($params, 'name');
+if ($nameParam === null) {
     ApiResponse::create(400, 'validation.required')
         ->withMessage('Missing required parameter: name')
         ->send();
 }
 
-$name = trim($params['name']);
+$name = trim($nameParam);
 
 // Validate name
 if (empty($name)) {

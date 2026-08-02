@@ -149,8 +149,7 @@ $aliases[$alias] = [
 ];
 
 // Save aliases
-$json = json_encode($aliases, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-if (file_put_contents($aliasesFile, $json) === false) {
+if (!qs_json_write($aliasesFile, $aliases, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)) {
     ApiResponse::create(500, 'api.error.write_failed')
         ->withMessage('Failed to save aliases')
         ->send();

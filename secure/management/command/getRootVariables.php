@@ -1,4 +1,5 @@
 <?php
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_param_string
 /**
  * getRootVariables - Get all CSS custom properties from :root
  * 
@@ -22,7 +23,9 @@ function __command_getRootVariables(array $params = [], array $urlParams = []): 
     $styleFile = PUBLIC_CONTENT_PATH . '/style/style.css';
 
     // Resolve themeTarget → CSS scope selector ("light" or omitted → :root, "dark" → [data-theme="dark"])
-    $themeTarget = isset($params['themeTarget']) ? trim($params['themeTarget']) : 'light';
+    // qs_param_string: `?themeTarget[]=x` reached trim() and TypeError'd. A
+    // non-string falls through to the in_array check below, which rejects it 400.
+    $themeTarget = trim(qs_param_string($params, 'themeTarget', 'light'));
     if (!in_array($themeTarget, ['light', 'dark'], true)) {
         return ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage('themeTarget must be "light" or "dark"');

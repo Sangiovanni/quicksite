@@ -1,4 +1,5 @@
 <?php
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_json_write
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 
@@ -23,6 +24,25 @@ if ($langCode === null) {
         ->send();
 }
 
+// Type validation - must be strings.
+// This block used to sit BELOW the name-generation block, one step too late:
+// `strtolower($langCode)` ran first and TypeError'd on `?code[]=x` before the
+// check it needed could fire (beta.10 C13 F-C13-11). The guard was never
+// missing — only mis-ordered.
+if (!is_string($langCode)) {
+    ApiResponse::create(400, 'validation.invalid_format')
+        ->withMessage("Invalid parameter type")
+        ->withErrors([['field' => 'code', 'reason' => 'must be a string', 'received_type' => gettype($langCode)]])
+        ->send();
+}
+
+if ($langName !== null && !is_string($langName)) {
+    ApiResponse::create(400, 'validation.invalid_format')
+        ->withMessage("Invalid parameter type")
+        ->withErrors([['field' => 'name', 'reason' => 'must be a string', 'received_type' => gettype($langName)]])
+        ->send();
+}
+
 // If name not provided, generate from code (e.g., 'fr' -> 'French', 'es' -> 'Spanish')
 if ($langName === null) {
     $commonLanguages = [
@@ -34,21 +54,6 @@ if ($langName === null) {
         'el' => 'Greek', 'he' => 'Hebrew', 'th' => 'Thai', 'vi' => 'Vietnamese'
     ];
     $langName = $commonLanguages[strtolower($langCode)] ?? ucfirst($langCode);
-}
-
-// Type validation - must be strings
-if (!is_string($langCode)) {
-    ApiResponse::create(400, 'validation.invalid_format')
-        ->withMessage("Invalid parameter type")
-        ->withErrors([['field' => 'code', 'reason' => 'must be a string', 'received_type' => gettype($langCode)]])
-        ->send();
-}
-
-if (!is_string($langName)) {
-    ApiResponse::create(400, 'validation.invalid_format')
-        ->withMessage("Invalid parameter type")
-        ->withErrors([['field' => 'name', 'reason' => 'must be a string', 'received_type' => gettype($langName)]])
-        ->send();
 }
 
 $langCode = trim($langCode);
@@ -186,8 +191,7 @@ $target_file = PROJECT_PATH . '/translate/' . $langCode . '.json';
 
 if (!file_exists($source_file)) {
     // Fallback: create empty translation file
-    $empty_translations = json_encode([], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-    file_put_contents($target_file, $empty_translations, LOCK_EX);
+    qs_json_write($target_file, [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE, LOCK_EX);
 } else {
     // Copy default translations as starting point
     if (!copy($source_file, $target_file)) {

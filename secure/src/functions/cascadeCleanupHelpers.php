@@ -55,7 +55,7 @@ function cleanPageEventsForRoutes($routeNames): array {
     }
 
     if (!empty($cleaned)) {
-        file_put_contents($eventsFile, json_encode($allEvents, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        qs_json_write($eventsFile, $allEvents, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     }
 
     return ['cleaned' => $cleaned];
@@ -135,10 +135,7 @@ function cleanPageEventsForApiEndpoint(string $apiId, ?string $endpointId = null
     }
 
     if ($modified) {
-        file_put_contents(
-            $eventsFile,
-            json_encode($allEvents, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
-        );
+        qs_json_write($eventsFile, $allEvents, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     }
 
     return ['removedCalls' => $removedCalls];
@@ -193,10 +190,7 @@ function renamePageEventsForApiEndpoint(string $apiId, string $fromId, string $t
     unset($pageEvents, $calls);
 
     if ($modified) {
-        file_put_contents(
-            $eventsFile,
-            json_encode($allEvents, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
-        );
+        qs_json_write($eventsFile, $allEvents, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     }
 
     return ['renamedCalls' => $renamedCalls];
@@ -355,11 +349,7 @@ function _transformInteractionFile(string $filePath, callable $valueTransform, s
     _walkNodesTransform($structure, _getAllEventAttributeNames(), $valueTransform, $context, $records, $modified);
 
     if ($modified) {
-        file_put_contents(
-            $filePath,
-            json_encode($structure, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
-            LOCK_EX
-        );
+        qs_json_write($filePath, $structure, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES, LOCK_EX);
         return $records;
     }
     return null;

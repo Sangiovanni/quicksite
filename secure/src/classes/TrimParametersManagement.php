@@ -56,9 +56,14 @@ class TrimParametersManagement{
       // Check for JSON data - use pre-captured body if available (for logging)
       $json_data = defined('REQUEST_BODY_RAW') ? REQUEST_BODY_RAW : file_get_contents('php://input');
       $data = json_decode($json_data, true);
-      if ($data !== null) {
+      // is_array, NOT !== null: a JSON SCALAR body ('5', '"s"', 'true', '1.5')
+      // decodes to a non-null NON-array, and array_merge is typed for arrays, so
+      // it raised a TypeError → 500 on every command, unauthenticated on the
+      // public ones (beta.10 C13 F-C13-10). A scalar body carries no parameters,
+      // so ignoring it is the correct handling, not merely the safe one.
+      if (is_array($data)) {
           $this->params = array_merge($this->params, $data);
-      }         
+      }
     }
   }
 

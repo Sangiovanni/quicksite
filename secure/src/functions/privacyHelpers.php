@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/utilsManagement.php'; // qs_json_write
 /**
  * privacyHelpers.php — read / write the per-project privacy registry
  * (data/privacy.json). Structure-only (mirrors storage.json): the human-readable
@@ -80,8 +81,7 @@ function savePrivacyRegistry(array $reg): bool {
     $out['cookieSection'] = (isset($reg['cookieSection']) && in_array($reg['cookieSection'], PRIVACY_COOKIE_SECTION, true)) ? $reg['cookieSection'] : 'auto';
     $out['privacyRoute']  = (isset($reg['privacyRoute']) && is_string($reg['privacyRoute']) && $reg['privacyRoute'] !== '') ? $reg['privacyRoute'] : null;
 
-    $json = json_encode($out, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-    return file_put_contents($path, $json, LOCK_EX) !== false;
+    return qs_json_write($path, $out, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE, LOCK_EX);
 }
 
 /** Language the collected-data prose is authored in (defaults to website default). */

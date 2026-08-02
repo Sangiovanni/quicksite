@@ -95,8 +95,7 @@ function createEmptyTranslation_editNode(string $textKey): bool {
         }
     }
     
-    $json = json_encode($translations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    return file_put_contents($translationFile, $json, LOCK_EX) !== false;
+    return qs_json_write($translationFile, $translations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES, LOCK_EX);
 }
 
 // =============================================================================
@@ -363,9 +362,15 @@ function __command_editNode(array $params = [], array $urlParams = []): ApiRespo
     
     $structure = $editResult['structure'];
     
+    // SECURITY (F-C13-13): depth-check the RESULT of the edit.
+    if (!qs_structure_depth_ok($structure)) {
+        return ApiResponse::create(400, 'validation.invalid_format')
+            ->withMessage("Structure too deeply nested (max 50 levels)")
+            ->withErrors([['field' => 'structure', 'reason' => 'exceeds max depth of 50']]);
+    }
+
     // Write back
-    $json_content = json_encode($structure, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    if (file_put_contents($json_file, $json_content, LOCK_EX) === false) {
+    if (!qs_json_write($json_file, $structure, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES, LOCK_EX)) {
         return ApiResponse::create(500, 'server.file_write_failed')
             ->withMessage("Failed to write structure file");
     }

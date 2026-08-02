@@ -1,4 +1,5 @@
 <?php
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_param_string
 /**
  * duplicateSnippet - Duplicate a snippet to project snippets
  * 
@@ -29,7 +30,8 @@ require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
  * @return ApiResponse
  */
 function __command_duplicateSnippet(array $params = [], array $urlParams = []): ApiResponse {
-    $sourceId = $params['id'] ?? null;
+    // qs_param_string: an ARRAY here reached a string-typed sink as a TypeError (F-C13-11).
+    $sourceId = qs_param_string($params, 'id');
     $newId = $params['newId'] ?? null;
     $newName = $params['newName'] ?? null;
     // C8 8.5 CONTAINMENT: both the source read and the duplicate WRITE are BOUND

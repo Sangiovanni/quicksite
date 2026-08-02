@@ -58,10 +58,12 @@ if (consentRouteExists($routeTrim)) {
 saveConsentConfig(array_merge($cfg, ['policyRoute' => null]));
 if (file_exists(consentBannerPath())) {
     $banner = buildConsentBannerStructure(null);
-    file_put_contents(
+    qs_json_write(
         consentBannerPath(),
-        json_encode($banner, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n",
-        LOCK_EX
+        $banner,
+        JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE,
+        LOCK_EX,
+        "\n"
     );
 }
 

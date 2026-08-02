@@ -1,4 +1,5 @@
 <?php
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_json_write
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 
 /**
@@ -158,12 +159,7 @@ if ($enabled) {
         $syncedKeys = $afterCount - $beforeCount;
         
         // Save updated language file
-        $result = @file_put_contents(
-            $defaultLangFile, 
-            json_encode($langTranslations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
-        );
-        
-        if ($result === false) {
+        if (!qs_json_write($defaultLangFile, $langTranslations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)) {
             ApiResponse::create(500, 'server.file_write_failed')
                 ->withMessage("Failed to update {$defaultLang}.json")
                 ->send();
@@ -181,12 +177,7 @@ if ($enabled) {
         $syncedKeys = $afterCount - $beforeCount;
         
         // Save updated default file
-        $result = @file_put_contents(
-            $defaultFile, 
-            json_encode($defaultTranslations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
-        );
-        
-        if ($result === false) {
+        if (!qs_json_write($defaultFile, $defaultTranslations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)) {
             ApiResponse::create(500, 'server.file_write_failed')
                 ->withMessage('Failed to update default.json')
                 ->send();

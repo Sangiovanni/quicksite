@@ -11,6 +11,101 @@ require_once __DIR__ . '/routeHelpers.php';
 const SPECIAL_PAGES = ['404', '500', '403', '401'];
 
 /**
+ * array_is_list() polyfill — PHP 8.1+ builtin, and 8.0.30 is the supported floor.
+ * Guarded so 8.1+ keeps the (faster) engine implementation.
+ *
+ * Semantics match the builtin exactly, INCLUDING the empty case: array_is_list([])
+ * is true. Note `range(0, -1)` is [0, -1], not [], so the empty array has to be
+ * special-cased rather than falling through to the key comparison.
+ *
+ * Declared here so it is available tree-wide (utilsManagement is the shared
+ * utility home). Do not confuse it with resolverHelpers' _isResolverArrayShape,
+ * which deliberately answers FALSE for an empty array — see the note there.
+ */
+if (!function_exists('array_is_list')) {
+    function array_is_list(array $array): bool {
+        if ($array === []) {
+            return true;
+        }
+        return array_keys($array) === range(0, count($array) - 1);
+    }
+}
+
+/**
+ * Read a request parameter that MUST be a string, coercing nothing.
+ *
+ * `?name[]=x` (and its JSON equivalent) delivers an ARRAY where a command expects
+ * a string, and the array then reaches trim() / strtolower() / preg_match() /
+ * file_exists(), each of which is typed for a string: TypeError → 500
+ * (beta.10 C13 F-C13-11, 18 sites across 16 commands). Every one of those sites
+ * was in early validation, so nothing was half-written — but a 500 is the wrong
+ * answer to a malformed parameter, and it is reachable before authentication on
+ * the public commands.
+ *
+ * Returns $default (null unless overridden) when the key is absent OR present
+ * with a non-string value, so the caller's existing "missing required parameter"
+ * branch handles both without a second code path.
+ *
+ * @param array  $params  the merged parameter array
+ * @param string $key     parameter name
+ * @param mixed  $default returned when absent or not a string
+ * @return mixed the string, or $default
+ */
+function qs_param_string(array $params, string $key, $default = null)
+{
+    return (isset($params[$key]) && is_string($params[$key])) ? $params[$key] : $default;
+}
+
+/**
+ * Encode $data as JSON and write it to $path — refusing to write at all when the
+ * encode fails. THE one place in the tree that pairs json_encode with a write.
+ *
+ * Why this exists (beta.10 C13 F-C13-12): json_encode() returns FALSE on malformed
+ * UTF-8 (and on depth > 512), and file_put_contents($path, false) writes the empty
+ * string and returns int(0). Since 0 !== false, every `if (file_put_contents(...)
+ * === false)` guard in the tree PASSES — so the command answers 200 while the
+ * document on disk has been truncated to zero bytes. Malformed UTF-8 reaches the
+ * writers through the query string (TrimParametersManagement merges $_GET raw, and
+ * PHP does not UTF-8-validate query bytes; a JSON body cannot carry it because
+ * json_decode refuses malformed UTF-8).
+ *
+ * The contract, in order:
+ *   1. encode; on failure log and return false WITHOUT touching $path — the
+ *      existing file is left byte-for-byte unchanged, which is the whole point
+ *   2. otherwise write, and report whether the write itself succeeded
+ *
+ * SessionManagement and AuthManagement already did this by hand; the lesson was
+ * learned in three places and never generalised, which is why it is one helper
+ * rather than 55 local patches.
+ *
+ * @param string $path      target file
+ * @param mixed  $data      value to encode
+ * @param int    $jsonFlags json_encode flags (pass the site's existing flags verbatim)
+ * @param int    $fileFlags file_put_contents flags (LOCK_EX where the site used it)
+ * @param string $trailer   appended after the JSON — only for the handful of sites
+ *                          that deliberately end the file with "\n"
+ * @return bool true only when the encode succeeded AND the bytes were written
+ */
+function qs_json_write(string $path, $data, int $jsonFlags = 0, int $fileFlags = 0, string $trailer = ''): bool
+{
+    $json = json_encode($data, $jsonFlags);
+    if ($json === false) {
+        error_log('qs_json_write: refusing to write ' . $path
+            . ' — json_encode failed (' . json_last_error_msg() . '); file left unchanged');
+        return false;
+    }
+    // Warnings are suppressed and reported through error_log instead: a raw
+    // file_put_contents warning carries an absolute path and, with display_errors
+    // on, prints it into the response body (the F9 class C12 closed elsewhere).
+    $bytes = @file_put_contents($path, $json . $trailer, $fileFlags);
+    if ($bytes === false) {
+        error_log('qs_json_write: write failed for ' . $path);
+        return false;
+    }
+    return true;
+}
+
+/**
  * C15 15.4 — the absolute download URL of a build zip in the bound project's
  * own public/build/, reached through the /p/<id>/ passthrough (the visibility
  * gate applies: a private project's builds need the panel's qs_preview cookie
@@ -148,6 +243,41 @@ function validateStructureDepth($node, $depth = 0, $maxDepth = 50): bool {
     }
     
     return true;
+}
+
+/**
+ * Depth-check a WHOLE structure — the list-of-nodes shape and the single-node
+ * (component) shape — in one call. Wraps validateStructureDepth with exactly the
+ * branching editStructure.php does inline, so the other writers get the same rule
+ * without copying it nine times.
+ *
+ * Call it on the RESULT of an insert, never on the request: each request adds one
+ * level, so a request-side check sees nothing and the page still walks past the
+ * limit one call at a time (beta.10 C13 F-C13-13 — 254 × addNode(position=inside)
+ * each returned 200, and the page then exceeded JSON's own 512-level read bound
+ * and became unreadable by anything).
+ *
+ * Deliberately NOT applied to purely-removing writers (deleteNode): the check is
+ * on the result, so guarding a shrink operation would make an already-too-deep
+ * page impossible to repair by deleting from it.
+ *
+ * @param mixed $structure decoded structure (list of nodes, or one node)
+ * @param int   $maxDepth  same default as editStructure
+ * @return bool true when within the limit
+ */
+function qs_structure_depth_ok($structure, int $maxDepth = 50): bool {
+    if (!is_array($structure)) {
+        return true;
+    }
+    if (isset($structure[0]) || empty($structure)) {
+        foreach ($structure as $node) {
+            if (!validateStructureDepth($node, 0, $maxDepth)) {
+                return false;
+            }
+        }
+        return true;
+    }
+    return validateStructureDepth($structure, 0, $maxDepth);
 }
 
 /**

@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/utilsManagement.php'; // qs_json_write
 /**
  * Snippet Management Functions
  * 
@@ -431,9 +432,8 @@ function saveProjectSnippet(array $snippetData, string $projectName, string $sco
     unset($snippetData['_filePath']);
     
     $filePath = $categoryPath . '/' . $snippetId . '.json';
-    $json = json_encode($snippetData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-    
-    if (file_put_contents($filePath, $json) === false) {
+
+    if (!qs_json_write($filePath, $snippetData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)) {
         return ['success' => false, 'path' => '', 'error' => 'Failed to write snippet file'];
     }
     

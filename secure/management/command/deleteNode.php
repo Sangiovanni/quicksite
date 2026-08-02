@@ -97,8 +97,7 @@ function removeTranslationKeysFromFiles(array $keys): array {
             // Clean up empty parent objects
             cleanupEmptyParents($translations);
             
-            $json = json_encode($translations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-            if (file_put_contents($file, $json, LOCK_EX) === false) {
+            if (!qs_json_write($file, $translations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES, LOCK_EX)) {
                 $errors[] = "Failed to write: " . basename($file);
             }
         }

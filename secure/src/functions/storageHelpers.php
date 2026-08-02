@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/utilsManagement.php'; // qs_json_write
 /**
  * storageHelpers.php — read / write / validate the per-project storage
  * registry (`data/storage.json`).
@@ -80,8 +81,7 @@ function saveStorageRegistry(array $registry): bool {
         $out['descLang'] = $registry['descLang'];
     }
     $out['items'] = empty($items) ? (object) [] : $items;
-    $json = json_encode($out, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-    return file_put_contents($path, $json, LOCK_EX) !== false;
+    return qs_json_write($path, $out, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE, LOCK_EX);
 }
 
 /**

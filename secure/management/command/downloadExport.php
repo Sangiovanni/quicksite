@@ -1,4 +1,5 @@
 <?php
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_param_string
 /**
  * downloadExport Command
  * 
@@ -39,7 +40,8 @@ function __command_downloadExport(array $params = [], array $urlParams = []): Ap
     }
     $projectName = $bound['project'];
 
-    $filename = trim($params['file'] ?? '');
+    // qs_param_string: `?file[]=x` reached trim() as a TypeError (F-C13-11).
+    $filename = trim(qs_param_string($params, 'file', ''));
 
     if (empty($filename)) {
         return ApiResponse::create(400, 'validation.missing_field')

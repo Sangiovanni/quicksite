@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/utilsManagement.php'; // qs_json_write
 /**
  * Sitemap configuration helpers — shared by getSiteMap (read) and
  * setSiteMapConfig (write).
@@ -59,10 +60,11 @@ function qs_sitemap_config_save(string $projectPath, array $config): bool {
         return false;
     }
     $payload = qs_sitemap_config_normalise($config);
-    return file_put_contents(
+    return qs_json_write(
         qs_sitemap_config_path($projectPath),
-        json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
-    ) !== false;
+        $payload,
+        JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES
+    );
 }
 
 /**

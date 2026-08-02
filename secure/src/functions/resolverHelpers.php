@@ -83,11 +83,10 @@ function saveResolversSidecar(array $resolvers): bool {
     // array-shape resolver lists, turning [config0, config1] into
     // {"0": config0, "1": config1}.)
     if (empty($resolvers)) {
-        $json = "{}\n";
-    } else {
-        $json = json_encode($resolvers, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        // Literal — no encode involved, so qs_json_write has nothing to guard.
+        return file_put_contents($path, "{}\n", LOCK_EX) !== false;
     }
-    return file_put_contents($path, $json, LOCK_EX) !== false;
+    return qs_json_write($path, $resolvers, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES, LOCK_EX);
 }
 
 /**
@@ -116,8 +115,13 @@ function saveResolversSidecar(array $resolvers): bool {
  */
 
 /**
- * True when $arr is a sequential 0-indexed list (PHP 8.1's
- * array_is_list polyfill — runtime is 8.0.30).
+ * True when $arr is a NON-EMPTY sequential 0-indexed list.
+ *
+ * NOT an array_is_list() polyfill, despite what this comment used to claim —
+ * array_is_list([]) is TRUE and this deliberately answers FALSE, because an
+ * empty sidecar entry means "no resolver", not "an empty list of resolvers".
+ * The real polyfill lives in utilsManagement.php. Keep them distinct: swapping
+ * this for array_is_list would make an empty entry take the array-shape branch.
  */
 function _isResolverArrayShape(array $arr): bool {
     if (empty($arr)) return false;
