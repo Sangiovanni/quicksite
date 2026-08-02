@@ -614,6 +614,14 @@ Match highlighting paints into a separate `<pre>` overlay layer (between the hig
 
 **Draft persistence.** On every input the editor's content is debounced-written (500ms) to `localStorage` under `STYLE_SOURCE_DRAFT` (see §6). On the next Source entry, if the draft differs from the server file, a restore banner appears between the toolbar and the editor offering **Restore** (load the draft + mark dirty) or **Discard** (clear the draft). The draft is also cleared on successful save / Cancel.
 
+**Content restrictions.** A whole-file save (and every structured style write) is validated before it lands:
+
+- **Remote `@import` is rejected.** An `@import` that points at another origin — anything carrying a URL scheme (`https:`, `http:`, `data:`, …) or a protocol-relative `//host` — is refused. This keeps the generated site dependency-free (no third-party fetch on a visitor's behalf) and closes an exfiltration channel. Relative and same-origin imports (`theme.css`, `/style/extra.css`) are allowed; to use a web font or external sheet, download it into the project instead.
+- **A few legacy vectors are blocked** regardless of how they are spelled (comments or CSS escapes inserted mid-keyword do not evade the check): the `javascript:` / `vbscript:` schemes, IE `expression(...)` and `behavior:`, Firefox `-moz-binding:`, and `data:` URIs carrying HTML. `scroll-behavior` and ordinary quoted values (`font-family: "Segoe UI"`, `content: "→"`) are unaffected.
+- **Size limit.** A stylesheet is capped at 512 KB — the largest the CSS engine parses within the server's memory budget. This applies to the whole-file save and to every incremental write (variables, rules, keyframes, snippet CSS injection).
+
+Selectors, media queries, variable names, and declaration blocks additionally may not contain a raw `{` or `}` (which would break out of the rule) — the `>` child combinator, pseudo-classes, and attribute selectors are all fine.
+
 **Dirty guards:**
 - Switching from Source to Theme / Selectors / Animations while dirty → confirm before discarding.
 - Switching to another sidebar mode while dirty → same prompt (via `setMode`'s guard).

@@ -18,8 +18,22 @@ class CssParser {
 
     private string $content;
 
+    /**
+     * F-C13-6 — when the input is larger than the parser can process within the
+     * install's memory_limit, every parse method degrades to empty/no-op instead
+     * of allocating ~140-210x the input and fatally exhausting memory. This guards
+     * the paths that land a stylesheet on disk WITHOUT going through the write cap
+     * (importProject writes public/style/style.css directly), so a read command
+     * like getRootVariables cannot be made to OOM by a planted oversized sheet.
+     * The ceiling mirrors CSS_MAX_BYTES (utilsStyleManagement.php); the fallback
+     * covers callers that don't load that helper.
+     */
+    private bool $tooLarge;
+
     public function __construct(string $content) {
-        $this->content = $content;
+        $this->content  = $content;
+        $ceiling        = defined('CSS_MAX_BYTES') ? CSS_MAX_BYTES : 512 * 1024;
+        $this->tooLarge = strlen($content) > $ceiling;
     }
 
     /**
@@ -143,6 +157,7 @@ class CssParser {
      *   'innerEnd'   => int     byte offset of the closing '}'
      */
     private function parseTopLevelBlocks(): array {
+        if ($this->tooLarge) return [];   // F-C13-6: refuse before allocating the block tree
         $blocks = [];
         $len    = strlen($this->content);
         $pos    = 0;
@@ -637,8 +652,9 @@ class CssParser {
      * @return array List of keyframe names and their content
      */
     public function getKeyframes(): array {
+        if ($this->tooLarge) return [];   // F-C13-6: refuse before the whole-content regex allocates
         $keyframes = [];
-        
+
         preg_match_all('/@keyframes\s+([\w-]+)\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/s', $this->content, $matches, PREG_SET_ORDER);
         
         foreach ($matches as $match) {
@@ -668,6 +684,11 @@ class CssParser {
      * @return array Operation result
      */
     public function setKeyframes(string $name, array $frames): array {
+        // F-C13-6: on an oversized sheet, do not run the whole-content regex; leave
+        // content untouched (the write cap rejects the oversized file downstream).
+        if ($this->tooLarge) {
+            return ['action' => 'unchanged', 'name' => $name, 'frames' => array_keys($frames)];
+        }
         $escapedName = preg_quote($name, '/');
         $action = 'added';
         
@@ -684,8 +705,10 @@ class CssParser {
         $pattern = '/@keyframes\s+' . $escapedName . '\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/s';
         
         if (preg_match($pattern, $this->content)) {
-            // Update existing
-            $this->content = preg_replace($pattern, $newKeyframes, $this->content);
+            // Update existing. F-C13-5: use a callback so `$0` / `\1` inside a
+            // caller-supplied frame style are written LITERALLY, not interpreted as
+            // preg_replace backreferences.
+            $this->content = preg_replace_callback($pattern, static fn() => $newKeyframes, $this->content);
             $action = 'updated';
         } else {
             // Add new
@@ -705,6 +728,7 @@ class CssParser {
      * @return bool True if deleted, false if not found
      */
     public function deleteKeyframes(string $name): bool {
+        if ($this->tooLarge) return false;   // F-C13-6: refuse before the whole-content regex allocates
         $escapedName = preg_quote($name, '/');
         $pattern = '/\s*@keyframes\s+' . $escapedName . '\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}\s*/s';
         

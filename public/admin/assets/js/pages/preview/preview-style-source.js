@@ -290,6 +290,35 @@
         _navigationConsented = true;
     }
 
+    // Resolve a REAL toast. This module previously called the bare
+    // `window.showToast`, which is undefined on the preview page — so save
+    // errors and successes silently no-op'd (a refused save looked like nothing
+    // happened). The working entrypoints, in order: QuickSiteUtils.showToast
+    // (always loaded via layout.php), QuickSiteAdmin.showToast (what preview.js
+    // uses), then the legacy global. Falls back to the console only if none exist.
+    function sourceToast(message, type) {
+        if (window.QuickSiteUtils && typeof QuickSiteUtils.showToast === 'function') {
+            QuickSiteUtils.showToast(message, type);
+        } else if (window.QuickSiteAdmin && typeof QuickSiteAdmin.showToast === 'function') {
+            QuickSiteAdmin.showToast(message, type);
+        } else if (typeof window.showToast === 'function') {
+            window.showToast(message, type);
+        } else {
+            console.log('[Toast]', type, message);
+        }
+    }
+
+    // Build a save-error message that surfaces the SPECIFIC reason the server
+    // gave (e.g. "Remote @import … blocked") from the response envelope's
+    // errors[], not just the generic top-line message.
+    function saveErrorMessage(data) {
+        data = data || {};
+        var base = data.message || data.error || 'Save failed';
+        var e = data.errors && data.errors[0];
+        var detail = e && (e.pattern || e.hint || e.reason);
+        return detail ? base + ' — ' + detail : base;
+    }
+
     function saveStyles() {
         if (!_editor || _isSaving || !_isDirty) return;
         var content = _editor.getValue();
@@ -305,13 +334,13 @@
         var failed = function (err) {
             var msg = (err && err.message) || 'Unknown error';
             var tpl = i18n.styleSourceSaveError || 'Save failed: {error}';
-            if (window.showToast) window.showToast(tpl.replace('{error}', msg), 'error');
+            sourceToast(tpl.replace('{error}', msg), 'error');
         };
         var ok = function () {
             _serverContent = content;
             _isDirty = false;
             clearDraft();
-            if (window.showToast) window.showToast(i18n.styleSourceSaved || 'style.css saved', 'success');
+            sourceToast(i18n.styleSourceSaved || 'style.css saved', 'success');
             // Slice 5: drop the live injection and force the iframe's
             // <link rel="stylesheet"> to re-fetch — saved content is now
             // authoritative, the injection has nothing left to add.
@@ -329,7 +358,7 @@
             QuickSiteAPI.request('editStyles', 'POST', { content: content })
                 .then(function (result) {
                     if (!result.ok) {
-                        throw new Error((result.data && (result.data.message || result.data.error)) || 'Save failed');
+                        throw new Error(saveErrorMessage(result.data));
                     }
                     ok();
                 })
@@ -345,7 +374,7 @@
             }).then(function (r) { return r.json(); })
               .then(function (data) {
                   if (!data || (data.status !== 200 && data.status !== 201)) {
-                      throw new Error((data && data.message) || 'Save failed');
+                      throw new Error(saveErrorMessage(data));
                   }
                   ok();
               })
@@ -378,10 +407,8 @@
             // the cached state of the other tabs, their caches are stale.
             invalidateStructuredTabs();
         }).catch(function (err) {
-            if (window.showToast) {
-                var label = i18n.styleSourceLoadError || 'Failed to load style.css';
-                window.showToast(label + ': ' + ((err && err.message) || ''), 'error');
-            }
+            var label = i18n.styleSourceLoadError || 'Failed to load style.css';
+            sourceToast(label + ': ' + ((err && err.message) || ''), 'error');
         });
     }
 

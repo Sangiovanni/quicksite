@@ -93,7 +93,11 @@ window.QuickSiteUtils = (function() {
     // ============================================
 
     /**
-     * Escape HTML to prevent XSS
+     * Escape HTML for TEXT-node context (between tags).
+     * This is a TEXT escaper: it neutralises & < > but deliberately leaves quotes
+     * alone, which is correct and sufficient for `>${escapeHtml(x)}<`. It is NOT
+     * safe for attribute values — a quote in `x` closes the attribute. For
+     * `attr="${...}"` use escapeAttr(). (F-C13-3.)
      * @param {string} text - Text to escape
      * @returns {string} Escaped HTML string
      */
@@ -101,6 +105,25 @@ window.QuickSiteUtils = (function() {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    /**
+     * Escape a value for use inside a double-quoted HTML ATTRIBUTE (`attr="${...}"`).
+     * Unlike escapeHtml, this also escapes both quote characters, so the value
+     * cannot close the attribute and inject further markup or an event handler.
+     * Prefer building DOM with createElement + element.value / setAttribute where
+     * practical; use this where an innerHTML template is genuinely the right tool.
+     * (F-C13-3.)
+     * @param {string} text - Value to place inside a quoted attribute
+     * @returns {string} Attribute-safe string
+     */
+    function escapeAttr(text) {
+        return String(text == null ? '' : text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 
     /**
@@ -510,6 +533,7 @@ window.QuickSiteUtils = (function() {
         
         // Text Utilities
         escapeHtml,
+        escapeAttr,
         formatJson,
         truncate,
         

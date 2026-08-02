@@ -20,6 +20,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/CssParser.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/SnippetManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsStyleManagement.php';
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -172,6 +173,14 @@ function __command_injectSnippetCss(array $params = [], array $urlParams = []): 
     // Append CSS with comment marker
     $comment = "/* Snippet: {$snippetId} — " . ($mode === 'missing' ? 'added missing CSS' : 'replaced CSS') . " */";
     $newCss = rtrim($existingCss) . "\n\n{$comment}\n" . $cssToInject . "\n";
+
+    // F-C13-6: cap the result at the size the CssParser can read back, matching
+    // every other CSS writer (this command writes directly, so it checks here).
+    if (strlen($newCss) > CSS_MAX_BYTES) {
+        return ApiResponse::create(413, 'validation.size_limit_exceeded')
+            ->withMessage('Injecting this snippet would exceed the maximum stylesheet size ('
+                . (int) round(CSS_MAX_BYTES / 1024) . ' KB)');
+    }
 
     // Write to BOTH locations: live public + project backup
     $writeFailed = false;

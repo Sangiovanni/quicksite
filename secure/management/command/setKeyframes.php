@@ -82,13 +82,21 @@ foreach ($frames as $key => $styles) {
         '/expression\s*\(/i',
         '/<\s*script/i',
     ];
-    
+
     foreach ($dangerousPatterns as $pattern) {
         if (preg_match($pattern, $styles)) {
             ApiResponse::create(400, 'validation.security')
                 ->withMessage('Potentially dangerous CSS pattern detected')
                 ->send();
         }
+    }
+
+    // F-C13-4 confinement — a `}` in a frame's declaration block escapes the
+    // @keyframes block and emits arbitrary CSS. The denylist above does not catch it.
+    if (!qs_css_confine($styles)) {
+        ApiResponse::create(400, 'validation.security')
+            ->withMessage('Frame styles may not contain "{" or "}"')
+            ->send();
     }
 }
 

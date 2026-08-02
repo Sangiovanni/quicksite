@@ -80,6 +80,17 @@ foreach ($dangerousPatterns as $pattern) {
     }
 }
 
+// F-C13-4 confinement — a `{` or `}` in the selector, the media query, or the
+// declaration block lets the input escape its rule and emit arbitrary CSS. The
+// denylist above does NOT cover braces, and mediaQuery never reached it at all.
+foreach (['selector' => $selector, 'styles' => $styles, 'mediaQuery' => $mediaQuery] as $field => $value) {
+    if ($value !== null && $value !== '' && !qs_css_confine((string) $value)) {
+        ApiResponse::create(400, 'validation.security')
+            ->withMessage('CSS ' . $field . ' may not contain "{" or "}"')
+            ->send();
+    }
+}
+
 // Validate media query format if provided
 if ($mediaQuery !== null && !RegexPatterns::match('media_query_basic', $mediaQuery)) {
     // Allow common media query formats

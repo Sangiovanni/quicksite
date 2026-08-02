@@ -1,5 +1,6 @@
 <?php
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsStyleManagement.php';
 
 $params = $trimParametersManagement->params();
 
@@ -36,35 +37,42 @@ if ($contentSize === 0) {
         ->send();
 }
 
-// Validate file size (max 2MB)
-$maxSize = 2 * 1024 * 1024; // 2MB
+// Validate file size. F-C13-6: the ceiling is CSS_MAX_BYTES (what the CssParser can
+// read back within the memory_limit), shared with every other CSS writer via
+// cssWriteAllTargets — NOT the old 2 MB, which was ~2.5x beyond what the parser
+// survives, so one oversized editStyles write bricked the 14 CssParser-using commands.
+$maxSize = CSS_MAX_BYTES;
 
 if ($contentSize > $maxSize) {
     ApiResponse::create(400, 'validation.invalid_length')
-        ->withMessage("Content too large (max 2MB)")
+        ->withMessage('Content too large (max ' . (int) round($maxSize / 1024) . ' KB)')
         ->withData([
             'size' => $contentSize,
             'max_size' => $maxSize,
-            'size_mb' => round($contentSize / 1024 / 1024, 2)
+            'size_kb' => round($contentSize / 1024, 1)
         ])
         ->send();
 }
 
-// SECURITY: Check for potentially dangerous CSS patterns
-// Note: This is basic protection. SCSS is compiled server-side, so we focus on obvious attacks
-// Using regex to avoid false positives (e.g., scroll-behavior vs behavior:)
+// SECURITY: Check for potentially dangerous CSS patterns.
+// The patterns run against a normalised copy (comments stripped, `\XX` escapes
+// decoded) so the byte-level bypasses `behavior/**​/:` and `b\65 havior` cannot slip
+// past (F5). The @import rule now blocks ANY REMOTE import (scheme or `//`) — a
+// remote stylesheet is an exfiltration channel AND violates the dependency-free
+// policy; relative and same-origin (`/x.css`) imports are still allowed.
+$scanContent = qs_css_normalize_for_scan($newContent);
 $dangerousPatterns = [
     '/javascript\s*:/i' => 'JavaScript protocol',
     '/expression\s*\(/i' => 'CSS expression (IE-specific JS)',
     '/(?<!scroll-)behavior\s*:/i' => 'CSS behavior (IE-specific)',
     '/vbscript\s*:/i' => 'VBScript protocol',
     '/-moz-binding\s*:/i' => 'XBL binding (Firefox-specific)',
-    '/@import\s+url\s*\(\s*["\']?\//i' => 'Absolute path import (potential file access)',
+    '/@import\s+(?:url\(\s*)?["\']?\s*(?:[a-z][a-z0-9+.\-]*:|\/\/)/i' => 'Remote @import (external stylesheet — blocked by the dependency-free policy)',
     '/data\s*:\s*text\/html/i' => 'Data URI with HTML',
 ];
 
 foreach ($dangerousPatterns as $pattern => $description) {
-    if (preg_match($pattern, $newContent)) {
+    if (preg_match($pattern, $scanContent)) {
         ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage('Content contains potentially dangerous CSS pattern')
             ->withErrors([

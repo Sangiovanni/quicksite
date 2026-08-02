@@ -38,11 +38,20 @@ foreach ($variables as $name => $value) {
             ->withMessage('Variable names and values must be strings')
             ->send();
     }
-    
+
     // Basic CSS value validation - prevent injection
     if (RegexPatterns::match('css_injection', $value)) {
         ApiResponse::create(400, 'validation.invalid_css')
             ->withMessage('Invalid CSS value detected')
+            ->send();
+    }
+
+    // F-C13-4 confinement — the css_injection check above covers the VALUE (it
+    // rejects `{ } < >`) but the NAME was never validated, so a braced key could
+    // escape the :root block. Confine both for uniformity.
+    if (!qs_css_confine($name) || !qs_css_confine($value)) {
+        ApiResponse::create(400, 'validation.invalid_css')
+            ->withMessage('Variable names and values may not contain "{" or "}"')
             ->send();
     }
 }

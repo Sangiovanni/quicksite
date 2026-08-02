@@ -64,8 +64,16 @@
     }
     
     function showToast(message, type) {
-        if (window.QuickSiteAdmin?.toast) {
-            QuickSiteAdmin.toast(message, type);
+        // Resolve a REAL toast. The prior `QuickSiteAdmin?.toast` was a wrong method
+        // name (the shipped method is `.showToast`, 12 callers vs this lone `.toast`),
+        // so every theme toast silently went to the console — including the save-error
+        // shown when a variable is refused (e.g. a brace, now rejected server-side).
+        if (window.QuickSiteUtils && typeof QuickSiteUtils.showToast === 'function') {
+            QuickSiteUtils.showToast(message, type);
+        } else if (window.QuickSiteAdmin && typeof QuickSiteAdmin.showToast === 'function') {
+            QuickSiteAdmin.showToast(message, type);
+        } else if (typeof window.showToast === 'function') {
+            window.showToast(message, type);
         } else {
             console.log(`[Toast ${type}]`, message);
         }
@@ -269,34 +277,90 @@
     
     // ==================== Render Functions ====================
     
+    // ── DOM builders (F-C13-3) ──────────────────────────────────────────────
+    // Theme variable NAMES and VALUES are attacker-controllable (they come out of
+    // the project stylesheet via getRootVariables), so they must never be glued
+    // into an HTML string. These helpers build one element each with createElement
+    // + textContent + property assignment; a value like `red" onmouseover=…` lands
+    // in `input.value` / `el.style` as inert data, never parsed as markup. Static
+    // structure stays here; nothing user-derived touches innerHTML.
+
+    /**
+     * Build one color-variable row. Returns { item, swatch, input } so the caller
+     * can wire events. `value` reaches the swatch via style.backgroundColor and the
+     * field via input.value — both property assignments, never an HTML parse.
+     */
+    function _renderColorRow(name, value) {
+        const item = document.createElement('div');
+        item.className = 'preview-theme-color';
+
+        const swatch = document.createElement('div');
+        swatch.className = 'preview-theme-color__swatch';
+        swatch.style.backgroundColor = value;      // invalid CSS just no-ops; no markup parse
+        swatch.setAttribute('data-var', name);
+
+        const info = document.createElement('div');
+        info.className = 'preview-theme-color__info';
+
+        const nameEl = document.createElement('span');
+        nameEl.className = 'preview-theme-color__name';
+        nameEl.textContent = formatVariableName(name);
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'preview-theme-color__value';
+        input.value = value;
+        input.setAttribute('data-var', name);
+        input.setAttribute('data-original', value);
+
+        info.appendChild(nameEl);
+        info.appendChild(input);
+        item.appendChild(swatch);
+        item.appendChild(info);
+        return { item, swatch, input };
+    }
+
+    /**
+     * Build one text-variable row (fonts / spacing / other). Returns { item, input }.
+     */
+    function _renderTextRow(name, value, placeholder) {
+        const item = document.createElement('div');
+        item.className = 'preview-theme-input';
+
+        const label = document.createElement('label');
+        label.className = 'preview-theme-input__label';
+        label.textContent = formatVariableName(name);
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'preview-theme-input__field';
+        input.value = value;
+        input.setAttribute('data-var', name);
+        input.setAttribute('data-original', value);
+        if (placeholder) input.setAttribute('placeholder', placeholder);
+
+        item.appendChild(label);
+        item.appendChild(input);
+        return { item, input };
+    }
+
     /**
      * Render color inputs
      */
     function renderColorInputs(container, variables) {
         if (!container) return;
         container.innerHTML = '';
-        
+
         const i18n = getI18n();
-        
+
         if (variables.length === 0) {
             container.innerHTML = `<p class="preview-theme-empty">${i18n.noColorVariables || 'No color variables'}</p>`;
             return;
         }
-        
+
         variables.forEach(({ name, value }) => {
-            const item = document.createElement('div');
-            item.className = 'preview-theme-color';
-            item.innerHTML = `
-                <div class="preview-theme-color__swatch" style="background-color: ${value};" data-var="${name}"></div>
-                <div class="preview-theme-color__info">
-                    <span class="preview-theme-color__name">${formatVariableName(name)}</span>
-                    <input type="text" class="preview-theme-color__value" value="${value}" data-var="${name}" data-original="${value}">
-                </div>
-            `;
-            
-            const swatch = item.querySelector('.preview-theme-color__swatch');
-            const input = item.querySelector('.preview-theme-color__value');
-            
+            const { item, swatch, input } = _renderColorRow(name, value);
+
             // Initialize QSColorPicker on the input if available
             if (typeof QSColorPicker !== 'undefined') {
                 new QSColorPicker(input, {
@@ -307,10 +371,10 @@
                     }
                 });
             }
-            
+
             // Big swatch click → trigger input click (opens QSColorPicker)
             swatch.addEventListener('click', () => input.click());
-            
+
             // Manual input change handler (for typing hex values)
             input.addEventListener('change', (e) => {
                 handleVariableChange(name, e.target.value);
@@ -321,35 +385,27 @@
                 previewThemeVariable(name, e.target.value);
                 swatch.style.backgroundColor = e.target.value;
             });
-            
+
             container.appendChild(item);
         });
     }
-    
+
     /**
      * Render text-based variable inputs (fonts, spacing, other)
      */
     function renderTextInputs(container, variables, emptyMsg, placeholder) {
         if (!container) return;
         container.innerHTML = '';
-        
+
         if (variables.length === 0) {
             if (emptyMsg) container.innerHTML = `<p class="preview-theme-empty">${emptyMsg}</p>`;
             return;
         }
-        
+
         variables.forEach(({ name, value }) => {
-            const item = document.createElement('div');
-            item.className = 'preview-theme-input';
-            item.innerHTML = `
-                <label class="preview-theme-input__label">${formatVariableName(name)}</label>
-                <input type="text" class="preview-theme-input__field" value="${value}" data-var="${name}" data-original="${value}"${placeholder ? ` placeholder="${placeholder}"` : ''}>
-            `;
-            
-            const input = item.querySelector('.preview-theme-input__field');
+            const { item, input } = _renderTextRow(name, value, placeholder);
             input.addEventListener('change', (e) => handleVariableChange(name, e.target.value));
             input.addEventListener('input', (e) => previewThemeVariable(name, e.target.value));
-            
             container.appendChild(item);
         });
     }
