@@ -62,11 +62,23 @@ function qs_file_policy(): array
         ],
         // Archive resource limits. `getFromIndex()` reads an entry fully into
         // memory, so an unbounded archive is an unbounded allocation.
+        //
+        // The BYTE caps are the real ceiling: whatever an entry's compression
+        // ratio, no single entry may allocate more than `max_entry_bytes` and
+        // no archive more than `max_total_bytes`. `max_ratio` only raises the
+        // UPLOAD COST of reaching that ceiling, so it can afford to be
+        // generous — and it has to be. A page tree is repetitive by
+        // construction (every node repeats tag, class, style, children), so it
+        // deflates far better than hand-written text, and a tight ratio
+        // refuses the engine's own export. 300:1 leaves several times the
+        // headroom real project content needs; a decompression bomb sits
+        // orders of magnitude higher (a megabyte of one repeated byte exceeds
+        // 1000:1).
         'limits' => [
             'max_entries'     => 10000,
             'max_total_bytes' => 200 * 1024 * 1024,
             'max_entry_bytes' => 50 * 1024 * 1024,
-            'max_ratio'       => 100,
+            'max_ratio'       => 300,
         ],
     ];
 

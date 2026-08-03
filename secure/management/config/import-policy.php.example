@@ -61,8 +61,12 @@ return [
         'max_total_bytes' => 200 * 1024 * 1024,
         // Maximum UNCOMPRESSED size of any single entry, in bytes (50 MB).
         'max_entry_bytes' => 50 * 1024 * 1024,
-        // Maximum uncompressed:compressed ratio for any single entry. A high
-        // ratio is the signature of a decompression bomb.
-        'max_ratio'       => 100,
+        // Maximum uncompressed:compressed ratio for any single entry. A very
+        // high ratio is the signature of a decompression bomb. The two byte
+        // caps above are the real ceiling on what an archive can allocate;
+        // this only raises the upload cost of reaching it, which is why the
+        // default is generous. Lowering it much below 300 starts refusing
+        // legitimate exports — a page tree compresses extremely well.
+        'max_ratio'       => 300,
     ],
 ];
