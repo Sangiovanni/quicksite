@@ -104,25 +104,21 @@ function findComponentUsagesInternal(string $componentName): array {
 }
 
 /**
- * Recursively validate structure for blocked tags
+ * Recursively validate structure for blocked tags + unsafe params.
+ *
+ * The TAG half moved to qs_first_unrenderable_tag() in utilsManagement.php
+ * (beta.10 C13 13.5) so the other structure writers can enforce the identical
+ * rule without copying this walk — CLAUDE.md centralize-shared-logic. The gate
+ * itself is unchanged: TagRegistry::isRenderable, the same policy the renderer
+ * and the compiler apply, and it still runs BEFORE the param check at the call
+ * site so a tag error still wins over a param error.
+ *
  * @param mixed $node Node to validate
- * @return string|null Error message if blocked tag found, null if valid
+ * @return string|null Error message if unsafe param found, null if valid
  */
 function validateStructureTags($node): ?string {
     if (!is_array($node)) {
         return null;
-    }
-    
-    // Enforce the SAME gate the renderer + compiler use — TagRegistry::
-    // isRenderable = well-formed name + NOT blocked + on the allowlist.
-    // Previously only isBlocked was checked, so non-allowed tags (raw SVG
-    // <rect>/<text>/<set>, <foreignObject>, …) could be STORED even though the
-    // render/compile layers drop them (beta.10 F-g). Reject on write too, so
-    // stored JSON stays clean and the author gets an immediate error.
-    if (isset($node['tag']) && is_string($node['tag'])) {
-        if (!TagRegistry::isRenderable($node['tag'])) {
-            return "Tag '{$node['tag']}' is not allowed (security restriction)";
-        }
     }
 
     // Param safety: reject raw on* handlers + dangerous URL schemes on write
@@ -314,6 +310,18 @@ if ($structure !== null && is_array($structure)) {
 
 // SECURITY: Validate no blocked tags (script, style, etc.) - skip for delete
 if ($structure !== null && is_array($structure)) {
+    // Tags first — one shared walk that handles BOTH stored shapes (list of nodes
+    // for page/menu/footer, single object for a component), so the list/single
+    // branching no longer lives here. Same rule, same 400, same message.
+    $badTag = qs_first_unrenderable_tag($structure);
+    if ($badTag !== null) {
+        ApiResponse::create(400, 'validation.blocked_tag')
+            ->withMessage("Tag '{$badTag}' is not allowed (security restriction)")
+            ->withErrors([['field' => 'structure', 'reason' => 'blocked_tag']])
+            ->send();
+    }
+
+    // Then params, which still walk per-shape.
     // For pages/menu/footer (arrays of nodes)
     if (isset($structure[0]) || empty($structure)) {
         foreach ($structure as $node) {

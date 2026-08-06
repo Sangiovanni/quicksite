@@ -4209,48 +4209,59 @@ $GLOBALS['__help_commands'] = [
     ],
 
     'exportProject' => [
-        'description' => 'Exports a project as a downloadable ZIP file',
+        'description' => 'Exports the targeted project as a ZIP. Streams the archive by default; set save=true to store it in the project\'s exports folder and get a download URL instead.',
         'method' => 'GET',
         'parameters' => [
             'name' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => 'Project name to export (defaults to active project if not specified)'
+                'description' => 'Optional echo of the project in the URL marker. It does NOT select what gets exported - the marker does. A value that disagrees with the marker is refused with 400 project.mismatch. Accepts `project` as an alias.'
             ],
             'include_public' => [
                 'required' => false,
                 'type' => 'boolean',
-                'description' => 'Include public folder in export',
+                'description' => 'Include the project\'s public folder (assets, style, build) in the archive',
                 'default' => true
             ],
-            'download' => [
+            'save' => [
                 'required' => false,
                 'type' => 'boolean',
-                'description' => 'Stream file directly as download',
+                'description' => 'false (default): stream the ZIP bytes straight back as the response body - no JSON envelope, nothing stored. true: write the archive into secure/projects/<id>/exports/ and return the JSON envelope below with a download_url.',
                 'default' => false
             ]
         ],
-        'example_get' => 'GET /management/exportProject (exports active project) or GET /management/exportProject?name=quicksite&download=true',
+        'example_get' => 'GET /management/p/quicksite/exportProject (streams the ZIP) or GET /management/p/quicksite/exportProject?save=true&include_public=false (stores it, returns JSON)',
         'success_response' => [
             'status' => 200,
             'code' => 'resource.exported',
-            'message' => "Project 'quicksite' exported successfully",
+            'message' => "Project 'quicksite' exported and saved",
+            'note' => 'This envelope is returned ONLY when save=true. With the default save=false the response body is the raw ZIP stream.',
             'data' => [
                 'project' => 'quicksite',
                 'filename' => 'quicksite_export_20250120_143022.zip',
+                'path' => 'secure/projects/quicksite/exports/quicksite_export_20250120_143022.zip',
                 'size' => '2.1 MB',
+                'size_bytes' => 2202009,
+                'files_count' => 148,
+                'directories_count' => 21,
+                'original_size' => '6.4 MB',
                 'download_url' => '/management/p/quicksite/downloadExport?file=quicksite_export_20250120_143022.zip',
-                'expires' => '2025-01-21 14:30:22'
+                'expires' => '2025-01-21 14:30:22',
+                'format' => 'v2.0-secure',
+                'note' => 'Secure format: PHP files excluded, will be rebuilt on import'
             ]
         ],
         'error_responses' => [
             '400.project.required' => 'No project targeted - use /management/p/<projectId>/exportProject',
-            '400.validation.missing_field' => 'Missing name parameter',
             '400.project.mismatch' => 'A name/project in the request disagreed with the project in the URL',
+            '400.validation.invalid_format' => 'The targeted project id is not a valid project name',
             '404.resource.not_found' => 'Project not found',
-            '500.server.missing_extension' => 'PHP ZIP extension not available'
+            '500.server.missing_extension' => 'PHP ZIP extension not available',
+            '500.server.zip_create_failed' => 'Could not create the archive',
+            '500.server.zip_error' => 'The archive failed to finalise',
+            '500.server.move_failed' => 'save=true, but the archive could not be written into the exports folder'
         ],
-        'notes' => 'Project-scoped: the exported project is the one in the URL marker; a name/project in the request is optional and must match. Saved exports live in that project\'s own folder (secure/projects/<id>/exports/) and are auto-cleaned (keeps last 5). Use download=true to stream directly.'
+        'notes' => 'Project-scoped: the exported project is the one in the URL marker; a name/project in the request is optional and must match. Export format v2.0-secure - PHP files are NOT included, they are rebuilt from JSON on import. Saved exports live in that project\'s own folder (secure/projects/<id>/exports/), are auto-cleaned (keeps the last 5), and are reachable only through their own project\'s marker via downloadExport.'
     ],
     
     'importProject' => [
@@ -4340,7 +4351,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_filename' => 'Invalid filename (path traversal blocked)',
             '404.resource.not_found' => 'Export file not found or expired'
         ],
-        'notes' => 'Export files expire after 24 hours. Use exportProject with download=true for immediate download.'
+        'notes' => 'Export files expire after 24 hours. This command only serves archives that exportProject was asked to SAVE (save=true); for an immediate download call exportProject with no options - streaming is its default and stores nothing.'
     ],
     
     // =========================================================================

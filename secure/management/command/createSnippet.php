@@ -22,6 +22,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/SnippetManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_first_unrenderable_tag
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -74,6 +75,19 @@ function __command_createSnippet(array $params = [], array $urlParams = []): Api
     $validCategories = ['nav', 'forms', 'cards', 'layouts', 'content', 'lists', 'other'];
     if (!in_array($category, $validCategories)) {
         $category = 'other';
+    }
+
+    // SECURITY (beta.10 C13 13.5, F2 write side): the structure arrives verbatim
+    // from the request, so this command is where a non-renderable tag can ENTER
+    // stored data — and from here insertSnippet copies it into a page. Enforce the
+    // same TagRegistry gate the renderer, the compiler and editStructure use. The
+    // editor only ever emits allowlisted tags, so this refuses nothing a legitimate
+    // snippet contains.
+    $badTag = qs_first_unrenderable_tag($structure);
+    if ($badTag !== null) {
+        return ApiResponse::create(400, 'validation.blocked_tag')
+            ->withMessage("Tag '{$badTag}' is not allowed (security restriction)")
+            ->withErrors([['field' => 'structure', 'reason' => 'blocked_tag', 'value' => $badTag]]);
     }
     
     // (project already bound to the authorized marker above)

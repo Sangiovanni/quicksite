@@ -280,6 +280,76 @@ function qs_structure_depth_ok($structure, int $maxDepth = 50): bool {
     return validateStructureDepth($structure, 0, $maxDepth);
 }
 
+// TagRegistry is the single source of truth for tag policy (CLAUDE.md: never
+// define tag lists anywhere else). Required explicitly rather than relied on
+// transitively, so qs_first_unrenderable_tag() works from any caller.
+require_once SECURE_FOLDER_PATH . '/src/classes/TagRegistry.php';
+
+/**
+ * Walk a WHOLE structure and return the first tag the render/compile layers would
+ * refuse, or null when every tag is renderable. Handles both stored shapes — the
+ * list-of-nodes (page/menu/footer) and the single-node (component) — with the same
+ * branching qs_structure_depth_ok uses.
+ *
+ * TagRegistry::isRenderable is the shared policy: well-formed name, NOT blocked,
+ * and on the allowlist. The renderer (JsonToHtmlRenderer) and the compiler
+ * (JsonToPhpCompiler) both enforce it, so a non-renderable tag can never be SERVED
+ * — it renders as an HTML comment and compiles to nothing. This helper is the
+ * WRITE-side twin of that gate: belt-and-braces, so stored JSON stays clean and the
+ * author gets an immediate error instead of a node that silently never appears.
+ *
+ * Use it on whatever a writer is about to persist. Note the distinction that
+ * decides whether a given writer wants it at all (beta.10 C13 13.5):
+ *   - a writer that takes a tag/structure FROM THE REQUEST can INTRODUCE a bad tag,
+ *     and a gate there PREVENTS;
+ *   - a writer that only copies or moves tags already in the store (moveNode,
+ *     duplicateNode, insertSnippet) can only PROPAGATE one, and a gate there
+ *     QUARANTINES — it would refuse to move or duplicate pre-existing content,
+ *     which is a behaviour change, not a hardening.
+ *
+ * @param mixed $structure decoded structure (list of nodes, or one node)
+ * @return string|null the offending tag, or null when all tags are renderable
+ */
+function qs_first_unrenderable_tag($structure): ?string {
+    if (!is_array($structure)) {
+        return null;
+    }
+    if (isset($structure[0]) || empty($structure)) {
+        foreach ($structure as $node) {
+            $bad = qs_first_unrenderable_tag_node($node);
+            if ($bad !== null) {
+                return $bad;
+            }
+        }
+        return null;
+    }
+    return qs_first_unrenderable_tag_node($structure);
+}
+
+/**
+ * Single-node recursion behind qs_first_unrenderable_tag().
+ *
+ * @param mixed $node
+ * @return string|null
+ */
+function qs_first_unrenderable_tag_node($node): ?string {
+    if (!is_array($node)) {
+        return null;
+    }
+    if (isset($node['tag']) && is_string($node['tag']) && !TagRegistry::isRenderable($node['tag'])) {
+        return $node['tag'];
+    }
+    if (isset($node['children']) && is_array($node['children'])) {
+        foreach ($node['children'] as $child) {
+            $bad = qs_first_unrenderable_tag_node($child);
+            if ($bad !== null) {
+                return $bad;
+            }
+        }
+    }
+    return null;
+}
+
 /**
  * Validate nested object/array depth (for translations, configs, etc.)
  * Unlike validateStructureDepth which checks 'children' arrays,

@@ -213,6 +213,20 @@ function __command_addComplexElement(array $params = [], array $urlParams = []):
             ->withMessage($err);
     }
 
+    // SECURITY (beta.10 C13 13.5, F2 write side): walk the emitted subtree for a
+    // tag the renderer and compiler would refuse. Every shipped builder pins its
+    // tags to a closed world — the only two that read a tag from `config` are
+    // ListElement (ul|ol) and FieldRow (ACCEPTED_TYPES), both proven live to
+    // refuse anything else — so this fires on nothing today. It is here so a
+    // FUTURE builder cannot become the one writer that emits an unrenderable tag
+    // without noticing: the gate belongs to the splice, not to each builder.
+    $badTag = qs_first_unrenderable_tag($newNode);
+    if ($badTag !== null) {
+        return ApiResponse::create(400, 'validation.blocked_tag')
+            ->withMessage("Builder '$kind' emitted tag '{$badTag}', which is not allowed (security restriction)")
+            ->withErrors([['field' => 'config', 'reason' => 'blocked_tag', 'value' => $badTag]]);
+    }
+
     // SECURITY: walk the builder's emitted subtree for reserved-namespace
     // storage keys (slice 5b). Builders consume user-supplied `config` and
     // could propagate hostile values into emitted nodes; this is the
