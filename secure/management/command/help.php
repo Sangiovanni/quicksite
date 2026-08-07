@@ -4562,22 +4562,41 @@ $GLOBALS['__help_commands'] = [
     
     'clearExports' => [
         'description' => 'Clears the exported project ZIP files belonging to the targeted project. Useful to free up disk space after exports have been downloaded.',
-        'method' => 'DELETE',
-        'parameters' => [],
-        'example_delete' => 'DELETE /management/p/quicksite/clearExports',
+        'method' => 'POST',
+        'parameters' => [
+            'confirm' => [
+                'required' => true,
+                'type' => 'boolean',
+                'description' => 'Safety confirmation. Without confirm=true the command refuses and deletes nothing.',
+                'example' => true
+            ],
+            'project' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Redundant echo of the URL marker. It cannot select another project: a value that disagrees with the marker is refused. Present only as a filter on the filename prefix within the marker project\'s own exports folder.',
+                'example' => 'quicksite'
+            ]
+        ],
+        'example_post' => 'POST /management/p/quicksite/clearExports with body: {"confirm": true}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
-            'message' => 'Exports cleared successfully',
+            'message' => '5 export file(s) deleted',
             'data' => [
                 'deleted_count' => 5,
+                'deleted_files' => ['quicksite_export_20260807_101500.zip'],
+                'failed_count' => 0,
+                'failed_files' => [],
                 'freed_space' => '15.5 MB'
             ]
         ],
         'error_responses' => [
-            '500.server.delete_failed' => 'Failed to delete some export files'
+            '400.validation.confirmation_required' => 'confirm was not true; nothing was deleted',
+            '400.validation.invalid_format' => 'The project filter is not a valid project name',
+            '207.operation.partial_success' => 'Some archives were deleted and some could not be removed. data.failed_files names the survivors and errors lists them; the deletions that DID happen are real.',
+            '500.server.delete_failed' => 'Every archive that was found failed to delete (deleted_count is 0)'
         ],
-        'notes' => 'Project-scoped: deletes .zip files only in the targeted project\'s own exports folder (secure/projects/<id>/exports/). It cannot reach another project\'s archives. Does not affect project data or backups.'
+        'notes' => 'Project-scoped: deletes .zip files only in the targeted project\'s own exports folder (secure/projects/<id>/exports/). It cannot reach another project\'s archives. Does not affect project data or backups. A run in which any unlink fails NEVER answers 200 — check the status/code, not just data.deleted_count.'
     ],
 
     // ==========================================
@@ -6208,9 +6227,19 @@ $GLOBALS['__help_commands'] = [
                 'type' => 'object',
                 'description' => 'Translation keys used in the snippet',
                 'example' => ['en' => ['key' => 'value']]
+            ],
+            'scope' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => "Where the snippet is stored. 'project' (default) puts it in the marker project's own snippets folder, visible to every member of that project. 'personal' puts it in the CALLER'S OWN library (secure/snippets/custom/<userId>/), which they can reuse in any project they are a member of and which no other user can list, read, insert or delete. 'global' is accepted as a legacy alias of 'personal'.",
+                'example' => 'personal'
             ]
         ],
-        'example_post' => 'POST /management/createSnippet with body: {"id": "my-nav", "name": "My Nav", "category": "nav", "structure": {"tag": "nav"}}',
+        'notes' => [
+            "A structure carrying a tag the renderer would refuse (a blocked tag, or one that is not on the allowlist) is rejected with 400 validation.blocked_tag — the same TagRegistry policy the renderer and the compiler enforce.",
+            "The project written to is bound to the URL marker; a body 'project' that disagrees is refused with 400 project.mismatch."
+        ],
+        'example_post' => 'POST /management/createSnippet with body: {"id": "my-nav", "name": "My Nav", "category": "nav", "structure": {"tag": "nav"}, "scope": "personal"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',

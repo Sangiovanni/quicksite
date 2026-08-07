@@ -28,7 +28,18 @@ class ApiResponse {
             'route.deleted' => 'Route deleted successfully',
             'menu.option.deleted' => 'Menu option deleted',
         ],
-        
+        // 207: the operation partly succeeded. Used by sweeps that act on a SET
+        // — some members done, some refused — where 200 would overstate and 5xx
+        // would understate. `deleteBuild` and `cleanBuilds` have emitted it since
+        // before this entry existed, which meant every partial failure wrote
+        // "Warning: Unregistered response code: 207.operation.partial_success"
+        // to the error log, and any caller that did not pass its own
+        // withMessage() would have been handed "Unknown response". Registering
+        // it fixes both, for them as well as for clearExports.
+        207 => [
+            'operation.partial_success' => 'Operation partially completed',
+        ],
+
         // Client errors (4xx)
         400 => [
             'validation.required' => 'Required parameter missing',
@@ -63,8 +74,11 @@ class ApiResponse {
             'server.file_write_failed' => 'Failed to write file',
             'server.directory_create_failed' => 'Failed to create directory',
             'server.internal_error' => 'Internal server error',
-            'asset.move_failed' => 'Failed to move uploaded file',       
-            'asset.delete_failed' => 'Failed to delete file',            
+            'asset.move_failed' => 'Failed to move uploaded file',
+            'asset.delete_failed' => 'Failed to delete file',
+            // Emitted by deleteProject and clearExports; registering it stops
+            // the "Unregistered response code" line those already write.
+            'server.delete_failed' => 'Failed to delete',
         ],
         503 => [
             'server.unavailable' => 'Service temporarily unavailable',

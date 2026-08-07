@@ -194,7 +194,20 @@ if (!is_dir(SECURE_FOLDER_PATH)) {
 // Define build path before locking (so we can scope the lock to this build)
 $buildPath = PUBLIC_CONTENT_PATH . '/build';
 $timestamp = date('Ymd_His');
-$buildFolderName = $buildCustomName !== '' ? $buildCustomName : 'build_' . $timestamp;
+// beta.10 C13 13.6b: the auto name is second-resolution, and it used to be
+// mkdir'd with no existence check — so two builds inside the same second made
+// the second one answer 500 server.directory_create_failed on an operation that
+// is perfectly legitimate. Disambiguate with a suffix instead. A CUSTOM name is
+// left alone on purpose: it already gets an explicit 409 conflict.already_exists
+// below, which is the right answer for a name the caller chose.
+if ($buildCustomName !== '') {
+    $buildFolderName = $buildCustomName;
+} else {
+    $buildFolderName = 'build_' . $timestamp;
+    for ($suffix = 2; $suffix <= 100 && is_dir($buildPath . '/' . $buildFolderName); $suffix++) {
+        $buildFolderName = 'build_' . $timestamp . '_' . $suffix;
+    }
+}
 $buildFullPath = $buildPath . '/' . $buildFolderName;
 
 // Sanitize folder name for lock file (replace / with _ to make it filename-safe)

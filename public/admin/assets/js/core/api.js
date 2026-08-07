@@ -233,13 +233,28 @@ window.QuickSiteAPI = (function() {
 
     // Shared client-side error for a project-scoped call with no project selected.
     function noProjectError(command) {
+        return clientError('client.project_required',
+            'No project selected for project-scoped command: ' + command, 0);
+    }
+
+    // Every failure this module answers WITHOUT reaching the server used to carry
+    // only `error`, while the server's own envelope (ApiResponse) carries `message`.
+    // Callers overwhelmingly read `result.data.message` — 89 sites across the admin
+    // panel against 18 that read `.error` — so a client-side refusal printed each
+    // caller's generic fallback and the real reason never surfaced. That is how
+    // "getSizeInfo failed: Unknown error" reached the dashboard console at zero
+    // membership with no hint that the cause was a missing project (beta.10 C13
+    // 13.6b). Both keys are emitted: `message` so the common path works, `error`
+    // so the 18 existing readers keep working.
+    function clientError(code, text, status) {
         return {
             ok: false,
-            status: 0,
+            status: status,
             data: {
                 success: false,
-                code: 'client.project_required',
-                error: 'No project selected for project-scoped command: ' + command
+                code: code,
+                message: text,
+                error: text
             }
         };
     }
@@ -296,11 +311,7 @@ window.QuickSiteAPI = (function() {
     async function request(command, method = 'GET', data = null, urlParams = [], queryParams = {}, _isRetry = false, opts = {}) {
         const token = getToken();
         if (!token) {
-            return {
-                ok: false,
-                data: { success: false, error: 'No authentication token' },
-                status: 401
-            };
+            return clientError('client.no_token', 'No authentication token', 401);
         }
 
         // Build URL — project-scoped commands carry the C7 '/p/<projectId>/' marker;
@@ -400,11 +411,7 @@ window.QuickSiteAPI = (function() {
             };
         } catch (error) {
             console.error('API request error:', error);
-            return {
-                ok: false,
-                data: { success: false, error: error.message || 'Network error' },
-                status: 0
-            };
+            return clientError('client.network_error', error.message || 'Network error', 0);
         }
     }
 
@@ -424,11 +431,7 @@ window.QuickSiteAPI = (function() {
     async function upload(command, formData, urlParams = [], _isRetry = false) {
         const token = getToken();
         if (!token) {
-            return {
-                ok: false,
-                data: { success: false, error: 'No authentication token' },
-                status: 401
-            };
+            return clientError('client.no_token', 'No authentication token', 401);
         }
 
         // Project-scoped commands (uploadAsset) carry the C7 '/p/<projectId>/' marker (8.W)
@@ -487,11 +490,7 @@ window.QuickSiteAPI = (function() {
             };
         } catch (error) {
             console.error('API upload error:', error);
-            return {
-                ok: false,
-                data: { success: false, error: error.message || 'Upload failed' },
-                status: 0
-            };
+            return clientError('client.upload_failed', error.message || 'Upload failed', 0);
         }
     }
 

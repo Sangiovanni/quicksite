@@ -6653,10 +6653,14 @@
         
         let isOpen = false;
         
-        // Source label helper
+        // Source label helper. The middle tier is per-USER now (beta.10 C13
+        // 13.6b) — it was one flat installation-wide directory every project
+        // could read and delete from, so a chip reading "Global" was telling the
+        // author something that is no longer true. 'global' still maps here
+        // because a snippet listed by an older server would carry it.
         function sourceLabel(source) {
             if (source === 'core') return 'Core';
-            if (source === 'global') return 'Global';
+            if (source === 'personal' || source === 'global') return 'Personal';
             return 'Project';
         }
         
@@ -6882,7 +6886,8 @@
         if (addSnippetInput) addSnippetInput.value = snippet.id;
         
         const src = snippet.source || (snippet.isCore ? 'core' : 'project');
-        const srcLabel = src === 'core' ? 'Core' : (src === 'global' ? 'Global' : 'Project');
+        const srcLabel = src === 'core' ? 'Core'
+            : ((src === 'personal' || src === 'global') ? 'Personal' : 'Project');
         
         // Show preview panel
         if (addSnippetPreview) {
@@ -11181,8 +11186,10 @@
             // Extract translations using the old->new key mapping
             const translations = await extractAndRemapTranslations(keyMapping);
             
-            // Call createSnippet API
-            const scope = saveSnippetGlobal?.checked ? 'global' : 'project';
+            // Call createSnippet API. 'personal' = the author's own library,
+            // reusable across THEIR projects (13.6b); the server still accepts
+            // 'global' as a legacy alias of the same thing.
+            const scope = saveSnippetGlobal?.checked ? 'personal' : 'project';
             
             const requestData = {
                 id: id,

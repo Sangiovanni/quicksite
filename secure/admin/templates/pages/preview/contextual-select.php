@@ -177,11 +177,16 @@
             </div>
         </div>
         
-        <!-- Global scope option -->
+        <!-- Personal-library scope option. The copy said "all projects", and the
+             storage matched it literally: one installation-wide directory any
+             project could read from and delete from, including other users'
+             (beta.10 C13 13.6b). It is the author's OWN library now, so the
+             label says whose. The element id is unchanged — it is referenced by
+             preview.js and by the admin CSS. -->
         <div class="preview-contextual-form__field preview-contextual-form__field--inline">
             <label class="admin-checkbox">
                 <input type="checkbox" id="save-snippet-global">
-                <span><?= __admin('preview.saveSnippetGlobal', 'Make available to all projects') ?></span>
+                <span><?= __admin('preview.saveSnippetGlobal', 'Save to my personal snippets (reusable in all my projects)') ?></span>
             </label>
         </div>
         

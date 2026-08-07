@@ -63,13 +63,33 @@ Every command — success or failure — returns the same JSON envelope (built b
 
 | Field | Type | Notes |
 |---|---|---|
-| `status` | integer | HTTP-style status code (200, 201, 400, 401, 403, 404, 409, 422, 500…). Mirrors the actual HTTP response code. |
+| `status` | integer | HTTP-style status code (200, 201, 204, 207, 400, 401, 403, 404, 409, 422, 500…). Mirrors the actual HTTP response code. |
 | `code` | string | Stable dotted identifier (`route.created`, `validation.required`, `auth.forbidden`…). Suitable for client-side branching and i18n. |
 | `message` | string | Human-readable summary. Localized when called from the admin panel. |
 | `data` | object\|null | Command-specific payload on success. |
 | `errors` | array (optional) | On validation failures, structured entries with `field` / `value` / `reason`. |
 
 There is **no separate error envelope**. A failed call uses the same four fields with a non-2xx `status`, an error `code`, and `data: null`. This keeps clients simple: parse once, branch on `status`.
+
+### Partial success (`207`)
+
+A command that acts on a **set** — deleting several builds, clearing a folder of archives, sweeping orphaned files — can finish with some members done and some refused. Those commands answer `207` with the code `operation.partial_success`:
+
+```json
+{
+    "status":  207,
+    "code":    "operation.partial_success",
+    "message": "4 of 5 export file(s) deleted; 1 could not be removed",
+    "data":    { "deleted_count": 4, "failed_count": 1, "failed_files": ["…"] },
+    "errors":  [ { "file": "…", "reason": "delete_failed" } ]
+}
+```
+
+The work that succeeded is real and is not rolled back. `errors` names every member that did not complete. When **nothing** in the set succeeded, the command answers `5xx` instead — a total failure is not a partial success.
+
+`207` is a 2xx, so a client testing only "was this a 2xx" will read it as success. **Branch on `code`, or on `data.failed_count`, whenever a command can act on more than one thing.** Commands that use it: `clearExports`, `deleteBuild`, `cleanBuilds`.
+
+`cleanOrphanTranslations` is the exception: it reports the same `operation.partial_success` code with `errors` populated, but keeps `status: 200`, because it runs as one phase of a longer chain that stops on a non-2xx.
 
 ## Command catalogue
 

@@ -26,6 +26,31 @@
     // ========================================================================
 
     /**
+     * Can this page actually run `command` right now?
+     *
+     * Permission is only half the question. A PROJECT-SCOPED command with no
+     * project bound never reaches the server at all — api.js's buildCommandPath
+     * returns null and the call is refused client-side — so the block that
+     * consumes the result can only ever render an error. At zero membership that
+     * is every project-scoped call on the page.
+     *
+     * beta.10 C13 13.4(b) swept the admin PAGES and the /admin/api arms for "no
+     * arm assumes a bound project" and passed; it did not sweep a page's own
+     * client-side calls, which is why the dashboard kept firing getSizeInfo and
+     * logging "getSizeInfo failed: Unknown error" for an account that is a member
+     * of nothing. Gate on BOTH, in one place, so a future call inherits it.
+     */
+    function canRun(command) {
+        const admin = window.QuickSiteAdmin;
+        const api = window.QuickSiteAPI;
+        if (!(admin?.hasPermission(command) ?? true)) return false;
+        // Unknown scope => treat as project-scoped, mirroring api.js and the
+        // server's own 'scope' ?? 'project' default (fail closed).
+        if (api && !api.isProjectScoped(command)) return true;
+        return !!(api ? api.getCurrentProject() : (window.QUICKSITE_CONFIG?.currentProject));
+    }
+
+    /**
      * Get translation string with fallback
      */
     function t(path, fallback) {
@@ -179,13 +204,17 @@
 
     async function loadDashboardStats() {
         try {
-            const hp = (cmd) => window.QuickSiteAdmin?.hasPermission(cmd) ?? true;
+            const hp = canRun;
 
-            const routesResult = await QuickSiteAdmin.apiRequest('getRoutes');
-            if (routesResult.ok) {
-                document.getElementById('stat-routes').textContent = routesResult.data.data?.count || 0;
+            // getRoutes was the one stat call with no gate at all — not even a
+            // permission check — so it fired for every account on every load.
+            if (hp('getRoutes')) {
+                const routesResult = await QuickSiteAdmin.apiRequest('getRoutes');
+                if (routesResult.ok) {
+                    document.getElementById('stat-routes').textContent = routesResult.data.data?.count || 0;
+                }
             }
-            
+
             if (hp('listPages')) {
                 const pagesResult = await QuickSiteAdmin.apiRequest('listPages');
                 if (pagesResult.ok) {
@@ -661,9 +690,14 @@
             toggle.classList.toggle('manage-space__toggle--open', !isOpen);
             if (!isOpen && !manageSpaceLoaded) {
                 manageSpaceLoaded = true;
-                loadManageSpaceBuilds();
-                loadManageSpaceExports();
-                loadManageSpaceBackups();
+                // Same rule as the load-time blocks (13.6b): all three panels are
+                // project-scoped, so with no project bound they would each fire a
+                // call api.js refuses client-side and then render "Error loading
+                // data" three times over. Gated at the CALL SITE rather than inside
+                // each loader so the loaders stay untouched.
+                if (canRun('listBuilds'))   loadManageSpaceBuilds();
+                if (canRun('getSizeInfo'))  loadManageSpaceExports();
+                if (canRun('listBackups'))  loadManageSpaceBackups();
             }
         });
     }
@@ -1370,9 +1404,21 @@
         const typeSelect = document.getElementById('dash-structure-type');
         const nameSelect = document.getElementById('dash-structure-name');
         const loadBtn = document.getElementById('dash-load-structure');
-        
+
         if (!typeSelect || !nameSelect || !loadBtn) return;
-        
+
+        // 13.6b: the viewer's own calls (listPages / listComponents / getStructure)
+        // are project-scoped. This panel is user-TRIGGERED rather than load-time, so
+        // it never showed up in the console — but with no project bound every one of
+        // its buttons leads to a refusal. Disable the controls instead, the same way
+        // _setProjectActionsEnabled already handles the project-action buttons.
+        if (!canRun('getStructure')) {
+            typeSelect.disabled = true;
+            nameSelect.disabled = true;
+            loadBtn.disabled = true;
+            return;
+        }
+
         const trans = window.QUICKSITE_CONFIG?.translations?.structure?.select || {};
         
         typeSelect.addEventListener('change', async function() {
@@ -1613,15 +1659,16 @@
         // Wait for admin.js to finish loading permissions before checking them
         await (window.QuickSiteAdmin?.permissionsReady || Promise.resolve());
 
-        const hp = (cmd) => window.QuickSiteAdmin?.hasPermission(cmd) ?? true;
+        const hp = canRun;
 
-        // Load dashboard data, skipping sections the current user lacks permission for
+        // Load dashboard data, skipping sections the current user lacks permission
+        // for OR that are project-scoped with no project bound (13.6b).
         await Promise.all([
             loadDashboardStats(),
             hp('getSiteMap')         ? loadSiteMap()         : Promise.resolve(),
             hp('getCommandHistory')  ? loadRecentCommands()  : Promise.resolve(),
             hp('listProjects')       ? loadProjectManager()  : Promise.resolve(),
-            loadStorageOverview(),
+            hp('getSizeInfo')        ? loadStorageOverview() : Promise.resolve(),
             // Owner-wide usage walks every owned project, so it loads alongside
             // rather than gating anything; it hides itself when you own nothing.
             hp('getMySpaceUsage')    ? loadOwnerSpaceUsage(false) : Promise.resolve()

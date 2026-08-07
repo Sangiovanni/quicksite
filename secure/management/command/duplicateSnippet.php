@@ -78,10 +78,15 @@ function __command_duplicateSnippet(array $params = [], array $urlParams = []): 
             ->withMessage('New ID must start with a letter and contain only letters, numbers, dashes, and underscores');
     }
     
-    // Check if new ID already exists in project or global
+    // Check if new ID already exists in the project or in the caller's OWN
+    // personal library (13.6b — this used to search one flat installation-wide
+    // directory, which made it an existence oracle over every user's snippets).
     $existing = findSnippetInPath($newId, getProjectSnippetsPath($projectName), 'project');
     if ($existing === null) {
-        $existing = findSnippetInPath($newId, getGlobalSnippetsPath(), 'global');
+        $personalSnippetsPath = getPersonalSnippetsPath();
+        if ($personalSnippetsPath !== null) {
+            $existing = findSnippetInPath($newId, $personalSnippetsPath, 'personal');
+        }
     }
     if ($existing !== null) {
         return ApiResponse::create(409, 'snippets.already_exists')

@@ -2,14 +2,25 @@
 require_once __DIR__ . '/utilsManagement.php'; // qs_json_write
 /**
  * Snippet Management Functions
- * 
- * Helper functions for managing snippets (core, global, and project-specific).
+ *
+ * Helper functions for managing snippets (core, personal, and project-specific).
  * Snippets are pre-built content structures users can insert into pages.
- * 
+ *
  * Three-tier snippet scope:
- *   Core    = shipped, read-only (secure/snippets/core/)
- *   Global  = user-created, shared across projects (secure/snippets/custom/)
- *   Project = user-created, project-only (secure/projects/{proj}/snippets/)
+ *   Core     = shipped, read-only (secure/snippets/core/)
+ *   Personal = user-created, shared across THAT USER'S projects
+ *              (secure/snippets/custom/{userId}/)
+ *   Project  = user-created, project-only (secure/projects/{proj}/snippets/)
+ *
+ * The middle tier used to be called GLOBAL and lived in one flat
+ * secure/snippets/custom/ with no owner in the path. Every read and every delete
+ * reached it from ANY project marker, while every other write in the same
+ * commands is marker-bound (C8 8.5). Proven live in beta.10 C13 13.6b: a member
+ * of project A wrote a snippet there, and a member of project B — sharing no
+ * project with A, refused 403 on A's own marker — listed it, read its full
+ * structure, inserted A's content into project B's page, and deleted A's file.
+ * The tier is per-USER now, which is what "available to all projects" was always
+ * meant to say: all of MINE.
  */
 
 /**
@@ -22,12 +33,78 @@ function getCoreSnippetsPath(): string {
 }
 
 /**
- * Get path to global (custom) snippets directory
- * 
- * @return string Path to global snippets directory
+ * Root of the personal-snippet tier. Holds one directory per user; it is NEVER
+ * a read or write target itself.
+ *
+ * @return string Path to the custom snippets root
  */
-function getGlobalSnippetsPath(): string {
+function getCustomSnippetsRoot(): string {
     return SECURE_FOLDER_PATH . '/snippets/custom';
+}
+
+/**
+ * Path to ONE user's personal snippet directory.
+ *
+ * @param string|null $userId Defaults to the authenticated caller.
+ * @return string|null null when there is no caller to attribute the snippets to,
+ *                     or when the id is not a well-formed user id. Callers treat
+ *                     null as "this tier does not exist for you" and skip it —
+ *                     fail closed, because this value becomes a path segment.
+ */
+/**
+ * Snippets left in the FLAT pre-13.6b layout (secure/snippets/custom/*.json or
+ * custom/<category>/*.json, i.e. not under a usr_ directory).
+ *
+ * They are no longer served: nothing in the file records who wrote them, so
+ * there is no user to attribute them to, and continuing to serve them to
+ * everybody is the defect itself. They are NOT deleted either — the bytes stay
+ * on disk and this logs them once per call site so an operator can move them
+ * into the right secure/snippets/custom/<userId>/ folder. A fresh install ships
+ * none (only .gitkeep is tracked), so on most installations this returns [].
+ *
+ * @return string[] absolute paths of orphaned legacy snippet files
+ */
+function findLegacyFlatSnippets(): array {
+    $root = getCustomSnippetsRoot();
+    if (!is_dir($root)) {
+        return [];
+    }
+    $found = array_merge(glob($root . '/*.json') ?: [], glob($root . '/*/*.json') ?: []);
+    // Anything directly under a usr_ directory belongs to that user, not to the
+    // legacy tier — the second glob above would otherwise sweep it up.
+    return array_values(array_filter($found, static function (string $p): bool {
+        return preg_match('#/usr_[a-f0-9]{32}/[^/]+\.json$#', str_replace('\\', '/', $p)) !== 1;
+    }));
+}
+
+/**
+ * Log the orphaned legacy snippets once, if there are any.
+ */
+function warnAboutLegacyFlatSnippets(): void {
+    $legacy = findLegacyFlatSnippets();
+    if ($legacy === []) {
+        return;
+    }
+    error_log('QuickSite [snippets]: ' . count($legacy) . ' snippet(s) remain in the pre-13.6b flat '
+        . 'secure/snippets/custom/ layout and are no longer served (no owner recorded). Move each into '
+        . 'secure/snippets/custom/<userId>/<category>/ to restore it: ' . implode(', ', $legacy));
+}
+
+function getPersonalSnippetsPath(?string $userId = null): ?string {
+    if ($userId === null) {
+        require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+        $user = function_exists('getCurrentUser') ? getCurrentUser() : null;
+        $userId = is_array($user) ? ($user['id'] ?? null) : null;
+    }
+    // The id is minted as 'usr_' . bin2hex(random_bytes(16)). Pin that shape
+    // rather than sanitising: this string is concatenated into a filesystem
+    // path, and an allowlist is the only form of that check that cannot be
+    // out-thought (C3/C11).
+    if (!is_string($userId) || preg_match('/^usr_[a-f0-9]{32}$/', $userId) !== 1) {
+        return null;
+    }
+
+    return getCustomSnippetsRoot() . '/' . $userId;
 }
 
 /**
@@ -170,10 +247,10 @@ function loadSnippetFile(string $filePath, string $source = 'core'): ?array {
 
 /**
  * Get full snippet data by ID
- * Searches: project → global → core (most specific first)
- * 
+ * Searches: project → personal (caller's own) → core (most specific first)
+ *
  * @param string $snippetId Snippet ID
- * @param string|null $projectName Project name. null = search global + core only.
+ * @param string|null $projectName Project name. null = search personal + core only.
  *                    C15 15.3: there is no installation-wide project to fall back to, and
  *                    guessing one let a caller authorized on project A read project B's
  *                    snippets (flagged in C8 8.5 as a cross-project leak vector). All four
@@ -189,14 +266,16 @@ function getSnippetById(string $snippetId, ?string $projectName = null): ?array 
             return $snippet;
         }
     }
-    
-    // 2. Check global (custom) snippets
-    $globalSnippetsPath = getGlobalSnippetsPath();
-    $snippet = findSnippetInPath($snippetId, $globalSnippetsPath, 'global');
-    if ($snippet !== null) {
-        return $snippet;
+
+    // 2. Check the CALLER'S OWN personal snippets — never another user's.
+    $personalPath = getPersonalSnippetsPath();
+    if ($personalPath !== null) {
+        $snippet = findSnippetInPath($snippetId, $personalPath, 'personal');
+        if ($snippet !== null) {
+            return $snippet;
+        }
     }
-    
+
     // 3. Check core snippets
     $coreSnippetsPath = getCoreSnippetsPath();
     return findSnippetInPath($snippetId, $coreSnippetsPath, 'core');
@@ -398,20 +477,27 @@ function appendSnippetCss(string $css, string $stylesheetPath): bool {
  * 
  * @param array $snippetData Snippet data to save
  * @param string $projectName Project name
- * @param string $scope Save scope: "project" (default) or "global"
+ * @param string $scope Save scope: "project" (default) or "personal"
  * @return array ['success' => bool, 'path' => string, 'error' => string|null]
  */
 function saveProjectSnippet(array $snippetData, string $projectName, string $scope = 'project'): array {
     $category = $snippetData['category'] ?? 'other';
     $snippetId = $snippetData['id'] ?? null;
-    
+
     if (!$snippetId) {
         return ['success' => false, 'path' => '', 'error' => 'Snippet ID is required'];
     }
-    
+
     // Determine base path based on scope
-    if ($scope === 'global') {
-        $basePath = getGlobalSnippetsPath();
+    if ($scope === 'personal') {
+        $basePath = getPersonalSnippetsPath();
+        if ($basePath === null) {
+            return ['success' => false, 'path' => '',
+                    'error' => 'Personal snippets need an identified caller'];
+        }
+        if (!is_dir($basePath) && !@mkdir($basePath, 0755, true) && !is_dir($basePath)) {
+            return ['success' => false, 'path' => '', 'error' => 'Failed to create the personal snippets directory'];
+        }
     } else {
         // Ensure project snippets directory exists
         if (!ensureProjectSnippetsDir($projectName)) {
@@ -451,13 +537,17 @@ function deleteProjectSnippet(string $snippetId, string $projectName): array {
     // Try project snippets first
     $projectSnippetsPath = getProjectSnippetsPath($projectName);
     $snippet = findSnippetInPath($snippetId, $projectSnippetsPath, 'project');
-    
+
     if ($snippet === null) {
-        // Try global snippets
-        $globalSnippetsPath = getGlobalSnippetsPath();
-        $snippet = findSnippetInPath($snippetId, $globalSnippetsPath, 'global');
+        // Then the CALLER'S OWN personal snippets. This is the row that mattered
+        // most: on the flat layout a member of any project could delete a
+        // snippet any other user had authored.
+        $personalPath = getPersonalSnippetsPath();
+        if ($personalPath !== null) {
+            $snippet = findSnippetInPath($snippetId, $personalPath, 'personal');
+        }
     }
-    
+
     if ($snippet === null) {
         return ['success' => false, 'error' => 'Snippet not found in project or global snippets', 'source' => null];
     }

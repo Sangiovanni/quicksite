@@ -537,6 +537,23 @@ function extractProjectFromZipSecure(ZipArchive $zip, string $prefix, string $de
         }
         $content = $verdict['content'];
 
+        // SECURITY (beta.10 C13 13.6b, F-C13-21) — TAG GATE for archive-borne
+        // structure. Every gate above constrains an entry's PATH, EXTENSION or
+        // CONTENT SHAPE; none of them looks at a tag NAME inside a well-formed
+        // page JSON, so an archive could put a node the renderer refuses
+        // ('script', or anything off the allowlist) straight into stored data.
+        // Same shared policy the write-side writers use — one helper, one answer.
+        //
+        // Refused PER ENTRY, not per archive: an extension refusal and a
+        // content-shape refusal already skip the entry and report it while the
+        // rest imports, and a new whole-archive failure mode would be both
+        // inconsistent with that contract and harsher than it.
+        $badTag = importFirstUnrenderableTag($relativePath, $content);
+        if ($badTag !== null) {
+            $stats['skipped_disallowed'][] = $relativePath . ' (blocked tag: ' . $badTag . ')';
+            continue;
+        }
+
         if (file_put_contents($destFilePath, $content) === false) {
             return ['success' => false, 'error' => "Failed to write file: $relativePath"];
         }
@@ -546,6 +563,46 @@ function extractProjectFromZipSecure(ZipArchive $zip, string $prefix, string $de
     }
 
     return ['success' => true];
+}
+
+/**
+ * The tag gate's SITE predicate: given an archive entry, return the first tag the
+ * render/compile layers would refuse, or null when this entry carries no
+ * renderable structure at all.
+ *
+ * Deliberately narrow. `qs_first_unrenderable_tag()` walks a node tree by
+ * following `children` and trips on a `tag` key — which is exactly right for a
+ * page/component/menu/footer tree, and exactly WRONG for the author's own data.
+ * A `data/items.json` holding `[{"tag":"newsletter",...}]` is legitimate content,
+ * not markup, and gating it would silently drop a file the site depends on. So
+ * the walk runs only where structure actually lives:
+ *   - templates/model/json/**  — pages, components, menu.json, footer.json;
+ *     the file IS the tree.
+ *   - snippets/**              — a snippet wraps its tree under `structure`, and
+ *     insertSnippet copies that tree into a page (the same chain 13.5 closed on
+ *     the createSnippet side).
+ * Paths are matched case-insensitively: NTFS resolves 'Templates/' and
+ * 'templates/' to one directory, so a case variant must not slip the gate.
+ *
+ * @return string|null the offending tag, or null when the entry is clean/irrelevant
+ */
+function importFirstUnrenderableTag(string $relativePath, string $content): ?string {
+    $lower = strtolower($relativePath);
+    if (substr($lower, -5) !== '.json') {
+        return null;
+    }
+    $isModelJson = strpos($lower, 'templates/model/json/') === 0;
+    $isSnippet   = strpos($lower, 'snippets/') === 0;
+    if (!$isModelJson && !$isSnippet) {
+        return null;
+    }
+    $data = json_decode($content, true);
+    if (!is_array($data)) {
+        return null;
+    }
+    $structure = $isSnippet ? ($data['structure'] ?? null) : $data;
+
+    return qs_first_unrenderable_tag($structure);
 }
 
 /**

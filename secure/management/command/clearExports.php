@@ -89,20 +89,48 @@ function __command_clearExports(array $params = [], array $urlParams = []): ApiR
         }
     }
     
-    $message = count($deleted) . ' export file(s) deleted';
-    if ($projectFilter) {
-        $message .= " for project '$projectFilter'";
+    $forProject = $projectFilter ? " for project '$projectFilter'" : '';
+    $payload = [
+        'deleted_count' => count($deleted),
+        'deleted_files' => $deleted,
+        'failed_count' => count($failed),
+        'failed_files' => $failed,
+        'freed_space' => formatClearExportsBytes($totalSize)
+    ];
+
+    // beta.10 C13 F-C13-17: the data payload was always honest, but the ENVELOPE
+    // was not. A run that failed to unlink an archive still answered HTTP 200
+    // operation.success with a message counting only the successes — so a caller
+    // checking status/code, which is what the envelope is for, believed every
+    // archive was gone while it was still on disk and still readable. Reproduced
+    // live in 13.4 against a genuinely undeletable file.
+    //
+    // The shape follows the two sibling sweeps in this tree rather than
+    // inventing a third: `deleteBuild` and `cleanBuilds` answer 207
+    // operation.partial_success when part of a set survives, and `deleteBuild`
+    // answers 5xx when NOTHING was deleted. Same here.
+    if (!empty($failed)) {
+        $errors = array_map(static function (string $name): array {
+            return ['file' => $name, 'reason' => 'delete_failed'];
+        }, $failed);
+
+        if (empty($deleted)) {
+            return ApiResponse::create(500, 'server.delete_failed')
+                ->withMessage('No export file could be deleted' . $forProject)
+                ->withData($payload)
+                ->withErrors($errors);
+        }
+
+        return ApiResponse::create(207, 'operation.partial_success')
+            ->withMessage(count($deleted) . ' of ' . (count($deleted) + count($failed))
+                . ' export file(s) deleted' . $forProject . '; ' . count($failed) . ' could not be removed')
+            ->withData($payload)
+            ->withErrors($errors);
     }
-    
+
     return ApiResponse::create(200, 'operation.success')
-        ->withMessage($message)
-        ->withData([
-            'deleted_count' => count($deleted),
-            'deleted_files' => $deleted,
-            'failed_count' => count($failed),
-            'failed_files' => $failed,
-            'freed_space' => formatClearExportsBytes($totalSize)
-        ]);
+        ->withMessage(count($deleted) . ' export file(s) deleted' . $forProject)
+        ->withData($payload);
 }
 
 /**

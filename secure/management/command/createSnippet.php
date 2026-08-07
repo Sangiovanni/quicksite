@@ -13,8 +13,12 @@
  * @param object $structure Required - Structure JSON (like components)
  * @param object $translations Optional - Translation keys by language
  * @param string $project Optional - Project name (defaults to active project)
- * 
- * Creates a new snippet in the project's snippets folder.
+ * @param string $scope Optional - 'project' (default) or 'personal' (the caller's
+ *               own library, reusable across THEIR projects). 'global' is a
+ *               legacy alias of 'personal'.
+ *
+ * Creates a new snippet in the project's snippets folder, or in the caller's own
+ * personal library when scope=personal.
  * User snippets cannot have CSS field (they use project styles).
  */
 
@@ -92,14 +96,21 @@ function __command_createSnippet(array $params = [], array $urlParams = []): Api
     
     // (project already bound to the authorized marker above)
     
-    // Check if snippet ID already exists in project or global
+    // Check if snippet ID already exists in the project or in the caller's own
+    // personal library. It is deliberately NOT checked against other users'
+    // personal snippets: doing so would answer "does user X own a snippet called
+    // Y" to anyone who can guess an id — the existence oracle C10 spent a slice
+    // closing elsewhere.
     $existingSnippet = findSnippetInPath($snippetId, getProjectSnippetsPath($projectName), 'project');
     if ($existingSnippet === null) {
-        $existingSnippet = findSnippetInPath($snippetId, getGlobalSnippetsPath(), 'global');
+        $personalSnippetsPath = getPersonalSnippetsPath();
+        if ($personalSnippetsPath !== null) {
+            $existingSnippet = findSnippetInPath($snippetId, $personalSnippetsPath, 'personal');
+        }
     }
     if ($existingSnippet !== null) {
         return ApiResponse::create(409, 'snippets.already_exists')
-            ->withMessage('A snippet with this ID already exists' . ($existingSnippet['source'] === 'global' ? ' (global)' : ' in the project'));
+            ->withMessage('A snippet with this ID already exists' . ($existingSnippet['source'] === 'personal' ? ' in your personal snippets' : ' in the project'));
     }
     
     // Build snippet data
@@ -124,12 +135,23 @@ function __command_createSnippet(array $params = [], array $urlParams = []): Api
         $snippetData['css'] = $cssResult['css'];
     }
     
-    // Determine save scope (project or global)
+    // Determine save scope (project or personal).
+    //
+    // 'global' is accepted as a legacy ALIAS of 'personal'. The scope used to
+    // write to one flat installation-wide directory that every project marker
+    // could read, insert from and DELETE — proven cross-project in beta.10 C13
+    // 13.6b. It is per-user now, which is what the UI's "available to all
+    // projects" always meant: all of the author's own. The alias stays so a
+    // cached editor bundle (or any caller written against the old name) keeps
+    // working; it lands in the same per-user directory.
     $scope = $params['scope'] ?? 'project';
-    if (!in_array($scope, ['project', 'global'], true)) {
+    if ($scope === 'global') {
+        $scope = 'personal';
+    }
+    if (!in_array($scope, ['project', 'personal'], true)) {
         $scope = 'project';
     }
-    
+
     // Save snippet
     $result = saveProjectSnippet($snippetData, $projectName, $scope);
     

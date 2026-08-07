@@ -7,7 +7,8 @@
  * @auth required
  * @permission read
  * 
- * Returns all snippets (core + project-specific) organized by category.
+ * Returns all snippets visible to the caller (core + their own personal +
+ * the marker project's) organized by category.
  * Core snippets are read-only and marked with isCore: true.
  */
 
@@ -39,10 +40,15 @@ function __command_listSnippets(array $params = [], array $urlParams = []): ApiR
     $coreSnippetsPath = getCoreSnippetsPath();
     $coreSnippets = listSnippetsFromPath($coreSnippetsPath, 'core');
     
-    // Load global (custom) snippets
-    $globalSnippetsPath = getGlobalSnippetsPath();
-    $globalSnippets = listSnippetsFromPath($globalSnippetsPath, 'global');
-    
+    // Load the CALLER'S OWN personal snippets. On the flat pre-13.6b layout this
+    // listed every user's, from any project marker (beta.10 C13 13.6b).
+    $personalSnippets = [];
+    $personalSnippetsPath = getPersonalSnippetsPath();
+    if ($personalSnippetsPath !== null) {
+        $personalSnippets = listSnippetsFromPath($personalSnippetsPath, 'personal');
+    }
+    warnAboutLegacyFlatSnippets();
+
     // Load project snippets
     $projectSnippets = [];
     if ($projectName) {
@@ -51,7 +57,7 @@ function __command_listSnippets(array $params = [], array $urlParams = []): ApiR
     }
     
     // Merge all sources
-    $allSnippets = array_merge($coreSnippets, $globalSnippets, $projectSnippets);
+    $allSnippets = array_merge($coreSnippets, $personalSnippets, $projectSnippets);
     
     // Group by category
     $byCategory = [];
@@ -86,7 +92,7 @@ function __command_listSnippets(array $params = [], array $urlParams = []): ApiR
             'counts' => [
                 'total' => count($allSnippets),
                 'core' => count($coreSnippets),
-                'global' => count($globalSnippets),
+                'personal' => count($personalSnippets),
                 'project' => count($projectSnippets)
             ],
             'project' => $projectName

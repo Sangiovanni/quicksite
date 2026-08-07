@@ -28,6 +28,7 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/errorHygiene.php'; // qs_safe_error_message
 
 // Allowed keys in config.json export (security: no arbitrary PHP execution)
 const EXPORT_ALLOWED_CONFIG_KEYS = [
@@ -164,14 +165,26 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
         $stats['files']++;
         
         $zip->close();
-    } catch (Exception $e) {
+    } catch (Throwable $e) {
+        // beta.10 C13 F-C13-16: this used to catch `Exception`, and an `Error`
+        // (TypeError from a malformed routes.php, the max_execution_time timeout,
+        // any other engine-level failure) is NOT an Exception. It escaped, so
+        // neither close() nor unlink() ran — and the ZipArchive destructor still
+        // MATERIALISED the half-built archive at request shutdown. The result was
+        // a full copy of the project's data tree left in the service temp dir,
+        // owned by the Apache service account, with no product route to remove it.
+        // `Throwable` is the only catch that covers both hierarchies.
         $zip->close();
         if (file_exists($zipPath)) {
-            unlink($zipPath);
+            @unlink($zipPath);
         }
         return ApiResponse::create(500, 'server.zip_error')
             ->withMessage('Error creating ZIP archive')
-            ->withData(['error' => $e->getMessage()]);
+            // C12/F9: PHP's own messages embed absolute paths ("... called in
+            // C:\wamp64\...\exportProject.php on line 419"), so the raw message
+            // published the install layout. Development still sees it; production
+            // gets a fixed string and the detail goes to the error log.
+            ->withData(['error' => qs_safe_error_message($e, 'exportProject')]);
     }
     
     // Get final ZIP size
@@ -269,12 +282,18 @@ function exportConfigAsJson(ZipArchive $zip, string $projectPath, string $projec
 function exportRoutesAsJson(ZipArchive $zip, string $projectPath, string $projectName, array &$stats): void {
     $routesFile = $projectPath . '/routes.php';
     
+    // A project's routes.php is data on disk, not a trusted constant: a truncated
+    // or hand-edited file can `return` a scalar (or nothing at all). Four of the
+    // six sites that require it already gate on is_array(); these two did not.
     if (!file_exists($routesFile)) {
         $routes = ['home' => []];
     } else {
         $routes = require $routesFile;
+        if (!is_array($routes)) {
+            $routes = [];
+        }
     }
-    
+
     $content = json_encode($routes, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
     $zip->addFromString($projectName . '/routes.json', $content);
     $stats['files']++;
@@ -409,14 +428,22 @@ function createExportMetadata(string $projectName, string $projectPath, array $s
     $configFile = $projectPath . '/config.php';
     if (file_exists($configFile)) {
         $config = require $configFile;
+        if (!is_array($config)) {
+            $config = [];
+        }
     }
-    
-    // Count routes recursively
+
+    // Count routes recursively. countRoutesRecursive() is typed `array`, so a
+    // scalar here raised a TypeError that the old `catch (Exception)` did not
+    // catch — F-C13-16's carrier. The guard removes the carrier; the Throwable
+    // catch above covers every other one.
     $routesCount = 0;
     $routesFile = $projectPath . '/routes.php';
     if (file_exists($routesFile)) {
         $routes = require $routesFile;
-        $routesCount = countRoutesRecursive($routes);
+        if (is_array($routes)) {
+            $routesCount = countRoutesRecursive($routes);
+        }
     }
     
     // Count languages
