@@ -294,8 +294,13 @@ $responseData = [
     'route' => $routePath,
     'segments' => $segments,
     'depth' => count($segments),
-    'php_file' => str_replace(PROJECT_PATH, '', $phpFilePath),
-    'json_file' => str_replace(PROJECT_PATH, '', $jsonFilePath),
+    // beta.10 C12 12.5: the str_replace that used to sit here is now ApiResponse's
+    // job. It was also wrong twice over — it left the leading separator on
+    // ("\templates\model\...") and, because PROJECT_PATH is glued with
+    // DIRECTORY_SEPARATOR while these paths are built with "/", it missed
+    // outright whenever the two disagreed.
+    'php_file' => $phpFilePath,
+    'json_file' => $jsonFilePath,
 ];
 
 if (!empty($cascadeCreated)) {

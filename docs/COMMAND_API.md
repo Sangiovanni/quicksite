@@ -71,6 +71,20 @@ Every command — success or failure — returns the same JSON envelope (built b
 
 There is **no separate error envelope**. A failed call uses the same four fields with a non-2xx `status`, an error `code`, and `data: null`. This keeps clients simple: parse once, branch on `status`.
 
+### File paths in a response are relative
+
+Whenever the envelope names a file or directory — `data.file`, `data.path`, `data.build_directory`, a path interpolated into `message`, a `value` inside `errors` — it is **relative, never absolute**. The installation's location on disk is not part of the API.
+
+| Where the file lives | How it appears | Example |
+|---|---|---|
+| Inside the project the request targeted | Relative to that project's root | `templates/model/json/pages/home/home.json`, `public/style/style.css` |
+| Elsewhere in the installation | Relative to the installation root | `secure/projects/other-site`, `public/build/b.zip` |
+| The project root or installation root itself | A single dot | `.` |
+
+Separators are always `/`, on every platform. A path the **caller** supplied — a deploy target outside the installation, for instance — is echoed back as given, since it discloses nothing the caller did not already have.
+
+The relative form is the same in development and production. Only *diagnostic* detail varies by environment: an uncaught exception's message and a fatal's file/line appear in a response body only when `secure/management/config/environment.php` declares the install as development, and go to the PHP error log otherwise.
+
 ### Partial success (`207`)
 
 A command that acts on a **set** — deleting several builds, clearing a folder of archives, sweeping orphaned files — can finish with some members done and some refused. Those commands answer `207` with the code `operation.partial_success`:

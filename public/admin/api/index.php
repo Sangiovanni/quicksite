@@ -977,7 +977,13 @@ function makeInternalApiCall(string $endpoint, string $token): array {
         
         return ['success' => false, 'error' => $response->toArray()['message'] ?? 'Command error'];
     } catch (\Throwable $e) {
-        return ['success' => false, 'error' => 'Command execution error: ' . $e->getMessage()];
+        // beta.10 C12 12.5. This relay is the one path-leak site that does NOT
+        // go through ApiResponse, so the central scrub cannot see it — and PHP's
+        // own messages routinely embed absolute paths
+        // ("file_get_contents(C:\...\x.json): Failed to open stream"). Route it
+        // through the same gate 12.3 built for every other exception body: full
+        // message in development, generic in production, real detail to the log.
+        return ['success' => false, 'error' => qs_safe_error_message($e, 'admin-api:' . $command)];
     }
 }
 

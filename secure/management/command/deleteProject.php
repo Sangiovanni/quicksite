@@ -100,9 +100,16 @@ function __command_deleteProject(array $params = [], array $urlParams = []): Api
     $deleted = deleteDirectory($projectPath);
     
     if (!$deleted) {
+        // beta.10 C13 F-C13-18. This returned `path` => the absolute project
+        // directory, ungated. The central scrub in ApiResponse would render it
+        // "secure/projects/<id>", but the id is something the caller just named
+        // and the folder convention adds nothing — so say what actually failed
+        // and send the path where the person who can act on it is looking. Same
+        // treatment C12 gave qs_project_context_die().
+        error_log("deleteProject: failed to remove project directory {$projectPath}");
         return ApiResponse::create(500, 'server.delete_failed')
             ->withMessage('Failed to delete project directory')
-            ->withData(['path' => $projectPath]);
+            ->withData(['project' => $projectName]);
     }
 
     // C10 10.1b — destroy this project's command log with it. The log lives in

@@ -173,10 +173,11 @@ $failedFiles = [];
 
 foreach ($filesToDelete as $file) {
     if (file_exists($file)) {
+        // beta.10 C12 12.5: rendering these project-relative is ApiResponse's job now.
         if (@unlink($file)) {
-            $deletedFiles[] = str_replace(PROJECT_PATH, '', $file);
+            $deletedFiles[] = $file;
         } else {
-            $failedFiles[] = str_replace(PROJECT_PATH, '', $file);
+            $failedFiles[] = $file;
         }
     }
 }
@@ -192,7 +193,7 @@ foreach ($dirsToDelete as $dir) {
         $contents = array_diff(scandir($dir), ['.', '..']);
         if (empty($contents)) {
             if (@rmdir($dir)) {
-                $deletedDirs[] = str_replace(PROJECT_PATH, '', $dir);
+                $deletedDirs[] = $dir;
             }
         }
     }

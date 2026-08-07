@@ -1,5 +1,14 @@
 <?php
 
+// beta.10 C12 12.5 (F-C12-4, F-C13-18). Every path that leaves a command leaves
+// through one of the setters below, so the install layout is stripped HERE
+// rather than at the ~48 sites that build one. A per-site fix is one whose
+// completeness cannot be proven — the static scan for those sites produced both
+// false positives ('files' => a COUNT) and false negatives (ZipUtilities'
+// zip_path, setupToken's path) — and it would miss the getData()/toArray()
+// readers that /admin/api and CommandRunner use instead of send().
+require_once __DIR__ . '/../functions/publicPaths.php';
+
 class ApiResponse {
     private $status;
     private $code;
@@ -110,7 +119,7 @@ class ApiResponse {
     public static function success(?array $data = null): self {
         $instance = self::create(200, 'operation.success');
         if ($data !== null) {
-            $instance->data = $data;
+            $instance->data = qs_scrub_paths($data);
         }
         return $instance;
     }
@@ -122,15 +131,19 @@ class ApiResponse {
         $instance = new self();
         $instance->status = $status;
         $instance->code = $code;
-        $instance->message = $message;
+        $instance->message = qs_scrub_path_string($message);
         return $instance;
     }
 
     /**
      * Set response data/payload
+     *
+     * Scrubbed at SET time, not at send() time, so the three ways a response
+     * leaves a command all see the same public view: send() on /management,
+     * getData() on /admin/api's internal relay, and toArray() in CommandRunner.
      */
     public function withData(array $data): self {
-        $this->data = $data;
+        $this->data = qs_scrub_paths($data);
         return $this;
     }
 
@@ -138,15 +151,18 @@ class ApiResponse {
      * Set validation errors
      */
     public function withErrors(array $errors): self {
-        $this->errors = $errors;
+        $this->errors = qs_scrub_paths($errors);
         return $this;
     }
 
     /**
      * Override the default message
+     *
+     * Messages are interpolated ("Failed to copy file: {$destPath}"), so the
+     * message carries paths as often as the data does.
      */
     public function withMessage(string $message): self {
-        $this->message = $message;
+        $this->message = qs_scrub_path_string($message);
         return $this;
     }
 

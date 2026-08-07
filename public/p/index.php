@@ -247,8 +247,15 @@ if (!file_exists($templateFile)) {
     if (file_exists($notFoundFile)) {
         require_once $notFoundFile;
     } else {
+        // beta.10 C12 12.5. Same defect class as F-C12-4, on the PUBLIC surface:
+        // the str_replace here misses whenever PROJECT_PATH's DIRECTORY_SEPARATOR
+        // disagrees with the "/" these paths are built with, and an anonymous
+        // visitor to a site with a missing template then gets the absolute server
+        // path. Sibling of the OAuth error 12.3 fixed a few hundred lines below;
+        // this one uses the shared renderer because it is not an ApiResponse.
+        require_once SECURE_FOLDER_PATH . '/src/functions/publicPaths.php';
         echo '<h1>404 - Page Not Found</h1>';
-        echo '<p>Template file not found: ' . htmlspecialchars(str_replace(PROJECT_PATH, '', $templateFile)) . '</p>';
+        echo '<p>Template file not found: ' . htmlspecialchars(qs_scrub_path_string($templateFile)) . '</p>';
     }
     exit;
 }
