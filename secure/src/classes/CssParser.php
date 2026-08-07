@@ -300,7 +300,13 @@ class CssParser {
 
         $inner = substr($this->content, $block['innerStart'], $block['innerEnd'] - $block['innerStart']);
         $variables = [];
-        preg_match_all('/(--.+?)\s*:\s*([^;]+);/s', $inner, $matches, PREG_SET_ORDER);
+        // The semicolon after the LAST declaration in a block is optional in CSS,
+        // so the terminator is "a semicolon or the end of the block". Requiring
+        // the semicolon silently dropped the final variable of any hand-authored
+        // stylesheet that omitted it, and the Theme panel then never showed it.
+        // The value class still cannot cross a semicolon, so every earlier
+        // declaration terminates exactly where it did before.
+        preg_match_all('/(--.+?)\s*:\s*([^;]+)(?:;|$)/s', $inner, $matches, PREG_SET_ORDER);
         foreach ($matches as $match) {
             $variables[trim($match[1])] = trim($match[2]);
         }
@@ -329,13 +335,28 @@ class CssParser {
                 if (!str_starts_with((string)$varName, '--')) {
                     $varName = '--' . $varName;
                 }
-                $varPattern = '/(' . preg_quote($varName, '/') . '\s*:\s*)([^;]+)(;)/s';
+                // Same optional-semicolon rule as the reader: a block's last
+                // declaration may end at the block instead of at a ';'. Without
+                // this the update found nothing, fell to the append branch, and
+                // left TWO declarations of the same variable behind. The
+                // trailing run of whitespace is captured and put back so the
+                // line break before the closing brace survives the rewrite.
+                $varPattern = '/(' . preg_quote($varName, '/') . '\s*:\s*)([^;]+?)(\s*)(;|$)/s';
                 if (preg_match($varPattern, $newInner)) {
                     $safeValue  = str_replace(['\\', '$'], ['\\\\', '\\$'], $varValue);
-                    $newInner   = preg_replace($varPattern, '${1}' . $safeValue . '${3}', $newInner);
+                    $newInner   = preg_replace($varPattern, '${1}' . $safeValue . '${3}${4}', $newInner);
                     $updated[$varName] = $varValue;
                 } else {
-                    $newInner         = rtrim($newInner) . "\n    " . $varName . ': ' . $varValue . ";\n";
+                    // Terminate the declaration we are appending after. If the
+                    // block's last one had no semicolon, gluing a new line onto
+                    // it produced a single declaration whose VALUE contained the
+                    // new one — which the reader then returned as one mangled
+                    // variable.
+                    $newInner = rtrim($newInner);
+                    if ($newInner !== '' && substr($newInner, -1) !== ';') {
+                        $newInner .= ';';
+                    }
+                    $newInner        .= "\n    " . $varName . ': ' . $varValue . ";\n";
                     $added[$varName]  = $varValue;
                 }
             }

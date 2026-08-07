@@ -185,7 +185,7 @@ The full list of 177 commands is registered in `secure/management/routes.php`. S
 }
 ```
 
-Errors include a structured `errors` array with `field` / `value` / `reason`.
+Errors include a structured `errors` array with `field` / `value` / `reason`. Any file or directory the envelope names is relative — to the targeted project where it lives inside one, to the installation root otherwise — so a response never discloses where the installation sits on disk. A command that acts on a set can also answer `207` when some members succeeded and some did not. Both are specified in [COMMAND_API.md](COMMAND_API.md).
 
 ### Authentication & roles
 
@@ -469,7 +469,28 @@ Other layered protections:
 | AuthN / AuthZ | Username+password login → short-lived access token (Bearer) + rotating refresh token with reuse-detection (family revoke); role check on every Management call; logged. Session tokens are stored hashed; failed logins are throttled per username. |
 | CSRF on admin | Admin panel sends the Bearer access token via `fetch`; the refresh token never reaches the browser (held server-side in the PHP session). |
 | CORS | Configurable per deployment. |
-| Per-project serving (`/p/<id>/`) | Static sub-resources are served **only** from the project's own `public/` subtree via a `realpath` canonicalisation + prefix check (a jail): any path resolving outside `…/public/` is refused, so `config/` (members.json), `data/` (api-endpoints.json), `routes.php`, `config.php`, `templates/`, `translate/` are unreachable, and encoded / backslash / absolute traversals are rejected. HTML is always live-rendered, never served as raw project files; the view runs the same render/compile sanitisation as the built site, plus a Content-Security-Policy. Private projects require membership. |
+| Per-project serving (`/p/<id>/`) | Static sub-resources are served **only** from the project's own `public/` subtree via a `realpath` canonicalisation + prefix check (a jail): any path resolving outside `…/public/` is refused, so `config/` (members.json), `data/` (api-endpoints.json), `routes.php`, `config.php`, `templates/`, `translate/` are unreachable, and encoded / backslash / absolute traversals are rejected. Hidden paths are refused as well — no segment of a served path may begin with a dot, so neither a dotfile nor anything inside a hidden directory such as `.git/` is reachable (§5.1). HTML is always live-rendered, never served as raw project files; the view runs the same render/compile sanitisation as the built site, plus a Content-Security-Policy. Private projects require membership. |
+| Error + path disclosure | A PHP fatal happens outside every `try` a program can write, so all three entry points (`/management`, `/admin/api`, `/admin`) register a shared shutdown handler (`secure/src/functions/errorHygiene.php`) that discards the partial output and answers `500` — as a JSON envelope on the API surfaces and as a plain page on the panel. The error's type, message, file and line reach the response **only** on an install that declares itself development (`environment.php`); otherwise they go to the PHP error log. Separately, no response publishes where the installation lives: paths in a response body are rewritten to be relative before the envelope is assembled (`secure/src/functions/publicPaths.php`), so the disk layout is not disclosed by an ordinary success either. See the note below on `display_errors`. |
+
+**Deployment requirement — `display_errors` must be off in production.** The fatal handler
+above can only replace a response that has not started going out. On a full admin page the
+layout is flushed early, so by the time a late fatal happens the status and headers are already
+on the wire and no handler can take them back; the visitor gets a truncated page under a `200`.
+What stops PHP printing the failing file's absolute path into that page is `display_errors`
+being off — which the engine sets for itself on every request, as part of registering the
+handler, whenever the install is not declared development.
+
+Two cases fall outside that, and both are the deployment's to close:
+
+- **A fatal raised before the engine has started.** The handler registers within the first few
+  lines of each entry point, but a failure in the bootstrap that precedes it — a corrupt
+  `init.php`, a broken PHP extension — runs on whatever `php.ini` says. Set `display_errors =
+  Off` (and `log_errors = On`) in the php.ini your production install actually loads, so the
+  window is closed before PHP hands control to any application code.
+- **An install left declared as development.** `environment.php` saying `development`
+  deliberately keeps error output on, on top of relaxing the outbound-fetch rules. That is a
+  local-authoring setting; a reachable deployment must run as `production`, which is also what
+  it does when the file is absent.
 
 ---
 

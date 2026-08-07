@@ -20,13 +20,13 @@ The API documents itself. Once installed:
 GET /management/help
 ```
 
-returns full documentation for **all 177 commands** — parameters, examples, validation rules, and error codes. For a specific command:
+returns the per-command reference — parameters, examples, validation rules, and error codes. For a specific command:
 
 ```
 GET /management/help/addRoute
 ```
 
-The `help` endpoint is publicly accessible and is the canonical source of truth for the API surface. This document is a high-level map; `help` is the contract.
+The `help` endpoint is publicly accessible, takes no token, and is the contract for how a command behaves: what it accepts, what it answers, and how it fails. This document is a high-level map on top of it. Which commands *exist* is decided elsewhere — `secure/management/routes.php` is the routable allowlist, and a command is reachable whether or not `help` carries an entry for it.
 
 ## Authentication
 
@@ -50,7 +50,7 @@ The `help` endpoint is publicly accessible and is the canonical source of truth 
 
 ## Response shape
 
-Every command — success or failure — returns the same JSON envelope (built by `secure/src/classes/ApiResponse.php`):
+Every command — success or failure — returns the same JSON envelope. Command results are assembled by `secure/src/classes/ApiResponse.php`; a few refusals raised before dispatch, such as a missing `Authorization` header, are written directly but use the same shape.
 
 ```json
 {
@@ -66,10 +66,13 @@ Every command — success or failure — returns the same JSON envelope (built b
 | `status` | integer | HTTP-style status code (200, 201, 204, 207, 400, 401, 403, 404, 409, 422, 500…). Mirrors the actual HTTP response code. |
 | `code` | string | Stable dotted identifier (`route.created`, `validation.required`, `auth.forbidden`…). Suitable for client-side branching and i18n. |
 | `message` | string | Human-readable summary. Localized when called from the admin panel. |
-| `data` | object\|null | Command-specific payload on success. |
-| `errors` | array (optional) | On validation failures, structured entries with `field` / `value` / `reason`. |
+| `data` | object (optional) | Command-specific payload. **Omitted entirely when there is nothing to report** — read it as "absent or an object", not as "always present, sometimes null". |
+| `errors` | array (optional) | On validation failures, structured entries with `field` / `value` / `reason`. Omitted when empty. |
+| `hint` | string (optional) | Appears on some `401` refusals with a concrete next step (which header to send, for example). Advisory text for a human — never branch on it. |
 
-There is **no separate error envelope**. A failed call uses the same four fields with a non-2xx `status`, an error `code`, and `data: null`. This keeps clients simple: parse once, branch on `status`.
+There is **no separate error envelope**. A failed call uses the same `status` / `code` / `message` triple with a non-2xx status and an error code, and carries `data` only when it has something useful to say — a `404` for an unknown command, for instance, echoes back the name that was requested. This keeps clients simple: parse once, branch on `status` or `code`.
+
+If the envelope itself cannot be serialised — malformed UTF-8 somewhere in the payload, or a structure nested deeper than JSON encoding allows — the response becomes a `500` with code `server.internal_error` rather than the original status with an empty body. A client never receives a `2xx` whose body is missing.
 
 ### File paths in a response are relative
 
@@ -81,7 +84,9 @@ Whenever the envelope names a file or directory — `data.file`, `data.path`, `d
 | Elsewhere in the installation | Relative to the installation root | `secure/projects/other-site`, `public/build/b.zip` |
 | The project root or installation root itself | A single dot | `.` |
 
-Separators are always `/`, on every platform. A path the **caller** supplied — a deploy target outside the installation, for instance — is echoed back as given, since it discloses nothing the caller did not already have.
+A rewritten path always uses `/` as its separator, on every platform. A path the **caller** supplied — a deploy target outside the installation, for instance — is left exactly as given, separators included, since it discloses nothing the caller did not already have.
+
+The rule applies to the whole envelope, not just to fields that look like paths: `data` at any depth (values *and* keys, so a payload keyed by filename is covered), `errors`, and the `message` string, which often interpolates a path into a sentence. It applies identically however a command's result leaves the engine — over HTTP, through the admin panel's internal relay, or through `CommandRunner`.
 
 The relative form is the same in development and production. Only *diagnostic* detail varies by environment: an uncaught exception's message and a fatal's file/line appear in a response body only when `secure/management/config/environment.php` declares the install as development, and go to the PHP error log otherwise.
 
@@ -134,7 +139,7 @@ Each row enumerates the commands in that category — comma-separated, alphabeti
 | **Backups** | `backupProject`, `listBackups`, `restoreBackup`, `deleteBackup` — snapshot / restore (configurable scope). All are project-scoped on the URL marker and act only on the targeted project; a project named in the body must match the marker or the call is refused (`400 project.mismatch`). Backups never include `config/members.json`, so a restore never touches membership. |
 | **Export / Import** | `exportProject`, `downloadExport`, `clearExports`, `importProject` — pack a project as ZIP for portability; import a ZIP back. `exportProject` is project-scoped (marker-bound, like the backups) and **excludes `config/members.json`** from the archive (the membership graph + private invitation notes never travel). `importProject` is **global** (create-from-archive, any authenticated user, like `createProject`): it mints a NEW project and **birth-writes the importer as sole owner**, discarding any `members.json` the archive carried (an untrusted roster is never accepted). An archive is treated as untrusted input throughout: entries are accepted against an **extension allowlist**, **hidden paths are refused** (no path segment may begin with a dot, so a `.git/`, `.svn/` or `.idea/` directory never becomes project content), each entry's **content is checked against what its name claims** (signature for binary formats, parseable JSON for `.json`, no PHP opening tag for text, sanitisation for SVG), and archive **resource limits** — entry count, total and per-entry uncompressed size, per-entry compression ratio — are enforced from the ZIP headers before anything is written. A refused entry is skipped and listed in the response with its reason; the rest of the archive still imports. Both the permitted extensions and the limits are configurable — see *Archive import limits* below. `cloneProject` (see *Projects*) does the same birth-write — a clone/import is a fresh project owned solely by you; collaborators are not carried over. |
 | **Roles** | `listRoles`, `getMyPermissions` — read the fixed roles and your own effective permissions. (`createRole` / `editRole` / `deleteRole` are disabled: roles are a fixed set, not customisable.) |
-| **Snippets** | `listSnippets`, `getSnippet`, `createSnippet`, `deleteSnippet`, `duplicateSnippet`, `insertSnippet`, `injectSnippetCss` — reusable in-tree snippets (nav, cards, forms…); insert / inject into a page's structure. |
+| **Snippets** | `listSnippets`, `getSnippet`, `createSnippet`, `deleteSnippet`, `duplicateSnippet`, `insertSnippet`, `injectSnippetCss` — reusable in-tree snippets (nav, cards, forms…); insert / inject into a page's structure. Snippets come from three tiers — **core** (shipped with the engine, read-only), **personal** (yours, reusable across every project you work on), and **project** (this project only). `listSnippets` returns core + your own personal library + the targeted project's, each row tagged with the tier it came from. `createSnippet` takes an optional `scope`: `project` (the default) or `personal`; `global` is accepted as a legacy spelling of `personal`, and an unrecognised value falls back to `project`. See *Snippet tiers* below. |
 | **JS functions & data bindings** | `listJsFunctions`, `listDataBindings` — catalog read endpoints. `listJsFunctions` returns the QS.* verb catalog (consumed by the admin picker; see [ADMIN_PANEL.md §9.9](ADMIN_PANEL.md)). `listDataBindings` returns the `data-qs-*` attribute catalog. |
 | **Interactions** | `listInteractions`, `addInteraction`, `editInteraction`, `deleteInteraction` — bind triggers (click, hover, scroll…) to verb chains on a node. |
 | **Page events** | `getPageEvents`, `addPageEvent`, `editPageEvent`, `deletePageEvent` — page-level lifecycle hooks (`onload`, `onresize`, `onscroll`) per route. |
@@ -147,6 +152,31 @@ Each row enumerates the commands in that category — comma-separated, alphabeti
 | **System updates** | `checkForUpdates` — inspect the engine version and report whether a newer release exists. Applying an update is an operator/CLI action, not an API command. |
 | **System** | `getCommandHistory`, `clearCommandHistory`, `getSizeInfo`, `getIframeSandbox`, `setIframeSandbox`, `removeIframeSandbox` — engine-level state (audit log of executed commands, project size info, iframe sandbox config for the visual editor). The command history is **per project**: both commands act only on the project named by the URL marker, and there is no installation-wide view. See *Command history storage* below. |
 | **Workflow tooling** | `listWorkflowBlocks`, `lintWorkflows` — enumerate reusable prompt blocks in `secure/admin/workflows/{blocks,pins,warnings,examples}/`; report paragraphs that occur in 3+ workflow templates as candidates for extraction. Both are authoring aids for the shipped workflow catalogue — they read QuickSite's own files rather than any project's data, so both are global (any authenticated user) and take no project marker. |
+
+## Snippet tiers
+
+A snippet is a reusable chunk of page structure — a nav bar, a card, a contact form — that can be inserted into any page. Snippets come from three places:
+
+| Tier | Who can use it | Where it lives | Written by |
+|---|---|---|---|
+| **core** | everyone on the installation | `secure/snippets/core/` | ships with the engine; read-only |
+| **personal** | you, in every project you work on | `secure/snippets/custom/<userId>/` | `createSnippet` with `scope: "personal"` |
+| **project** | anyone with access to that one project | `secure/projects/<projectId>/snippets/` | `createSnippet` (default) |
+
+**A personal snippet belongs to the person who wrote it, not to the installation.** It follows you across every project you are a member of, and it is invisible to everybody else: another user cannot list it, read it, insert it into their own pages, or delete it — not even a member of the same project. The library is keyed by your user id, so two people can hold snippets of the same name without either seeing the other's.
+
+`createSnippet` chooses the tier with an optional `scope` parameter:
+
+| `scope` | Result |
+|---|---|
+| `"project"` | Saved to the targeted project only. **This is the default** when `scope` is absent. |
+| `"personal"` | Saved to your own library, reusable across your projects. |
+| `"global"` | Legacy spelling of `"personal"`, kept so existing callers and stored payloads keep working. Same destination, same visibility. |
+| anything else | Treated as `"project"` — an unrecognised value never widens where a snippet lands. |
+
+Reads resolve **most specific first**: the targeted project, then your own personal library, then core. A project snippet therefore shadows a personal one of the same name, and a personal one shadows a core one. `listSnippets` returns all three sets together with each row tagged by the tier it came from, plus per-tier counts. `deleteSnippet` looks in the project and then in your own library; core snippets are never deletable.
+
+Creating a snippet whose id already exists is refused, but the check only ever looks at the targeted project and your own library — never at anyone else's. Reporting a collision against a stranger's snippet would answer "does this person have a snippet called X", which is not a question the API should answer.
 
 ## Archive import limits
 
@@ -247,7 +277,9 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/jso
 - Command handlers live in `secure/management/command/<command>.php`, one file per command.
 - The whitelist of valid commands is `secure/management/routes.php` (177 entries — this file is the single source of truth for which commands exist).
 - Shared helpers live in `secure/src/functions/utilsManagement.php` (e.g., `varExportNested()`, `SPECIAL_PAGES`, role helpers).
-- Internal callers (visual editor data gathering, workflow steps) bypass the HTTP layer and invoke commands through `secure/src/classes/CommandRunner.php`. CommandRunner carries a **hardcoded read-only allowlist** (26 `get*` / `list*` commands) it will execute internally; membership and other mutating commands are not on it.
+- An unknown command answers `404` with code `route.not_found` and echoes back the name that was requested, so a typo is diagnosable. It does **not** enumerate the commands that do exist — `help` is where the catalogue lives, and it is a deliberate decision to publish it there rather than from every mistyped call.
+- Internal callers (visual editor data gathering, workflow steps) bypass the HTTP layer and invoke commands through `secure/src/classes/CommandRunner.php`. CommandRunner carries a **hardcoded read-only allowlist** of 26 commands it will execute internally — reads and audits, mostly `get*` / `list*` but also `help` and the `analyze*` / `validate*` / `checkStructureMulti` inspectors. Membership and other mutating commands are not on it.
+- When an internally-invoked command throws, the caller gets the command name and a fixed message. The exception's own message, file and line go to the PHP error log instead — unless the install declares itself development, in which case the real message is passed through (see *File paths in a response are relative*).
 - Because that allowlist bypasses the permission check, it **is** the boundary: every command on it is reachable by the lowest membership tier, so it holds only commands inside the `viewer` grant (`content.read`) or a global any-authenticated category. Admin-tier reads — command history, backup listings — are deliberately absent and must go through the HTTP layer, where the role check applies.
 - Workflow execution adds a second, per-command role check via `WorkflowManager::setTokenInfo()`, so a workflow's declared data commands are authorized against the calling user and the targeted project before they run.
 

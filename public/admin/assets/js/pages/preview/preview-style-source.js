@@ -339,20 +339,36 @@
         var ok = function () {
             _serverContent = content;
             _isDirty = false;
-            clearDraft();
-            sourceToast(i18n.styleSourceSaved || 'style.css saved', 'success');
-            // Slice 5: drop the live injection and force the iframe's
-            // <link rel="stylesheet"> to re-fetch — saved content is now
-            // authoritative, the injection has nothing left to add.
-            if (_injectTimer) { clearTimeout(_injectTimer); _injectTimer = null; }
-            removeLiveStyles();
-            if (window.PreviewState && PreviewState.hotReloadCss) {
-                PreviewState.hotReloadCss();
+            // Whether the save succeeded was decided by the server, and it has
+            // already answered. Everything in this block is LOCAL follow-up
+            // work — clearing the draft, dropping the live injection, making
+            // the iframe re-fetch its stylesheet, invalidating the other tabs'
+            // caches. It used to run inside the promise chain with the success
+            // toast fired part-way through it, so a throw anywhere here landed
+            // in .catch(failed) and put an ERROR toast on screen after the
+            // SUCCESS toast, for one save the server had accepted. Isolated so
+            // a local refresh failure can no longer contradict the server's
+            // verdict; it is reported to the console, where it belongs.
+            try {
+                clearDraft();
+                // Drop the live injection and force the iframe's
+                // <link rel="stylesheet"> to re-fetch — saved content is now
+                // authoritative, the injection has nothing left to add.
+                if (_injectTimer) { clearTimeout(_injectTimer); _injectTimer = null; }
+                removeLiveStyles();
+                if (window.PreviewState && PreviewState.hotReloadCss) {
+                    PreviewState.hotReloadCss();
+                }
+                // A Source save can change anything in style.css — including
+                // :root variables that the other structured tabs cache. Mark
+                // their caches stale so the next view re-fetches.
+                invalidateStructuredTabs();
+            } catch (e) {
+                console.error('[style-source] post-save refresh failed', e);
             }
-            // Slice 6 fix: a Source save can change anything in style.css
-            // — including :root variables that the other structured tabs
-            // cache. Mark their caches stale so the next view re-fetches.
-            invalidateStructuredTabs();
+            // Last, and outside the try: one save produces exactly one toast,
+            // and it reports what the server said.
+            sourceToast(i18n.styleSourceSaved || 'style.css saved', 'success');
         };
         if (window.QuickSiteAPI && QuickSiteAPI.request) {
             QuickSiteAPI.request('editStyles', 'POST', { content: content })

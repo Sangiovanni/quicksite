@@ -28,6 +28,19 @@
  * server-side edit — it is intentionally NOT a runtime API setting, so a
  * leaked/low-trust token can never flip the environment to re-open SSRF.
  * (A future setup.bat/setup.sh step will offer to write this at install time.)
+ *
+ * ALSO SET display_errors = Off IN YOUR PRODUCTION php.ini.
+ * On a 'production' install QuickSite turns display_errors off itself, on every
+ * request, as part of installing its fatal-error handler — so an application
+ * fatal cannot print the failing file's absolute path to a visitor. That only
+ * covers failures from the point the engine starts. A fatal in the bootstrap
+ * BEFORE it — a corrupt init.php, a broken PHP extension — runs on whatever
+ * php.ini says, and there is no application code left to intercept it. Setting
+ * it off at the php.ini level closes that window too, and costs nothing: pair
+ * it with log_errors = On so the operator still gets the error.
+ *
+ * On a 'development' install error output stays on deliberately. That is the
+ * point of the setting — do not run a reachable deployment that way.
  */
 
 return [

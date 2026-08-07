@@ -57,9 +57,13 @@ quicksite/
 │   │       │   ├── scripts/      #   generated qs-api-config / qs-enums / qs-route-schema
 │   │       │   ├── sitemap.txt   #   published sitemap (generated)
 │   │       │   └── build/        #   production builds (generated, gitignored)
+│   │       ├── snippets/         # Snippets belonging to this project alone
 │   │       ├── exports/          # This project's export ZIPs (generated)
 │   │       └── backups/          # Project backups (gitignored)
-│   ├── snippets/                 # Reusable component snippets (nav, cards, forms, etc.)
+│   ├── snippets/                 # Reusable content snippets (nav, cards, forms, etc.)
+│   │   ├── core/                 #   shipped with the engine, read-only
+│   │   └── custom/               #   personal libraries — one folder per user
+│   │       └── usr_<id>/         #     that user's own snippets, private to them
 │   ├── deploy/                   # Apache + nginx vhost examples for mapped domains
 │   ├── nginx/                    # Auto-generated nginx config (dynamic_routes.conf)
 │   ├── cron/                     # Optional cron scripts (nginx reload fallback)
@@ -88,6 +92,7 @@ operator's own site.
 - **The shared `qs.js` runtime is engine-owned** (`secure/src/runtime/qs.js`) and served to every project. It handles front-end features like show/hide triggers, filtering, fetches, and state stores. What lands in a project's own `public/scripts/` is generated per-project config — the `qs-api-config` / `qs-enums` / `qs-route-schema` trio.
 - **`secure/management/config/`** holds sensitive files (sessions, auth policy, the user registry) that are gitignored. `auth.php` and `roles.php` are auto-created from `.example` templates on first load; `users.php` is written when the first account is created.
 - **Projects** are fully isolated in `secure/projects/`. Each has its own pages, translations, routes, and assets, and each is served from its own folder under its own `/p/<projectId>/` view — no project is privileged. Change which one you are *editing* with `setSelectedProject` (the admin header picker).
+- **Snippets live in three tiers.** `secure/snippets/core/` ships with the engine and is read-only. `secure/snippets/custom/<userId>/` is one author's own library — private to them, and available to them in every project they work on. `secure/projects/<id>/snippets/` belongs to that project alone. See [COMMAND_API.md](COMMAND_API.md) for how a snippet is saved to each and how reads resolve between them.
 
 ## Folder customization
 
