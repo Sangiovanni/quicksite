@@ -31,7 +31,7 @@ $commandStartTime = microtime(true);
 // same fatal with HTTP 200 and an absolute filesystem path. Two copies of the
 // same decision is the drift shape C11 spent a slice removing; the debug block
 // is also gated in exactly one place now.
-qs_register_fatal_json_handler(QS_FATAL_SHAPE_ENVELOPE);
+qs_register_fatal_handler(QS_FATAL_SHAPE_ENVELOPE);
 
 // ============================================================================
 // CORS Handling - Must be before any output

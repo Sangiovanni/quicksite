@@ -39,8 +39,12 @@ class AdminTranslation {
             session_start();
         }
         
-        // URL parameter has HIGHEST priority (user clicking language switcher)
-        if (!empty($_GET['lang'])) {
+        // URL parameter has HIGHEST priority (user clicking language switcher).
+        // is_string: a query parameter arrives as whatever the caller sent, and
+        // `?lang[]=x` is an ARRAY. Passing it to isValidLanguage(string) raised an
+        // uncaught TypeError — a fatal on every admin page, this one included,
+        // i.e. reachable with no credentials at all (beta.10 C13 F-C13-22).
+        if (!empty($_GET['lang']) && is_string($_GET['lang'])) {
             $requestedLang = $_GET['lang'];
             if ($this->isValidLanguage($requestedLang)) {
                 $this->currentLang = $requestedLang;
@@ -48,13 +52,17 @@ class AdminTranslation {
                 return;
             }
         }
-        
-        // Then check session
-        if (!empty($_SESSION['admin_lang'])) {
+
+        // Then check session. Re-validated rather than trusted: it is only ever
+        // written from a checked value above, but a session written BEFORE that
+        // check existed would otherwise keep its bad value alive for the life of
+        // the session (F-C13-23).
+        if (!empty($_SESSION['admin_lang']) && is_string($_SESSION['admin_lang'])
+            && $this->isValidLanguage($_SESSION['admin_lang'])) {
             $this->currentLang = $_SESSION['admin_lang'];
             return;
         }
-        
+
         // Finally check browser preference
         if (!empty($_SERVER['HTTP_ACCEPT_LANGUAGE'])) {
             $browserLang = substr($_SERVER['HTTP_ACCEPT_LANGUAGE'], 0, 2);
@@ -95,9 +103,29 @@ class AdminTranslation {
     }
 
     /**
-     * Check if language is available
+     * Check if language is available.
+     *
+     * SHAPE FIRST, EXISTENCE SECOND (beta.10 C13 F-C13-23). This value is
+     * concatenated into a filesystem path, and it used to go in unexamined — so
+     * `?lang=../../projects/<id>/config/members` resolved out of the translations
+     * directory, `file_exists` said yes, and loadTranslations() read that file
+     * into the translation array. Two consequences, both reachable on the LOGIN
+     * page with no credentials: any readable .json on the box could be loaded,
+     * and the true/false answer was a project-EXISTENCE ORACLE — which is exactly
+     * what surface B's uniform 404 and the management API's uniform 403 exist to
+     * deny.
+     *
+     * The gate is a shape, not a registry of known codes: no dots (so `..` cannot
+     * be spelled), no slashes or backslashes (so no sub-path), letters, digits
+     * and hyphens only, bounded — which leaves `en`, `fr`, `pt-BR` and anything
+     * else a translator drops into the directory working without a code change.
+     * The file_exists check still decides whether the language is really there;
+     * this only decides whether the name is allowed to become a path at all.
      */
     private function isValidLanguage(string $lang): bool {
+        if (preg_match('/^[A-Za-z0-9-]{1,32}$/', $lang) !== 1) {
+            return false;
+        }
         $file = SECURE_FOLDER_PATH . '/admin/translations/' . $lang . '.json';
         return file_exists($file);
     }

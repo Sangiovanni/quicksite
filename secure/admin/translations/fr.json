@@ -291,6 +291,12 @@
         }
     },
     "dashboard": {
+        "denied": {
+            "notice": "Vous n'avez pas la permission d'ouvrir cette page avec votre rôle sur ce projet."
+        },
+        "noProject": {
+            "notice": "L'éditeur visuel a besoin d'un projet sur lequel travailler, et vous n'êtes membre d'aucun projet pour l'instant. Créez-en un ci-dessous, ou demandez à un propriétaire de projet de vous inviter."
+        },
         "memberships": {
             "title": "Adhésions",
             "projects": "Mes projets",

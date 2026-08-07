@@ -291,6 +291,12 @@
         }
     },
     "dashboard": {
+        "denied": {
+            "notice": "You do not have permission to open that page with your role on this project."
+        },
+        "noProject": {
+            "notice": "The visual editor needs a project to work on, and you are not a member of any project yet. Create one below, or ask a project owner to invite you."
+        },
         "memberships": {
             "title": "Memberships",
             "projects": "My projects",

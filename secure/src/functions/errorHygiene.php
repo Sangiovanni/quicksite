@@ -1,6 +1,6 @@
 <?php
 /**
- * Fatal-error hygiene for the JSON dispatchers (beta.10 C12).
+ * Fatal-error hygiene for the request dispatchers (beta.10 C12, C13).
  *
  * A PHP fatal happens outside every `try` an application can write: it is not
  * an exception, nothing catches it, and whatever the interpreter prints goes
@@ -18,8 +18,18 @@
  *
  * This is that logic, extracted rather than copied. C11 spent a slice unifying
  * seven hand-copied marker binds; adding an eighth copy of anything is the
- * shape that beta was fixing. One implementation, two response shapes, one
+ * shape that beta was fixing. One implementation, three response shapes, one
  * place where the development gate is consulted.
+ *
+ * C13 added the third shape and the third caller: the admin PAGE surface
+ * (`public/admin/index.php`) also had no fatal handling, so the identical
+ * defect was live there — an admin page answering 200 with a stack trace and
+ * absolute paths in its body. A page cannot answer with a JSON envelope, hence
+ * QS_FATAL_SHAPE_HTML: same status, same redaction, same development gate,
+ * different content type. The function is named for what it does (register a
+ * fatal handler) rather than for one of the shapes it can emit — a
+ * `..._json_handler` that returns HTML is how a fourth hand-rolled copy gets
+ * written.
  *
  * Not a general error handler: it deliberately handles ONLY the fatal classes
  * (E_ERROR / E_PARSE / E_CORE_ERROR / E_COMPILE_ERROR / E_USER_ERROR). Warnings
@@ -28,19 +38,20 @@
 
 require_once __DIR__ . '/environment.php';
 
-/** Response shapes the two dispatchers use. */
+/** Response shapes the three dispatchers use. */
 const QS_FATAL_SHAPE_ENVELOPE = 'envelope';   // /management — ApiResponse's {status,code,message,data}
 const QS_FATAL_SHAPE_ERROR    = 'error';      // /admin/api  — its own {error: …}
+const QS_FATAL_SHAPE_HTML     = 'html';       // /admin      — the panel's page surface
 
 /**
- * Register the fatal → JSON-500 converter for the current request.
+ * Register the fatal → 500 converter for the current request.
  *
  * Safe to call more than once per request; only the first registration takes
  * effect, so a dispatcher that includes another cannot double-emit.
  *
  * @param string $shape One of the QS_FATAL_SHAPE_* constants.
  */
-function qs_register_fatal_json_handler(string $shape = QS_FATAL_SHAPE_ENVELOPE): void
+function qs_register_fatal_handler(string $shape = QS_FATAL_SHAPE_ENVELOPE): void
 {
     static $registered = false;
     if ($registered) {
@@ -88,9 +99,28 @@ function qs_register_fatal_json_handler(string $shape = QS_FATAL_SHAPE_ENVELOPE)
         }
 
         http_response_code(500);
-        header('Content-Type: application/json');
         header('Cache-Control: no-store');
 
+        // The ONLY place any of this detail is allowed out, and only when the
+        // install has deliberately declared itself a development install.
+        // function_exists() because a fatal early enough to beat the require at
+        // the top of this file must still produce the SAFE body.
+        $debug = (function_exists('qs_is_development') && qs_is_development())
+            ? [
+                'type'    => qs_fatal_type_name($error['type']),
+                'message' => $error['message'],
+                'file'    => $error['file'],
+                'line'    => $error['line'],
+            ]
+            : null;
+
+        if ($shape === QS_FATAL_SHAPE_HTML) {
+            header('Content-Type: text/html; charset=utf-8');
+            echo qs_fatal_html_page($debug);
+            return;
+        }
+
+        header('Content-Type: application/json');
         $body = $shape === QS_FATAL_SHAPE_ERROR
             ? ['error' => 'Internal server error']
             : [
@@ -99,22 +129,61 @@ function qs_register_fatal_json_handler(string $shape = QS_FATAL_SHAPE_ENVELOPE)
                 'message' => 'A fatal error occurred while processing the request',
                 'data'    => null,
             ];
-
-        // The ONLY place any of this detail is allowed out, and only when the
-        // install has deliberately declared itself a development install.
-        // function_exists() because a fatal early enough to beat the require at
-        // the top of this file must still produce the SAFE body.
-        if (function_exists('qs_is_development') && qs_is_development()) {
-            $body['debug'] = [
-                'type' => qs_fatal_type_name($error['type']),
-                'message' => $error['message'],
-                'file' => $error['file'],
-                'line' => $error['line'],
-            ];
+        if ($debug !== null) {
+            $body['debug'] = $debug;
         }
 
         echo json_encode($body, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     });
+}
+
+/**
+ * The admin page surface's fatal body.
+ *
+ * Deliberately a self-contained string rather than a template: by the time this
+ * runs the request has already died, and the layout/translation machinery it
+ * would have to load is one of the things that can have died with it. It
+ * therefore reads no constant, requires no file and calls no helper — the same
+ * reason the JSON shapes hand-build their arrays.
+ *
+ * Inline CSS because the panel's stylesheet is served from a URL this function
+ * cannot derive without BASE_URL (which a fatal in init.php would have left
+ * undefined) — and because an error page that depends on a second request to
+ * look right is an error page that can fail twice.
+ *
+ * @param array|null $debug The type/message/file/line quadruple, or null in
+ *                          production — the argument is the gate's *result*,
+ *                          so the decision stays in one place above.
+ */
+function qs_fatal_html_page(?array $debug): string
+{
+    $page = '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">'
+        . '<meta name="robots" content="noindex, nofollow">'
+        . '<title>Something went wrong</title>'
+        . '<style>body{margin:0;padding:3rem 1.5rem;background:#12141a;color:#e6e8ee;'
+        . 'font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}'
+        . 'main{max-width:38rem;margin:0 auto}h1{font-size:1.4rem;margin:0 0 .75rem}'
+        . 'p{margin:0 0 .75rem;color:#a9b0c0}'
+        . 'pre{white-space:pre-wrap;word-break:break-all;background:#1b1e27;border:1px solid #2c3040;'
+        . 'border-radius:6px;padding:1rem;font-size:.85rem;color:#e6e8ee}</style></head><body><main>'
+        . '<h1>Something went wrong</h1>'
+        . '<p>This page could not be completed. The error has been recorded in the server log.</p>'
+        . '<p>Go back and try again. If it keeps happening, ask whoever administers this'
+        . ' installation to check the PHP error log.</p>';
+
+    if ($debug !== null) {
+        $page .= '<p><strong>Development mode</strong> — details below are shown because this'
+            . ' install declares <code>environment.php</code> as development.</p><pre>'
+            . htmlspecialchars(
+                $debug['type'] . ': ' . $debug['message'] . "\n"
+                . $debug['file'] . ':' . $debug['line'],
+                ENT_QUOTES,
+                'UTF-8'
+            )
+            . '</pre>';
+    }
+
+    return $page . '</main></body></html>';
 }
 
 /** Human-readable name for a fatal error constant. */

@@ -34,7 +34,6 @@ $languages = $isMultilingual ? ($editConfig['LANGUAGES_SUPPORTED'] ?? [$defaultL
 // browser navigation with no Authorization header — authenticates against surface B
 // (D3 seam; HttpOnly hardening → C5b).
 $previewProject = $router->getCurrentProject();          // what you EDIT (selected_project)
-$previewAtRoot  = ($previewProject === null || $previewProject === '');
 $siteUrl = $router->projectSiteBase($previewProject) . '/';
 if ($isMultilingual) {
     $siteUrl .= $defaultLang . '/';

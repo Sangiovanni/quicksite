@@ -52,7 +52,7 @@ require_once SECURE_FOLDER_PATH . '/admin/functions/AdminHelper.php';
 // the body. Registered as early as the constants allow, sharing one
 // implementation with /management so the two surfaces cannot drift apart.
 require_once SECURE_FOLDER_PATH . '/src/functions/errorHygiene.php';
-qs_register_fatal_json_handler(QS_FATAL_SHAPE_ERROR);
+qs_register_fatal_handler(QS_FATAL_SHAPE_ERROR);
 
 header('Content-Type: application/json');
 header('Cache-Control: no-store');

@@ -113,7 +113,12 @@ $langNames = [
     <script>
     (function() {
         var stored = localStorage.getItem('quicksite_admin_lang');
-        var current = '<?= $currentLang ?>';
+        // json_encode, not hand-written quotes: this is a JS string literal, and
+        // the value ultimately comes from ?lang=. Its shape is gated now
+        // (AdminTranslation::isValidLanguage, C13 F-C13-23), so nothing can break
+        // out — this is the escaping that makes that a belt rather than the only
+        // brace, and it is the correct escaper for the context either way.
+        var current = <?= json_encode($currentLang) ?>;
         var url = new URL(window.location.href);
         // Only redirect if stored lang differs and we're not already setting it via URL
         if (stored && stored !== current && !url.searchParams.has('lang')) {
@@ -406,10 +411,15 @@ $langNames = [
             <?php endif; ?>
             <?php
             // "Back to site" opens the project you're EDITING at its own /p/<id>/ view,
-            // which resolves that project's default language itself. With no edited
-            // project there is no site to go back to, so the link points at the install
-            // base (the web root is free — it belongs to whatever the deployment put there).
-            $siteUrl = $router->projectSiteBase() . '/';
+            // which resolves that project's default language itself.
+            //
+            // C13 — hidden outright when there is no edited project. It used to fall back
+            // to the install base on the reasoning that "the web root is free, it belongs
+            // to whatever the deployment put there" — but on a default deployment nothing
+            // is there, so an account with no membership got Apache's own 403 in a new
+            // tab. There is no site to go back to; the honest UI is no button.
+            if ($editingProject):
+                $siteUrl = $router->projectSiteBase() . '/';
             ?>
             <a href="<?= $siteUrl ?>" id="back-to-site-btn" class="admin-btn admin-btn--ghost" target="_blank">
                 <svg class="admin-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -419,7 +429,8 @@ $langNames = [
                 </svg>
                 <span><?= __admin('common.backToSite') ?></span>
             </a>
-            
+            <?php endif; ?>
+
             <!-- Current User Role Badge -->
             <div class="admin-user-badge" id="admin-user-badge">
                 <svg class="admin-user-badge__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -608,7 +619,7 @@ $langNames = [
                     }
                 }
             },
-            adminLang: '<?= $currentLang ?>'
+            adminLang: <?= json_encode($currentLang) ?>
         };
         
         // Language Switcher

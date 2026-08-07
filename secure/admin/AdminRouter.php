@@ -13,6 +13,18 @@ class AdminRouter {
     private string $command = '';
     private array $params = [];
     private ?string $workflowId = null;  // For workflow routing
+    /**
+     * The admin URL namespace — the ONLY first segments that are pages.
+     *
+     * beta.10 C13 (F-C13-19): this list was declared here and never read, so the
+     * real router was `templates/pages/{segment}.php` + `file_exists`. Every file
+     * in that directory was therefore a URL, and six of them are PARTIALS meant to
+     * be included by a parent view — they rendered as top-level pages with their
+     * parent's variables undefined (one of them fatally). They are not pages with
+     * an unmet precondition, so there is no page to redirect to and no state to
+     * explain; the honest answer is that the URL does not exist. Reading the list
+     * answers 404 for all six, and for any partial added to that directory later.
+     */
     private array $validPages = [
         'login',       // Authentication page
         'register',    // Self-registration page (C8; renders only when auth.php allows it)
@@ -733,7 +745,35 @@ class AdminRouter {
         if ($this->isAuthenticated() && !$this->canAccessPage($this->page)) {
             $this->redirect('dashboard?denied=1');
         }
-        
+
+        // C13 — the visual editor needs a project to edit. An account that is a
+        // member of NOTHING resolves no project (C15 R3), and the page then points
+        // its iframe at the install base, which is not a QuickSite URL: on a
+        // default deployment the web root has no index and Apache answers the
+        // editor's own iframe with its 403 page. Send that account to the one
+        // place that can fix its situation instead.
+        //
+        // This fires ONLY at zero membership. A member of other projects always
+        // resolves one, and a request for a project the caller is genuinely not a
+        // member of is refused by the marker gate (403) and by surface B (404) —
+        // deliberately NOT softened here, because those are real permission
+        // failures and a friendly redirect would hide one.
+        if ($this->page === 'preview' && $this->getCurrentProject() === null) {
+            $this->redirect('dashboard?noproject=1');
+        }
+
+        // C13 (F-C13-19) — anything outside the declared namespace is not a page.
+        // Placed AFTER the authentication gate on purpose: an unauthenticated
+        // caller keeps getting the same redirect to /admin/login for every
+        // segment, so this cannot become a pre-auth oracle for which page names
+        // exist.
+        if (!in_array($this->page, $this->validPages, true)) {
+            http_response_code(404);
+            // The 404 template is rendered as the page, so the layout stops
+            // reflecting the requested segment into <title> and data-page too.
+            $this->page = '404';
+        }
+
         // Load the appropriate template
         $this->render();
     }

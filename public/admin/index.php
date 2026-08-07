@@ -9,6 +9,29 @@
  */
 
 require_once '../init.php';
+
+// beta.10 C13 (F9, F-C13-20) — the admin PAGE surface had no fatal handling of
+// any kind. /management and /admin/api both convert a fatal into a clean 500;
+// this one let PHP print its own error — absolute path and stack frames
+// included — into a body whose status was still 200. Measured live on any admin
+// URL carrying an array `lang` parameter, the login page included, i.e. before
+// authentication.
+//
+// Registered BEFORE the router is required so a parse error in AdminRouter.php
+// (or in anything it pulls in) is covered too — that class of failure is what
+// C12 measured on /admin/api, and it is exactly the case a later registration
+// would miss. It also switches display_errors off in a production install, so
+// even a fatal raised after the headers are on the wire — which no shutdown
+// handler can repair — stops disclosing paths.
+//
+// One caveat, deliberate: /admin/session-refresh is served by this same entry
+// point and answers JSON. A fatal there now returns a 500 HTML body instead of
+// a 500 JSON body. The client branches on the status, not the shape, and a
+// wrong content type on a dead request is a smaller problem than an unhandled
+// fatal on every page.
+require_once SECURE_FOLDER_PATH . '/src/functions/errorHygiene.php';
+qs_register_fatal_handler(QS_FATAL_SHAPE_HTML);
+
 require_once SECURE_FOLDER_PATH . '/admin/AdminRouter.php';
 
 // Initialize the admin router

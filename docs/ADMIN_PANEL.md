@@ -238,6 +238,8 @@ The visual editor is the panel's flagship feature. It runs as a sidebar UI in th
 
 The panel edits one project at a time — the user's **selected project** (a per-user preference; ARCHITECTURE §6). The header carries a **project picker** listing the projects the user is a member of; changing it calls `setSelectedProject` and does a cache-busted reload, so the header badge, the editor's command target, and the preview iframe all follow together. The dashboard's project switch calls the same command.
 
+An account that is a member of no project has nothing to edit. `/admin/preview` sends it to the dashboard with a note saying the editor needs a project and pointing at creating or joining one — the editor is never opened bound to nothing, and the header's "Back to site" button is hidden, since there is no site to go back to. This applies only when there is no membership at all; asking for a project you are simply not a member of is refused by the usual gates.
+
 The preview iframe loads the edited project in editor mode through its per-project live view (`/p/<id>/?_editor=1`) — the same way for every project, since none is privileged. "Back to site" and the floating miniplayer resolve to that same view. Private projects authenticate via a short-lived HttpOnly `qs_preview` cookie the panel sets from the caller's token. The iframe URL carries a per-load cache-buster so a switch always loads the new project fresh — the editor's command target and the iframe DOM can never drift onto different projects.
 
 ### 8.1 Modes
@@ -2858,7 +2860,7 @@ automatically. Same pattern as `qsVerbCatalog.php`.
 
 | File | Role |
 |---|---|
-| `secure/admin/AdminRouter.php` | Route parsing, auth gate, URL helpers. |
+| `secure/admin/AdminRouter.php` | Route parsing, auth gate, URL helpers. Holds the list of page names the panel serves: a first URL segment outside it answers `404`, so the files under `templates/pages/` that are partials of a parent view are not reachable as pages of their own. |
 | `secure/admin/templates/layout.php` | Shell + nav + script loader; injects `window.QUICKSITE_CONFIG`. |
 | `secure/admin/templates/pages/preview.php` | Preview page composition. |
 | `secure/admin/templates/pages/preview-config.php` | Generates `window.PreviewConfig`. Critical boot dependency for all preview modules. |

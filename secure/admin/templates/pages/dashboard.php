@@ -19,6 +19,30 @@ $baseUrl = rtrim(BASE_URL, '/');
     <p class="admin-page-header__subtitle"><?= __admin('dashboard.subtitle') ?></p>
 </div>
 
+<?php
+// C13 — why you are here: the visual editor was asked for, and this account is a
+// member of no project yet, so there is nothing for it to edit (AdminRouter
+// redirects rather than opening an editor bound to nothing). isset() only, never
+// a string comparison: the parameter is attacker-controlled and can arrive as an
+// array, and the point of arriving on this page is that the request already went
+// wrong once.
+if (isset($_GET['noproject'])): ?>
+<div class="admin-alert admin-alert--info" style="margin-bottom: var(--space-md);">
+    <?= __admin('dashboard.noProject.notice', 'The visual editor needs a project to work on, and you are not a member of any project yet. Create one below, or ask a project owner to invite you.') ?>
+</div>
+<?php endif; ?>
+
+<?php
+// C13 — the role gate bounces here with ?denied=1 and, until now, said nothing:
+// you asked for a page and silently arrived somewhere else. The copy is
+// deliberately generic and never names the page that was refused — telling an
+// account which pages exist is the thing a permission gate is there to avoid.
+if (isset($_GET['denied'])): ?>
+<div class="admin-alert admin-alert--warning" style="margin-bottom: var(--space-md);">
+    <?= __admin('dashboard.denied.notice', 'You do not have permission to open that page with your role on this project.') ?>
+</div>
+<?php endif; ?>
+
 <!-- Owner Space Usage — every project the caller OWNS, above the per-project view -->
 <section class="admin-section" id="owner-space-section" style="display: none;">
     <div class="storage-overview owner-space">
