@@ -5950,3 +5950,451 @@ and the file-based model is the product's premise). One combined state file
 `secure/projects/<id>/config/members.json`,
 `secure/src/functions/AuthManagement.php` (`qs_members_mutate`). Behaviour:
 [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md).
+
+---
+
+## File and archive boundaries (beta.10)
+
+### A project's `public/` holds the website as it is; hidden paths are refused (locked 2026-07-31)
+
+**Decision**: No segment of a path may begin with a dot. The rule applies where a
+visitor's request is served, where an uploaded archive is unpacked into a project,
+and where a build copies files into a directory a deployment publishes. It is
+deliberately "no segment may *start* with a dot", never "no dots" — a `.css` or
+`.png` file must keep its extension. Anything a deployment genuinely needs at a
+hidden path — an ACME challenge, server configuration — is served from the
+deployment's own web root, which never enters QuickSite's passthrough.
+
+**Reasoning**: The previous check inspected only the final path segment, which
+refuses `style/.htaccess` and serves `.hidden/anything` — so a hidden *directory*
+published everything inside it. `.git/` is the case that matters: its contents
+carry ordinary permitted extensions, so an extension allowlist waves them through,
+and what leaks is the source history plus whatever was committed beside it. Making
+the rule per-segment rather than per-basename is what closes the directory case,
+and stating it as a property of the *path* rather than a list of forbidden names
+means a `.svn/` or `.idea/` directory never has to be enumerated. The counterpart
+half of the decision matters as much: a project's public directory is the website,
+not a deployment surface, so the correct home for hidden deployment files is one
+level up, outside the product. Declining to carve out exceptions is what keeps the
+rule cheap to state and impossible to get wrong.
+
+**Alternatives considered**: A blocklist of known hidden directories (rejected —
+an enumeration of today's tooling, and a new tool ships a new leak). Refusing only
+hidden *directories* while still serving hidden files (rejected — `.htaccess` and
+`.env` are exactly the files worth refusing). An allowlist of hidden paths a
+deployment may serve, so `/.well-known/` could pass through QuickSite (rejected —
+it is a feature nobody asked for, and the web server already serves that path from
+its own root without QuickSite running at all).
+
+**Source**: `secure/src/functions/filePolicy.php`
+(`qs_policy_has_hidden_segment`), `secure/src/functions/surfaceB.php`
+(`qs_surface_b_resolve_static`), `secure/management/command/importProject.php`.
+Related: *Path safety is enforced in the shared resolvers, not in each command*
+(see above). Behaviour: [ARCHITECTURE.md §7](ARCHITECTURE.md),
+[COMMAND_API.md](COMMAND_API.md).
+
+### What may be imported and what may be published are allowlists, not blocklists (locked 2026-07-30)
+
+**Decision**: Both file boundaries name the extensions they accept, rather than the
+ones they refuse. Import additionally checks each entry's **content** against what
+its name claims — a signature for binary formats, parseable JSON for `.json`, no
+PHP opening tag for text, sanitisation for SVG. Both lists live in a
+deployer-editable config file created from a shipped example, and an override
+*replaces* the default list so an installation can narrow as well as widen.
+
+**Reasoning**: A blocklist has to enumerate every dangerous spelling; an allowlist
+only has to enumerate the safe ones, and the safe set is short and known — it is
+derived from what a legitimate export can actually contain plus the asset types the
+engine already accepts at upload. The blocklist this replaced failed in three
+independent ways at once, which is the argument in miniature: it matched one
+control filename case-sensitively on a platform where both the filesystem and the
+web server are case-insensitive, it did not list every executable spelling, and it
+never looked at contents, so a PHP payload named `.png` passed unexamined. Checking
+content as well as extension is what stops a name from lying about what a file is;
+neither check alone is sufficient, because an allowlisted extension is exactly what
+an attacker will choose.
+
+**Alternatives considered**: Extend the blocklist with the missing spellings and
+make it case-insensitive (rejected — it fixes the three known holes and leaves the
+shape that produced them). Content sniffing alone, with no extension rule (rejected
+— the extension is what the web server dispatches on, so it has to be constrained
+in its own right). A single shared list for both boundaries (rejected — see the
+entry below; they are two different questions that happen to have similar answers
+today).
+
+**Source**: `secure/src/functions/filePolicy.php` (`qs_import_allows_extension`,
+`qs_import_validate_content`, `qs_publish_allows_extension`),
+`secure/management/config/import-policy.php.example`. Behaviour:
+[COMMAND_API.md](COMMAND_API.md).
+
+### The publish boundary lives at the build, not in the shared copier (locked 2026-07-30)
+
+**Decision**: The publish allowlist is applied by the build's own copy routine, at
+the moment a file stops being project data and becomes something a web server hands
+to the public. It is not applied inside the generic recursive copier that other
+callers share, and it is a separate list from the import allowlist even where the
+two currently hold the same entries. Copies that do not cross into a served
+directory — translation files landing in a secure sibling folder, for instance —
+deliberately keep the unfiltered copier.
+
+**Reasoning**: A file existing inside a project and a file being published are two
+different decisions, and collapsing them either over-filters or under-filters. The
+under-filtering case is the one that was live: import filtered, the build did not,
+and a hostile file that got past import rode an ordinary build into the web
+server's document root. The over-filtering case is just as real — putting the
+filter inside the shared copier would silently drop files for callers whose
+destination nobody serves, which is a data-loss bug wearing a security fix's
+clothes. Placing the gate at the boundary it describes also means the gate is
+findable: someone reading the build knows what the build publishes, without
+tracing into a utility. Keeping the two lists separate costs one duplicated array
+and buys the ability to diverge later without unpicking a shared assumption; a
+deployer who narrows what may be published does not thereby narrow what may be
+imported.
+
+**Alternatives considered**: Filter inside the shared copier (rejected — it has
+callers whose destination is not served, and it would drop their files). Filter at
+deploy time instead of build time (rejected — the built artifact is downloadable in
+its own right, so it must be clean before deploy is reached). One list for both
+boundaries (rejected as above).
+
+**Source**: `secure/src/functions/filePolicy.php`
+(`qs_copy_publishable_directory`), `secure/management/command/build.php`,
+`secure/src/functions/FileSystem.php` (the generic copier, deliberately
+unfiltered). Behaviour: [COMMAND_API.md](COMMAND_API.md).
+
+### The absolute byte caps are the archive ceiling; the compression ratio only prices the attack (locked 2026-08-01)
+
+**Decision**: An uploaded archive is bounded by four limits read from its own
+headers before anything is decompressed — entry count, total uncompressed size,
+per-entry uncompressed size, and per-entry compression ratio. The two byte caps are
+treated as the real ceiling and are set conservatively; the ratio is set generously
+(300:1), because it governs how *cheaply* the ceiling can be reached, not how high
+the ceiling is. All four are overridable per key in a deployer-editable file, and
+all four are documented in the reference docs rather than only in that file's
+comments.
+
+**Reasoning**: A tight ratio refuses QuickSite's own export. A page tree is
+repetitive by construction — every node repeats its tag, classes, styles and
+children — so a large structural document deflates far better than hand-written
+text, and the engine was producing archives it would then refuse to read back.
+Raising the ratio does not widen what an archive may allocate, because whatever an
+entry's ratio it still cannot exceed the per-entry and per-archive byte caps;
+relaxing the ratio makes an attack cheaper to mount while leaving the server's
+worst case identical. That asymmetry is the whole reasoning: it is safe to be
+generous about upload cost and strict about allocation, and confusing the two is
+what set the number wrong in the first place. Reading the limits from the central
+directory before decompressing is retained deliberately — decompressing is the cost
+being defended against, so the decision has to be reachable without paying it.
+
+**Alternatives considered**: Exempt structural JSON from the ratio check by name
+(rejected, and the reason generalises: archive entry names are authored by whoever
+builds the archive and the source is public, so a name-based exemption disables the
+check for anyone who reads the code, while looking more targeted than simply
+setting the number correctly). Apply matching limits at export so the engine cannot
+produce what it will not accept (rejected for this release — it constrains a
+download, which is not the surface under attack, and the round trip is proven
+green). Remove the ratio check and rely on the byte caps alone (rejected — the
+ratio is the only one of the four that catches a bomb before its size is paid for).
+
+**Source**: `secure/src/functions/filePolicy.php` (`qs_archive_limits`),
+`secure/management/config/import-policy.php.example`. Behaviour:
+[COMMAND_API.md](COMMAND_API.md) (*Archive import limits*).
+
+---
+
+## Data, generated code and containment (beta.10)
+
+### A write that cannot be encoded aborts before the file is touched (locked 2026-08-02)
+
+**Decision**: Every JSON write in the engine goes through one shared writer that
+encodes first, and on failure logs the reason and returns without opening the
+target. The existing file is left byte for byte unchanged. Commands that accept
+free-text carrying the offending bytes additionally refuse at their own boundary,
+so the caller gets a bad-request naming the field rather than a server error.
+
+**Reasoning**: The failure this prevents looks like success at every individual
+step, which is why guarding it locally never worked. The encoder returns `false` on
+input it cannot represent; writing `false` writes the empty string and reports zero
+bytes written; zero is not `false`, so every `=== false` guard in the codebase
+passes and the command answers a 2xx over a file it just emptied. A variant with a
+trailing newline writes one byte and reports one byte, which passes just as
+cleanly. The mechanism had been discovered and patched three separate times in
+three places without anyone generalising it, and the third discovery is what
+settled the shape: one writer, adopted at every unguarded site, rather than
+fifty-five local patches whose completeness nobody can demonstrate. Refusing before
+touching the file — rather than writing and repairing — is the part that makes the
+guarantee simple to state: a failed write changes nothing.
+
+**Alternatives considered**: Check the encoder's return at each call site (rejected
+— fifty-five sites, and the next writer added forgets). Validate encoding at the
+input boundary only (kept as an *additional* layer for the commands that carry
+prose, rejected as the primary defence — a value can also arrive by import, by
+merge, or from a file edited on disk, and only the write is common to all of them).
+Write and then verify the result, rolling back on mismatch (rejected — it doubles
+the I/O and leaves a window where the file on disk is wrong).
+
+This extends *One writer for the membership file, with an invariant backstop that
+aborts* (see above) from one file to every JSON store in the engine.
+
+**Source**: `secure/src/functions/utilsManagement.php` (`qs_json_write`),
+`secure/src/functions/AuthManagement.php` (`qs_members_mutate`),
+`secure/src/functions/SessionManagement.php`. Behaviour:
+[COMMAND_API.md](COMMAND_API.md).
+
+### Generated code takes its variable parts at runtime, never baked in at generation (locked 2026-08-01)
+
+**Decision**: Code the engine writes to disk is generated from a non-interpolating
+template, and anything that varies per page or per project is read at request time
+from the runtime rather than substituted into the source at generation time. One
+canonical generator serves every path that produces a given artifact — creation and
+import share it — so there is no second copy to drift.
+
+**Reasoning**: An interpolating template turns every value it embeds into a
+data-to-code boundary, and the value that crossed it here was an archive entry
+name: the importer listed the directory it had just unpacked, took each filename,
+and substituted it into a quoted string in generated PHP. A name chosen to close
+that string made the remainder live code in a file the renderer later includes. No
+PHP opening tag was needed, because the injection point was already inside PHP —
+which is exactly what kept the payload inside the character set a Windows filename
+accepts. Removing the interpolation beats escaping it: an escaper is a thing that
+can be wrong, or be applied to five of six substitutions, whereas a template with
+no substitutions is inert by construction and provably identical for hostile and
+benign input. The runtime already exposed everything the generated file needed, so
+nothing was lost. The single-generator half of the decision is the other lesson:
+the duplicate generator had also drifted functionally, emitting an older wrapper
+shape than the one creation produced.
+
+**Alternatives considered**: Escape the interpolated value (rejected — it leaves a
+data-to-code boundary that has to stay correct forever, and it does not make the
+output name-independent). Validate archive entry names against a strict shape
+(kept in reserve as defence in depth, rejected as the fix — it makes the hostile
+name unable to land, but leaves the generator able to execute one if it ever does).
+Generate the wrapper at request time instead of writing it (rejected — the file on
+disk is what the routing layer resolves, and generating per request trades a
+one-time cost for a per-request one).
+
+**Source**: `secure/src/functions/utilsManagement.php`
+(`generate_page_template`), `secure/management/command/importProject.php`,
+`secure/management/command/createProject.php`.
+
+### A project-scoped target is bound through one shared helper that fails closed (locked 2026-07-31)
+
+**Decision**: Every project-scoped command resolves its target by calling one
+shared binder. With no marker in the URL the binder refuses; with a marker, a
+matching field in the body is accepted as an echo and a disagreeing one is refused,
+whichever field carries the disagreement. No command reads the project from the
+request body itself, and no command implements this inline.
+
+**Reasoning**: This is the enforcement idiom for the rule recorded above (*The URL
+marker is the sole source of a project-scoped target; a body value may only echo
+it*), and it is a separate decision because the rule was already correct while
+seven commands still got it wrong. Each had copied the containment inline and
+wrapped it in "if a marker is present" — so an *absent* marker skipped the check
+entirely and the body value survived. That is fail-open where the shared helper is
+fail-closed, and the commands concerned were the ones that export, clone, back up,
+restore and delete. Nothing could reach them without a marker at the time, but that
+depended on two hand-maintained lists staying correct, and the whole point of a
+containment rule is that it does not rest on an inventory. Consolidating deleted
+roughly eighty-five lines of duplicated logic and made the refusal message uniform,
+but the load-bearing gain is that there is now one place where "which project is
+this" is answered, and it answers "none" rather than "whatever you said".
+
+**Alternatives considered**: Fix the seven inline copies in place (rejected — it
+preserves seven places for the next divergence). Have the dispatcher bind the
+project and pass it down (rejected for this release — global commands legitimately
+have no marker, so the dispatcher cannot make binding universal without a second
+concept for the exceptions). Refuse a body project field outright rather than
+accepting a matching echo (rejected — existing integrations send it, and an echo
+that must agree is strictly safer than one that is ignored).
+
+**Source**: `secure/src/functions/projectContainment.php`
+(`qs_bind_marker_project`). Behaviour: [COMMAND_API.md](COMMAND_API.md),
+[ARCHITECTURE.md §3](ARCHITECTURE.md).
+
+### A snippet saved outside a project belongs to its author, not to the installation (locked 2026-08-07)
+
+**Decision**: Snippets come from three tiers — core (shipped, read-only), personal
+(the author's own, reusable across every project they work on), and project. There
+is no installation-wide tier. The author's user id is a path segment in the
+personal tier, allowlisted against the exact minted shape rather than sanitised, so
+an unrecognised value yields nothing and every caller skips the tier instead of
+falling back to a shared location. The older scope name survives as an alias
+resolving to the same place. Files already sitting in the old shared directory are
+not served and not deleted; they are logged once, by name, for an operator to
+relocate.
+
+**Reasoning**: The old tier was labelled "available to all projects", and it meant
+it: a snippet saved there was listable, readable, insertable and deletable by any
+editor on any project, including accounts sharing nothing with the author. Framing
+this as a missing gate produced bad options — filter the shared directory by
+something, add an ownership field, restrict who may write to it. Framing it as a
+naming error produced the right one: the word "global" was the bug in the mental
+model as much as in the storage, and what an author actually wants from a snippet
+saved outside a project is *their own library*, which is per-user by definition. An
+identifier that becomes a path segment is allowlisted rather than escaped, because
+the property worth having is that it cannot describe a path at all. The duplicate-id
+check is deliberately narrowed to the caller's own library: checking a proposed name
+against everyone's would answer "does this user own a snippet by this name" to
+anyone willing to guess, which is the same existence-oracle shape closed elsewhere
+in this release. The legacy files are logged rather than migrated because nothing
+records who created them — assigning them to an account would be a guess, and
+continuing to serve them to everybody is the defect itself.
+
+**Alternatives considered**: Keep the shared tier and filter it by an owner field
+written at save time (rejected — it leaves every existing file ownerless and keeps
+a shared namespace nobody needs). Keep it and restrict writing to a high role
+(rejected — it does not stop the reading, which is the reach that was proven).
+Delete the legacy files on upgrade (rejected — destroying an author's work to close
+a hole they did not open). Migrate them into the first account (rejected — a guess
+presented as a migration).
+
+**Source**: `secure/src/functions/SnippetManagement.php`,
+`secure/management/command/createSnippet.php`. Behaviour:
+[COMMAND_API.md](COMMAND_API.md) (*Snippet tiers*),
+[PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md),
+[ADMIN_PANEL.md](ADMIN_PANEL.md).
+
+---
+
+## Responses and environment (beta.10)
+
+### Paths in a response are relative, scrubbed at one chokepoint, in every environment (locked 2026-08-07)
+
+**Decision**: A response never publishes where the installation sits on disk. A
+path inside the targeted project is reported relative to that project; a path
+elsewhere under the installation is reported relative to the installation root,
+with its real folder names; a root itself is reported as a single dot rather than
+an empty string. A path outside the installation is left untouched. The rule is
+enforced once, where a response is assembled, and it is **not** gated on the
+development/production setting.
+
+**Reasoning**: Three separate choices, each with its own argument. *Relative rather
+than removed*, because a path in a response is useful — the scrubbed value rejoins
+to the project root and still resolves on disk, so it stays actionable; real folder
+names disclose the product's own documented structure, never where the product is
+installed. *One chokepoint rather than every emission site*, because a per-site fix
+is one whose completeness cannot be demonstrated: a static sweep of the candidate
+sites produced both false positives and false negatives, and enforcing at assembly
+also covers the readers that never send an HTTP response at all — the internal
+admin API and the in-process command runner — which a per-site sweep would have
+missed entirely. *Not environment-gated*, because an exception message is
+diagnostics and is rightly dev-gated where it is produced, whereas a `file` field in
+a successful response is **contract**; a contract that changes shape between
+development and production is how environment-only defects are made. Leaving paths
+outside the installation alone is the deliberate limit: deciding by shape that a
+leading slash means a filesystem path would rewrite every route, asset and endpoint
+URL the product returns, so that case is asserted by test rather than guessed at by
+rule.
+
+**Alternatives considered**: Strip paths entirely (rejected — callers use them, and
+an empty field is indistinguishable from a missing one). Fix each emission site
+(rejected as above). Gate the rewrite on production so development keeps absolute
+paths for debugging (rejected — divergent contracts). String-replace the install
+constant, which is what a few sites already attempted (rejected, and those
+attempts were deleted: one path is assembled from a forward-slash document root
+glued to a separator-joined project path, so it reaches the response with mixed
+separators and no literal replacement of the constant can match it — which is why a
+command that appeared to handle this was shipping absolute paths anyway).
+
+**Source**: `secure/src/functions/publicPaths.php`,
+`secure/src/classes/ApiResponse.php`. Behaviour:
+[COMMAND_API.md](COMMAND_API.md), [ARCHITECTURE.md §3](ARCHITECTURE.md).
+
+### One environment gate, dependency-free, and every failure path answers production (locked 2026-07-31)
+
+**Decision**: "Is this a development installation?" is answered by one function
+that depends on nothing and locates its own configuration relative to itself, so it
+can still be asked after the bootstrap has failed. Every failure path resolves to
+*production*: an absent file, an empty one, a file that is not PHP at all, a syntax
+error, a wrong shape, an unrecognised value. A malformed configuration file
+degrades to the safe default rather than taking the request down.
+
+**Reasoning**: The question had two implementations and could be answered
+differently within a single request, which makes every behaviour that depends on it
+— error verbosity, the outbound-request internal-address allowance — undecidable by
+reading either site. Resolving to production on every failure is the only defensible
+default for a switch whose *permissive* setting is the exceptional one. Two hazards
+had to be handled rather than one, and both are unusual enough to be worth
+recording: a parse error in a required file is not suppressible by the calling
+code, so it is caught explicitly; and requiring a file that is not PHP *echoes its
+contents*, so the require happens inside a discarded buffer — without which a broken
+configuration file prepends its own bytes to the response, which is exactly the
+byte-order-mark defect fixed alongside it. Locating the config relative to the
+function rather than through the installation constant is deliberate: it is what
+lets a fatal handler ask the question after the bootstrap that would have defined
+that constant has already failed.
+
+**Alternatives considered**: Read an environment variable instead of a file
+(rejected — a deployment can lose an environment variable silently, and the
+file-based model is the product's premise). Default to development when unset, on
+the grounds that an unconfigured install is probably a laptop (rejected — an
+unconfigured install is equally probably a hurried deployment). Let a malformed
+config fail the request loudly (rejected — a deployer's typo should not take every
+import and every page down; it is logged instead).
+
+**Source**: `secure/src/functions/environment.php` (`qs_is_development`),
+`secure/management/config/environment.php.example`. Behaviour:
+[ARCHITECTURE.md](ARCHITECTURE.md).
+
+### Internal detail belongs in the log, never in the response body (locked 2026-07-31)
+
+**Decision**: A fatal error produces a generic envelope with a server-error status,
+identical in shape wherever it happens. One shared handler serves every entry point
+— the management dispatcher, the admin API, the admin page surface — rather than a
+copy per dispatcher, and it registers the same discipline everywhere: error display
+off outside development, the detail written to the error log, nothing of it in the
+response.
+
+**Reasoning**: The two dispatchers disagreed, and the disagreement was the defect:
+one converted a fatal into a proper envelope while the other answered a success
+status with the raw error text and an absolute filesystem path in the body, and the
+page surface registered nothing at all, so a fatal there returned a full stack trace
+to any signed-in caller. Extracting the working handler rather than copying it is
+what makes "identical in shape" true by construction instead of by vigilance —
+three entry points needing three different output shapes (an envelope, an HTML page,
+a plain error) is an argument for one handler with three shapes, not for three
+handlers. Putting the detail in the log rather than the response is the older half
+of the rule and needs little defence; what this locks is that it holds at *every*
+entry point, including the ones nobody thinks of as an API.
+
+**Alternatives considered**: Keep per-dispatcher handlers and fix the failing one
+(rejected — it leaves two implementations of one policy). Return the detail in
+development only (kept for the *message*, which is dev-gated where it is produced;
+rejected for the response *shape*, per the entry above). Assert the required
+error-display setting at runtime (rejected — after the handler registers there is
+nothing left for an assertion to catch, and it would fail working installations to
+cover only the window before registration; recorded as a deployment note instead).
+
+**Source**: `secure/src/functions/errorHygiene.php`,
+`public/management/index.php`, `secure/admin/AdminRouter.php`. Behaviour:
+[COMMAND_API.md](COMMAND_API.md).
+
+### Cross-origin access ships closed (locked 2026-07-31)
+
+**Decision**: The shipped configuration example lists **no** allowed origins, and a
+configuration with no cross-origin block at all resolves the same way. An
+installation names the origins it actually serves. A wildcard entry is still
+honoured if a deployer writes one, and the example says plainly what it means.
+
+**Reasoning**: The example shipped a wildcard, so every new installation answered
+any origin that asked, from any visitor's browser — a default nobody chose and most
+deployers would never notice. Same-origin calls, which is what the admin panel and
+any page this installation serves are, are recognised before the list is consulted,
+so an empty list costs the common case nothing: the setting only ever governs
+*other* sites calling this API. That asymmetry is what makes closed the right
+default rather than merely the cautious one — the permissive value buys nothing
+until someone has a specific integration, and at that point they know its origin.
+Keeping the wildcard *available* rather than removing it is deliberate: there are
+legitimate uses, and a setting that silently ignores what a deployer wrote is worse
+than one that does what it says.
+
+**Alternatives considered**: Keep the wildcard and warn in the documentation
+(rejected — a default that needs a warning is the wrong default). Remove wildcard
+support entirely (rejected — it has legitimate uses, and refusing to honour a
+written setting is its own surprise). Derive the allowed origins from the
+installation's configured public base (rejected — that origin is already allowed as
+same-origin; the list exists for the ones that are not).
+
+**Source**: `secure/management/config/auth.php.example`,
+`secure/src/functions/AuthManagement.php`. Behaviour:
+[ARCHITECTURE.md §3](ARCHITECTURE.md).
