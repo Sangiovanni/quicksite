@@ -78,14 +78,24 @@ function findLegacyFlatSnippets(): array {
 }
 
 /**
- * Log the orphaned legacy snippets once, if there are any.
+ * Log the orphaned legacy snippets, at most once per request.
+ *
+ * The guard is not cosmetic: this runs from listSnippets, which the editor calls
+ * on every snippet listing, so without it an affected installation writes its
+ * whole orphan list to the error log on every read. A diagnostic that repeats
+ * that often stops being read, which is the opposite of what it is for.
  */
 function warnAboutLegacyFlatSnippets(): void {
+    static $alreadyWarned = false;
+    if ($alreadyWarned) {
+        return;
+    }
     $legacy = findLegacyFlatSnippets();
     if ($legacy === []) {
         return;
     }
-    error_log('QuickSite [snippets]: ' . count($legacy) . ' snippet(s) remain in the pre-13.6b flat '
+    $alreadyWarned = true;
+    error_log('QuickSite [snippets]: ' . count($legacy) . ' snippet(s) remain in the older flat '
         . 'secure/snippets/custom/ layout and are no longer served (no owner recorded). Move each into '
         . 'secure/snippets/custom/<userId>/<category>/ to restore it: ' . implode(', ', $legacy));
 }
