@@ -1,13 +1,16 @@
 <?php
 /**
- * login Command (C5b; username identity C8 8.0b)
+ * login Command
  *
- * Exchanges username + password for a SESSION: a short-lived access token
- * (sent as `Authorization: Bearer` on every subsequent request) + a
- * longer-lived refresh token (used only against refreshSession). PUBLIC +
- * self-authenticating (listed in the dispatcher's $PUBLIC_COMMANDS — the
- * credentials in the body ARE the authentication; no bearer header is
- * consulted).
+ * Exchanges username + password for a SESSION. The response sets the session
+ * cookie and returns that session's TOKEN; every later request presents both —
+ * the cookie as the credential, the token as `Authorization: Bearer` proving
+ * the caller is the one the session was handed to (see AuthManagement's
+ * validateBearerToken for why both are required). A command-line client needs a
+ * cookie jar: `curl -c jar -b jar`.
+ *
+ * PUBLIC + self-authenticating (listed in the dispatcher's $PUBLIC_COMMANDS —
+ * the credentials in the body ARE the authentication; no session is consulted).
  *
  * Refusals are uniform (unknown username, wrong password, passwordless/
  * externally managed account, disabled user all yield the same 401) — no
@@ -19,6 +22,9 @@
  * @auth none (self-authenticating)
  * @param string $username Login identifier (users.php `username` — private)
  * @param string $password Plain password, verified against `password_hash`
+ * @param bool   $remember Optional — give the session cookie a lifetime so it
+ *                         survives a browser restart (default: dies with the
+ *                         browser session)
  * @return ApiResponse
  */
 
@@ -42,24 +48,22 @@ function __command_login(array $params = [], array $urlParams = []): ApiResponse
                 ->withMessage('Too many failed attempts — try again later')
                 ->withData(['retry_after' => $attempt['retry_after']]);
         }
-        if ($attempt['error'] === 'server') {
-            return ApiResponse::create(500, 'server.session_store_failed')
-                ->withMessage('Could not create the session');
-        }
         return ApiResponse::create(401, 'auth.invalid_credentials')
             ->withMessage('Invalid username or password');
     }
 
-    $user = $attempt['user'];
-    $session = $attempt['session'];
+    $user  = $attempt['user'];
+    $token = qs_session_establish(
+        (string)$user['id'],
+        qs_user_generation($user),
+        !empty($params['remember'])
+    );
+
     return ApiResponse::create(200, 'operation.success')
         ->withMessage('Logged in')
         ->withData([
-            'token_type'         => 'Bearer',
-            'access_token'       => $session['access_token'],
-            'expires_in'         => $session['access_expires'] - time(),
-            'refresh_token'      => $session['refresh_token'],
-            'refresh_expires_in' => $session['refresh_expires'] - time(),
+            'token_type'    => 'Bearer',
+            'session_token' => $token,
             'user' => [
                 'id'               => $user['id'],
                 'name'             => $user['name'] ?? '',

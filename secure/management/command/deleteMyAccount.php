@@ -180,10 +180,11 @@ function __command_deleteMyAccount(array $params = [], array $urlParams = []): A
             ->withMessage('Could not delete the account record. Your project memberships were already removed — retry, or contact the operator.');
     }
 
-    // Every session dies, including this one and the admin panel's separate
-    // family. Without this the panel keeps rendering ungated pages until the
-    // access token expires (F-C8-8.2-1).
-    $revoked = qs_session_revoke_user_families($userId, null, 'account_deleted');
+    // Every session of this account is already dead: the record is gone, so no
+    // session resolves to a user any more (F-C8-8.2-1 — the panel must not keep
+    // rendering pages for a deleted account). This one is destroyed outright so
+    // the browser is not left holding a cookie for a session that cannot work.
+    qs_session_destroy();
 
     return ApiResponse::create(200, 'resource.deleted')
         ->withMessage('Your account has been permanently deleted')
@@ -191,7 +192,7 @@ function __command_deleteMyAccount(array $params = [], array $urlParams = []): A
             'deleted'              => true,
             'memberships_removed'  => $memberships,
             'invitations_removed'  => $invitations,
-            'sessions_revoked'     => $revoked,
+            'sessions_ended'       => true,
         ]);
 }
 

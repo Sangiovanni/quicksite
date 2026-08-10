@@ -83,12 +83,22 @@ function __command_changePassword(array $params = [], array $urlParams = []): Ap
             ->withMessage('Could not persist the new password');
     }
 
-    // Containment: every other session of this user dies; this one survives.
-    $revoked = qs_session_revoke_user_families($userId, $auth['family']);
+    // Containment: bump the generation so every session of this user stops
+    // being accepted, then re-stamp THIS one so the caller stays signed in.
+    // Same outcome as before — "your other devices are logged out" — with one
+    // integer instead of a session index.
+    $generation = qs_user_bump_generation($userId);
+    if ($generation === null) {
+        // The password IS changed; only the containment step failed. Say so
+        // rather than reporting a clean success the user would misread.
+        return ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage('Password changed, but your other sessions could not be ended — sign out everywhere to be sure');
+    }
+    qs_session_restamp($generation);
 
     return ApiResponse::create(200, 'operation.success')
         ->withMessage('Password changed')
-        ->withData(['other_sessions_revoked' => $revoked]);
+        ->withData(['other_sessions_ended' => true]);
 }
 
 // Execute via HTTP (not internal call)

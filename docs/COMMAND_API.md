@@ -33,18 +33,20 @@ The `help` endpoint is publicly accessible, takes no token, and is the contract 
 - Credentials are **username + password** (`users.php` stores a `password_hash`; a `null` hash marks an externally-managed account that cannot use password login). The username is the **private** login identifier — never shown to other users; public identity is the display name + the user id (there is no email field). `POST /management/login` exchanges the credentials for a **session**:
   ```json
   { "username": "your-username", "password": "…" }
-  → { "access_token": "qsa_…", "expires_in": 900,
-      "refresh_token": "qsr_…", "refresh_expires_in": 2592000, … }
+  → sets the session cookie `QSSESSID`, and returns
+    { "token_type": "Bearer", "session_token": "…64 hex…", "user": { … } }
   ```
-- Every other endpoint requires the short-lived **access token**:
+  Add `"remember": true` to give the cookie a lifetime so it survives a browser restart.
+- Every other endpoint requires **both halves**: the session cookie, and that session token in a header.
   ```
-  Authorization: Bearer <access_token>
+  Cookie: QSSESSID=…
+  Authorization: Bearer <session_token>
   ```
-  When it expires, requests return `401` with code `auth.token_expired` — call `refreshSession` with the refresh token and retry. Each refresh **rotates** the refresh token (always store both returned tokens); presenting an already-rotated refresh token after a short grace window is treated as theft and revokes the whole session family. `logoutSession` ends a session explicitly.
-- Five commands are public: `help`, `login`, `refreshSession`, `logoutSession`, `register`. The session commands are self-authenticating; `register` is self-gating — it enforces the `registration.allow_self_registration` flag server-side (default: **disabled**) plus flood controls (attempts per IP per minute, successful registrations per hour install-wide, and an optional absolute account cap). Failed logins are throttled per username (doubling cooldown after 5 attempts). A duplicate username at `register` returns the same success response as a real creation — login identifiers are private, so no account-existence oracle.
-- `changePassword` (authenticated) changes the caller's own password: it requires the current password, shares the login throttle, and revokes every **other** session of the user on success (the session performing the change survives).
+  A command-line client therefore needs a cookie jar (`curl -c jar -b jar`) as well as the header. Both are required on purpose. The cookie alone would let any page on the internet drive this API through a visitor's browser — browsers send cookies on cross-site requests automatically. The token alone grants nothing: it is meaningless without the session it belongs to. Together they say the request came from something that could read a page of this session, which another origin cannot do. A refusal is always `401 auth.unauthorized`: there is nothing to refresh, so it always means sign in again. `logoutSession` ends a session explicitly, and `logoutSession {"everywhere": true}` ends every session of the account.
+- Three commands are public: `help`, `login`, `register`. `login` is self-authenticating (the credentials in the body ARE the authentication); `register` is self-gating — it enforces the `registration.allow_self_registration` flag server-side (default: **disabled**) plus flood controls (attempts per IP per minute, successful registrations per hour install-wide, and an optional absolute account cap). Failed logins are throttled per username (doubling cooldown after 5 attempts). A duplicate username at `register` returns the same success response as a real creation — login identifiers are private, so no account-existence oracle.
+- `changePassword` (authenticated) changes the caller's own password: it requires the current password, shares the login throttle, and ends every **other** session of the user on success (the session performing the change survives).
 - `deleteMyAccount` (authenticated) permanently deletes the caller's **own** account: it requires the current password plus `confirm=true`, and ends every session. There is no command that deletes someone else's account — authorization in QuickSite is per project, so the ways to part with a person are `removeMember` (evict them from one project) and, for the operator, editing `users.php` directly. Deletion is **refused** while the caller is the sole owner of any project: the response lists them, and each must be handed over with `transferOwnership` or destroyed with `deleteProject` first. On success the caller is removed from every project they belong to, along with any invitation addressed to them and any join request they filed. References to them *inside other people's* pending entries (who invited or sponsored whom) are deliberately kept so a third party never loses an invitation, and render with a `null` name.
-- Session TTLs (`access_ttl`, `refresh_ttl`, `reuse_grace`) and the registration policy (`allow_self_registration`, `min_password_length`, `max_users`, `throttle.per_ip_per_minute`, `throttle.global_per_hour` — 0 disables a limit) live in `secure/management/config/auth.php` (gitignored, auto-created from `.example`); runtime session state lives in `sessions.json` next to it (machine-written, hashed at rest — never edit).
+- Session lifetimes (`idle_ttl` — inactivity before a session stops being accepted, slid forward as the caller works; `remember_ttl` — how long a "remember me" cookie survives a browser restart) and the registration policy (`allow_self_registration`, `min_password_length`, `max_users`, `throttle.per_ip_per_minute`, `throttle.global_per_hour` — 0 disables a limit) live in `secure/management/config/auth.php` (gitignored, auto-created from `.example`). Sessions are PHP's own, written under `secure/tmp/sessions` rather than the shared system path so another application on the same host cannot garbage-collect them out from under a working user.
 - Authorization is **per project**: a user's role comes from the target project's `config/members.json`. The six fixed roles (`viewer` … `owner`) are defined by trust-coherent command **categories** in `categories.php`; `roles.php` grants each role a `rank` and its categories, expanded to a per-command allowlist at load time. There is no superadmin and no custom roles.
 - There is **no default account and no default password**. While no account exists, every admin URL shows a first-run page that creates the first one. It asks for a **setup token**, which the engine writes to `secure/management/config/setup-token.txt` — being able to read that file is the authorisation, so no command line is needed. The token is destroyed on use and the page disappears permanently once an account exists. The requirement is enforced at the shared account-creation path, not in the page: while the registry is empty, `register` cannot create an account either (403 `auth.setup_required`), whatever `allow_self_registration` says. To bootstrap by hand instead, copy `users.php.example` to `users.php` and follow the instructions in that file.
 
@@ -112,7 +114,7 @@ The work that succeeded is real and is not rolled back. `errors` names every mem
 
 ## Command catalogue
 
-The 177 commands group into the categories below. Use `GET /management/help` for the full per-command spec.
+The 176 commands group into the categories below. Use `GET /management/help` for the full per-command spec.
 
 > **AI is browser-direct (BYOK).** There is no `callAi` / `testAiKey` / `detectProvider` / `listAiProviders` server command — the admin panel calls AI providers directly from the browser using credentials stored in `aiConnectionsV3` (localStorage). The Management API only handles workflow specs and command execution.
 
@@ -121,7 +123,7 @@ Each row enumerates the commands in that category — comma-separated, alphabeti
 | Category | Commands & detail |
 |---|---|
 | **Meta** | `help` — self-documenting endpoint, callable without authentication. |
-| **Session & account** | `login`, `refreshSession`, `logoutSession`, `register`, `changePassword`, `deleteMyAccount` — username+password login → access + refresh pair; refresh rotation with reuse-detection (family revoke); explicit logout; flag-gated flood-controlled self-registration (public); self-service password change and account deletion (authenticated — both require the current password; deletion also needs `confirm=true`, is refused while the caller solely owns a project, and ends every session). See *Authentication* above. |
+| **Session & account** | `login`, `logoutSession`, `register`, `changePassword`, `deleteMyAccount` — username+password login → a session (cookie + session token); explicit logout, optionally everywhere; flag-gated flood-controlled self-registration (public); self-service password change and account deletion (authenticated — both require the current password; deletion also needs `confirm=true`, is refused while the caller solely owns a project, and ends every session). See *Authentication* above. |
 | **Pages** | `listPages`, `createAlias`, `deleteAlias`, `listAliases`, `editFavicon`, `editTitle` — page metadata, title, favicon, alias routes. |
 | **Routes & sitemap** | `addRoute`, `deleteRoute`, `getRoutes`, `getSiteMap`, `setSiteMapConfig`, `setRouteLayout`, `analyzeReachability` — URL routing tree CRUD, sitemap export, dead-route audit. `getSiteMap` is **read-only**; `setSiteMapConfig` owns the two sitemap writes (the excluded-routes / custom-URLs sidecar, and publishing the project's own `public/sitemap.txt`) and needs a write role, because both decide what the published sitemap contains. `getSiteMap` URLs are absolute: a `baseUrl` body param (validated URL) wins; otherwise the deployment's `QS_PUBLIC_BASE_URL` env var, else the project's own `/p/<id>/` URL on the install. `setRouteResolver` is under "Server-side data resolvers" below since the route layer just hosts the resolver config. |
 | **Structure** | `getStructure`, `editStructure`, `addNode`, `addComplexElement`, `addComponentToNode`, `editComponentToNode`, `editNode`, `moveNode`, `deleteNode`, `duplicateNode` — edit nodes inside a page tree. |
@@ -275,7 +277,7 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/jso
 ## Internals
 
 - Command handlers live in `secure/management/command/<command>.php`, one file per command.
-- The whitelist of valid commands is `secure/management/routes.php` (177 entries — this file is the single source of truth for which commands exist).
+- The whitelist of valid commands is `secure/management/routes.php` (176 entries — this file is the single source of truth for which commands exist).
 - Shared helpers live in `secure/src/functions/utilsManagement.php` (e.g., `varExportNested()`, `SPECIAL_PAGES`, role helpers).
 - An unknown command answers `404` with code `route.not_found` and echoes back the name that was requested, so a typo is diagnosable. It does **not** enumerate the commands that do exist — `help` is where the catalogue lives, and it is a deliberate decision to publish it there rather than from every mistyped call.
 - Internal callers (visual editor data gathering, workflow steps) bypass the HTTP layer and invoke commands through `secure/src/classes/CommandRunner.php`. CommandRunner carries a **hardcoded read-only allowlist** of 26 commands it will execute internally — reads and audits, mostly `get*` / `list*` but also `help` and the `analyze*` / `validate*` / `checkStructureMulti` inspectors. Membership and other mutating commands are not on it.
@@ -316,7 +318,7 @@ never stored.** Sanitization is deny-by-default and command-independent:
   matching key discards its entire value, so an `auth` or `credentials` object is
   removed whole rather than walked into. The key itself is kept, so the trail still
   records *that* a credential was submitted.
-- Authentication commands (`login`, `register`, `refreshSession`, `logoutSession`,
+- Authentication commands (`login`, `register`, `logoutSession`,
   `changePassword`, `deleteMyAccount`) log **no body at all**. The entry still
   records who acted, when, and with what result.
 - `uploadAsset` records file metadata instead of file content, and `editStyles`

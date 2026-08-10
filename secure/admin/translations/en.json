@@ -569,6 +569,8 @@
         "visualEditor": "Visual Editor",
         "preview": "Visual Editor",
         "logout": "Logout",
+        "logoutEverywhere": "Logout everywhere",
+        "logoutEverywhereHint": "Signs you out of this browser and ends every other session of your account.",
         "build": "Build",
         "inspect": "Inspect",
         "interactions": "Interactions",

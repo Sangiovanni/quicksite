@@ -35,13 +35,13 @@ For a deeper view of how QuickSite is organized:
 ### Key features
 
 - **Visual Admin Panel** — iframe-based page editor with drag-and-drop node management, live preview, and component library
-- **177 API Commands** — RESTful endpoints covering pages, translations, styles, assets, builds, projects, backups, membership, and more
+- **176 API Commands** — RESTful endpoints covering pages, translations, styles, assets, builds, projects, backups, membership, and more
 - **JSON-Driven Templates** — page structures defined in JSON, compiled to optimized PHP for production
 - **Multilingual** — built-in translation system with validation, health checks, and mono/multi-language modes
 - **Multi-Project** — host multiple independent sites from one installation
 - **Production Builds** — one-command compilation, optimization, and ZIP packaging
 - **File-Based** — no database, no migrations. JSON + PHP files, deployable anywhere
-- **Role-Based Access** — username + password login issues a short-lived access token; authority is **per project**, with six fixed roles (viewer, editor, designer, developer, admin, owner)
+- **Role-Based Access** — username + password login establishes a session; authority is **per project**, with six fixed roles (viewer, editor, designer, developer, admin, owner)
 - **Self-Updating** — built-in update checker via GitHub
 - **AI Integration (BYOK)** — the admin panel calls AI providers **directly from the browser** with your own API keys (OpenAI, Anthropic, Google, Mistral); no key ever reaches the server
 
@@ -249,11 +249,11 @@ All steps support renaming, nesting, un-nesting, and are re-runnable. On nginx, 
 QuickSite exposes a single self-documenting Management API. Once installed:
 
 ```
-GET /management/help              # full docs for all 177 commands
+GET /management/help              # full docs for all 176 commands
 GET /management/help/addRoute     # docs for one command
 ```
 
-Five commands are public — `help`, `login`, `refreshSession`, `logoutSession`, `register`. Every other endpoint requires the short-lived access token (`Authorization: Bearer <token>`) returned by `login`, and is authorized against the caller's role **on the target project**.
+Three commands are public — `help`, `login`, `register`. Every other endpoint requires the session `login` established: its cookie, plus the session token it returned sent as `Authorization: Bearer`. Both are needed, and the request is authorized against the caller's role **on the target project**.
 
 Full reference — endpoint shape, response envelope, command catalogue, auth, internals: **[docs/COMMAND_API.md](docs/COMMAND_API.md)**.
 

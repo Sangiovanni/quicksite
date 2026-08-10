@@ -584,6 +584,8 @@
         "visualEditor": "Éditeur visuel",
         "preview": "Éditeur visuel",
         "logout": "Déconnexion",
+        "logoutEverywhere": "Déconnexion partout",
+        "logoutEverywhereHint": "Vous déconnecte de ce navigateur et met fin à toutes les autres sessions de votre compte.",
         "build": "Construire",
         "inspect": "Inspecter",
         "interactions": "Interactions",
@@ -1042,7 +1044,7 @@
         },
         "tagSelect": {
             "searchPlaceholder": "Tapez pour rechercher..."
-        },
+        },
         "categories": {
             "creation": {
                 "title": "Création",

@@ -98,13 +98,13 @@ function generateLogId(): string {
  * "this user changed their password at 14:02" stays auditable — but the body
  * carries only credentials and adds nothing an auditor needs.
  *
- * The public session commands (login/register/refreshSession/logoutSession) run
- * before the dispatcher installs its logging callback and are therefore not
- * logged at all today; they are listed anyway so the guarantee does not depend on
- * that dispatch detail staying true.
+ * The public session commands (login/register) run before the dispatcher
+ * installs its logging callback and are therefore not logged at all today; they
+ * are listed anyway so the guarantee does not depend on that dispatch detail
+ * staying true.
  */
 const QS_LOG_SKIP_BODY_COMMANDS = [
-    'login', 'register', 'refreshSession', 'logoutSession',
+    'login', 'register', 'logoutSession',
     'changePassword', 'deleteMyAccount',
 ];
 

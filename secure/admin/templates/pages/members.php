@@ -18,7 +18,7 @@
 $baseUrl = rtrim(BASE_URL, '/');
 
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
-$__myAuth = validateBearerToken('Bearer ' . (string)$router->getToken());
+$__myAuth = qs_session_auth();
 $__myUserId = !empty($__myAuth['valid']) ? (string)($__myAuth['userId'] ?? '') : '';
 $__project  = (string)($router->getCurrentProject() ?? '');
 $__myRole   = $router->getTokenRole();          // role on the EDITED project

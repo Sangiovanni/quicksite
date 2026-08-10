@@ -29,10 +29,9 @@ $languages = $isMultilingual ? ($editConfig['LANGUAGES_SUPPORTED'] ?? [$defaultL
 
 // Get site URL for iframe (start with default language) + ?_editor=1 for editor mode.
 // The project you EDIT is getCurrentProject() (per-user selected_project); every project
-// previews at its own /p/<id>/ from its own folder. The qs_preview cookie (emitted below,
-// before the iframe) carries the admin's token so a PRIVATE project's iframe — a plain
-// browser navigation with no Authorization header — authenticates against surface B
-// (D3 seam; HttpOnly hardening → C5b).
+// previews at its own /p/<id>/ from its own folder. A PRIVATE project's iframe is a plain
+// browser navigation with no headers of its own; it authenticates on the session cookie,
+// which the browser sends because surface B shares this origin.
 $previewProject = $router->getCurrentProject();          // what you EDIT (selected_project)
 $siteUrl = $router->projectSiteBase($previewProject) . '/';
 if ($isMultilingual) {
@@ -46,8 +45,12 @@ $siteUrl .= '?_editor=1&_t=' . time();
 // Get available routes for navigation (from the EDITED project)
 $routes = [];
 $routesFile = $editProjectPath . '/routes.php';
-if (file_exists($routesFile)) {
-    $routesData = require $routesFile;
+$routesData = file_exists($routesFile) ? require $routesFile : null;
+// is_array, not file_exists alone: a routes.php that returns anything else
+// (empty file, a stray scalar, a half-written save) reached the flattener as a
+// non-array and fatalled the whole editor page. Every other reader in the tree
+// already guards this way.
+if (is_array($routesData)) {
     // Flatten routes
     $flattenRoutes = function($routes, $prefix = '') use (&$flattenRoutes) {
         $result = [];

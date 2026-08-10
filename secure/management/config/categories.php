@@ -243,7 +243,7 @@ return [
     'auth.session' => [
         'scope' => 'global',
         'access' => 'any',
-        'commands' => ['login', 'refreshSession', 'logoutSession', 'register'],
+        'commands' => ['login', 'logoutSession', 'register'],
     ],
 
     // Authenticated self-service on the caller's OWN account (C8). Unlike

@@ -49,28 +49,15 @@ $currentProject = $isLoginPage ? null : $router->getCurrentProject();   // the p
 
 // The header picker lists the caller's memberships so they can switch what they edit.
 // "Back to site" + the preview always target /p/<id>/ — every project is reached that way.
+// A PRIVATE project's /p/<id>/ preview iframe is a plain browser navigation with
+// no headers of its own; it authenticates on the session cookie, which the
+// browser already sends because the panel and surface B share an origin and the
+// cookie's path is '/'. Nothing extra is emitted here.
 $myProjectIds = [];
 if (!$isLoginPage) {
-    $__pkTok = $router->getToken();
-    if ($__pkTok) {
-        $__pkAuth = validateBearerToken('Bearer ' . $__pkTok);
-        if (!empty($__pkAuth['valid'])) {
-            $myProjectIds = getUserProjectIds($__pkAuth['user']);
-        }
-    }
-    // C9 — set the qs_preview cookie SERVER-SIDE (before any output) so a PRIVATE
-    // /p/<id>/ preview iframe — a plain browser navigation with no Authorization header —
-    // authenticates on the FIRST load, not only after a footer script runs (which the
-    // iframe would race). HttpOnly: JS can't read it, the browser still sends it → the D3
-    // seam, hardened. surfaceB validates $_COOKIE['qs_preview'].
-    if (!empty($__pkTok) && !headers_sent()) {
-        setcookie('qs_preview', $__pkTok, [
-            'expires'  => 0,
-            'path'     => '/',
-            'secure'   => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
-            'httponly' => true,
-            'samesite' => 'Strict',
-        ]);
+    $__pkAuth = qs_session_auth();
+    if (!empty($__pkAuth['valid'])) {
+        $myProjectIds = getUserProjectIds($__pkAuth['user']);
     }
 }
 
@@ -449,6 +436,18 @@ $langNames = [
                 </svg>
                 <span><?= __admin('nav.logout') ?></span>
             </a>
+
+            <!-- Ends every session of this account, not just this browser. -->
+            <a href="<?= $router->url('logout') ?>?everywhere=1" class="admin-btn admin-btn--outline"
+               title="<?= adminEscape(__admin('nav.logoutEverywhereHint')) ?>">
+                <svg class="admin-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                    <polyline points="16 17 21 12 16 7"/>
+                    <line x1="21" y1="12" x2="9" y2="12"/>
+                    <circle cx="18" cy="6" r="3"/>
+                </svg>
+                <span><?= __admin('nav.logoutEverywhere') ?></span>
+            </a>
         </div>
     </header>
     <?php endif; ?>
@@ -464,8 +463,7 @@ $langNames = [
     $usingDefaultAccount = false;
     if (!$isLoginPage) {
         require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
-        $__warnTok = $router->getToken();
-        $__warnAuth = $__warnTok ? validateBearerToken('Bearer ' . $__warnTok) : ['valid' => false];
+        $__warnAuth = qs_session_auth();
         $__warnUserId = !empty($__warnAuth['valid']) ? ($__warnAuth['userId'] ?? null) : null;
         foreach (loadUsersConfig()['users'] ?? [] as $__uid => $__u) {
             if (is_string($__uid) && stripos($__uid, 'CHANGE_ME') !== false) {
@@ -540,12 +538,15 @@ $langNames = [
             // the wrong project's files (or a broken image) while editing another one.
             projectContentBase: '<?= adminEscape($router->getProjectContentBase()) ?>',
             publicSpace: '<?= defined('PUBLIC_FOLDER_SPACE') ? PUBLIC_FOLDER_SPACE : '' ?>',
-            // C5b — the SHORT-LIVED access token + its remaining lifetime MUST be
-            // in the config from creation: api.js seeds its in-memory token and
+            // The PER-SESSION TOKEN. Not a credential on its own — it grants
+            // nothing without the session cookie it belongs to; sending it back
+            // as `Authorization: Bearer` is how a management-API call proves it
+            // came from something that could READ this page, which is what stops
+            // a foreign site driving the API through the visitor's browser.
+            // It MUST be in the config from creation: api.js seeds it and
             // admin.js fires loadPermissions() at parse time, both BEFORE any
-            // later script block runs (the refresh token never reaches the page).
+            // later script block runs.
             token: '<?= adminEscape((string)$router->getToken()) ?>',
-            tokenExpiresIn: <?= (int)$router->getTokenExpiresIn() ?>,
             // C8 (8.W) — project transport. currentProject = the EDITED project
             // (selected_project), the same one preview + the dashboard use; globalCommands =
             // the categories.php scope==='global' set. The client prepends the
@@ -662,9 +663,6 @@ $langNames = [
 
     <script>
     (function () {
-        // (The qs_preview cookie is set SERVER-SIDE in this layout's PHP head, HttpOnly,
-        // before any output — so a private /p/ preview iframe authenticates on first load.)
-
         // C9 — the header project picker switches which project you EDIT (setSelectedProject).
         // It does NOT change the main/served project (quicksite stays at the site root). The
         // dashboard's project switch calls the same command. Editing the main → the site root;

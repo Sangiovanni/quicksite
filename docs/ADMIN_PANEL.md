@@ -38,9 +38,9 @@ The requirement lives at the shared account-creation path rather than in the pag
 
 `layout.php` emits `<script>` tags in this exact order:
 
-1. Inline `<script>` defines `window.QUICKSITE_CONFIG` (apiBase, adminBase, baseUrl, publicSpace, defaultLang, multilingual, translations, token, tokenExpiresIn, …). The `token` is the **short-lived access token** of the panel's session (the rotating refresh token stays server-side in the PHP session) and MUST be in this first block — `api.js` seeds from it and `admin.js` loads permissions at parse time.
+1. Inline `<script>` defines `window.QUICKSITE_CONFIG` (apiBase, adminBase, baseUrl, publicSpace, defaultLang, multilingual, translations, token, …). The `token` is the panel session's **per-session token**, sent back on every management call as `Authorization: Bearer` so the server can tell the call came from a page of this session. It is not a credential on its own — the session cookie is — and it MUST be in this first block, because `api.js` seeds from it and `admin.js` loads permissions at parse time.
 2. `core/storage-keys.js` → defines `window.QuickSiteStorageKeys` (single source of truth for localStorage / sessionStorage key strings).
-3. `core/api.js` → defines `window.QuickSiteAPI` (`request()`, `upload()`; emits `quicksite:command-executed` after every successful write). Holds the access token in memory, refreshes it through `POST /admin/session-refresh` (single-flight, plus a keepalive at ~80% of the token's lifetime), transparently retries a request once on `401 auth.token_expired`, and exposes `setTokenSource(fn)` so an embedding platform can plug its own token provider.
+3. `core/api.js` → defines `window.QuickSiteAPI` (`request()`, `upload()`; emits `quicksite:command-executed` after every successful write). Holds the session token in memory and sends it with every call alongside the session cookie. There is nothing to refresh or expire client-side: a session ends by signing out, by going idle, or by the account's session generation being bumped, and all three surface as a `401` that sends the user to the login page. `setTokenSource(fn)` lets an embedding platform plug its own token provider, and that is the only case with a transparent retry.
 4. `core/utils.js` → defines `window.QuickSiteUtils` (toasts, confirms, escaping, prefs, pending messages).
 5. `admin.js` → defines `window.QuickSiteAdmin` (singleton: permissions load, user badge, nav, page utility delegation).
 6. The page template loads its page-specific module(s). For preview pages, `preview-config.php` runs first and exposes `window.PreviewConfig`.
@@ -91,7 +91,7 @@ File lists are grouped by role. Where useful, the entry point or main exported f
 
 | File | Purpose |
 |---|---|
-| `js/core/api.js` | `QuickSiteAPI.request` + `upload`; in-memory access token + session refresh (`/admin/session-refresh`, keepalive, retry-once on expiry, `setTokenSource` seam); emits `quicksite:command-executed`. |
+| `js/core/api.js` | `QuickSiteAPI.request` + `upload`; in-memory session token sent with the session cookie (`setTokenSource` seam for embedders); emits `quicksite:command-executed`. |
 | `js/core/utils.js` | `QuickSiteUtils`: toasts, confirms, escaping, prefs storage, pending messages. |
 | `js/core/storage-keys.js` | Constants for every localStorage / sessionStorage key (`window.QuickSiteStorageKeys`). |
 | `js/core/dom.js` | `window.QSDom`: shared `el()` element factory + `svgIcon()` + `clear()` — the createElement/textContent idiom for dynamic DOM. Loaded in `<head>` so page scripts can use it at parse time. |
@@ -196,7 +196,7 @@ Public API: `QSEasingPicker.open({ anchor, value, onConfirm, onCancel })` → on
 
 Every localStorage / sessionStorage key is declared as a constant in `js/core/storage-keys.js`.
 
-Authentication uses **no browser storage**: the short-lived access token is page-embedded + held in memory (`api.js`), and the refresh token stays server-side in the PHP session. (`api.js` still clears the retired pre-session `quicksite_admin_token` / `quicksite_admin_remember` keys on logout as one-time upgrade hygiene.)
+Authentication uses **no browser storage**: the session lives in an HttpOnly cookie the page cannot read, and the per-session token is page-embedded and held in memory (`api.js`). (`api.js` still clears the retired `quicksite_admin_token` / `quicksite_admin_remember` keys on logout as one-time upgrade hygiene.)
 
 | Constant | Storage | Used by |
 |---|---|---|
@@ -217,7 +217,7 @@ Authentication uses **no browser storage**: the short-lived access token is page
 
 | PHP file | Injects into | Notable fields |
 |---|---|---|
-| `templates/layout.php` | `window.QUICKSITE_CONFIG` | `apiBase`, `adminBase`, `baseUrl`, `publicSpace`, `currentProject`, `globalCommands`, `defaultLang`, `multilingual`, `translations`, `token` (short-lived access token), `tokenExpiresIn`, `apiUrl` |
+| `templates/layout.php` | `window.QUICKSITE_CONFIG` | `apiBase`, `adminBase`, `baseUrl`, `publicSpace`, `currentProject`, `globalCommands`, `defaultLang`, `multilingual`, `translations`, `token` (the per-session token), `apiUrl` |
 | `templates/pages/settings.php` | extends `QUICKSITE_CONFIG` | `commandUrl`, `aiSettingsUrl`, `quicksiteVersion` |
 | `templates/pages/apis.php` | inline `window.translations` | `apis` namespace |
 | `templates/pages/preview-config.php` | `window.PreviewConfig` | full preview runtime data — routes, components, settings, i18n, token (200+ fields) |
@@ -240,7 +240,7 @@ The panel edits one project at a time — the user's **selected project** (a per
 
 An account that is a member of no project has nothing to edit. `/admin/preview` sends it to the dashboard with a note saying the editor needs a project and pointing at creating or joining one — the editor is never opened bound to nothing, and the header's "Back to site" button is hidden, since there is no site to go back to. This applies only when there is no membership at all; asking for a project you are simply not a member of is refused by the usual gates.
 
-The preview iframe loads the edited project in editor mode through its per-project live view (`/p/<id>/?_editor=1`) — the same way for every project, since none is privileged. "Back to site" and the floating miniplayer resolve to that same view. Private projects authenticate via a short-lived HttpOnly `qs_preview` cookie the panel sets from the caller's token. The iframe URL carries a per-load cache-buster so a switch always loads the new project fresh — the editor's command target and the iframe DOM can never drift onto different projects.
+The preview iframe loads the edited project in editor mode through its per-project live view (`/p/<id>/?_editor=1`) — the same way for every project, since none is privileged. "Back to site" and the floating miniplayer resolve to that same view. Private projects authenticate on the panel's own session cookie — the iframe is a plain browser navigation with no headers of its own, and the cookie covers the whole origin. A project mapped to its own domain is a different origin and does not receive it, so a private project is previewed at `/p/<id>/` on the panel's hostname. The iframe URL carries a per-load cache-buster so a switch always loads the new project fresh — the editor's command target and the iframe DOM can never drift onto different projects.
 
 ### 8.1 Modes
 

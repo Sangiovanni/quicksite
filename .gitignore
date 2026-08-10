@@ -85,11 +85,11 @@ secure/management/config/deploy-roots.php
 secure/management/config/import-policy.php
 secure/management/config/environment.php
 
-# Session + login/registration-throttle runtime state (C5b/C8) -
-# machine-written JSON (auto-created; holds sha256-hashed session tokens +
-# hashed-key backoff counters) plus flock sidecars and atomic-write temp
-# files (users.php.lock = the C8 centralized users-writer's sidecar).
-secure/management/config/sessions.json
+# Login/registration-throttle runtime state - machine-written JSON
+# (auto-created; hashed-key backoff counters) plus flock sidecars and
+# atomic-write temp files (users.php.lock = the centralized users-writer's
+# sidecar). PHP session files live under secure/tmp/sessions, already covered
+# by the tmp/ rule above.
 secure/management/config/login-throttle.json
 secure/management/config/registration-throttle.json
 
@@ -112,7 +112,6 @@ secure/management/config/*.tmp*
 secure/management/config/users.php.*
 secure/management/config/auth.php.*
 secure/management/config/roles.php.*
-secure/management/config/sessions.json.*
 secure/management/config/import-policy.php.*
 secure/management/config/setup-token.txt.*
 secure/management/config/deploy-roots.php.*

@@ -1,333 +1,323 @@
 <?php
 /**
- * Session Lifecycle Management (C5b) — access + refresh tokens with rotation
- * and reuse-detection.
+ * Session Lifecycle Management — the PHP session IS the session (beta.11 S1).
  *
- * Replaces the lifetime bearer token: a short-lived ACCESS token is what every
- * request presents (validateBearerToken checks it here); a longer-lived REFRESH
- * token is exchangeable at one endpoint for a new pair. Each refresh ROTATES
- * the refresh token; presenting an already-rotated refresh token after a short
- * grace window is a theft signal and revokes the whole session FAMILY.
+ * You log in on arrival and the browser session holds the login. There is no
+ * access token, no refresh token, no rotation, no family, and no server-side
+ * token store: `$_SESSION` holds the user id, the user's session GENERATION
+ * (the kill switch — see AuthManagement's qs_user_generation) and one
+ * per-session TOKEN. Everything a session needs is in the session file PHP
+ * already keys by its own cookie.
  *
- * Storage: sessions.json (runtime STATE, not config — deliberately JSON, not a
- * PHP array file: it is machine-rewritten on every login/refresh, so a PHP
- * emitter here would be a permanently hot F10 writer surface and would need
- * opcache_invalidate on every read). Tokens are stored sha256-HASHED (a file
- * leak is not a credential leak — F7). Writes are serialized with flock on a
- * sidecar lock file and land via temp + rename (L12 atomic).
+ * THE PER-SESSION TOKEN is not a credential on its own. The cookie identifies
+ * the session; the token proves the caller could READ a page of this session
+ * (it is embedded at render time and sent back as `Authorization: Bearer`).
+ * That pairing is what keeps the cookie-authenticated management API safe from
+ * cross-site request forgery: a foreign page can make the browser SEND the
+ * cookie, but it cannot read the token, and it cannot set an Authorization
+ * header on a cross-origin request without a preflight this install refuses.
+ * A leaked token alone therefore grants nothing — the old access token did.
  *
- * This file is loaded via AuthManagement.php (require at its top); the
- * disabled-user check in qs_session_rotate calls loadUsersConfig from there.
+ * Cookie: name QSSESSID, HttpOnly, SameSite=Lax, Secure under HTTPS, path '/'
+ * so `/p/<id>/` (surface B) receives it on the same origin. Lax rather than
+ * Strict so arriving from a bookmark or an external link does not look like
+ * being signed out; cross-site POSTs carry no cookie, and the Authorization
+ * pairing above is the actual CSRF gate.
  *
- * Shape:
- *   families: famId -> { userId, created, revoked, revokedAt?, reason? }
- *   access:   sha256(token) -> { family, expires }
- *   refresh:  sha256(token) -> { family, expires, rotatedAt (null = active) }
+ * Storage: PHP's own session files, in an install-local directory
+ * (`secure/tmp/sessions`) rather than the shared system path — otherwise any
+ * OTHER application on the same host garbage-collects QuickSite's sessions at
+ * ITS gc_maxlifetime and users are signed out mid-work for no visible reason.
+ *
+ * This file ALSO holds the login-attempt and registration flood controls. They
+ * are brute-force protection, entirely independent of how a session is carried,
+ * and they were never part of the token machinery — deleting them with it would
+ * remove the only backstop against password guessing.
  */
 
+/** The session cookie name — deliberately not PHP's default. */
+const QS_SESSION_COOKIE = 'QSSESSID';
+
 /**
- * Session lifecycle knobs from auth.php (all optional, safe defaults).
+ * Session knobs from auth.php (all optional, safe defaults).
  *
- * @return array{access_ttl:int, refresh_ttl:int, reuse_grace:int}
+ * idle_ttl     — seconds of inactivity after which a session stops being
+ *                accepted (the session's own lifetime; sliding, refreshed as
+ *                the caller works).
+ * remember_ttl — how long the "remember me" cookie survives a browser restart.
+ *                Without it the cookie dies with the browser session.
+ *
+ * @return array{idle_ttl:int, remember_ttl:int}
  */
 function qs_session_config(): array {
     $cfg = loadAuthConfig()['authentication']['session'] ?? [];
     return [
-        'access_ttl'  => max(60, (int)($cfg['access_ttl'] ?? 900)),
-        'refresh_ttl' => max(3600, (int)($cfg['refresh_ttl'] ?? 2592000)),
-        'reuse_grace' => max(0, (int)($cfg['reuse_grace'] ?? 60)),
+        'idle_ttl'     => max(300, (int)($cfg['idle_ttl'] ?? 86400)),
+        'remember_ttl' => max(3600, (int)($cfg['remember_ttl'] ?? 2592000)),
     ];
 }
 
-function qs_sessions_path(): string {
-    return SECURE_FOLDER_PATH . '/management/config/sessions.json';
+/** Where PHP writes this install's session files (see the file header). */
+function qs_session_save_path(): string {
+    return SECURE_FOLDER_PATH . '/tmp/sessions';
 }
 
 /**
- * Read the sessions store (shape-defaulted; tolerant of a missing/corrupt file
- * — sessions are re-creatable state, never precious data).
+ * Is this cookie value shaped like a session id at all? A junk value would make
+ * PHP mint (and write) a brand-new empty session for a caller who has none —
+ * cheap litter, but avoidable. Matches PHP's own id alphabets across the
+ * supported hash/bits-per-character settings, plus the ',' and '-' used by
+ * base64-ish ids.
  */
-function qs_sessions_read(): array {
-    $path = qs_sessions_path();
-    $data = is_file($path) ? json_decode((string)@file_get_contents($path), true) : null;
-    if (!is_array($data)) {
-        $data = [];
+function qs_session_id_shape_ok(string $id): bool {
+    return preg_match('/^[A-Za-z0-9,-]{16,128}$/', $id) === 1;
+}
+
+/**
+ * Configure and start the session. Returns false when there is nothing to open
+ * (read mode with no cookie) — the caller is simply anonymous.
+ *
+ * $forWrite=false starts with read_and_close: the data is read and the session
+ * file is released immediately, so concurrent admin requests never serialize
+ * behind each other's session lock, AND session_status() falls back to NONE so
+ * a later session on the same request (the author's-site OAuth state store
+ * names its own) can start cleanly.
+ */
+function qs_session_boot(bool $forWrite): bool {
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        return true; // already open for this request (admin page flow)
+    }
+    $cookie = $_COOKIE[QS_SESSION_COOKIE] ?? null;
+    if (!$forWrite && (!is_string($cookie) || !qs_session_id_shape_ok($cookie))) {
+        return false;
+    }
+
+    $knobs = qs_session_config();
+    $dir   = qs_session_save_path();
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0700, true);
+    }
+    if (is_dir($dir)) {
+        session_save_path($dir);
+    }
+    // PHP's own GC must outlive the longest thing we promise; our own idle
+    // check below is what actually expires a session.
+    ini_set('session.gc_maxlifetime', (string)max($knobs['idle_ttl'], $knobs['remember_ttl']));
+    ini_set('session.use_strict_mode', '1'); // never adopt a caller-invented id
+    session_name(QS_SESSION_COOKIE);
+    session_set_cookie_params(qs_session_cookie_params(0));
+
+    // Silenced deliberately: a stray PHP warning (headers already sent on a
+    // late call) would land INSIDE a JSON response body. Failure is reported by
+    // the return value, which every caller checks.
+    return @session_start($forWrite ? [] : ['read_and_close' => true]);
+}
+
+/**
+ * Is there a session to open at all? A write-mode boot creates one when there
+ * is not, which is right for login and wrong for everything else — destroy and
+ * touch use this so they never mint an empty session (and a Set-Cookie) for a
+ * caller who has none.
+ */
+function qs_session_present(): bool {
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        return true;
+    }
+    $cookie = $_COOKIE[QS_SESSION_COOKIE] ?? null;
+    return is_string($cookie) && qs_session_id_shape_ok($cookie);
+}
+
+/**
+ * The session cookie's attributes. $lifetime 0 = dies with the browser session
+ * ("remember me" off).
+ */
+function qs_session_cookie_params(int $lifetime): array {
+    return [
+        'lifetime' => $lifetime,
+        'path'     => '/', // surface B lives at /p/<id>/ on the same origin
+        'secure'   => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ];
+}
+
+/** Drop the memoised snapshot after anything that changes the session. */
+function qs_session_cache_reset(): void {
+    $GLOBALS['__qs_session_snapshot'] = null;
+    unset($GLOBALS['__qs_session_snapshot_done']);
+}
+
+/**
+ * The current session's QuickSite state, or null when there is none.
+ *
+ * Read-only and side-effect-free for the caller: when the session was not
+ * already open it is read with read_and_close and $_SESSION is put back exactly
+ * as it was found, so a page that later runs its OWN session (the author's-site
+ * OAuth store) is unaffected.
+ *
+ * @return array{uid:string, gen:int, token:string, seen:int, remember:bool}|null
+ */
+function qs_session_snapshot(): ?array {
+    if (!empty($GLOBALS['__qs_session_snapshot_done'])) {
+        return $GLOBALS['__qs_session_snapshot'];
+    }
+    $GLOBALS['__qs_session_snapshot_done'] = true;
+    $GLOBALS['__qs_session_snapshot'] = null;
+
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        $GLOBALS['__qs_session_snapshot'] = qs_session_extract($_SESSION);
+        return $GLOBALS['__qs_session_snapshot'];
+    }
+
+    $hadSession = isset($GLOBALS['_SESSION']);
+    $prior      = $hadSession ? $_SESSION : null;
+    if (!qs_session_boot(false)) {
+        return null;
+    }
+    $GLOBALS['__qs_session_snapshot'] = qs_session_extract($_SESSION);
+    // read_and_close leaves $_SESSION populated with OUR data; hand the global
+    // back in the state we found it.
+    if ($hadSession) {
+        $_SESSION = $prior;
+    } else {
+        unset($GLOBALS['_SESSION']);
+    }
+    return $GLOBALS['__qs_session_snapshot'];
+}
+
+/**
+ * Pull the QuickSite keys out of a session array, or null when it holds no
+ * login. Shape-checked: a half-written session is not a login.
+ */
+function qs_session_extract(array $data): ?array {
+    $uid   = $data['qs_uid'] ?? null;
+    $token = $data['qs_token'] ?? null;
+    if (!is_string($uid) || $uid === '' || !is_string($token) || $token === '') {
+        return null;
     }
     return [
-        'families' => is_array($data['families'] ?? null) ? $data['families'] : [],
-        'access'   => is_array($data['access'] ?? null) ? $data['access'] : [],
-        'refresh'  => is_array($data['refresh'] ?? null) ? $data['refresh'] : [],
+        'uid'      => $uid,
+        'gen'      => (int)($data['qs_gen'] ?? 0),
+        'token'    => $token,
+        'seen'     => (int)($data['qs_seen'] ?? 0),
+        'remember' => !empty($data['qs_remember']),
     ];
 }
 
 /**
- * Serialized read-modify-write on the sessions store: flock (mutual exclusion
- * between concurrent logins/refreshes) + prune + temp-file + rename (atomic
- * swap for lock-free readers). $fn receives the store by reference and its
- * return value is passed through.
+ * Log a user in: a fresh session id (never reuse the pre-login one — that is
+ * the session-fixation rule), the identity, the generation stamp that the kill
+ * switch compares against, and the per-session token the pages embed.
  *
- * @param callable $fn function(array &$data): mixed
- * @return mixed the callback's return value (false on lock/write failure)
+ * @return string the per-session token
  */
-function qs_sessions_mutate(callable $fn) {
-    $path = qs_sessions_path();
-    $lock = @fopen($path . '.lock', 'c');
-    if ($lock === false) {
-        return false;
+function qs_session_establish(string $userId, int $generation, bool $remember): string {
+    qs_session_boot(true);
+    session_regenerate_id(true); // fresh id on privilege change; old file deleted
+
+    $token = bin2hex(random_bytes(32));
+    $_SESSION['qs_uid']      = $userId;
+    $_SESSION['qs_gen']      = $generation;
+    $_SESSION['qs_token']    = $token;
+    $_SESSION['qs_seen']     = time();
+    $_SESSION['qs_remember'] = $remember;
+
+    // session_regenerate_id already emitted the cookie with the params the
+    // session was started with (lifetime 0). "Remember me" needs a longer one,
+    // and session_set_cookie_params refuses to run while a session is active —
+    // so re-emit the cookie explicitly. Same name and id: the browser keeps the
+    // last Set-Cookie for a name, which is this one.
+    $lifetime = $remember ? qs_session_config()['remember_ttl'] : 0;
+    if (!headers_sent()) {
+        $params = qs_session_cookie_params($lifetime);
+        $params['expires'] = $lifetime > 0 ? time() + $lifetime : 0;
+        unset($params['lifetime']);
+        setcookie(session_name(), session_id(), $params);
     }
-    flock($lock, LOCK_EX);
-    try {
-        $data = qs_sessions_read();
-        $result = $fn($data);
-        qs_sessions_prune($data);
-        $tmp = $path . '.tmp' . getmypid();
-        $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-        if ($json === false || file_put_contents($tmp, $json) === false) {
-            @unlink($tmp);
-            return false;
-        }
-        if (!@rename($tmp, $path)) {
-            // Windows: a transient sharing violation (AV scan) can fail the swap once.
-            usleep(50000);
-            if (!@rename($tmp, $path)) {
-                @unlink($tmp);
-                return false;
-            }
-        }
-        return $result;
-    } finally {
-        flock($lock, LOCK_UN);
-        fclose($lock);
-    }
+
+    qs_session_cache_reset();
+    return $token;
 }
 
 /**
- * Drop expired tokens and dead families (in place, called under the write lock).
- * Rotated refresh entries are KEPT until their natural expiry — that retention
- * IS the reuse-detection window.
+ * Re-stamp THIS session with a new generation, so a bump that was meant to end
+ * the user's OTHER sessions does not also end the one that asked for it. This
+ * is the "revoke my other sessions but not the one I am using" half of a
+ * password change: bump, then re-stamp.
  */
-function qs_sessions_prune(array &$data): void {
-    $now = time();
-    foreach ($data['access'] as $hash => $entry) {
-        if (($entry['expires'] ?? 0) <= $now || !isset($data['families'][$entry['family'] ?? ''])) {
-            unset($data['access'][$hash]);
-        }
-    }
-    foreach ($data['refresh'] as $hash => $entry) {
-        if (($entry['expires'] ?? 0) <= $now || !isset($data['families'][$entry['family'] ?? ''])) {
-            unset($data['refresh'][$hash]);
-        }
-    }
-    // A family with no live tokens is done; a revoked family is kept (tombstone
-    // for audit) until every token that pointed at it has expired out above.
-    $live = [];
-    foreach ($data['access'] as $entry) { $live[$entry['family']] = true; }
-    foreach ($data['refresh'] as $entry) { $live[$entry['family']] = true; }
-    foreach ($data['families'] as $famId => $fam) {
-        if (!isset($live[$famId])) {
-            unset($data['families'][$famId]);
-        }
-    }
-}
-
-function qs_session_hash(string $rawToken): string {
-    return hash('sha256', $rawToken);
-}
-
-/**
- * Mint a brand-new session family for a user — THE single issuance path (C5b):
- * the `login` command, the admin panel, and (C8) createUser/register all come
- * through here. Returns RAW tokens (only moment they exist unhashed).
- *
- * @return array|false {access_token, access_expires, refresh_token, refresh_expires, family}
- */
-function qs_session_issue(string $userId) {
-    $knobs = qs_session_config();
-    $now = time();
-    $family  = 'fam_' . bin2hex(random_bytes(8));
-    $access  = 'qsa_' . bin2hex(random_bytes(24));
-    $refresh = 'qsr_' . bin2hex(random_bytes(24));
-    $result = [
-        'access_token'    => $access,
-        'access_expires'  => $now + $knobs['access_ttl'],
-        'refresh_token'   => $refresh,
-        'refresh_expires' => $now + $knobs['refresh_ttl'],
-        'family'          => $family,
-    ];
-    $ok = qs_sessions_mutate(function (array &$data) use ($result, $userId, $now, $family, $access, $refresh) {
-        $data['families'][$family] = ['userId' => $userId, 'created' => $now, 'revoked' => false];
-        $data['access'][qs_session_hash($access)]   = ['family' => $family, 'expires' => $result['access_expires']];
-        $data['refresh'][qs_session_hash($refresh)] = ['family' => $family, 'expires' => $result['refresh_expires'], 'rotatedAt' => null];
-        return true;
-    });
-    return $ok === true ? $result : false;
-}
-
-/**
- * Per-request access-token check (read-only, lock-free).
- *
- * @return array{valid:bool, userId:?string, family:?string, error:?string}
- *         error: 'invalid' | 'expired' (expired drives the client's refresh)
- */
-function qs_session_validate_access(string $rawToken): array {
-    $no = static function (string $error): array {
-        return ['valid' => false, 'userId' => null, 'family' => null, 'error' => $error];
-    };
-    if ($rawToken === '') {
-        return $no('invalid');
-    }
-    $data = qs_sessions_read();
-    $entry = $data['access'][qs_session_hash($rawToken)] ?? null;
-    if ($entry === null) {
-        return $no('invalid');
-    }
-    $family = $data['families'][$entry['family'] ?? ''] ?? null;
-    if ($family === null || !empty($family['revoked'])) {
-        return $no('invalid');
-    }
-    if (($entry['expires'] ?? 0) <= time()) {
-        return $no('expired');
-    }
-    return ['valid' => true, 'userId' => (string)$family['userId'], 'family' => (string)$entry['family'], 'error' => null];
-}
-
-/**
- * Exchange a refresh token for a fresh pair (ROTATION), with reuse-detection.
- *
- *  - active token            -> mark it rotated, mint a new pair (same family;
- *                               sliding refresh TTL)
- *  - rotated, within grace   -> legit concurrent race (two tabs / a retry):
- *                               mint a SIBLING pair, no punishment
- *  - rotated, after grace    -> theft signal: REVOKE the whole family
- *  - expired / unknown       -> plain refusal
- *  - user disabled           -> refusal + family revoke (L10 reaches refresh too)
- *
- * @return array {ok:true, access_token, access_expires, refresh_token,
- *                refresh_expires, family, userId}
- *             | {ok:false, error:'invalid'|'expired'|'reuse_revoked'|'user_disabled'|'store'}
- */
-function qs_session_rotate(string $rawRefresh): array {
-    if ($rawRefresh === '') {
-        return ['ok' => false, 'error' => 'invalid'];
-    }
-    $knobs = qs_session_config();
-    $result = qs_sessions_mutate(function (array &$data) use ($rawRefresh, $knobs) {
-        $now = time();
-        $hash = qs_session_hash($rawRefresh);
-        $entry = $data['refresh'][$hash] ?? null;
-        if ($entry === null) {
-            return ['ok' => false, 'error' => 'invalid'];
-        }
-        $famId = (string)($entry['family'] ?? '');
-        $family = $data['families'][$famId] ?? null;
-        if ($family === null || !empty($family['revoked'])) {
-            return ['ok' => false, 'error' => 'invalid'];
-        }
-        if (($entry['expires'] ?? 0) <= $now) {
-            return ['ok' => false, 'error' => 'expired'];
-        }
-
-        // Reuse-detection: an already-rotated token coming back.
-        $rotatedAt = $entry['rotatedAt'] ?? null;
-        if ($rotatedAt !== null && ($now - (int)$rotatedAt) > $knobs['reuse_grace']) {
-            qs_session_mark_family_revoked($data, $famId, 'refresh_reuse');
-            error_log("QuickSite auth: refresh-token reuse detected — session family {$famId} revoked (user {$family['userId']})");
-            return ['ok' => false, 'error' => 'reuse_revoked'];
-        }
-
-        // L10: a disabled user's sessions die at the refresh boundary too.
-        $userId = (string)$family['userId'];
-        if (function_exists('loadUsersConfig')) {
-            $user = loadUsersConfig()['users'][$userId] ?? null;
-            if ($user === null || ($user['status'] ?? 'active') === 'disabled') {
-                qs_session_mark_family_revoked($data, $famId, 'user_disabled');
-                return ['ok' => false, 'error' => 'user_disabled'];
-            }
-        }
-
-        if ($rotatedAt === null) {
-            $data['refresh'][$hash]['rotatedAt'] = $now; // normal rotation
-        }
-        // (within-grace reuse falls through: mint a sibling, old entry untouched)
-
-        $access  = 'qsa_' . bin2hex(random_bytes(24));
-        $refresh = 'qsr_' . bin2hex(random_bytes(24));
-        $pair = [
-            'ok'              => true,
-            'access_token'    => $access,
-            'access_expires'  => $now + $knobs['access_ttl'],
-            'refresh_token'   => $refresh,
-            'refresh_expires' => $now + $knobs['refresh_ttl'], // sliding window
-            'family'          => $famId,
-            'userId'          => $userId,
-        ];
-        $data['access'][qs_session_hash($access)]   = ['family' => $famId, 'expires' => $pair['access_expires']];
-        $data['refresh'][qs_session_hash($refresh)] = ['family' => $famId, 'expires' => $pair['refresh_expires'], 'rotatedAt' => null];
-        return $pair;
-    });
-    return is_array($result) ? $result : ['ok' => false, 'error' => 'store'];
-}
-
-/**
- * In-place family revoke (under the caller's write lock): tombstone the family
- * and drop every token pointing at it.
- */
-function qs_session_mark_family_revoked(array &$data, string $famId, string $reason): void {
-    if (!isset($data['families'][$famId])) {
+function qs_session_restamp(int $generation): void {
+    if (!qs_session_present()) {
         return;
     }
-    $data['families'][$famId]['revoked']   = true;
-    $data['families'][$famId]['revokedAt'] = time();
-    $data['families'][$famId]['reason']    = $reason;
-    foreach ($data['access'] as $hash => $entry) {
-        if (($entry['family'] ?? '') === $famId) {
-            unset($data['access'][$hash]);
-        }
+    $alreadyOpen = session_status() === PHP_SESSION_ACTIVE;
+    if (!$alreadyOpen && !qs_session_boot(true)) {
+        return;
     }
-    foreach ($data['refresh'] as $hash => $entry) {
-        if (($entry['family'] ?? '') === $famId) {
-            unset($data['refresh'][$hash]);
-        }
+    if (isset($_SESSION['qs_uid'])) {
+        $_SESSION['qs_gen'] = $generation;
     }
+    if (!$alreadyOpen) {
+        session_write_close();
+    }
+    qs_session_cache_reset();
 }
 
 /**
- * Revoke a whole session family by id (logout, admin action, theft response).
+ * End THIS session: data, file and cookie. Other sessions of the same user are
+ * untouched — bumping the user's generation is what ends those (see
+ * qs_user_bump_generation).
  */
-function qs_session_revoke_family(string $famId, string $reason = 'logout'): bool {
-    $result = qs_sessions_mutate(function (array &$data) use ($famId, $reason) {
-        $known = isset($data['families'][$famId]);
-        qs_session_mark_family_revoked($data, $famId, $reason);
-        return $known;
-    });
-    return $result === true;
+function qs_session_destroy(): void {
+    if (!qs_session_present() || !qs_session_boot(true)) {
+        return;
+    }
+    $_SESSION = [];
+    if (!headers_sent()) {
+        $params = qs_session_cookie_params(0);
+        $params['expires'] = time() - 3600;
+        unset($params['lifetime']);
+        setcookie(session_name(), '', $params);
+    }
+    @session_destroy();
+    qs_session_cache_reset();
 }
 
 /**
- * Logout by refresh token: revoke the family it belongs to. Idempotent —
- * unknown/expired tokens simply report false.
+ * Slide the idle window forward. Called lazily — only once the stamp is older
+ * than a tenth of the idle TTL — so an ordinary request stays a lock-free read
+ * and a long working session still never expires under the user.
  */
-function qs_session_revoke_by_refresh(string $rawRefresh): bool {
-    if ($rawRefresh === '') {
-        return false;
+function qs_session_touch(): void {
+    if (headers_sent() || !qs_session_present()) {
+        return; // a write here could need a Set-Cookie we can no longer send
     }
-    $result = qs_sessions_mutate(function (array &$data) use ($rawRefresh) {
-        $entry = $data['refresh'][qs_session_hash($rawRefresh)] ?? null;
-        if ($entry === null) {
-            return false;
-        }
-        qs_session_mark_family_revoked($data, (string)$entry['family'], 'logout');
-        return true;
-    });
-    return $result === true;
+    $alreadyOpen = session_status() === PHP_SESSION_ACTIVE;
+    if (!$alreadyOpen && !qs_session_boot(true)) {
+        return;
+    }
+    if (!isset($_SESSION['qs_uid'])) {
+        return;
+    }
+    $_SESSION['qs_seen'] = time();
+    if (!$alreadyOpen) {
+        session_write_close();
+    }
+    qs_session_cache_reset();
 }
 
 // ============================================================================
-// Login throttle (brute-force backoff) — separate small state file, same
-// flock + temp/rename discipline. Keyed by sha256 of the lowercased login
-// identifier (the USERNAME since C8 8.0b; the raw identifier never sits in
-// the state file).
+// Login throttle (brute-force backoff) — a small state file with flock +
+// temp/rename discipline. Keyed by sha256 of the lowercased login identifier
+// (the USERNAME): the raw identifier never sits in the state file.
+//
+// Independent of the session model: this is what makes password guessing
+// expensive, and it is consulted before any credential is checked.
 // ============================================================================
+
+/** Hash a throttle key. Keys are identifiers and IPs — never stored in clear. */
+function qs_throttle_hash(string $value): string {
+    return hash('sha256', $value);
+}
 
 function qs_login_throttle_path(): string {
     return SECURE_FOLDER_PATH . '/management/config/login-throttle.json';
@@ -343,7 +333,7 @@ function qs_login_throttle_check(string $identifier): int {
     if (!is_array($data)) {
         return 0;
     }
-    $entry = $data[qs_session_hash(strtolower($identifier))] ?? null;
+    $entry = $data[qs_throttle_hash(strtolower($identifier))] ?? null;
     if (!is_array($entry)) {
         return 0;
     }
@@ -378,8 +368,8 @@ function qs_login_throttle_mutate(callable $fn) {
         // file and file_put_contents returns 0, not false, so a check on the
         // write alone lets a failed encode truncate the store (C11 11.3). This
         // file holds only hashed keys and integers, so nothing unrepresentable
-        // can reach it today — checked for the same reason the sessions writer
-        // above already does.
+        // can reach it today — checked because a throttle store that silently
+        // emptied itself would disable brute-force protection without a trace.
         $json = json_encode($data, JSON_PRETTY_PRINT);
         if ($json === false || file_put_contents($tmp, $json) === false || !@rename($tmp, $path)) {
             @unlink($tmp);
@@ -397,7 +387,7 @@ function qs_login_throttle_mutate(callable $fn) {
  * (30s, 60s, 120s, … capped at 1h).
  */
 function qs_login_throttle_fail(string $identifier): void {
-    $key = qs_session_hash(strtolower($identifier));
+    $key = qs_throttle_hash(strtolower($identifier));
     qs_login_throttle_mutate(function (array &$data) use ($key) {
         $now = time();
         $fails = (int)(($data[$key]['fails'] ?? 0)) + 1;
@@ -414,34 +404,11 @@ function qs_login_throttle_fail(string $identifier): void {
  * Successful login clears the identifier's counter.
  */
 function qs_login_throttle_clear(string $identifier): void {
-    $key = qs_session_hash(strtolower($identifier));
+    $key = qs_throttle_hash(strtolower($identifier));
     qs_login_throttle_mutate(function (array &$data) use ($key) {
         unset($data[$key]);
         return true;
     });
-}
-
-/**
- * Revoke EVERY session family belonging to a user except (optionally) one (C8).
- * Password change: the new password invalidates every other device/session
- * (theft containment) while the session that performed the change survives.
- * Also serves a future admin force-logout.
- *
- * @return int number of families revoked
- */
-function qs_session_revoke_user_families(string $userId, ?string $exceptFamily = null, string $reason = 'password_change'): int {
-    $result = qs_sessions_mutate(function (array &$data) use ($userId, $exceptFamily, $reason) {
-        $count = 0;
-        foreach ($data['families'] as $famId => $fam) {
-            if (($fam['userId'] ?? '') !== $userId || !empty($fam['revoked']) || $famId === $exceptFamily) {
-                continue;
-            }
-            qs_session_mark_family_revoked($data, (string)$famId, $reason);
-            $count++;
-        }
-        return $count;
-    });
-    return is_int($result) ? $result : 0;
 }
 
 // ============================================================================
@@ -475,7 +442,7 @@ function qs_registration_config(): array {
  * The caller's network address for rate limiting. Deliberately REMOTE_ADDR
  * only — X-Forwarded-For is caller-controlled (spoofable) and QuickSite does
  * not know which proxies to trust; behind a reverse proxy this rate-limits
- * the proxy address (deploy-time concern, beta.11 checklist).
+ * the proxy address (deploy-time concern).
  */
 function qs_client_ip(): string {
     return (string)($_SERVER['REMOTE_ADDR'] ?? '');
@@ -539,7 +506,7 @@ function qs_registration_throttle_check(array $cfg): int {
     }
     $now = time();
     if ($cfg['per_ip_per_minute'] > 0) {
-        $entry = $data['ips'][qs_session_hash(qs_client_ip())] ?? null;
+        $entry = $data['ips'][qs_throttle_hash(qs_client_ip())] ?? null;
         if (is_array($entry)
             && (int)($entry['minute'] ?? -1) === intdiv($now, 60)
             && (int)($entry['count'] ?? 0) >= $cfg['per_ip_per_minute']) {
@@ -562,7 +529,7 @@ function qs_registration_throttle_check(array $cfg): int {
  * Every attempt counts — failed, duplicate, or successful.
  */
 function qs_registration_throttle_attempt(): void {
-    $key = qs_session_hash(qs_client_ip());
+    $key = qs_throttle_hash(qs_client_ip());
     qs_registration_throttle_mutate(function (array &$data) use ($key) {
         $now = time();
         $minute = intdiv($now, 60);

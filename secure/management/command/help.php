@@ -529,7 +529,7 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.validation.invalid_date' => 'Invalid date format (expected YYYY-MM-DD)'
         ],
-        'notes' => 'PROJECT-SCOPED: returns the history of the project named by the URL marker (/management/p/<projectId>/getCommandHistory) and nothing else - there is no installation-wide view. Logs are stored in daily files under secure/logs/p/<projectId>/. By default returns last 7 days. The getCommandHistory command itself is not logged to prevent recursion. Commands that target no project (registration, login, project creation, membership self-service) are recorded separately in secure/logs/_global/, which no command reads. Request bodies are sanitized DENY-BY-DEFAULT: any key that looks like a credential (password/secret/token/credential/key/auth/authorization/signature/salt) has its value replaced with [redacted] at every depth, for every command including ones added later; the authentication commands (login/register/refreshSession/logoutSession/changePassword/deleteMyAccount) log no body at all; uploadAsset logs file metadata only and editStyles truncates stylesheets over 5KB.'
+        'notes' => 'PROJECT-SCOPED: returns the history of the project named by the URL marker (/management/p/<projectId>/getCommandHistory) and nothing else - there is no installation-wide view. Logs are stored in daily files under secure/logs/p/<projectId>/. By default returns last 7 days. The getCommandHistory command itself is not logged to prevent recursion. Commands that target no project (registration, login, project creation, membership self-service) are recorded separately in secure/logs/_global/, which no command reads. Request bodies are sanitized DENY-BY-DEFAULT: any key that looks like a credential (password/secret/token/credential/key/auth/authorization/signature/salt) has its value replaced with [redacted] at every depth, for every command including ones added later; the authentication commands (login/register/logoutSession/changePassword/deleteMyAccount) log no body at all; uploadAsset logs file metadata only and editStyles truncates stylesheets over 5KB.'
     ],
 
     'clearCommandHistory' => [
@@ -2191,7 +2191,7 @@ $GLOBALS['__help_commands'] = [
     ],
     
     'login' => [
-        'description' => 'Exchanges username + password for a session: a short-lived access token (sent as Authorization: Bearer on every request) + a longer-lived refresh token (used only with refreshSession). PUBLIC + self-authenticating - no bearer header needed.',
+        'description' => 'Exchanges username + password for a SESSION. The response sets the session cookie and returns that session token; every later request sends both - the cookie as the credential, the token as Authorization: Bearer. PUBLIC + self-authenticating.',
         'method' => 'POST',
         'parameters' => [
             'username' => [
@@ -2206,6 +2206,12 @@ $GLOBALS['__help_commands'] = [
                 'ui_type' => 'password',
                 'description' => 'Plain password, verified against the password_hash of the user',
                 'example' => '********'
+            ],
+            'remember' => [
+                'required' => false,
+                'type' => 'boolean',
+                'description' => 'Give the session cookie a lifetime so it survives a browser restart. Default false - the cookie dies with the browser session.',
+                'example' => true
             ]
         ],
         'example_post' => 'POST /management/login with body: {"username": "your-username", "password": "********"}',
@@ -2215,10 +2221,7 @@ $GLOBALS['__help_commands'] = [
             'message' => 'Logged in',
             'data' => [
                 'token_type' => 'Bearer',
-                'access_token' => 'qsa_a1b2c3... (52 characters, short-lived)',
-                'expires_in' => 900,
-                'refresh_token' => 'qsr_d4e5f6... (52 characters, rotate via refreshSession)',
-                'refresh_expires_in' => 2592000,
+                'session_token' => 'a1b2c3... (64 hex characters)',
                 'user' => [
                     'id' => 'usr_...',
                     'name' => 'Your Name',
@@ -2230,70 +2233,37 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.validation.required' => 'username and password are required',
             '401.auth.invalid_credentials' => 'Invalid username or password (uniform for unknown username, wrong password, externally managed or disabled account - no account oracle)',
-            '429.auth.throttled' => 'Too many failed attempts - retry_after gives the wait in seconds',
-            '500.server.session_store_failed' => 'Could not create the session'
+            '429.auth.throttled' => 'Too many failed attempts - retry_after gives the wait in seconds'
         ],
-        'notes' => 'Session TTLs are configured in auth.php (authentication.session: access_ttl / refresh_ttl / reuse_grace). When the access token expires, requests return 401 with code auth.token_expired - call refreshSession with the refresh token and retry. Users with password_hash null are externally managed and cannot log in here.'
-    ],
-
-    'refreshSession' => [
-        'description' => 'Exchanges a refresh token for a NEW access + refresh pair (rotation). Reusing an already-rotated refresh token after a short grace window is treated as theft and revokes the whole session family. PUBLIC + self-authenticating.',
-        'method' => 'POST',
-        'parameters' => [
-            'refresh_token' => [
-                'required' => true,
-                'type' => 'string',
-                'description' => 'The refresh token issued by login or by a previous refreshSession',
-                'example' => 'qsr_d4e5f6...'
-            ]
-        ],
-        'example_post' => 'POST /management/refreshSession with body: {"refresh_token": "qsr_d4e5f6..."}',
-        'success_response' => [
-            'status' => 200,
-            'code' => 'operation.success',
-            'message' => 'Session refreshed',
-            'data' => [
-                'token_type' => 'Bearer',
-                'access_token' => 'qsa_... (new)',
-                'expires_in' => 900,
-                'refresh_token' => 'qsr_... (new - the presented one is now rotated)',
-                'refresh_expires_in' => 2592000
-            ]
-        ],
-        'error_responses' => [
-            '400.validation.required' => 'refresh_token parameter is required',
-            '401.auth.refresh_invalid' => 'Invalid or expired refresh token',
-            '401.auth.refresh_reuse_revoked' => 'Rotated-token reuse detected - the session family was revoked; log in again',
-            '401.auth.unauthorized' => 'User account is disabled (the family is revoked)',
-            '500.server.session_store_failed' => 'Could not rotate the session'
-        ],
-        'notes' => 'Always store BOTH returned tokens - the presented refresh token is retired on success. A re-presentation within the reuse_grace window (default 60s, e.g. two browser tabs racing) yields a sibling pair without punishment; after the window it revokes the family (theft signal).'
+        'notes' => 'A command-line client needs a cookie jar (curl -c jar -b jar) as well as the Authorization header: the token authorizes nothing without the session cookie it belongs to, which is what keeps a cookie-authenticated API safe from cross-site request forgery. Session lifetimes are configured in auth.php (authentication.session: idle_ttl / remember_ttl). Users with password_hash null are externally managed and cannot log in here.'
     ],
 
     'logoutSession' => [
-        'description' => 'Revokes the session family the given refresh token belongs to (its access + refresh tokens all die together). Idempotent. PUBLIC + self-authenticating.',
+        'description' => 'Ends the calling session. With everywhere=true it also bumps the account session generation, which ends every OTHER session of this user on their next request. AUTHENTICATED.',
         'method' => 'POST',
         'parameters' => [
-            'refresh_token' => [
-                'required' => true,
-                'type' => 'string',
-                'description' => 'The refresh token of the session to revoke',
-                'example' => 'qsr_d4e5f6...'
+            'everywhere' => [
+                'required' => false,
+                'type' => 'boolean',
+                'description' => 'Also end this account\'s other sessions (other browsers, other devices)',
+                'example' => true
             ]
         ],
-        'example_post' => 'POST /management/logoutSession with body: {"refresh_token": "qsr_d4e5f6..."}',
+        'example_post' => 'POST /management/logoutSession with body: {"everywhere": true}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
-            'message' => 'Session revoked',
+            'message' => 'Signed out',
             'data' => [
-                'revoked' => true
+                'ended' => true,
+                'other_sessions_ended' => false
             ]
         ],
         'error_responses' => [
-            '400.validation.required' => 'refresh_token parameter is required'
+            '401.auth.required' => 'Authentication required',
+            '500.server.file_write_failed' => 'Could not end the account\'s other sessions'
         ],
-        'notes' => 'Unknown or already-revoked tokens return 200 with revoked=false (idempotent, no token oracle). The admin panel logout revokes the same way in-process.'
+        'notes' => 'Proving you may end a session is proving you hold it, so this is an ordinary authenticated command rather than a public one - there is no token to present separately. The admin panel logout ends the session the same way in-process, and its "log out everywhere" link is the same generation bump.'
     ],
 
     'register' => [
@@ -6659,7 +6629,7 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'export_import' => ['exportProject', 'importProject', 'downloadExport', 'clearExports'],
                 'storage_monitoring' => ['getSizeInfo'],
                 'command_history' => ['getCommandHistory', 'clearCommandHistory'],
-                'authentication' => ['login', 'refreshSession', 'logoutSession', 'register', 'changePassword'],
+                'authentication' => ['login', 'logoutSession', 'register', 'changePassword'],
                 'role_management' => ['listRoles', 'getMyPermissions', 'createRole', 'editRole', 'deleteRole'],
                 'snippet_management' => ['listSnippets', 'getSnippet', 'createSnippet', 'deleteSnippet', 'duplicateSnippet', 'insertSnippet'],
                 'system_updates' => ['checkForUpdates'],
@@ -6668,11 +6638,11 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
             ],
             'authentication' => [
                 'required' => true,
-                'login' => 'POST /management/login with {username, password} (users.php credentials) returns an access + refresh token pair',
-                'header' => 'Authorization: Bearer <access_token>',
-                'access_token_format' => 'qsa_<48 hex characters> (short-lived; on 401 auth.token_expired call refreshSession and retry)',
-                'refresh_token_format' => 'qsr_<48 hex characters> (rotates on every refreshSession - always keep the newest pair; reusing a rotated token revokes the whole session family)',
-                'public_commands' => ['help', 'login', 'refreshSession', 'logoutSession', 'register'],
+                'login' => 'POST /management/login with {username, password} (users.php credentials) sets the session cookie and returns that session token',
+                'cookie' => 'The session cookie QSSESSID is the credential - a command-line client needs a cookie jar (curl -c jar -b jar)',
+                'header' => 'Authorization: Bearer <session_token> - required alongside the cookie; it proves the caller is the one the session was handed to, which is what keeps a cookie-authenticated API safe from cross-site request forgery',
+                'session_token_format' => '64 hex characters; grants nothing on its own, and lives exactly as long as the session',
+                'public_commands' => ['help', 'login', 'register'],
                 'registration' => 'POST /management/register (public) creates an account when auth.php registration.allow_self_registration is true (default: false); flood-controlled; sign in afterwards via login',
                 'role_system' => [
                     'note' => 'Roles are PER PROJECT (config/members.json), fixed set, no superadmin. Rank order: viewer < editor < designer < developer < admin < owner.',
@@ -6704,7 +6674,7 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'style_workflow' => '1) getStyles to retrieve current CSS, 2) editStyles to update (response includes backup for rollback).',
                 'css_granular_workflow' => '1) getRootVariables to see all CSS variables, 2) setRootVariables to update colors/spacing/etc, 3) listStyleRules to see all selectors, 4) getStyleRule to inspect specific rules, 5) setStyleRule to add/update rules, 6) deleteStyleRule to remove rules.',
                 'animation_workflow' => '1) getKeyframes to list all animations, 2) setKeyframes to add/update animations, 3) deleteKeyframes to remove animations.',
-                'token_workflow' => '1) login with email+password to get an access + refresh pair, 2) send the access token as Authorization: Bearer, 3) on 401 auth.token_expired call refreshSession with the refresh token (it rotates - keep the new pair), 4) logoutSession to end the session.',
+                'session_workflow' => '1) login with username+password - the response sets the session cookie and returns the session token, 2) send BOTH on every later call: the cookie, and the token as Authorization: Bearer, 3) logoutSession to end the session, or logoutSession {everywhere: true} to end every session of the account.',
                 'role_workflow' => '1) listRoles to see available roles and commands, 2) getMyPermissions to check current access, 3) createRole to add custom roles, 4) editRole to modify roles, 5) deleteRole to remove custom roles.',
                 'alias_workflow' => '1) listAliases to see existing redirects, 2) createAlias to add URL redirects, 3) deleteAlias to remove redirects.',
                 'component_workflow' => '1) listComponents to see available reusable components, 2) getComponent?name=... to view full details with preview, 3) editStructure with type="component" to create/update/delete.',

@@ -56,6 +56,20 @@ function qs_sb_valid_id(string $id): bool {
  * asked. The cost is accepted and deliberate: a signed-out member of a private
  * project sees 404 rather than a prompt to sign in.
  *
+ * COOKIE ONLY. Identity here is the panel's session cookie and nothing else.
+ * The gate used to also accept an `Authorization: Bearer` header, which under
+ * Apache never arrives (the header is not forwarded to this surface unless the
+ * deployment configures it) but under nginx does — the same code deciding
+ * access differently on the two supported targets. One credential path removes
+ * that divergence, and it is the path that actually works: a preview iframe is
+ * a plain browser navigation and can carry no header of its own.
+ *
+ * The trade this accepts: a project mapped to its OWN domain is a different
+ * origin, so the panel's cookie is not sent there. That is irrelevant for a
+ * public project (no credential needed) and means a PRIVATE project cannot be
+ * previewed on its mapped domain — preview it at `/p/<id>/` on the panel's own
+ * origin, which is where the editor points anyway.
+ *
  * @return int|null null = allowed (public project, or authenticated member);
  *                  404 = refused, reason deliberately not distinguished.
  */
@@ -70,13 +84,10 @@ function qs_surface_b_gate(string $id, string $secure): ?int {
     if ($visibility === 'public') {
         return null;
     }
-    // Private → require identity. The author's own preview iframe carries a
-    // short-lived `qs_preview` cookie (D3); a bearer header is also accepted.
-    $token      = $_COOKIE['qs_preview'] ?? null;
-    $authHeader = ($token !== null && $token !== '')
-        ? 'Bearer ' . $token
-        : ($_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? null);
-    $auth = validateBearerToken($authHeader);
+    // Private → require identity, from the session cookie (see above). Read
+    // without holding the session open, so the author's-site OAuth state store
+    // can still start its own session later in this same request.
+    $auth = qs_session_auth();
     if (empty($auth['valid'])) {
         return 404; // no identity — indistinguishable from "no such project"
     }
@@ -108,9 +119,9 @@ function qs_surface_b_maybe_handle(): void {
     // `fastcgi_param QS_PROJECT <id>` (nginx) and funnels every non-file request
     // here (FallbackResource / try_files). No URL marker, no rewrite — the request
     // path IS the route, and the domain root IS the site. REDIRECT_ fallback:
-    // FallbackResource's internal redirect re-prefixes environment variables (same
-    // reason the gate reads REDIRECT_HTTP_AUTHORIZATION). Never set on the
-    // authoring hostname, where /p/<id>/ URL detection below stays the entry.
+    // FallbackResource's internal redirect re-prefixes environment variables, so
+    // both spellings are read. Never set on the authoring hostname, where the
+    // /p/<id>/ URL detection below stays the entry.
     $envId = $_SERVER['QS_PROJECT'] ?? $_SERVER['REDIRECT_QS_PROJECT'] ?? '';
     if (is_string($envId) && $envId !== '') {
         // R5 (Sangio 2026-07-24) — one domain, one site: a mapped domain answers

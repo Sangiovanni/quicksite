@@ -46,25 +46,31 @@ window.QuickSiteAPI = (function() {
     };
 
     // ============================================
-    // Token Management (C5b)
+    // Session token
     // ============================================
-    // The panel's session (access + refresh pair) is held SERVER-SIDE in the
-    // PHP session; the page only ever sees the short-lived ACCESS token,
-    // embedded at render time (QUICKSITE_CONFIG.token) and renewed via the
-    // /admin/session-refresh endpoint. Nothing auth-related touches
-    // localStorage/sessionStorage anymore — an XSS can at worst steal a token
-    // that dies within its TTL.
+    // The panel's session is the PHP session: the browser holds its cookie and
+    // the server holds everything else. The page is handed ONE value — the
+    // per-session token (QUICKSITE_CONFIG.token) — which every request sends
+    // back as `Authorization: Bearer`. It is not a credential on its own: the
+    // cookie is. Sending it is how a request proves it came from something that
+    // could READ this page, which is what stops another site driving the API
+    // through the visitor's browser.
+    //
+    // There is nothing to refresh and nothing to expire client-side. The
+    // session ends when the user signs out, when it goes idle, or when the
+    // account's session generation is bumped ("log out everywhere") — all of
+    // which surface as a 401 on the next call, which sends the user to login.
+    // Nothing auth-related touches localStorage/sessionStorage.
 
-    // In-memory access token, seeded from the server-rendered page config.
+    // In-memory session token, seeded from the server-rendered page config.
     let currentToken = (window.QUICKSITE_CONFIG && window.QUICKSITE_CONFIG.token) || null;
 
-    // C5b token-SOURCE seam: a deployment embedding QuickSite (e.g. a SaaS
-    // platform) can plug its own async token provider here; the default source
-    // is the built-in session flow above. See setTokenSource().
+    // Token-SOURCE seam: a deployment embedding QuickSite (e.g. a SaaS
+    // platform) can plug its own async token provider here.
     let customTokenSource = null;
 
     /**
-     * Get the current (short-lived) access token
+     * Get the current session token
      * @returns {string|null}
      */
     function getToken() {
@@ -73,58 +79,42 @@ window.QuickSiteAPI = (function() {
     }
 
     /**
-     * Adopt a fresh access token: update this module + the page-embedded
-     * globals so the hand-built fetch sites (PreviewConfig.authToken readers,
-     * QUICKSITE_CONFIG.token readers) stay valid, then schedule the keepalive.
+     * Adopt a token: update this module + the page-embedded globals so the
+     * hand-built fetch sites (PreviewConfig.authToken readers,
+     * QUICKSITE_CONFIG.token readers) stay valid.
      * @param {string} token
-     * @param {number} [expiresIn=0] - seconds of validity (0 = unknown)
      */
-    function applyToken(token, expiresIn = 0) {
+    function applyToken(token) {
         currentToken = token;
         if (window.QUICKSITE_CONFIG) window.QUICKSITE_CONFIG.token = token;
         if (window.PreviewConfig) window.PreviewConfig.authToken = token;
-        scheduleKeepalive(expiresIn);
     }
 
     /**
-     * C5b seam — plug a custom access-token source (async function resolving to
-     * a token string). Used by deployments whose auth lives outside QuickSite;
-     * the built-in PHP-session refresh flow is skipped while a source is set.
+     * Seam — plug a custom token source (async function resolving to a token
+     * string). Used by deployments whose auth lives outside QuickSite.
      * @param {(() => Promise<string|null>)|null} fn
      */
     function setTokenSource(fn) {
         customTokenSource = (typeof fn === 'function') ? fn : null;
     }
 
-    // Single-flight refresh: a burst of concurrent 401s collapses into ONE
-    // /admin/session-refresh POST (mirrors the qs.js Tier-2 refresh pattern).
+    // Single-flight: a burst of concurrent 401s collapses into ONE call to the
+    // custom source. With no source there is nothing to obtain — the built-in
+    // session either works or is over.
     let refreshInFlight = null;
 
     /**
-     * Obtain a fresh access token (custom source if set, else the PHP-session
-     * refresh endpoint). Resolves to the new token, or null when the session
-     * is dead (caller falls back to the login redirect).
+     * Obtain a token from the custom source, when one is plugged in.
      * @returns {Promise<string|null>}
      */
     function refreshAccessToken() {
+        if (!customTokenSource) return Promise.resolve(null);
         if (refreshInFlight) return refreshInFlight;
         refreshInFlight = (async () => {
             try {
-                if (customTokenSource) {
-                    const token = await customTokenSource();
-                    if (token) { applyToken(token, 0); return token; }
-                    return null;
-                }
-                const response = await fetch(`${config.adminBase}/session-refresh`, {
-                    method: 'POST',
-                    headers: { 'Accept': 'application/json' }
-                });
-                if (!response.ok) return null;
-                const data = await response.json();
-                if (data && data.token) {
-                    applyToken(data.token, data.expires_in | 0);
-                    return data.token;
-                }
+                const token = await customTokenSource();
+                if (token) { applyToken(token); return token; }
                 return null;
             } catch {
                 return null;
@@ -135,30 +125,12 @@ window.QuickSiteAPI = (function() {
         return refreshInFlight;
     }
 
-    // Proactive keepalive at ~80% of the token's remaining lifetime, so
-    // long-open pages (visual editor) and the hand-built fetch sites that
-    // never retry always find a live token. The login page (no token) never
-    // schedules one.
-    let keepaliveTimer = null;
-
-    function scheduleKeepalive(expiresIn) {
-        const remaining = (expiresIn | 0) > 0
-            ? (expiresIn | 0)
-            : ((window.QUICKSITE_CONFIG && window.QUICKSITE_CONFIG.tokenExpiresIn) | 0);
-        if (remaining <= 0 || !getToken()) return;
-        clearTimeout(keepaliveTimer);
-        keepaliveTimer = setTimeout(() => { refreshAccessToken(); }, Math.max(30, Math.floor(remaining * 0.8)) * 1000);
-    }
-
-    scheduleKeepalive(0); // boot from the server-emitted tokenExpiresIn
-
     /**
-     * Clear the in-memory token (and any legacy pre-C5b storage entries left
-     * from older versions — one-time upgrade hygiene).
+     * Clear the in-memory token (and any retired storage entries left by older
+     * versions — one-time upgrade hygiene).
      */
     function clearToken() {
         currentToken = null;
-        clearTimeout(keepaliveTimer);
         if (window.QUICKSITE_CONFIG) window.QUICKSITE_CONFIG.token = '';
         try {
             localStorage.removeItem(TOKEN_KEY);
@@ -341,6 +313,10 @@ window.QuickSiteAPI = (function() {
 
         const options = {
             method: method,
+            // The session cookie is the credential; the header proves this call
+            // came from a page of that session. 'same-origin' is fetch's default
+            // and is stated here because the request does not work without it.
+            credentials: 'same-origin',
             headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
@@ -380,14 +356,14 @@ window.QuickSiteAPI = (function() {
                 }));
             }
 
-            // C5b: an EXPIRED access token is refreshable — do it transparently
-            // and retry the original request exactly once. A 401 with
-            // auth.invalid_credentials is a COMMAND-level credential check
-            // (e.g. changePassword's current password) — the session itself is
-            // alive, so surface it to the caller (C8). Any other 401 means the
-            // session is dead → login.
+            // A 401 with auth.invalid_credentials is a COMMAND-level credential
+            // check (e.g. changePassword's current password) — the session
+            // itself is alive, so surface it to the caller (C8). Any other 401
+            // means the session is over (signed out, idle, or ended elsewhere)
+            // → login. An embedding platform that plugged its own token source
+            // gets one transparent retry through it first.
             if (response.status === 401) {
-                if (!_isRetry && result && result.code === 'auth.token_expired') {
+                if (!_isRetry && customTokenSource) {
                     const fresh = await refreshAccessToken();
                     if (fresh) {
                         return request(command, method, data, urlParams, queryParams, true, opts);
@@ -447,6 +423,7 @@ window.QuickSiteAPI = (function() {
         try {
             const response = await fetch(url, {
                 method: 'POST',
+                credentials: 'same-origin', // the session cookie is the credential
                 headers: {
                     'Authorization': `Bearer ${token}`
                     // Don't set Content-Type - browser will set it with boundary for FormData
@@ -456,10 +433,9 @@ window.QuickSiteAPI = (function() {
 
             const result = await response.json();
 
-            // C5b: refresh + retry once on an expired access token (see request()
-            // — incl. the auth.invalid_credentials carve-out, kept symmetric).
+            // Same 401 handling as request(), kept symmetric.
             if (response.status === 401) {
-                if (!_isRetry && result && result.code === 'auth.token_expired') {
+                if (!_isRetry && customTokenSource) {
                     const fresh = await refreshAccessToken();
                     if (fresh) {
                         return upload(command, formData, urlParams, true);
@@ -541,6 +517,7 @@ window.QuickSiteAPI = (function() {
         }
 
         const response = await fetch(url, {
+            credentials: 'same-origin', // the session cookie is the credential
             headers: {
                 'Authorization': `Bearer ${token}`
             }
@@ -563,7 +540,9 @@ window.QuickSiteAPI = (function() {
         // Configuration
         config,
 
-        // Token Management (C5b: short-lived access token; refresh lives server-side)
+        // Session token (the credential is the session cookie; see the top of
+        // this module). refreshAccessToken only does anything when an embedding
+        // platform plugged its own source via setTokenSource.
         getToken,
         clearToken,
         isAuthenticated,

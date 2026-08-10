@@ -2,11 +2,13 @@
 /**
  * Authentication & CORS Management Functions
  *
- * Handles API token validation, role-based permissions, and CORS header management.
- * C5b/C8 8.0b: credentials are username + password (users.php `password_hash`);
- * per-request auth is a short-lived ACCESS token from the session store
- * (SessionManagement.php). The username is PRIVATE (login-only); public identity
- * is the display `name` + the opaque user id — there is no email field.
+ * Handles caller authentication, role-based permissions, and CORS headers.
+ * Credentials are username + password (users.php `password_hash`); the login
+ * establishes a PHP session (SessionManagement.php) and per-request auth is
+ * that session's cookie plus, for HTTP API callers, the per-session token it
+ * carries in `Authorization: Bearer`. The username is PRIVATE (login-only);
+ * public identity is the display `name` + the opaque user id — there is no
+ * email field.
  */
 
 require_once __DIR__ . '/SessionManagement.php';
@@ -758,23 +760,121 @@ function isBuiltinRole(string $roleName): bool {
 }
 
 /**
- * Validate a Bearer ACCESS token and resolve it to a USER (C5/C5b).
- * access token -> session family (sessions.json) -> userId -> user (users.php).
- * Disabled users are rejected before any command runs (L10). The returned user
- * has its 'id' attached.
+ * A user's session GENERATION — the kill switch. Every session stamps the value
+ * it saw at login; a session whose stamp no longer matches the record is dead.
+ * Bumping the counter therefore ends every existing session of that user at
+ * once, with no session index to maintain and nothing to clean up. Absent field
+ * = generation 0, so an account minted before the field existed is valid.
+ */
+function qs_user_generation(?array $user): int {
+    return (int)(($user['session_generation'] ?? 0));
+}
+
+/**
+ * Bump a user's session generation: every session of theirs stops being
+ * accepted on its next request. This is what "log out everywhere" does, and
+ * what changePassword uses for containment (it then re-stamps the session that
+ * performed the change, so only the OTHERS die).
  *
- * The 'code' key distinguishes an EXPIRED access token ('auth.token_expired' —
- * the client should refresh and retry) from every other refusal
- * ('auth.unauthorized' — the client should re-authenticate).
+ * @return int|null the new generation, or null when the write failed
+ */
+function qs_user_bump_generation(string $userId): ?int {
+    $next = null;
+    $ok = qs_users_mutate(function (array &$cfg) use ($userId, &$next) {
+        if (!isset($cfg['users'][$userId])) {
+            return false;
+        }
+        $next = qs_user_generation($cfg['users'][$userId]) + 1;
+        $cfg['users'][$userId]['session_generation'] = $next;
+        return true;
+    });
+    return ($ok === true) ? $next : null;
+}
+
+/**
+ * Resolve the CALLER'S SESSION to a user — the cookie half of authentication.
+ *
+ * The session cookie names the session; the session names the user. The user
+ * must still exist, must not be disabled (L10), and the generation stamped into
+ * the session at login must still match the record (the kill switch). A session
+ * idle longer than `idle_ttl` is refused and its idle window is otherwise slid
+ * forward as the caller works.
+ *
+ * Callers that receive an HTTP request from a browser must NOT use this alone —
+ * a cookie travels on cross-site requests. Use validateBearerToken, which adds
+ * the per-session token the caller can only know by having read a page of this
+ * session. This function is the right one where no such request exists: the
+ * admin panel resolving its own page, and surface B answering a plain iframe
+ * navigation that carries no headers at all.
+ *
+ * @return array ['valid'=>bool, 'user'=>array|null, 'userId'=>string|null,
+ *                'token'=>string|null, 'error'=>string|null, 'code'=>string|null]
+ */
+function qs_session_auth(): array {
+    $refuse = static function (string $error, ?string $userId = null): array {
+        return ['valid' => false, 'user' => null, 'userId' => $userId, 'token' => null,
+                'error' => $error, 'code' => 'auth.unauthorized'];
+    };
+
+    $session = qs_session_snapshot();
+    if ($session === null) {
+        return $refuse('Not signed in');
+    }
+
+    $knobs = qs_session_config();
+    $idle  = time() - $session['seen'];
+    if ($session['seen'] > 0 && $idle > $knobs['idle_ttl']) {
+        return $refuse('Session expired');
+    }
+
+    $userId = $session['uid'];
+    $user   = loadUsersConfig()['users'][$userId] ?? null;
+    if ($user === null) {
+        return $refuse('Session does not resolve to a user');
+    }
+    // L10: disabled user — every session of theirs dies everywhere, at once.
+    if (($user['status'] ?? 'active') === 'disabled') {
+        return $refuse('User account is disabled', $userId);
+    }
+    // The kill switch: a stale stamp means the account revoked its sessions.
+    if ($session['gen'] !== qs_user_generation($user)) {
+        return $refuse('Session has been revoked', $userId);
+    }
+
+    // Slide the idle window, lazily — an ordinary request stays a lock-free
+    // read, and a session in active use never expires under its user.
+    if ($idle > (int)($knobs['idle_ttl'] / 10)) {
+        qs_session_touch();
+    }
+
+    $user['id'] = $userId; // attach resolved id for downstream (authz, logging, ownership)
+    return ['valid' => true, 'user' => $user, 'userId' => $userId,
+            'token' => $session['token'], 'error' => null, 'code' => null];
+}
+
+/**
+ * Authenticate an HTTP API caller: the session cookie AND the per-session token
+ * presented as `Authorization: Bearer <token>`.
+ *
+ * BOTH halves are required, and that is the point. The cookie alone would let
+ * any page on the internet drive this API through a visitor's browser — it is
+ * sent automatically on cross-site requests. The token alone grants nothing: it
+ * is meaningless without the session it belongs to. Together they say "this
+ * request was made by something that could read a page of this session", which
+ * a foreign origin cannot do (it cannot read the page, and it cannot set an
+ * Authorization header cross-origin without a preflight this install refuses).
+ *
+ * A non-browser client works the same way: `login` returns the token and sets
+ * the cookie, so curl needs a cookie jar plus the header.
  *
  * @param string|null $authHeader The Authorization header value
- * @return array ['valid'=>bool, 'user'=>array|null, 'userId'=>string|null, 'family'=>string|null, 'error'=>string|null, 'code'=>string|null]
- *               'family' = the presenting access token's session family (C8:
- *               lets changePassword spare the caller's own session when revoking)
+ * @return array ['valid'=>bool, 'user'=>array|null, 'userId'=>string|null,
+ *                'token'=>string|null, 'error'=>string|null, 'code'=>string|null]
  */
 function validateBearerToken(?string $authHeader): array {
-    $refuse = static function (string $error, ?string $userId = null, string $code = 'auth.unauthorized'): array {
-        return ['valid' => false, 'user' => null, 'userId' => $userId, 'family' => null, 'error' => $error, 'code' => $code];
+    $refuse = static function (string $error, ?string $userId = null): array {
+        return ['valid' => false, 'user' => null, 'userId' => $userId, 'token' => null,
+                'error' => $error, 'code' => 'auth.unauthorized'];
     };
 
     // No header provided
@@ -787,32 +887,17 @@ function validateBearerToken(?string $authHeader): array {
         return $refuse('Invalid Authorization header format. Use: Bearer <token>');
     }
 
-    $token = trim($matches[1]);
-
-    // access token -> session family -> userId (C5b)
-    $session = qs_session_validate_access($token);
-    if (!$session['valid']) {
-        if ($session['error'] === 'expired') {
-            return $refuse('Access token expired', null, 'auth.token_expired');
-        }
-        return $refuse('Invalid or expired token');
+    $auth = qs_session_auth();
+    if (!$auth['valid']) {
+        return $auth;
     }
 
-    // userId -> user
-    $userId = $session['userId'];
-    $users = loadUsersConfig();
-    $user = ($userId !== null) ? ($users['users'][$userId] ?? null) : null;
-    if ($user === null) {
-        return $refuse('Token does not resolve to a user');
+    // Constant-time compare — the token is a secret the caller either has or
+    // does not, and a length-leaking comparison is free to avoid.
+    if (!hash_equals((string)$auth['token'], trim($matches[1]))) {
+        return $refuse('Invalid session token', $auth['userId']);
     }
-
-    // L10: disabled user — ALL their sessions die everywhere; short-circuit here
-    if (($user['status'] ?? 'active') === 'disabled') {
-        return $refuse('User account is disabled', $userId);
-    }
-
-    $user['id'] = $userId; // attach resolved id for downstream (authz, logging, ownership)
-    return ['valid' => true, 'user' => $user, 'userId' => $userId, 'family' => $session['family'], 'error' => null, 'code' => null];
+    return $auth;
 }
 
 /**
@@ -848,17 +933,20 @@ function findUserByUsername(string $username): ?array {
 }
 
 /**
- * THE login gate (C5b) — shared by the `login` command and the admin panel's
- * form so there is exactly ONE credential-check + issuance path (C8's
- * register/createUser flows mint through qs_session_issue the same way).
+ * THE login gate — shared by the `login` command and the admin panel's form so
+ * there is exactly ONE credential-check path.
+ *
+ * It checks credentials and nothing else: establishing the session is the
+ * caller's job (qs_session_establish), because only the caller knows whether
+ * "remember me" was asked for and only the caller can still send headers.
  *
  * Refusals are deliberately uniform ('invalid_credentials' for unknown
  * username, wrong password, passwordless/externally-managed account, disabled
  * user) — no account-existence oracle. Verification is timing-equalized with
  * a dummy hash when the user has no usable password.
  *
- * @return array {ok:true, user:array, session:array}   (session = qs_session_issue result)
- *             | {ok:false, error:'invalid_credentials'|'throttled'|'server', retry_after?:int}
+ * @return array {ok:true, user:array}   (user has 'id' attached)
+ *             | {ok:false, error:'invalid_credentials'|'throttled', retry_after?:int}
  */
 function qs_auth_attempt_login(string $username, string $password): array {
     $username = trim($username);
@@ -888,11 +976,7 @@ function qs_auth_attempt_login(string $username, string $password): array {
     }
 
     qs_login_throttle_clear($username);
-    $session = qs_session_issue($user['id']);
-    if ($session === false) {
-        return ['ok' => false, 'error' => 'server'];
-    }
-    return ['ok' => true, 'user' => $user, 'session' => $session];
+    return ['ok' => true, 'user' => $user];
 }
 
 /**
@@ -948,7 +1032,7 @@ function qs_users_mutate(callable $fn) {
 
 /**
  * Mint a NEW user account — THE single identity-creation path (C8; the
- * identity mirror of qs_session_issue): the public `register` command and the
+ * identity mirror of the login gate): the public `register` command and the
  * admin register page both come through here. Username uniqueness and the
  * account cap are checked INSIDE the users.php write lock (no TOCTOU).
  *
@@ -1028,12 +1112,13 @@ function qs_user_create(string $name, string $username, ?string $password, int $
             }
         }
         $cfg['users'][$userId] = [
-            'name'             => $name,
-            'username'         => $username,
-            'status'           => 'active',
-            'password_hash'    => $hash,
-            'selected_project' => null,
-            'projects'         => [],
+            'name'               => $name,
+            'username'           => $username,
+            'status'             => 'active',
+            'password_hash'      => $hash,
+            'session_generation' => 0, // the kill switch's starting stamp
+            'selected_project'   => null,
+            'projects'           => [],
         ];
         return true;
     });
@@ -1425,12 +1510,11 @@ function handlePreflightRequest(): void {
 }
 
 /**
- * Resolve the current request's full auth context from the Authorization
- * header: the user AND the presenting session family (C8 — changePassword
- * spares the caller's own family when revoking the rest).
+ * Resolve the current request's full auth context — the session cookie plus the
+ * Authorization header that proves the caller read a page of it.
  *
  * @return array|null the full validateBearerToken success shape
- *                    (user / userId / family), or null when unauthenticated
+ *                    (user / userId / token), or null when unauthenticated
  */
 function getCurrentAuth(): ?array {
     $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? null;
@@ -1459,8 +1543,8 @@ function getCurrentUser(): ?array {
  *
  * @param string $message Error message
  * @param string|null $hint Optional hint for fixing the error
- * @param string $code Response code — 'auth.token_expired' tells the client to
- *                     refresh + retry; anything else means re-authenticate (C5b)
+ * @param string $code Response code — always 'auth.unauthorized' today: there
+ *                     is nothing to refresh, so every refusal means sign in again
  */
 function sendUnauthorizedResponse(string $message, ?string $hint = null, string $code = 'auth.unauthorized'): void {
     http_response_code(401);

@@ -28,15 +28,11 @@ try {
     $__aiToolsManager = new WorkflowManager();
     $__aiToolsSpecs = $__aiToolsManager->listWorkflows();
     $__aiToolsAllowed = null;
-    $__aiToolsToken = $router->getToken();
-    if ($__aiToolsToken) {
-        // Resolve the session access token to a user, then its effective
-        // commands (C5/C5b — validateBearerToken checks the session store).
-        $__aiToolsResolved = validateBearerToken('Bearer ' . $__aiToolsToken);
-        if ($__aiToolsResolved['valid']) {
-            $__aiToolsPerms = getTokenPermissions($__aiToolsResolved['user']);
-            $__aiToolsAllowed = $__aiToolsPerms['commands'] ?? null;
-        }
+    // Resolve the caller's session to a user, then its effective commands.
+    $__aiToolsResolved = qs_session_auth();
+    if ($__aiToolsResolved['valid']) {
+        $__aiToolsPerms = getTokenPermissions($__aiToolsResolved['user']);
+        $__aiToolsAllowed = $__aiToolsPerms['commands'] ?? null;
     }
     $__aiToolsCategoryOrder = ['creation', 'template', 'modification', 'content', 'style', 'advanced', 'wip'];
     $__aiToolsCategoryIndex = array_flip($__aiToolsCategoryOrder);
@@ -148,6 +144,9 @@ window.PreviewConfig = {
     // (matches /admin/workflows). One entry per visible workflow.
     aiToolsWorkflows: <?= json_encode($__previewAiToolsWorkflows) ?>,
     projectStyleUrl: <?= json_encode(rtrim(BASE_URL, '/') . '/style/style.css') ?>,
+    // The per-session token, same value as QUICKSITE_CONFIG.token — the editor's
+    // hand-built fetch sites read it from here. It authorizes nothing on its own;
+    // the session cookie is the credential (see AuthManagement).
     authToken: <?= json_encode($router->getToken()) ?>,
     structureUrl: <?= json_encode($router->url('structure')) ?>,
     multilingual: <?= json_encode($editConfig['MULTILINGUAL_SUPPORT'] ?? false) ?>,

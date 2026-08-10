@@ -21,9 +21,8 @@ quicksite/
 │   ├── management/               # API engine (shared across all projects)
 │   │   ├── command/              # Command handler files (one per command; see COMMAND_API.md)
 │   │   ├── config/               # API configuration
-│   │   │   ├── auth.php          # Session TTLs, registration policy (self-registration + flood controls), CORS (gitignored)
-│   │   │   ├── users.php         # User registry: name + username + password_hash + per-user project list (gitignored)
-│   │   │   ├── sessions.json     # Runtime sessions — access/refresh tokens, hashed (machine-written, gitignored)
+│   │   │   ├── auth.php          # Session lifetimes, registration policy (self-registration + flood controls), CORS (gitignored)
+│   │   │   ├── users.php         # User registry: name + username + password_hash + session generation + per-user project list (gitignored)
 │   │   │   ├── *-throttle.json   # Login + registration backoff counters, hashed keys (machine-written, gitignored)
 │   │   │   ├── roles.php         # Role definitions (gitignored)
 │   │   │   ├── environment.php   # production | development — SSRF/error gate (gitignored; default production)
@@ -67,6 +66,10 @@ quicksite/
 │   ├── deploy/                   # Apache + nginx vhost examples for mapped domains
 │   ├── nginx/                    # Auto-generated nginx config (dynamic_routes.conf)
 │   ├── cron/                     # Optional cron scripts (nginx reload fallback)
+│   ├── tmp/                      # Scratch space (gitignored)
+│   │   └── sessions/             #   PHP session files — kept here, not in the shared
+│   │                             #   system path, so another application on the same
+│   │                             #   host cannot expire QuickSite's sessions
 │   └── logs/                     # Command execution logs, partitioned per project (gitignored)
 │
 ├── docs/                         # Documentation (this folder)

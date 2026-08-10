@@ -23,12 +23,6 @@ require_once '../init.php';
 // would miss. It also switches display_errors off in a production install, so
 // even a fatal raised after the headers are on the wire — which no shutdown
 // handler can repair — stops disclosing paths.
-//
-// One caveat, deliberate: /admin/session-refresh is served by this same entry
-// point and answers JSON. A fatal there now returns a 500 HTML body instead of
-// a 500 JSON body. The client branches on the status, not the shape, and a
-// wrong content type on a dead request is a smaller problem than an unhandled
-// fatal on every page.
 require_once SECURE_FOLDER_PATH . '/src/functions/errorHygiene.php';
 qs_register_fatal_handler(QS_FATAL_SHAPE_HTML);
 

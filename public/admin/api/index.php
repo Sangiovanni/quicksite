@@ -42,7 +42,6 @@ $__qsApiProject = null;
 }
 
 require_once __DIR__ . '/../../init.php';
-require_once SECURE_FOLDER_PATH . '/admin/AdminRouter.php';
 require_once SECURE_FOLDER_PATH . '/admin/functions/AdminHelper.php';
 
 // C12 (F9): this dispatcher had no fatal handling of any kind — no
@@ -57,32 +56,21 @@ qs_register_fatal_handler(QS_FATAL_SHAPE_ERROR);
 header('Content-Type: application/json');
 header('Cache-Control: no-store');
 
-// Get the router to check authentication
-$router = new AdminRouter();
-
-// Check for Bearer token in Authorization header (for AJAX calls)
-$authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
-$token = null;
-
-if (preg_match('/Bearer\s+(.+)$/i', $authHeader, $matches)) {
-    $token = $matches[1];
-} elseif ($router->isAuthenticated()) {
-    // Fall back to session token
-    $token = $router->getToken();
-}
-
-if (!$token) {
-    http_response_code(401);
-    echo json_encode(['error' => 'Unauthorized']);
-    exit;
-}
-
-// Resolve token to tokenInfo for role-based permission checks
+// Authenticate exactly like /management does: the session cookie AND the
+// per-session token in the Authorization header. This helper runs management
+// commands in-process, so it must not be reachable on a weaker credential than
+// the commands themselves.
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
 // is_valid_project_name — the F1 shape gate for the URL marker (the management
 // dispatcher requires this the same way).
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
-$tokenValidation = validateBearerToken('Bearer ' . $token);
+
+$authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+if ($authHeader === '' && function_exists('apache_request_headers')) {
+    $headers = apache_request_headers();
+    $authHeader = $headers['Authorization'] ?? $headers['authorization'] ?? '';
+}
+$tokenValidation = validateBearerToken($authHeader !== '' ? $authHeader : null);
 $tokenInfo = $tokenValidation['valid'] ? $tokenValidation['user'] : null;
 
 if ($tokenInfo === null) {
@@ -206,7 +194,7 @@ switch ($action) {
         
     case 'pages':
         // Return list of pages
-        $result = makeInternalApiCall('listPages', $token);
+        $result = makeInternalApiCall('listPages');
         if ($result['success']) {
             $pages = array_map(function($page) {
                 // Pages come as objects with 'name' property
@@ -239,7 +227,7 @@ switch ($action) {
         
     case 'components':
         // Return list of components
-        $result = makeInternalApiCall('listComponents', $token);
+        $result = makeInternalApiCall('listComponents');
         if ($result['success']) {
             $components = array_map(function($comp) {
                 return ['value' => $comp['name'], 'label' => $comp['name']];
@@ -258,7 +246,7 @@ switch ($action) {
             break;
         }
         
-        $result = makeInternalApiCall('listComponents', $token);
+        $result = makeInternalApiCall('listComponents');
         if ($result['success']) {
             $component = null;
             foreach ($result['data']['components'] ?? [] as $comp) {
@@ -288,7 +276,7 @@ switch ($action) {
         
     case 'routes':
         // Return list of routes
-        $result = makeInternalApiCall('getRoutes', $token);
+        $result = makeInternalApiCall('getRoutes');
         if ($result['success']) {
             // Use flat_routes which is a simple array of route names
             $routes = array_map(function($route) {
@@ -302,7 +290,7 @@ switch ($action) {
         
     case 'languages':
         // Return list of languages
-        $result = makeInternalApiCall('getLangList', $token);
+        $result = makeInternalApiCall('getLangList');
         if ($result['success']) {
             $langs = array_map(function($lang) {
                 return ['value' => $lang, 'label' => strtoupper($lang)];
@@ -322,7 +310,7 @@ switch ($action) {
             $url .= '/' . $category;
         }
         
-        $result = makeInternalApiCall($url, $token);
+        $result = makeInternalApiCall($url);
         if ($result['success']) {
             $files = [];
             // listAssets returns data in ['assets'][$category] format
@@ -364,7 +352,7 @@ switch ($action) {
         
     case 'builds':
         // Return list of builds
-        $result = makeInternalApiCall('listBuilds', $token);
+        $result = makeInternalApiCall('listBuilds');
         if ($result['success']) {
             $buildsData = $result['data']['builds'] ?? [];
             $builds = array_map(function($build) {
@@ -384,7 +372,7 @@ switch ($action) {
         
     case 'aliases':
         // Return list of aliases for deleteAlias
-        $result = makeInternalApiCall('listAliases', $token);
+        $result = makeInternalApiCall('listAliases');
         if ($result['success']) {
             $aliases = [];
             // listAliases returns array of objects with 'alias' and 'target' properties
@@ -417,7 +405,7 @@ switch ($action) {
         // Return list of translation keys from a specific language
         $lang = $params[0] ?? 'en';
         
-        $result = makeInternalApiCall('getTranslation/' . $lang, $token);
+        $result = makeInternalApiCall('getTranslation/' . $lang);
         if ($result['success']) {
             $keys = flattenTranslationKeysForSelect($result['data']['translations'] ?? []);
             echo json_encode(['success' => true, 'data' => $keys]);
@@ -430,7 +418,7 @@ switch ($action) {
         // Return full translation data for a language (for showing current values)
         $lang = $params[0] ?? 'en';
         
-        $result = makeInternalApiCall('getTranslation/' . $lang, $token);
+        $result = makeInternalApiCall('getTranslation/' . $lang);
         if ($result['success']) {
             echo json_encode(['success' => true, 'data' => $result['data']['translations'] ?? []]);
         } else {
@@ -449,7 +437,7 @@ switch ($action) {
         }
         
         // Get translation for the language
-        $result = makeInternalApiCall('getTranslation/' . $lang, $token);
+        $result = makeInternalApiCall('getTranslation/' . $lang);
         if ($result['success']) {
             $translations = $result['data']['translations'] ?? [];
             // Look for page.titles.{route}
@@ -465,21 +453,21 @@ switch ($action) {
         $lang = $params[0] ?? 'en';
         
         // Get all translation keys
-        $translationResult = makeInternalApiCall('getTranslation/' . $lang, $token);
+        $translationResult = makeInternalApiCall('getTranslation/' . $lang);
         if (!$translationResult['success']) {
             echo json_encode(['success' => false, 'error' => $translationResult['error']]);
             break;
         }
         
         // Get unused keys (keys in translation but not used in structure)
-        $unusedResult = makeInternalApiCall('getUnusedTranslationKeys/' . $lang, $token);
+        $unusedResult = makeInternalApiCall('getUnusedTranslationKeys/' . $lang);
         $unusedKeys = [];
         if ($unusedResult['success'] && isset($unusedResult['data']['results'][$lang]['unused_keys'])) {
             $unusedKeys = $unusedResult['data']['results'][$lang]['unused_keys'];
         }
         
         // Get missing/unset keys (keys in structure but not in translation)
-        $validateResult = makeInternalApiCall('validateTranslations/' . $lang, $token);
+        $validateResult = makeInternalApiCall('validateTranslations/' . $lang);
         $missingKeys = [];
         if ($validateResult['success'] && isset($validateResult['data']['validation_results'][$lang]['missing_keys'])) {
             $missingKeys = $validateResult['data']['validation_results'][$lang]['missing_keys'];
@@ -566,7 +554,7 @@ switch ($action) {
             $endpoint = "getStructure/{$type}/showIds";
         }
         
-        $result = makeInternalApiCall($endpoint, $token);
+        $result = makeInternalApiCall($endpoint);
         if ($result['success']) {
             $structure = $result['data']['structure'] ?? [];
             $nodes = buildHierarchicalNodeOptions($structure);
@@ -578,7 +566,7 @@ switch ($action) {
     
     case 'current-styles':
         // Return current CSS content for editStyles
-        $result = makeInternalApiCall('getStyles', $token);
+        $result = makeInternalApiCall('getStyles');
         if ($result['success']) {
             echo json_encode([
                 'success' => true, 
@@ -595,7 +583,7 @@ switch ($action) {
     
     case 'root-variables':
         // Return CSS :root variables for setRootVariables selector
-        $result = makeInternalApiCall('getRootVariables', $token);
+        $result = makeInternalApiCall('getRootVariables');
         if ($result['success']) {
             $variables = $result['data']['variables'] ?? [];
             // Return as array with name and value for selector
@@ -615,7 +603,7 @@ switch ($action) {
     
     case 'keyframes':
         // Return list of keyframe animation names
-        $result = makeInternalApiCall('getKeyframes', $token);
+        $result = makeInternalApiCall('getKeyframes');
         if ($result['success']) {
             $keyframes = $result['data']['keyframes'] ?? [];
             $list = [];
@@ -636,7 +624,7 @@ switch ($action) {
     
     case 'style-rules':
         // Return CSS selectors grouped by global/media for getStyleRule/setStyleRule/deleteStyleRule
-        $result = makeInternalApiCall('listStyleRules', $token);
+        $result = makeInternalApiCall('listStyleRules');
         if ($result['success']) {
             $grouped = $result['data']['grouped'] ?? [];
             $selectors = $result['data']['selectors'] ?? [];
@@ -930,7 +918,7 @@ function formatBytes(int $bytes, int $precision = 1): string {
  * Parses endpoint like "listBuilds" or "getTranslation/en" or "getStructure/page/home/showIds"
  * into command name + URL params, then calls the __command_* function directly.
  */
-function makeInternalApiCall(string $endpoint, string $token): array {
+function makeInternalApiCall(string $endpoint): array {
     // Parse endpoint: first segment is the command, rest are URL params
     $segments = explode('/', trim($endpoint, '/'));
     $command = array_shift($segments);

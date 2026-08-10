@@ -34,11 +34,13 @@ class AdminTranslation {
      * Detect user's preferred language
      */
     private function detectLanguage(): void {
-        // Check session first
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
-        
+        // The admin language rides the SAME session as the login — a bare
+        // session_start() here would open PHP's DEFAULT session instead, giving
+        // the panel a second cookie and, worse, leaving $_SESSION pointing at
+        // the wrong session for anything that reads the login afterwards.
+        require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+        qs_session_boot(true);
+
         // URL parameter has HIGHEST priority (user clicking language switcher).
         // is_string: a query parameter arrives as whatever the caller sent, and
         // `?lang[]=x` is an ARRAY. Passing it to isValidLanguage(string) raised an

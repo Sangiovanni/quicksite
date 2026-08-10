@@ -27,6 +27,15 @@
  *   password_hash    password_hash() output; null = externally managed account
  *                    (its sessions are minted by an embedding platform, never
  *                    by the login page)
+ *   session_generation
+ *                    integer, default 0 — the SESSION KILL SWITCH. Each session
+ *                    stamps this value at login and it is compared on every
+ *                    request; raising it by one ends every existing session of
+ *                    this user at once. "Log out everywhere" and a password
+ *                    change both work by bumping it (a password change then
+ *                    re-stamps the session that asked, so only the OTHERS die).
+ *                    Machine-written — you never need to set it by hand, and a
+ *                    missing field simply means generation 0.
  *   selected_project the project opened by default (UX only — never authorization)
  *   projects         status MIRROR of "my projects" (never authoritative —
  *                    access always re-checks the project's members.json).
@@ -60,12 +69,13 @@
 return [
     'users' => [
         'usr_CHANGE_ME_default' => [
-            'name'             => 'Default Admin',
-            'username'         => 'admin',
-            'status'           => 'active',
-            'password_hash'    => null,
-            'selected_project' => null,
-            'projects'         => [],
+            'name'               => 'Default Admin',
+            'username'           => 'admin',
+            'status'             => 'active',
+            'password_hash'      => null,
+            'session_generation' => 0,
+            'selected_project'   => null,
+            'projects'           => [],
         ],
     ],
 ];

@@ -4,22 +4,24 @@
  *
  * Copy this file to auth.php and customize.
  *
- * C5b/C8 8.0b: credentials are USERNAME + PASSWORD — see users.php(.example)
- * `password_hash`. Runtime sessions (short-lived access token + rotating
- * refresh token) live in sessions.json next to this file (machine-written,
- * auto-created — never edit or commit it). This file holds the session TTL
- * knobs, the self-registration gate, and CORS.
+ * Credentials are USERNAME + PASSWORD — see users.php(.example)
+ * `password_hash`. A login establishes a PHP session; the session files live
+ * under secure/tmp/sessions (machine-written, auto-created — never edit or
+ * commit them). This file holds the session lifetime knobs, the
+ * self-registration gate, and CORS.
  */
 
 return [
     'authentication' => [
-        // Session lifecycle knobs (seconds).
+        // Session lifetime knobs (seconds).
         'session' => [
-            'access_ttl'  => 900,       // access-token lifetime (15 min)
-            'refresh_ttl' => 2592000,   // refresh-token lifetime, sliding (30 days)
-            'reuse_grace' => 60,        // window in which a rotated refresh token's
-                                        // reuse is treated as a legit race (two tabs),
-                                        // not theft
+            'idle_ttl'     => 86400,     // inactivity before a session stops being
+                                        // accepted (1 day). Sliding: it moves
+                                        // forward as the caller works.
+            'remember_ttl' => 2592000,   // how long a "remember me" session cookie
+                                        // survives a browser restart (30 days).
+                                        // Without it the cookie dies with the
+                                        // browser session.
         ],
         // Self-registration policy. allow_self_registration false (secure
         // default) = no register page, no public register command; accounts

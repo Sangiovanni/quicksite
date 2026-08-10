@@ -64,12 +64,15 @@ if ($origin) {
 // ============================================================================
 // Public Routes (no authentication required)
 // ============================================================================
-// C5b: the session endpoints are public because they are SELF-authenticating —
-// login checks email+password, refreshSession/logoutSession check the refresh
-// token itself. They never act on behalf of a bearer header.
-// C8: register is public too — SELF-gating (the registration flag + flood
-// controls are enforced inside the command; default = disabled).
-$PUBLIC_COMMANDS = ['help', 'login', 'refreshSession', 'logoutSession', 'register'];
+// `login` is public because it is SELF-authenticating: the credentials in its
+// body ARE the authentication, and it is what CREATES the session every other
+// command needs. `register` is public and SELF-gating (the registration flag +
+// flood controls are enforced inside the command; default = disabled).
+//
+// `logoutSession` is NOT here: with the PHP-session model there is no refresh
+// token to present, so ending a session means proving you hold it — which is
+// exactly what the normal authenticated path checks.
+$PUBLIC_COMMANDS = ['help', 'login', 'register'];
 
 // Parse the command early to check if it's public
 $requestUri = $_SERVER['REQUEST_URI'] ?? '';
@@ -113,11 +116,11 @@ if (!$authHeader && function_exists('apache_request_headers')) {
 $authResult = validateBearerToken($authHeader);
 
 if (!$authResult['valid']) {
-    // C5b: 'auth.token_expired' tells the client to refresh + retry; any other
-    // code means re-authenticate (login).
+    // Both halves are required — the session cookie AND the session token in
+    // the header. A caller missing either is told the same thing: sign in.
     sendUnauthorizedResponse(
         $authResult['error'],
-        'Include header: Authorization: Bearer <your-token>',
+        'Sign in with the login command, then send its session cookie plus the header: Authorization: Bearer <session_token>',
         $authResult['code'] ?? 'auth.unauthorized'
     );
 }

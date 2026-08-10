@@ -25,13 +25,10 @@ const QuickSiteAdmin = {
             return window.QuickSiteAPI?.config.publicSpace || window.QUICKSITE_CONFIG?.publicSpace || '';
         },
         get token() {
-            // Try QUICKSITE_CONFIG first, then cookie
-            if (window.QUICKSITE_CONFIG?.token) {
-                return window.QUICKSITE_CONFIG.token;
-            }
-            // Read from cookie
-            const match = document.cookie.match(/(?:^|; )admin_token=([^;]*)/);
-            return match ? decodeURIComponent(match[1]) : '';
+            // The per-session token, emitted with the page. There is no cookie
+            // fallback: the session cookie is HttpOnly by design and JS cannot
+            // read it — a page with no token is a page with no session.
+            return window.QUICKSITE_CONFIG?.token || '';
         },
         get defaultLang() {
             return window.QUICKSITE_CONFIG?.defaultLang || 'en';
@@ -342,8 +339,8 @@ const QuickSiteAdmin = {
     },
 
     /**
-     * Get the current access token - delegates to QuickSiteAPI (C5b: tokens
-     * never live in browser storage; the page-embedded config is the fallback)
+     * Get the per-session token - delegates to QuickSiteAPI (it never lives in
+     * browser storage; the page-embedded config is the fallback)
      */
     getToken() {
         if (window.QuickSiteAPI) {
@@ -353,7 +350,7 @@ const QuickSiteAdmin = {
     },
 
     /**
-     * Clear the access token - delegates to QuickSiteAPI
+     * Clear the per-session token - delegates to QuickSiteAPI
      */
     clearToken() {
         if (window.QuickSiteAPI) {

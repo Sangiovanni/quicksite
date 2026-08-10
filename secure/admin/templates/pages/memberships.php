@@ -18,7 +18,7 @@ $baseUrl = rtrim(BASE_URL, '/');
 // The caller's own opaque public id — the "you" marker + self-row logic need
 // it and no API response carries it (deliberate; it is page-render data).
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
-$__myAuth = validateBearerToken('Bearer ' . (string)$router->getToken());
+$__myAuth = qs_session_auth();
 $__myUserId = !empty($__myAuth['valid']) ? (string)($__myAuth['userId'] ?? '') : '';
 ?>
 

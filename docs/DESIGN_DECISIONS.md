@@ -10,8 +10,9 @@
 > [WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md), and [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md).
 > This file is the *why*. Together the two halves form the full doc.
 
-> _Maintainers note:_ append a new entry every time a non-trivial design
-> decision is locked — at lock time, not after implementation. This file
+> _Maintainers note:_ append a new entry for every non-trivial design decision
+> **once the code implementing it lands** — an unbuilt decision is a plan, and
+> its rationale belongs with the plan until then. This file
 > is **append-only** for the historical decisions; never silently rewrite
 > a past entry. When a decision later changes, add a NEW dated entry that
 > says `**Supersedes**: <link to old entry>` and mark the old entry's
@@ -4299,7 +4300,7 @@ account-recovery story QuickSite does not have yet).
 `secure/management/command/login.php`. Behaviour:
 [ARCHITECTURE.md §3](ARCHITECTURE.md).
 
-### Access token plus refresh token, with rotation and reuse detection (locked 2026-07-11)
+### Access token plus refresh token, with rotation and reuse detection (locked 2026-07-11) (superseded 2026-08-10)
 
 **Decision**: A login mints a **pair** — a short-lived access token sent on every
 request (15 minutes) and a longer-lived refresh token accepted only at the
@@ -4331,7 +4332,7 @@ already rides an HttpOnly cookie).
 `qs_session_rotate`, `qs_session_revoke_family`). Behaviour:
 [ARCHITECTURE.md §3](ARCHITECTURE.md).
 
-### The admin panel holds one session; the access token lives in memory only (locked 2026-07-11)
+### The admin panel holds one session; the access token lives in memory only (locked 2026-07-11) (superseded 2026-08-10)
 
 **Decision**: The admin panel is the single holder of the browser's session. The
 server-side PHP session owns the token pair; the page emits the current access
@@ -6398,3 +6399,178 @@ same-origin; the list exists for the ones that are not).
 **Source**: `secure/management/config/auth.php.example`,
 `secure/src/functions/AuthManagement.php`. Behaviour:
 [ARCHITECTURE.md §3](ARCHITECTURE.md).
+
+### The browser session IS the session — rotation dropped (locked 2026-08-10)
+
+**Supersedes**: *Access token plus refresh token, with rotation and reuse
+detection* and *The admin panel holds one session; the access token lives in
+memory only* (both above).
+
+**Decision**: A login establishes a **PHP session** and nothing else. There is no
+access token, no refresh token, no rotation, no session family and no server-side
+token store. The session cookie is the credential; the response also returns one
+**per-session token**, which every API call sends back as `Authorization: Bearer`.
+Both halves are required on every call.
+
+**Reasoning**: The pair-and-rotate design was correct for a system whose
+credential travelled only in a header. QuickSite's does not: the admin panel is
+already a PHP-session holder, the preview iframe is a plain navigation that can
+carry no header at all, and the rotation machinery existed mostly to keep a
+header-borne credential short-lived. Once the session cookie carries identity,
+that machinery is answering a question nobody is asking any more — and it was not
+free: a 228 KB token store that was 99.4% orphaned, a reuse-detection window that
+could log the victim out, and two places (the cookie and the store) that had to
+agree about who was signed in.
+
+The per-session token stays, in a smaller role. Cookie-only authentication would
+have handed every page on the internet the ability to drive this API through a
+visitor's browser, because browsers send cookies on cross-site requests
+automatically. Requiring a value the caller can only have obtained by *reading a
+page of the session* closes that: another origin can neither read the page nor set
+an `Authorization` header cross-origin without a preflight this installation
+refuses. The token is strictly weaker than what it replaces — on its own it
+authorizes nothing — which is the point: leaking it is no longer a compromise.
+
+**Alternatives considered**: Keep the pair and only change the preview cookie
+(rejected — leaves the store, the rotation and the two-owner problem in place to
+serve a header path the working deployments do not use). Make the bearer token the
+PHP session id (rejected — page-embedding it would undo the HttpOnly protection
+the cookie exists for, and turn an XSS from "steals a short-lived token" into
+"steals the session"). A signed, self-contained token with no store (rejected —
+that is construction where deletion was available, and it re-creates the problem
+of a page-embedded credential that works on its own). A distinct `X-QS-CSRF`
+header instead of reusing `Authorization` (rejected — roughly sixty hand-built
+fetch call sites already send `Authorization`, and each one missed in a rename is
+a silent 401; the header name is unchanged, only what the value means).
+
+**Source**: `secure/src/functions/SessionManagement.php`,
+`secure/src/functions/AuthManagement.php` (`qs_session_auth`,
+`validateBearerToken`), `secure/admin/AdminRouter.php`. Behaviour:
+[COMMAND_API.md](COMMAND_API.md), [ARCHITECTURE.md §3](ARCHITECTURE.md).
+
+### The session kill switch is a generation counter, not a session index (locked 2026-08-10)
+
+**Decision**: Each user record carries one integer, `session_generation`. A
+session stamps its value at login; every request compares the stamp against the
+record. Raising the integer ends every existing session of that account at once.
+"Log out everywhere" is that bump. A password change is that bump followed by
+re-stamping the session that asked, so the caller stays signed in and every other
+device does not.
+
+**Reasoning**: The obvious alternative is to keep an index of live sessions per
+user and walk it. PHP keys session files by session id and offers no
+user→sessions lookup, so that index would have to be built and maintained by hand
+— which is the store this release just deleted, re-created under a new name, with
+the same failure modes: it can drift from reality, it needs pruning, and it grows
+with every login. A counter needs none of that. It is O(1) to bump, it is already
+being read (the user record is loaded on every request to check status and role),
+it cannot drift because there is nothing to keep in sync, and it degrades to
+"generation 0" for a record written before the field existed. Django and Laravel
+both solve this the same way.
+
+The cost is honest and small: you cannot enumerate or selectively end one *other*
+session, because nothing records that they exist. The product need — "end my
+sessions everywhere" and "a password change should not leave a thief signed in" —
+is served exactly.
+
+**Alternatives considered**: A per-user index of live session ids (rejected —
+above). Deleting the user's session files directly (rejected — it means reaching
+into PHP's storage layer and reading every file to find the owner, and it breaks
+outright under any non-file session handler). Bumping on every password change
+*without* the re-stamp (rejected — it would sign the user out of the browser they
+just used to change their password, which reads as a bug).
+
+**Source**: `secure/src/functions/AuthManagement.php` (`qs_user_generation`,
+`qs_user_bump_generation`), `secure/src/functions/SessionManagement.php`
+(`qs_session_restamp`), `secure/management/command/logoutSession.php`,
+`secure/management/command/changePassword.php`. Behaviour:
+[COMMAND_API.md](COMMAND_API.md).
+
+### Single-session-per-user was considered and rejected (locked 2026-08-10)
+
+**Decision**: A login does **not** evict the account's other sessions. Two
+browsers, a desktop and a phone, stay signed in together. Ending other sessions is
+an explicit action the user takes ("log out everywhere"), never a side effect of
+signing in.
+
+**Reasoning**: One-session-at-a-time looks like a security control and is not one.
+Someone holding the password can log in and evict the legitimate user — a denial
+of service delivered *by the attacker*, at will. The two then take turns evicting
+each other, which is indistinguishable from a flaky connection and obscures the
+very intrusion the mechanism appears to reveal. It also breaks ordinary use: a
+designer previewing on a phone while editing on a desktop is a normal working
+pattern, not an anomaly to be defended against.
+
+What the idea is actually reaching for is the ability to end sessions you did not
+start, and the generation counter (see the entry above) delivers that directly,
+on demand, without punishing the honest case.
+
+**Alternatives considered**: Ship it as the model (rejected — above). Ship it as a
+setting defaulting on (rejected — same behaviour, with a setting to blame). If it
+is ever wanted, it ships as a setting defaulting **off**, never as the model.
+
+**Source**: `secure/management/command/logoutSession.php`. Behaviour:
+[COMMAND_API.md](COMMAND_API.md).
+
+### Surface B is cookie-only (locked 2026-08-10)
+
+**Decision**: The `/p/<id>/` visibility gate reads the panel's session cookie and
+nothing else. The `Authorization: Bearer` path it also accepted is dropped, along
+with the short-lived `qs_preview` cookie that used to carry a token to it.
+
+**Reasoning**: The header path did not work the same way on the two supported
+targets. Apache does not forward `Authorization` to this surface unless the
+deployment configures it; nginx does. The same code therefore decided access
+differently depending on the web server, which is the sort of divergence that is
+discovered in production rather than in review. Choosing between them is easy once
+stated plainly: the credential that actually reaches this surface is a cookie,
+because a preview iframe is a plain browser navigation and can carry no header of
+its own. Keeping the header as a second path bought nothing on Apache and, on
+nginx, was a second way in to maintain and test. And with the session cookie
+covering the whole origin, `qs_preview` had nothing left to carry.
+
+The accepted cost is stated rather than worked around: a project mapped to its
+**own** domain is a different origin, so the panel's cookie is not sent there.
+That is irrelevant for a public project — no credential is needed — and it means a
+**private** project cannot be previewed on its mapped domain. It is previewed at
+`/p/<id>/` on the panel's own hostname, which is where the editor points anyway.
+
+**Alternatives considered**: Keep both paths and document the Apache caveat
+(rejected — a gate whose behaviour depends on the web server is a defect, not a
+caveat). Keep the header path and require every Apache deployment to forward the
+header (rejected — it makes correct behaviour depend on a configuration step
+deployers will miss, and the failure is silent). Issue a separate short-lived
+preview cookie for mapped domains (rejected — it re-introduces a second credential
+to serve a case the editor does not use).
+
+**Source**: `secure/src/functions/surfaceB.php` (`qs_surface_b_gate`),
+`secure/admin/templates/layout.php`. Behaviour:
+[ARCHITECTURE.md §5.1](ARCHITECTURE.md), [ADMIN_PANEL.md](ADMIN_PANEL.md).
+
+### Session files live in the installation, not the shared system path (locked 2026-08-10)
+
+**Decision**: PHP sessions are written to `secure/tmp/sessions` inside the
+installation, with `gc_maxlifetime` raised to cover the longest session QuickSite
+promises, and the session cookie is named `QSSESSID` rather than PHP's default.
+
+**Reasoning**: The default save path is shared by every application on the host,
+and PHP's garbage collector deletes files older than *the collecting request's*
+`gc_maxlifetime` — commonly 24 minutes. A neighbouring application's ordinary
+traffic would therefore sign QuickSite's users out mid-work, at random, with
+nothing in any log to explain it. Owning the directory removes the interaction
+entirely and keeps session state inside the installation, which is where every
+other piece of this file-based system's state already lives. The distinct cookie
+name is the same reasoning applied to the browser: an unrelated `PHPSESSID` set by
+another application on the same hostname is no longer something QuickSite has to
+reason about.
+
+**Alternatives considered**: Leave the default path and raise `gc_maxlifetime`
+(rejected — it only changes what QuickSite's own requests collect; the neighbour
+still collects at its own setting). Leave the default path and accept the logouts
+(rejected — an unexplainable intermittent logout is the worst kind of defect to
+diagnose). A database or custom session handler (rejected — a database dependency
+is exactly what this project's positioning rules out).
+
+**Source**: `secure/src/functions/SessionManagement.php` (`qs_session_boot`,
+`qs_session_save_path`). Behaviour:
+[PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md).

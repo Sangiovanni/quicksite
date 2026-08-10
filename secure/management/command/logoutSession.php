@@ -1,17 +1,25 @@
 <?php
 /**
- * logoutSession Command (C5b)
+ * logoutSession Command
  *
- * Revokes the SESSION FAMILY the given refresh token belongs to — the access
- * token(s) and refresh token of that login all die together. Idempotent:
- * an unknown/already-revoked token simply reports revoked=false. PUBLIC +
- * self-authenticating (holding the refresh token proves ownership of the
- * session being ended; no bearer header is consulted).
+ * Ends the CALLER'S session: the session data, its file and its cookie.
+ *
+ * With `everywhere: true` it also bumps the account's session GENERATION, which
+ * ends every OTHER session of this user — a second browser, a phone, a session
+ * left open somewhere else — on their next request. That is the whole
+ * mechanism: one integer on the user record, stamped into each session at login
+ * and compared on every request. Nothing is indexed and nothing needs cleaning
+ * up afterwards.
+ *
+ * AUTHENTICATED. There is no refresh token to present any more, so proving you
+ * may end a session is proving you hold it — which is what the ordinary
+ * authenticated path already checks. Idempotent by construction: a caller with
+ * no session never reaches the command.
  *
  * @method POST
  * @route /management/logoutSession
- * @auth none (self-authenticating)
- * @param string $refresh_token The session's refresh token
+ * @auth required (global scope — acts only on the caller's own sessions)
+ * @param bool $everywhere Optional — also end this account's other sessions
  * @return ApiResponse
  */
 
@@ -19,18 +27,31 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
 
 function __command_logoutSession(array $params = [], array $urlParams = []): ApiResponse {
-    $refresh = (string)($params['refresh_token'] ?? '');
-    if (trim($refresh) === '') {
-        return ApiResponse::create(400, 'validation.required')
-            ->withMessage('refresh_token is required')
-            ->withData(['required' => ['refresh_token']]);
+    $auth = getCurrentAuth();
+    if ($auth === null) {
+        return ApiResponse::create(401, 'auth.required')
+            ->withMessage('Authentication required');
     }
 
-    $revoked = qs_session_revoke_by_refresh(trim($refresh));
+    $everywhere = !empty($params['everywhere']);
+    $othersEnded = false;
+    if ($everywhere) {
+        $generation = qs_user_bump_generation((string)$auth['userId']);
+        if ($generation === null) {
+            return ApiResponse::create(500, 'server.file_write_failed')
+                ->withMessage('Could not end the account\'s other sessions');
+        }
+        $othersEnded = true;
+    }
+
+    qs_session_destroy();
 
     return ApiResponse::create(200, 'operation.success')
-        ->withMessage($revoked ? 'Session revoked' : 'No matching session (already logged out?)')
-        ->withData(['revoked' => $revoked]);
+        ->withMessage($everywhere ? 'Signed out everywhere' : 'Signed out')
+        ->withData([
+            'ended'               => true,
+            'other_sessions_ended' => $othersEnded,
+        ]);
 }
 
 // Execute via HTTP (not internal call)

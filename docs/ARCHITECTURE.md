@@ -13,7 +13,7 @@ QuickSite separates concerns into three top-level layers. Each one has a clear b
 | Layer | Folder | Audience | Purpose |
 |---|---|---|---|
 | **Project** | `secure/projects/{name}/` | Site owner | The actual website data: routes, page structures (JSON), translations, components, interactions, styles, assets. |
-| **Management** | `secure/management/` | API client (admin panel, scripts) | The 177 commands that read or mutate project data. Single entry point: `public/management/index.php`. Token + role enforced. AI calls bypass this layer entirely (browser-direct). |
+| **Management** | `secure/management/` | API client (admin panel, scripts) | The 176 commands that read or mutate project data. Single entry point: `public/management/index.php`. Session + role enforced. AI calls bypass this layer entirely (browser-direct). |
 | **Admin** | `public/admin/` + `secure/admin/` | Human operator | The browser UI that calls Management commands. Includes the visual editor, sitemap, theme editor, AI workspace, workflow runner. |
 
 ```
@@ -142,7 +142,8 @@ Every operation in QuickSite runs through one HTTP endpoint:
 
 ```
 {POST|GET} /management/{command}
-Authorization: Bearer qsa_xxx        ← short-lived access token from /management/login
+Cookie: QSSESSID=…                   ← the session, from /management/login
+Authorization: Bearer <session_token>  ← that session's token, from the same response
 Content-Type: application/json
 ```
 
@@ -172,7 +173,7 @@ ApiResponse::create(201, 'route.created')
     ->send();
 ```
 
-The full list of 177 commands is registered in `secure/management/routes.php`. See [COMMAND_API.md](COMMAND_API.md) for the catalogue and a per-command reference (also obtainable at runtime via `GET /management/help`).
+The full list of 176 commands is registered in `secure/management/routes.php`. See [COMMAND_API.md](COMMAND_API.md) for the catalogue and a per-command reference (also obtainable at runtime via `GET /management/help`).
 
 ### Response shape
 
@@ -189,7 +190,7 @@ Errors include a structured `errors` array with `field` / `value` / `reason`. An
 
 ### Authentication & roles
 
-Credentials are **username + password** (the username is the private login identifier; public identity is the display name + the user id — there is no email field): `users.php` holds each user's `password_hash` (a `null` hash marks an externally-managed account — its sessions are minted by an embedding platform, never by password login). The public `login` command exchanges them for a **session** — a short-lived access token (sent as `Authorization: Bearer` on every call) plus a rotating refresh token (`refreshSession`; reusing a rotated refresh token after a short grace window revokes the whole session family — a theft becomes visible instead of silent). Runtime sessions live hashed in `secure/management/config/sessions.json`; the TTL knobs and the registration policy live in `auth.php` alongside CORS. The admin panel holds its session server-side in the PHP session and only ever exposes the short-lived access token to the browser.
+Credentials are **username + password** (the username is the private login identifier; public identity is the display name + the user id — there is no email field): `users.php` holds each user's `password_hash` (a `null` hash marks an externally-managed account — its sessions are minted by an embedding platform, never by password login). The public `login` command exchanges them for a **session**: it sets an HttpOnly session cookie and returns that session's token. Every later call presents both — the cookie as the credential, the token as `Authorization: Bearer` proving the caller could read a page of the session, which is what keeps a cookie-authenticated API safe from cross-site request forgery. Sessions are PHP's own, stored under `secure/tmp/sessions`; the lifetime knobs and the registration policy live in `auth.php` alongside CORS. Every session is killable from one integer: each user record carries a **session generation** that a session stamps at login and the server compares on every request, so raising it ends every session of that account at once — that is how "log out everywhere" works, and how a password change ends the user's other sessions while keeping the one that made the change.
 
 The **first** account is created on the first-run page: while the user registry is empty, every admin URL renders `/admin/setup`, which asks for a setup token the engine writes under `secure/management/config/`. Reading that file is the authorisation — filesystem access to the install, which is strictly stronger than any account it can mint — so no default credential ships and no command line is required. The rule is enforced at the single account-creation path shared by every route, so a direct call to `register` on an empty registry is refused the same way; the token is consumed on use, and the gate independently requires the registry to be empty, so the path dies permanently once an account exists.
 
@@ -314,11 +315,12 @@ root, where the web server serves it directly.
 ### 5.2 Management API request
 
 ```
-POST /management/addRoute       Authorization: Bearer qsa_xxx
+POST /management/addRoute       Cookie: QSSESSID=… + Authorization: Bearer <session_token>
   │
 public/management/index.php
-  ├── validates the access token → resolves user (sessions.json → users.php)
-  │     (expired → 401 auth.token_expired; the client refreshes + retries)
+  ├── resolves the session → user (session cookie → users.php), and checks the
+  │     header token matches the session and the user's session generation
+  │     still matches the one stamped at login (→ 401 auth.unauthorized)
   ├── checks the user's project role permits 'addRoute'
   │     (members.json role → categories.php → roles.php) → 401/403 if not
   ├── resolves command via secure/management/routes.php
@@ -332,7 +334,7 @@ addRoute.php
   └── ApiResponse::create(201, 'route.created')->send()
 ```
 
-The same pattern — parse → validate → mutate files → `ApiResponse` — is used by all 177 commands.
+The same pattern — parse → validate → mutate files → `ApiResponse` — is used by all 176 commands.
 
 ### 5.3 Routing — exact and parameterised routes
 
@@ -438,7 +440,7 @@ squatting it (the shipped `.htaccess` also disables directory listings there).
 **Project visibility.** Each project's `config/members.json` carries a `visibility` flag:
 
 - `public` — the `/p/<id>/` view is open to anonymous visitors (a shareable site).
-- `private` — the `/p/<id>/` view requires membership (owner / member / viewer). Membership is presented by a short-lived, HttpOnly `qs_preview` cookie the admin panel sets from the caller's access token. The gate also reads an `Authorization: Bearer` header, but under Apache that header is not forwarded to this surface, so the cookie is the working mechanism there; a deployment that needs the bearer path must forward the header to `public/p/` in its own server configuration.
+- `private` — the `/p/<id>/` view requires membership (owner / member / viewer). Identity is the panel's own session cookie and nothing else: a preview iframe is a plain browser navigation and can carry no header of its own, and the cookie is scoped to the whole origin so `/p/<id>/` receives it. One consequence is worth knowing before mapping a domain: a project served on its OWN domain is a different origin, so the panel's cookie is not sent there. That is irrelevant for a public project, and it means a **private** project cannot be previewed on its mapped domain — preview it at `/p/<id>/` on the panel's own hostname, which is where the editor points anyway.
 
 A refused `/p/<id>/` request answers `404` with a plain, engine-owned status page — the **same status, headers and bytes** an id that names no project at all gets. Whether the visitor is anonymous or signed in as a non-member makes no difference: a private project is indistinguishable from one that does not exist, so `/p/` cannot be used to discover which project ids are real. (The cost is deliberate: a signed-out member of a private project also sees `404` rather than a prompt to sign in.) The page borrows no project's templates — rendering the requested project's own error page would hand a non-member that project's styling — and it names nothing. A deployment can substitute its own static pages for these engine-owned statuses by declaring `QS_ERROR_PAGE_<status>` (e.g. `SetEnv QS_ERROR_PAGE_404 /404.html`): the value must be a root-relative `.html`/`.htm` file inside the document root, is served with the real status code, and an invalid value is logged and ignored. (A missing *page* inside a project that did resolve is different — that renders the project's own 404 template, no configuration involved.)
 
@@ -466,8 +468,8 @@ Other layered protections:
 | XSS in JSON content | Only allowlisted tags render: a tag must be on `TagRegistry::ALLOWED_TAGS` and off the blacklist (`script`, `noscript`, `style`, `template`, `slot`, `object`, `embed`, `applet`) — anything else is dropped. URL attributes (`href`, `src`, `xlink:href`, `ping`, `srcset`, …) accept only `http` / `https` / `mailto` / `tel` schemes plus relative / anchor / protocol-relative values; everything else becomes `#`. All attribute values are HTML-escaped. The renderer and the compiler enforce this identically (`TagRegistry::isRenderable`, `UrlPolicy`), so preview and built output agree. |
 | Inline JS injection | `on*` attributes only accept the `{{call:fn:args}}` syntax (see §8), transformed to allowlisted `QS.*()` calls (`CallTransformer`); raw JS is rejected. The tag, URL-scheme and `on*` policies are also enforced by the node writers (`addNode` / `editNode` / `editStructure`), so unsafe values are refused on write, not just dropped at render. |
 | File upload | MIME sniffed from content (not extension); per-category size cap; JS uploads disallowed. |
-| AuthN / AuthZ | Username+password login → short-lived access token (Bearer) + rotating refresh token with reuse-detection (family revoke); role check on every Management call; logged. Session tokens are stored hashed; failed logins are throttled per username. |
-| CSRF on admin | Admin panel sends the Bearer access token via `fetch`; the refresh token never reaches the browser (held server-side in the PHP session). |
+| AuthN / AuthZ | Username+password login → a PHP session (HttpOnly cookie) plus a per-session token; both are required on every Management call. Role is checked per project on every call, and logged. A session generation counter on the user record ends every session of an account at once. Failed logins are throttled per username. |
+| CSRF on admin | The session cookie alone never authorizes: a call must also carry the per-session token, which is page-embedded and unreadable to another origin. A cross-site request can make the browser send the cookie but cannot supply the token. |
 | CORS | Configurable per deployment. |
 | Per-project serving (`/p/<id>/`) | Static sub-resources are served **only** from the project's own `public/` subtree via a `realpath` canonicalisation + prefix check (a jail): any path resolving outside `…/public/` is refused, so `config/` (members.json), `data/` (api-endpoints.json), `routes.php`, `config.php`, `templates/`, `translate/` are unreachable, and encoded / backslash / absolute traversals are rejected. Hidden paths are refused as well — no segment of a served path may begin with a dot, so neither a dotfile nor anything inside a hidden directory such as `.git/` is reachable (§5.1). HTML is always live-rendered, never served as raw project files; the view runs the same render/compile sanitisation as the built site, plus a Content-Security-Policy. Private projects require membership. |
 | Error + path disclosure | A PHP fatal happens outside every `try` a program can write, so all three entry points (`/management`, `/admin/api`, `/admin`) register a shared shutdown handler (`secure/src/functions/errorHygiene.php`) that discards the partial output and answers `500` — as a JSON envelope on the API surfaces and as a plain page on the panel. The error's type, message, file and line reach the response **only** on an install that declares itself development (`environment.php`); otherwise they go to the PHP error log. Separately, no response publishes where the installation lives: paths in a response body are rewritten to be relative before the envelope is assembled (`secure/src/functions/publicPaths.php`), so the disk layout is not disclosed by an ordinary success either. See the note below on `display_errors`. |
