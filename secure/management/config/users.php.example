@@ -23,7 +23,17 @@
  *   username         PRIVATE login identifier (unique; 3-32 characters,
  *                    lowercase letters/digits/dash/underscore; null = cannot
  *                    log in by password)
- *   status           'active' | 'disabled' (disabled = every session rejected)
+ *   status           'active' | 'disabled'. While the value is 'disabled' the
+ *                    account cannot log in and every request from an existing
+ *                    session of theirs is refused.
+ *                    It SUSPENDS, it does not REVOKE: the sessions are refused,
+ *                    not destroyed, so setting the status back to 'active'
+ *                    lets any of them that have not idled out carry on working.
+ *                    If you are disabling an account because you believe it is
+ *                    compromised, raise `session_generation` as well — that is
+ *                    what ends its sessions for good, and re-enabling the
+ *                    account cannot bring them back. There is no command for
+ *                    either: both are hand edits to users.php.
  *   password_hash    password_hash() output; null = externally managed account
  *                    (its sessions are minted by an embedding platform, never
  *                    by the login page)

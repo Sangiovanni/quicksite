@@ -832,7 +832,13 @@ function qs_session_auth(): array {
     if ($user === null) {
         return $refuse('Session does not resolve to a user');
     }
-    // L10: disabled user — every session of theirs dies everywhere, at once.
+    // L10: disabled user — every request of theirs is refused, on every
+    // session, from the moment the status changes. Note this SUSPENDS rather
+    // than REVOKES: the session file is refused, not destroyed, so flipping the
+    // status back to 'active' lets a session that has not idled out resume.
+    // Revoking is qs_user_bump_generation()'s job (below), and an operator who
+    // disables an account because they suspect it is compromised wants both —
+    // which is what users.php.example tells them.
     if (($user['status'] ?? 'active') === 'disabled') {
         return $refuse('User account is disabled', $userId);
     }

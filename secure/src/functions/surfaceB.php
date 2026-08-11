@@ -11,8 +11,12 @@
  *   1. qs_surface_b_maybe_handle()  — runs FIRST, BEFORE init.php. Binds the project
  *      from one of two entries: the vhost's QS_PROJECT env (a mapped production
  *      domain — C15 15.4) or a detected /p/<id>/ request (the authoring hostname;
- *      existence-based, so an optional PUBLIC_FOLDER_SPACE prefix that we cannot
- *      read pre-init does not matter). Sets BASE_URL before init.php would derive it. PUBLIC_CONTENT_PATH is NOT set here: C15 15.3 binds it
+ *      the id is the segment after the FIRST 'p' marker, so an optional
+ *      PUBLIC_FOLDER_SPACE prefix that we cannot read pre-init does not matter).
+ *      Whether that id names a real project is NOT asked here — the gate decides,
+ *      and it is the same decision for "private" and for "does not exist", which
+ *      is what keeps the two indistinguishable (see qs_surface_b_gate).
+ *      Sets BASE_URL before init.php would derive it. PUBLIC_CONTENT_PATH is NOT set here: C15 15.3 binds it
  *      beside PROJECT_PATH in qs_load_project_context(), so there is no longer a competing
  *      definition to pre-empt.
  *   2. qs_surface_b_finish()        — runs AFTER init + qs_load_project_context(id).
@@ -56,6 +60,25 @@ function qs_sb_valid_id(string $id): bool {
  * asked. The cost is accepted and deliberate: a signed-out member of a private
  * project sees 404 rather than a prompt to sign in.
  *
+ * THE GATE NEVER ASKS WHETHER THE PROJECT EXISTS. That is not an oversight, it
+ * is the whole mechanism: an id naming nothing has no members.json, so
+ * loadProjectMembers() hands back the empty shape and the id reads as PRIVATE
+ * WITH NO MEMBERS — which is precisely what it is. A ghost id and a private
+ * project therefore execute the SAME LINES and cannot answer differently.
+ * Existence is a BINDING question (which folder do we serve from?), answered
+ * only after this function admits, and admission already implies a members.json
+ * — which cannot exist without the project.
+ *
+ * That property is load-bearing and was learned the hard way. The oracle was
+ * closed once in beta.10 by making the two refusals emit matching headers, and
+ * beta.11's session rework reopened it: routing checked existence FIRST, so a
+ * real id ran this gate (starting a session, emitting PHP's `Expires` and
+ * `Pragma` cache-limiter headers) while a ghost id was refused earlier and
+ * emitted neither. Any caller holding ANY cookie could read the difference. The
+ * repair is structural rather than cosmetic — there is now ONE refusal path, so
+ * there is no second path to keep in step. DO NOT reintroduce an existence test
+ * ahead of the identity check below, here or in the caller.
+ *
  * COOKIE ONLY. Identity here is the panel's session cookie and nothing else.
  * The gate used to also accept an `Authorization: Bearer` header, which under
  * Apache never arrives (the header is not forwarded to this surface unless the
@@ -70,6 +93,10 @@ function qs_sb_valid_id(string $id): bool {
  * previewed on its mapped domain — preview it at `/p/<id>/` on the panel's own
  * origin, which is where the editor points anyway.
  *
+ * Safe to call with ANY id a URL can carry — malformed, oversized, naming
+ * nothing. Those cases are refused by the ordinary private-project path, not by
+ * an early return of their own.
+ *
  * @return int|null null = allowed (public project, or authenticated member);
  *                  404 = refused, reason deliberately not distinguished.
  */
@@ -79,7 +106,12 @@ function qs_surface_b_gate(string $id, string $secure): ?int {
     }
     require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
 
-    $members    = loadProjectMembers($id);
+    // The shape rule is this function's own precondition now that it is handed
+    // raw URL segments. A malformed id takes the empty shape — the same shape an
+    // id naming no project takes, and the same shape a private project with no
+    // members takes — so all three walk the identity check below together.
+    // (loadProjectMembers is independently F1-guarded; this is not its defence.)
+    $members    = qs_sb_valid_id($id) ? loadProjectMembers($id) : ['members' => []];
     $visibility = $members['visibility'] ?? 'private';   // secure default: private
     if ($visibility === 'public') {
         return null;
@@ -135,6 +167,11 @@ function qs_surface_b_maybe_handle(): void {
             // Deployment config error, not a visitor error: the vhost names a
             // project that does not exist. Degrade to 404 with a log (R4 posture)
             // — there is no fallback project by design (C15 15.3).
+            //
+            // This IS an existence test ahead of the gate, and it is NOT the
+            // shape the /p/ lookup below had to give up: $envId comes from the
+            // vhost, so a visitor cannot vary it and cannot compare two answers.
+            // There is one id here and the deployment already knows it.
             error_log(
                 "QuickSite: QS_PROJECT='{$envId}' names no existing project — "
                 . 'check the vhost SetEnv / fastcgi_param.'
@@ -158,30 +195,45 @@ function qs_surface_b_maybe_handle(): void {
         return;
     }
 
-    // Find the FIRST 'p' segment whose NEXT segment is an EXISTING, valid project.
-    // Existence-based → robust to an optional space prefix; cannot hijack a served
-    // route unless that route is literally p/<existing-project-id> ('p' is reserved).
+    // The id this request NAMES: the segment after the FIRST 'p' marker. The
+    // marker is anchored rather than searched for, so an optional space prefix
+    // (`/<space>/p/<id>/…`) still resolves, and a project's own route that
+    // happens to contain a 'p' segment cannot pull the binding off the id.
+    //
+    // ⚠ THIS LOOKUP IS DELIBERATELY FILESYSTEM-FREE. It used to accept only a
+    // 'p' whose next segment was an EXISTING project directory, which made
+    // "does this project exist?" a ROUTING decision taken BEFORE the gate — so
+    // a real id ran the gate and a ghost id did not, and the gate's side
+    // effects (a started session, hence PHP's cache-limiter headers) told the
+    // two apart to anyone holding any cookie at all. Existence is settled by
+    // the gate now, as the absence of a members.json. Adding an is_dir() back
+    // here reopens the oracle. (see qs_surface_b_gate)
     $idIndex = -1;
     $count = count($segs);
     for ($i = 0; $i < $count - 1; $i++) {
         if ($segs[$i] === 'p') {
-            $cand = rawurldecode($segs[$i + 1]);
-            if (qs_sb_valid_id($cand) && is_dir($secure . '/projects/' . $cand)) {
-                $idIndex = $i;
-                break;
-            }
+            $idIndex = $i;
+            break;
         }
     }
     if ($idIndex < 0) {
-        // Not a resolvable /p/<id>/ request. The renderer answers a generic 404: there is
-        // no privileged project to fall back to (C15 15.3).
+        // No id named at all — a bare `/p/`, or (on a misconfigured mapped
+        // domain) a path carrying no marker. Nothing to gate, and no id whose
+        // existence could leak: public/p/index.php answers the generic 404
+        // below its own require of init.php. There is no privileged project to
+        // fall back to (C15 15.3).
         return;
     }
 
     $id = rawurldecode($segs[$idIndex + 1]);
 
     // ---- visibility + membership gate (§8.4) — PRE-INIT deliberately ------------
-    // A refused request answers a generic, engine-owned status page and stops here.
+    // THE single decision point for every id this surface is asked about: private,
+    // public, nonexistent and malformed all arrive here and are answered by the
+    // same lines at the same moment in the request. A refused request answers a
+    // generic, engine-owned status page and stops — it does not reach init.php,
+    // and neither does a nonexistent one any more, so there is no longer a pair
+    // of refusal paths whose responses have to be kept matching by hand.
     // It used to fall through to the NORMAL pipeline so the MAIN served project could
     // render ITS error page; C15 15.3 deleted the served project, so there is no other
     // project to borrow a template from — and borrowing the REQUESTED project's own
@@ -192,6 +244,9 @@ function qs_surface_b_maybe_handle(): void {
     if ($denyStatus !== null) {
         qs_sb_deny($denyStatus, 'This site is not available.');
     }
+    // Admitted ⇒ the project's members.json was read and said so, and that file
+    // cannot exist without the project. Binding below needs no existence test of
+    // its own (and must not grow one — see the lookup note above).
 
     $prefixSegs = array_slice($segs, 0, $idIndex + 2);       // [optional space] + p + id
     $subSegs    = array_slice($segs, $idIndex + 2);          // the rest (route or asset)
@@ -424,25 +479,51 @@ function qs_sb_error_page_file(int $status): ?string {
  * declared and valid (QS_ERROR_PAGE_<status>, E3); the built-in minimal page
  * is the default.
  *
- * The visibility/membership refusal happens PRE-init, an id naming no project
- * refuses POST-init — so this function emits init.php's two baseline security
- * headers itself. Without them the pre-init deny would be missing headers the
- * post-init deny carries, and the header set alone would tell a visitor which
- * of the two refusals they hit: an existence oracle the unified 404 status
- * otherwise closes. (init.php's own header() calls are idempotent.)
+ * EVERY REFUSAL THAT NAMES AN ID NOW HAPPENS PRE-INIT, through the one gate, so
+ * every response an id-existence comparison could be built from is produced by
+ * this function at the same point in the request. What still reaches it AFTER
+ * init.php is the bare `/p/` backstop in public/p/index.php — no id, nothing to
+ * compare — and the in-project asset / page 404s, which only a caller already
+ * admitted to that project can reach. Those two carry init.php's own baseline
+ * headers ahead of the ones set here, so their header ORDER differs from a
+ * pre-init deny. That is accepted: neither can be reached for an id whose
+ * existence is still secret. This function emits init.php's two baseline
+ * security headers itself so the header SET is the same either way (init.php's
+ * own header() calls are idempotent).
+ *
+ * That header symmetry is a courtesy now, not the containment. Containment is
+ * that "private" and "does not exist" are ONE code path — beta.10 relied on the
+ * symmetry alone and the beta.11 session rework slipped straight past it, adding
+ * `Expires` and `Pragma` on one side only.
+ *
+ * A REFUSAL'S HEADERS DEPEND ON NOTHING BUT ITS STATUS. The cache trio below is
+ * emitted unconditionally for exactly the reason above: reading the gate's
+ * cookie starts a PHP session, and session_start()'s cache limiter emits
+ * `Expires` / `Cache-Control` / `Pragma` on its own. Emitting them here too
+ * means a caller holding a cookie and a caller holding none get the same
+ * response — PHP's versions are simply overwritten in place, keeping their
+ * position, so the ORDER matches as well. Without this the deny would carry
+ * three extra headers for anyone who presented a cookie, which is how the
+ * signed-in and anonymous refusals drifted apart in the first place.
  */
 function qs_sb_deny(int $status, string $message): void {
     if (!headers_sent()) {
         http_response_code($status);
-        // Baseline headers FIRST, in init.php's own order: re-setting a header
-        // keeps its original position, so a post-init deny (where init.php
-        // already sent these two) ends up with the same header ORDER as a
-        // pre-init deny that sends them here. Same status, same body, same
-        // headers, same order — nothing left to tell the two refusals apart.
+        // Cache posture FIRST — that is where session_start() already put its
+        // copies, and header() replaces in place, so declaring them in this
+        // order makes both the with-session and without-session responses come
+        // out identical. `no-store` alone is enough for a modern client; the
+        // other two are the HTTP/1.0 belt PHP itself sends.
+        header('Expires: Thu, 19 Nov 1981 08:52:00 GMT');
+        header('Cache-Control: no-store');
+        header('Pragma: no-cache');
+        // Then init.php's two baseline security headers, in init.php's own
+        // order, so a post-init deny (where init.php already sent these) ends
+        // up with the same header ORDER as a pre-init deny that sends them
+        // here. Same status, same body, same headers, same order.
         header('X-Content-Type-Options: nosniff');
         header('X-Frame-Options: SAMEORIGIN');
         header('Content-Type: text/html; charset=utf-8');
-        header('Cache-Control: no-store');
     }
     $custom = qs_sb_error_page_file($status);
     if ($custom !== null) {

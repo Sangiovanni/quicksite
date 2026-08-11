@@ -5354,7 +5354,7 @@ deployment would silently expose everything).
 (`qs_surface_b_resolve_static`). Behaviour:
 [ARCHITECTURE.md §7](ARCHITECTURE.md).
 
-### A private project and a nonexistent project are indistinguishable (locked 2026-07-24)
+### A private project and a nonexistent project are indistinguishable (locked 2026-07-24) (superseded 2026-08-11)
 
 **Decision**: A request for a project the caller may not see returns exactly what
 a request for a project that does not exist returns — same status, same body,
@@ -6684,3 +6684,56 @@ work the nav describes, and the header badge already names the account).
 `public/admin/assets/js/pages/account.js`, `secure/admin/AdminRouter.php` (the
 page allowlist), `secure/admin/templates/layout.php` (the badge link). Behaviour:
 [ADMIN_PANEL.md §9.13](ADMIN_PANEL.md).
+
+### "Does this project exist?" is answered by the gate, not by routing (locked 2026-08-11)
+
+**Supersedes**: *A private project and a nonexistent project are indistinguishable*
+(locked 2026-07-24, above). The contract it states is unchanged and still holds;
+what changed is the mechanism that holds it up.
+
+**Decision**: `/p/<id>/` binds whatever id the URL names, without asking whether
+that id names a real project. The visibility gate is the single decision point,
+and it has no existence check at all: an id naming nothing has no `members.json`,
+so it reads as *private with no members*, which is exactly what it is. A ghost id
+and a private project therefore run the same lines, in the same order, at the same
+moment in the request, and are refused by the same call. The refusal's headers are
+set unconditionally rather than inherited from whatever ran earlier.
+
+**Reasoning**: The first closure made two different refusal paths emit matching
+responses. That is a promise about two pieces of code staying in step, and it
+lasted until beta.11 moved the session model underneath it. Routing checked
+existence first, so a real id ran the gate and a ghost id was refused before it —
+and once the gate resolved identity from a session cookie, running it *started a
+PHP session*, whose cache limiter adds `Expires` and `Pragma`. A private project's
+`404` carried two headers a nonexistent one did not, and anyone holding any cookie
+at all — no account needed, an invented value works — could read the difference.
+Nothing had been done wrong to the refusal paths; a third thing had been added to
+one of them, which is the failure mode of every invariant maintained by hand.
+
+So the second closure removes the thing being maintained. There are no longer two
+refusal paths to compare, which is why this cannot regress the way the first did:
+a future change to the gate lands on "private" and "does not exist" simultaneously,
+because they are not distinct cases in the code. The rule that replaces the promise
+is short enough to hold: existence may not be consulted before identity, and the
+way to guarantee that is not to consult it at all.
+
+Two consequences are accepted deliberately. Because the marker is now anchored
+rather than searched for, `/p/<id>/` means that id — a URL like `/p/<ghost>/p/<real>/`
+is refused instead of quietly binding the second project, which is the more honest
+reading of the path. And the mapped-domain entry keeps an existence check ahead of
+its gate: there the id comes from the vhost, so a visitor cannot vary it and has no
+second answer to compare it against.
+
+**Alternatives considered**: Equalise the two paths' headers again — suppress the
+session's cache limiter, or mirror it onto the other branch (rejected: it repairs
+the symptom that was measured and leaves the structure that produced it, so the
+next thing to touch one path reopens the oracle, exactly as this one did). Keep
+routing's existence check and add a second refusal beside it that runs the gate
+first (rejected: it is the same two-paths shape wearing the fix's clothes). Put the
+existence check inside the gate, after the identity read (rejected: it works, but
+it is held up by a line that must not be moved, and a rule of that kind is what the
+whole entry is about).
+
+**Source**: `secure/src/functions/surfaceB.php` (`qs_surface_b_gate`,
+`qs_surface_b_maybe_handle`, `qs_sb_deny`). Behaviour:
+[ARCHITECTURE.md §5.1](ARCHITECTURE.md), [ARCHITECTURE.md §6](ARCHITECTURE.md).
