@@ -229,6 +229,60 @@
     flex: 1;
 }
 
+/* ---- Visibility (owner only) ----
+   Deliberately a FRAMED BLOCK, not an inline row like the join policy under
+   it: state on its own line, the consequence in a sentence, a button named
+   after where it moves to. The two settings sound alike and were confused;
+   they must not look alike. */
+.members-visibility {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 14px 16px;
+    border-radius: 6px;
+    border: 1px solid var(--admin-border);
+    border-left-width: 5px;
+    margin-bottom: 12px;
+}
+.members-visibility--public {
+    border-color: var(--admin-error);
+    background: var(--admin-error-bg, transparent);
+}
+.members-visibility--private {
+    border-color: var(--admin-success);
+}
+.members-visibility__state {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 12px;
+}
+.members-visibility__badge {
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-size: 0.85em;
+}
+.members-visibility__badge--public {
+    background: var(--admin-error);
+    color: #fff;
+}
+.members-visibility__badge--private {
+    background: var(--admin-success);
+    color: #fff;
+}
+.members-visibility__meaning {
+    margin: 0;
+    flex: 1 1 20rem;
+}
+.members-visibility__url {
+    margin: 0;
+    word-break: break-all;
+}
+
 /* ---- Join policy ---- */
 .members-policy-row {
     display: flex;

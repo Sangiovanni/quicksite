@@ -113,7 +113,8 @@ File lists are grouped by role. Where useful, the entry point or main exported f
 | `pages/dashboard.js` | Stats cards, command activity, recent history. |
 | `pages/dashboard-memberships.js` | Fills the dashboard memberships card from the `quicksite:membership-counts-updated` event (computed by `core/members-badge.js`). |
 | `pages/memberships.js` | My Memberships page: my projects / invitation inbox / my join requests / my proposals / notices / request-to-join. Global self-service commands only. |
-| `pages/members.js` | Project Members page: roster, pending queue, invite + propose (findUser flows), join-policy toggle, ownership transfer for the edited project. |
+| `pages/members.js` | Project Members page: roster, pending queue, invite + propose (findUser flows), visibility control, join-policy toggle, ownership transfer for the edited project. |
+| `pages/account.js` | My Account page: change password, sign out everywhere, delete account (§9.13). |
 | `pages/command.js` | Command index list, permission-aware filter. |
 | `pages/command-form.js` | Dynamic per-command form, helper widgets, execution. |
 | `pages/history.js` | Command history listing + detail modal. |
@@ -198,6 +199,8 @@ Every localStorage / sessionStorage key is declared as a constant in `js/core/st
 
 Authentication uses **no browser storage**: the session lives in an HttpOnly cookie the page cannot read, and the per-session token is page-embedded and held in memory (`api.js`). (`api.js` still clears the retired `quicksite_admin_token` / `quicksite_admin_remember` keys on logout as one-time upgrade hygiene.)
 
+Two other cookies exist, both HttpOnly and neither readable by page scripts. `QSSESSID` carries the session. `qs_form_token` carries the CSRF token of the **unauthenticated** auth forms — login, register and first-run run before any session exists, so they cannot use the per-session token every other page embeds; the server plants this cookie and the same value as a hidden field, and accepts a POST only when the two match. It is scoped to the admin path and `SameSite=Strict`, so a cross-site POST carries neither half. Signing out is likewise a **POST** carrying the per-session token, not a link: the header renders it as a form, and a bare `GET /admin/logout` ends nothing.
+
 | Constant | Storage | Used by |
 |---|---|---|
 | `PREFS` | localStorage | `utils.js`, `admin.js`, `settings.js`, `preview-sidebar-resize.js` |
@@ -224,7 +227,8 @@ Authentication uses **no browser storage**: the session lives in an HttpOnly coo
 | `templates/pages/ai/*.php` | `data-precomputed` on `.admin-ai-page` | precomputed components/routes snapshot |
 | `templates/pages/optimize.php` | inline readiness flag | `window.__cssRefinerLibReady` |
 | `templates/pages/memberships.php` | `window.QS_MEMBERSHIPS_CONFIG` + `window.QS_MEMBERSHIPS_I18N` | `myUserId` (the caller's own public id — no API response carries it), `editedProject`; JS-facing strings for dynamic rows |
-| `templates/pages/members.php` | `window.QS_MEMBERS_CONFIG` + `window.QS_MEMBERS_I18N` | `project`, `myUserId`, `myRole`, `myRank`, `roleRanks` (from `roles.php` — drives the strictly-below-my-rank pickers), `joinPolicy` + `visibility` (admin/owner only, read server-side from `members.json`); JS-facing strings |
+| `templates/pages/members.php` | `window.QS_MEMBERS_CONFIG` + `window.QS_MEMBERS_I18N` | `project`, `myUserId`, `myRole`, `myRank`, `roleRanks` (from `roles.php` — drives the strictly-below-my-rank pickers), `joinPolicy` + `visibility` (admin/owner only, read server-side from `members.json`), `isOwner` + `siteUrl` (the address a public visibility exposes); JS-facing strings |
+| `templates/pages/account.php` | `window.QS_ACCOUNT_CONFIG` + `window.QS_ACCOUNT_I18N` | `username` (the typed-confirmation target for deletion), `minPasswordLength` (from `auth.php`, the same value `changePassword` enforces), `hasLocalPassword`, `loginUrl`; JS-facing strings |
 
 `currentProject` is the user's **edited** project (their `selected_project`, §8.0) — the client prepends a `p/<currentProject>/` marker to project-scoped Management calls so the server acts on it; `globalCommands` is the set of commands called without that marker. There is no schema or runtime validation on injected objects, and page-level extensions of `QUICKSITE_CONFIG` can silently overwrite global fields. Treat the injected globals as read-only by convention.
 
@@ -783,6 +787,7 @@ The AI call is browser-direct via `QSAiCall.call(...)` (see `public/admin/assets
 | **Command form** (`command-form.js`) | Renders a dynamic form for any command from `help` metadata, then executes it. The escape hatch into raw API. |
 | **History** (`history.js`) | Browses `getCommandHistory` for the **currently edited project** — the command history is per-project, so switching projects switches the trail. Modal with full request/response. Actions that belong to no project (signing in, creating a project, membership self-service) are recorded server-side but are not shown here; see *Command history storage* in `COMMAND_API.md`. |
 | **Settings** (`settings.js`) | User profile, language, theme, AI provider config status. |
+| **My account** (`account.js`) | The caller's own account — change password, sign out everywhere, delete the account. See §9.13. Commands: `changePassword`, `logoutSession`, `deleteMyAccount`. |
 | **APIs** (`apis.js`) | External API registry — see §9.1. Commands: `listApiEndpoints`, `addApi`, `editApi`, `deleteApi`, `getApiEndpoint`, `testApiEndpoint`. |
 | **Assets** (`assets.js`) | Asset browser + uploader: `listAssets`, `uploadAsset`, `editAsset`, `deleteAsset`. |
 | **Sitemap** (`sitemap.js`) | Route tree, reachability, ordering. |
@@ -2665,15 +2670,78 @@ role + mandatory vouch). Admin/owner additionally get the **Pending queue**
 attribution; cancel for invites, approve / deny with mandatory reason for
 requests — approve of a proposal reports the conversion to an invitation), the
 **Invite** form (role picker limited to strictly below the caller's rank), and
-the **Join policy** toggle (open/closed; flipping a *private* project to open
-first shows the knockable-by-id privacy advisory, and the warning stays visible
-while the combination is active). The owner alone gets **Transfer ownership**
-(member picker + departing-owner role + checkbox + final confirm modal; the page
-reloads after transfer since the caller's role changed).
+the **Who can ask to join** toggle (open/closed; flipping a *private* project to
+open first shows the knockable-by-id privacy advisory, and the warning stays
+visible while the combination is active). The owner alone gets **Who can see this
+site** (below) and **Transfer ownership** (member picker + departing-owner role +
+checkbox + final confirm modal; the page reloads after transfer since the
+caller's role changed).
+
+**Who can see this site** is `setProjectVisibility`, and it is **owner-only** —
+the `project.visibility` category sits at the delete/transfer tier, so an admin
+who runs the project day to day cannot unilaterally expose it. Non-owners are not
+shown the control at all (the section is branched server-side on the caller's
+role; the command re-checks ownership in-lock regardless).
+
+It is deliberately shaped **unlike** the join-policy toggle beneath it. The two
+settings sound alike and are routinely confused — an open join policy reads as
+"the site is public", which it is not — so visibility renders as a framed block
+with a coloured state badge (PUBLIC / PRIVATE), the consequence written out
+(*"anyone with the address can view this site"* versus *"to everyone else it
+answers as if it did not exist"*), the address a public setting exposes, and a
+button named after the state it moves to rather than a generic *Toggle*. Each
+section also states what it is **not**.
+
+The wording avoids "publish" throughout, and the confirmation says so explicitly:
+making a project public **does not deploy it**. No domain is configured, nothing
+is submitted to a search engine, and the address does not change — the project's
+existing `/p/<id>/` view simply stops requiring membership (a public address can
+still be found and indexed like any other). Going public asks for a tick inside
+its confirm modal — the same friction as an ownership transfer; going back to
+members-only is a plain confirm. A visibility change never touches the pending
+request queue, and when the result is private + open the server's own advisory
+note is surfaced verbatim.
 
 Both pages render all dynamic rows via `QSDom` helpers (createElement +
 textContent); static structure and all labels live in the PHP templates
 (en/fr translated), with JS-facing strings injected per page (§7).
+
+### 9.13 My account (/admin/account)
+
+The signed-in account's own self-service surface, reached by clicking your name
+in the header. Every command it drives is global-scope with `access: 'any'`, so
+the page is open to **every authenticated user** — including one who belongs to
+no project — and carries no role gate.
+
+**Identity** is read-only and rendered server-side from the session: display
+name, username, account id, and the caller's role on the project they are
+editing. The username appears here and nowhere else in the panel — it is the
+private login identifier, and no API response returns it.
+
+**Change password** (`changePassword`) asks for the current password and the new
+one twice, and enforces `auth.php`'s `min_password_length` client-side before the
+server does. Succeeding ends every **other** session of the account and keeps the
+one that asked — that is the containment story for "someone has my old password".
+A wrong current password answers `401 auth.invalid_credentials`, which `api.js`
+deliberately does not treat as a dead session, so the user stays on the page.
+
+**Sessions** offers *Sign out everywhere* (`logoutSession {everywhere: true}`)
+behind a confirm. It ends every session of the account including the current one,
+then redirects to the login page. There is no list of active sessions to show:
+the kill switch is a single generation counter on the user record, not an index
+(ARCHITECTURE.md §3).
+
+**Delete my account** (`deleteMyAccount`) is irreversible and gated twice — the
+current password, plus typing your username exactly (a string only the account's
+owner has in mind, and one that cannot be clicked through). The command refuses
+while the caller is the sole owner of any project, since that would leave the
+project unownable and undeletable; the page lists the blocking projects by name
+and member count so the next step is obvious. An externally-managed account (no
+local password) is told so up front and is shown neither password-gated form.
+
+All dynamic structure — the confirm modals and the blocking-project list — is
+built with `QSDom` helpers; the static shell and every label live in
+`templates/pages/account.php` (en/fr).
 
 ---
 

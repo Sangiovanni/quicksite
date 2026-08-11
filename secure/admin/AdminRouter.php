@@ -43,11 +43,29 @@ class AdminRouter {
         'privacy',     // Privacy helper — data-sharing / API surface (beta.9)
         'memberships', // My Memberships — inbox / requests / proposals / notices (C8 8.3c; any authenticated user)
         'members',     // Project Members — roster / queue / invite / policy for the EDITED project (C8 8.3c)
+        'account',     // My Account — password, sign out everywhere, delete account (any authenticated user)
         'assets',      // Asset Management page
         'sitemap',     // Visual Sitemap & Route Management
         'optimize',    // Optimization Tools
-        'logout'       // Logout action (?everywhere=1 ends the account's other sessions too)
+        'logout'       // Logout action — POST only (everywhere=1 ends the account's other sessions too)
     ];
+
+    /**
+     * The cookie carrying the CSRF token of the UNAUTHENTICATED auth forms.
+     *
+     * Login, register and first-run run before any session exists, so they
+     * cannot borrow the per-session token every other admin page embeds. They
+     * use a double-submit pair instead: the server plants this cookie and the
+     * same value as a hidden field, and only accepts a POST where the two
+     * match. A foreign origin can make the browser send a cookie but can
+     * neither read it (HttpOnly) nor put its value in a form — and SameSite
+     * Strict means it is not even sent on a cross-site POST, so the comparison
+     * has nothing to compare and fails closed.
+     */
+    private const FORM_TOKEN_COOKIE = 'qs_form_token';
+
+    /** Memoised for the request, so one render never plants two tokens. */
+    private ?string $formToken = null;
 
     public function __construct() {
         $this->parseUrl();
@@ -276,6 +294,72 @@ class AdminRouter {
             return 'password_too_short:' . (int)($attempt['min_length'] ?? 12);
         }
         return $attempt['error'];
+    }
+
+    /**
+     * The CSRF token for the unauthenticated auth forms (login / register /
+     * first-run), planting the cookie half of the pair if it is not there yet.
+     *
+     * MUST be reached before any output — planting means Set-Cookie. dispatch()
+     * primes it for exactly those three pages, so a template calling this
+     * always finds the value already minted and never depends on whether the
+     * page has begun flushing.
+     *
+     * An existing well-shaped cookie is REUSED rather than replaced: two login
+     * tabs open at once must both stay submittable, and re-minting on every
+     * render would silently invalidate whichever form was drawn first.
+     */
+    public function formToken(): string {
+        if ($this->formToken !== null) {
+            return $this->formToken;
+        }
+        $existing = (string)($_COOKIE[self::FORM_TOKEN_COOKIE] ?? '');
+        if (preg_match('/^[0-9a-f]{64}$/', $existing) === 1) {
+            $this->formToken = $existing;
+            return $this->formToken;
+        }
+
+        $this->formToken = bin2hex(random_bytes(32));
+        if (!headers_sent()) {
+            // Path from the panel's own base so an install under a public
+            // folder space (PUBLIC_FOLDER_SPACE) scopes the cookie to its real
+            // admin prefix instead of a '/admin' that does not exist there.
+            $path = parse_url($this->getBaseUrl(), PHP_URL_PATH);
+            setcookie(self::FORM_TOKEN_COOKIE, $this->formToken, [
+                'expires'  => 0, // dies with the browser session
+                'path'     => is_string($path) && $path !== '' ? $path : '/admin',
+                'secure'   => !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off',
+                'httponly' => true,
+                'samesite' => 'Strict',
+            ]);
+        }
+        return $this->formToken;
+    }
+
+    /**
+     * Does a submitted auth-form token match the one planted in the browser?
+     *
+     * Compared against the COOKIE THE REQUEST CARRIED, never against
+     * formToken() — that would happily compare a freshly minted value with
+     * itself and authorise everything. A missing cookie is a failure, which is
+     * precisely the cross-site case.
+     */
+    public function formTokenValid(string $submitted): bool {
+        $planted = (string)($_COOKIE[self::FORM_TOKEN_COOKIE] ?? '');
+        return $planted !== '' && $submitted !== '' && hash_equals($planted, $submitted);
+    }
+
+    /**
+     * Does a submitted value match THIS session's per-session token?
+     *
+     * The signed-in half of the same idea: pages already embed that token for
+     * the admin JS, so a form on a rendered page can prove the same thing an
+     * API call proves — that whoever built the request could read a page of
+     * this session. Used by the logout form.
+     */
+    public function sessionTokenValid(string $submitted): bool {
+        $token = (string)$this->getToken();
+        return $token !== '' && $submitted !== '' && hash_equals($token, $submitted);
     }
 
     /**
@@ -520,11 +604,23 @@ class AdminRouter {
      * Dispatch the request to the appropriate handler
      */
     public function dispatch(): void {
-        // Handle logout. `?everywhere=1` also ends the account's OTHER sessions
+        // Handle logout. `everywhere=1` also ends the account's OTHER sessions
         // (the header offers it as a second action next to the plain logout).
+        //
+        // POST + the per-session token, not a GET link: ending a session is a
+        // state change, and as a GET any foreign page could spend one <img> tag
+        // signing the user out of the panel. The token is the same proof the
+        // management API requires — readable only from a page of this session.
+        // Anything that is not that pair is not a logout request, so nothing is
+        // ended and the caller simply goes back where they belong (idempotent:
+        // a caller with no session lands on the login page either way).
         if ($this->page === 'logout') {
-            $this->clearToken(($_GET['everywhere'] ?? '') === '1');
-            $this->redirect('login');
+            $submitted = (string)($_POST['session_token'] ?? '');
+            if ($_SERVER['REQUEST_METHOD'] === 'POST' && $this->sessionTokenValid($submitted)) {
+                $this->clearToken((string)($_POST['everywhere'] ?? '') === '1');
+                $this->redirect('login');
+            }
+            $this->redirect($this->isAuthenticated() ? 'dashboard' : 'login');
         }
 
         // Legacy: ai-settings -> ai-connections (Phase 3 rename).
@@ -580,6 +676,14 @@ class AdminRouter {
         // failures and a friendly redirect would hide one.
         if ($this->page === 'preview' && $this->getCurrentProject() === null) {
             $this->redirect('dashboard?noproject=1');
+        }
+
+        // The auth forms' CSRF token rides a cookie, so it has to be planted
+        // before the first byte of the page. Priming it here — not inside the
+        // templates, which run once the layout has begun emitting — is what
+        // keeps that Set-Cookie reachable regardless of output buffering.
+        if (in_array($this->page, ['login', 'register', 'setup'], true)) {
+            $this->formToken();
         }
 
         // C13 (F-C13-19) — anything outside the declared namespace is not a page.

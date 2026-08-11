@@ -418,36 +418,52 @@ $langNames = [
             </a>
             <?php endif; ?>
 
-            <!-- Current User Role Badge -->
-            <div class="admin-user-badge" id="admin-user-badge">
+            <!-- Current User Role Badge — also the way in to My Account
+                 (password, sign out everywhere, delete account). Clicking your
+                 own name is where people look for account settings. -->
+            <a href="<?= adminAttr($router->url('account')) ?>"
+               class="admin-user-badge<?= $currentPage === 'account' ? ' admin-user-badge--active' : '' ?>"
+               id="admin-user-badge"
+               title="<?= adminAttr(__admin('account.navHint', 'Your account settings')) ?>">
                 <svg class="admin-user-badge__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
                     <circle cx="12" cy="7" r="4"/>
                 </svg>
                 <span class="admin-user-badge__name" id="admin-user-name">...</span>
                 <span class="admin-user-badge__role" id="admin-user-role"></span>
-            </div>
-            
-            <a href="<?= $router->url('logout') ?>" class="admin-btn admin-btn--outline">
-                <svg class="admin-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-                    <polyline points="16 17 21 12 16 7"/>
-                    <line x1="21" y1="12" x2="9" y2="12"/>
-                </svg>
-                <span><?= __admin('nav.logout') ?></span>
             </a>
+            
+            <!-- Both logouts POST and carry the per-session token: signing
+                 somebody out is a state change, and as GET links any foreign
+                 page could spend one <img> tag doing it. The router refuses
+                 anything that is not that pair. -->
+            <form method="POST" action="<?= adminAttr($router->url('logout')) ?>" class="admin-logout-form">
+                <input type="hidden" name="session_token" value="<?= adminAttr((string)$router->getToken()) ?>">
+                <button type="submit" class="admin-btn admin-btn--outline">
+                    <svg class="admin-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                        <polyline points="16 17 21 12 16 7"/>
+                        <line x1="21" y1="12" x2="9" y2="12"/>
+                    </svg>
+                    <span><?= __admin('nav.logout') ?></span>
+                </button>
+            </form>
 
             <!-- Ends every session of this account, not just this browser. -->
-            <a href="<?= $router->url('logout') ?>?everywhere=1" class="admin-btn admin-btn--outline"
-               title="<?= adminEscape(__admin('nav.logoutEverywhereHint')) ?>">
-                <svg class="admin-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-                    <polyline points="16 17 21 12 16 7"/>
-                    <line x1="21" y1="12" x2="9" y2="12"/>
-                    <circle cx="18" cy="6" r="3"/>
-                </svg>
-                <span><?= __admin('nav.logoutEverywhere') ?></span>
-            </a>
+            <form method="POST" action="<?= adminAttr($router->url('logout')) ?>" class="admin-logout-form">
+                <input type="hidden" name="session_token" value="<?= adminAttr((string)$router->getToken()) ?>">
+                <input type="hidden" name="everywhere" value="1">
+                <button type="submit" class="admin-btn admin-btn--outline"
+                        title="<?= adminAttr(__admin('nav.logoutEverywhereHint')) ?>">
+                    <svg class="admin-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                        <polyline points="16 17 21 12 16 7"/>
+                        <line x1="21" y1="12" x2="9" y2="12"/>
+                        <circle cx="18" cy="6" r="3"/>
+                    </svg>
+                    <span><?= __admin('nav.logoutEverywhere') ?></span>
+                </button>
+            </form>
         </div>
     </header>
     <?php endif; ?>

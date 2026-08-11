@@ -23,24 +23,30 @@ $registerMinLength = 0;
 $passwordMinLength = qs_registration_config()['min_password_length'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $name = (string)($_POST['name'] ?? '');
-    $username = (string)($_POST['username'] ?? '');
-    $password = (string)($_POST['password'] ?? '');
-
-    $result = $router->attemptRegister($name, $username, $password);
-    if ($result === null) {
-        $router->redirect('login');
-    }
-    if (strpos($result, 'throttled:') === 0) {
-        $registerError = 'throttled';
-        $registerRetryAfter = (int)substr($result, strlen('throttled:'));
-    } elseif (strpos($result, 'password_too_short:') === 0) {
-        $registerError = 'password_too_short';
-        $registerMinLength = (int)substr($result, strlen('password_too_short:'));
+    // CSRF gate FIRST — a forged cross-site POST must not be able to mint an
+    // account in the visitor's name, nor spend the registration flood budget.
+    if (!$router->formTokenValid((string)($_POST['form_token'] ?? ''))) {
+        $registerError = 'csrf';
     } else {
-        // 'registration_disabled' | 'registration_closed' | 'missing_fields'
-        // | 'invalid_username' | 'name_equals_username' | 'server'
-        $registerError = $result;
+        $name = (string)($_POST['name'] ?? '');
+        $username = (string)($_POST['username'] ?? '');
+        $password = (string)($_POST['password'] ?? '');
+
+        $result = $router->attemptRegister($name, $username, $password);
+        if ($result === null) {
+            $router->redirect('login');
+        }
+        if (strpos($result, 'throttled:') === 0) {
+            $registerError = 'throttled';
+            $registerRetryAfter = (int)substr($result, strlen('throttled:'));
+        } elseif (strpos($result, 'password_too_short:') === 0) {
+            $registerError = 'password_too_short';
+            $registerMinLength = (int)substr($result, strlen('password_too_short:'));
+        } else {
+            // 'registration_disabled' | 'registration_closed' | 'missing_fields'
+            // | 'invalid_username' | 'name_equals_username' | 'server'
+            $registerError = $result;
+        }
     }
 }
 ?>
@@ -62,7 +68,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <div class="admin-card">
         <div class="admin-card__body">
-            <?php if ($registerError === 'throttled'): ?>
+            <?php if ($registerError === 'csrf'): ?>
+            <div class="admin-alert admin-alert--error"><?= __admin('login.csrfFailed') ?></div>
+            <?php elseif ($registerError === 'throttled'): ?>
             <div class="admin-alert admin-alert--error"><?= __admin('register.throttled', ['seconds' => $registerRetryAfter]) ?></div>
             <?php elseif ($registerError === 'password_too_short'): ?>
             <div class="admin-alert admin-alert--error"><?= __admin('register.passwordTooShort', ['min' => $registerMinLength]) ?></div>
@@ -81,6 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <?php endif; ?>
 
             <form id="admin-register-form" method="POST" action="">
+                <input type="hidden" name="form_token" value="<?= adminAttr($router->formToken()) ?>">
                 <div class="admin-form-group">
                     <label class="admin-label admin-label--required" for="name">
                         <?= __admin('register.nameLabel') ?>

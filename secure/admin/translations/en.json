@@ -55,6 +55,7 @@
         "submit": "Sign in",
         "invalidCredentials": "Invalid username or password",
         "missingFields": "The form arrived without a username or password — hard-refresh this page (Ctrl+F5) and try again",
+        "csrfFailed": "Your session could not be verified — the form was too old, or it came from another site. Reload this page and try again.",
         "throttled": "Too many failed attempts — try again in :seconds seconds",
         "serverError": "Could not create the session — try again",
         "showPassword": "Show password",
@@ -265,9 +266,29 @@
             "sentMsg": "Proposal recorded — an admin or the owner must validate it",
             "vouchRequired": "The vouch note is required."
         },
+        "visibility": {
+            "title": "Who can see this site",
+            "public": "PUBLIC",
+            "private": "PRIVATE",
+            "meaningPublic": "Anyone with the address can view this site — no account, no invitation, no login.",
+            "meaningPrivate": "Only signed-in members of this project can reach the site. To everyone else it answers as if it did not exist.",
+            "urlLabel": "Reachable at",
+            "goPublic": "Make it public to everyone",
+            "goPrivate": "Make it members-only",
+            "confirmPublicTitle": "Make this site public to everyone?",
+            "confirmPublicBody": "Everything this project serves becomes viewable by anyone who has the address, with no account and no login. This does not deploy the site: no domain is set up, nothing is submitted to a search engine, and the address does not change — it simply stops requiring membership. A public address can still be found and indexed like any other. You can make it members-only again, but anything already read cannot be unread.",
+            "confirmPublicCheck": "I understand anyone with the address can view this site.",
+            "confirmPrivateTitle": "Make this site members-only?",
+            "confirmPrivateBody": "The site stops being served to the public. Visitors without a membership get the same answer as for a project that does not exist. Existing links stop working for them.",
+            "checkRequired": "Tick the confirmation first.",
+            "savedPublicMsg": "This site is now PUBLIC",
+            "savedPrivateMsg": "This site is now members-only",
+            "notPolicy": "This is not the same as the join policy below. Visibility decides who can VIEW the site; the join policy decides who can ASK to become a member."
+        },
         "policy": {
-            "title": "Join policy",
+            "title": "Who can ask to join",
             "hint": "Open = anyone authenticated may send a join request (the self-service front door). Closed = requests bounce; invitations and member proposals always work. Closing never discards requests already pending.",
+            "notVisibility": "This does NOT make the site public. A project with an open join policy is still visible to members only — the visibility setting above is what opens the site to everyone.",
             "label": "Self-service join requests",
             "toggle": "Toggle",
             "open": "open",
@@ -548,12 +569,64 @@
             "jsonInput": "Enter JSON data..."
         }
     },
+    "account": {
+        "title": "My account",
+        "subtitle": "Your password, your sessions and your account itself. Nothing here touches other people.",
+        "navHint": "Your account settings",
+        "externallyManaged": "This account has no local password — it is managed by the platform that created it. Changing or deleting it must happen there.",
+        "identity": {
+            "title": "Identity",
+            "name": "Display name",
+            "username": "Username",
+            "usernameHint": "private — used only to sign in",
+            "userId": "Account id",
+            "role": "Role on the project you are editing"
+        },
+        "password": {
+            "title": "Change password",
+            "hint": "Changing your password signs out every OTHER session of your account — this is how you lock out someone who has your old password. The browser you are using now stays signed in.",
+            "currentLabel": "Current password",
+            "newLabel": "New password",
+            "minHint": "At least :min characters.",
+            "confirmLabel": "Repeat the new password",
+            "submit": "Change password",
+            "required": "Fill in your current password and the new one.",
+            "mismatch": "The two new passwords do not match.",
+            "tooShort": "The new password is too short.",
+            "sameAsOld": "The new password is the same as the current one.",
+            "changedMsg": "Password changed — your other sessions have been signed out."
+        },
+        "sessions": {
+            "title": "Sessions",
+            "hint": "Signs you out of every browser, phone and tab where this account is signed in — including this one. Use it when you think somebody else holds a session of yours, or when you have left one open somewhere you cannot reach.",
+            "submit": "Sign out everywhere",
+            "confirmTitle": "Sign out everywhere?",
+            "confirmBody": "Every session of your account ends, including this one. You will be asked to sign in again.",
+            "doneMsg": "Signed out everywhere — redirecting to the login page."
+        },
+        "delete": {
+            "title": "Delete my account",
+            "warn": "Permanently deletes your account, ends every session, and removes you from every project you belong to. There is no undo and no operator lane to restore it. You cannot delete an account that is the sole owner of a project — transfer or delete those projects first.",
+            "passwordLabel": "Your current password",
+            "typedLabel": "Type your username to confirm",
+            "submit": "Delete my account",
+            "confirmTitle": "Delete your account — final confirmation",
+            "confirmBody": "This permanently deletes your account, ends every session, and removes you from every project you belong to. It cannot be undone.",
+            "needsPassword": "Enter your current password.",
+            "needsTyped": "Type your username exactly to confirm.",
+            "doneMsg": "Your account has been deleted.",
+            "soleOwnerTitle": "You still own these projects",
+            "soleOwnerHint": "Transfer ownership on the Project Members page, or delete the project, then come back.",
+            "memberCount": "members"
+        }
+    },
     "nav": {
         "members": "Members",
         "myMemberships": "My memberships",
         "projectMembers": "Project members",
         "login": "Login",
         "dashboard": "Dashboard",
+        "account": "My account",
         "apis": "APIs",
         "commands": "Commands",
         "command": "Command",

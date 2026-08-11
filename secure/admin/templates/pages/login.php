@@ -3,11 +3,15 @@
  * Admin Login Page
  *
  * Username + password authentication (C5b; username identity C8 8.0b). The
- * form POSTs to this page; the
- * router verifies the credentials through the shared login gate and holds the
- * resulting session (access + refresh pair) server-side in the PHP session.
- * "Remember me" persists the rotating refresh token in an HttpOnly cookie —
- * no credential or token is ever stored in browser JS storage.
+ * form POSTs to this page; the router verifies the credentials through the
+ * shared login gate and establishes the PHP session that IS the login. There
+ * is no access token and no refresh token; "remember me" simply gives the
+ * session cookie a lifetime so it survives a browser restart. No credential is
+ * ever stored in browser JS storage.
+ *
+ * The form carries a CSRF token (double-submit against an HttpOnly cookie the
+ * router plants) — a login form is forgeable like any other, and being logged
+ * into an account somebody else chose is a real attack, not a nuisance.
  *
  * @version 1.6.0
  */
@@ -24,19 +28,27 @@ unset($_SESSION['qs_register_flash']);
 // admin URL to the first-run page while the registry is empty (C14).
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = (string)($_POST['username'] ?? '');
-    $password = (string)($_POST['password'] ?? '');
-    $remember = isset($_POST['remember']);
-
-    $result = $router->attemptLogin($username, $password, $remember);
-    if ($result === null) {
-        $router->redirect('dashboard');
-    }
-    if (strpos($result, 'throttled:') === 0) {
-        $loginError = 'throttled';
-        $loginRetryAfter = (int)substr($result, strlen('throttled:'));
+    // CSRF gate FIRST — before the credentials are even looked at. A forged
+    // cross-site POST must not be able to log the visitor into an account the
+    // attacker chose, and must not be able to spend their login-throttle
+    // budget probing usernames either.
+    if (!$router->formTokenValid((string)($_POST['form_token'] ?? ''))) {
+        $loginError = 'csrf';
     } else {
-        $loginError = $result; // 'invalid_credentials' | 'server'
+        $username = (string)($_POST['username'] ?? '');
+        $password = (string)($_POST['password'] ?? '');
+        $remember = isset($_POST['remember']);
+
+        $result = $router->attemptLogin($username, $password, $remember);
+        if ($result === null) {
+            $router->redirect('dashboard');
+        }
+        if (strpos($result, 'throttled:') === 0) {
+            $loginError = 'throttled';
+            $loginRetryAfter = (int)substr($result, strlen('throttled:'));
+        } else {
+            $loginError = $result; // 'invalid_credentials' | 'server'
+        }
     }
 }
 ?>
@@ -62,7 +74,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="admin-alert admin-alert--success"><?= __admin('login.registerSuccess') ?></div>
             <?php endif; ?>
 
-            <?php if ($loginError === 'throttled'): ?>
+            <?php if ($loginError === 'csrf'): ?>
+            <div class="admin-alert admin-alert--error"><?= __admin('login.csrfFailed') ?></div>
+            <?php elseif ($loginError === 'throttled'): ?>
             <div class="admin-alert admin-alert--error"><?= __admin('login.throttled', ['seconds' => $loginRetryAfter]) ?></div>
             <?php elseif ($loginError === 'server'): ?>
             <div class="admin-alert admin-alert--error"><?= __admin('login.serverError') ?></div>
@@ -73,6 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <?php endif; ?>
 
             <form id="admin-login-form" method="POST" action="">
+                <input type="hidden" name="form_token" value="<?= adminAttr($router->formToken()) ?>">
                 <div class="admin-form-group">
                     <label class="admin-label admin-label--required" for="username">
                         <?= __admin('login.usernameLabel') ?>

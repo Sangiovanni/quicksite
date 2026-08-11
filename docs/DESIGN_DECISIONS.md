@@ -6574,3 +6574,113 @@ is exactly what this project's positioning rules out).
 **Source**: `secure/src/functions/SessionManagement.php` (`qs_session_boot`,
 `qs_session_save_path`). Behaviour:
 [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md).
+
+### The pre-session auth forms get a double-submit CSRF pair, not a session-backed token (locked 2026-08-11)
+
+**Decision**: `/admin/login`, `/admin/register` and `/admin/setup` carry a CSRF
+token planted as an HttpOnly, `SameSite=Strict` cookie scoped to the admin path
+and repeated as a hidden field; a POST is accepted only when the two match, and
+the check runs *before* the credentials are looked at. Signing out becomes a POST
+carrying the per-session token instead of a `GET` link.
+
+**Reasoning**: The Management API's CSRF defence is the per-session token a page
+embeds — but these three forms run before any session exists, so they have no
+token to embed. A value the server plants in a cookie and repeats in the form
+satisfies the same property: another origin can make the browser send a cookie,
+but it can neither read one nor put its value in a form it builds. Running the
+comparison ahead of the credential check matters as much as the check itself — a
+forged POST must not be able to spend the login throttle probing usernames, nor
+the registration flood budget. Logout moved to POST for the plainer reason that a
+state change reachable by `GET` is reachable from any page on the internet with
+one `<img>` tag.
+
+**Alternatives considered**: A token held in the PHP session (rejected — it would
+tie a security control to a side effect of another module: `AdminTranslation`
+happens to open a write session on every admin render today, and a CSRF defence
+that quietly depends on that staying true is fragile. The cookie pair is
+self-contained and needs no session at all). Origin/Referer header checking
+(rejected — the headers are absent or stripped often enough that the fallback
+decides the policy, and the fallback is either "allow" or "break real users").
+Leaving the auth forms unprotected because login CSRF is low severity (rejected —
+the API gained a CSRF defence in the same beta, and leaving the front door of the
+same panel without one is an inconsistency that will not survive the next reader).
+
+**Source**: `secure/admin/AdminRouter.php` (`formToken`, `formTokenValid`,
+`sessionTokenValid`, the logout branch of `dispatch`), the three auth templates,
+`secure/admin/templates/layout.php`. Behaviour:
+[ADMIN_PANEL.md §6](ADMIN_PANEL.md), [ARCHITECTURE.md §7](ARCHITECTURE.md).
+
+### Project visibility lives on the members page, shaped deliberately unlike the join policy (locked 2026-08-11)
+
+**Decision**: `setProjectVisibility` is surfaced on `/admin/members`, above the
+join-policy control, rendered as a framed block with a coloured state badge, the
+consequence written out in a sentence, the URL a public setting exposes, and a
+button named after the state it moves to — *"Make it public to everyone"*, never
+*"publish"*. Each of the two sections states what it is *not*, and the
+confirmation states that the site is **not deployed**: no domain, no search-engine
+submission, no change of address; the existing `/p/<id>/` view merely stops
+requiring membership. The control is shown to the owner only, and going public
+requires a tick inside its confirm modal.
+
+**Reasoning**: The two settings sound alike — "open" and "public" both read as
+"anyone can get in" — and they were in fact confused during testing: an open join
+policy was taken to have opened the site to everyone, which it does not do. Two
+lookalike toggles side by side is the defect, so the fix is to make them not look
+alike rather than to add explanatory text to a matching pair. Naming the button
+after its destination removes the second ambiguity a *Toggle* button carries,
+which is what state you end up in. **"Publish" is avoided deliberately**: the
+first wording of this control said *"Publish to the internet"*, and it was
+rejected in review for implying a deployment — a domain, a sitemap, an SEO step —
+none of which happens. The operation changes one flag; a control that suggests it
+did more is a worse lie than a vague one. The page is the right home because it
+already reads visibility to warn about the private+open posture, so the value is
+on screen either way; a control that only reads a value it will not let you change
+is its own confusion. Owner-only follows the command: the `project.visibility`
+category sits at the delete/transfer tier, so the UI must not offer it to an admin
+the server will refuse.
+
+**Alternatives considered**: A dedicated project-settings page (rejected — it
+separates visibility from the join policy it is confused *with*, which is exactly
+the comparison the user needs to see). A matching toggle next to the join policy
+for consistency (rejected — visual consistency is what caused the confusion).
+Leaving it on the generic command console (rejected — the single knob that opens a
+site to everyone should not be reachable only by finding it among 175 others). A
+typed confirmation like the account deletion (rejected — the flag is reversible,
+so the friction of a tick is proportionate where typing is not).
+
+**Source**: `secure/admin/templates/pages/members.php`,
+`public/admin/assets/js/pages/members.js` (`renderVisibility`,
+`setupVisibilityToggle`), `public/admin/assets/css/members-admin.css`. Behaviour:
+[ADMIN_PANEL.md §9.12](ADMIN_PANEL.md).
+
+### Account deletion ships on the account page, behind a typed confirmation (locked 2026-08-11)
+
+**Decision**: `/admin/account` carries `deleteMyAccount` alongside the password
+change and the sign-out-everywhere action, gated by the current password *and* by
+typing the account's username exactly. The page is reached by clicking your own
+name in the header, and is open to every authenticated user with no role gate.
+
+**Reasoning**: A settings page that hides the destructive action does not prevent
+the deletion; it sends the person to the raw command console to do the same thing
+with less context and no confirmation at all. Putting it here is the safer of the
+two, because the surface can explain what will happen and can list the projects
+whose sole ownership is blocking the deletion — information the console shows only
+as a JSON error. The typed confirmation is the username rather than a fixed word
+like DELETE: it is the one string only this account's owner has in mind, and
+unlike a checkbox it cannot be clicked through by reflex. No role gate, because
+all three commands are global-scope `access: 'any'` and act only on the caller —
+an account belonging to no project must still be able to change its own password.
+The header badge is the entry point because clicking your own name is where people
+already look for account settings.
+
+**Alternatives considered**: Omit deletion and keep it console-only (rejected —
+see above; it moves the risk rather than removing it). A checkbox confirmation
+like the ownership transfer (rejected — transfer is recoverable by the new owner,
+deletion is recoverable by nobody, so the friction should differ). A new top-level
+nav entry (rejected — the account surface is per-user, not part of the project
+work the nav describes, and the header badge already names the account).
+
+**Source**: `secure/admin/templates/pages/account.php`,
+`public/admin/assets/js/pages/account.js`, `secure/admin/AdminRouter.php` (the
+page allowlist), `secure/admin/templates/layout.php` (the badge link). Behaviour:
+[ADMIN_PANEL.md §9.13](ADMIN_PANEL.md).

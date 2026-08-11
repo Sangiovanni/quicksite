@@ -47,27 +47,33 @@ $tokenPath = str_replace(
 );
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $name = (string)($_POST['name'] ?? '');
-    $username = (string)($_POST['username'] ?? '');
-    $password = (string)($_POST['password'] ?? '');
-    $token = (string)($_POST['setup_token'] ?? '');
-
-    $result = $router->attemptSetup($name, $username, $password, $token);
-    if ($result === null) {
-        // Created. No auto-login — the login page stays the single
-        // session-establishing point (it shows the "account created" banner).
-        $router->redirect('login');
-    }
-    if (strpos($result, 'throttled:') === 0) {
-        $setupError = 'throttled';
-        $setupRetryAfter = (int)substr($result, strlen('throttled:'));
-    } elseif (strpos($result, 'password_too_short:') === 0) {
-        $setupError = 'password_too_short';
-        $setupMinLength = (int)substr($result, strlen('password_too_short:'));
+    // CSRF gate FIRST — the setup token is the real authorisation here, but a
+    // forged POST must not get to spend the setup throttle guessing it.
+    if (!$router->formTokenValid((string)($_POST['form_token'] ?? ''))) {
+        $setupError = 'csrf';
     } else {
-        // 'invalid_token' | 'missing_fields' | 'invalid_username'
-        // | 'name_equals_username' | 'setup_complete' | 'server'
-        $setupError = $result;
+        $name = (string)($_POST['name'] ?? '');
+        $username = (string)($_POST['username'] ?? '');
+        $password = (string)($_POST['password'] ?? '');
+        $token = (string)($_POST['setup_token'] ?? '');
+
+        $result = $router->attemptSetup($name, $username, $password, $token);
+        if ($result === null) {
+            // Created. No auto-login — the login page stays the single
+            // session-establishing point (it shows the "account created" banner).
+            $router->redirect('login');
+        }
+        if (strpos($result, 'throttled:') === 0) {
+            $setupError = 'throttled';
+            $setupRetryAfter = (int)substr($result, strlen('throttled:'));
+        } elseif (strpos($result, 'password_too_short:') === 0) {
+            $setupError = 'password_too_short';
+            $setupMinLength = (int)substr($result, strlen('password_too_short:'));
+        } else {
+            // 'invalid_token' | 'missing_fields' | 'invalid_username'
+            // | 'name_equals_username' | 'setup_complete' | 'server'
+            $setupError = $result;
+        }
     }
 }
 ?>
@@ -101,7 +107,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
             <?php endif; ?>
 
-            <?php if ($setupError === 'throttled'): ?>
+            <?php if ($setupError === 'csrf'): ?>
+            <div class="admin-alert admin-alert--error"><?= __admin('login.csrfFailed') ?></div>
+            <?php elseif ($setupError === 'throttled'): ?>
             <div class="admin-alert admin-alert--error"><?= __admin('setup.throttled', ['seconds' => $setupRetryAfter]) ?></div>
             <?php elseif ($setupError === 'invalid_token'): ?>
             <div class="admin-alert admin-alert--error"><?= __admin('setup.invalidToken', 'That setup token is not valid. Open the file named below and copy the whole line.') ?></div>
@@ -127,6 +135,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
 
             <form id="admin-setup-form" method="POST" action="">
+                <input type="hidden" name="form_token" value="<?= adminAttr($router->formToken()) ?>">
                 <div class="admin-form-group">
                     <label class="admin-label admin-label--required" for="setup_token">
                         <?= __admin('setup.tokenLabel', 'Setup token') ?>

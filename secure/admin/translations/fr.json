@@ -55,6 +55,7 @@
         "submit": "Se connecter",
         "invalidCredentials": "Nom d'utilisateur ou mot de passe invalide",
         "missingFields": "Le formulaire est arrivé sans nom d'utilisateur ou mot de passe — rechargez la page (Ctrl+F5) et réessayez",
+        "csrfFailed": "Votre session n'a pas pu être vérifiée — le formulaire était trop ancien, ou il provenait d'un autre site. Rechargez cette page et réessayez.",
         "throttled": "Trop de tentatives échouées — réessayez dans :seconds secondes",
         "serverError": "Impossible de créer la session — réessayez",
         "showPassword": "Afficher le mot de passe",
@@ -265,9 +266,29 @@
             "sentMsg": "Proposition enregistrée — un admin ou le propriétaire doit la valider",
             "vouchRequired": "La note de recommandation est obligatoire."
         },
+        "visibility": {
+            "title": "Qui peut voir ce site",
+            "public": "PUBLIC",
+            "private": "PRIVÉ",
+            "meaningPublic": "Toute personne disposant de l'adresse peut consulter ce site — sans compte, sans invitation, sans connexion.",
+            "meaningPrivate": "Seuls les membres connectés de ce projet peuvent atteindre le site. Pour tous les autres, il répond comme s'il n'existait pas.",
+            "urlLabel": "Accessible à",
+            "goPublic": "Rendre visible par tout le monde",
+            "goPrivate": "Réserver aux membres",
+            "confirmPublicTitle": "Rendre ce site visible par tout le monde ?",
+            "confirmPublicBody": "Tout ce que ce projet sert devient consultable par quiconque dispose de l'adresse, sans compte et sans connexion. Ceci ne déploie pas le site : aucun nom de domaine n'est configuré, rien n'est soumis à un moteur de recherche et l'adresse ne change pas — elle cesse simplement d'exiger une adhésion. Une adresse publique peut malgré tout être trouvée et indexée comme n'importe quelle autre. Vous pouvez repasser en accès réservé aux membres, mais ce qui a déjà été lu ne peut pas être délu.",
+            "confirmPublicCheck": "Je comprends que toute personne disposant de l'adresse peut consulter ce site.",
+            "confirmPrivateTitle": "Réserver ce site aux membres ?",
+            "confirmPrivateBody": "Le site cesse d'être servi au public. Les visiteurs sans adhésion obtiennent la même réponse que pour un projet inexistant. Les liens existants cessent de fonctionner pour eux.",
+            "checkRequired": "Cochez d'abord la confirmation.",
+            "savedPublicMsg": "Ce site est désormais PUBLIC",
+            "savedPrivateMsg": "Ce site est désormais réservé aux membres",
+            "notPolicy": "Ce n'est pas la même chose que la politique d'adhésion ci-dessous. La visibilité décide qui peut CONSULTER le site ; la politique d'adhésion décide qui peut DEMANDER à devenir membre."
+        },
         "policy": {
-            "title": "Politique d'adhésion",
+            "title": "Qui peut demander à rejoindre",
             "hint": "Ouverte = toute personne authentifiée peut envoyer une demande (la porte d'entrée libre-service). Fermée = les demandes sont refusées ; invitations et propositions de membres fonctionnent toujours. Fermer ne supprime jamais les demandes déjà en attente.",
+            "notVisibility": "Ceci ne rend PAS le site public. Un projet dont la politique d'adhésion est ouverte reste visible par les seuls membres — c'est le réglage de visibilité ci-dessus qui ouvre le site à tout le monde.",
             "label": "Demandes d'adhésion libre-service",
             "toggle": "Basculer",
             "open": "ouverte",
@@ -563,12 +584,64 @@
             "jsonInput": "Entrez des données JSON..."
         }
     },
+    "account": {
+        "title": "Mon compte",
+        "subtitle": "Votre mot de passe, vos sessions et votre compte lui-même. Rien ici ne touche aux autres personnes.",
+        "navHint": "Les réglages de votre compte",
+        "externallyManaged": "Ce compte n'a pas de mot de passe local — il est géré par la plateforme qui l'a créé. Sa modification ou sa suppression doit s'y faire.",
+        "identity": {
+            "title": "Identité",
+            "name": "Nom d'affichage",
+            "username": "Nom d'utilisateur",
+            "usernameHint": "privé — sert uniquement à se connecter",
+            "userId": "Identifiant du compte",
+            "role": "Rôle sur le projet que vous éditez"
+        },
+        "password": {
+            "title": "Changer le mot de passe",
+            "hint": "Changer votre mot de passe déconnecte toutes les AUTRES sessions de votre compte — c'est ainsi que vous excluez quelqu'un qui détient votre ancien mot de passe. Le navigateur que vous utilisez maintenant reste connecté.",
+            "currentLabel": "Mot de passe actuel",
+            "newLabel": "Nouveau mot de passe",
+            "minHint": "Au moins :min caractères.",
+            "confirmLabel": "Répétez le nouveau mot de passe",
+            "submit": "Changer le mot de passe",
+            "required": "Renseignez votre mot de passe actuel et le nouveau.",
+            "mismatch": "Les deux nouveaux mots de passe ne correspondent pas.",
+            "tooShort": "Le nouveau mot de passe est trop court.",
+            "sameAsOld": "Le nouveau mot de passe est identique à l'actuel.",
+            "changedMsg": "Mot de passe changé — vos autres sessions ont été déconnectées."
+        },
+        "sessions": {
+            "title": "Sessions",
+            "hint": "Vous déconnecte de tous les navigateurs, téléphones et onglets où ce compte est connecté — celui-ci compris. À utiliser si vous pensez que quelqu'un d'autre détient une de vos sessions, ou si vous en avez laissé une ouverte quelque part hors de portée.",
+            "submit": "Se déconnecter partout",
+            "confirmTitle": "Se déconnecter partout ?",
+            "confirmBody": "Toutes les sessions de votre compte prennent fin, celle-ci comprise. Il vous faudra vous reconnecter.",
+            "doneMsg": "Déconnecté partout — redirection vers la page de connexion."
+        },
+        "delete": {
+            "title": "Supprimer mon compte",
+            "warn": "Supprime définitivement votre compte, met fin à toutes les sessions et vous retire de tous les projets auxquels vous appartenez. Il n'y a pas de retour en arrière ni de voie opérateur pour le restaurer. Vous ne pouvez pas supprimer un compte qui est l'unique propriétaire d'un projet — transférez ou supprimez ces projets d'abord.",
+            "passwordLabel": "Votre mot de passe actuel",
+            "typedLabel": "Tapez votre nom d'utilisateur pour confirmer",
+            "submit": "Supprimer mon compte",
+            "confirmTitle": "Supprimer votre compte — confirmation finale",
+            "confirmBody": "Ceci supprime définitivement votre compte, met fin à toutes les sessions et vous retire de tous les projets auxquels vous appartenez. C'est irréversible.",
+            "needsPassword": "Saisissez votre mot de passe actuel.",
+            "needsTyped": "Tapez exactement votre nom d'utilisateur pour confirmer.",
+            "doneMsg": "Votre compte a été supprimé.",
+            "soleOwnerTitle": "Vous possédez encore ces projets",
+            "soleOwnerHint": "Transférez la propriété depuis la page Membres du projet, ou supprimez le projet, puis revenez.",
+            "memberCount": "membres"
+        }
+    },
     "nav": {
         "members": "Membres",
         "myMemberships": "Mes adhésions",
         "projectMembers": "Membres du projet",
         "login": "Connexion",
         "dashboard": "Tableau de bord",
+        "account": "Mon compte",
         "apis": "APIs",
         "commands": "Commandes",
         "command": "Commande",
