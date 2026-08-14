@@ -11,14 +11,53 @@
 
 /**
  * Generate nginx location block content for QuickSite routing
- * 
+ *
  * Creates 5 location blocks in order of specificity:
  *   1. /prefix/admin/api/    — Admin panel AJAX helper
  *   2. /prefix/management/   — Management API
  *   3. /prefix/admin/        — Admin panel
  *   4. /prefix/p/            — Project renderer (surface B, /p/<id>/)
  *   5. /prefix/              — Public root (FREE — no QuickSite fallback; C15 15.2)
- * 
+ *
+ * ── WHY /p/ IS THE ONLY BLOCK WITH `^~` ──────────────────────────────────────
+ *
+ * Blocks 1, 2, 3 and 5 are plain prefixes, and a plain prefix LOSES to any regex
+ * location in the surrounding vhost. That is safe for them because everything
+ * they serve is either extensionless (a command, a panel route) or a real file
+ * inside the web root — a regex block looking for it on disk finds it.
+ *
+ * /p/ is different, and it is the difference that matters: a project's files
+ * live in secure/projects/<id>/public/, deliberately OUTSIDE the web root, so
+ * PHP can apply the visibility gate before a single byte is sent. Nothing under
+ * /p/ can ever be found on disk. A panel-generated vhost almost always carries
+ * something like
+ *
+ *     location ~* ^.+\.(css|js|png|…)$ { expires max; }
+ *
+ * and a REGEX beats a PREFIX, so every stylesheet, script and image under /p/
+ * was answered by that block, which looked in the web root and 404ed — while
+ * extensionless page routes, matching no regex, rendered perfectly. `^~` is what
+ * takes /p/ out of that competition.
+ *
+ * ── AND WHY THE FALLBACK IS A NAMED LOCATION ─────────────────────────────────
+ *
+ * `^~` suppresses regex matching for anything it wins, INCLUDING the vhost's own
+ * `location ~ \.php$` handler. So the obvious
+ *
+ *     location ^~ /p/ { try_files $uri $uri/ /p/index.php; }
+ *
+ * is a trap: the fallback re-enters location matching, lands back in this same
+ * `^~` block with regex still suppressed, and `try_files $uri` now finds
+ * /p/index.php ON DISK — nginx serves the engine's source as plain text. The
+ * naive version looks identical to this one and discloses the whole renderer.
+ *
+ * A NAMED location cannot do that: nginx jumps straight to it without re-running
+ * location matching, so there is no second pass to be trapped in. The operator
+ * defines it once in their vhost (it needs their php-fpm upstream, which this
+ * file cannot know). The nested `location ~ \.php$ { return 404; }` closes the
+ * remaining hole — a DIRECT request for /p/index.php, which `^~` would otherwise
+ * hand to the static file handler.
+ *
  * @param string $publicFolderSpace URL prefix (e.g., 'quicksite/test' or '')
  * @return string Nginx configuration content
  */
@@ -33,8 +72,10 @@ function generate_nginx_config(string $publicFolderSpace): string {
     $config .= "# Auto-generated on {$date} by QuickSite\n";
     $config .= "# Do NOT edit manually — regenerated when public space changes.\n";
     $config .= "#\n";
-    $config .= "# Usage: Include this file in your nginx server {} block:\n";
-    $config .= "#   include /path/to/secure/nginx/dynamic_routes.conf;\n";
+    $config .= "# Usage — TWO steps, both required:\n";
+    $config .= "#   1. include /path/to/secure/nginx/dynamic_routes.conf;   (in server {})\n";
+    $config .= "#   2. define the `@quicksite_project` named location — see the block\n";
+    $config .= "#      further down. Without it every project URL answers 500.\n";
     $config .= "#\n";
     $config .= "# QuickSite attempts to reload nginx automatically when\n";
     $config .= "# the public space configuration changes (requires sudoers setup).\n";
@@ -61,13 +102,58 @@ function generate_nginx_config(string $publicFolderSpace): string {
     $config .= "    try_files \$uri \$uri/ {$prefix}/admin/index.php\$is_args\$args;\n";
     $config .= "}\n\n";
 
-    // Project renderer (surface B) — C15 15.2. Each project is served from its own
-    // folder at /p/<projectId>/. Longer prefix than the root block below, so nginx
-    // routes /p/... here.
-    $config .= "# Project renderer (/p/<projectId>/ — each project served from its own folder)\n";
-    $config .= "location {$prefix}/p/ {\n";
-    $config .= "    try_files \$uri \$uri/ {$prefix}/p/index.php\$is_args\$args;\n";
+    // Project renderer (surface B) — see the function docblock for why this one
+    // block is `^~` and why its fallback is a NAMED location.
+    $config .= "# Project renderer — every project is served at /p/<projectId>/ from its own\n";
+    $config .= "# folder under secure/projects/, which is OUTSIDE the web root so the\n";
+    $config .= "# visibility gate runs before any byte is sent.\n";
+    $config .= "#\n";
+    $config .= "# `^~` is required: it stops a vhost's own `location ~* \\.(css|js|png|…)$`\n";
+    $config .= "# regex from claiming these URLs and 404ing them (a regex outranks a plain\n";
+    $config .= "# prefix in nginx). Page routes have no extension and were never affected,\n";
+    $config .= "# which is why only styles, scripts and images went missing.\n";
+    $config .= "location ^~ {$prefix}/p/ {\n";
+    $config .= "    try_files \$uri \$uri/ @quicksite_project;\n";
+    $config .= "\n";
+    $config .= "    # `^~` also suppresses the vhost's PHP handler here, so a direct request\n";
+    $config .= "    # for the entry point must be refused explicitly — otherwise nginx would\n";
+    $config .= "    # serve it as a static file and hand out the engine's source.\n";
+    $config .= "    location ~ \\.php\$ { return 404; }\n";
     $config .= "}\n\n";
+
+    // The named location the operator must define. It cannot be generated: it needs
+    // the deployment's own php-fpm upstream, which QuickSite has no way to know.
+    $config .= "# ----------------------------------------------------------------------------\n";
+    $config .= "# REQUIRED — add this to your server {} block, NOT to this file.\n";
+    $config .= "# This file is regenerated whenever the install layout changes; edits here\n";
+    $config .= "# are lost.\n";
+    $config .= "#\n";
+    $config .= "# WHERE TO FIND THE fastcgi_pass VALUE: search your vhost for the word\n";
+    $config .= "# `fastcgi_pass`. It is already there — your `location ~ \\.php$` block cannot\n";
+    $config .= "# work without it. Copy that whole line. It looks like one of:\n";
+    $config .= "#     fastcgi_pass unix:/run/php/php8.3-fpm.sock;\n";
+    $config .= "#     fastcgi_pass 127.0.0.1:9000;\n";
+    $config .= "# (127.0.0.1 is loopback — this machine talking to itself. It exposes\n";
+    $config .= "# nothing; php-fpm is already listening there for your other PHP requests.)\n";
+    $config .= "#\n";
+    $config .= "# location @quicksite_project {\n";
+    $config .= "#     include        fastcgi_params;\n";
+    $config .= "#     fastcgi_param  SCRIPT_FILENAME \$document_root{$prefix}/p/index.php;\n";
+    // NOT angle brackets. A `<placeholder>` pasted verbatim fails with "invalid
+    // number of arguments", which is caught but says nothing about the fix — it
+    // happened in testing. A single token that names the action fails the config
+    // test just as loudly and reads as the instruction it is.
+    $config .= "#     fastcgi_pass   COPY_THIS_FROM_YOUR_OWN_php_BLOCK;\n";
+    $config .= "# }\n";
+    $config .= "#\n";
+    $config .= "# SCRIPT_FILENAME is HARDCODED to the entry point above, and must stay that\n";
+    $config .= "# way: deriving it from \$fastcgi_script_name is what lets a request like\n";
+    $config .= "# /uploads/photo.jpg/x.php execute an uploaded file. With a fixed path there\n";
+    $config .= "# is no request-controlled component left, so that class cannot arise here.\n";
+    $config .= "#\n";
+    $config .= "# Without this block every project URL answers 500 and the error log says\n";
+    $config .= "# `could not find named location \"@quicksite_project\"`.\n";
+    $config .= "# ----------------------------------------------------------------------------\n\n";
 
     // Public root — DELIBERATELY FREE (C15 15.2). No fallback into QuickSite: the root
     // serves real static files only (a user's own hand-made site), 404 otherwise. The

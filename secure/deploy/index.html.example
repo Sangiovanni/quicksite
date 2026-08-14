@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>QuickSite is installed</title>
+<!--
+  ============================================================================
+  This is a PLACEHOLDER, and it is meant to be deleted.
+
+  QuickSite does not serve anything at the web root on purpose: the root is
+  yours, so your own hand-made site can live there and QuickSite never squats
+  the domain. On a brand-new install that leaves nothing to serve, and a web
+  server with nothing to serve and no directory listing answers 403 Forbidden —
+  which looks like a broken install and is not one.
+
+  So setup drops this file in, ONCE, and only when the root had no index file
+  of its own. Replace it with your site, or delete it, and nothing changes:
+  the root simply goes back to being empty. Nothing in QuickSite reads it.
+
+  It carries meta robots=noindex, but it does still announce that this server
+  runs QuickSite. If that matters to you, delete it once you are signed in.
+
+  The link below is deliberately RELATIVE, so it stays correct if the install
+  serves from a URL prefix (http://your-domain/web/).
+  ============================================================================
+-->
+<style>
+  :root { color-scheme: light dark; }
+  body {
+    margin: 0; min-height: 100vh; display: flex; align-items: center;
+    justify-content: center; padding: 2rem; box-sizing: border-box;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    line-height: 1.6; background: #fafafa; color: #333;
+  }
+  main { max-width: 34rem; }
+  h1 { margin: 0 0 .3em; font-size: 1.6rem; color: #1a1a2e; }
+  p.sub { margin: 0 0 1.75rem; color: #666; }
+  .card {
+    background: #fff; border-left: 4px solid #4a9eff; border-radius: 4px;
+    padding: 1rem 1.25rem; margin: 1rem 0; box-shadow: 0 1px 3px rgba(0,0,0,.08);
+  }
+  .card h2 { margin: 0 0 .4em; font-size: 1rem; color: #1a1a2e; }
+  .card p { margin: 0; }
+  a.btn {
+    display: inline-block; margin-top: .5rem; padding: .7rem 1.4rem;
+    background: #4a9eff; color: #fff; text-decoration: none;
+    border-radius: 6px; font-weight: 600;
+  }
+  a.btn:hover { background: #3d8ae0; }
+  code { background: #e8eaf0; padding: 2px 6px; border-radius: 3px; font-size: .9em; }
+  footer { margin-top: 2rem; font-size: .85rem; color: #888; }
+  @media (prefers-color-scheme: dark) {
+    body { background: #16161d; color: #cdd6f4; }
+    h1, .card h2 { color: #e6e6f0; }
+    p.sub, footer { color: #9a9aa8; }
+    .card { background: #1e1e2e; box-shadow: none; }
+    code { background: #2a2a3c; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>QuickSite is installed</h1>
+  <p class="sub">This is the web root, and it is deliberately empty — it belongs to your site, not to QuickSite.</p>
+
+  <div class="card">
+    <h2>Your admin panel is at <code>/admin/</code></h2>
+    <p>On a new installation that page asks you to create the first account, and
+       tells you which file on the server holds your setup token.</p>
+    <p><a class="btn" href="admin/">Open the admin panel</a></p>
+  </div>
+
+  <div class="card">
+    <h2>Your sites are at <code>/p/&lt;project&gt;/</code></h2>
+    <p>Every project is served from its own folder. A project set to
+       <em>private</em> answers 404 to anyone who is not a member — including
+       you, until you sign in.</p>
+  </div>
+
+  <footer>
+    You are seeing this because the web root had no index file when QuickSite
+    was set up. Replace this file with your own site, or delete it — nothing
+    depends on it.
+  </footer>
+</main>
+</body>
+</html>

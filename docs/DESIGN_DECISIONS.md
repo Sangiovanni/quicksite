@@ -6737,3 +6737,269 @@ whole entry is about).
 **Source**: `secure/src/functions/surfaceB.php` (`qs_surface_b_gate`,
 `qs_surface_b_maybe_handle`, `qs_sb_deny`). Behaviour:
 [ARCHITECTURE.md §5.1](ARCHITECTURE.md), [ARCHITECTURE.md §6](ARCHITECTURE.md).
+
+---
+
+## Installation and first run (beta.11)
+
+### Setup is a menu, and it never writes what it has no subject for (locked 2026-08-11)
+
+**Decision**: `setup.sh` / `setup.bat` present a menu of six independent items —
+public folder name, secure folder name, URL space, environment, self-registration,
+show my setup token — instead of walking a fixed sequence. The menu header shows
+the values currently on disk. Two of those items write config the scripts
+previously left to be discovered by hand; a third only reads.
+
+**Reasoning**: The linear walk made changing one setting mean answering all of
+them, which is why the scripts were run once and then avoided. A menu is the
+shape the task actually has: these settings are independent, they are revisited
+at different times, and the state they read back is on disk rather than in the
+operator's memory.
+
+The harder half of the decision is what setup may NOT do. It runs before any
+account exists, so anything whose subject is an account cannot be written here —
+not the user registry, not the project roster, not the operator list. The setup
+token is the case that looks like an exception and is not: it is minted by the
+engine when the first-run page renders, so on a fresh clone the file genuinely
+does not exist while setup is running. The menu item therefore says so and gives
+the ordering, rather than printing an empty value that reads as a broken install.
+
+The environment and self-registration answers are written as server-side files
+for the same reason the environment setting has never been an API: an operator
+running the setup script has filesystem access by definition, and a setting that
+governs outbound network reach must not be reachable by anything weaker than
+that.
+
+Setup also stops carrying its own copy of the nginx routing generator. It had
+one, it drifted, and it emitted a root catch-all pointing at an entry point that
+no longer exists plus no project-renderer block at all — so re-running setup
+broke the routing of an install that was working. It now deletes the generated
+file and lets the engine rebuild it from the single generator on the next page
+load. Deleting is the one operation that cannot go stale.
+
+**Alternatives considered**: Keep the linear walk and add the two new prompts to
+the end (rejected — it makes the walk longer, and the complaint was never that it
+was short). Have setup shell out to PHP to regenerate the nginx config
+(rejected — it makes a working install depend on a PHP CLI being present and on
+PATH, which is not true on Windows and not guaranteed on a locked-down host).
+Have setup write the routing file itself from a corrected copy of the generator
+(rejected — that is exactly the duplication that produced the defect, with the
+serial number filed off). Make the environment switchable from the admin panel
+(rejected — it is the control on server-side fetch reach; putting it behind a
+credential means a leaked credential can re-open it).
+
+**Source**: `setup.sh`, `setup.bat`, `secure/src/functions/NginxConfig.php`,
+`public/init.php`. Behaviour: [README.md](../README.md).
+
+### First run makes the bootstrap account the owner of the projects that shipped (locked 2026-08-11)
+
+**Decision**: When the first account on an installation is created, the engine
+writes a `config/members.json` for every project directory that has none, naming
+that account as owner, and mirrors those projects into its user record the same
+way `createProject` does. Adoption is by ABSENCE of a roster, not by matching the
+starter project's id.
+
+**Reasoning**: `qs_project_birth_write_members()` runs at project creation, and a
+project that arrived in the download never passes through it. Without a roster,
+`loadProjectMembers()` reads a project as private with no members — invisible and
+uneditable to everyone, including the person who just installed QuickSite. The
+result was an install that started with a starter project nobody could open.
+
+Adoption keys on the missing roster rather than on the id `quicksite` because the
+starter's name is not a contract, because someone may drop a second project in
+before first run, and — the load-bearing reason — because a project with no
+roster is reachable by nobody, so adopting it cannot take anything away from
+anyone. The registry was empty one instruction earlier; there is no other account
+with a claim to weigh.
+
+Failure is reported and never fatal. The account exists by the time this runs,
+and an account creation that rolled back because one directory was read-only
+would leave the deployer with no way in at all — whereas an account plus a
+warning leaves them signed in, looking at the panel, able to fix it.
+
+**Alternatives considered**: Ship a `members.json` with the starter project
+(rejected — it would have to name a user id that does not exist yet, and the file
+is per-install by construction). Have setup write it (rejected — no account
+exists at setup time, which is the same seam as the operator list below). Adopt
+only the id `quicksite` (rejected — hardcodes a name that is not a contract, and
+silently does nothing for any other shipped project). Adopt every project,
+roster or not (rejected — that would re-home a project somebody else owns, which
+is the one thing this must never do).
+
+**Source**: `secure/src/functions/firstRun.php`,
+`secure/src/functions/AuthManagement.php` (`qs_auth_attempt_setup`).
+Behaviour: [README.md](../README.md).
+
+### The operator list is a display preference, not a role (locked 2026-08-11)
+
+**Decision**: `secure/management/config/operator.php` names the accounts that see
+operator-facing notices. It is gitignored with a tracked `.example`, written at
+first run naming the bootstrap account, and edited by hand thereafter — no
+command writes it. **It grants nothing**: it decides whether a notice renders and
+nothing else, and no code path may consult it to authorize an action. A missing,
+unreadable or malformed file reads as an empty list, never as "everybody".
+
+**Reasoning**: Notices like "an update is available" are addressed to whoever
+maintains the server. Showing them to every authenticated account means someone
+invited to edit one project's text is told the engine version and offered an
+action they cannot take.
+
+The obvious answer — a role — is the one thing that must not be built. A global
+permission in QuickSite is now either "any signed-in account" or "nobody", and
+nothing else can be expressed; that was arrived at by deleting an
+installation-wide tier and the escalation it carried. A file naming "the
+administrator of this server" puts that principal straight back. Keeping the file
+display-only is what avoids it: a list that authorizes nothing is not a
+principal, whatever it is named.
+
+Who the operator IS needs no definition, because it is not a grant. It is whoever
+can edit the file — which is whoever has filesystem access, which is strictly
+more power than any list could hand out. That is the same principle the first-run
+setup token already runs on, and it dissolves the questions a role would have
+raised: nobody appoints an operator, operators do not appoint each other, and
+there is no hierarchy to design.
+
+Absence reads as "nobody" rather than "everybody" because every install QuickSite
+creates has this file, so absence means either an install predating it — whose
+operator can add a line from the shell they demonstrably have — or an empty list
+somebody chose. Guessing "everybody" for either restores the disclosure the file
+exists to close.
+
+**Alternatives considered**: A deployer role (rejected — reintroduces the
+installation-wide principal, in full, with the escalation path that made it
+dangerous). Show the notice to every project owner (rejected — owning a project
+says nothing about maintaining the server, and on a multi-tenant install it is
+most of the accounts). Restrict the underlying update check instead (rejected —
+that is authorization, and the problem is presentation; the check has no
+principal to gate on). Default to "everybody" when the file is absent (rejected —
+preserves today's disclosure precisely on the installs least likely to notice).
+
+**Source**: `secure/management/config/operator.php.example`,
+`secure/src/functions/firstRun.php` (`qs_operator_ids`,
+`qs_first_run_write_operator`). Behaviour: [README.md](../README.md).
+
+### The free web root gets a placeholder, not a front controller (locked 2026-08-12)
+
+**Decision**: On its **first** run only, and **only** when the web root holds no
+`index.*` of its own, setup copies `secure/deploy/index.html.example` to
+`public/index.html` — a static page saying the panel is at `/admin/`. The live
+file is gitignored; the template is tracked. Nothing in the engine reads it, no
+routing changes, and a later setup run never re-creates it.
+
+**Reasoning**: QuickSite serves nothing at the domain root on purpose — the root
+belongs to the deployment, so the engine never squats it. The cost, unnoticed
+until someone installed from scratch and looked, is that a fresh install answers
+**403 Forbidden** at the address a person types first. It is the correct
+behaviour and it is indistinguishable from a broken install, which is the worst
+pairing an install step can have: every other failure mode here explains itself.
+
+A static file is the answer that does not undo the decision it is patching. The
+root is free because nothing is ROUTED there — no `FallbackResource`, no
+`try_files` into PHP — and a plain file that `DirectoryIndex` happens to pick up
+changes none of that. Put a site at the root and it is served exactly as before.
+
+Both conditions are load-bearing, in opposite directions. *Only when the root is
+empty*, because QuickSite is installed onto servers that already have a site and
+overwriting somebody's front page would be unforgivable — the check is for any
+`index.*`, not just the name we would write, since the deployment picks its own
+`DirectoryIndex`. *Only on the first run*, because deleting the placeholder has
+to be permanent: a file that reappears every time you open setup is not a
+placeholder, it is a nag.
+
+It has to be setup that does this, not the engine. On Apache a request for `/`
+with no index file never executes PHP at all, so there is no point at which
+QuickSite could notice and react — by the time anything of ours runs, the 403
+has already been sent.
+
+The page is honest about announcing that the server runs QuickSite, and says so
+in its own comment: an operator who does not want that deletes it, which is the
+same gesture that replaces it.
+
+**Alternatives considered**: A `FallbackResource` at the root that renders a
+QuickSite welcome page (rejected — that is squatting the domain, which is the
+decision this one exists inside). Redirect `/` to `/admin/` (rejected — same
+objection, plus it makes the root unusable for the site it is reserved for).
+Ship `public/index.html` as a tracked file (rejected — a `git pull` would
+resurrect it after deletion, or worse, overwrite the page that replaced it).
+Document the 403 and change nothing (rejected — it was already documented, and
+the person hitting it has not read the README yet; that is the point at which
+they are deciding whether this software works). Create it on every setup run
+when the root is empty (rejected — indistinguishable from the above for a fresh
+install, and a nag for everyone else).
+
+**Source**: `secure/deploy/index.html.example`, `setup.sh` /
+`setup.bat` (`maybe_place_landing_page`). Behaviour: [README.md](../README.md).
+
+### The project namespace is `^~` with a named-location fallback (locked 2026-08-13)
+
+**Decision**: The generated nginx routing gives `/p/` — and only `/p/` — the `^~`
+modifier, and its `try_files` fallback is the **named location**
+`@quicksite_project`, never a path. The named location is defined once by the
+operator in their own server block, because it needs a php-fpm upstream QuickSite
+cannot know, and its `SCRIPT_FILENAME` is a **fixed** path to the `/p/` entry
+point. A nested `location ~ \.php$ { return 404; }` sits inside the `^~` block.
+
+**Reasoning**: A project's files live in `secure/projects/<id>/public/`,
+deliberately outside the web root, so the visibility gate runs before a byte is
+sent. Nothing under `/p/` is ever findable on disk. Panel-generated vhosts almost
+all carry a static-asset rule of the shape
+`location ~* ^.+\.(css|js|png|…)$ { expires max; }` — and in nginx **a regex
+location outranks a prefix location**. So every stylesheet, script and image
+under `/p/` was answered by that block, which looked in the web root, found
+nothing, and returned 404, while extensionless page routes matched no regex,
+reached the prefix, and rendered perfectly. A site that renders its HTML and
+none of its assets looks like an application bug and is a routing one. `^~` is
+the only modifier that takes a prefix out of that competition.
+
+The reason this entry exists is the second half, because the naive version looks
+identical and is far worse than the bug it fixes. `^~` suppresses regex matching
+for everything it wins, **including the vhost's own `location ~ \.php$`**. So
+
+    location ^~ /p/ { try_files $uri $uri/ /p/index.php; }
+
+is a trap: the fallback is a path, a path re-enters location matching, `^~` wins
+again with regex still suppressed, and this time `try_files $uri` finds
+`/p/index.php` **on disk** — nginx serves the renderer as `text/plain`. The fix
+for a 404 would have been handing out the engine's source. A named location
+cannot do that, because nginx jumps straight to it without re-running location
+matching; there is no second pass to be trapped in. The nested `.php` refusal
+closes the one door that remains, a direct request for the entry point.
+
+`SCRIPT_FILENAME` is hardcoded rather than derived from `$fastcgi_script_name`
+for the same class of reason: a request-derived script path is exactly what lets
+`/photo.jpg/x.php` execute an uploaded file. With a fixed path there is no
+request-controlled component, so the class cannot arise here at all — immunity by
+construction rather than by validation.
+
+The cost is one block the operator pastes at install time. It is accepted because
+the failure is loud: with the include in place and the block missing, every
+project URL answers `500` and the log says `could not find named location
+"@quicksite_project"`. Compare the alternative below, whose failure is a silent
+404 on assets only — the exact symptom that took a full debugging session to
+attribute the first time.
+
+Only `/p/` gets this. `/admin/`, `/admin/api/`, `/management/` and the free root
+stay plain prefixes, and that is deliberate in both directions. They do not need
+`^~`: every dotted URL they serve is a real file inside the web root (111 of
+them under `public/admin/`), so the panel's regex and our prefix both resolve it,
+and every URL of theirs that needs PHP is extensionless — no routed command name
+contains a dot, and a project id cannot. And they must **not** have `^~`, because
+their fallback *is* a `.php` path; adding the modifier would arm the exact trap
+described above on three more namespaces.
+
+**Alternatives considered**: A regex of our own, `location ~ ^/p/.+\.(css|js|…)$`,
+placed ahead of the panel's (rejected — regex-versus-regex is settled by
+configuration order, so it works until the include moves or the panel regenerates
+the vhost, and then it silently returns to 404ing assets; it would also require
+keeping an extension list in sync with someone else's forever). Plain `^~` with a
+path fallback (rejected — discloses source, as above). Serving project files from
+the web root so no PHP is involved (rejected — it is the visibility model: a
+private project's contents would be world-readable, and the existence of
+`public/p/<id>/` would answer "does this project exist?" where no application
+code can intervene). Leaving it and documenting the 404 (rejected — it makes a
+supported target ship visibly broken).
+
+**Source**: `secure/src/functions/NginxConfig.php` (`generate_nginx_config`),
+`public/init.php` (the first-load setup page),
+`secure/deploy/nginx-vhosts.conf.example`. Behaviour:
+[README.md](../README.md).

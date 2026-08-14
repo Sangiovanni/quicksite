@@ -1,0 +1,49 @@
+<?php
+/**
+ * Operator notices — WHO SEES THEM  (v1.0.0-beta.11)
+ *
+ * Copy this file to operator.php to change who sees operator-facing notices in
+ * the admin panel (today: "a QuickSite update is available"). QuickSite writes
+ * operator.php for you at first run, naming the account that created the
+ * install, so on a normal installation there is nothing to do here.
+ *
+ * ── IT GRANTS NOTHING ────────────────────────────────────────────────────────
+ *
+ * This list decides whether a NOTICE RENDERS. That is all it does. Naming an
+ * account here gives it no command, no permission and no access it did not
+ * already have, and no code may use this list to authorize an action.
+ *
+ * That is deliberate and it is the whole design. QuickSite has no
+ * installation-wide role: a permission is either "any signed-in account" or
+ * "nobody", and everything else is per-project. A file that could name
+ * "the administrator of this server" would put that principal back, and with it
+ * the escalation it brings. A display preference cannot.
+ *
+ * The reason it exists at all: notices like "update available" are addressed to
+ * whoever maintains the SERVER. Someone invited to edit one project's text is
+ * not that person — they cannot act on it, and it tells them which engine
+ * version the install is running.
+ *
+ * ── WHO THE OPERATOR IS ──────────────────────────────────────────────────────
+ *
+ * Whoever has filesystem access to the server. That is not a role QuickSite
+ * hands out; it is a fact about the machine. Somebody who can edit this file
+ * can already edit users.php, so they hold strictly more than any list could
+ * grant — which is exactly why editing a file, and not calling an API, is how
+ * this changes. The first-run setup token works on the same principle.
+ *
+ * ── FORMAT ───────────────────────────────────────────────────────────────────
+ *
+ * User ids, as they appear in secure/management/config/users.php — the
+ * 'usr_…' array keys, NOT usernames. Any number of them, including none.
+ *
+ * DEFAULT WHEN THIS FILE IS ABSENT: nobody. A missing, unreadable or malformed
+ * file reads as an empty list, never as "everybody" — so a notice meant for the
+ * server's maintainer is never shown to an account by accident.
+ */
+
+return [
+    'operators' => [
+        // 'usr_0123456789abcdef0123456789abcdef',
+    ],
+];

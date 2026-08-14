@@ -120,7 +120,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         placeholder="<?= adminAttr(__admin('register.usernamePlaceholder')) ?>"
                         value="<?= adminAttr((string)($_POST['username'] ?? '')) ?>"
                         maxlength="32"
-                        pattern="[a-zA-Z0-9_-]{3,32}"
+                        <?php /* Escaped '-' — see setup.php: the `v` flag makes an unescaped one
+                                 invalidate the pattern, and an invalid pattern is ignored. */ ?>
+                        pattern="[a-zA-Z0-9_\-]{3,32}"
                         autocomplete="username"
                         autocapitalize="none"
                         spellcheck="false"

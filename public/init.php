@@ -147,6 +147,11 @@ if (file_exists($nginxSetupPending) && stripos($serverSoftware, 'nginx') !== fal
     } else {
         $cfgPath = htmlspecialchars(SECURE_FOLDER_PATH . DIRECTORY_SEPARATOR . 'nginx' . DIRECTORY_SEPARATOR . 'dynamic_routes.conf');
         $pubFolder = htmlspecialchars(PUBLIC_FOLDER_NAME);
+        // The URL prefix the install serves under — the named location's
+        // SCRIPT_FILENAME has to carry it, or a space install posts every project
+        // request at an entry point that is not there.
+        $nginxPrefix = PUBLIC_FOLDER_SPACE !== '' ? '/' . trim(PUBLIC_FOLDER_SPACE, '/') : '';
+        $entryPoint = htmlspecialchars('$document_root' . $nginxPrefix . '/p/index.php');
         http_response_code(503);
         die(
             '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">' .
@@ -160,6 +165,11 @@ if (file_exists($nginxSetupPending) && stripos($serverSoftware, 'nginx') !== fal
             'pre{background:#1e1e2e;color:#cdd6f4;padding:16px 20px;border-radius:8px;overflow-x:auto;font-size:0.88em;line-height:1.5}' .
             '.step{margin:20px 0;padding:16px 20px;background:#fff;border-left:4px solid #4a9eff;border-radius:4px;box-shadow:0 1px 3px rgba(0,0,0,0.08)}' .
             '.step h3{margin-top:0;color:#1a1a2e}' .
+            '.hint{font-size:0.9em;color:#666;margin-bottom:0}' .
+            // "You must replace this" — highlighted rather than left to be spotted
+            // in a block of monospace. Both placeholders use the same token shape
+            // AND the same highlight, so one glance finds every hole to fill.
+            '.fill{background:#ffe08a;color:#5a4100;font-weight:700;padding:1px 5px;border-radius:3px;border-bottom:2px solid #d99a00}' .
             '.note{margin-top:30px;padding:14px 18px;background:#fff8e1;border-left:4px solid #f9a825;border-radius:4px}' .
             '.note strong{color:#e65100}' .
             '.done-btn{display:inline-block;margin-top:12px;padding:12px 28px;background:#4caf50;color:#fff;border:none;border-radius:6px;font-size:1em;font-weight:600;cursor:pointer}' .
@@ -173,15 +183,71 @@ if (file_exists($nginxSetupPending) && stripos($serverSoftware, 'nginx') !== fal
             'QuickSite has generated a routing configuration file for you, but it needs to be included in your nginx server block.</p>' .
 
             '<div class="step"><h3>Step 1 &mdash; Include the routing config</h3>' .
-            '<p>Add this line inside your nginx <code>server { }</code> block (e.g. in your vhost config or CloudPanel site settings):</p>' .
-            '<pre>include ' . $cfgPath . ';</pre></div>' .
+            '<p>Add this line inside your nginx <code>server { }</code> block (in your vhost config, or CloudPanel site settings &rarr; Vhost):</p>' .
+            '<pre>include ' . $cfgPath . ';</pre>' .
+            '<p class="hint">On CloudPanel the usual spot is right after the existing ' .
+            '<code>include /etc/nginx/global_settings;</code> line. That is one example, not a requirement &mdash; ' .
+            'anywhere inside <code>server { }</code> works.</p></div>' .
 
-            '<div class="step"><h3>Step 2 &mdash; Test and reload nginx</h3>' .
+            '<div class="step"><h3>Step 2 &mdash; Add the project handler</h3>' .
+            '<p>Also inside <code>server { }</code>, add this block. QuickSite cannot generate it, ' .
+            'because only your server knows its PHP upstream:</p>' .
+            '<p class="hint"><strong>Where to put it:</strong> right next to the ' .
+            '<code>location ~ \.php$</code> block that is already in that same ' .
+            '<code>server { }</code>. Order does not matter to nginx &mdash; keeping them together ' .
+            'just means the line you copy from is next to the line you paste into.</p>' .
+            '<pre>location @quicksite_project {' . "\n" .
+            '    include        fastcgi_params;' . "\n" .
+            '    fastcgi_param  SCRIPT_FILENAME ' . $entryPoint . ';' . "\n" .
+            '    fastcgi_pass   <span class="fill">COPY_THIS_FROM_YOUR_OWN_php_BLOCK</span>;' . "\n" .
+            '}</pre>' .
+            '<p class="hint"><strong>Where to find that last value:</strong> search this same vhost ' .
+            'for the word <code>fastcgi_pass</code>. It is already there &mdash; your ' .
+            '<code>location ~ \.php$</code> block cannot work without it. Copy that whole line. ' .
+            'It looks like <code>unix:/run/php/php8.3-fpm.sock;</code> or ' .
+            '<code>127.0.0.1:9000;</code>. (<code>127.0.0.1</code> is loopback, this machine ' .
+            'talking to itself &mdash; it exposes nothing, and php-fpm is already listening there ' .
+            'for every other PHP request on this site.)</p>' .
+            '<p class="hint"><strong>Both steps are required.</strong> Your pages would render without ' .
+            'this block, but every stylesheet, script and image would fail &mdash; and once the routing ' .
+            'config is included, project URLs answer <code>500</code> until it exists, with ' .
+            '<code>could not find named location</code> in your nginx error log.</p>' .
+            '<p class="hint">Leave <code>SCRIPT_FILENAME</code> exactly as printed. It is a fixed path on ' .
+            'purpose: nothing from the request goes into it, so a URL like ' .
+            '<code>/photo.jpg/x.php</code> has no way to make PHP execute the wrong file.</p></div>' .
+
+            '<div class="note">' .
+            '<strong>Two server blocks? (CloudPanel and similar)</strong>' .
+            '<p style="margin-bottom:0.5em">Some panels generate <em>two</em> <code>server { }</code> blocks: a public one ' .
+            'on 443 that proxies to a backend one on 8080, with the static-asset rule ' .
+            '(<code>location ~* \.(css|js|png…)$</code>) in the <strong>public</strong> block. ' .
+            'The include above goes in the backend block &mdash; so a project stylesheet is ' .
+            'answered from disk by the public block and never proxied at all. Pages render, ' .
+            'assets 404.</p>' .
+            '<p style="margin-bottom:0.5em">If that is your layout, add this to the <strong>public</strong> block too &mdash; ' .
+            'the one with the <code>listen 443</code> lines, right after its own ' .
+            '<code>location / { }</code>. Order does not matter; keeping them adjacent just puts ' .
+            'the line you copy next to the line you paste into.</p>' .
+            '<p style="margin-bottom:0.5em">Do not invent a target &mdash; copy the <code>proxy_pass</code> line out of that ' .
+            'block\'s own <code>location / { }</code>, whatever it says. On CloudPanel that is ' .
+            'literally the line <code>{{varnish_proxy_pass}}</code>; copy it verbatim so the panel ' .
+            'keeps filling it in for you:</p>' .
+            '<pre>location ^~ ' . htmlspecialchars($nginxPrefix) . '/p/ {' . "\n" .
+            '    <span class="fill">COPY_THE_proxy_pass_LINE_FROM_YOUR_location_slash_BLOCK</span>;' . "\n" .
+            '    proxy_set_header Host $host;' . "\n" .
+            '}</pre>' .
+            '<p style="margin-bottom:0.5em">This sends project URLs down the path every other request ' .
+            'already takes. It opens nothing: <code>proxy_pass</code> dials out, it does not listen, ' .
+            'and the backend block is already listening either way.</p>' .
+            '<p style="margin-bottom:0">One server block only? Ignore this &mdash; steps 1 and 2 are all you need.</p>' .
+            '</div>' .
+
+            '<div class="step"><h3>Step 3 &mdash; Test and reload nginx</h3>' .
             '<pre>sudo nginx -t &amp;&amp; sudo nginx -s reload</pre>' .
             '<p>On CloudPanel or similar panels, you may need to restart nginx from the panel UI instead.</p></div>' .
 
-            '<div class="step"><h3>Step 3 &mdash; Confirm setup</h3>' .
-            '<p>Once you have added the include directive and reloaded nginx, click the button below:</p>' .
+            '<div class="step"><h3>Step 4 &mdash; Confirm setup</h3>' .
+            '<p>Once both blocks are in place and nginx is reloaded, click the button below:</p>' .
             '<form method="post"><button type="submit" name="nginx_setup_done" value="1" class="done-btn">I have completed the nginx setup</button></form></div>' .
 
             '<div class="note">' .

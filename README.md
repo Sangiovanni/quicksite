@@ -48,8 +48,10 @@ For a deeper view of how QuickSite is organized:
 ## Requirements
 
 - **PHP** 8.0+ (tested on 8.0 and 8.4)
-- **Web server**: Apache with `mod_rewrite` **or** nginx
+- **Web server**: Apache with `mod_rewrite`, **or** nginx
 - **PHP extensions**: json, fileinfo, zip
+
+**Verified on:** Apache 2.4 (WAMP) and nginx as configured by [CloudPanel](https://www.cloudpanel.io/). Other nginx setups are expected to work — the routing is plain `try_files` and QuickSite generates it for you — but they are not what these instructions were tested against. What differs between nginx installs is the php-fpm upstream name, where `fastcgi_params` lives, and whether your control panel owns the server block; see `secure/deploy/nginx-vhosts.conf.example`.
 
 ## Installation
 
@@ -67,6 +69,24 @@ git clone https://github.com/Sangiovanni/quicksite.git .
 
 After cloning, configure your web server's virtual host to point its document root to the `public/` folder, then run the setup wizard.
 
+> ### ⚠ QuickSite lives at `/admin/`, not at `/`
+>
+> **`http://your-domain/admin/`** is the admin panel, and on a new installation
+> it is the page that creates your first account. Everything below assumes you
+> go there.
+>
+> **The domain root is deliberately empty.** QuickSite serves nothing at `/` so
+> that your own hand-made site can live there — the engine never squats your
+> domain. A web server with nothing to serve and no directory listing answers
+> **403 Forbidden**, so on a bare install that is what `/` gives you. That is
+> correct, not a broken install.
+>
+> Setup softens this: on its **first** run, if the root has no index file of its
+> own, it drops in a small placeholder page pointing at `/admin/`. Delete or
+> replace it whenever you like — nothing depends on it, and setup will not put
+> it back. If the root already has an `index.php` or `index.html` (you are
+> installing alongside an existing site), setup leaves it completely alone.
+
 ### Quick setup
 
 Run the interactive setup wizard:
@@ -80,30 +100,63 @@ chmod +x setup.sh
 setup.bat
 ```
 
-The wizard walks you through 3 optional steps:
+You get a **menu**, not a fixed sequence. Every item is independent and safe to
+re-run, so changing one setting later never means answering the others again:
 
-1. **Rename the public folder** — match your vhost DocumentRoot (e.g. `www`, `public_html`, `www.example.com`)
-2. **Rename the secure folder** — obscure the backend, optionally nest it (e.g. `backend`, `app`, `backends/project1`)
-3. **Set a URL space** — serve from a subdirectory path after the domain (e.g. `mysite` → `http://domain.com/mysite/` — for deployment targets, not for replacing vhosts)
+| | | |
+|---|---|---|
+| **1** | Rename the public folder | match your vhost DocumentRoot (e.g. `www`, `public_html`, `www.example.com`). Only needed when your host *forces* a document-root name — if you can edit the vhost, just point `root` at `public/` and skip this |
+| **2** | Rename the secure folder | obscure the backend, optionally nest it (e.g. `backend`, `app`, `backends/project1`) |
+| **3** | Change the URL space | serve from a subdirectory of the domain (e.g. `mysite` → `http://domain.com/mysite/`) |
+| **4** | Switch environment | `production` (default) or `development` — see below |
+| **5** | Self-registration on / off | may visitors create their own accounts at `/admin/register`? Default off |
+| **6** | Show my setup token | reads the first-run credential off disk once it exists |
 
-All three are optional — press Enter to skip any step. The scripts update `init.php` constants, `.htaccess` files, and nginx routing config automatically. Everything else (config files, nginx setup page) is handled on first page load.
+The menu header always shows the values currently on disk, so nothing is
+guessed. Every item is optional — skip anything you do not need.
 
-The scripts are **re-runnable** — they save their state to `.quicksite.conf` and detect current folder names on restart, even after a partial run or crash.
+**Item 4, environment.** QuickSite fetches URLs from the server on your behalf:
+data resolvers, API endpoint tests, OAuth back-channels, importing an asset by
+URL. On `production` those fetches may not reach loopback, private or
+cloud-metadata addresses. `development` lifts that block so a local author can
+call `http://localhost:3000` or a LAN API; the http/https scheme rule and DNS
+pinning stay on either way. **Only choose `development` on a machine you trust
+and that untrusted callers cannot reach.** It is a server-side file
+(`secure/management/config/environment.php`) and deliberately not an API
+setting, so a leaked credential can never flip it.
 
-> **Security tip (Linux):** After running setup.sh, remove execute and write permissions:  
+**Item 6, the setup token.** It does not exist yet when you first run setup —
+see *Create your first account* below for the order.
+
+Items 1–3 update `init.php` constants and the `.htaccess` routing, and drop the
+generated nginx routing config so the engine rebuilds it for the new layout on
+the next page load. Items 4–5 write config files under the secure folder.
+Item 6 only reads.
+
+Outside the menu, the **first** run does one thing more: if the web root has no
+index file, it copies `secure/deploy/index.html.example` to `public/index.html`
+as a placeholder pointing at `/admin/` (see the callout above). Both conditions
+are required — a root that already has a page keeps it, and a later run never
+re-creates a placeholder you deleted.
+
+The scripts are **re-runnable** — they save their state to `.quicksite.conf` and
+detect current folder names on restart, even after a partial run or crash.
+
+> **Security tip (Linux):** Once the install is set up and your account exists, remove execute and write permissions:  
 > `chmod -x -w setup.sh`  
-> This prevents accidental re-runs and unauthorized modifications. To reconfigure later, restore permissions first:  
-> `chmod +x +w setup.sh`
+> This prevents accidental runs and unauthorized modifications. To reconfigure later, restore them first:  
+> `chmod +x +w setup.sh`  
+> Do this **after** you have read your setup token (menu item 6), not before.
 
 > **Linux servers (recommended workflow):** Clone as `root`, then run `chmod +x setup.sh && ./setup.sh`. The script detects `root` and automatically fixes file ownership to your web server user (CloudPanel site user, `www-data`, `nginx`, or `apache`). If auto-detection fails, run manually:  
 > `chown -R YOUR_WEB_USER:YOUR_WEB_USER /path/to/quicksite`  
 > Replace `YOUR_WEB_USER` with your php-fpm user.
 
-You can also pass the public folder name as an argument to skip the interactive prompt:
+You can also pass the public folder name as an argument — it pre-answers item 1,
+then the menu opens as usual:
 
 ```bash
 ./setup.sh www.example.com
-setup.bat www.example.com
 ```
 
 **Don't want to use scripts?** Rename folders manually and edit `init.php` to match (`PUBLIC_FOLDER_NAME`, `SECURE_FOLDER_NAME`, `PUBLIC_FOLDER_SPACE`). On nginx, you'll see a first-load setup page with the exact `include` directive you need.
@@ -118,9 +171,28 @@ It asks for a **setup token**. The token is written on the server, and the page 
 secure/management/config/setup-token.txt
 ```
 
-Open that file, copy its single line into the form along with a display name, a username and a password, and the account is created. Being able to read a file inside `secure/` is what proves the installation is yours — so you need no command-line access and no password ever ships in the repository.
+**The order matters**, because that file does not exist until the engine writes
+it:
+
+1. Run setup, point your vhost at the public folder, restart your web server.
+2. **Open `http://your-domain/admin/`.** Rendering that page is what mints the
+   token. Leave the page open — it is the form you are about to fill in.
+3. Read the token: open the file above, or run `setup.sh` / `setup.bat` again
+   and choose **item 6**, which prints it for you. (Before step 2 that item
+   correctly tells you the token does not exist yet, rather than showing you
+   nothing.)
+4. Paste it into the form with a display name, a username and a password.
+
+Being able to read a file inside `secure/` is what proves the installation is yours — so you need no command-line access and no password ever ships in the repository.
 
 The token is destroyed as soon as it is used, and the page is gone for good once an account exists.
+
+**What that first account gets.** It becomes the **owner of the starter
+project** QuickSite ships with, so the panel has a real site to edit the moment
+you sign in, and it is named in `secure/management/config/operator.php` — the
+list of accounts that see operator notices such as "an update is available".
+That file grants nothing; it only decides whether a notice renders. Edit it by
+hand to add or remove people.
 
 ### Manual setup
 
@@ -151,8 +223,15 @@ No file changes needed — the repo defaults work out of the box with a virtual 
 
 nginx ignores `.htaccess` files. QuickSite handles this automatically:
 
-- **On first page load**, QuickSite detects nginx and shows a setup page with the exact `include` directive you need to add to your nginx server block. Follow the instructions, reload nginx, and you're done.
+- **On first page load**, QuickSite detects nginx and shows a setup page with the two blocks you need to add to your server block, with your install's paths already filled in. Follow it, reload nginx, and you're done.
 - The routing config file (`secure/nginx/dynamic_routes.conf`) is auto-generated — you never edit it manually.
+
+> **CloudPanel: don't rename the public folder.** CloudPanel pre-creates
+> `htdocs/<domain>/` as your document root, so setup's *rename the public folder*
+> item would be renaming onto a folder that already exists — and it refuses,
+> correctly, rather than merge into it. Point the vhost `root` at
+> `…/htdocs/public` instead and skip that item entirely. The rename exists for
+> hosts that force a document-root name; CloudPanel isn't one.
 
 **Quick version** (for those who want to set it up before the first load):
 
@@ -162,21 +241,81 @@ nginx ignores `.htaccess` files. QuickSite handles this automatically:
        listen 80;
        server_name quicksite.example.com;
        root /path/to/quicksite/public;
-       index index.php;
 
-       # PHP processing
+       # QuickSite routing (auto-generated — never edited by hand)
+       include /path/to/quicksite/secure/nginx/dynamic_routes.conf;
+
+       # REQUIRED, and QuickSite cannot generate it: only your server knows its
+       # PHP upstream. The generated include routes /p/ to this named location.
+       location @quicksite_project {
+           include fastcgi_params;
+           # Hardcoded on purpose — nothing from the request goes into it, so a
+           # URL like /photo.jpg/x.php cannot steer PHP at the wrong file.
+           # With a URL space this becomes $document_root/<space>/p/index.php;
+           # the setup page prints the exact line for your install.
+           fastcgi_param SCRIPT_FILENAME $document_root/p/index.php;
+           fastcgi_pass unix:/run/php/php-fpm.sock;
+       }
+
+       # PHP processing. try_files comes FIRST: without it a request like
+       # /photo.jpg/x.php reaches PHP with a path that does not exist, and a
+       # PHP built with cgi.fix_pathinfo=1 walks back up and executes the jpg.
        location ~ \.php$ {
+           try_files $uri =404;
            fastcgi_pass unix:/run/php/php-fpm.sock;
            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
            include fastcgi_params;
        }
-
-       # QuickSite routing (auto-generated)
-       include /path/to/quicksite/secure/nginx/dynamic_routes.conf;
    }
    ```
 
-2. **Generate the routing config** — visit any page in your browser. QuickSite detects nginx and auto-generates `secure/nginx/dynamic_routes.conf`, then shows a setup page with the exact `include` directive to add.
+   There is no `index index.php;` — QuickSite has no front controller at the web
+   root, on purpose: the root stays free for your own site. The generated
+   include carries the routing for all four of QuickSite's namespaces
+   (`/admin/api/`, `/management/`, `/admin/`, `/p/`).
+
+   **Both blocks are required.** Project pages would still render without
+   `@quicksite_project`, but every stylesheet, script and image would fail — and
+   once the include is in place, project URLs answer `500` with
+   `could not find named location` in the nginx error log.
+
+   > **If your vhost already has a static-asset block** — panels usually add
+   > something like `location ~* \.(css|js|png|…)$ { expires max; }` — you don't
+   > need to change it, **as long as it is in the same server block as the
+   > include**. A project's assets live outside the web root so the visibility
+   > gate can run, and the generated `/p/` block uses `^~` precisely so that
+   > regex can't claim them.
+
+   > **⚠ Two server blocks? (CloudPanel, and panels like it)**
+   >
+   > Some panels generate *two* `server { }` blocks: a public one on 443 that
+   > proxies to a backend one on 8080 — with the static-asset rule in the
+   > **public** block and your QuickSite include in the **backend** one. A
+   > project stylesheet is then answered from disk by the public block and never
+   > proxied at all: **pages render, every asset 404s.** The `^~` in the
+   > generated file cannot help, because the request dies a block earlier.
+   >
+   > Add this to the **public** block as well. Don't invent a target — copy the
+   > `proxy_pass` line out of that block's own `location / { }`, whatever it
+   > says. On CloudPanel it is a `{{varnish_proxy_pass}}` placeholder; copy that
+   > verbatim so the panel keeps filling it in for you.
+   >
+   > ```nginx
+   > location ^~ /p/ {
+   >     COPY_THE_proxy_pass_LINE_FROM_YOUR_location_slash_BLOCK;
+   >     proxy_set_header Host $host;
+   > }
+   > ```
+   >
+   > This sends project URLs down the path every other request already takes. It
+   > opens nothing — `proxy_pass` dials *out*, it does not listen, and the
+   > backend block is already listening either way. If that line points at
+   > `127.0.0.1`, that is loopback: the machine talking to itself, never the
+   > network.
+   >
+   > One server block only? Then there is nothing to do here.
+
+2. **Generate the routing config** — visit any page in your browser. QuickSite detects nginx and auto-generates `secure/nginx/dynamic_routes.conf`, then shows a setup page with both blocks to add. On CloudPanel the usual place for the include is right after the existing `include /etc/nginx/global_settings;` line — that's one example, not a requirement; anywhere inside `server { }` works.
 
    Alternatively, generate it from the command line:
    ```bash
@@ -198,7 +337,7 @@ nginx ignores `.htaccess` files. QuickSite handles this automatically:
 
 **Renamed the public folder?** Run `setup.sh` — it handles everything. Or manually update `PUBLIC_FOLDER_NAME` in `init.php`.
 
-For subdirectory installs on nginx (e.g., `example.com/mysite/`), set the URL space in `setup.sh` step 3 — the nginx config auto-adjusts.
+For subdirectory installs on nginx (e.g., `example.com/mysite/`), set the URL space with menu item 3 — setup drops the old routing config and the engine regenerates it for the new prefix on the next page load. Reload nginx after that page load, not before.
 
 </details>
 
@@ -220,13 +359,24 @@ On first load, QuickSite auto-creates its config files from `.example` templates
 - `secure/management/config/auth.php` — session TTLs, registration policy, CORS
 - `secure/management/config/roles.php` — role definitions
 
-The user registry (`users.php`) is **not** among them: it is written when you create your first account (see *Create your first account* above), so no credential ever ships in the repository.
+It also mints the setup token, and on nginx it generates the routing config and
+shows you the `include` line to add.
+
+Three files are **not** created then, because none of them has a subject yet:
+
+- `users.php` — the user registry, written when you create your first account, so no credential ever ships in the repository.
+- `operator.php` — written at the same moment, naming that account. See *Create your first account*.
+- The starter project's `config/members.json` — also written then, making that account its owner.
+
+`environment.php` is never created automatically: with no file, QuickSite runs
+as `production`, which is the safe answer. Setup item 4 writes it when you
+choose, and you can edit or delete it by hand at any time.
 
 ## Project structure
 
 QuickSite has a strict public/private split:
 
-- `public/` — web root. The `p/` per-project front controller, the admin UI, and the `management/` API gateway. Nothing else — the root itself serves real files only, so it stays free for your own site.
+- `public/` — web root. The `p/` per-project front controller, the admin UI, and the `management/` API gateway. Nothing else — the root itself serves real files only, so it stays free for your own site. (Setup may leave a deletable `index.html` placeholder there on a fresh install; it is gitignored, like anything else you put at the root.)
 - `secure/` — backend, outside the web root. API engine, admin backend, shared `src/`, isolated `projects/` (each holding its own public files, builds, exports and backups), snippets, logs.
 - `docs/`, `tests/`, `setup.sh`/`setup.bat`, `VERSION`, `LICENSE`, `README.md` at the repo root.
 

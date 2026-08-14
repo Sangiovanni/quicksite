@@ -21,7 +21,19 @@ $loginRetryAfter = 0;
 
 // One-shot "account created" banner, set by the register page and by the
 // first-run page (C8/C14) — neither logs you in, both send you here.
-$registerFlash = !empty($_SESSION['qs_register_flash']);
+//
+// The flash carries the USERNAME that was just registered, so this page can
+// pre-fill it. A duplicate username reports success exactly like a real
+// creation (the private login identifier must not be probeable), which leaves
+// one bad path: mistype the password while registering and you are told the
+// account was created, cannot sign in, and re-registering does nothing. Filling
+// the field in makes the next attempt a normal failed login against a name you
+// can see. Nothing is disclosed — it is the value this browser just submitted.
+// Older sessions may still hold `true` from before this carried a string, so
+// the value is only used when it is a non-empty string (default-on-absent).
+$flashValue = $_SESSION['qs_register_flash'] ?? null;
+$registerFlash = !empty($flashValue);
+$registeredUsername = is_string($flashValue) ? $flashValue : '';
 unset($_SESSION['qs_register_flash']);
 
 // An install with no accounts never reaches this page: the router sends every
@@ -98,7 +110,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         name="username"
                         class="admin-input"
                         placeholder="<?= adminAttr(__admin('login.usernamePlaceholder')) ?>"
-                        value="<?= adminAttr((string)($_POST['username'] ?? '')) ?>"
+                        <?php /* A submitted value wins (a failed login keeps what was typed);
+                                 otherwise the just-registered username, if there is one. */ ?>
+                        value="<?= adminAttr((string)($_POST['username'] ?? $registeredUsername)) ?>"
                         autocomplete="username"
                         autocapitalize="none"
                         spellcheck="false"

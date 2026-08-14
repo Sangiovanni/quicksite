@@ -248,7 +248,9 @@ class AdminRouter {
 
         $attempt = qs_auth_attempt_setup($name, $username, $password, $token);
         if ($attempt['ok']) {
-            $_SESSION['qs_register_flash'] = true;
+            // Carry the username so the login page can pre-fill it — see
+            // attemptRegister() below for why that matters.
+            $_SESSION['qs_register_flash'] = strtolower(trim($username));
             return null;
         }
         if ($attempt['error'] === 'throttled') {
@@ -284,7 +286,18 @@ class AdminRouter {
 
         $attempt = qs_auth_attempt_register($name, $username, $password);
         if ($attempt['ok']) {
-            $_SESSION['qs_register_flash'] = true;
+            // The flash carries the USERNAME, not just a boolean, so the login
+            // page can pre-fill it.
+            //
+            // This matters because a duplicate username reports success exactly
+            // like a real creation — deliberately, so the private login
+            // identifier cannot be probed. The cost is a dead end: mistype your
+            // password while registering, and you get "account created", cannot
+            // sign in, and re-registering silently does nothing. Pre-filling
+            // turns that into an ordinary failed login against a name you can
+            // see, which is diagnosable. It discloses nothing: the value is the
+            // one this browser just typed into the form on this page.
+            $_SESSION['qs_register_flash'] = strtolower(trim($username));
             return null;
         }
         if ($attempt['error'] === 'throttled') {

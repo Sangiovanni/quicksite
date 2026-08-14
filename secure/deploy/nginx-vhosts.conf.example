@@ -9,8 +9,81 @@
 # routing include for the AUTHORING install). Copy what you need into your
 # site config and adjust paths/domains/php upstream. Nothing reads this file.
 #
+# VERIFIED ON: nginx as configured by CloudPanel. Another nginx install differs
+# mainly in three places — the php-fpm upstream name (`fastcgi_pass php;`
+# below), where `fastcgi_params` lives, and whether your panel owns the server
+# block and will overwrite hand edits. Everything else here is plain nginx.
+#
 # nginx does not list directories unless `autoindex on` is set — the free root
 # needs no extra directive here.
+#
+# ---- THE FOUR ENTRY POINTS --------------------------------------------------
+# QuickSite is four self-contained namespaces under the public folder, each with
+# its own front controller. Every routing rule below exists to put a request in
+# front of the RIGHT one:
+#
+#   /admin/api/   -> public/admin/api/index.php   panel AJAX helper
+#   /management/  -> public/management/index.php  the command API
+#   /admin/       -> public/admin/index.php       the admin panel
+#   /p/           -> public/p/index.php           the project renderer
+#
+# `/admin/api/` needs its OWN location. nginx picks the LONGEST matching prefix,
+# so without it `location /admin/` wins for /admin/api/… and hands those
+# requests to the panel's front controller instead of the API's.
+#
+# There is deliberately NO public/index.php: the web root is free, so your own
+# hand-made site can live there and QuickSite never squats the domain root.
+#
+# ---- ⚠ IF YOUR VHOST HAS A STATIC-ASSET REGEX -------------------------------
+# Panel-generated vhosts usually carry something like
+#
+#     location ~* ^.+\.(css|js|png|…)$ { expires max; }
+#
+# and in nginx a REGEX location outranks a PREFIX one. A mapped domain serves its
+# project's stylesheets, scripts and images THROUGH PHP — they live in
+# secure/projects/<id>/public/, not in the web root, so the visibility gate can
+# run before any byte is sent. A block like the one above will look for them on
+# disk, not find them, and answer 404, while extensionless page routes keep
+# rendering perfectly. If you have one, make it fall through instead:
+#
+#     location ~* ^.+\.(css|js|png|…)$ { try_files $uri @site; }
+#
+# The authoring surface at the bottom of this file solves the same problem a
+# different way, with `^~` — see the note there.
+#
+# ---- ⚠ AND IF YOUR PANEL GENERATES TWO SERVER BLOCKS ------------------------
+# CloudPanel (and panels like it) emit a PUBLIC block on 443 that proxies to a
+# BACKEND block on 8080, and they put the static-asset regex in the PUBLIC one
+# while the QuickSite include lands in the BACKEND one. A project stylesheet is
+# then answered from disk by the public block and never proxied — pages render,
+# every asset 404s — and `^~` in the included file cannot help, because the
+# request never reaches the block that file is in.
+#
+# The public block needs its own passthrough, copying the proxy target from its
+# own `location / { }`:
+#
+#     location ^~ /p/ {
+#         COPY_THE_proxy_pass_LINE_FROM_YOUR_location_slash_BLOCK;
+#         proxy_set_header Host $host;
+#     }
+#
+# Copy that line rather than inventing a target — on CloudPanel it is a
+# {{varnish_proxy_pass}} placeholder the panel fills in. It opens nothing:
+# proxy_pass dials OUT, it does not listen, and the backend block is already
+# listening either way. A 127.0.0.1 target is loopback — the machine talking to
+# itself, never the network.
+#
+# Verified on nginx 1.24.0 by reproducing the two-block layout: without this the
+# stylesheet is 404, with it the request reaches the project handler, and
+# /p/index.php still answers 404 end to end.
+#
+# ---- WHY ONLY /p/ USES `^~` -------------------------------------------------
+# `^~` means "if this prefix wins, do not consider regex locations at all". That
+# is what /p/ needs, and it is also why the other three must NOT have it: their
+# try_files fallback is a .php path, which re-enters location matching — with
+# regex suppressed it would land back in the same block, find the front
+# controller ON DISK, and serve it as plain text. `^~` plus a .php fallback
+# hands out your source. The three plain prefixes below are correct as written.
 # =============================================================================
 
 # ---- example.com  ->  project "siteA" ---------------------------------------
@@ -19,16 +92,22 @@ server {
     server_name example.com;
     root        /srv/quicksite/public;
 
-    # The engine's own namespaces keep working on every domain.
-    location ^~ /admin/      { try_files $uri $uri/ /admin/index.php$is_args$args; }
-    location ^~ /management/ { try_files $uri $uri/ /management/index.php$is_args$args; }
+    # The engine's own namespaces keep working on every domain. Longest prefix
+    # first for readability — nginx picks by length, not by order.
+    location /admin/api/  { try_files $uri $uri/ /admin/api/index.php$is_args$args; }
+    location /management/ { try_files $uri $uri/ /management/index.php$is_args$args; }
+    location /admin/      { try_files $uri $uri/ /admin/index.php$is_args$args; }
 
     # One domain, one site: /p/ is not this domain's surface.
     # (The engine also enforces this itself when QS_PROJECT is set.)
     location ^~ /p/ { return 404; }
 
-    # Real files first (your own root files, project assets resolve inside the
+    # Real files first (your own root files; project assets resolve inside the
     # engine), everything else renders the mapped project.
+    #
+    # No `$uri/` here on purpose: a directory should not produce an index
+    # listing or a directory redirect on a mapped domain — every non-file URL
+    # belongs to the project renderer.
     location / { try_files $uri @site; }
 
     location @site {
@@ -43,6 +122,12 @@ server {
     }
 
     location ~ \.php$ {
+        # try_files FIRST. Without it, /whatever.jpg/x.php is handed to PHP with
+        # SCRIPT_FILENAME pointing at a path that does not exist, and a PHP built
+        # with cgi.fix_pathinfo=1 walks back up and executes whatever.jpg. The
+        # =404 is what makes this location refuse anything that is not a real
+        # file on disk.
+        try_files      $uri =404;
         include        fastcgi_params;
         fastcgi_param  SCRIPT_FILENAME $document_root$fastcgi_script_name;
         fastcgi_pass   php;
@@ -55,8 +140,9 @@ server {
     server_name shop.example.net;
     root        /srv/quicksite/public;
 
-    location ^~ /admin/      { try_files $uri $uri/ /admin/index.php$is_args$args; }
-    location ^~ /management/ { try_files $uri $uri/ /management/index.php$is_args$args; }
+    location /admin/api/  { try_files $uri $uri/ /admin/api/index.php$is_args$args; }
+    location /management/ { try_files $uri $uri/ /management/index.php$is_args$args; }
+    location /admin/      { try_files $uri $uri/ /admin/index.php$is_args$args; }
     location ^~ /p/          { return 404; }
     location /               { try_files $uri @site; }
 
@@ -70,6 +156,7 @@ server {
     }
 
     location ~ \.php$ {
+        try_files      $uri =404;
         include        fastcgi_params;
         fastcgi_param  SCRIPT_FILENAME $document_root$fastcgi_script_name;
         fastcgi_pass   php;
@@ -78,15 +165,51 @@ server {
 
 # ---- the install's own hostname — the AUTHORING surface ---------------------
 # No QS_PROJECT / QS_PUBLIC_BASE_URL: every project serves at /p/<projectId>/
-# (visibility-gated) and the root stays free. Use the generated include for the
-# routing (see secure/nginx/dynamic_routes.conf and the in-app setup notice):
+# (visibility-gated) and the root stays free.
+#
+# Do NOT hand-write the routing here. QuickSite generates it on the first page
+# load, from the folder names and URL space you chose in setup, and rewrites it
+# whenever those change — include the generated file instead. The page you get
+# on that first load names the exact path and prints the block below with your
+# install's paths already filled in.
+#
+# TWO things go in the server block, and BOTH are required:
+#
+#   1. the include, and
+#   2. the `@quicksite_project` named location.
+#
+# The generated file routes /p/ with `^~`, which takes it out of competition with
+# any static-asset regex your panel added — that is what makes stylesheets,
+# scripts and images work here. But `^~` also suppresses the `.php` handler for
+# anything it wins, so the fallback CANNOT be a path: it would re-enter matching,
+# land back in the same block, find public/p/index.php on disk and serve the
+# engine as plain text. A NAMED location is jumped to directly, with no second
+# pass, which is why it is shaped this way.
+#
+# QuickSite cannot generate step 2 itself — only your server knows its PHP
+# upstream. Without it, project URLs answer 500 and the error log says
+# `could not find named location "@quicksite_project"`.
 #
 # server {
 #     listen      80;
 #     server_name quicksite.example.internal;
 #     root        /srv/quicksite/public;
+#
 #     include     /srv/quicksite/secure/nginx/dynamic_routes.conf;
+#
+#     location @quicksite_project {
+#         include        fastcgi_params;
+#         # HARDCODED, deliberately. Deriving this from $fastcgi_script_name is
+#         # what lets /photo.jpg/x.php execute an uploaded file; a fixed path has
+#         # no request-controlled component, so that class cannot arise.
+#         # With a URL space, this becomes $document_root/<space>/p/index.php —
+#         # the generated file prints the exact line for your install.
+#         fastcgi_param  SCRIPT_FILENAME $document_root/p/index.php;
+#         fastcgi_pass   php;
+#     }
+#
 #     location ~ \.php$ {
+#         try_files      $uri =404;
 #         include        fastcgi_params;
 #         fastcgi_param  SCRIPT_FILENAME $document_root$fastcgi_script_name;
 #         fastcgi_pass   php;

@@ -31,10 +31,32 @@
 #                                            404 template — no config needed.)
 #
 # Shared hosting (no vhost access): every SetEnv above is also legal in a
-# .htaccess file at the document root.
+# .htaccess file at the document root. So is FallbackResource. RewriteRule is
+# too, but the pattern loses its leading slash there — `^p(/|$)` in .htaccess,
+# `^/p(/|$)` in a vhost, which is why the mapped-domain examples below cannot be
+# pasted into .htaccess unchanged.
+#
+# VERIFIED ON: Apache 2.4 (WAMP). Needs mod_rewrite for the RewriteRule and
+# mod_env for SetEnv; FallbackResource is core.
 #
 # Copy what you need into your Apache configuration and adjust paths/domains.
 # This file is documentation — nothing in QuickSite reads or writes it.
+#
+# ---- THE FOUR ENTRY POINTS --------------------------------------------------
+# QuickSite is four self-contained namespaces under the public folder, each with
+# its own front controller and its own per-directory .htaccess:
+#
+#   /admin/api/   -> public/admin/api/index.php   panel AJAX helper
+#   /management/  -> public/management/index.php  the command API
+#   /admin/       -> public/admin/index.php       the admin panel
+#   /p/           -> public/p/index.php           the project renderer
+#
+# Those four .htaccess files ship with QuickSite and need no configuration —
+# they apply to every vhost pointed at the same DocumentRoot. There is
+# deliberately NO public/index.php: the web root is free, so your own hand-made
+# site can live there and QuickSite never squats the domain root. A mapped
+# domain is the one case that DOES want the root funnelled into the engine,
+# which is what the FallbackResource below adds — per vhost, never install-wide.
 # =============================================================================
 
 # ---- example.com  ->  project "siteA" ---------------------------------------

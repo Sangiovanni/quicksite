@@ -1,2 +1,16 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Line endings that are not cosmetic.
+#
+# cmd.exe reads a batch file by BYTE OFFSET, re-seeking after every command, so
+# an LF-only .bat mis-resolves GOTO and silently runs the wrong branch — the
+# menu in setup.bat reads a valid choice and then reports it as unknown.
+# Pinning CRLF here makes the working tree correct on every platform AND in the
+# release archives, not just on a Windows clone that happens to have
+# core.autocrlf enabled.
+*.bat text eol=crlf
+
+# Shell scripts are the mirror image: a CRLF setup.sh fails with
+# "bad interpreter: /bin/bash^M" on the servers it is meant to run on.
+*.sh  text eol=lf

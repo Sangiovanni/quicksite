@@ -1209,6 +1209,14 @@ function qs_auth_attempt_setup(string $name, string $username, string $password,
     $created = qs_user_create($name, $username, $password, $cfg['max_users'], $token);
     if ($created['ok']) {
         qs_login_throttle_clear($throttleKey);
+        // FIRST RUN, and the only moment it can happen: give this account the
+        // projects QuickSite shipped (nobody owns them yet — see firstRun.php)
+        // and name it in the operator list. Deliberately AFTER the account is on
+        // disk and deliberately non-fatal: the account must stay usable even if
+        // a directory refuses a write, because the panel is where the deployer
+        // would fix that.
+        require_once __DIR__ . '/firstRun.php';
+        qs_first_run_bootstrap($created['userId']);
         return ['ok' => true, 'userId' => $created['userId']];
     }
     switch ($created['error']) {

@@ -181,7 +181,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         class="admin-input"
                         value="<?= adminAttr((string)($_POST['username'] ?? '')) ?>"
                         maxlength="32"
-                        pattern="[a-zA-Z0-9_-]{3,32}"
+                        <?php /* The '-' is ESCAPED. Browsers now compile the pattern attribute
+                                 with the RegExp `v` flag, which reserves '-' inside a character
+                                 class; an unescaped one makes the whole pattern invalid, and an
+                                 invalid pattern is IGNORED — silently dropping client-side
+                                 validation on this field. Every other pattern in the panel
+                                 already writes it this way. */ ?>
+                        pattern="[a-zA-Z0-9_\-]{3,32}"
                         autocomplete="username"
                         autocapitalize="none"
                         spellcheck="false"
