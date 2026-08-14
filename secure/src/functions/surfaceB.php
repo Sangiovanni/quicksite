@@ -34,11 +34,26 @@
 require_once __DIR__ . '/projectPublicArtifacts.php'; // QS_RESERVED_BASE + regen helpers
 require_once __DIR__ . '/projectContext.php';         // qs_request_origin (R6) — pre-init-safe
 
-if (!defined('QS_SURFACE_B_RESERVED_WORDS')) {
-    // Segment names that may NOT be a /p/ project id (and that createProject must also
-    // reserve). Mirrors the URL namespaces a project view must never shadow (D6).
-    define('QS_SURFACE_B_RESERVED_WORDS', 'quicksite,p,admin,management,assets,scripts,style,src,logs,config,projects');
-}
+/**
+ * How big a file may be before its ETag stops being a content hash.
+ *
+ * At or below this, the validator is md5 of the bytes: it changes when the
+ * content changes and at no other time, which is what a strong validator has to
+ * mean. That covers the files an author actually edits — stylesheets, scripts,
+ * JSON, most images — and hashing them costs far less than the response the
+ * validator saves. Above it, the validator is the file's modification time and
+ * size, the same pair Apache and nginx ship by default: re-reading a 200 MB
+ * video on every conditional request would cost more than sending it.
+ *
+ * Neither form contains a path, an inode or anything else about the filesystem.
+ * beta.10 removed absolute paths from responses on purpose, and an ETag is a
+ * response header like any other.
+ */
+const QS_SB_ETAG_CONTENT_MAX = 1048576; // 1 MiB
+
+/** Read size for a range body — big enough not to syscall per packet, small
+ *  enough that a 200 MB file never sits in memory. */
+const QS_SB_STREAM_CHUNK = 262144; // 256 KiB
 
 /** F1 id shape (replicated so this can run pre-init without PathManagement). */
 function qs_sb_valid_id(string $id): bool {
@@ -376,7 +391,51 @@ function qs_sb_looks_static(string $subpath): bool {
     return pathinfo(rawurldecode($subpath), PATHINFO_EXTENSION) !== '';
 }
 
-/** Send a static file with an allowlisted content-type + cache headers, then exit. */
+/**
+ * Send a static file with an allowlisted content-type, a cache validator and
+ * byte-range support, then exit.
+ *
+ * ⚠ THE GATE HAS ALREADY RUN. Nothing in this function decides who may read
+ * anything: it is reached only from qs_surface_b_finish(), which runs after
+ * qs_surface_b_maybe_handle() admitted the request, and a refusal there calls
+ * qs_sb_deny() which exits. A Range request is not a way round that — it is a
+ * request header, read here, long after the decision. Adding a caller that
+ * reaches this function without passing the gate would be the bug; the range
+ * arithmetic below cannot be one.
+ *
+ * WHAT THIS ANSWERS, and why each matters on a site made of project assets:
+ *
+ *   Accept-Ranges / Range → 206
+ *      Without it a browser cannot ask for the middle of a file. A video
+ *      scrubber stalls or never appears, and a PDF viewer must fetch every page
+ *      before it can draw the first. The content-type allowlist below has
+ *      carried mp4, webm, ogg, mp3, wav and pdf all along.
+ *   ETag / Last-Modified → 304
+ *      The bigger everyday cost. With no validator there is nothing to
+ *      revalidate against, so once max-age lapses the browser cannot ask "has
+ *      this changed?" and has to refetch the whole file. That applies to every
+ *      asset on every project site; it is merely invisible when the asset is a
+ *      4 KB stylesheet rather than a 200 MB video.
+ *
+ * MULTI-RANGE IS DECLINED HERE, NOT FAKED. A Range naming more than one range
+ * is ignored and the whole representation is sent with 200 — a legitimate
+ * answer (RFC 9110: a server MAY ignore a Range header) and an honest one.
+ * Answering 206 with one range while the client asked for several would
+ * misdescribe what it received, and multipart/byteranges is a lot of machinery
+ * for something nothing fetching a project asset asks for.
+ *
+ * ⚠ What the CLIENT sees may still be a multipart 206, because declaring
+ * `Accept-Ranges: bytes` on a 200 with a known Content-Length arms the web
+ * server's OWN range filter. Measured on Apache 2.4.62: a two-range request
+ * comes back as a correct `206 multipart/byteranges` with per-part
+ * `Content-range` headers, assembled by Apache from the full body sent here.
+ * That is a better answer than the one this function chose, and it costs
+ * nothing to be right about: single ranges never reach that filter (a 206 is
+ * not re-sliced), and an ignored-because-invalid range stays ignored (Apache
+ * rejects the same malformed and inverted specs, and honours If-Range the same
+ * way). So the guarantee this function makes is "a correct response either
+ * way", not "always 200" — do not write a test that asserts the status.
+ */
 function qs_sb_send_file(string $file): void {
     if (!is_file($file)) {
         qs_sb_deny(404, 'Not found');
@@ -391,19 +450,222 @@ function qs_sb_send_file(string $file): void {
         'mp4' => 'video/mp4', 'webm' => 'video/webm', 'ogg' => 'audio/ogg', 'mp3' => 'audio/mpeg',
         'wav' => 'audio/wav', 'pdf' => 'application/pdf',
     ];
-    $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+    $ext   = strtolower(pathinfo($file, PATHINFO_EXTENSION));
     $ctype = $types[$ext] ?? 'application/octet-stream';
+    $size  = (int) filesize($file);
+    $mtime = (int) filemtime($file);
+    $etag  = qs_sb_etag($file, $size, $mtime);
+    $isHead = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')) === 'HEAD';
 
+    // Everything a 200, a 206 and a 304 all carry. Content-Length is NOT here:
+    // it differs per outcome (the file, the range, or absent), and declaring it
+    // early is how a 206 ends up announcing the size of the whole file.
     header('Content-Type: ' . $ctype);
     header('X-Content-Type-Options: nosniff');
-    header('Content-Length: ' . (string) filesize($file));
     header('Cache-Control: public, max-age=300');
+    header('Accept-Ranges: bytes');
+    header('ETag: ' . $etag);
+    header('Last-Modified: ' . gmdate('D, d M Y H:i:s', $mtime) . ' GMT');
     // SVG can carry script — force download-style handling defensively (never inline-exec).
     if ($ext === 'svg') {
         header('Content-Security-Policy: default-src \'none\'; style-src \'unsafe-inline\'; sandbox');
     }
-    readfile($file);
+
+    // ---- conditional request: is what the caller already has still current? ----
+    if (qs_sb_not_modified($etag, $mtime)) {
+        http_response_code(304);
+        exit; // no body, and no Content-Length to contradict it
+    }
+
+    // ---- byte range ------------------------------------------------------------
+    $range = qs_sb_parse_range($_SERVER['HTTP_RANGE'] ?? null, $size, $etag, $mtime);
+    if ($range === 'unsatisfiable') {
+        // The caller asked for bytes past the end. Tell it how long the file
+        // actually is so it can ask again — that is what the '*' form is for.
+        http_response_code(416);
+        header('Content-Range: bytes */' . $size);
+        header('Content-Length: 0');
+        exit;
+    }
+    if (is_array($range)) {
+        [$start, $end] = $range;
+        http_response_code(206);
+        header(sprintf('Content-Range: bytes %d-%d/%d', $start, $end, $size));
+        // THE LENGTH OF THE RANGE, not of the file.
+        header('Content-Length: ' . (string) ($end - $start + 1));
+        if (!$isHead) {
+            qs_sb_emit_range($file, $start, $end - $start + 1);
+        }
+        exit;
+    }
+
+    header('Content-Length: ' . (string) $size);
+    if (!$isHead) {
+        readfile($file);
+    }
     exit;
+}
+
+/**
+ * The cache validator for this file. Strong in both forms — see
+ * QS_SB_ETAG_CONTENT_MAX for why there are two and where the line sits.
+ */
+function qs_sb_etag(string $file, int $size, int $mtime): string {
+    if ($size <= QS_SB_ETAG_CONTENT_MAX) {
+        $hash = @md5_file($file);
+        if (is_string($hash)) {
+            return '"' . $hash . '"';
+        }
+    }
+    return sprintf('"%x-%x"', $mtime, $size);
+}
+
+/**
+ * Does the caller already hold this exact representation?
+ *
+ * If-None-Match decides alone when it is present: it compares a validator the
+ * server chose, while If-Modified-Since compares a clock, and RFC 9110 gives
+ * the entity tag precedence for exactly that reason. The comparison is the weak
+ * one the spec requires for GET — `W/"x"` and `"x"` name the same
+ * representation for caching purposes.
+ */
+function qs_sb_not_modified(string $etag, int $mtime): bool {
+    $inm = $_SERVER['HTTP_IF_NONE_MATCH'] ?? null;
+    if (is_string($inm) && trim($inm) !== '') {
+        if (trim($inm) === '*') {
+            return true;
+        }
+        foreach (explode(',', $inm) as $candidate) {
+            $candidate = trim($candidate);
+            if (strncmp($candidate, 'W/', 2) === 0) {
+                $candidate = substr($candidate, 2);
+            }
+            if ($candidate === $etag) {
+                return true;
+            }
+        }
+        return false; // it named tags, none of them ours
+    }
+    $ims = $_SERVER['HTTP_IF_MODIFIED_SINCE'] ?? null;
+    if (is_string($ims) && trim($ims) !== '') {
+        $since = strtotime($ims);
+        return $since !== false && $mtime <= $since;
+    }
+    return false;
+}
+
+/**
+ * Resolve a Range header against a file of $size bytes.
+ *
+ * @return array{0:int,1:int}|string|null  [start,end] to answer with 206;
+ *         'unsatisfiable' to answer 416; null to ignore the header and send the
+ *         whole file with 200.
+ *
+ * The three answers are not interchangeable, and the difference is where range
+ * implementations go wrong:
+ *   - UNSATISFIABLE means the caller asked for a position past the end. Only
+ *     that. It earns a 416.
+ *   - INVALID (last byte before first, junk where a number belongs, a unit that
+ *     is not bytes, more than one range) is not an error at all: the header is
+ *     ignored and the whole file is sent, which is always a correct response to
+ *     a GET.
+ */
+function qs_sb_parse_range(?string $header, int $size, string $etag, int $mtime) {
+    if (!is_string($header) || trim($header) === '') {
+        return null;
+    }
+
+    // If-Range: honour the Range only while the caller's copy still matches this
+    // representation. If the file changed under it, the pieces it holds and the
+    // piece it is asking for do not belong to the same file, and the whole file
+    // is the only safe answer.
+    $ifRange = $_SERVER['HTTP_IF_RANGE'] ?? null;
+    if (is_string($ifRange) && trim($ifRange) !== '') {
+        $ifRange = trim($ifRange);
+        $stillValid = ($ifRange === $etag);
+        if (!$stillValid) {
+            $asDate = strtotime($ifRange);
+            $stillValid = ($asDate !== false && $asDate === $mtime);
+        }
+        if (!$stillValid) {
+            return null;
+        }
+    }
+
+    if (strncasecmp($header, 'bytes=', 6) !== 0) {
+        return null; // a range unit we do not implement
+    }
+    $spec = trim(substr($header, 6));
+    if ($spec === '' || strpos($spec, ',') !== false || strpos($spec, '-') === false) {
+        return null; // empty, multi-range (refused by design), or malformed
+    }
+
+    [$fromRaw, $toRaw] = explode('-', $spec, 2);
+    $fromRaw = trim($fromRaw);
+    $toRaw   = trim($toRaw);
+
+    if ($fromRaw === '') {
+        // Suffix form `bytes=-N`: the LAST N bytes, not the first N.
+        if ($toRaw === '' || !ctype_digit($toRaw)) {
+            return null;
+        }
+        $wanted = (int) $toRaw;
+        if ($wanted <= 0 || $size === 0) {
+            return 'unsatisfiable'; // `bytes=-0` names no bytes that exist
+        }
+        return [max(0, $size - $wanted), $size - 1]; // asking for more than there is = all of it
+    }
+
+    if (!ctype_digit($fromRaw)) {
+        return null;
+    }
+    $start = (int) $fromRaw;
+    if ($toRaw === '') {
+        $end = $size - 1;            // open-ended `bytes=N-`
+    } elseif (ctype_digit($toRaw)) {
+        $end = (int) $toRaw;
+        if ($end < $start) {
+            return null;             // invalid, not unsatisfiable — ignore it
+        }
+        $end = min($end, $size - 1); // a request past the end is clamped, not refused
+    } else {
+        return null;
+    }
+    if ($start >= $size) {
+        return 'unsatisfiable';      // also the whole answer for a zero-byte file
+    }
+    return [$start, $end];
+}
+
+/**
+ * Write exactly $length bytes starting at $start.
+ *
+ * Seek and read — never readfile(), which would read the file from byte zero
+ * and hand the client the whole thing under a header promising a slice of it.
+ */
+function qs_sb_emit_range(string $file, int $start, int $length): void {
+    $fh = @fopen($file, 'rb');
+    if ($fh === false) {
+        return;
+    }
+    if ($start > 0) {
+        fseek($fh, $start);
+    }
+    while ($length > 0 && !feof($fh)) {
+        $buf = fread($fh, (int) min(QS_SB_STREAM_CHUNK, $length));
+        if ($buf === false || $buf === '') {
+            break;
+        }
+        echo $buf;
+        $length -= strlen($buf);
+        // Keep memory flat across a large range even if something upstream
+        // started an output buffer.
+        if (ob_get_level() > 0) {
+            @ob_flush();
+        }
+        @flush();
+    }
+    fclose($fh);
 }
 
 /** Emit surface-B response security headers for the HTML render. */

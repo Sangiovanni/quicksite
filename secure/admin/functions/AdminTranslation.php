@@ -39,7 +39,20 @@ class AdminTranslation {
         // the panel a second cookie and, worse, leaving $_SESSION pointing at
         // the wrong session for anything that reads the login afterwards.
         require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
-        qs_session_boot(true);
+
+        // WRITE mode only when this request actually has something to write, or
+        // a session to write it into. This runs on EVERY admin page render,
+        // including anonymous ones: booting for write unconditionally minted a
+        // session — file, cookie and all — for every visitor who so much as
+        // loaded the login page, which is one half of the accumulation S2.2
+        // exists to stop. Reading a preference needs no session of its own.
+        $switching = !empty($_GET['lang']) && is_string($_GET['lang'])
+                     && $this->isValidLanguage($_GET['lang']);
+        if ($switching || qs_session_present()) {
+            qs_session_boot(true);
+        } else {
+            qs_session_boot(false); // read-only; false simply means "anonymous"
+        }
 
         // URL parameter has HIGHEST priority (user clicking language switcher).
         // is_string: a query parameter arrives as whatever the caller sent, and
@@ -138,6 +151,11 @@ class AdminTranslation {
     public function setLanguage(string $lang): void {
         if ($this->isValidLanguage($lang)) {
             $this->currentLang = $lang;
+            // Storing a preference is a deliberate write, so ask for a session
+            // that can hold one: detectLanguage() opens the session read-only
+            // for a visitor who has none, and a write into a closed session is
+            // discarded without a word.
+            qs_session_boot(true);
             $_SESSION['admin_lang'] = $lang;
             $this->loadTranslations();
         }

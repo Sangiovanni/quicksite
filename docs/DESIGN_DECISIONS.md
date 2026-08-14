@@ -7003,3 +7003,156 @@ supported target ship visibly broken).
 `public/init.php` (the first-load setup page),
 `secure/deploy/nginx-vhosts.conf.example`. Behaviour:
 [README.md](../README.md).
+
+## Session hygiene and static serving (beta.11)
+
+### A read never mints a session (locked 2026-08-14)
+
+**Decision**: a read-mode session boot declines unless the id in the cookie names
+a session file that already exists. Only a deliberate write — logging in, storing
+a language choice, setting a one-shot flash — may create one. `qs_session_present()`
+is the single place that answers "is there a session to open", and every caller
+that must not invent one goes through it.
+
+**Reasoning**: `session.use_strict_mode = 1` was already set, and it does close
+session fixation: an id the caller invented is never adopted. What it does not do
+is decline. Strict mode's answer to an unknown id is *mint a fresh one instead*,
+and minting writes a file and sends a `Set-Cookie`. A browser takes the id it is
+handed and stops asking; a script, a scanner or a curl suite ignores `Set-Cookie`
+and asks again on every request, and is handed a new session every time. Measured
+on the development install: 5393 session files, 4619 of them empty, all inside
+three days, from an unauthenticated request that needs no account and no valid
+cookie — only a cookie shaped like one. Two distinct paths produced it: the
+surface-B gate reading the cookie, and the admin panel resolving its display
+language, which opened the session for WRITE on every page render including
+anonymous ones, so even a request carrying no cookie at all left a file behind.
+
+The fix is contained: reading a session that does not exist has no result worth
+having, so declining costs nothing a caller could want. It does couple the engine
+to PHP's `files` session handler, which is why `qs_session_file_path()` returns
+null under any other handler and both callers fall back to their previous
+behaviour — a store QuickSite cannot read is never reported as empty.
+
+**Alternatives considered**: leaving it to PHP's garbage collector (rejected — it
+cannot, see the entry below). A shorter `gc_maxlifetime` (rejected — PHP has one
+lifetime setting for the whole store, so the longest promise, remember-me at 30
+days, sets the floor for the junk as well). Refusing cookies that do not name a
+session at the web-server layer (rejected — the server cannot see the session
+store, and it would put an authentication decision outside the application).
+Accepting the accumulation and sweeping only (rejected — it treats the symptom,
+and the sweep would then be load-bearing rather than housekeeping).
+
+**Source**: `secure/src/functions/SessionManagement.php` (`qs_session_boot`,
+`qs_session_present`, `qs_session_file_path`),
+`secure/admin/functions/AdminTranslation.php`. Behaviour:
+[ARCHITECTURE.md](ARCHITECTURE.md) §3.
+
+### QuickSite sweeps its own session store, and the sweep is not a command (locked 2026-08-14)
+
+**Decision**: the engine collects dead session files on its own rule — empty
+files past a short grace, sessions idle past `idle_ttl`, and sessions holding no
+QuickSite login once they are past the longest lifetime this install promises
+anything. It runs opportunistically after a login on a 1-in-N die
+(`auth.php` `authentication.session.sweep_divisor`, default 10) and on demand
+from `php secure/cli/session-sweep.php`. It is **not** a routed command.
+
+**Reasoning**: PHP's own collector cannot do this job. It fires on 0.1% of
+session starts, and its `gc_maxlifetime` must outlive the longest thing the
+install promises — remember-me, 30 days — so it refuses to touch anything
+younger than a month. QuickSite already knows better: its own idle check is what
+actually expires a session, and it knows one is dead a day after it was last
+seen. Login is the right host for the die because it is infrequent, already
+writing to disk, and needs no scheduler and nothing for an operator to remember.
+
+Not a command, because clearing the session store is installation-wide and there
+is no principal that could authorize it. Every permission in QuickSite is a fact
+about one project, and a project role cannot mean "sign out everyone on this
+server"; beta.10 deleted the last installation-wide tier deliberately, and adding
+a command here would reintroduce exactly the global principal that was removed.
+The credential for an installation-wide action is filesystem access to the
+server — the same principle the first-run setup token uses — so the entry point
+is a script outside the web root that refuses to run under a web SAPI.
+
+Correctness is bought ahead of thoroughness in three places. The sweep only
+deletes what it can positively classify, so a session belonging to another
+component sharing the save path is left alone rather than guessed about. Every
+deletion happens under a non-blocking exclusive lock — the same lock PHP's files
+handler takes for a write — and the file's stats are re-read under it, so a
+session written between the scan and the delete is re-judged instead of removed
+on stale evidence. And the scan costs one stat per file: a file written inside
+the idle window cannot hold an idle-dead session, because its own `qs_seen` was
+written before it was, so a fresh modification time proves a live session without
+opening the file. Measured: 870 files, nearly all of them candidates, 0.25 s;
+the same store once tidy, 0.011 s.
+
+**Alternatives considered**: a routed sweep command (rejected — the principal
+problem above). A scheduled task or cron entry (rejected — it is one more thing
+an install can be missing, and the failure is silent). Sweeping on every request
+(rejected — it puts a directory scan in the path of every page view). Sweeping on
+every login without a die (rejected — same cost, concentrated on the one action a
+user is waiting on). Deleting anything not recognised as a QuickSite session
+(rejected — the save path is shared with the author's-site OAuth state store when
+that runs in the same request, and a sweep that guesses is a sweep that
+eventually deletes something live).
+
+**Source**: `secure/src/functions/SessionManagement.php` (`qs_session_sweep`,
+`qs_session_sweep_consider`, `qs_session_sweep_maybe`),
+`secure/cli/session-sweep.php`. Behaviour: [ARCHITECTURE.md](ARCHITECTURE.md) §3.
+
+### Range and conditional requests are answered in PHP, not delegated to the web server (locked 2026-08-14)
+
+**Decision**: the static passthrough emits `Accept-Ranges`, `ETag` and
+`Last-Modified`, answers `304` to a matching `If-None-Match` / `If-Modified-Since`,
+and answers `Range` with `206 Partial Content` and a correct `Content-Range`,
+seeking to the requested offset rather than reading the file from the start.
+`X-Sendfile` / `X-Accel-Redirect` — handing the file to the web server to send —
+was considered and deferred.
+
+**Reasoning**: the accelerator is the option that looks obviously better, which
+is why the reasoning is worth recording. It is genuinely faster: the web server
+sends the bytes with its own zero-copy path, no PHP process is held open for the
+duration of a download, and byte ranges and conditional requests come free with
+it. But it is server-specific configuration. nginx has `X-Accel-Redirect` built
+in; Apache needs `mod_xsendfile`, which is absent from most Apache builds and
+from WAMP. So it can only ever be an optional accelerator sitting on top of a
+correct fallback — which means the fallback has to be right regardless, and the
+fallback is the part that fixes the user-visible defects on every deployment with
+no configuration at all. Engine-level work had no home after this release; the
+accelerator can land in any later one, because it slots in ahead of this path
+rather than replacing it.
+
+The everyday cost being fixed is not seeking, it is revalidation. Without a
+validator there is nothing for a browser to revalidate against, so once
+`max-age` lapses it must refetch the whole file — on every asset of every project
+site, invisible only because most assets are small.
+
+Two details are load-bearing. The ETag describes content and never the
+filesystem: for files up to 1 MiB it is a hash of the bytes, above that the
+modification time and size, and neither form can carry a path or an inode —
+beta.10 removed absolute paths from responses deliberately and an ETag is a
+response header like any other. And the visibility gate still runs first: a
+`Range` header is a request header, read long after membership was decided, so a
+partial request reaches no bytes a whole request could not have.
+
+Multi-range is declined here rather than faked — the whole representation is sent
+with `200`, which RFC 9110 permits — and it is worth knowing that the client may
+still see a multipart `206` anyway, because declaring `Accept-Ranges` on a
+response with a known length arms the web server's own range filter. Measured on
+Apache 2.4.62: a two-range request comes back as a correct
+`206 multipart/byteranges` assembled by Apache from the full body. Single ranges
+never reach that filter, since a `206` is not re-sliced.
+
+**Alternatives considered**: `X-Sendfile` / `X-Accel-Redirect` now (deferred, as
+above). Moving project files into the web root so the server serves them directly
+(rejected — it is the visibility model: a private project's contents would become
+world-readable, and the existence of `public/p/<id>/` on disk would answer "does
+this project exist?" somewhere no application code can intervene). Emitting only
+`Last-Modified` and skipping ETags (rejected — one-second resolution makes it a
+weak validator, and a strong one costs a hash on files small enough for the hash
+to be cheap). Implementing `multipart/byteranges` (rejected — a lot of machinery
+for something nothing fetching a project asset asks for, and the web server
+already answers it).
+
+**Source**: `secure/src/functions/surfaceB.php` (`qs_sb_send_file`, `qs_sb_etag`,
+`qs_sb_not_modified`, `qs_sb_parse_range`, `qs_sb_emit_range`). Behaviour:
+[ARCHITECTURE.md](ARCHITECTURE.md) §5.1, §6.

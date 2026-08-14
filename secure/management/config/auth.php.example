@@ -22,6 +22,16 @@ return [
                                         // survives a browser restart (30 days).
                                         // Without it the cookie dies with the
                                         // browser session.
+            'sweep_divisor' => 10,       // 1-in-N chance that a login also sweeps
+                                        // the session store (0 = never). PHP's own
+                                        // collector cannot do this job: it runs on
+                                        // 0.1% of session starts and its lifetime
+                                        // must cover remember_ttl, so it refuses to
+                                        // touch anything younger than the longest
+                                        // promise here. QuickSite sweeps on its own
+                                        // idle rule instead. The operator CLI
+                                        // (secure/cli/session-sweep.php) forces a
+                                        // pass regardless of this setting.
         ],
         // Self-registration policy. allow_self_registration false (secure
         // default) = no register page, no public register command; accounts

@@ -29,6 +29,27 @@
  * OTHER application on the same host garbage-collects QuickSite's sessions at
  * ITS gc_maxlifetime and users are signed out mid-work for no visible reason.
  *
+ * OWNING the save path is also what makes the two hygiene rules below sound.
+ *
+ *   1. A READ never mints. `session.use_strict_mode=1` closes session fixation
+ *      (an id the caller invented is never adopted) but it does not mean "no
+ *      session" — it means "mint a fresh one instead", and minting WRITES A
+ *      FILE. A client that ignores Set-Cookie therefore left one empty session
+ *      file per request behind, with no account and no credential: an
+ *      unauthenticated disk-consumption primitive. So a read-mode boot now
+ *      declines outright unless the id names a file that already exists.
+ *   2. QuickSite sweeps its own store. PHP's GC cannot: it runs on 0.1% of
+ *      session starts and its lifetime is pinned to the LONGEST thing this
+ *      install promises (remember-me, 30 days), because one gc_maxlifetime has
+ *      to cover every session here. QuickSite knows a session is dead long
+ *      before that — its own idle check is what actually expires one — so it
+ *      collects on its own rule (qs_session_sweep).
+ *
+ * Both rules read the store as `sess_<id>` files, which is PHP's `files`
+ * handler and nothing else. That coupling is deliberate and checked at the one
+ * place it matters (qs_session_file_path returns null for any other handler, and
+ * both rules degrade to their pre-existing behaviour when it does).
+ *
  * This file ALSO holds the login-attempt and registration flood controls. They
  * are brute-force protection, entirely independent of how a session is carried,
  * and they were never part of the token machinery — deleting them with it would
@@ -46,20 +67,50 @@ const QS_SESSION_COOKIE = 'QSSESSID';
  *                the caller works).
  * remember_ttl — how long the "remember me" cookie survives a browser restart.
  *                Without it the cookie dies with the browser session.
+ * sweep_divisor — 1-in-N chance that a login also sweeps the session store
+ *                (0 = never; the operator CLI still works). Logins are rare and
+ *                already write to disk, which is why the sweep rides one rather
+ *                than every request — PHP's own gc_probability/gc_divisor idiom,
+ *                with a divisor sized for logins instead of session starts.
  *
- * @return array{idle_ttl:int, remember_ttl:int}
+ * Every key is optional and absent means the default: an auth.php written
+ * before a key existed keeps working.
+ *
+ * @return array{idle_ttl:int, remember_ttl:int, sweep_divisor:int}
  */
 function qs_session_config(): array {
     $cfg = loadAuthConfig()['authentication']['session'] ?? [];
     return [
-        'idle_ttl'     => max(300, (int)($cfg['idle_ttl'] ?? 86400)),
-        'remember_ttl' => max(3600, (int)($cfg['remember_ttl'] ?? 2592000)),
+        'idle_ttl'      => max(300, (int)($cfg['idle_ttl'] ?? 86400)),
+        'remember_ttl'  => max(3600, (int)($cfg['remember_ttl'] ?? 2592000)),
+        'sweep_divisor' => max(0, (int)($cfg['sweep_divisor'] ?? 10)),
     ];
 }
 
 /** Where PHP writes this install's session files (see the file header). */
 function qs_session_save_path(): string {
     return SECURE_FOLDER_PATH . '/tmp/sessions';
+}
+
+/**
+ * The file PHP would keep session $id in, or null when this install is not
+ * using the `files` handler.
+ *
+ * The null case is the whole point of the function existing. Reading the store
+ * as files is an assumption, and an assumption that is wrong in a way nobody
+ * would notice quickly: if a deployment sets session.save_handler to redis or
+ * memcached, "no file" would mean "no session" and EVERY caller would be
+ * treated as signed out. Callers therefore ask, and fall back to the old
+ * unconditional behaviour when the answer is null.
+ *
+ * $id is already shape-checked by qs_session_id_shape_ok — no dots, no
+ * separators — so it cannot compose a path of its own.
+ */
+function qs_session_file_path(string $id): ?string {
+    if (ini_get('session.save_handler') !== 'files') {
+        return null;
+    }
+    return qs_session_save_path() . '/sess_' . $id;
 }
 
 /**
@@ -75,20 +126,30 @@ function qs_session_id_shape_ok(string $id): bool {
 
 /**
  * Configure and start the session. Returns false when there is nothing to open
- * (read mode with no cookie) — the caller is simply anonymous.
+ * (read mode with no session behind the cookie) — the caller is simply
+ * anonymous.
  *
  * $forWrite=false starts with read_and_close: the data is read and the session
  * file is released immediately, so concurrent admin requests never serialize
  * behind each other's session lock, AND session_status() falls back to NONE so
  * a later session on the same request (the author's-site OAuth state store
  * names its own) can start cleanly.
+ *
+ * A READ NEVER MINTS. Reading a session that does not exist has no result worth
+ * having — there is nothing to read — but session_start() would still create
+ * one, write its file and send a Set-Cookie, because strict mode's answer to an
+ * unknown id is "mint a fresh one", not "decline". So read mode declines here
+ * instead, and only a deliberate write (logging in, storing a language choice,
+ * setting a one-shot flash) ever creates a session. See the file header.
+ *
+ * WRITE mode is unchanged: it must be able to create, and every caller that
+ * wants "open it, but do not invent one" asks qs_session_present() first.
  */
 function qs_session_boot(bool $forWrite): bool {
     if (session_status() === PHP_SESSION_ACTIVE) {
         return true; // already open for this request (admin page flow)
     }
-    $cookie = $_COOKIE[QS_SESSION_COOKIE] ?? null;
-    if (!$forWrite && (!is_string($cookie) || !qs_session_id_shape_ok($cookie))) {
+    if (!$forWrite && !qs_session_present()) {
         return false;
     }
 
@@ -115,16 +176,28 @@ function qs_session_boot(bool $forWrite): bool {
 
 /**
  * Is there a session to open at all? A write-mode boot creates one when there
- * is not, which is right for login and wrong for everything else — destroy and
- * touch use this so they never mint an empty session (and a Set-Cookie) for a
- * caller who has none.
+ * is not, which is right for login and wrong for everything else — destroy,
+ * touch, restamp and every read use this so they never mint an empty session
+ * (and a Set-Cookie) for a caller who has none.
+ *
+ * "Has none" means BOTH halves: no cookie, a cookie that is not shaped like a
+ * session id, or a cookie naming a session that does not exist on disk. The
+ * third case is the one that mattered — it is the only one a caller can produce
+ * over and over, since a browser adopts the id it is handed and stops asking,
+ * while a script that ignores Set-Cookie asks forever.
  */
 function qs_session_present(): bool {
     if (session_status() === PHP_SESSION_ACTIVE) {
         return true;
     }
     $cookie = $_COOKIE[QS_SESSION_COOKIE] ?? null;
-    return is_string($cookie) && qs_session_id_shape_ok($cookie);
+    if (!is_string($cookie) || !qs_session_id_shape_ok($cookie)) {
+        return false;
+    }
+    $file = qs_session_file_path($cookie);
+    // Non-files handler: we cannot see the store, so answer as before and let
+    // session_start() decide. Never report "absent" on a store we cannot read.
+    return $file === null || is_file($file);
 }
 
 /**
@@ -236,6 +309,14 @@ function qs_session_establish(string $userId, int $generation, bool $remember): 
     }
 
     qs_session_cache_reset();
+
+    // Opportunistic housekeeping, on a die (qs_session_sweep_maybe). A login is
+    // the right host: infrequent, already writing, and it needs nothing an
+    // operator has to remember. Deliberately AFTER the session is established
+    // and the cookie is sent, so a sweep can never delay or affect the login
+    // that triggered it.
+    qs_session_sweep_maybe();
+
     return $token;
 }
 
@@ -268,16 +349,30 @@ function qs_session_restamp(int $generation): void {
  * qs_user_bump_generation).
  */
 function qs_session_destroy(): void {
-    if (!qs_session_present() || !qs_session_boot(true)) {
-        return;
-    }
-    $_SESSION = [];
-    if (!headers_sent()) {
+    // The cookie name rather than session_name(): this has to be able to expire
+    // a cookie without a session ever being opened (the case just below), and
+    // boot() always names the session after the same constant anyway.
+    $expireCookie = static function (): void {
+        if (headers_sent()) {
+            return;
+        }
         $params = qs_session_cookie_params(0);
         $params['expires'] = time() - 3600;
         unset($params['lifetime']);
-        setcookie(session_name(), '', $params);
+        setcookie(QS_SESSION_COOKIE, '', $params);
+    };
+
+    if (!qs_session_present() || !qs_session_boot(true)) {
+        // Nothing to destroy. If the caller presented a cookie anyway it names
+        // a session that is gone — swept, expired, or never real — so expire it
+        // rather than leaving the browser to keep sending a dead pointer.
+        if (isset($_COOKIE[QS_SESSION_COOKIE])) {
+            $expireCookie();
+        }
+        return;
     }
+    $_SESSION = [];
+    $expireCookie();
     @session_destroy();
     qs_session_cache_reset();
 }
@@ -303,6 +398,239 @@ function qs_session_touch(): void {
         session_write_close();
     }
     qs_session_cache_reset();
+}
+
+// ============================================================================
+// Session store sweep — QuickSite collects on ITS OWN rule (see the file
+// header for why PHP's GC cannot). Two entries, per the S2 design:
+//   - opportunistically at LOGIN, on a 1-in-N die (qs_session_sweep_maybe);
+//   - explicitly from the operator CLI (secure/cli/session-sweep.php).
+//
+// NOT a routed command, deliberately. Clearing the session store is
+// installation-wide and has no principal to authorize it: a per-project role
+// cannot mean "sign out everyone on this server", and beta.10 removed every
+// installation-wide tier on purpose. The credential for this is filesystem
+// access, which is strictly more power than any role could grant.
+// ============================================================================
+
+/** A 0-byte session file is only ever transient for the instant between
+ *  creation and first write. This grace is that instant, generously rounded —
+ *  it exists so a session being created right now is never swept, and for no
+ *  other reason. */
+const QS_SESSION_SWEEP_EMPTY_GRACE = 3600;
+
+/** Safety valve, not a tuning knob: bounds one pass over a pathologically large
+ *  store (the 5393 files that prompted this work would fit ~4 times over). A
+ *  capped pass reports it and the next sweep continues. */
+const QS_SESSION_SWEEP_MAX_FILES = 20000;
+
+/**
+ * Delete session files this install can prove are worthless, and leave
+ * everything else alone. Returns a report; never throws.
+ *
+ * THREE RULES, each with its own reason to be sound:
+ *
+ *  1. EMPTY (0 bytes), older than the grace above → gone. An empty file holds
+ *     no session for anybody, QuickSite or otherwise. This is the litter the
+ *     read-mode fix stops producing, and the only rule that acts quickly.
+ *  2. Holds a QUICKSITE LOGIN (a `qs_uid` key), last seen longer ago than
+ *     `idle_ttl` → gone. This is not a new policy: it is exactly the session
+ *     qs_session_auth() already refuses. The file is the last thing left of a
+ *     session that stopped being accepted.
+ *  3. Holds NO QuickSite login (an anonymous language preference, or another
+ *     component's session sharing this save path — the author's-site OAuth
+ *     state store starts its own session and inherits the path when QuickSite
+ *     booted first), last WRITTEN longer ago than max(idle_ttl, remember_ttl)
+ *     → gone. That bar is the longest lifetime this install promises anything,
+ *     and it is exactly the gc_maxlifetime PHP is configured with here — so
+ *     this rule only ever collects what PHP itself already considers
+ *     collectable, and can never outrace a foreign session's own expiry.
+ *
+ * Anything else is left alone. The sweep is allowed to be slow to notice; it is
+ * not allowed to be wrong.
+ *
+ * CHEAP BY CONSTRUCTION. Every file costs one stat. Contents are read only for
+ * a file already stale by mtime, which on a healthy store is none of them:
+ * `qs_seen` is written into the file, so the file's mtime is never older than
+ * its own `qs_seen`, and a fresh mtime therefore proves a fresh session without
+ * opening it.
+ *
+ * NEVER RACES A LIVE WRITE. A candidate is only removed while this process
+ * holds a non-blocking exclusive flock on it — the same lock PHP's own files
+ * handler takes for the duration of a write-mode request — and its stats are
+ * re-read under that lock, so a file that was rewritten between the scan and
+ * the delete is re-judged rather than removed on stale evidence.
+ *
+ * @param bool     $dryRun report what would go, delete nothing
+ * @param int|null $now    injectable clock (tests); null = time()
+ * @return array{examined:int, removed:int, bytes:int, empty:int, idle:int,
+ *               foreign:int, locked:int, capped:bool, seconds:float,
+ *               removed_files:array<int,string>}
+ */
+function qs_session_sweep(bool $dryRun = false, ?int $now = null): array {
+    $started = microtime(true);
+    $now     = $now ?? time();
+    $knobs   = qs_session_config();
+    $idleTtl = $knobs['idle_ttl'];
+    $longest = max($knobs['idle_ttl'], $knobs['remember_ttl']);
+
+    $report = ['examined' => 0, 'removed' => 0, 'bytes' => 0, 'empty' => 0,
+               'idle' => 0, 'foreign' => 0, 'locked' => 0, 'capped' => false,
+               'seconds' => 0.0, 'removed_files' => []];
+
+    $dir = qs_session_save_path();
+    // Only this install's own store, and only the files handler. A store we
+    // cannot read as files is a store we must not guess about.
+    if (ini_get('session.save_handler') !== 'files' || !is_dir($dir)) {
+        $report['seconds'] = round(microtime(true) - $started, 4);
+        return $report;
+    }
+
+    $dh = @opendir($dir);
+    if ($dh === false) {
+        $report['seconds'] = round(microtime(true) - $started, 4);
+        return $report;
+    }
+
+    while (($entry = readdir($dh)) !== false) {
+        if (strncmp($entry, 'sess_', 5) !== 0) {
+            continue; // not a session file (lock files, ., ..)
+        }
+        if ($report['examined'] >= QS_SESSION_SWEEP_MAX_FILES) {
+            $report['capped'] = true;
+            break;
+        }
+        $report['examined']++;
+
+        $file  = $dir . '/' . $entry;
+        $size  = @filesize($file);
+        $mtime = @filemtime($file);
+        if ($size === false || $mtime === false) {
+            continue; // vanished mid-scan, or unreadable — not ours to force
+        }
+
+        // Pre-filter on mtime alone: a file written within the idle window
+        // cannot hold an idle-dead session (mtime >= qs_seen, always), and a
+        // 0-byte file inside the grace may be one being created right now.
+        if ($size === 0) {
+            if ($now - $mtime <= QS_SESSION_SWEEP_EMPTY_GRACE) {
+                continue;
+            }
+        } elseif ($now - $mtime <= $idleTtl) {
+            continue;
+        }
+
+        $verdict = qs_session_sweep_consider($file, $now, $idleTtl, $longest, $dryRun);
+        if ($verdict === null) {
+            $report['foreign']++;  // alive, or not ours to judge
+            continue;
+        }
+        if ($verdict === 'locked') {
+            $report['locked']++;
+            continue;
+        }
+        $report[$verdict]++; // 'empty' | 'idle'
+        $report['bytes'] += $size;
+        $report['removed']++;
+        if (count($report['removed_files']) < 20) {
+            $report['removed_files'][] = $entry;
+        }
+    }
+    closedir($dh);
+
+    $report['seconds'] = round(microtime(true) - $started, 4);
+    return $report;
+}
+
+/**
+ * Judge one candidate under an exclusive lock and, unless this is a dry run,
+ * remove it there and then. Returns 'empty' or 'idle' when the file was judged
+ * dead, 'locked' when another process owns it, and null when it is alive or not
+ * ours to judge.
+ *
+ * Judging and deleting are one step on purpose: the lock is what makes the
+ * verdict current, so acting on it anywhere else would be acting on evidence
+ * about a moment that has passed. The scan's own stats are re-read here for the
+ * same reason.
+ *
+ * The unlink is attempted while the lock is held — on POSIX that is the version
+ * with no window between deciding and acting. Windows refuses to unlink a file
+ * this process still has open, so it gets a second attempt after the handle is
+ * closed; that window is bounded by the fact that the file was already judged
+ * dead by content AND by age.
+ */
+function qs_session_sweep_consider(
+    string $file, int $now, int $idleTtl, int $longest, bool $dryRun
+): ?string {
+    $fh = @fopen($file, 'rb');
+    if ($fh === false) {
+        return null; // gone, or held open in a way we may not touch
+    }
+    if (!@flock($fh, LOCK_EX | LOCK_NB)) {
+        fclose($fh);
+        return 'locked'; // a request owns this session right now
+    }
+
+    $verdict = null;
+    clearstatcache(true, $file);
+    $size  = @filesize($file);
+    $mtime = @filemtime($file);
+    if ($size !== false && $mtime !== false) {
+        if ($size === 0) {
+            // Rule 1 — holds nothing, for anybody.
+            $verdict = ($now - $mtime > QS_SESSION_SWEEP_EMPTY_GRACE) ? 'empty' : null;
+        } else {
+            $raw = @stream_get_contents($fh);
+            if (is_string($raw) && $raw !== '') {
+                if (strpos($raw, 'qs_uid') === false) {
+                    // Rule 3 — no QuickSite login in it. Only collectable past
+                    // the longest lifetime this install promises anything.
+                    $verdict = ($now - $mtime > $longest) ? 'idle' : null;
+                } else {
+                    // Rule 2 — QuickSite's own idle rule, read off the session.
+                    // Tolerant of the serialize_handler in use: the `php`
+                    // default writes the key then `i:123;`, `php_serialize`
+                    // quotes the key, `php_binary` length-prefixes it. An
+                    // unparseable stamp falls back to mtime, so a session is
+                    // never deleted on a guess.
+                    $seen = $mtime;
+                    if (preg_match('/qs_seen[^0-9-]{0,6}i:(-?\d+)/', $raw, $m) === 1
+                        && (int)$m[1] > 0) {
+                        $seen = (int)$m[1];
+                    }
+                    $verdict = ($now - $seen > $idleTtl) ? 'idle' : null;
+                }
+            }
+        }
+    }
+
+    $removed = false;
+    if ($verdict !== null && !$dryRun) {
+        $removed = @unlink($file);
+    }
+    @flock($fh, LOCK_UN);
+    fclose($fh);
+    if ($verdict !== null && !$dryRun && !$removed && is_file($file)) {
+        @unlink($file); // Windows: the handle had to be closed first
+    }
+    return $verdict;
+}
+
+/**
+ * Sweep on a 1-in-N die. Called by login, which is the right host for it: it is
+ * infrequent, it is already writing to disk, and it needs no scheduler, no
+ * cron entry and nothing for an operator to remember. `sweep_divisor` = 0
+ * disables it entirely (the CLI entry still works).
+ */
+function qs_session_sweep_maybe(): void {
+    $divisor = qs_session_config()['sweep_divisor'];
+    if ($divisor <= 0) {
+        return;
+    }
+    if ($divisor > 1 && random_int(1, $divisor) !== 1) {
+        return;
+    }
+    qs_session_sweep();
 }
 
 // ============================================================================

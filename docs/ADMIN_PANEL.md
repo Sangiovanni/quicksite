@@ -201,6 +201,8 @@ Authentication uses **no browser storage**: the session lives in an HttpOnly coo
 
 Two other cookies exist, both HttpOnly and neither readable by page scripts. `QSSESSID` carries the session. `qs_form_token` carries the CSRF token of the **unauthenticated** auth forms — login, register and first-run run before any session exists, so they cannot use the per-session token every other page embeds; the server plants this cookie and the same value as a hidden field, and accepts a POST only when the two match. It is scoped to the admin path and `SameSite=Strict`, so a cross-site POST carries neither half. Signing out is likewise a **POST** carrying the per-session token, not a link: the header renders it as a form, and a bare `GET /admin/logout` ends nothing.
 
+`QSSESSID` is only ever set by something that deliberately stores state — signing in, or picking a language while signed out (the panel remembers that choice for a visitor who has no account). Loading a page never mints one, and a `QSSESSID` naming a session that no longer exists is treated as no cookie at all: the visitor is anonymous and is not handed a replacement.
+
 | Constant | Storage | Used by |
 |---|---|---|
 | `PREFS` | localStorage | `utils.js`, `admin.js`, `settings.js`, `preview-sidebar-resize.js` |
