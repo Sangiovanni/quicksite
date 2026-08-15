@@ -34,4 +34,19 @@ window.QuickSiteStorageKeys = Object.freeze({
     // edits so the user can recover if they navigate away or refresh
     // before saving. Cleared on successful save or explicit discard.
     styleSourceDraft:    'qs_style_source_draft',
+
+    // Operator update notice. Written only in a browser signed in as an account
+    // named in operator.php — nobody else runs update-notice.js at all.
+    //   updateCheckAt      epoch ms of the last checkForUpdates call, so a panel
+    //                      navigation does not spend a GitHub API call each time
+    //                      (unauthenticated GitHub allows 60/hour per address).
+    //   updateNoticeHidden the version string the operator dismissed. Stored as
+    //                      the VERSION, not a boolean, so the next release shows
+    //                      the notice again instead of staying dismissed forever.
+    //   updateLastSeen     the newest version the last check reported, so the
+    //                      banner can be re-shown inside the throttle window
+    //                      without spending another GitHub call.
+    updateCheckAt:       'qs_update_check_at',
+    updateNoticeHidden:  'qs_update_notice_hidden',
+    updateLastSeen:      'qs_update_last_seen',
 });

@@ -14,3 +14,8 @@
 # Shell scripts are the mirror image: a CRLF setup.sh fails with
 # "bad interpreter: /bin/bash^M" on the servers it is meant to run on.
 *.sh  text eol=lf
+
+# PowerShell reads either ending, but update.ps1 is invoked by a .bat on a
+# Windows box and there is no reason for the pair to disagree. Pinned so a
+# release archive carries the same bytes a Windows clone does.
+*.ps1 text eol=crlf

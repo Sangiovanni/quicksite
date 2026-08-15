@@ -25,6 +25,12 @@ $setupRetryAfter = 0;
 $setupMinLength = 0;
 $passwordMinLength = qs_registration_config()['min_password_length'];
 
+// A username to OFFER when the field is otherwise empty. Generated per render —
+// a failed POST re-renders with whatever was typed, so this never overwrites a
+// value someone chose (see the field below). Random by design, not derived from
+// the display name: qs_suggest_username() explains why.
+$usernameSuggestion = qs_suggest_username();
+
 // Mint on first render (create-if-absent — never regenerated, or the value the
 // deployer is reading would go stale while they read it).
 $tokenState = qs_setup_token_ensure();
@@ -179,7 +185,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         id="username"
                         name="username"
                         class="admin-input"
-                        value="<?= adminAttr((string)($_POST['username'] ?? '')) ?>"
+                        <?php /* The POSTed value wins whenever there is one, so a rejected
+                                 submission hands back what was typed rather than a fresh
+                                 suggestion the person never saw. */ ?>
+                        value="<?= adminAttr(($_POST['username'] ?? '') !== '' ? (string)$_POST['username'] : $usernameSuggestion) ?>"
                         maxlength="32"
                         <?php /* The '-' is ESCAPED. Browsers now compile the pattern attribute
                                  with the RegExp `v` flag, which reserves '-' inside a character
@@ -194,6 +203,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         required
                     >
                     <p class="admin-hint"><?= __admin('setup.usernameHint', 'Private — you sign in with it and nobody else sees it. 3-32 characters: letters, digits, dash or underscore.') ?></p>
+                    <p class="admin-hint"><?= __admin('setup.usernameSuggested', 'One has been suggested for you. Keep it or type your own — write it down either way, you sign in with it.') ?></p>
                 </div>
 
                 <div class="admin-form-group">

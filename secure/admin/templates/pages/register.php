@@ -22,6 +22,11 @@ $registerRetryAfter = 0;
 $registerMinLength = 0;
 $passwordMinLength = qs_registration_config()['min_password_length'];
 
+// Offered when the field would otherwise be empty — same helper and same
+// reasoning as the first-run form (qs_suggest_username): random, never derived
+// from the display name, and never overwriting a value the visitor typed.
+$usernameSuggestion = qs_suggest_username();
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // CSRF gate FIRST — a forged cross-site POST must not be able to mint an
     // account in the visitor's name, nor spend the registration flood budget.
@@ -118,7 +123,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         name="username"
                         class="admin-input"
                         placeholder="<?= adminAttr(__admin('register.usernamePlaceholder')) ?>"
-                        value="<?= adminAttr((string)($_POST['username'] ?? '')) ?>"
+                        <?php /* POSTed value wins — a rejected submission hands back what was
+                                 typed, not a fresh suggestion nobody saw. */ ?>
+                        value="<?= adminAttr(($_POST['username'] ?? '') !== '' ? (string)$_POST['username'] : $usernameSuggestion) ?>"
                         maxlength="32"
                         <?php /* Escaped '-' — see setup.php: the `v` flag makes an unescaped one
                                  invalidate the pattern, and an invalid pattern is ignored. */ ?>
@@ -129,6 +136,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         required
                     >
                     <p class="admin-hint"><?= __admin('register.usernameHint') ?></p>
+                    <p class="admin-hint"><?= __admin('register.usernameSuggested', 'One has been suggested for you. Keep it or type your own — write it down either way, you sign in with it.') ?></p>
                 </div>
 
                 <div class="admin-form-group">

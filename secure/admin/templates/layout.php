@@ -54,10 +54,22 @@ $currentProject = $isLoginPage ? null : $router->getCurrentProject();   // the p
 // browser already sends because the panel and surface B share an origin and the
 // cookie's path is '/'. Nothing extra is emitted here.
 $myProjectIds = [];
+// Does THIS account see operator notices? (secure/management/config/operator.php,
+// written at first run — §2.6.) A DISPLAY PREFERENCE AND NOTHING ELSE: it gates
+// whether the update banner renders, and no other decision anywhere reads it.
+// checkForUpdates keeps the permissions it always had, so this neither grants nor
+// withholds any capability — which is what stops it becoming the installation-wide
+// principal beta.10 deliberately removed.
+// DEFAULT-ON-ABSENT: qs_operator_ids() reads a missing or malformed file as
+// "nobody", never "everybody".
+$isOperator = false;
 if (!$isLoginPage) {
+    require_once SECURE_FOLDER_PATH . '/src/functions/firstRun.php';
     $__pkAuth = qs_session_auth();
     if (!empty($__pkAuth['valid'])) {
         $myProjectIds = getUserProjectIds($__pkAuth['user']);
+        $__pkUserId = (string)($__pkAuth['user']['id'] ?? ($__pkAuth['userId'] ?? ''));
+        $isOperator = $__pkUserId !== '' && in_array($__pkUserId, qs_operator_ids(), true);
     }
 }
 
@@ -516,6 +528,15 @@ $langNames = [
     </div>
     <?php endif; ?>
 
+    <?php if ($isOperator): ?>
+    <!-- Operator update notice (§2.6). Rendered EMPTY and filled by
+         js/core/update-notice.js, which is loaded only on this branch: checking
+         for an update is a live network call to GitHub, and doing it inline
+         would make every panel page wait on a third party. An account that is
+         not an operator never receives the container OR the script. -->
+    <div class="admin-security-warning admin-security-warning--info" id="admin-update-notice" hidden></div>
+    <?php endif; ?>
+
     <!-- Main Content -->
     <main class="admin-main<?= $isLoginPage ? ' admin-main--centered' : '' ?>">
         <?php require $templatePath; ?>
@@ -570,6 +591,11 @@ $langNames = [
             // globalCommands. Both are UX/plumbing — the server re-authorizes each call.
             currentProject: <?= json_encode($currentProject) ?>,
             globalCommands: <?= json_encode($globalCommands) ?>,
+            // Operator notices — a DISPLAY flag, never an authorization input.
+            // No version is emitted here: the notice gets both versions from
+            // checkForUpdates' own response, and putting the engine version into
+            // every account's page is the fingerprinting §2.6 objects to.
+            isOperator: <?= $isOperator ? 'true' : 'false' ?>,
             defaultLang: '<?= CONFIG['LANGUAGE_DEFAULT'] ?? 'en' ?>',
             multilingual: <?= (CONFIG['MULTILINGUAL_SUPPORT'] ?? false) ? 'true' : 'false' ?>,
             translations: {
@@ -623,6 +649,19 @@ $langNames = [
                         docLoadFailed: '<?= __adminJs('commandForm.errors.docLoadFailed') ?>'
                     }
                 },
+                <?php if ($isOperator): ?>
+                // Only an operator's page loads update-notice.js, so only an
+                // operator's page carries its strings.
+                updateNotice: {
+                    label: '<?= __adminJs('updateNotice.label') ?>',
+                    available: '<?= __adminJs('updateNotice.available') ?>',
+                    availableSuffix: '<?= __adminJs('updateNotice.availableSuffix') ?>',
+                    youHave: '<?= __adminJs('updateNotice.youHave') ?>',
+                    howTo: '<?= __adminJs('updateNotice.howTo') ?>',
+                    releaseNotes: '<?= __adminJs('updateNotice.releaseNotes') ?>',
+                    dismiss: '<?= __adminJs('updateNotice.dismiss') ?>'
+                },
+                <?php endif; ?>
                 settings: {
                     toast: {
                         preferencesSaved: '<?= __adminJs('settings.toast.preferencesSaved') ?>',
@@ -668,9 +707,16 @@ $langNames = [
     <!-- Membership counts + nav badge (C8 8.3c) — async, derived from existing reads -->
     <script src="<?= $versionedAsset('/js/core/members-badge.js') ?>"></script>
     <?php endif; ?>
-    
+
     <!-- Admin JavaScript -->
     <script src="<?= $versionedAsset('/admin.js') ?>"></script>
+
+    <?php if ($isOperator): ?>
+    <!-- Operator update notice (§2.6) — emitted ONLY for an account named in
+         operator.php, so a non-operator never downloads it at all. After
+         admin.js, which is where QuickSiteAdmin.apiRequest comes from. -->
+    <script src="<?= $versionedAsset('/js/core/update-notice.js') ?>"></script>
+    <?php endif; ?>
     
     <?php if (!$isLoginPage): ?>
     <script>

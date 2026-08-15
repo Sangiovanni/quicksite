@@ -128,6 +128,11 @@ function qs_surface_b_gate(string $id, string $secure): ?int {
     // (loadProjectMembers is independently F1-guarded; this is not its defence.)
     $members    = qs_sb_valid_id($id) ? loadProjectMembers($id) : ['members' => []];
     $visibility = $members['visibility'] ?? 'private';   // secure default: private
+    // Stashed for qs_sb_send_file(), which has to choose `Cache-Control: public`
+    // or `private` and must not re-derive the answer — two readings of the same
+    // question are two things to keep in step. Written on EVERY path, including
+    // the refusals below, so it is never left over from a previous call.
+    $GLOBALS['__qs_sb_public'] = ($visibility === 'public');
     if ($visibility === 'public') {
         return null;
     }
@@ -462,7 +467,24 @@ function qs_sb_send_file(string $file): void {
     // early is how a 206 ends up announcing the size of the whole file.
     header('Content-Type: ' . $ctype);
     header('X-Content-Type-Options: nosniff');
-    header('Cache-Control: public, max-age=300');
+    // `public` invites ANY cache to store this, shared proxies and CDNs included;
+    // on a member-only project that is an asset stored where a non-member's
+    // request could be answered from. The gate already decided the project's
+    // visibility (qs_surface_b_gate stashes it) — read that answer, never a
+    // second reading of members.json.
+    //
+    // `private`, NOT `no-store`: a member's own browser holding an asset it was
+    // entitled to fetch is fine and is the whole point of the ETag/Last-Modified
+    // validators above. `no-store` would forbid that too, so every navigation
+    // would refetch the bytes instead of answering 304 — a real cost paid for no
+    // gain, since the thing being kept out is the SHARED cache and `private`
+    // already keeps it out.
+    //
+    // DEFAULT-ON-ABSENT leans private: an unset flag means the gate did not run,
+    // which cannot happen through qs_surface_b_finish() but must fail closed if a
+    // future caller finds another way in.
+    $sharedCacheable = !empty($GLOBALS['__qs_sb_public']);
+    header('Cache-Control: ' . ($sharedCacheable ? 'public' : 'private') . ', max-age=300');
     header('Accept-Ranges: bytes');
     header('ETag: ' . $etag);
     header('Last-Modified: ' . gmdate('D, d M Y H:i:s', $mtime) . ' GMT');

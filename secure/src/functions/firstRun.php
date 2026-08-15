@@ -72,7 +72,21 @@ function qs_operator_ids(): array {
     if (function_exists('opcache_invalidate')) {
         opcache_invalidate($path, true);
     }
-    $cfg = @include $path;
+    // ⚠ THE try/catch IS LOAD-BEARING, and `@` alone is not enough. A SYNTAX
+    // error in an included file is not a warning to suppress — it is a
+    // ParseError, and an uncaught one is fatal. This file is edited BY HAND on
+    // the server (that is the whole design: no command writes it), so a stray
+    // character in it is an ordinary event, and every authenticated admin page
+    // calls this function. Without the catch, one typo here takes down the
+    // entire panel — including the pages someone would use to work out why.
+    // Verified catchable on 8.0.30 and 8.4.0.
+    try {
+        $cfg = @include $path;
+    } catch (\Throwable $e) {
+        error_log('qs_operator_ids: ' . $path . ' could not be parsed (' . $e->getMessage()
+            . ') — reading it as naming nobody');
+        return [];
+    }
     if (!is_array($cfg) || !isset($cfg['operators']) || !is_array($cfg['operators'])) {
         return [];
     }

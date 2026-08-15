@@ -74,8 +74,9 @@ function loadRolesConfig(): array {
  * that ownership in a single call, which is the mechanism behind the F-C8-8.1-1
  * privilege escalation. Authority in this model is per-project only (AUTH_REWORK
  * L4/§2.2 — no superadmin, no global tier), so a global category can only sanely be
- * "any authenticated user" or "nobody"; anything installation-wide (applyUpdate,
- * the served-project pointer) is operator/CLI-side per GAP A. Do not reintroduce a
+ * "any authenticated user" or "nobody"; anything installation-wide (applying an
+ * update, the served-project pointer) is operator/CLI-side per GAP A — update.sh /
+ * update.bat are that side, and have no HTTP surface to gate. Do not reintroduce a
  * value here without a global authority PRINCIPAL to gate on — there isn't one.
  */
 const QS_GLOBAL_ACCESS_GRANTING = ['any'];
@@ -914,6 +915,35 @@ function validateBearerToken(?string $authHeader): array {
  */
 function qs_valid_username(string $username): bool {
     return preg_match('/^[a-z0-9_-]{3,32}$/', $username) === 1;
+}
+
+/**
+ * A username to OFFER on an account-creation form. A suggestion, never an
+ * imposition — every caller renders it into an editable field.
+ *
+ * FULLY RANDOM, DELIBERATELY NOT DERIVED FROM THE DISPLAY NAME. The username is
+ * the PRIVATE login identifier (see qs_valid_username above): nobody else is
+ * shown it, and qs_user_create refuses a username equal to the display name for
+ * exactly that reason. A suggestion built out of the name would hand back the
+ * property the field exists to have — anyone who knows "Alice Martin" would know
+ * to try `alice-martin` — so the generator is told nothing about the person.
+ *
+ * SHAPE: two lowercase letters, an underscore, six digits (`qk_483927`).
+ * Nine characters, inside the 3–32 rule, and made only of characters the rule
+ * allows, so what is offered always validates. Letters-then-digits reads as a
+ * name rather than a hash, which matters because a human has to be able to see
+ * it on one screen and type it on another. ~676 million combinations — not a
+ * secret (the password is the secret), just not guessable from a display name.
+ *
+ * random_int(), not rand(): this is trivially cheap here and choosing the weaker
+ * generator for an identifier is a habit worth not having. It can throw only if
+ * the platform has no CSPRNG at all, which would already have broken session and
+ * token minting; the caller gets the exception rather than a silent weak value.
+ */
+function qs_suggest_username(): string {
+    $letters = 'abcdefghijklmnopqrstuvwxyz';
+    $prefix  = $letters[random_int(0, 25)] . $letters[random_int(0, 25)];
+    return $prefix . '_' . str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 }
 
 /**

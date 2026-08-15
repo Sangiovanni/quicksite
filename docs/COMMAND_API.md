@@ -349,13 +349,15 @@ server log containing operational detail.
 
 ## Update detection
 
-Two commands manage in-place upgrades against the GitHub repo:
+One command reports upgrades against the GitHub repo:
 
 | Command | Method | Notes |
 |---|---|---|
 | `checkForUpdates` | GET | Reads the local `VERSION` file, fetches the latest GitHub release tag, compares with PHP's `version_compare`. Returns `update_available`, `current_version`, `latest_version`, `release_url`, `install_method` (`git`\|`zip`). |
 
-Applying an update is **not** an API command. It replaces the code that runs every project on the installation, and authority in QuickSite is per-project — a project role cannot sanely imply "may rewrite the shared engine". `secure/management/command/applyUpdate.php` is therefore unrouted and invoked from the deploy/CLI side; the panel still reports available updates through `checkForUpdates`.
+Applying an update is **not** an API command, and there is no unrouted command file for it either. It replaces the code that runs every project on the installation, and authority in QuickSite is per-project — a project role cannot sanely imply "may rewrite the shared engine". Applying is done by `update.sh` / `update.bat` at the install root, which are operator/CLI entry points with no HTTP surface; the panel only *reports* available updates, through `checkForUpdates`.
+
+Who sees that report in the panel is decided by `secure/management/config/operator.php` — a list of user ids, written at first run, that grants nothing and only controls whether the notice renders. The command itself stays callable by any authenticated account.
 
 `version_compare` natively orders pre-release tags correctly: `1.0.0-beta.5 < 1.0.0-beta.10 < 1.0.0-rc.1 < 1.0.0`. The installed version is read from the local `VERSION` file, so that file's contents are what `checkForUpdates` compares against the latest GitHub release tag.
 

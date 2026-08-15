@@ -79,6 +79,7 @@
         "usernameLabel": "Username",
         "usernamePlaceholder": "your-username",
         "usernameHint": "3–32 characters: lowercase letters, numbers, dashes or underscores. This is your private sign-in identifier — other users know you by your public name.",
+        "usernameSuggested": "One has been suggested for you. Keep it or type your own — write it down either way, you sign in with it.",
         "passwordLabel": "Password",
         "passwordHint": "At least :min characters — length matters more than symbols.",
         "submit": "Create account",
@@ -110,6 +111,7 @@
         "nameHint": "Shown to other users. Must be different from your username.",
         "usernameLabel": "Username",
         "usernameHint": "Private — you sign in with it and nobody else sees it. 3–32 characters: letters, numbers, dashes or underscores.",
+        "usernameSuggested": "One has been suggested for you. Keep it or type your own — write it down either way, you sign in with it.",
         "passwordLabel": "Password",
         "passwordHint": "At least :min characters — length matters more than symbols.",
         "submit": "Create account",
@@ -125,6 +127,15 @@
             "title": "Why a token?",
             "text": "This page can create an account without anyone signing in first, so it must be proven that you are the person who installed QuickSite — not a passer-by who found the address. Reading a file on the server is that proof. This page disappears for good once the first account exists."
         }
+    },
+    "updateNotice": {
+        "label": "QuickSite update:",
+        "available": "version",
+        "availableSuffix": "is available.",
+        "youHave": "is available — you have",
+        "howTo": "Run ./update.sh (or update.bat) on the server to apply it.",
+        "releaseNotes": "Release notes",
+        "dismiss": "Dismiss"
     },
     "logout": {
         "title": "Logout",

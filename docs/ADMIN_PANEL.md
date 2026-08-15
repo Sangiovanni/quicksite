@@ -97,6 +97,7 @@ File lists are grouped by role. Where useful, the entry point or main exported f
 | `js/core/dom.js` | `window.QSDom`: shared `el()` element factory + `svgIcon()` + `clear()` — the createElement/textContent idiom for dynamic DOM. Loaded in `<head>` so page scripts can use it at parse time. |
 | `js/core/members-badge.js` | Membership counts (inbox awaiting me + queue awaiting my adjudication) → the Members nav badge; publishes `window.QSMembershipCounts` + the `quicksite:membership-counts-updated` event; recomputes on `quicksite:memberships-changed`. |
 | `js/core/searchable-select.js` | Type-ahead select widget for long option lists; loaded by `layout.php` and used by the visual editor's pickers. |
+| `js/core/update-notice.js` | The operator update banner (§9.14). Loaded **only** for an account named in `operator.php`; calls `checkForUpdates`, throttles to one call per six hours, and renders a dismissible notice. |
 | `admin.js` | Singleton `QuickSiteAdmin`: permissions, user badge, nav, delegation. |
 
 ### 5.2 Shared components
@@ -228,6 +229,9 @@ Two other cookies exist, both HttpOnly and neither readable by page scripts. `QS
 | `AI_AUTO_PREVIEW` | localStorage | declared; no current reader |
 | `AI_AUTO_EXECUTE` | localStorage | `preview-ai-tools.js`, `ai-connections.js`, `settings.js` |
 | `STYLE_SOURCE_DRAFT` | localStorage | `preview-style-source.js` (visual-editor CSS mode → Source view; debounced draft of unsaved edits, restored on next entry, cleared on save / discard) |
+| `UPDATE_CHECK_AT` | localStorage | `update-notice.js` — epoch ms of the last update check, so a panel navigation does not spend a GitHub API call each time |
+| `UPDATE_NOTICE_HIDDEN` | localStorage | `update-notice.js` — the version string the operator dismissed; stored as the version, not a flag, so the next release shows the notice again |
+| `UPDATE_LAST_SEEN` | localStorage | `update-notice.js` — the newest version the last check reported, so the banner can re-render inside the throttle window without another call |
 
 ---
 
@@ -235,7 +239,7 @@ Two other cookies exist, both HttpOnly and neither readable by page scripts. `QS
 
 | PHP file | Injects into | Notable fields |
 |---|---|---|
-| `templates/layout.php` | `window.QUICKSITE_CONFIG` | `apiBase`, `adminBase`, `baseUrl`, `publicSpace`, `currentProject`, `globalCommands`, `defaultLang`, `multilingual`, `translations`, `token` (the per-session token), `apiUrl` |
+| `templates/layout.php` | `window.QUICKSITE_CONFIG` | `apiBase`, `adminBase`, `baseUrl`, `publicSpace`, `currentProject`, `globalCommands`, `defaultLang`, `multilingual`, `translations`, `token` (the per-session token), `apiUrl`, `isOperator` (§9.14) |
 | `templates/pages/settings.php` | extends `QUICKSITE_CONFIG` | `commandUrl`, `aiSettingsUrl`, `quicksiteVersion` |
 | `templates/pages/apis.php` | inline `window.translations` | `apis` namespace |
 | `templates/pages/preview-config.php` | `window.PreviewConfig` | full preview runtime data — routes, components, settings, i18n, token (200+ fields) |
@@ -2779,6 +2783,41 @@ local password) is told so up front and is shown neither password-gated form.
 All dynamic structure — the confirm modals and the blocking-project list — is
 built with `QSDom` helpers; the static shell and every label live in
 `templates/pages/account.php` (en/fr).
+
+---
+
+### 9.14 Operator update notice
+
+A banner above the main content, on every authenticated page, saying that a
+newer QuickSite release exists. It reports; it cannot act. Applying an update is
+done on the server with `update.sh` / `update.bat`, which have no HTTP surface
+at all — the panel's job is only to tell somebody there is something to do,
+because a script cannot.
+
+**Who sees it** is `secure/management/config/operator.php`: a list of user ids,
+written at first run naming the account that created the install, and edited by
+hand afterwards. An account not on that list receives neither the banner
+container nor `js/core/update-notice.js` — the notice is absent from the page
+rather than hidden in it.
+
+**The list grants nothing.** It decides whether a notice renders and nothing
+else. `checkForUpdates` keeps the permissions it always had and stays callable
+by any authenticated account; no code path uses the list to authorise anything.
+That is what keeps it a display preference rather than an installation-wide
+role, which the authority model does not have (`ARCHITECTURE.md` §3).
+
+A missing, unreadable or malformed `operator.php` reads as **nobody** — never as
+everybody — so a notice addressed to whoever maintains the server is never shown
+by accident.
+
+**How it renders.** `layout.php` emits an empty container and the
+`isOperator` flag; `update-notice.js` calls `checkForUpdates` and fills it in.
+The check is a live network round trip to GitHub, so doing it inline would make
+every panel page wait on a third party. It is throttled to one call per six
+hours per browser (unauthenticated GitHub allows 60 per hour per address) and
+the result is remembered so the banner can re-render in between without another
+call. Dismissing it stores the **version** that was dismissed, so the next
+release shows the notice again instead of it staying gone for good.
 
 ---
 

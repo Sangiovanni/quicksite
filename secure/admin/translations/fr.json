@@ -79,6 +79,7 @@
         "usernameLabel": "Nom d'utilisateur",
         "usernamePlaceholder": "votre-identifiant",
         "usernameHint": "3 à 32 caractères : lettres minuscules, chiffres, tirets ou underscores. C'est votre identifiant de connexion privé — les autres utilisateurs vous connaissent par votre nom public.",
+        "usernameSuggested": "Un identifiant vous est proposé. Gardez-le ou saisissez le vôtre — notez-le dans les deux cas, c'est avec lui que vous vous connecterez.",
         "passwordLabel": "Mot de passe",
         "passwordHint": "Au moins :min caractères — la longueur compte plus que les symboles.",
         "submit": "Créer le compte",
@@ -110,6 +111,7 @@
         "nameHint": "Visible par les autres utilisateurs. Doit être différent de votre identifiant.",
         "usernameLabel": "Identifiant",
         "usernameHint": "Privé — il sert à vous connecter et personne d'autre ne le voit. 3 à 32 caractères : lettres, chiffres, tirets ou tirets bas.",
+        "usernameSuggested": "Un identifiant vous est proposé. Gardez-le ou saisissez le vôtre — notez-le dans les deux cas, c'est avec lui que vous vous connecterez.",
         "passwordLabel": "Mot de passe",
         "passwordHint": "Au moins :min caractères — la longueur compte plus que les symboles.",
         "submit": "Créer le compte",
@@ -125,6 +127,15 @@
             "title": "Pourquoi un jeton ?",
             "text": "Cette page peut créer un compte sans que personne ne soit connecté : il faut donc prouver que vous êtes bien la personne qui a installé QuickSite, et non un visiteur qui a trouvé l'adresse. Lire un fichier sur le serveur est cette preuve. Cette page disparaît définitivement dès que le premier compte existe."
         }
+    },
+    "updateNotice": {
+        "label": "Mise à jour QuickSite :",
+        "available": "la version",
+        "availableSuffix": "est disponible.",
+        "youHave": "est disponible — vous avez la",
+        "howTo": "Lancez ./update.sh (ou update.bat) sur le serveur pour l'appliquer.",
+        "releaseNotes": "Notes de version",
+        "dismiss": "Fermer"
     },
     "logout": {
         "title": "Déconnexion",

@@ -342,11 +342,11 @@ return [
     // 'system.admin' (access 'owner') was retired in C8 8.5 along with the rule
     // itself: hasPermission resolved it as "owns ANY project anywhere",
     // target-independent, while projects.create is access 'any' — so any account
-    // minted that ownership in one call (the F-C8-8.1-1 mechanism). Its last member,
-    // applyUpdate, is now operator/CLI-side per AUTH_REWORK §2.3 GAP A: it is
-    // UNROUTED (absent from routes.php) and invoked from the deploy/CLI side, so no
-    // token can reach a command that git-pulls the installation. checkForUpdates
-    // stays routed under system.read, so the panel still reports available updates.
+    // minted that ownership in one call (the F-C8-8.1-1 mechanism). Its last member
+    // applied updates; that is now `update.sh` / `update.bat` at the install root,
+    // an operator/CLI entry point with no HTTP surface at all, so no token can reach
+    // the code that git-pulls the installation. checkForUpdates stays routed under
+    // system.read, so the panel still reports available updates.
     // (The generateToken/listTokens/revokeToken trio was REMOVED in C5b; switchProject
     // was deleted in C15 along with the served-project concept it existed to repoint.)
     // Global categories may only declare an access in QS_GLOBAL_ACCESS_GRANTING

@@ -183,6 +183,28 @@ code,
     color: #4e342e;
 }
 
+/* Informational variant — same banner mechanics, no alarm. Used for the
+   operator update notice, which reports news rather than a misconfiguration.
+   Only the palette is overridden; layout, stickiness and the dismiss control
+   are the block's own. */
+.admin-security-warning--info {
+    background: #e8f1fb;
+    border-bottom-color: #90caf9;
+    color: #14395e;
+}
+
+.admin-security-warning--info .admin-security-warning__icon {
+    color: #1565c0;
+}
+
+.admin-security-warning--info .admin-security-warning__dismiss {
+    color: #5b7fa6;
+}
+
+.admin-security-warning--info .admin-security-warning__dismiss:hover {
+    color: #14395e;
+}
+
 /* =============================================================================
    HEADER
    ============================================================================= */

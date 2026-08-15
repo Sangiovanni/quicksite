@@ -7281,3 +7281,183 @@ script execution is exactly what the storage namespace assumes cannot happen).
 **Source**: `secure/src/runtime/qs.js` (`QS_ALLOWED_URL_SCHEMES`,
 `_qsSafeNavigationUrl`, `QS.redirect`). Behaviour:
 [ARCHITECTURE.md](ARCHITECTURE.md) §8.
+
+---
+
+### Applying an update is a CLI script, not a command; discovery stays in the panel (locked 2026-08-15)
+
+**Decision**: `secure/management/command/applyUpdate.php` is deleted. Applying an
+update is done by `update.sh` / `update.bat` at the install root, which have no
+HTTP surface at all. `checkForUpdates` stays routed and unchanged, so the panel
+still reports that a newer release exists.
+
+**Reasoning**: applying an update rewrites the code every project on the
+installation runs on, and it shells out to do it. There is no principal to gate
+that on. Authority in QuickSite is per-project — no superadmin, no global tier —
+so a per-project role cannot sanely imply "you may rewrite the shared
+substrate". The command had already been unrouted for that reason; what remained
+was a file still reachable in-process by defining `COMMAND_INTERNAL_CALL`, whose
+own header documented that it was waiting for a CLI entry point. This is that
+entry point, so the file has no remaining reason to exist.
+
+The credential for an update is **filesystem access to the server**. Somebody
+who can run the script can already edit `users.php`, so they hold strictly more
+than any role could grant — which is why editing files, and not calling an API,
+is how this works. The first-run setup token rests on the same principle.
+
+Action and discovery are separate problems, and both ship. A script cannot tell
+you there is something to do; you have to remember to run it. An HTTP endpoint
+can tell you, and must not be the thing that does it. So the panel reports and
+the script applies.
+
+**Alternatives considered**: a "deployer" role that could authorise the command
+(rejected, and rejected by Sangio himself when he proposed it — beta.10
+deliberately deleted every installation-wide tier, and reintroducing one brings
+back the escalation class that made it dangerous: `system.admin` at access
+`owner` resolved to "owns ANY project", while `projects.create` is access `any`,
+so any account could mint that ownership in one call and point it at an
+arbitrary-code-execution primitive). Keeping the command file unrouted but
+present (rejected — it stays reachable in-process, and a file whose header
+explains why nobody may call it is a trap for the next person). Making the
+script apply-only and dropping `--check` (rejected — a check costs nothing, and
+it is what makes the script usable from `cron`).
+
+**Source**: `update.sh`, `update.bat`, `update.ps1`;
+`secure/management/config/categories.php` (the `system.read` note).
+Behaviour: [README.md](../README.md) *Keeping QuickSite up to date*,
+[COMMAND_API.md](COMMAND_API.md) *Update detection*.
+
+---
+
+### operator.php decides who SEES a notice, and grants nothing (locked 2026-08-15)
+
+**Decision**: `secure/management/config/operator.php` — gitignored, with a
+tracked `.example`, written at first run naming the account that created the
+install — lists the user ids that see operator notices in the panel. Today that
+is one notice: "a QuickSite update is available". It is consumed in
+`layout.php`, which emits the banner container and its script only for a listed
+account. No code path may use the list to authorize an action.
+
+**Reasoning**: `checkForUpdates` is readable by any authenticated user, so
+somebody invited to edit one project's text was being told the installation has
+an update they cannot apply. The notice is addressed to whoever maintains the
+server, and that is not a role QuickSite hands out — it is a fact about who has
+filesystem access to the machine.
+
+Making this a *display preference* rather than a permission is what keeps it
+compatible with the authority model. A file that could name "the administrator
+of this installation" would put back the installation-wide principal beta.10
+removed, and with it the escalation that came with it. A file that only decides
+whether a banner renders cannot. The distinction is load-bearing, and it is
+stated in the file's own header, in `firstRun.php`, and in the probe that guards
+it: a non-operator must still be able to call `checkForUpdates` exactly as
+before.
+
+It matches an existing pattern exactly — `environment.php` and
+`deploy-roots.php` are both gitignored, operator-controlled files the runtime
+reads and no command writes.
+
+Absence reads as **nobody**, never as everybody. An install QuickSite created
+always has the file; absence means either an install predating it (a one-line
+fix from a shell its operator demonstrably has) or an empty list somebody chose.
+Guessing "everybody" for either would hand the engine version to every account
+invited to edit one project's text. Malformed reads as nobody too, and that
+needed a `try`/`catch` rather than `@`: a syntax error in an included file is a
+`ParseError`, not a suppressible warning, and every authenticated admin page
+calls this function — so one typo in a hand-edited file would otherwise take
+down the whole panel, including the pages someone would use to diagnose it.
+
+**Alternatives considered**: gating `checkForUpdates` itself on the list
+(rejected — that is exactly what turns a display preference into an
+authorization tier; and it would not even close the version-disclosure it aims
+at, since `/admin/settings` already emits `quicksiteVersion` to every
+authenticated account by a different path). Showing the notice to every project
+owner (rejected — "owns any project" is the target-independent resolution that
+caused the beta.10 escalation, and a project owner is not necessarily the person
+who maintains the machine). Shipping no notice and relying on the operator
+running `--check` from `cron` (rejected — that is the discovery half of the
+problem, and it is the half a script cannot solve).
+
+**Source**: `secure/management/config/operator.php.example`,
+`secure/src/functions/firstRun.php` (`qs_operator_ids`),
+`secure/admin/templates/layout.php`,
+`public/admin/assets/js/core/update-notice.js`.
+Behaviour: [ADMIN_PANEL.md](ADMIN_PANEL.md) §9.14.
+
+---
+
+### A suggested username is fully random, never derived from the display name (locked 2026-08-15)
+
+**Decision**: the first-run and self-registration forms pre-fill the username
+field with a generated suggestion of the shape `qk_483927` — two lowercase
+letters, an underscore, six digits. It is a suggestion: the field stays
+editable, and a rejected submission hands back whatever was typed rather than a
+fresh value nobody saw.
+
+**Reasoning**: an empty username field asks somebody to invent an identifier at
+the moment they are least equipped to, and what they invent is usually their
+name — which is the one thing it must not be. The username is the **private
+login identifier**: nobody else is shown it, and `qs_user_create` already
+refuses a username equal to the display name for that reason. A suggestion
+derived from the display name would give back the property the field exists to
+have, since anyone who knows "Alice Martin" would think to try `alice-martin`.
+So the generator is told nothing about the person.
+
+The shape is a compromise between unguessable and usable. Nine characters,
+inside the existing 3–32 rule and built only from characters that rule allows,
+so what is offered always validates. Letters-then-digits reads as a name rather
+than a hash, which matters because a human has to read it off one screen and
+type it into another. ~676 million combinations — not a secret (the password is
+the secret), just not derivable from a public name.
+
+**Alternatives considered**: seeding from the display name with a random suffix
+(rejected — it leaks the thing the username is private about, which is the whole
+point). A longer random token (rejected — nobody would retype it, so it would be
+copy-pasted or lost, and this is the value you sign in with). Leaving the field
+empty (the status quo; rejected — it produces name-shaped usernames, which is
+the outcome the privacy rule exists to avoid).
+
+**Source**: `secure/src/functions/AuthManagement.php` (`qs_suggest_username`,
+beside `qs_valid_username` whose rule it satisfies),
+`secure/admin/templates/pages/setup.php`,
+`secure/admin/templates/pages/register.php`.
+
+---
+
+### A private project's assets are Cache-Control private, not no-store (locked 2026-08-15)
+
+**Decision**: `qs_sb_send_file()` emits `Cache-Control: private, max-age=300`
+for an asset belonging to a project that is not public, and keeps
+`public, max-age=300` for one that is. The visibility is stashed by
+`qs_surface_b_gate()`, which has already computed it, rather than being read a
+second time.
+
+**Reasoning**: the function sent `public` to everything. `public` is an
+invitation to *any* cache to store the response, shared proxies and CDNs
+included — so a member-only asset could be held somewhere that might then answer
+a request the gate never admitted. The gate itself was never wrong; the header
+contradicted it.
+
+`private` rather than `no-store` is the substantive half of the decision. A
+member's own browser holding an asset it was entitled to fetch is fine, and it
+is the entire point of the `ETag` / `Last-Modified` validators added alongside
+range support. `no-store` would forbid that too, so every navigation would
+refetch the bytes in full instead of answering `304` — a real and permanent cost
+paid for nothing, because the thing being kept out is the *shared* cache, and
+`private` already keeps it out.
+
+Reading the gate's answer instead of re-deriving it is deliberate: two readings
+of the same question are two things that have to be kept in step. An unset flag
+falls back to `private`, so a future caller that somehow reaches the sender
+without passing the gate fails closed.
+
+**Alternatives considered**: `no-store` for private projects (rejected as above —
+it discards revalidation to prevent something `private` already prevents).
+Leaving it `public` and relying on the gate (rejected — the gate governs
+QuickSite's own responses, and says nothing to an intermediary that has already
+been handed a cacheable copy). Re-reading `members.json` inside the sender
+(rejected — a second answer to a question already answered, and one more file
+read on the hot path of every asset request).
+
+**Source**: `secure/src/functions/surfaceB.php` (`qs_surface_b_gate` stashes,
+`qs_sb_send_file` reads). Behaviour: [ARCHITECTURE.md](ARCHITECTURE.md) §6.
