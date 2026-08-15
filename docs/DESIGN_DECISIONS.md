@@ -7156,3 +7156,128 @@ already answers it).
 **Source**: `secure/src/functions/surfaceB.php` (`qs_sb_send_file`, `qs_sb_etag`,
 `qs_sb_not_modified`, `qs_sb_parse_range`, `qs_sb_emit_range`). Behaviour:
 [ARCHITECTURE.md](ARCHITECTURE.md) §5.1, §6.
+
+### Browser storage is namespaced per project, inside qs.js, always (locked 2026-08-15)
+
+**Decision**: `qs.js` writes and reads every author-declared storage key as
+`qsp_<projectId>_<key>`. The prefix is applied at the storage boundary and
+nowhere else — the declared key stays the logical identity in the registry, in
+the consent category map, in the `data-storage-show` / `data-storage-value` /
+`data-auth-source` attributes, in the verb arguments and on the generated cookie
+policy. The project id is supplied by the server as `window.QS_PROJECT`, emitted
+before `qs.js` on both render paths. It is applied identically on the live site
+and in a built site.
+
+**Reasoning**: browser storage is scoped by **origin**, and a path is not part of
+an origin. Every project served at `/p/<id>/` on one host therefore shares one
+`localStorage`, and a key named `cart` in project A is literally the same slot as
+`cart` in project B — one project silently reading and overwriting another's
+data, including its auth tokens. That is a property of the multi-tenant serving
+model this release exists to make safe, not a matter of tidiness.
+
+⚠ **The boundary holds because authors cannot execute JavaScript.** `script`,
+`noscript`, `style`, `object`, `embed` and `applet` are blacklisted in
+`TagRegistry`; any tag outside the allowlist (`foreignObject`, raw SVG children)
+is dropped by the renderer; `on*` attributes are refused unless they are
+`{{call:…}}` syntax, which compiles to a fixed 26-verb allowlist with arguments
+quoted as string literals; URL attributes are scheme-allowlisted by `UrlPolicy`;
+uploaded and imported SVG is sanitised and additionally served under
+`default-src 'none'; sandbox`; `.html` is in neither the import nor the publish
+extension allowlist; an `iframe` with `srcdoc` has no host to match a sandbox
+rule against, so it always receives the strictest `sandbox=""`; and custom JS
+functions were deleted in beta.3. `qs.js` is consequently the only path from a
+page to storage, which is what makes a prefix inside it a boundary rather than a
+suggestion. **If author-supplied JavaScript is ever reintroduced, this degrades
+from a boundary to a naming convention** and the isolation has to be
+re-established somewhere the author cannot reach — separate origins being the
+obvious answer. (One hole in that premise was found while verifying it and closed
+in the same change; see the entry below.)
+
+**The prefix could not be `qs_`.** `secure/src/functions/reservedStorageKeys.php`
+refuses author keys matching `quicksite_` / `quicksite-` / `qs_` / `qs-` so a
+rendered page cannot read or clear the admin panel's own storage, which shares
+the same origin. Generating `qs_<id>_<key>` would have meant carving an exception
+into the guard that exists to block precisely that shape. `qsp_` keeps the keys
+recognisably QuickSite and clears the reservation with no exception; a probe
+asserts both halves — generated keys pass, and `qs_` / `QS_` / `quicksite-`
+remain blocked.
+
+**The id must come from the server.** It arrives differently per serving mode: at
+`/p/<id>/` it is a URL segment, but on a mapped domain it comes from the vhost's
+`QS_PROJECT` and the path contains no id at all. Deriving it from
+`location.pathname` would give a mapped-domain deployment a different — or
+empty — prefix, so the same site would store under different names in preview and
+in production. `PROJECT_NAME` is bound by `qs_load_project_context()` in both
+modes, so one emit covers both; `window.QS_PROJECT` follows the existing
+`window.QS_*` hydration precedent and is read lazily so script ordering cannot
+matter. When it is absent the runtime falls back to the unnamed namespace
+`qsp__<key>` and warns — never to an unprefixed key, which would silently
+reproduce the bug.
+
+**Alternatives considered**: stripping the prefix at build time, on the grounds
+that a deployed site has its own origin and cannot collide (rejected — two
+behaviours means preview and production store under different key names, which
+is the exact shape of "works in preview, broken in production", and it stops the
+build output being testable against the same expectations; nothing is gained,
+since `/p/<id>/` and a mapped domain are already different origins and storage
+never carried between them). Deriving the id from the URL path (rejected — the
+deployment trap above). Giving each project its own origin or subdomain (a
+deployment-model change far larger than this, and not something a single-host
+install can assume). Prefixing only the keys the registry marks sensitive
+(rejected — the collision is on the key name, so a partial rule leaves exactly
+the collisions that are hardest to notice). Rendering the physical key on the
+generated cookie-policy page (rejected — that page is a snapshot written at
+generate time, so baking the project id into it creates a staleness class; the
+admin storage page shows the physical key live instead, which is where an author
+looks before opening developer tools).
+
+**Source**: `secure/src/runtime/qs.js` (`QS_STORAGE_PREFIX`, `_storageKey`,
+`_storageGet` / `_storageSet` / `_storageRemove`, `QS.storageKey`),
+`secure/src/classes/PageManagement.php`, `secure/src/classes/Page.php`,
+`public/p/index.php`, `public/admin/assets/js/pages/storage.js`. Behaviour:
+[ARCHITECTURE.md](ARCHITECTURE.md) §8, [ADMIN_PANEL.md](ADMIN_PANEL.md) §6, §9.10.
+
+### QS.redirect enforces a scheme allowlist at the sink (locked 2026-08-15)
+
+**Decision**: `QS.redirect` refuses to navigate to any URL whose explicit scheme
+is outside `http` / `https` / `mailto` / `tel`, warning instead. Relative paths,
+anchors and protocol-relative URLs carry no scheme and pass unchanged.
+
+**Reasoning**: found while verifying the no-author-JavaScript premise the storage
+namespace above depends on. `UrlPolicy` guards URL *attributes* — `href`, `src`,
+`action` and the rest — so an anchor carrying a script URL has been neutralised
+since beta.10. But `{{call:redirect:javascript:alert(1)}}` compiled to
+`QS.redirect('javascript:alert(1)')`, which passed the handler validator — it is
+a structurally valid `QS.<verb>(…)` call with a quoted string argument, and that
+validator's job is to prove nothing foreign was injected, not to interpret
+arguments — and the value went straight to `location.href`. That executes in the
+page's own origin. The surface-B CSP cannot prevent it: engine pages emit inline
+handlers and therefore require `script-src 'unsafe-inline'`, which permits script
+URLs too.
+
+The check belongs at the sink rather than at compile time because three callers
+reach it and only one is the verb: the magic-link verbs pass their `returnTo`
+argument to it, and when that is absent they fall back to the `?return=` query
+parameter — a value supplied by whoever wrote the link, not by the author. One
+guard covers all three, and it lives in the file that freezes at the end of this
+release, whereas a compile-time equivalent can still be added by a later one.
+
+Scheme detection mirrors `UrlPolicy::sanitize` rather than being reinvented:
+leading ASCII whitespace and control characters are stripped before the scheme is
+read, and any embedded control character is refused outright, because a browser
+ignores those before resolving the URL — a tab inside the word `javascript` still
+produces a script URL.
+
+**Alternatives considered**: sanitising the argument in `CallTransformer` at
+compile time (a reasonable defence-in-depth addition, but it covers only the verb
+and neither of the two runtime callers, and it lives in a file later releases can
+still reach). Teaching `isValidHandler` to inspect argument values (rejected — it
+validates structure across every verb; per-verb argument semantics would
+duplicate the catalog and still miss the `?return=` path). Doing nothing on the
+grounds that only a project editor can author the call (rejected — an editor of
+one project holds no authority over another project's data, and same-origin
+script execution is exactly what the storage namespace assumes cannot happen).
+
+**Source**: `secure/src/runtime/qs.js` (`QS_ALLOWED_URL_SCHEMES`,
+`_qsSafeNavigationUrl`, `QS.redirect`). Behaviour:
+[ARCHITECTURE.md](ARCHITECTURE.md) §8.

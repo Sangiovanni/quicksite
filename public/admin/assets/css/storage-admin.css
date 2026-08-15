@@ -43,6 +43,24 @@
     color: var(--admin-text);
     margin-right: 4px;
 }
+/* The physical slot qs.js writes — `qsp_<project>_<id>`. Shown so an author
+   searching the browser's developer tools knows what name to look for. */
+.storage-card__physical {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-top: 5px;
+    font-size: 12px;
+    color: var(--admin-text-muted);
+    min-width: 0;
+}
+.storage-card__physical-label { flex-shrink: 0; }
+.storage-card__physical-key {
+    font-family: var(--font-mono, ui-monospace, Menlo, Consolas, monospace);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
 .storage-card__summary {
     margin-top: 6px;
     color: var(--admin-text-muted);

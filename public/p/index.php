@@ -114,6 +114,9 @@ if (isset($_GET['_component']) && isset($_GET['_editor']) && $_GET['_editor'] ==
         </div>
         <?= $componentHtml ?>
     </div>
+    <?php // Storage-namespace handoff (see PageManagement::render) — the component
+          // preview shares the project's origin, so it must share its key prefix. ?>
+    <script>window.QS_PROJECT=<?= json_encode(defined('PROJECT_NAME') ? PROJECT_NAME : 'default', JSON_UNESCAPED_SLASHES) ?>;</script>
     <script src="<?= QS_PUBLIC_BASE ?>scripts/qs.js"></script>
 </body>
 </html><?php

@@ -197,6 +197,19 @@ Public API: `QSEasingPicker.open({ anchor, value, onConfirm, onCancel })` → on
 
 Every localStorage / sessionStorage key is declared as a constant in `js/core/storage-keys.js`.
 
+The panel and every project on the install share **one browser-storage origin** —
+a path is not part of an origin, so `/admin/` and `/p/<id>/` address the same
+store. Two rules keep the three parties apart in it:
+
+- **The panel owns `quicksite_` / `quicksite-` / `qs_` / `qs-`.** A site key
+  matching any of those is refused, in the picker for UX and in
+  `secure/src/functions/reservedStorageKeys.php` for real, so a rendered page
+  cannot read or clear panel state.
+- **A site's keys are namespaced by project.** `qs.js` writes every author key as
+  `qsp_<projectId>_<key>`, so two projects on one host cannot collide on an
+  identically-named key (§9.10). `qsp_` clears the reservation above rather than
+  needing an exception carved into it.
+
 Authentication uses **no browser storage**: the session lives in an HttpOnly cookie the page cannot read, and the per-session token is page-embedded and held in memory (`api.js`). (`api.js` still clears the retired `quicksite_admin_token` / `quicksite_admin_remember` keys on logout as one-time upgrade hygiene.)
 
 Two other cookies exist, both HttpOnly and neither readable by page scripts. `QSSESSID` carries the session. `qs_form_token` carries the CSRF token of the **unauthenticated** auth forms — login, register and first-run run before any session exists, so they cannot use the per-session token every other page embeds; the server plants this cookie and the same value as a hidden field, and accepts a POST only when the two match. It is scoped to the admin path and `SameSite=Strict`, so a cross-site POST carries neither half. Signing out is likewise a **POST** carrying the per-session token, not a link: the header renders it as a form, and a bare `GET /admin/logout` ends nothing.
@@ -1281,11 +1294,17 @@ response into browser storage — and back out on logout.
 
 | Verb | Args | What it does |
 |---|---|---|
-| `saveToken` | `storage` (`localStorage`/`sessionStorage`), `key` (storage key name), `path` (dot-notation into `QS._lastFetchResult`) | Reads the value, writes to `window[storage].setItem(key, value)`, fires `qs:auth:saved` on `document`. |
-| `clearToken` | `storage`, `key` | Removes from storage, fires `qs:auth:cleared`. |
+| `saveToken` | `storage` (`localStorage`/`sessionStorage`), `key` (storage key name), `path` (dot-notation into `QS._lastFetchResult`) | Reads the value, writes it to the project-namespaced slot for `key`, fires `qs:auth:saved` on `document`. |
+| `clearToken` | `storage`, `key` | Removes that slot, fires `qs:auth:cleared`. |
 
-Events carry `detail: { storage, key, tokenKey, value? }`. UI components
-that change with login state can listen on `qs:auth:saved` /
+`key` is always the **declared key name**, never the physical slot: `qs.js`
+prefixes it with the project id (`qsp_<projectId>_<key>`) so projects sharing a
+host cannot read each other's storage. `QS.storageKey(name)` returns the physical
+slot if you need it for debugging. See §6 and §9.10.
+
+Events carry `detail: { storage, key, tokenKey, value?, storageKey }` — `key` and
+`tokenKey` are the declared name a listener matches on, `storageKey` the physical
+slot. UI components that change with login state can listen on `qs:auth:saved` /
 `qs:auth:cleared` and re-render.
 
 Forgiving by design: invalid storage type, missing fetch result,
@@ -1422,6 +1441,9 @@ reserves for its own markers and strips from user params):
 
 `data-auth-show` is auth sugar over "is the token present"; the
 `data-storage-*` pair is the general form (any key, auth or not).
+The `key` half of every source above is the **declared key name**, resolved
+against the project's own namespace exactly as the verbs resolve it (§6) — the
+attributes and the verbs therefore always address the same slot.
 **Gotcha**: the show/hide elements must be **siblings**, not nested — a
 hidden parent hides its children regardless of their own state.
 
@@ -2518,6 +2540,19 @@ group.
 `listStorageItems` / `addStorageItem` / `editStorageItem` / `deleteStorageItem`.
 Storage-referencing fields elsewhere (e.g. `saveToken` / `QS.store` `key` args)
 use the `storageKey` picker, which selects a declared key or creates one inline.
+
+**The declared id is the name you use; `qsp_<projectId>_<id>` is the name the
+browser holds.** Every project served on one host shares a single storage origin,
+so `qs.js` prefixes each key with the project id on the way in and out — two
+projects can both declare `cart` without touching each other's data. The prefix
+applies on the live site and in a built site alike, so the two never disagree
+about where a value lives. Everything you author names the **declared id**: the
+registry, the `data-storage-show` / `data-storage-value` / `data-auth-source`
+attributes, the verb arguments, the consent categories and the policy page. The
+translation happens once, inside `qs.js`, at the point of the read or write. Each
+`localStorage` / `sessionStorage` card shows its `stored as` line so you know what
+to search for in the browser's developer tools; `cookie`-scope entries have none,
+because `qs.js` writes no cookies for them.
 
 **Descriptions + language.** Descriptions are authored in one registry-level
 **description language** — a selector at the top of the page, defaulting to the

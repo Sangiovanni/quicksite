@@ -108,6 +108,21 @@ class Page {
     if (file_exists($routesMetaPath)): ?>
     <script src="/<?= PUBLIC_FOLDER_SPACE !== '' ? PUBLIC_FOLDER_SPACE . '/' : '' ?>scripts/qs-route-schema.js"></script>
     <?php endif; ?>
+    <?php
+    // Storage-namespace handoff — mirrors PageManagement::render(). A built page
+    // is still served by PHP, so it emits the same handoff from the same
+    // PROJECT_NAME. The prefix is NOT stripped at build time: preview and
+    // production must agree on key names, and /p/<id>/ and a mapped domain are
+    // different origins anyway, so storage never carried between them.
+    //
+    // ⚠ A build has no entry point at present (build.php's index.php/init.php
+    // copy reads paths no project has), so nothing defines PROJECT_NAME in a
+    // built site and $projectKey falls back to 'default' — which also affects
+    // the theme key above. Pre-existing and S3's to fix; recorded in
+    // NOTES/planning/BETA11_S2_QUICKSITE_DEPLOY.md §6 with a tripwire in
+    // NOTES/tests/beta11/s24_build_probe.php.
+    ?>
+    <script>window.QS_PROJECT=<?= json_encode($projectKey, JSON_UNESCAPED_SLASHES) ?>;</script>
     <script src="/<?= PUBLIC_FOLDER_SPACE !== '' ? PUBLIC_FOLDER_SPACE . '/' : '' ?>scripts/qs.js"></script>
     <?php
     // Inject theme toggle behaviour (mirrors PageManagement implementation)

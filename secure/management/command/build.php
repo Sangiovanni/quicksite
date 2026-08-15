@@ -325,9 +325,29 @@ foreach ($publicFiles as $file) {
             
             // Replace PROJECT_PATH block: a production build pins its own project path
             // All project files are at SECURE_FOLDER_PATH root (config.php, routes.php, templates/, translate/)
+            //
+            // PROJECT_NAME pins the REAL project id, not a literal. It used to be
+            // the fixed string 'production', which made every built site claim
+            // the same identity — and PROJECT_NAME is what names this site's
+            // browser-storage namespace (`qsp_<PROJECT_NAME>_<key>`, see
+            // Page::render) and its theme key. A fixed literal meant the same
+            // project stored under one name at /p/<id>/ and another once built:
+            // precisely the "works in preview, broken in production" split the
+            // always-prefix rule exists to prevent. It also put two built sites
+            // deployed under one origin back in a shared namespace.
+            //
+            // The id is F1-validated (letters, digits, underscore, hyphen), so it
+            // carries no quote to break out of the literal and no `$` or `\` for
+            // preg_replace to read as a backreference; escaped anyway, because a
+            // replacement string is the wrong place to rely on a caller's
+            // validation holding.
+            $buildProjectName = str_replace(
+                ['\\', '$'], ['\\\\', '\\$'],
+                var_export((string) PROJECT_NAME, true)
+            );
             $content = preg_replace(
                 "/if\s*\(\s*!defined\('PROJECT_PATH'\)\s*\)\s*\{.*?\n\}/s",
-                "if (!defined('PROJECT_PATH')) {\n    define('PROJECT_PATH', SECURE_FOLDER_PATH);\n    define('PROJECT_NAME', 'production');\n}",
+                "if (!defined('PROJECT_PATH')) {\n    define('PROJECT_PATH', SECURE_FOLDER_PATH);\n    define('PROJECT_NAME', " . $buildProjectName . ");\n}",
                 $content
             );
             

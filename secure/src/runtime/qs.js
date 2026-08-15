@@ -269,13 +269,48 @@
     };
 
     /**
+     * Schemes a navigation target may name explicitly. Mirrors the server-side
+     * UrlPolicy::ALLOWED_SCHEMES, which guards every URL ATTRIBUTE (href, src,
+     * action, …) on the render and compile paths. `location.href = "javascript:…"`
+     * executes in the page's own origin, and the surface-B CSP cannot stop it
+     * (engine pages need script-src 'unsafe-inline' for their own inline
+     * handlers, and that permits javascript: URIs too) — so the check has to be
+     * here, at the sink.
+     *
+     * Three callers reach it and all three carry values the page did not choose:
+     * the {{call:redirect:…}} verb, the magic-link verbs' returnTo argument, and
+     * the ?return= query parameter those verbs fall back to — the last of which
+     * is supplied by whoever wrote the link, not by the author.
+     */
+    var QS_ALLOWED_URL_SCHEMES = ['http', 'https', 'mailto', 'tel'];
+
+    /**
+     * Is this navigation target safe to assign to location.href? Relative paths,
+     * anchors and protocol-relative URLs carry no scheme and pass; an explicit
+     * scheme must be in the allowlist. Leading ASCII whitespace/control is
+     * stripped before the test and any embedded control character is refused,
+     * because a browser ignores those before reading the scheme
+     * ("java\tscript:…" is a javascript: URL to a browser).
+     */
+    function _qsSafeNavigationUrl(url) {
+        var probe = String(url).replace(/^[\x00-\x20]+/, '');
+        if (/[\x00-\x1F\x7F]/.test(probe)) return false;
+        var m = /^([a-z][a-z0-9+.\-]*):/i.exec(probe);
+        if (!m) return true;                       // relative / anchor / //host
+        return QS_ALLOWED_URL_SCHEMES.indexOf(m[1].toLowerCase()) !== -1;
+    }
+
+    /**
      * Navigate to URL
      * @param {string} url - URL to navigate to
      */
     QS.redirect = function(url) {
-        if (url) {
-            window.location.href = url;
+        if (!url) return;
+        if (!_qsSafeNavigationUrl(url)) {
+            console.warn('[QS] redirect: refused navigation to a disallowed scheme:', url);
+            return;
         }
+        window.location.href = url;
     };
 
     // ---- QS.filter: highlight helpers (DOM-walk, XSS-safe) ----
@@ -934,6 +969,101 @@
         }
     }
     
+    // =========================================================================
+    // PROJECT STORAGE NAMESPACE
+    // =========================================================================
+    // Browser storage is scoped by ORIGIN, and a path is not part of an origin.
+    // Every project served at /p/<id>/ on one host therefore shares ONE
+    // localStorage: a key named "cart" in project A is literally the same slot
+    // as "cart" in project B. Every read, write and delete below goes through
+    // _storageKey(), which prefixes the author's key with `qsp_<projectId>_`,
+    // so one project has no code path by which to address another's data.
+    //
+    // WHY THIS IS A BOUNDARY AND NOT JUST TIDINESS: authors cannot run their own
+    // JavaScript (<script> is blacklisted, on* handlers only accept the
+    // {{call:...}} verb syntax, SVG is sanitised, no .html may enter a project),
+    // so qs.js is the only path from a page to storage. That premise is load-
+    // bearing and has to be DEFENDED, not assumed: QS.redirect's scheme guard
+    // exists because `{{call:redirect:javascript:…}}` was one way around it. If
+    // author-supplied JavaScript is ever reintroduced deliberately, this stops
+    // being a boundary and becomes a naming convention.
+    //
+    // THE PREFIX IS NOT `qs_`. reservedStorageKeys.php refuses author keys
+    // matching quicksite_ / quicksite- / qs_ / qs- precisely so a page cannot
+    // read or clear the ADMIN PANEL's own keys; generating `qs_<id>_<key>` would
+    // mean carving an exception into the guard that exists to block that shape.
+    //
+    // THE ID COMES FROM THE SERVER, NEVER FROM THE PATH. At /p/<id>/ the id is a
+    // URL segment; on a MAPPED DOMAIN it comes from the vhost's QS_PROJECT and
+    // the path contains no id at all. Deriving it from location.pathname would
+    // give those two modes different prefixes, so the same site would store
+    // under different names in preview and in production. window.QS_PROJECT is
+    // emitted by the page renderer in both modes, and read lazily here so the
+    // ordering of the hydration tag against this file cannot matter.
+    //
+    // ALWAYS PREFIXED — live render and built output alike. Two behaviours would
+    // mean preview and production disagree on key names, which is the exact
+    // shape of "works in preview, broken in production".
+
+    const QS_STORAGE_PREFIX = 'qsp_';
+    let _qsProjectWarned = false;
+
+    /** The project id this page belongs to, per the server. '' when unknown. */
+    function _qsProjectId() {
+        const id = window.QS_PROJECT;
+        if (typeof id === 'string' && id !== '') return id;
+        if (!_qsProjectWarned) {
+            _qsProjectWarned = true;
+            console.warn('[QS] window.QS_PROJECT is not set — browser-storage keys ' +
+                'fall back to the unnamed "' + QS_STORAGE_PREFIX + '_" namespace, ' +
+                'which every project without it shares. The page renderer emits it; ' +
+                'a page that lacks it predates the storage-namespace change.');
+        }
+        return '';
+    }
+
+    /**
+     * The physical storage key for an author-declared key name. The author key
+     * stays the logical identity everywhere else (the registry, the consent
+     * category map, the data-storage-* attributes, the admin pickers); this is
+     * the single point where it becomes a slot in the browser's store.
+     * @param {string} key Author-declared key name
+     * @returns {string}
+     */
+    function _storageKey(key) {
+        return QS_STORAGE_PREFIX + _qsProjectId() + '_' + key;
+    }
+    QS.storageKey = _storageKey;
+
+    /** Read an author key from `storage`. null when absent or unreadable. */
+    function _storageGet(storage, key) {
+        try {
+            return window[storage].getItem(_storageKey(key));
+        } catch (e) {
+            return null;   // storage disabled (private mode, blocked cookies)
+        }
+    }
+
+    /** Write an author key to `storage`. false when the write failed. */
+    function _storageSet(storage, key, value) {
+        try {
+            window[storage].setItem(_storageKey(key), value);
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    /** Delete an author key from `storage`. false when the delete failed. */
+    function _storageRemove(storage, key) {
+        try {
+            window[storage].removeItem(_storageKey(key));
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
     /**
      * Get token value from storage
      * @param {string} source - "localStorage:key" or "sessionStorage:key"
@@ -943,15 +1073,13 @@
         if (!source || !source.includes(':')) {
             return null;
         }
-        
+
         const [storageType, key] = source.split(':');
-        
-        if (storageType === 'localStorage') {
-            return localStorage.getItem(key);
-        } else if (storageType === 'sessionStorage') {
-            return sessionStorage.getItem(key);
+
+        if (storageType === 'localStorage' || storageType === 'sessionStorage') {
+            return _storageGet(storageType, key);
         }
-        
+
         return null;
     }
 
@@ -1184,14 +1312,19 @@
      */
     function setStoredToken(storage, key, value) {
         if (storage !== 'localStorage' && storage !== 'sessionStorage') return false;
+        // Consent is checked on the AUTHOR key: window.QS_CONSENT.categories is
+        // keyed by what the storage registry declares, so the classification and
+        // the gate have to speak the same names. The prefix is applied one line
+        // later, at the storage boundary and nowhere else.
         if (!_consentAllowsWrite(key)) return true;   // consent-gated: skip, not an error
-        try {
-            window[storage].setItem(key, String(value));
-        } catch (e) {
+        if (!_storageSet(storage, key, String(value))) {
             return false;
         }
         document.dispatchEvent(new CustomEvent('qs:auth:saved', {
-            detail: { storage: storage, key: key, tokenKey: key, value: String(value) }
+            detail: {
+                storage: storage, key: key, tokenKey: key, value: String(value),
+                storageKey: _storageKey(key)   // the physical slot, for debugging
+            }
         }));
         return true;
     }
@@ -1875,14 +2008,15 @@
             return;
         }
         if (!_consentAllowsWrite(key)) return;   // consent-gated: skip the write + event
-        try {
-            window[storage].setItem(key, String(value));
-        } catch (e) {
+        if (!_storageSet(storage, key, String(value))) {
             console.warn('[QS] store: storage write failed');
             return;
         }
         document.dispatchEvent(new CustomEvent('qs:storage:changed', {
-            detail: { storage: storage, key: key, value: String(value) }
+            detail: {
+                storage: storage, key: key, value: String(value),
+                storageKey: _storageKey(key)
+            }
         }));
     };
 
@@ -1902,14 +2036,15 @@
             console.warn('[QS] clearToken: key is required');
             return;
         }
-        try {
-            window[storage].removeItem(key);
-        } catch (e) {
-            console.warn('[QS] clearToken: storage write failed:', e);
+        if (!_storageRemove(storage, key)) {
+            console.warn('[QS] clearToken: storage write failed');
             return;
         }
         document.dispatchEvent(new CustomEvent('qs:auth:cleared', {
-            detail: { storage: storage, key: key, tokenKey: key }
+            detail: {
+                storage: storage, key: key, tokenKey: key,
+                storageKey: _storageKey(key)
+            }
         }));
     };
 
@@ -2509,7 +2644,10 @@
                     return (pv === undefined || pv === null || pv === '') ? fallback : pv;
                 }
                 if (prefix === 'localStorage' || prefix === 'sessionStorage') {
-                    var sv = window[prefix].getItem(key);
+                    // Same project-prefixed namespace the storage verbs write to
+                    // (_storageKey) — a store seeded from "localStorage:authToken"
+                    // must read the slot QS.saveToken filled, not a bare key.
+                    var sv = _storageGet(prefix, key);
                     return (sv === null || sv === '') ? fallback : sv;
                 }
             }

@@ -110,6 +110,40 @@
         return _el('span', { class: 'storage-pill storage-pill--' + kind, text: text });
     }
 
+    // The prefix qs.js writes browser-storage keys under. Kept in step with
+    // QS_STORAGE_PREFIX + _storageKey() in secure/src/runtime/qs.js: the
+    // declared id is the logical identity everywhere in this panel, and this is
+    // the only place the physical slot name is shown — so an author looking in
+    // devtools knows what to search for.
+    var PHYSICAL_KEY_PREFIX = 'qsp_';
+
+    /** The slot qs.js actually writes, or null for scopes it does not write. */
+    function _physicalKey(item) {
+        if (item.scope !== 'localStorage' && item.scope !== 'sessionStorage') {
+            return null;   // cookie items are declared here but written elsewhere
+        }
+        var project = (window.QUICKSITE_CONFIG && window.QUICKSITE_CONFIG.currentProject) || '';
+        return PHYSICAL_KEY_PREFIX + project + '_' + item.id;
+    }
+
+    /** "stored as qsp_<project>_<id>" line, or null when it does not apply. */
+    function _renderPhysicalKey(item) {
+        var physical = _physicalKey(item);
+        if (physical === null) return null;
+        var line = _el('div', { class: 'storage-card__physical' });
+        line.appendChild(_el('span', {
+            class: 'storage-card__physical-label', text: 'stored as',
+        }));
+        line.appendChild(_el('code', {
+            class: 'storage-card__physical-key',
+            text: physical,
+            title: 'Every project on this host shares one browser-storage origin, '
+                 + 'so qs.js prefixes each key with the project id. This is the name '
+                 + 'you will find in the browser’s developer tools.',
+        }));
+        return line;
+    }
+
     function _descOf(item) {
         var d = item.description;
         if (!d || typeof d !== 'object') return '';
@@ -145,6 +179,9 @@
             pills.appendChild(_renderPill('keeps: ' + item.retention, 'retention'));
         }
         main.appendChild(pills);
+
+        var physical = _renderPhysicalKey(item);
+        if (physical) main.appendChild(physical);
 
         var desc = _descOf(item);
         main.appendChild(_el('div', {
