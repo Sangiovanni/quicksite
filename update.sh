@@ -146,20 +146,40 @@ fi
 # ==========================================================
 # curl or wget, whichever exists. No PHP is required: this must work on a box
 # where the CLI php is absent or is a different build from the FPM one.
+# Writes the response body to stdout and sets HTTP_STATUS as a side effect.
+#
+# ⚠ CALL IT WITH A REDIRECT, NOT `$(…)`. A command substitution runs in a
+# subshell, so HTTP_STATUS set inside would be discarded the moment it returned
+# — the classic version of this function reports the status and the caller never
+# sees it.
+#
+# `-f` is deliberately NOT used. It makes curl exit 22 and print nothing on an
+# HTTP error, which throws away the very thing needed to tell "no network" from
+# "reached GitHub, got a 404". Failures are judged on HTTP_STATUS instead.
+HTTP_STATUS=''
 http_get() {
     url="$1"
+    HTTP_STATUS=''
     # A local fixture, for the probe. Real use never takes this branch.
     case "$url" in
-        file://*) cat "${url#file://}" 2>/dev/null; return $? ;;
+        file://*) HTTP_STATUS=200; cat "${url#file://}" 2>/dev/null; return $? ;;
     esac
     if command -v curl >/dev/null 2>&1; then
-        curl -fsSL --connect-timeout 15 --max-time 120 \
+        # Body, then the status on a final line. Split rather than a second
+        # request: a HEAD would be a different request and could be answered
+        # differently (rate limits are counted per request).
+        _raw=$(curl -sSL --connect-timeout 15 --max-time 120 \
              -H 'Accept: application/vnd.github.v3+json' \
              -H 'User-Agent: QuickSite-Updater/1.0' \
-             "$url" 2>/dev/null
-        return $?
+             -w '\n%{http_code}' "$url" 2>/dev/null)
+        _rc=$?
+        HTTP_STATUS=$(printf '%s\n' "$_raw" | sed -n '$p')
+        printf '%s\n' "$_raw" | sed '$d'
+        return $_rc
     fi
     if command -v wget >/dev/null 2>&1; then
+        # wget has no comparable status hook worth the complexity; the caller
+        # falls back to the older, vaguer message when HTTP_STATUS is empty.
         wget -qO- --timeout=120 \
              --header='Accept: application/vnd.github.v3+json' \
              --header='User-Agent: QuickSite-Updater/1.0' \
@@ -190,23 +210,62 @@ if [ "$QS_UPDATE_API" != "$QS_UPDATE_DEFAULT_API" ]; then
 fi
 say ""
 
-RELEASE_JSON="$(http_get "$QS_UPDATE_API")"
+# Redirect, not $(…) — see the note on http_get.
+BODY_FILE="$(mktemp 2>/dev/null || echo "${TMPDIR:-/tmp}/qs_update_body.$$")"
+http_get "$QS_UPDATE_API" > "$BODY_FILE" 2>/dev/null
 HTTP_RC=$?
 
 if [ $HTTP_RC -eq 127 ]; then
+    rm -f "$BODY_FILE"
     fail "Neither curl nor wget is installed — cannot reach GitHub."
     exit $EXIT_ERROR
 fi
 
-LATEST_TAG=""
-if [ -n "$RELEASE_JSON" ]; then
-    LATEST_TAG="$(printf '%s' "$RELEASE_JSON" | extract_tag)"
-fi
+LATEST_TAG="$(extract_tag < "$BODY_FILE")"
+rm -f "$BODY_FILE"
 
 if [ -z "$LATEST_TAG" ]; then
-    fail "Could not read the latest release from GitHub."
-    say  "    ${DIM}Offline, rate-limited, or the repository has no releases yet.${NC}"
-    say  "    ${DIM}Nothing has been changed.${NC}"
+    # SAY WHICH. These four need different things from the operator, and a
+    # single "could not read the latest release" told them apart from nothing.
+    # The distinction is free — the status is already in hand — and the wrong
+    # guess costs real time: somebody whose firewall blocks outbound HTTPS and
+    # somebody whose repository simply has no release yet would otherwise read
+    # the same sentence and go looking in the same wrong place.
+    case "${HTTP_STATUS:-}" in
+        404)
+            fail "GitHub has no published release for this repository."
+            say  "    ${DIM}GitHub answered (404). Either the repository is private to this${NC}"
+            say  "    ${DIM}machine, or no release has been published yet. Outbound access${NC}"
+            say  "    ${DIM}is working, so there is nothing to fix here.${NC}"
+            ;;
+        403|429)
+            fail "GitHub refused the request (HTTP $HTTP_STATUS) — most likely rate-limited."
+            say  "    ${DIM}Unauthenticated requests are capped per address, per hour.${NC}"
+            say  "    ${DIM}Wait and run this again; nothing has been changed.${NC}"
+            ;;
+        2??)
+            fail "GitHub answered, but the response carried no release tag."
+            say  "    ${DIM}HTTP $HTTP_STATUS with no 'tag_name'. If this persists, the API${NC}"
+            say  "    ${DIM}shape may have changed — report it rather than working around it.${NC}"
+            ;;
+        ''|000)
+            # ⚠ `000` IS THE NO-RESPONSE CASE, not a weird status. curl prints
+            # that for %{http_code} when it never completed an HTTP exchange at
+            # all — DNS failure, refused connection, TLS failure, timeout. An
+            # empty value is the wget path, which reports no status. Both mean
+            # the same thing to the operator, so they share a branch. (Matching
+            # only '' sent every genuinely-offline server to the vague default,
+            # which is the exact case this whole block exists to name.)
+            fail "Could not reach GitHub."
+            say  "    ${DIM}No HTTP response at all: no outbound network, DNS failure, or a${NC}"
+            say  "    ${DIM}firewall blocking api.github.com. The admin panel's update notice${NC}"
+            say  "    ${DIM}will be silent for the same reason.${NC}"
+            ;;
+        *)
+            fail "Could not read the latest release from GitHub (HTTP $HTTP_STATUS)."
+            say  "    ${DIM}Nothing has been changed.${NC}"
+            ;;
+    esac
     exit $EXIT_ERROR
 fi
 

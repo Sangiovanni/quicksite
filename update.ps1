@@ -84,17 +84,34 @@ function Invoke-Native {
     }
 }
 
+# Returns the body, and reports the HTTP status through $script:HttpStatus so the
+# caller can tell "no network" from "reached GitHub, got a 404" — the same
+# distinction update.sh makes, and for the same reason: those two need different
+# things from the operator.
+$script:HttpStatus = ''
 function Get-Text($Url) {
+    $script:HttpStatus = ''
     if ($Url -like 'file://*') {
         # A local fixture, for the probe. Real use never takes this branch.
+        $script:HttpStatus = 200
         return (Get-Content ($Url -replace '^file://', '') -Raw)
     }
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    $r = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 60 -Headers @{
-        'User-Agent' = 'QuickSite-Updater/1.0'
-        'Accept'     = 'application/vnd.github.v3+json'
+    try {
+        $r = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 60 -Headers @{
+            'User-Agent' = 'QuickSite-Updater/1.0'
+            'Accept'     = 'application/vnd.github.v3+json'
+        }
+        $script:HttpStatus = [int]$r.StatusCode
+        return $r.Content
+    } catch [Net.WebException] {
+        # An HTTP error still carries a response; a transport failure does not,
+        # and that absence is exactly what distinguishes the two.
+        if ($_.Exception.Response) {
+            $script:HttpStatus = [int]$_.Exception.Response.StatusCode
+        }
+        return ''
     }
-    return $r.Content
 }
 
 # The secure folder, which setup.bat may have renamed or nested.
@@ -165,9 +182,36 @@ try {
 }
 
 if (-not $LatestTag) {
-    Write-Bad 'Could not read the latest release.'
-    Write-Dim 'Offline, rate-limited, or the repository has no releases yet.'
-    Write-Dim 'Nothing has been changed.'
+    # SAY WHICH — mirrors update.sh. These need different things from the
+    # operator, and one message told them apart from nothing.
+    switch -Regex ([string]$script:HttpStatus) {
+        '^404$' {
+            Write-Bad 'GitHub has no published release for this repository.'
+            Write-Dim 'GitHub answered (404). Either the repository is private to this'
+            Write-Dim 'machine, or no release has been published yet. Outbound access'
+            Write-Dim 'is working, so there is nothing to fix here.'
+        }
+        '^(403|429)$' {
+            Write-Bad "GitHub refused the request (HTTP $script:HttpStatus) - most likely rate-limited."
+            Write-Dim 'Unauthenticated requests are capped per address, per hour.'
+            Write-Dim 'Wait and run this again; nothing has been changed.'
+        }
+        '^2\d\d$' {
+            Write-Bad 'GitHub answered, but the response carried no release tag.'
+            Write-Dim "HTTP $script:HttpStatus with no 'tag_name'. If this persists, the API"
+            Write-Dim 'shape may have changed - report it rather than working around it.'
+        }
+        '^$' {
+            Write-Bad 'Could not reach GitHub.'
+            Write-Dim 'No HTTP response at all: no outbound network, DNS failure, or a'
+            Write-Dim 'firewall blocking api.github.com. The admin panel update notice'
+            Write-Dim 'will be silent for the same reason.'
+        }
+        default {
+            Write-Bad "Could not read the latest release (HTTP $script:HttpStatus)."
+            Write-Dim 'Nothing has been changed.'
+        }
+    }
     Write-Host ''
     exit 1
 }
