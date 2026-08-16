@@ -7,6 +7,10 @@ require_once __DIR__ . '/Translator.php';
 require_once __DIR__ . '/../functions/qsVerbCatalog.php';
 // Beta.8 A1 — paramRoutePathToFs for sanitising ':slug' → '__slug' in file lookup
 require_once __DIR__ . '/../functions/routeHelpers.php';
+// S2.8 — qs_render_public_base(): the base relative URLs compose against, in
+// EVERY context this class renders in (surface B, and /management/ fragments).
+// Requiring this file defines no constants outside a surface-B request.
+require_once __DIR__ . '/../functions/renderBootstrap.php';
 
 /**
  * JsonToHtmlRenderer
@@ -29,7 +33,15 @@ class JsonToHtmlRenderer {
     private $translator;
     private $componentCache = [];
     private $componentsPath;
-    
+
+    /**
+     * The base every relative URL this render emits composes against — resolved
+     * ONCE, at construction, from the request context (S2.8). Read by
+     * processUrl(), the `{{__base_url}}` placeholder and the 404 branch of the
+     * language switcher, so those three can no longer disagree.
+     */
+    private $publicBase = '';
+
     // Editor mode state
     private $editorMode = false;
     private $currentStructure = '';      // menu, footer, page-home
@@ -46,7 +58,24 @@ class JsonToHtmlRenderer {
         $this->translator = $translator;
         $this->context = $context;
         $this->componentsPath = PROJECT_PATH . '/templates/model/json/components/';
-        
+
+        // S2.8 — where THIS project is served, resolved for whichever request
+        // is doing the rendering. A surface-B render and a /management/
+        // fragment render of the same node now compose against one value.
+        $this->publicBase = qs_render_public_base();
+
+        // S2.8 — and against one LANGUAGE. processUrl() prefixes non-asset URLs
+        // with the current language on a multilingual project, so a render that
+        // arrives with no language emits `/about` where the served page emits
+        // `/en/about` — the same insert-vs-reload divergence wearing a second
+        // hat. The six fragment commands already compute this value for the
+        // Translator; defaulting it here means they cannot forget to pass it,
+        // and a caller that supplies one (every page template does) is
+        // untouched.
+        if (empty($this->context['lang']) && defined('CONFIG')) {
+            $this->context['lang'] = CONFIG['LANGUAGE_DEFAULT'] ?? 'en';
+        }
+
         // Auto-detect editor mode from query parameter if not explicitly set
         // This ensures ALL renderer instances are in editor mode when ?_editor=1 is present
         if (isset($context['editorMode'])) {
@@ -1058,10 +1087,10 @@ class JsonToHtmlRenderer {
         // Check if current page is valid (not 404)
         if ($trimParams->page() === '404') {
             // Invalid route - redirect to home in target language
-            // C15 15.4 (R1): compose against the render-scoped public base;
-            // BASE_URL fallback keeps non-render callers unchanged.
-            $url = defined('QS_PUBLIC_BASE') ? QS_PUBLIC_BASE
-                : (defined('BASE_URL') ? BASE_URL : '');
+            // C15 15.4 (R1): compose against the render-scoped public base.
+            // S2.8: that base is now resolved for every render context, not
+            // only surface B (see the constructor).
+            $url = $this->publicBase;
             if (defined('MULTILINGUAL_SUPPORT') && MULTILINGUAL_SUPPORT) {
                 $url .= $targetLang . '/';
             }
@@ -1103,8 +1132,7 @@ class JsonToHtmlRenderer {
         return [
             '__current_page' => $currentPage,
             '__lang' => $this->context['lang'] ?? (defined('LANGUAGE_DEFAULT') ? LANGUAGE_DEFAULT : 'en'),
-            '__base_url' => defined('QS_PUBLIC_BASE') ? QS_PUBLIC_BASE
-                : (defined('BASE_URL') ? BASE_URL : ''),
+            '__base_url' => $this->publicBase,
             '__public_folder' => defined('PUBLIC_FOLDER_NAME') ? PUBLIC_FOLDER_NAME : 'public',
             '__current_route' => $this->context['page'] ?? 'home',
             '__space' => $space,
@@ -1134,12 +1162,12 @@ class JsonToHtmlRenderer {
             return $url;
         }
         
-        // It's a relative URL - build the full URL. C15 15.4 (R1): the render
-        // path supplies QS_PUBLIC_BASE (root-relative path form, one trailing
-        // slash), so links stay host- and scheme-agnostic; the BASE_URL
-        // fallback keeps non-render callers exactly as before.
-        $fullUrl = defined('QS_PUBLIC_BASE') ? QS_PUBLIC_BASE
-            : (defined('BASE_URL') ? BASE_URL : '');
+        // It's a relative URL - build the full URL. C15 15.4 (R1): the base is
+        // the root-relative path form with exactly one trailing slash, so links
+        // stay host- and scheme-agnostic. S2.8: resolved at construction for
+        // whichever request is rendering, so an editor fragment and the served
+        // page compose against the same value instead of the install root.
+        $fullUrl = $this->publicBase;
         
         // Add language prefix if multilingual and not a static asset
         if (defined('MULTILINGUAL_SUPPORT') && MULTILINGUAL_SUPPORT && !empty($this->context['lang'])) {

@@ -136,6 +136,38 @@ if (!function_exists('qs_resolve_public_base')) {
     }
 }
 
+if (!function_exists('qs_render_public_base')) {
+    /**
+     * The base a RENDER composes its relative URLs against — answerable from
+     * ANY request context, not only a surface-B one (S2.8).
+     *
+     * The constants below exist only under a surface-B render. That was fine
+     * while rendering only ever happened there, and stopped being fine when the
+     * editor started asking `/management/` to render a FRAGMENT of a page: the
+     * fallback those readers used was BASE_URL, which on the management path is
+     * where the INSTALL is, not where the PROJECT is served. An inserted
+     * `/assets/videos/intro.mp4` therefore came back as
+     * `http://host/assets/videos/intro.mp4` — a location that serves nothing —
+     * while reloading the preview produced `/p/<id>/assets/videos/intro.mp4`.
+     *
+     * One function, so the two contexts cannot answer differently:
+     *   - surface-B render → the constant already resolved for this request;
+     *   - anywhere else    → the SAME resolution chain, whose management-path
+     *     tier 2 composes the install base with this request's bound project.
+     *
+     * The env tier is honoured in both, which is what makes a mapped domain
+     * agree: `QS_PUBLIC_BASE_URL` is declared per-VHOST, so the `/management/`
+     * call and the page render it is previewing read one identical value.
+     */
+    function qs_render_public_base(): string
+    {
+        if (defined('QS_PUBLIC_BASE')) {
+            return QS_PUBLIC_BASE;
+        }
+        return qs_resolve_public_base()['path'];
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Render-path constants (defined ONLY under a surface-B render, where this
 // file is loaded post-project-context by public/p/index.php; a management

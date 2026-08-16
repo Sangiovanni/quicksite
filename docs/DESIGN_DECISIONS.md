@@ -7625,3 +7625,65 @@ is when it is least useful). Persisting the prefixed key (rejected as above).
 `secure/src/functions/storageHelpers.php` (`qs_storage_physical_key`),
 `secure/src/functions/consentLayerHelpers.php`. Behaviour:
 [ADMIN_PANEL.md](ADMIN_PANEL.md) §6, §9.10.
+
+---
+
+### An editor fragment composes URLs against the project, not the installation (locked 2026-08-16)
+
+**Decision**: the renderer resolves the project's public base itself, once per
+instance, through the same resolution the served page uses — so a page fragment
+rendered by the management API carries the same URLs the served page does. Fixed
+on the server; the editor's three DOM-insertion sites were left untouched.
+
+**Reasoning**: the visual editor does not reload the preview after each edit. It
+asks the management API to render just the node that changed and drops the
+returned fragment into the iframe. That fragment was rendered in the
+`/management/` request, whose base URL is where the INSTALLATION is, while a
+served page's base is where the PROJECT is. An author who inserted a video saw
+`http://host/assets/videos/intro.mp4` — a location that serves nothing — and the
+same node read `/p/<id>/assets/videos/intro.mp4` after a reload. A broken video
+announces itself with an error box; a broken image is a small icon nobody looks
+at twice, and this affected every URL attribute the renderer rewrites.
+
+Fixing it in the browser was the obvious shape and the wrong one. It would have
+meant re-deriving the project base in JavaScript and rewriting attributes after
+parsing — in three places, for eight attributes, on a string the server had
+already got wrong, with a second implementation of the base rule to keep in step
+with the first. Worse, the client sees three insertion sites while the server has
+six commands that return a rendered fragment, so a client-side repair would have
+been both duplicated and incomplete. Correcting the source means every caller,
+including any added later, is right by construction.
+
+The same resolution — not a second copy of the rule — is what makes a mapped
+domain agree. `QS_PUBLIC_BASE_URL` is declared per vhost, and one vhost serves
+both the management API and the site, so the fragment render and the page render
+read one identical value: `/p/<id>/…` on the authoring host, `/…` on a mapped
+domain, in both contexts.
+
+The base was not the only thing the fragment render arrived without. A
+multilingual project prefixes every non-asset URL with the current language, and
+a render given no language emitted `/about` where the served page emitted
+`/en/about` — the same divergence, one attribute over. The renderer now falls
+back to the project's default language when the caller supplies none, in the same
+constructor and for the same reason: the six commands already compute that value
+for the translator, and a default in one place is a thing none of them can
+forget. A caller that passes a language — every page template does — is
+untouched.
+
+Two things were deliberately left alone. CSS `url()` inside a `style` attribute
+is not rewritten in either context — it was consistent before and stays
+consistent, and changing that is a change to what authors may write, not a
+divergence fix. `ping`, `longdesc` and `background` get scheme safety but no
+rebasing, which was already the documented split between URL sinks and rewritable
+attributes.
+
+**Alternatives considered**: repairing the fragment in
+`preview-iframe-inject.js` (rejected as above). Reloading the preview after every
+insertion (rejected — it hides the wrong URL instead of correcting it, and costs
+the author their scroll position and selection on every edit). Passing the base
+in from each of the six commands (rejected — six copies of one decision is the
+duplication the shared resolver exists to prevent).
+
+**Source**: `secure/src/functions/renderBootstrap.php`
+(`qs_render_public_base`), `secure/src/classes/JsonToHtmlRenderer.php`.
+Behaviour: [ARCHITECTURE.md](ARCHITECTURE.md) §5.1.

@@ -287,10 +287,13 @@ qs_load_project_context(<projectId>)
   ├── loads project routes.php → ROUTES
   └── binds PUBLIC_CONTENT_PATH to that project's own public/
   │
-renderBootstrap  (render path only)
+renderBootstrap
   └── resolves the PUBLIC BASE once — QS_PUBLIC_BASE_URL env var, else
         derived from the request — into QS_PUBLIC_BASE (root-relative form
-        all in-page URLs compose against) + QS_PUBLIC_BASE_ABS (sitemap)
+        all in-page URLs compose against) + QS_PUBLIC_BASE_ABS (sitemap).
+        The same resolution answers on the management path, where the
+        editor renders page FRAGMENTS (see below); only the two constants
+        are specific to this entry point
   │
 public/p/index.php
   ├── checks aliases (data/aliases.json) → may redirect
@@ -309,6 +312,17 @@ Emitted URLs are **root-relative**: a page links to `/p/mysite/about` on the ins
 hostname and to `/about` on a mapped domain — the same rendered HTML carries no scheme or
 host, so it survives domain moves, HTTPS switches, and reverse proxies. The absolute base
 exists only where a spec demands one (`sitemap.txt`).
+
+That base is a property of the **project**, not of the request that happens to ask for it. The
+visual editor renders single nodes through the management API rather than through this entry
+point — an element added, edited, duplicated or inserted from a snippet comes back as a rendered
+fragment the editor drops straight into the preview — and those fragments compose their URLs
+against the same base, resolved the same way. An `/assets/videos/intro.mp4` written by the author
+therefore reads `/p/mysite/assets/videos/intro.mp4` whether it arrives as part of a whole page or
+as a freshly inserted node, and on a mapped domain it reads `/assets/videos/intro.mp4` in both.
+The rule holds for every URL attribute the renderer rewrites — `href`, `src`, `srcset`, `poster`,
+`action`, `formaction`, `cite`, `data` — and for the language prefix a multilingual project adds
+to non-asset URLs.
 
 A request for a **static sub-resource** under `/p/<projectId>/` — an image, a stylesheet, or the
 shared `qs.js` runtime — is served by the same entry point through a prefix-checked passthrough
