@@ -142,8 +142,13 @@ const QS_API_ARM_COMMANDS = [
 // binding — authenticated access is the gate, matching the global/'any'
 // categories. Listed explicitly so a NEW arm defaults to authorized-and-bound
 // rather than silently ungated.
+// ('upload-limits' reports the SERVER's own ini ceilings plus QuickSite's
+// per-category caps — installation-wide configuration, identical for every
+// project and every caller, so it belongs here rather than with the
+// project-bound arms.)
 const QS_API_STATIC_ARMS = [
     'structure-types', 'asset-categories', 'asset-extensions', 'alias-types', 'edit-actions',
+    'upload-limits',
 ];
 
 if (isset(QS_API_ARM_COMMANDS[$action])) {
@@ -348,6 +353,28 @@ switch ($action) {
         // Return allowed extensions per category
         $extensions = require SECURE_FOLDER_PATH . '/management/config/assetExtensions.php';
         echo json_encode(['success' => true, 'data' => $extensions]);
+        break;
+
+    case 'upload-limits':
+        // S2.5 — the size ceilings, so the upload zone can state them BEFORE a
+        // user discovers one by hitting it. Read live from PHP on every call
+        // rather than cached: post_max_size and upload_max_filesize are both
+        // PHP_INI_PERDIR, so a .htaccess or pool change takes effect without a
+        // QuickSite restart and a cached copy would go quietly stale.
+        require_once SECURE_FOLDER_PATH . '/src/functions/uploadLimits.php';
+        $__qsLimits = qs_upload_limits();
+        $__qsHuman  = [];
+        foreach ($__qsLimits['effective'] as $__cat => $__bytes) {
+            $__qsHuman[$__cat] = qs_format_size($__bytes);
+        }
+        echo json_encode(['success' => true, 'data' => [
+            'effective'           => $__qsLimits['effective'],
+            'effective_human'     => $__qsHuman,
+            'transport_max'       => $__qsLimits['transport_max'],
+            'transport_max_human' => qs_format_size($__qsLimits['transport_max']),
+            'post_max_size'       => $__qsLimits['post_max_size'],
+            'upload_max_filesize' => $__qsLimits['upload_max_filesize'],
+        ]]);
         break;
         
     case 'builds':

@@ -128,6 +128,31 @@ if (!$authResult['valid']) {
 $currentUser = $authResult['user'];
 
 // ============================================================================
+// Did PHP throw this request's body away? (S2.5)
+// ============================================================================
+// A body over `post_max_size` never reaches the command: PHP empties $_POST and
+// $_FILES and says nothing, so every command downstream sees a request with no
+// parameters and answers whatever "you sent nothing" looks like to it. On
+// uploadAsset that was "No file source provided. Upload a file or provide a url
+// parameter." — a sentence that is simply false about a request that carried a
+// file, and that sends the user looking for a bug in their own form.
+//
+// Answered here rather than per-command because the condition is a fact about
+// the REQUEST, not about any one command: the body is gone before dispatch, so
+// every command is equally blind to it. Placed after authentication so the
+// server's configured limits are not readable by an anonymous caller — the
+// Authorization header and the session cookie both survive a discarded body,
+// so this costs a genuine caller nothing.
+require_once SECURE_FOLDER_PATH . '/src/functions/uploadLimits.php';
+$__qsBodyBreach = qs_post_body_discarded();
+if ($__qsBodyBreach !== null) {
+    ApiResponse::create(413, 'request.body_too_large')
+        ->withMessage(qs_post_too_large_message($__qsBodyBreach))
+        ->withData(qs_post_too_large_data($__qsBodyBreach))
+        ->send();
+}
+
+// ============================================================================
 // Route Management Setup
 // ============================================================================
 

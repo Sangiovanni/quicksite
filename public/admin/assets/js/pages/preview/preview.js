@@ -11251,7 +11251,12 @@
             'embed': ['src'],
             'object': ['data'],
             'track': ['src'],
-            'link': ['href', 'rel']
+            'link': ['href', 'rel'],
+            // S2.5 — mirrors TagRegistry::MANDATORY_PARAMS. Both are required
+            // by HTML and silently wrong without it: a <meter> with no value is
+            // an empty gauge, an <optgroup> with no label is an unnamed group.
+            'meter': ['value'],
+            'optgroup': ['label']
         },
         TAGS_WITH_ALT: ['img', 'area'],
         RESERVED_PARAMS: ['placeholder', 'title', 'aria-label', 'aria-placeholder', 'aria-description']

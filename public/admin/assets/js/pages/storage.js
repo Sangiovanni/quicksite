@@ -126,6 +126,40 @@
         return PHYSICAL_KEY_PREFIX + project + '_' + item.id;
     }
 
+    /**
+     * The non-editable `qsp_<project>_` chip that sits in front of the key
+     * input in the add/edit modal.
+     *
+     * ⚠ IT IS A <span>, NOT AN INPUT, AND DELIBERATELY SO. The registry stores
+     * the DECLARED key — what the author types, and nothing else. The prefix is
+     * composed at the moment it is used (here, on the card, in the generated
+     * cookie policy, and in qs.js) and is never persisted. Persisting it would
+     * bake a project id into the very field consent gating matches on, and an
+     * import into a project with a different id would then match nothing.
+     */
+    function _renderKeyPrefixChip() {
+        var project = (window.QUICKSITE_CONFIG && window.QUICKSITE_CONFIG.currentProject) || '';
+        return _el('span', {
+            class: 'storage-keyfield__prefix',
+            text: PHYSICAL_KEY_PREFIX + project + '_',
+            title: 'Added automatically. Every project on this host shares one '
+                 + 'browser-storage origin, so qs.js prefixes each key with the '
+                 + 'project id. You do not type this part, and the registry does '
+                 + 'not store it.',
+        });
+    }
+
+    /** The key field's hint, which changes with the scope. */
+    function _keyHintText(isDeclare, prefixed) {
+        var base = isDeclare
+            ? 'Found in the build by the scan — declaring it adds it to the registry.'
+            : 'The storage key as written in code. No spaces.';
+        var prefixNote = prefixed
+            ? ' The greyed prefix is added by qs.js and is what you will find in devtools; you type only the part after it, and only that part is stored here.'
+            : ' Cookies are not prefixed — a cookie is written under exactly this name.';
+        return base + prefixNote + ' The value is provided by the visitor at runtime — never stored here.';
+    }
+
     /** "stored as qsp_<project>_<id>" line, or null when it does not apply. */
     function _renderPhysicalKey(item) {
         var physical = _physicalKey(item);
@@ -384,21 +418,35 @@
         var dialog = _renderModalShell(titleText, closeModal);
         if (!dialog) return;
 
-        // id
+        // id — shown behind the non-editable prefix chip, so the author reads
+        // the WHOLE physical key as they type rather than discovering it in
+        // devtools later.
         var idInput = _el('input', {
-            type: 'text', class: 'admin-input', autocomplete: 'off',
+            type: 'text', class: 'admin-input storage-keyfield__input', autocomplete: 'off',
             placeholder: 'key name, e.g. cartSession',
             value: isEdit ? item.id : (isDeclare ? prefill.id : ''),
         });
         if (isDeclare) idInput.readOnly = true;
-        dialog.appendChild(_renderGroup(_renderLabel('Key name', true), idInput,
-            _renderHint(isDeclare
-                ? 'Found in the build by the scan — declaring it adds it to the registry. The value is provided by the visitor at runtime — never stored here.'
-                : 'The storage key as written in code. No spaces. The value is provided by the visitor at runtime — never stored here.')));
+        var keyPrefixChip = _renderKeyPrefixChip();
+        var keyField = _el('div', { class: 'storage-keyfield' }, [keyPrefixChip, idInput]);
+        var keyHint = _renderHint('');
+        dialog.appendChild(_renderGroup(_renderLabel('Key name', true), keyField, keyHint));
 
         // scope
         var scopeSelect = _renderSelect(state.scopes, isEdit ? item.scope : ((isDeclare && prefill.scope) ? prefill.scope : 'localStorage'));
         dialog.appendChild(_renderGroup(_renderLabel('Scope', true), scopeSelect));
+
+        // The chip follows the SCOPE: qs.js prefixes localStorage and
+        // sessionStorage, and does not write cookies at all. Showing
+        // "qsp_<project>_" in front of a cookie name would be a plain lie about
+        // what lands in the browser — the one thing this chip exists to prevent.
+        function syncKeyPrefix() {
+            var prefixed = (scopeSelect.value === 'localStorage' || scopeSelect.value === 'sessionStorage');
+            keyPrefixChip.hidden = !prefixed;
+            keyHint.textContent = _keyHintText(isDeclare, prefixed);
+        }
+        scopeSelect.addEventListener('change', syncKeyPrefix);
+        syncKeyPrefix();
 
         // category
         var categorySelect = _renderSelect(state.categories, isEdit ? item.category : 'functional');

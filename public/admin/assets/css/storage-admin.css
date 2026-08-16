@@ -343,3 +343,40 @@
    for now since this stylesheet loads on every admin page). */
 .admin-project-badge { font-weight: 600; }
 .admin-project-badge .admin-btn__icon { color: var(--admin-accent); }
+
+/* ── Key field: the non-editable qsp_<project>_ prefix chip (S2.5) ──────────
+   The chip and the input read as ONE field, so the author sees the whole
+   physical key while typing the part they actually own. The chip is a <span>,
+   never an input — nothing here is submitted, and the registry stores only
+   what is typed to the right of it. */
+.storage-keyfield {
+    display: flex;
+    align-items: stretch;
+    min-width: 0;
+}
+.storage-keyfield__prefix {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 8px;
+    border: 1px solid var(--admin-border, #d0d0d0);
+    border-right: none;
+    border-radius: 4px 0 0 4px;
+    background: var(--admin-bg-muted, #f2f2f2);
+    color: var(--admin-text-muted, #666);
+    font-family: var(--font-mono, ui-monospace, Menlo, Consolas, monospace);
+    font-size: 13px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    /* Not selectable-by-accident: dragging across the field to retype the key
+       should not pick up a prefix the author cannot change. */
+    user-select: none;
+    cursor: default;
+}
+.storage-keyfield__prefix[hidden] { display: none; }
+.storage-keyfield__input {
+    flex: 1 1 auto;
+    min-width: 0;
+    border-radius: 0 4px 4px 0;
+}
+/* When the chip is hidden (cookie scope) the input is the whole field again. */
+.storage-keyfield__prefix[hidden] + .storage-keyfield__input { border-radius: 4px; }

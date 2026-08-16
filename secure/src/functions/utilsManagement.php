@@ -759,3 +759,32 @@ function findReservedQsParamInStructure($node, int $depth = 0, int $maxDepth = 5
     
     return null;
 }
+
+/**
+ * Human-readable size, matching the formatting used across the panel.
+ *
+ * Lives here rather than beside any one caller: it started in spaceUsage.php,
+ * gained a second caller in uploadLimits.php, and a second copy is exactly how
+ * the three surviving formatBytes() duplicates elsewhere in the tree happened.
+ */
+function qs_format_size(int $bytes): string {
+    $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    $i = 0;
+    $n = (float)$bytes;
+    while ($n >= 1024 && $i < count($units) - 1) {
+        $n /= 1024;
+        $i++;
+    }
+    if ($i === 0) {
+        return $bytes . ' B';
+    }
+    // Trailing zeros are dropped: a LIMIT reads badly as "2.00 MB" and a user
+    // reasonably wonders what the hundredths are hiding. Significant digits are
+    // kept — 1.25 MB stays 1.25 MB, only 2.00 and 1.50 lose what they were not
+    // saying anything with.
+    $text = number_format($n, $n >= 100 ? 0 : ($n >= 10 ? 1 : 2), '.', '');
+    if (strpos($text, '.') !== false) {
+        $text = rtrim(rtrim($text, '0'), '.');
+    }
+    return $text . ' ' . $units[$i];
+}

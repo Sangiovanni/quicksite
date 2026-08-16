@@ -306,6 +306,17 @@ function __command_editNode(array $params = [], array $urlParams = []): ApiRespo
     foreach ($addParams as $key => $value) {
         $finalParams[$key] = $value;
     }
+
+    // Tag defaults (S2.5) — applied ONLY when the tag actually changes. Turning
+    // a node into a <video> should give a working player for the same reason
+    // creating one does. Applying them on every edit would instead re-add a
+    // `controls` the author had just removed, which is the opposite of a
+    // default.
+    if ($newTag !== null && $newTag !== $currentTag) {
+        foreach (TagRegistry::defaultParamsFor($finalTag, $finalParams) as $defName => $defValue) {
+            $finalParams[$defName] = $defValue;
+        }
+    }
     
     // SECURITY: Strip sandbox attribute on embed tags — system enforces its own at render time
     IframeSandbox::sanitizeNodeParams($finalTag, $finalParams);

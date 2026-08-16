@@ -17,7 +17,6 @@
  * 
  * @param file $file Uploaded ZIP file (required via multipart/form-data)
  * @param string $name New project name (optional, uses ZIP folder name if not provided)
- * @param bool $overwrite Overwrite if project exists (optional, default: false)
  * @param bool $switch_to Switch to imported project (optional, default: false)
  * 
  * @return ApiResponse Import result
@@ -26,6 +25,7 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/filePolicy.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/uploadLimits.php';
 
 // Allowed keys in config.json import (security: whitelist only)
 const IMPORT_ALLOWED_CONFIG_KEYS = [
@@ -100,14 +100,49 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
         $uploadedFile = basename($filePathParam);
     }
     else {
+        // Same distinction uploadAsset draws: an archive PHP discarded for
+        // exceeding post_max_size arrives here looking exactly like no archive
+        // at all. An import ZIP is the one upload most likely to be big, so this
+        // is the surface where the wrong answer costs the most.
+        $breach = qs_post_body_discarded();
+        if ($breach !== null) {
+            return ApiResponse::create(413, 'request.body_too_large')
+                ->withMessage(qs_post_too_large_message($breach))
+                ->withData(qs_post_too_large_data($breach));
+        }
+
+        // transport_max, not effective_max: an archive is not an asset and has
+        // no per-category cap, so the ceiling that applies to it is the server's.
+        $limits = qs_upload_limits();
         return ApiResponse::create(400, 'validation.missing_field')
             ->withMessage('No file uploaded')
+            ->withData([
+                'max_file_size'       => $limits['transport_max'],
+                'max_file_size_human' => qs_format_size($limits['transport_max']),
+            ])
             ->withErrors(['file' => 'Required. Upload a ZIP file or provide file_path for internal calls']);
     }
     
-    // Options
+    // Options.
+    //
+    // ⚠ `overwrite` IS GONE (S2.5). It used to delete the existing project
+    // directory and re-create it from the archive, with the importer birth-
+    // written as sole owner — and with NO membership check of any kind.
+    // `projects.create` is a global access:'any' category, so that made
+    // "replace any project on this installation and take its id" available to
+    // every signed-in account, including one invited to edit a single
+    // unrelated project. Reproduced end to end in
+    // NOTES/tests/beta11/s25_import_collision_probe.sh: a non-member replaced
+    // another account's project and members.json came back naming the
+    // attacker as owner.
+    //
+    // The ruling is that two projects may never share an id, in any
+    // circumstance — which matters more since S2.4 made the id a browser
+    // storage namespace. So a collision now always refuses, and the way to
+    // reuse an id is to delete the project first: an explicit, owner-gated
+    // action that already exists as its own command, rather than a side effect
+    // of an upload.
     $newName = trim($params['name'] ?? '');
-    $overwrite = filter_var($params['overwrite'] ?? false, FILTER_VALIDATE_BOOLEAN);
     $switchTo = filter_var($params['switch_to'] ?? false, FILTER_VALIDATE_BOOLEAN);
     
     // Open and validate ZIP
@@ -164,19 +199,22 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
     // Check if project already exists
     $projectPath = SECURE_FOLDER_PATH . '/projects/' . $projectName;
     
+    // A colliding id is refused, always — there is no option that turns this
+    // off. See the note beside the removed `overwrite` option above: an id is a
+    // project's identity AND its browser-storage namespace, and no upload gets
+    // to reassign either.
+    //
+    // ⚠ Deliberately says nothing about who owns the existing project, or
+    // whether the caller can see it. The dispatcher's rule is that existence,
+    // membership and role never leak; this answer is identical for a project
+    // the caller owns and one they have never heard of.
     if (is_dir($projectPath)) {
-        if (!$overwrite) {
-            $zip->close();
-            return ApiResponse::create(409, 'resource.already_exists')
-                ->withMessage("Project '$projectName' already exists")
-                ->withData([
-                    'existing_path' => 'secure/projects/' . $projectName,
-                    'hint' => 'Set overwrite=true to replace existing project'
-                ]);
-        }
-        
-        // Delete existing project
-        deleteImportDirectory($projectPath);
+        $zip->close();
+        return ApiResponse::create(409, 'resource.already_exists')
+            ->withMessage("A project with the id '$projectName' already exists on this installation.")
+            ->withData([
+                'hint' => 'Import under a different name, or delete the existing project first.',
+            ]);
     }
     
     // Create project directory structure
@@ -909,14 +947,21 @@ function deleteImportDirectory(string $dir): bool {
  * Get upload error message
  */
 function getUploadErrorMessage(int $errorCode): string {
+    $limits = qs_upload_limits();
+
     $messages = [
-        UPLOAD_ERR_INI_SIZE => 'File exceeds upload_max_filesize',
-        UPLOAD_ERR_FORM_SIZE => 'File exceeds MAX_FILE_SIZE',
-        UPLOAD_ERR_PARTIAL => 'File only partially uploaded',
+        // The number, not the directive name — see uploadAsset for the same
+        // correction. "File exceeds upload_max_filesize" told a caller which
+        // config key to blame and never what the ceiling actually is.
+        UPLOAD_ERR_INI_SIZE => 'The archive is larger than this server accepts for a single upload ('
+            . qs_format_size($limits['upload_max_filesize']) . ', PHP upload_max_filesize). '
+            . 'The largest file this server will carry is ' . qs_format_size($limits['transport_max']) . '.',
+        UPLOAD_ERR_FORM_SIZE => 'The archive exceeds the MAX_FILE_SIZE limit declared by the form',
+        UPLOAD_ERR_PARTIAL => 'The archive was only partially uploaded — the connection ended early',
         UPLOAD_ERR_NO_FILE => 'No file uploaded',
-        UPLOAD_ERR_NO_TMP_DIR => 'Missing temporary folder',
-        UPLOAD_ERR_CANT_WRITE => 'Failed to write to disk',
-        UPLOAD_ERR_EXTENSION => 'Upload stopped by extension'
+        UPLOAD_ERR_NO_TMP_DIR => 'The server has no temporary upload folder configured',
+        UPLOAD_ERR_CANT_WRITE => 'The server could not write the upload to disk',
+        UPLOAD_ERR_EXTENSION => 'A PHP extension stopped the upload'
     ];
     
     return $messages[$errorCode] ?? 'Unknown error';

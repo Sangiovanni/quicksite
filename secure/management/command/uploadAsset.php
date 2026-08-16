@@ -3,6 +3,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/SvgSanitizer.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/AssetMetadataManager.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/OutboundUrlPolicy.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/uploadLimits.php';
 
 /**
  * Upload Asset Command
@@ -211,13 +212,18 @@ $url = $params['url'] ?? null;
 $sourceType = null;
 $cleanupTmpFile = null; // Temp file to delete on error (URL downloads only)
 
-// Validate file size limits (needed before URL download)
-$sizeLimits = [
-    'images' => 5 * 1024 * 1024,    // 5MB
-    'font' => 2 * 1024 * 1024,      // 2MB
-    'audio' => 10 * 1024 * 1024,    // 10MB
-    'videos' => 50 * 1024 * 1024    // 50MB
-];
+// QuickSite's own per-category ceilings. They live in uploadLimits.php so the
+// admin panel can SHOW the same numbers this command ENFORCES — they used to
+// exist only here, which is why the upload zone could not name a limit it was
+// about to refuse you on.
+//
+// These are the policy caps only. They are not the whole story for a multipart
+// upload, where the server's post_max_size / upload_max_filesize can bind first
+// (and on a server with post_max_size == upload_max_filesize, always do) —
+// qs_upload_limits()['effective'] is the combined figure. A URL download is not
+// a POST body, so it is bounded by the category cap alone, which is why this
+// path keeps using the raw numbers.
+$sizeLimits = qs_asset_size_limits();
 
 // Priority: multipart file upload > URL
 $hasFileUpload = isset($_FILES['file']) && ($_FILES['file']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE;
@@ -229,21 +235,36 @@ if ($hasFileUpload) {
     
     // Check for upload errors
     if ($file['error'] !== UPLOAD_ERR_OK) {
+        $limits = qs_upload_limits();
+
+        // UPLOAD_ERR_INI_SIZE used to answer "File exceeds upload_max_filesize
+        // directive in php.ini" — the name of a directive in a file the caller
+        // probably cannot open, and no number. Say how big the file was, how big
+        // it may be, and where that ceiling comes from.
         $errorMessages = [
-            UPLOAD_ERR_INI_SIZE => 'File exceeds upload_max_filesize directive in php.ini',
-            UPLOAD_ERR_FORM_SIZE => 'File exceeds MAX_FILE_SIZE directive in HTML form',
-            UPLOAD_ERR_PARTIAL => 'File was only partially uploaded',
-            UPLOAD_ERR_NO_FILE => 'No file was uploaded',
-            UPLOAD_ERR_NO_TMP_DIR => 'Missing temporary folder',
-            UPLOAD_ERR_CANT_WRITE => 'Failed to write file to disk',
-            UPLOAD_ERR_EXTENSION => 'A PHP extension stopped the file upload'
+            UPLOAD_ERR_INI_SIZE => 'The file is larger than this server accepts for a single upload. '
+                . 'The limit is ' . qs_format_size($limits['upload_max_filesize'])
+                . ' (PHP upload_max_filesize); the largest file you can upload here is '
+                . qs_format_size($limits['effective_max']) . '.',
+            UPLOAD_ERR_FORM_SIZE => 'The file exceeds the MAX_FILE_SIZE limit declared by the form.',
+            UPLOAD_ERR_PARTIAL => 'The file was only partially uploaded — the connection ended early. Try again.',
+            UPLOAD_ERR_NO_FILE => 'No file was uploaded.',
+            UPLOAD_ERR_NO_TMP_DIR => 'The server has no temporary upload folder configured.',
+            UPLOAD_ERR_CANT_WRITE => 'The server could not write the uploaded file to disk.',
+            UPLOAD_ERR_EXTENSION => 'A PHP extension stopped the file upload.'
         ];
-        
+
         $errorMsg = $errorMessages[$file['error']] ?? 'Unknown upload error';
-        
+
         ApiResponse::create(400, 'asset.upload_failed')
             ->withMessage($errorMsg)
-            ->withData(['error_code' => $file['error']])
+            ->withData([
+                'error_code'          => $file['error'],
+                'upload_max_filesize' => $limits['upload_max_filesize'],
+                'post_max_size'       => $limits['post_max_size'],
+                'max_file_size'       => $limits['effective_max'],
+                'max_file_size_human' => qs_format_size($limits['effective_max']),
+            ])
             ->send();
     }
     
@@ -332,9 +353,27 @@ if ($hasFileUpload) {
     ];
 
 } else {
+    // "You sent no file" and "PHP threw your file away" are indistinguishable
+    // from inside the command — both arrive as an empty $_FILES. The dispatcher
+    // already separates them, but this command is also reachable without it
+    // (CommandRunner, a direct include), and answering the wrong one of the two
+    // is what sent Sangio hunting for a bug in a form that was correct.
+    $breach = qs_post_body_discarded();
+    if ($breach !== null) {
+        ApiResponse::create(413, 'request.body_too_large')
+            ->withMessage(qs_post_too_large_message($breach))
+            ->withData(qs_post_too_large_data($breach))
+            ->send();
+    }
+
+    $limits = qs_upload_limits();
     ApiResponse::create(400, 'validation.missing_field')
         ->withMessage('No file source provided. Upload a file or provide a url parameter.')
-        ->withData(['accepted_sources' => ['file (multipart)', 'url (HTTPS)']])
+        ->withData([
+            'accepted_sources'    => ['file (multipart)', 'url (HTTPS)'],
+            'max_file_size'       => $limits['effective_max'],
+            'max_file_size_human' => qs_format_size($limits['effective_max']),
+        ])
         ->send();
 }
 

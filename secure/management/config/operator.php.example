@@ -24,6 +24,27 @@
  * not that person — they cannot act on it, and it tells them which engine
  * version the install is running.
  *
+ * ── ⚠ IF YOU ARE ABOUT TO MAKE THIS LIST DO MORE ─────────────────────────────
+ *
+ * IT MAY ONLY EVER GATE DISPLAY. NEVER CAPABILITY.
+ *
+ * The moment an ACTION is gated on it — a command, a button that does something,
+ * a permission check — this stops being a display preference and becomes the
+ * installation-wide role QuickSite deliberately does not have. Not something
+ * like it. The same thing, under a new name.
+ *
+ * It will not look like that when it happens. It arrives as a convenience, and
+ * the reasoning sounds right every time: "the operator is the only one who could
+ * act on this anyway", "we already load the list here", "it only reads". Each of
+ * those is a true sentence and the wrong move — because once an
+ * installation-wide principal exists, there is a path to becoming it, and
+ * QuickSite's whole permission model is built on there being no such principal.
+ *
+ * If an action genuinely needs an operator, it does not belong on the web
+ * surface at all: it belongs in a script run from a shell, where the credential
+ * is filesystem access. That is why updating QuickSite is update.sh and not an
+ * API call. A thing only an operator may do is a thing a shell does.
+ *
  * ── WHO THE OPERATOR IS ──────────────────────────────────────────────────────
  *
  * Whoever has filesystem access to the server. That is not a role QuickSite

@@ -55,6 +55,43 @@ function qs_operator_path(): string {
  * this list to authorize an action. That is what keeps it a display preference
  * instead of the installation-wide principal beta.10 deliberately removed.
  *
+ * ══════════════════════════════════════════════════════════════════════════════
+ * ⚠ THE CONSTRAINT, WRITTEN WHERE SOMEONE ABOUT TO BREAK IT WILL READ IT
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
+ * THIS LIST MAY ONLY EVER GATE DISPLAY. NEVER CAPABILITY.
+ *
+ * The moment ANY action is gated on it — a command, a route, a button that
+ * actually does something, a `hasPermission` special case, a "only operators may
+ * run the sweep" check — it stops being a display preference and becomes the
+ * installation-wide role beta.10 deleted on purpose. Not something like it: the
+ * same thing, reintroduced under a different name.
+ *
+ * ⚠ IT WILL NOT LOOK LIKE THAT WHEN IT HAPPENS. It will arrive as a small
+ * convenience, and the reasoning will be locally sound every single time:
+ *
+ *   "the operator is the only one who can act on this notice anyway, so let's
+ *    put the button behind the same list"
+ *   "we already load the list on this page, it's one `in_array`"
+ *   "this command is harmless, it only reads"
+ *
+ * Each of those is a correct sentence and the wrong move. `projects.create` is a
+ * global access:'any' category, so any signed-in account can mint ownership of a
+ * project; the moment an installation-wide principal exists again, the path from
+ * "ordinary account" to "the account that gates installation-wide actions" is
+ * back, and beta.10 spent a release closing exactly that (a `system.admin`
+ * access:'owner' that resolved to "owns ANY project").
+ *
+ * IF AN ACTION NEEDS AN OPERATOR, IT DOES NOT BELONG ON THE HTTP SURFACE. The
+ * operator is whoever has filesystem access to the server — that is the design
+ * (§2.3 of the S2 concern), and it is why `applyUpdate` became a CLI script and
+ * why the session sweep is a CLI entry point rather than a routed command. A
+ * thing only an operator may do is a thing a shell does.
+ *
+ * If you are here to add a capability check on this list: the answer is a CLI
+ * script under secure/cli/, or a per-project role. Not this.
+ * ══════════════════════════════════════════════════════════════════════════════
+ *
  * DEFAULT-ON-ABSENT: a missing, unreadable or malformed file reads as "nobody",
  * never as "everybody". An install QuickSite created always has this file (first
  * run writes it), so absence means either an install that predates the file — a

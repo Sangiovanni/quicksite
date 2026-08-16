@@ -196,6 +196,14 @@ function __command_addNode(array $params = [], array $urlParams = []): ApiRespon
         $nodeParams['alt'] = '';
     }
 
+    // Tag defaults (S2.5): params a new node needs to be USABLE, as opposed to
+    // valid. <video src="…"> is valid HTML and renders as a blank rectangle
+    // with no play button; <audio src="…"> renders as nothing at all. Merged
+    // only where the author supplied nothing, so this never overrides a choice.
+    foreach (TagRegistry::defaultParamsFor($tag, $nodeParams) as $defaultName => $defaultValue) {
+        $nodeParams[$defaultName] = $defaultValue;
+    }
+
     // <input> wizard (Group A, beta.6): require `name` for any input
     // type that participates in form submission. Submit/reset/button
     // are user-action triggers; hidden values are programmatic — all

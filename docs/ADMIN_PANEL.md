@@ -211,6 +211,12 @@ store. Two rules keep the three parties apart in it:
   identically-named key (§9.10). `qsp_` clears the reservation above rather than
   needing an exception carved into it.
 
+The prefix is never hidden from the author: `/admin/storage` shows it as a fixed
+chip in front of the key field while you type, each card carries a `stored as`
+line, and the generated cookie-policy page prints the full physical name a
+visitor will find in their browser. The registry itself stores only the declared
+key — see §9.10.
+
 Authentication uses **no browser storage**: the session lives in an HttpOnly cookie the page cannot read, and the per-session token is page-embedded and held in memory (`api.js`). (`api.js` still clears the retired `quicksite_admin_token` / `quicksite_admin_remember` keys on logout as one-time upgrade hygiene.)
 
 Two other cookies exist, both HttpOnly and neither readable by page scripts. `QSSESSID` carries the session. `qs_form_token` carries the CSRF token of the **unauthenticated** auth forms — login, register and first-run run before any session exists, so they cannot use the per-session token every other page embeds; the server plants this cookie and the same value as a hidden field, and accepts a POST only when the two match. It is scoped to the admin path and `SameSite=Strict`, so a cross-site POST carries neither half. Signing out is likewise a **POST** carrying the per-session token, not a link: the header renders it as a form, and a bare `GET /admin/logout` ends nothing.
@@ -2553,10 +2559,28 @@ applies on the live site and in a built site alike, so the two never disagree
 about where a value lives. Everything you author names the **declared id**: the
 registry, the `data-storage-show` / `data-storage-value` / `data-auth-source`
 attributes, the verb arguments, the consent categories and the policy page. The
-translation happens once, inside `qs.js`, at the point of the read or write. Each
-`localStorage` / `sessionStorage` card shows its `stored as` line so you know what
-to search for in the browser's developer tools; `cookie`-scope entries have none,
-because `qs.js` writes no cookies for them.
+translation happens once, inside `qs.js`, at the point of the read or write.
+
+**Where you see the physical name.** Three places, so it is never a surprise:
+
+- **While you type.** The add/edit form shows `qsp_<projectId>_` as a fixed,
+  non-editable chip immediately before the key box, so the whole browser name
+  reads left to right as you fill in the part you own. The chip disappears when
+  you switch the scope to `cookie` — `qs.js` writes no cookies, so a cookie is
+  stored under exactly the name you type.
+- **On each card.** `localStorage` / `sessionStorage` entries carry a `stored as`
+  line, so you know what to search for in the browser's developer tools;
+  `cookie`-scope entries have none.
+- **On the generated cookie-policy page.** Its first column is the physical name,
+  composed at generation time from the project id, followed by one sentence
+  explaining the prefix. The page is a disclosure document — a visitor who checks
+  it against their own browser has to find the same names. The sentence appears
+  only when the page actually lists a prefixed key.
+
+Only the declared id is stored. The prefix is composed each time it is shown or
+used and is never written into the registry: the declared id is what consent
+categories are matched on, so an id baked into the stored key would stop matching
+the moment the project was imported under a different name.
 
 **Descriptions + language.** Descriptions are authored in one registry-level
 **description language** — a selector at the top of the page, defaulting to the

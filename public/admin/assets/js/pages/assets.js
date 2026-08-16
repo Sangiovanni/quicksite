@@ -22,6 +22,11 @@
     let currentlyPlaying = null; // Audio element currently playing
     let editingAsset = null;     // Asset currently being edited
     let fontStyleElements = {};  // Track injected @font-face style elements
+    // S2.5 — the SERVER's ceilings, fetched once at init. Null until they
+    // arrive; every read below treats null as "do not block", so a failed fetch
+    // degrades to the previous behaviour (server refuses, honestly, on POST)
+    // rather than refusing everything client-side.
+    let uploadLimits = null;
 
     // ─── Init ────────────────────────────────────────────────────────────────
     function init() {
@@ -30,6 +35,7 @@
             return;
         }
         loadExtensions();
+        loadUploadLimits();
         loadAssets();
         initUploadZone();
         initUrlInputs();
@@ -44,11 +50,51 @@
         try {
             extensionsMap = await QuickSiteAdmin.fetchHelperData('asset-extensions');
             allowedExtensions = Object.values(extensionsMap).flat();
-            const hint = document.getElementById('asset-extensions-hint');
-            if (hint) hint.textContent = allowedExtensions.join(', ');
+            renderDropzoneHint();
             const fileInput = document.getElementById('asset-file-input');
             if (fileInput) fileInput.setAttribute('accept', allowedExtensions.map(e => '.' + e).join(','));
         } catch (e) { /* non-critical */ }
+    }
+
+    // S2.5 — say the size ceiling BEFORE a user finds it by hitting it. The
+    // numbers come from the server on every page load because both PHP
+    // directives behind them are per-directory settings a deployer can change
+    // without QuickSite knowing.
+    async function loadUploadLimits() {
+        try {
+            uploadLimits = await QuickSiteAdmin.fetchHelperData('upload-limits');
+            renderDropzoneHint();
+        } catch (e) { /* non-critical — the server still refuses honestly */ }
+    }
+
+    /** The dropzone's one-line hint: what may be uploaded, and how big. */
+    function renderDropzoneHint() {
+        const hint = document.getElementById('asset-extensions-hint');
+        if (!hint) return;
+
+        const parts = [];
+        if (allowedExtensions.length > 0) parts.push(allowedExtensions.join(', '));
+
+        // Per-category, because they genuinely differ — a single "max 5 MB"
+        // would be wrong for four of the five things a user can drop here.
+        if (uploadLimits && uploadLimits.effective_human) {
+            const sizes = Object.entries(uploadLimits.effective_human)
+                .map(([cat, human]) => `${cat} ${human}`)
+                .join(' · ');
+            if (sizes) parts.push('Max size — ' + sizes);
+        }
+
+        hint.textContent = parts.join('  |  ');
+    }
+
+    /**
+     * The ceiling that applies to one category, or null when the limits have
+     * not arrived. Null means "let the server decide", never "block".
+     */
+    function limitForCategory(category) {
+        if (!uploadLimits || !uploadLimits.effective) return null;
+        const bytes = uploadLimits.effective[category];
+        return typeof bytes === 'number' && bytes > 0 ? bytes : null;
     }
 
     async function loadAssets() {
@@ -278,6 +324,25 @@
             QuickSiteAdmin.showToast(`Unsupported file type: ${name}`, 'warning');
             return;
         }
+        // S2.5 — refuse an over-sized file HERE, where we can name it, rather
+        // than letting it be queued and rejected one round-trip later. Only for
+        // 'file': a URL download is fetched server-side and its size is not
+        // knowable until then, so it has no client-side answer.
+        //
+        // ⚠ Not a security control — the server enforces the same ceilings and
+        // is the only enforcement that counts. This exists so the answer arrives
+        // before a 50 MB upload, not instead of the server's.
+        if (type === 'file') {
+            const max = limitForCategory(category);
+            if (max !== null && file.size > max) {
+                QuickSiteAdmin.showToast(
+                    `${name} is ${formatSize(file.size)} — the limit for ${category} on this server is ${formatSize(max)}.`,
+                    'warning'
+                );
+                return;
+            }
+        }
+
         // Avoid duplicates
         const exists = uploadQueue.some(q => q.name === name && q.type === type);
         if (exists) return;

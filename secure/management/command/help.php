@@ -4251,12 +4251,6 @@ $GLOBALS['__help_commands'] = [
                 'description' => 'Override project name',
                 'default' => 'Uses folder name from ZIP'
             ],
-            'overwrite' => [
-                'required' => false,
-                'type' => 'boolean',
-                'description' => 'Overwrite if project exists',
-                'default' => false
-            ],
             'switch_to' => [
                 'required' => false,
                 'type' => 'boolean',
@@ -4289,14 +4283,16 @@ $GLOBALS['__help_commands'] = [
             'A refused entry is skipped and listed in security.skipped_disallowed with the reason; the rest of the archive still imports. Entries refusing to stay inside the project are listed in security.skipped_unsafe.',
             'Archive resource limits are enforced from the ZIP headers before anything is extracted: entry count, total and per-entry uncompressed size, and per-entry compression ratio. Exceeding any of them returns 413 and writes nothing.',
             'The permitted extensions and the limits can be changed by copying secure/management/config/import-policy.php.example to import-policy.php.',
-            'PHP is never imported. config.php and routes.php are rebuilt from the archive JSON, and any members.json in the archive is discarded — the importer becomes the sole owner.'
+            'PHP is never imported. config.php and routes.php are rebuilt from the archive JSON, and any members.json in the archive is discarded — the importer becomes the sole owner.',
+            'A project id is unique across the installation and an import never reassigns one. If the id is taken the import refuses with 409 and writes nothing; there is no option to replace the existing project. Import under a different name, or delete the existing project first.'
         ],
         'error_responses' => [
+            '413.request.body_too_large' => 'The archive exceeded the server\'s post_max_size, so PHP discarded the request before the command ran. The response carries the real limit.',
             '413.validation.size_limit_exceeded' => 'Archive exceeds an entry-count, size or compression-ratio limit',
             '400.upload.failed' => 'File upload failed',
             '400.validation.invalid_zip' => 'Invalid or corrupted ZIP',
             '400.validation.invalid_structure' => 'ZIP missing required project files',
-            '409.resource.already_exists' => 'Project exists (use overwrite=true)'
+            '409.resource.already_exists' => 'A project with that id already exists'
         ],
         'notes' => 'Compatible with exports from exportProject. ZIP must contain project folder with config.php or routes.php.'
     ],

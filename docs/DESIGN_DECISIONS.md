@@ -7461,3 +7461,167 @@ read on the hot path of every asset request).
 
 **Source**: `secure/src/functions/surfaceB.php` (`qs_surface_b_gate` stashes,
 `qs_sb_send_file` reads). Behaviour: [ARCHITECTURE.md](ARCHITECTURE.md) §6.
+
+---
+
+## Asset pipeline and media correctness (beta.11)
+
+### An over-`post_max_size` upload is answered with the real limit, from the dispatcher (locked 2026-08-16)
+
+**Decision**: the request dispatcher compares `CONTENT_LENGTH` against
+`post_max_size` and answers `413 request.body_too_large` with the server's actual
+numbers, before any command runs. `uploadAsset` and `importProject` repeat the
+check in their own "no file" branches, for the paths that do not pass through the
+dispatcher. Every limit is read from PHP at request time; none is written into
+the source.
+
+**Reasoning**: a body over `post_max_size` is discarded by PHP before the command
+executes — `$_POST` and `$_FILES` are both emptied and nothing in the request
+says why. Every command therefore sees a request with no parameters and answers
+whatever "you sent nothing" means to it. On `uploadAsset` that was *"No file
+source provided. Upload a file or provide a url parameter."*, which is false
+about a request that carried a file and sends the author looking for a fault in
+their own form. The condition is a fact about the request rather than about any
+one command, so the dispatcher is where one check covers every command.
+
+The limits are read rather than declared because both directives are
+`PHP_INI_PERDIR`: they differ per server *and* per directory, so a number in the
+source would be authoritative-looking and wrong on somebody's install.
+
+Two measurements shaped the implementation. `php://input` is **not** empty when
+the limit is exceeded — the widely repeated "empty `$_POST` plus empty input"
+test never fires on this stack, and a check built on it would have been dead code
+that looked correct. And a multipart body is larger than the file it carries, so
+where `post_max_size` equals `upload_max_filesize` — a common default — the post
+limit binds for every upload and `UPLOAD_ERR_INI_SIZE` is unreachable; the
+effective figure shown to the author is the smallest of the three ceilings rather
+than any single directive.
+
+**Alternatives considered**: handling it inside `uploadAsset` only (rejected —
+`importProject` has the same surface and is the upload most likely to be large,
+and any future multipart command would inherit the bug). Detecting it by empty
+`$_POST` plus empty `php://input` (rejected on measurement — the input stream
+still holds the body). Hard-coding a limit to display (rejected — wrong on any
+install configured differently, while looking definitive). Running the check
+before authentication (rejected — it would let an anonymous caller read the
+server's configured limits; the `Authorization` header and session cookie both
+survive a discarded body, so gating it costs a genuine caller nothing).
+
+**Source**: `secure/src/functions/uploadLimits.php`,
+`public/management/index.php`, `secure/management/command/uploadAsset.php`,
+`secure/management/command/importProject.php`, the `upload-limits` arm in
+`public/admin/api/index.php`. Behaviour:
+[COMMAND_API.md](COMMAND_API.md) (*Upload size limits*).
+
+---
+
+### A tag may carry DEFAULT params, separate from mandatory ones (locked 2026-08-16)
+
+**Decision**: `TagRegistry::DEFAULT_PARAMS` holds params written onto a new node
+when the author supplied none, distinct from `MANDATORY_PARAMS`, which the
+writers refuse a node without. `video` and `audio` default to `controls`. Values
+are non-empty strings, never PHP booleans.
+
+**Reasoning**: "this tag needs the attribute to work" and "the author must choose
+a value for it" are different statements, and only the second one
+`MANDATORY_PARAMS` can express — the writers count an empty string as missing, so
+listing a boolean HTML attribute there makes the tag impossible to create.
+`<video src="…">` is valid HTML that browsers render as a blank rectangle with no
+play button, and `<audio src="…">` has no intrinsic size at all and renders as
+nothing. Neither is recoverable by the author: `<script>` is blocked, `on*`
+handlers are refused, and the custom-JS feature was removed in beta.3, so no
+authored page has a code path to `play()`. The editor was emitting elements the
+author had no way to make work.
+
+The string value is the second half of the decision. The renderer emits a PHP
+`true` as a bare `controls` while the build compiler runs the same value through
+`var_export` and `htmlspecialchars` and emits `controls="1"` — the same thing to
+a browser, but a preview-versus-build difference in exactly the class beta.10
+spent a release removing. `'controls'` produces identical markup from both, and
+HTML permits a boolean attribute to carry its own name as its value.
+
+Defaults apply at creation and when a tag *changes* into one that has them, never
+on an ordinary edit: re-adding a `controls` the author has just removed is the
+opposite of a default.
+
+**Alternatives considered**: adding `controls` to `MANDATORY_PARAMS` (rejected —
+the empty-value rule makes video uncreatable). Forcing it in the renderer
+(rejected — removes the author's ability to build an autoplaying muted background
+video, which is a legitimate design). `true` as the value (rejected on the
+preview/build divergence above). Applying defaults on every edit (rejected — it
+would fight the author).
+
+**Source**: `secure/src/classes/TagRegistry.php` (`DEFAULT_PARAMS`,
+`defaultParamsFor`), `secure/management/command/addNode.php`,
+`secure/management/command/editNode.php`.
+
+---
+
+### `importProject` never replaces an existing project (locked 2026-08-16)
+
+**Decision**: the `overwrite` parameter is removed. A colliding project id is
+always refused with `409`, and nothing is written.
+
+**Reasoning**: `overwrite=true` deleted the existing project directory and
+recreated it from the archive, birth-writing the importer as sole owner — with no
+membership check of any kind. `projects.create` is a global `access: 'any'`
+category, so this made "replace any project on this installation and take its id"
+available to every signed-in account, including one invited to edit a single
+unrelated project. It was reproduced end to end: a non-member replaced another
+account's project and `members.json` came back naming the attacker as owner.
+
+A project id is not only an identity, it is the namespace its browser storage
+lives in, so reassigning one is a heavier act than a flag on an upload suggests.
+Deleting a project already exists as its own owner-gated command; making that the
+only route means the destructive step is explicit rather than a side effect of
+importing something.
+
+The refusal deliberately says nothing about who owns the existing project or
+whether the caller can see it, and no longer echoes its path — the answer is
+identical for a project the caller owns and one they have never heard of.
+
+**Alternatives considered**: gating `overwrite` on ownership of the existing
+project (rejected — it keeps a delete-by-upload path for a case `deleteProject`
+already covers, and one wrong ownership check reopens the whole hole). Renaming
+the incoming project automatically (rejected — an import silently landing under a
+different id than the caller asked for is its own surprise).
+
+**Source**: `secure/management/command/importProject.php`. Behaviour:
+[COMMAND_API.md](COMMAND_API.md) (*Export / Import*).
+
+---
+
+### The storage prefix is shown everywhere and stored nowhere (locked 2026-08-16)
+
+**Decision**: `/admin/storage` shows `qsp_<projectId>_` as a non-editable chip in
+front of the key input, and the generated cookie-policy page prints the full
+physical key plus one sentence explaining the prefix. The registry continues to
+store only the declared key; the prefix is composed at each point of use.
+
+**Reasoning**: after the prefix was introduced, the author declared `cart` and the
+browser held `qsp_<project>_cart`, with nothing in the authoring flow saying so.
+The cookie-policy page mattered most: it is a disclosure document, and a visitor
+who checks it against their own browser has to find the same names there.
+
+Storing the composed form would have been the easy way to show it and is the
+mistake worth naming. The declared key is what consent categories are matched on,
+what the `data-storage-*` attributes reference and what the pickers offer — an id
+baked into the stored key would stop matching the moment the project was imported
+under another name. There is no rename command, so a composed id cannot drift out
+from under a generated page; clone and import create new projects that generate
+their own.
+
+The chip follows the scope: `qs.js` writes no cookies, so showing a prefix in
+front of a cookie name would be the same kind of false statement the change
+exists to remove.
+
+**Alternatives considered**: an editable field pre-filled with the prefix
+(rejected — it invites an author to change or delete a part they do not own, and
+a form field is a thing that gets submitted). Showing the physical key only on the
+card after saving (rejected — the author learns the name after choosing it, which
+is when it is least useful). Persisting the prefixed key (rejected as above).
+
+**Source**: `public/admin/assets/js/pages/storage.js`,
+`secure/src/functions/storageHelpers.php` (`qs_storage_physical_key`),
+`secure/src/functions/consentLayerHelpers.php`. Behaviour:
+[ADMIN_PANEL.md](ADMIN_PANEL.md) §6, §9.10.

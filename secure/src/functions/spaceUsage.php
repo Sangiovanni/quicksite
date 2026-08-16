@@ -179,14 +179,7 @@ function qs_prune_space_cache(): void {
     }
 }
 
-/** Human-readable size, matching the formatting used elsewhere in the panel. */
-function qs_format_size(int $bytes): string {
-    $units = ['B', 'KB', 'MB', 'GB', 'TB'];
-    $i = 0;
-    $n = (float)$bytes;
-    while ($n >= 1024 && $i < count($units) - 1) {
-        $n /= 1024;
-        $i++;
-    }
-    return ($i === 0 ? (string)$bytes : number_format($n, $n >= 100 ? 0 : ($n >= 10 ? 1 : 2))) . ' ' . $units[$i];
-}
+// qs_format_size() moved to utilsManagement.php (required at the top of this
+// file) when uploadLimits.php became a second caller. It was never specific to
+// space measurement, and a second copy is how the three surviving formatBytes()
+// copies elsewhere in the tree came about.

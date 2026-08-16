@@ -99,6 +99,12 @@ class TagRegistry
     /**
      * Mandatory parameters per tag type.
      * NOTE: 'alt' handled separately — auto-generated as translation key.
+     *
+     * ⚠ A mandatory param must be one the AUTHOR supplies a value for: the
+     * writers reject an empty string as "missing" (addNode, editNode). A boolean
+     * HTML attribute — `controls`, `open`, `multiple` — has no value to supply,
+     * so listing one here makes the tag impossible to create. Those belong in
+     * DEFAULT_PARAMS below.
      */
     const MANDATORY_PARAMS = [
         'a' => ['href'],
@@ -115,6 +121,40 @@ class TagRegistry
         'area' => ['href'],
         'track' => ['src'],
         'link' => ['href', 'rel'],
+        // Required by HTML, and silently wrong without it rather than loudly:
+        // a <meter> with no value renders as an empty gauge, and an <optgroup>
+        // with no label renders as an unnamed group in the dropdown.
+        'meter' => ['value'],
+        'optgroup' => ['label'],
+    ];
+
+    /**
+     * Parameters written onto a NEW node of this tag when the author did not
+     * supply them — and only then. A default, never a requirement: the author
+     * may change or remove it afterwards.
+     *
+     * This exists because "the tag needs this to work" and "the author must
+     * choose a value" are different statements, and MANDATORY_PARAMS can only
+     * make the second one. `<video src="…">` with nothing else is valid HTML
+     * that browsers render as a blank rectangle with no play button, and
+     * `<audio src="…">` with nothing else has no intrinsic size at all — it
+     * renders as literally nothing. Neither is recoverable by the author:
+     * `<script>` is blocked, `on*` handlers are refused, and the custom-JS
+     * feature was removed in beta.3, so there is no code path from an authored
+     * page to `play()`. `controls` is the only thing that makes the element
+     * usable, and the editor was not emitting it.
+     *
+     * ⚠ VALUES ARE STRINGS, NOT `true`. The renderer emits a PHP boolean as a
+     * bare attribute (`controls`) while the build compiler runs it through
+     * `var_export` + `htmlspecialchars` and emits `controls="1"` — same meaning
+     * to a browser, but a preview/build difference of exactly the kind beta.10
+     * spent a release removing. `'controls'` as a string produces identical
+     * markup from both, and HTML explicitly permits a boolean attribute to
+     * carry its own name as its value.
+     */
+    const DEFAULT_PARAMS = [
+        'video' => ['controls' => 'controls'],
+        'audio' => ['controls' => 'controls'],
     ];
 
     /**
@@ -183,6 +223,31 @@ class TagRegistry
     public static function isVoidElement(string $tag): bool
     {
         return in_array(strtolower($tag), self::VOID_ELEMENTS, true);
+    }
+
+    /**
+     * The params a new node of this tag receives when the author supplied none
+     * of them. Returns only the ones actually absent, so an author who set
+     * `controls` themselves — or deliberately left it off by passing something
+     * else — is never overridden.
+     *
+     * @param array $given The params the author supplied
+     * @return array The defaults to merge in (possibly empty)
+     */
+    public static function defaultParamsFor(string $tag, array $given): array
+    {
+        $defaults = self::DEFAULT_PARAMS[strtolower($tag)] ?? [];
+        if ($defaults === []) {
+            return [];
+        }
+
+        $missing = [];
+        foreach ($defaults as $name => $value) {
+            if (!array_key_exists($name, $given)) {
+                $missing[$name] = $value;
+            }
+        }
+        return $missing;
     }
 
     /**
@@ -288,13 +353,13 @@ class TagRegistry
                     'label' => ['desc' => __admin('preview.tagDesc.label') ?? 'Form label', 'required' => true],
                     'select' => ['desc' => __admin('preview.tagDesc.select') ?? 'Dropdown', 'required' => true],
                     'option' => ['desc' => __admin('preview.tagDesc.option') ?? 'Select option'],
-                    'optgroup' => ['desc' => __admin('preview.tagDesc.optgroup') ?? 'Option group'],
+                    'optgroup' => ['desc' => __admin('preview.tagDesc.optgroup') ?? 'Option group', 'required' => true],
                     'fieldset' => ['desc' => __admin('preview.tagDesc.fieldset') ?? 'Field group'],
                     'legend' => ['desc' => __admin('preview.tagDesc.legend') ?? 'Fieldset caption'],
                     'datalist' => ['desc' => __admin('preview.tagDesc.datalist') ?? 'Autocomplete list'],
                     'output' => ['desc' => __admin('preview.tagDesc.output') ?? 'Calculation result'],
                     'progress' => ['desc' => __admin('preview.tagDesc.progress') ?? 'Progress bar'],
-                    'meter' => ['desc' => __admin('preview.tagDesc.meter') ?? 'Scalar measurement'],
+                    'meter' => ['desc' => __admin('preview.tagDesc.meter') ?? 'Scalar measurement', 'required' => true],
                 ]
             ],
             'table' => [

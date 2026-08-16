@@ -211,20 +211,37 @@ function buildCookiePolicyStructure(array $items, array $oauthLinks): array {
     $thead = _cNode('thead', [], [_cNode('tr', [], $headCells)]);
 
     // One body row per declared key (stable order).
+    //
+    // ⚠ THE KEY COLUMN SHOWS THE PHYSICAL NAME, not the declared one. This page
+    // is a disclosure document: a visitor who opens devtools to check what the
+    // site stores must find what this table says. qs.js writes
+    // `qsp_<projectId>_<key>`, so the declared name alone would send them
+    // looking for something that is not there.
+    //
+    // Composed HERE, at generation, from the live project id — never persisted
+    // into the registry (see qs_storage_physical_key). There is no rename
+    // command, so a composed id cannot drift out from under a generated page;
+    // clone and import create NEW projects, which generate their own.
     ksort($items);
     $bodyRows = [];
+    $anyPrefixed = false;
     foreach ($items as $id => $item) {
         if (!is_array($item)) continue;
         $cat = $item['category'] ?? 'functional';
         $consentKey = ($cat === 'essential') ? 'consent.policy.no' : 'consent.policy.yes';
         $retention = $item['retention'] ?? '';
+        $scope = (string) ($item['scope'] ?? '');
+        $physical = qs_storage_physical_key((string) $id, $scope);
+        if ($physical !== (string) $id) {
+            $anyPrefixed = true;
+        }
         // Description cell references the storage registry's canonical
         // description key (translate/ — storageDescKey), resolved live at render.
         // Empty cell when the item has no description.
         $hasDesc = storageItemDescription((string) $id, $item, storageDescLang()) !== '';
         $bodyRows[] = _cNode('tr', [], [
-            _cNode('td', ['class' => 'qs-cookie-policy__key'], [_cRaw((string) $id)]),
-            _cNode('td', [], [_cRaw((string) ($item['scope'] ?? ''))]),
+            _cNode('td', ['class' => 'qs-cookie-policy__key'], [_cRaw($physical)]),
+            _cNode('td', [], [_cRaw($scope)]),
             _cNode('td', [], [_cText('consent.category.' . $cat)]),
             _cNode('td', [], [_cRaw($retention !== '' ? (string) $retention : '—')]),
             _cNode('td', [], [_cText($consentKey)]),
@@ -238,6 +255,13 @@ function buildCookiePolicyStructure(array $items, array $oauthLinks): array {
         _cNode('p', ['class' => 'qs-cookie-policy__intro'], [_cText('consent.policy.intro')]),
         $table,
     ];
+
+    // One sentence explaining the prefix, and only when there is a prefixed key
+    // to explain. A visitor comparing this table against their browser sees a
+    // name they did not choose; saying why turns an oddity into a disclosure.
+    if ($anyPrefixed) {
+        $children[] = _cNode('p', ['class' => 'qs-cookie-policy__prefix-note'], [_cText('consent.policy.prefix_note')]);
+    }
 
     // OAuth provider privacy-policy links (only when providers exist).
     if (!empty($oauthLinks)) {
@@ -272,7 +296,7 @@ function cookiePolicyTranslationSeed(): array {
         'en' => [
             'consent.policy.title' => 'Cookie policy',
             'consent.policy.intro' => 'This page lists the browser storage this site uses, generated from the site\'s storage registry.',
-            'consent.policy.col_key' => 'Name',
+            'consent.policy.col_key' => 'Name in your browser',
             'consent.policy.col_scope' => 'Storage',
             'consent.policy.col_category' => 'Category',
             'consent.policy.col_retention' => 'Retention',
@@ -283,12 +307,13 @@ function cookiePolicyTranslationSeed(): array {
             'consent.policy.oauth_title' => 'Third-party sign-in',
             'consent.policy.oauth_intro' => 'This site offers sign-in via the following providers. See each provider\'s own privacy policy for what they collect.',
             'consent.policy.provider_link' => 'Privacy policy',
+            'consent.policy.prefix_note' => 'Names in the first column include a short site prefix, because several sites can share one browser storage area — this is how each site keeps its own entries separate. It is the exact name you will find in your browser.',
             'consent.policy.disclaimer' => 'This summary is generated from the site\'s storage registry and is provided for transparency. It is not legal advice — obtain your own legal review.',
         ],
         'fr' => [
             'consent.policy.title' => 'Politique des cookies',
             'consent.policy.intro' => 'Cette page liste les données de stockage que ce site utilise, générée à partir du registre de stockage du site.',
-            'consent.policy.col_key' => 'Nom',
+            'consent.policy.col_key' => 'Nom dans votre navigateur',
             'consent.policy.col_scope' => 'Stockage',
             'consent.policy.col_category' => 'Catégorie',
             'consent.policy.col_retention' => 'Conservation',
@@ -299,6 +324,7 @@ function cookiePolicyTranslationSeed(): array {
             'consent.policy.oauth_title' => 'Connexion tierce',
             'consent.policy.oauth_intro' => 'Ce site propose la connexion via les fournisseurs suivants. Consultez la politique de confidentialité de chaque fournisseur pour savoir ce qu\'il collecte.',
             'consent.policy.provider_link' => 'Politique de confidentialité',
+            'consent.policy.prefix_note' => 'Les noms de la première colonne comportent un court préfixe propre au site, car plusieurs sites peuvent partager un même espace de stockage du navigateur — c\'est ainsi que chaque site garde ses entrées séparées. C\'est exactement le nom que vous trouverez dans votre navigateur.',
             'consent.policy.disclaimer' => 'Ce résumé est généré à partir du registre de stockage du site et fourni à titre de transparence. Il ne constitue pas un avis juridique — faites réaliser votre propre vérification juridique.',
         ],
     ];

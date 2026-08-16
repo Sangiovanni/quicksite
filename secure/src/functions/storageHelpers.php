@@ -315,3 +315,33 @@ function validateStorageItem(string $id, array $input): array {
 
     return ['item' => $item, 'description' => $description, 'errors' => $errors];
 }
+
+/**
+ * The physical browser-storage slot for a DECLARED registry key.
+ *
+ * ⚠ THE REGISTRY STORES THE DECLARED KEY. This composes the prefixed form at
+ * the moment it is needed and nothing persists the result. That is not tidiness:
+ * the declared key is what the consent category map is keyed by, what the
+ * `data-storage-*` attributes name, and what the admin pickers offer — baking a
+ * project id into it would put an id inside the very field consent gating
+ * matches on, and an import into a project with a different id would match
+ * nothing.
+ *
+ * Mirrors `_storageKey()` in secure/src/runtime/qs.js, which is the runtime's
+ * single composition point. Cookies are NOT prefixed — qs.js does not write
+ * them, so a cookie carries exactly its declared name.
+ *
+ * @param string $declaredKey The key as the author declared it
+ * @param string $scope       localStorage | sessionStorage | cookie
+ * @param string|null $projectId Defaults to the bound project (PROJECT_NAME)
+ * @return string The name that appears in the browser
+ */
+function qs_storage_physical_key(string $declaredKey, string $scope, ?string $projectId = null): string {
+    if ($scope !== 'localStorage' && $scope !== 'sessionStorage') {
+        return $declaredKey;
+    }
+    if ($projectId === null) {
+        $projectId = defined('PROJECT_NAME') ? (string) PROJECT_NAME : '';
+    }
+    return 'qsp_' . $projectId . '_' . $declaredKey;
+}
