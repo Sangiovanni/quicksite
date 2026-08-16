@@ -39,6 +39,14 @@
 # VERIFIED ON: Apache 2.4 (WAMP). Needs mod_rewrite for the RewriteRule and
 # mod_env for SetEnv; FallbackResource is core.
 #
+# ---- UPLOADS: NOTHING TO DO HERE (unlike nginx) -----------------------------
+# Apache's LimitRequestBody defaults to 0 = unlimited, so PHP's own
+# post_max_size is the only ceiling and PHP answers an oversized upload itself,
+# in JSON, naming the real limit. If you SET LimitRequestBody, keep it above
+# post_max_size or Apache starts refusing first, with an HTML error page that
+# explains nothing. (nginx is the opposite: its default of 1 MB is smaller than
+# PHP's and has to be raised — see nginx-vhosts.conf.example.)
+#
 # Copy what you need into your Apache configuration and adjust paths/domains.
 # This file is documentation — nothing in QuickSite reads or writes it.
 #
@@ -57,6 +65,18 @@
 # site can live there and QuickSite never squats the domain root. A mapped
 # domain is the one case that DOES want the root funnelled into the engine,
 # which is what the FallbackResource below adds — per vhost, never install-wide.
+#
+# ---- ⚠ NEVER SET QS_PROJECT ON THE HOSTNAME THAT SERVES /admin/ -------------
+# A mapped domain serves ONE project at its root and answers 404 to any literal
+# /p/… request — one domain, one site, and that is what stops a production
+# domain being used to enumerate the other projects on the install. The visual
+# editor's preview iframe is `/p/<projectId>/`. So a vhost that has QS_PROJECT
+# set AND serves the admin panel gives you an editor whose preview 404s.
+#
+# The two roles are separate hostnames on purpose: mapped domains SERVE, the
+# authoring hostname EDITS. Every project on the install — including the ones
+# with their own domains — is edited at /p/<projectId>/ on the authoring
+# hostname, which is where the panel already points. See the last vhost below.
 # =============================================================================
 
 # ---- example.com  ->  project "siteA" ---------------------------------------
@@ -103,7 +123,10 @@
     # No QS_PROJECT, no QS_PUBLIC_BASE_URL:
     #   - every project is reachable at /p/<projectId>/ (visibility-gated),
     #   - links compose against the request-derived /p/<projectId>/ base,
-    #   - the ROOT STAYS FREE for your own hand-made site (no FallbackResource).
+    #   - the ROOT STAYS FREE for your own hand-made site (no FallbackResource),
+    #   - and THE VISUAL EDITOR WORKS. Its preview iframe is /p/<projectId>/,
+    #     which a QS_PROJECT vhost answers 404 by design (see the top of this
+    #     file). The missing SetEnv here is load-bearing, not an omission.
     # The shipped public/.htaccess already sets `Options -Indexes`, so a bare "/"
     # without an index file answers 403 rather than listing the install's folders.
 </VirtualHost>

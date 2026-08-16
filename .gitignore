@@ -85,14 +85,16 @@ secure/management/config/deploy-roots.php
 secure/management/config/import-policy.php
 secure/management/config/environment.php
 secure/management/config/operator.php
+secure/management/config/quota.php
 
-# Login/registration-throttle runtime state - machine-written JSON
+# Login/registration/upload-throttle runtime state - machine-written JSON
 # (auto-created; hashed-key backoff counters) plus flock sidecars and
 # atomic-write temp files (users.php.lock = the centralized users-writer's
 # sidecar). PHP session files live under secure/tmp/sessions, already covered
 # by the tmp/ rule above.
 secure/management/config/login-throttle.json
 secure/management/config/registration-throttle.json
+secure/management/config/upload-throttle.json
 
 # First-run setup token (C14) - the bootstrap credential for creating the very
 # first account, written by the engine when the user registry is empty and
@@ -118,8 +120,10 @@ secure/management/config/setup-token.txt.*
 secure/management/config/deploy-roots.php.*
 secure/management/config/environment.php.*
 secure/management/config/operator.php.*
+secure/management/config/quota.php.*
 secure/management/config/login-throttle.json.*
 secure/management/config/registration-throttle.json.*
+secure/management/config/upload-throttle.json.*
 secure/admin/config/api-secrets.php.*
 secure/admin/config/oauth-secrets.php.*
 secure/projects/quicksite/data/oauth-secrets.json.*

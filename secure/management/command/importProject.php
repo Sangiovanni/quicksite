@@ -26,6 +26,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/filePolicy.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/uploadLimits.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php';
 
 // Allowed keys in config.json import (security: whitelist only)
 const IMPORT_ALLOWED_CONFIG_KEYS = [
@@ -55,7 +56,21 @@ const IMPORT_ALLOWED_CONFIG_KEYS = [
 function __command_importProject(array $params = [], array $urlParams = []): ApiResponse {
     // Merge query parameters for POST with multipart (query params in URL)
     $params = array_merge($_GET, $_POST, $params);
-    
+
+    // Per-user resource limits (quota.php — absent file = no limits). The RATE
+    // axis first, before the archive is opened or a byte is read: an import is
+    // the most expensive upload QuickSite accepts, so a caller at their limit
+    // should be refused before any of that work is done. The counter is spent
+    // only by an import that actually completes.
+    require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+    $quotaUserId = (string)(getCurrentUser()['id'] ?? '');
+    $rateWait = qs_quota_rate_wait($quotaUserId);
+    if ($rateWait > 0) {
+        return ApiResponse::create(429, 'quota.rate_limited')
+            ->withMessage(qs_quota_rate_message($rateWait))
+            ->withData(['retry_after' => $rateWait]);
+    }
+
     // Check ZipArchive is available
     if (!class_exists('ZipArchive')) {
         return ApiResponse::create(500, 'server.missing_extension')
@@ -159,12 +174,25 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
     // central directory BEFORE a single byte is extracted. getFromIndex()
     // reads an entry fully into memory, so without a cap an uploaded archive
     // is an unbounded allocation and an unbounded number of files on disk.
-    $limitBreach = checkArchiveLimits($zip);
+    $archiveBytes = 0;
+    $limitBreach = checkArchiveLimits($zip, $archiveBytes);
     if ($limitBreach !== null) {
         $zip->close();
         return ApiResponse::create(413, 'validation.size_limit_exceeded')
             ->withMessage($limitBreach['message'])
             ->withData($limitBreach['data']);
+    }
+
+    // The STORAGE axis. The archive's UNCOMPRESSED total is what will land on
+    // disk, and checkArchiveLimits has just walked the central directory to
+    // compute it — so this costs nothing beyond the comparison. Checked before
+    // the project directory is created, so a refusal leaves nothing behind.
+    $quotaBreach = qs_quota_check_storage($quotaUserId, $archiveBytes);
+    if ($quotaBreach !== null) {
+        $zip->close();
+        return ApiResponse::create(507, 'quota.storage_exceeded')
+            ->withMessage($quotaBreach['message'])
+            ->withData($quotaBreach['data']);
     }
 
     // Find project folder in ZIP
@@ -290,8 +318,10 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
     // the ZIP carried (log it for audit) and mint a fresh trust file: the IMPORTER
     // is the sole owner. (Export now excludes members.json, but old archives and
     // hand-built ZIPs may still contain one — never trust it.)
-    require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
-    $importerId = getCurrentUser()['id'] ?? null;
+    // Resolved once at the top of the command for the quota check; reused here
+    // rather than re-validating the bearer token a second time. Same value,
+    // same nullable shape the birth-write and the index update below expect.
+    $importerId = $quotaUserId !== '' ? $quotaUserId : null;
     $discarded = @json_decode((string)@file_get_contents($projectPath . '/config/members.json'), true);
     if (is_array($discarded)) {
         $dOwner   = $discarded['owner'] ?? '(none)';
@@ -360,6 +390,11 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
     }
     $result['owner_user_id'] = $importerId;
 
+    // Per-user resource limits — the import is on disk, so it counts. The new
+    // project has no cached measurement to drop (it did not exist a moment
+    // ago), which is why only the rate counter moves here.
+    qs_quota_record_upload($quotaUserId);
+
     return ApiResponse::create(201, 'resource.imported')
         ->withMessage("Project '$projectName' imported successfully (secure rebuild)")
         ->withData($result);
@@ -371,10 +406,16 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
  * Reads only the per-entry headers (statIndex), so a bomb is refused without
  * decompressing anything. Limits and their defaults live in filePolicy.php.
  *
+ * @param int|null $totalBytes OUT: uncompressed total of every entry, set only
+ *                             when the archive passes. The walk needed to reach
+ *                             that number is the walk this function already
+ *                             does, so the per-user quota check reuses it
+ *                             rather than opening the central directory twice.
  * @return array{message:string, data:array}|null Null when the archive is within limits
  */
-function checkArchiveLimits(ZipArchive $zip): ?array {
+function checkArchiveLimits(ZipArchive $zip, ?int &$totalBytes = null): ?array {
     $limits = qs_archive_limits();
+    $totalBytes = 0;
 
     if ($zip->numFiles > $limits['max_entries']) {
         return ['message' => 'Archive contains too many entries', 'data' => [
@@ -420,6 +461,7 @@ function checkArchiveLimits(ZipArchive $zip): ?array {
         }
     }
 
+    $totalBytes = $total;
     return null;
 }
 

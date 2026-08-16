@@ -1,6 +1,19 @@
 <?php
 
-require_once __DIR__ . '/utilsManagement.php'; // qs_format_size
+// qs_format_size lives in utilsManagement.php, which is where every shared
+// helper lives — but utilsManagement's own body requires SECURE_FOLDER_PATH, so
+// requiring it unconditionally makes THIS file unloadable outside a booted
+// engine. It has to be loadable: qs_nginx_client_max_body_size() below is
+// called by the nginx config generator, and README documents a standalone
+// `php -r` invocation of that generator with no constants defined at all.
+//
+// Conditional, therefore, and NOT lazy-inside-the-functions: every engine
+// caller has the constant, so they load exactly what they always loaded and
+// nothing about their behaviour changes. Only the constant-less nginx path
+// takes the other branch, and it touches nothing that needs the utilities.
+if (defined('SECURE_FOLDER_PATH')) {
+    require_once __DIR__ . '/utilsManagement.php'; // qs_format_size
+}
 
 /**
  * Upload limits — what this SERVER accepts, and what QuickSite accepts on top.
@@ -142,6 +155,45 @@ function qs_upload_limits(): array
         'effective_max'       => $effective === [] ? 0 : max($effective),
         'transport_max'       => (int) min($fileRoom, $bodyRoom),
     ];
+}
+
+/**
+ * The `client_max_body_size` an nginx front end needs, in nginx's own notation
+ * ("51m", or "0" for unlimited).
+ *
+ * ⚠ nginx's DEFAULT IS 1 MB — smaller than what a typical PHP install accepts,
+ * so an nginx deployment refuses uploads QuickSite advertises as fine, and does
+ * it in the one way that hides the reason: nginx answers **413 with its own
+ * HTML error page before PHP runs at all**, so no QuickSite code executes and
+ * nothing in the response is JSON. Apache's `LimitRequestBody` defaults to
+ * unlimited, which is why an Apache install cannot reproduce it.
+ *
+ * The value is DERIVED, never written down. `post_max_size` is the directive
+ * that bounds a whole request body — the same thing `client_max_body_size`
+ * bounds — and it is `PHP_INI_PERDIR`, so it differs per server and can differ
+ * per directory on one server. A number in the source would be wrong on
+ * somebody's install while looking authoritative.
+ *
+ * It is deliberately LARGER than PHP's limit, not equal to it. The goal is that
+ * PHP is always the component that refuses an oversized upload, because PHP's
+ * refusal is a JSON answer naming the real limit and nginx's is an HTML page
+ * naming nothing. Equal values would leave nginx refusing the first byte over.
+ * The margin is one whole megabyte, and the result is rounded up to a whole
+ * megabyte so the emitted directive reads like something a human wrote.
+ *
+ * ⚠ Read from the SAPI that is actually serving. On a stack whose CLI php.ini
+ * differs from the web server's — WAMP ships exactly that — asking the CLI
+ * produces a number the web server never enforces.
+ */
+function qs_nginx_client_max_body_size(): string
+{
+    $postMax = qs_ini_bytes(ini_get('post_max_size'));
+    if ($postMax <= 0) {
+        return '0'; // PHP is unbounded; 0 means the same thing to nginx
+    }
+
+    $mb = (int) ceil($postMax / (1024 * 1024)) + 1;
+    return $mb . 'm';
 }
 
 /**

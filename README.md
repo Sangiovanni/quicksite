@@ -274,6 +274,23 @@ nginx ignores `.htaccess` files. QuickSite handles this automatically:
    include carries the routing for all four of QuickSite's namespaces
    (`/admin/api/`, `/management/`, `/admin/`, `/p/`).
 
+   > **⚠ Uploads: nginx allows a 1 MB request body by default**, which is
+   > *smaller* than what a normal PHP configuration accepts — and it refuses the
+   > excess with its own HTML error page **before PHP runs**, so QuickSite never
+   > gets to explain. The generated include carries a
+   > `client_max_body_size` line on the `/management/` block, computed from your
+   > server's own `post_max_size`, so a single-server-block vhost needs nothing
+   > extra. **Two server blocks?** Add the same line to the public one as well —
+   > that is the block the client's bytes arrive at. The setup page prints the
+   > exact value for your install.
+   >
+   > Apache needs nothing here: `LimitRequestBody` is unlimited by default.
+   >
+   > **Already have a `dynamic_routes.conf`?** It is generated once, when it is
+   > absent, so an install set up before this line existed still has the old
+   > file. Delete `secure/nginx/dynamic_routes.conf`, load any page to
+   > regenerate it, and reload nginx.
+
    **Both blocks are required.** Project pages would still render without
    `@quicksite_project`, but every stylesheet, script and image would fail — and
    once the include is in place, project URLs answer `500` with
@@ -301,6 +318,8 @@ nginx ignores `.htaccess` files. QuickSite handles this automatically:
    > verbatim so the panel keeps filling it in for you.
    >
    > ```nginx
+   > client_max_body_size 51m;   # match your PHP post_max_size — see above
+   >
    > location ^~ /p/ {
    >     COPY_THE_proxy_pass_LINE_FROM_YOUR_location_slash_BLOCK;
    >     proxy_set_header Host $host;
@@ -352,6 +371,36 @@ php -S localhost:8000
 Open `http://localhost:8000/admin/`. Clean URLs (`/about`, `/en/contact`) won't work — use Apache or nginx for full functionality.
 
 </details>
+
+### Serving a project on its own domain
+
+One install can serve any number of projects, each on its own domain. The
+deployment declares which project a domain serves — `SetEnv QS_PROJECT <id>` on
+Apache, `fastcgi_param QS_PROJECT <id>` on nginx — and that domain's **root is
+that project**. QuickSite itself holds no "which project is live" state.
+Complete vhosts for both servers are in `secure/deploy/apache-vhosts.conf.example`
+and `secure/deploy/nginx-vhosts.conf.example`.
+
+> ### ⚠ Never set `QS_PROJECT` on the hostname that serves `/admin/`
+>
+> A domain that serves a project answers **404 to any `/p/…` URL**. That is
+> deliberate — one domain, one site — and it is what stops a production domain
+> from being used to reach or enumerate the other projects on the install.
+>
+> But `/p/<projectId>/` is exactly what the visual editor's preview iframe
+> loads. So a hostname that both serves a mapped project *and* serves the admin
+> panel gives you an editor whose preview 404s, **for every project, not just
+> the mapped one**. The panel shows a warning when it detects this.
+>
+> **Keep the two roles on separate hostnames.** Mapped domains serve; the
+> install's own hostname is where you sign in and edit. Every project —
+> including the ones with their own domains — is edited at `/p/<projectId>/` on
+> that authoring hostname, which is where the panel already points.
+>
+> This is not worked around by pointing the editor at the mapped domain: a
+> different domain is a different origin, so the panel's session cookie is not
+> sent there. A public project would appear to work and a **private** one would
+> not load at all.
 
 ### First load
 

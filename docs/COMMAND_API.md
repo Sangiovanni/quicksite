@@ -212,6 +212,52 @@ It applies to every command, not only the two that take files, because the body 
 
 **The effective limit is the smallest of the three,** and which one binds depends on the server. A multipart body is larger than the file it carries, so on an install where `post_max_size` equals `upload_max_filesize` — a common default — `post_max_size` binds for every upload and `upload_max_filesize` can never be reached at all. The admin panel's upload zone shows the effective per-category figures, and `GET /admin/api/upload-limits` returns them.
 
+### A fourth ceiling that is not PHP's
+
+On nginx a limit sits in front of all three. `client_max_body_size` defaults to **1 MB** — smaller than the upload size a normal PHP configuration accepts — and nginx answers an oversized body with **413 and its own HTML error page, before PHP runs at all**. No QuickSite code executes, so none of the answers above is produced and the response is not JSON.
+
+QuickSite computes the value nginx needs from that server's own `post_max_size` and writes it into the generated routing config, on the `/management/` block: uploads reach QuickSite only through that namespace, so raising the limit there raises it nowhere else. The value is deliberately a little above PHP's, so PHP stays the component that refuses an oversized upload and can say why. A vhost that proxies to a second server block needs the directive in the public block too, since that is where the client's bytes arrive.
+
+Apache needs nothing: `LimitRequestBody` is unlimited by default. If you set it, keep it above `post_max_size`.
+
+A client that receives a non-JSON error — from nginx, a proxy, or a gateway — is given a sentence naming the status code rather than a parse failure.
+
+## Per-user resource limits
+
+Creating projects and uploading into them are open to any authenticated account. On a shared install, nothing stops an ordinary signed-in user from filling the disk, so `uploadAsset` and `importProject` enforce two optional per-user ceilings.
+
+**Nothing is limited by default.** With no `secure/management/config/quota.php` both axes are unlimited, and updating QuickSite never changes that — an existing install cannot start refusing uploads because it was upgraded. A malformed file is ignored, with a line in the server error log, and again nothing is limited: a typo in a quota file must not lock every author out of their own site.
+
+| Axis | Setting | Refusal |
+|---|---|---|
+| Total bytes | `max_total_bytes` | `507 quota.storage_exceeded` |
+| Upload rate | `upload_rate.max_uploads` per `upload_rate.period_seconds` | `429 quota.rate_limited`, with `retry_after` in seconds |
+
+Storage is measured across the projects the caller **owns** — the same figure `getMySpaceUsage` reports and the dashboard shows, counting each project's content, backups, exports and builds. An upload is refused when current usage **plus the incoming file** would cross the ceiling, so the configured number is a ceiling the total never crosses rather than a threshold it overshoots by one file. For an import, the incoming size is the archive's uncompressed total, read from its central directory, and the refusal happens before the project directory is created.
+
+```json
+{
+  "status": 507,
+  "code": "quota.storage_exceeded",
+  "message": "This would put your projects over your storage quota. They currently use 1.9 GB of 2 GB, and this upload adds 4 MB. You have 102 MB left. …",
+  "data": {
+    "used_bytes": 2040109465,
+    "incoming_bytes": 4194304,
+    "quota_bytes": 2147483648,
+    "remaining_bytes": 107374183,
+    "owned_projects": 3
+  }
+}
+```
+
+Two consequences of measuring by ownership are worth knowing before setting a number. A project with two owners counts in **full** against both — ownership is a set, not a share. And bytes are attributed to the project they land in, so an invited member's upload counts against that project's **owner**; an account that owns nothing has no storage total to exceed, and it is the rate axis that bounds it.
+
+The rate axis counts uploads that actually wrote something — a refused upload does not spend an allowance — in fixed windows, so the allowance refills on a period boundary rather than sliding. It exists to bound churn (upload, delete, upload again, which never grows a total), while `max_total_bytes` bounds volume.
+
+Sizes come from a short-lived measurement cache. The write paths drop a project's cached measurement after they write to it, so growth is always measured exactly; a **deletion** elsewhere can leave a total reading high for up to five minutes, which makes the quota briefly stricter than reality and never looser. Re-measuring on the spot is what the dashboard's refresh control does (`getMySpaceUsage` with `refresh: true`), and the refusal message says so.
+
+Copy `secure/management/config/quota.php.example` to `quota.php` to set the numbers; every value is an integer and 0 means unlimited for that axis.
+
 ## Archive import limits
 
 `importProject` treats an uploaded ZIP as untrusted input. Before a single byte is extracted it reads the archive's own central directory — the per-entry headers, which declare each entry's compressed and uncompressed size — and refuses the whole archive if any limit is exceeded. Nothing is decompressed to reach that decision, because decompressing is the cost being defended against.

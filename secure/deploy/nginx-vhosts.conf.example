@@ -17,6 +17,44 @@
 # nginx does not list directories unless `autoindex on` is set — the free root
 # needs no extra directive here.
 #
+# ---- ⚠ REQUIRED ON EVERY BLOCK THAT RECEIVES AN UPLOAD ----------------------
+# nginx allows a request body of 1 MB by default. That is SMALLER than the
+# upload size a normal PHP configuration accepts, so an nginx install refuses
+# uploads QuickSite advertises as fine — and refuses them in the way that hides
+# the reason: nginx answers 413 with its own HTML error page BEFORE PHP runs, so
+# no QuickSite code executes and nothing in the answer is JSON. Apache's
+# LimitRequestBody is unlimited by default, which is why an Apache install
+# cannot reproduce this.
+#
+#     client_max_body_size 51m;   # ← match YOUR php.ini, see below
+#
+# THE NUMBER IS NOT A CONSTANT. Set it one megabyte or so ABOVE this server's
+# `post_max_size`, so PHP is always the component that refuses an oversized
+# upload — PHP's refusal is JSON naming the real limit, nginx's is an HTML page
+# naming nothing. QuickSite already computes the right value for your server:
+# it is in the generated `secure/nginx/dynamic_routes.conf`, on the
+# `/management/` block, and the nginx setup page prints it. Uploads reach
+# QuickSite only through `/management/`, so that one block is the whole story
+# for a single-server-block vhost — the value below is for the mapped-domain
+# blocks in this file, which serve the same install.
+#
+# ⚠ A PROXYING PUBLIC BLOCK NEEDS ITS OWN COPY. In the two-block layout
+# described further down, the public block terminates the client connection, so
+# its own 1 MB default rejects the body before the backend is ever dialled.
+#
+# ---- ⚠ NEVER SET QS_PROJECT ON THE HOSTNAME THAT SERVES /admin/ -------------
+# A mapped domain serves ONE project at its root and answers 404 to any literal
+# /p/… request — one domain, one site, and that is what stops a production
+# domain being used to enumerate the other projects on the install. The visual
+# editor's preview iframe is `/p/<projectId>/`. So a vhost that has QS_PROJECT
+# set AND serves the admin panel gives you an editor whose preview 404s.
+#
+# The two roles are separate hostnames on purpose: mapped domains SERVE, the
+# authoring hostname EDITS. Every project on the install — including the ones
+# with their own domains — is edited at /p/<projectId>/ on the authoring
+# hostname, which is where the panel already points. See the last block in this
+# file.
+#
 # ---- THE FOUR ENTRY POINTS --------------------------------------------------
 # QuickSite is four self-contained namespaces under the public folder, each with
 # its own front controller. Every routing rule below exists to put a request in
@@ -62,6 +100,7 @@
 # The public block needs its own passthrough, copying the proxy target from its
 # own `location / { }`:
 #
+#     client_max_body_size 51m;   # this block receives the bytes — see the top
 #     location ^~ /p/ {
 #         COPY_THE_proxy_pass_LINE_FROM_YOUR_location_slash_BLOCK;
 #         proxy_set_header Host $host;
@@ -91,6 +130,11 @@ server {
     listen      443 ssl;
     server_name example.com;
     root        /srv/quicksite/public;
+
+    # REQUIRED for uploads — see the note at the top. 51m suits a server whose
+    # post_max_size is 50M; use the value from your own generated
+    # dynamic_routes.conf, not this one.
+    client_max_body_size 51m;
 
     # The engine's own namespaces keep working on every domain. Longest prefix
     # first for readability — nginx picks by length, not by order.
@@ -140,6 +184,8 @@ server {
     server_name shop.example.net;
     root        /srv/quicksite/public;
 
+    client_max_body_size 51m;   # REQUIRED — see the note at the top
+
     location /admin/api/  { try_files $uri $uri/ /admin/api/index.php$is_args$args; }
     location /management/ { try_files $uri $uri/ /management/index.php$is_args$args; }
     location /admin/      { try_files $uri $uri/ /admin/index.php$is_args$args; }
@@ -166,6 +212,13 @@ server {
 # ---- the install's own hostname — the AUTHORING surface ---------------------
 # No QS_PROJECT / QS_PUBLIC_BASE_URL: every project serves at /p/<projectId>/
 # (visibility-gated) and the root stays free.
+#
+# ⚠ THE ABSENCE OF QS_PROJECT HERE IS LOAD-BEARING, NOT AN OMISSION. This is the
+# hostname you sign in to and edit on, and the visual editor previews a project
+# by loading /p/<projectId>/ in an iframe. Setting QS_PROJECT on this vhost
+# turns those URLs into 404s (one domain, one site) and the editor stops working
+# — for every project, not just the mapped one. Keep serving and authoring on
+# separate hostnames; that is what the two blocks above and this one are.
 #
 # Do NOT hand-write the routing here. QuickSite generates it on the first page
 # load, from the folder names and URL space you chose in setup, and rewrites it

@@ -152,6 +152,14 @@ if (file_exists($nginxSetupPending) && stripos($serverSoftware, 'nginx') !== fal
         // request at an entry point that is not there.
         $nginxPrefix = PUBLIC_FOLDER_SPACE !== '' ? '/' . trim(PUBLIC_FOLDER_SPACE, '/') : '';
         $entryPoint = htmlspecialchars('$document_root' . $nginxPrefix . '/p/index.php');
+        // nginx caps a request body at 1 MB by default — under what PHP here
+        // accepts — and refuses the excess with its own HTML 413 before PHP
+        // runs. The generated include carries the directive for the namespace
+        // uploads use; a proxying PUBLIC block terminates the connection
+        // itself, so it needs its own copy, which is why the number is printed
+        // here too. Derived from this server's post_max_size, never written down.
+        require_once SECURE_FOLDER_PATH . '/src/functions/uploadLimits.php';
+        $bodySize = htmlspecialchars(qs_nginx_client_max_body_size());
         http_response_code(503);
         die(
             '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">' .
@@ -187,7 +195,13 @@ if (file_exists($nginxSetupPending) && stripos($serverSoftware, 'nginx') !== fal
             '<pre>include ' . $cfgPath . ';</pre>' .
             '<p class="hint">On CloudPanel the usual spot is right after the existing ' .
             '<code>include /etc/nginx/global_settings;</code> line. That is one example, not a requirement &mdash; ' .
-            'anywhere inside <code>server { }</code> works.</p></div>' .
+            'anywhere inside <code>server { }</code> works.</p>' .
+            '<p class="hint"><strong>Uploads are in there too.</strong> nginx allows a 1 MB request body ' .
+            'by default &mdash; less than the ' . htmlspecialchars(ini_get('post_max_size')) . ' PHP accepts on this server &mdash; and it ' .
+            'refuses the rest with its own HTML error page before PHP runs, so QuickSite ' .
+            'never gets to explain. The generated file carries ' .
+            '<code>client_max_body_size ' . $bodySize . ';</code> on the upload endpoint, computed from ' .
+            'that PHP setting. Nothing to do here unless you have two server blocks &mdash; see below.</p></div>' .
 
             '<div class="step"><h3>Step 2 &mdash; Add the project handler</h3>' .
             '<p>Also inside <code>server { }</code>, add this block. QuickSite cannot generate it, ' .
@@ -239,6 +253,10 @@ if (file_exists($nginxSetupPending) && stripos($serverSoftware, 'nginx') !== fal
             '<p style="margin-bottom:0.5em">This sends project URLs down the path every other request ' .
             'already takes. It opens nothing: <code>proxy_pass</code> dials out, it does not listen, ' .
             'and the backend block is already listening either way.</p>' .
+            '<p style="margin-bottom:0.5em"><strong>And add the upload size to that same public block</strong> ' .
+            '&mdash; it is the block that receives the client\'s bytes, so its own 1 MB default ' .
+            'rejects a large upload before the backend ever sees it:</p>' .
+            '<pre>client_max_body_size ' . $bodySize . ';</pre>' .
             '<p style="margin-bottom:0">One server block only? Ignore this &mdash; steps 1 and 2 are all you need.</p>' .
             '</div>' .
 

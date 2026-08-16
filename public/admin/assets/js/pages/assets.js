@@ -430,6 +430,18 @@
         document.getElementById('asset-upload-btn')?.addEventListener('click', uploadAll);
     }
 
+    // One upload-status line. Built as an element with textContent rather than
+    // interpolated into innerHTML: the text can be a server message, and since
+    // an upload may be answered by the web server rather than by QuickSite,
+    // "server message" can mean an arbitrary error body. Nothing here needs
+    // markup — it is one coloured string.
+    function _renderUploadStatus(text, kind) {
+        const span = document.createElement('span');
+        span.style.color = kind === 'success' ? 'var(--admin-success)' : 'var(--admin-error)';
+        span.textContent = text;
+        return span;
+    }
+
     async function uploadAll() {
         if (uploadQueue.length === 0) return;
 
@@ -469,14 +481,14 @@
 
                 if (result.ok) {
                     successCount++;
-                    statusEl.innerHTML = `<span style="color:var(--admin-success)">→ ${item.category}/ ✓</span>`;
+                    statusEl.replaceChildren(_renderUploadStatus('→ ' + item.category + '/ ✓', 'success'));
                 } else {
                     failCount++;
-                    statusEl.innerHTML = `<span style="color:var(--admin-error)">✗ ${result.data?.message || 'Failed'}</span>`;
+                    statusEl.replaceChildren(_renderUploadStatus('✗ ' + (result.data?.message || 'Failed'), 'error'));
                 }
             } catch (error) {
                 failCount++;
-                statusEl.innerHTML = `<span style="color:var(--admin-error)">✗ ${error.message}</span>`;
+                statusEl.replaceChildren(_renderUploadStatus('✗ ' + error.message, 'error'));
             }
         }
 

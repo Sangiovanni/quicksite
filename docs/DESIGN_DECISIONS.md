@@ -7687,3 +7687,178 @@ duplication the shared resolver exists to prevent).
 **Source**: `secure/src/functions/renderBootstrap.php`
 (`qs_render_public_base`), `secure/src/classes/JsonToHtmlRenderer.php`.
 Behaviour: [ARCHITECTURE.md](ARCHITECTURE.md) §5.1.
+
+## Deployment resource limits and front-end truthfulness (beta.11)
+
+### Per-user quotas exist, and default to unlimited (locked 2026-08-16)
+
+**Decision**: `uploadAsset` and `importProject` enforce two optional per-user
+ceilings — total bytes owned, and uploads per period — configured in
+`secure/management/config/quota.php`. With no such file, **neither axis limits
+anything**. Usage is the measurement `getMySpaceUsage` already produces, not a
+second measurer.
+
+**Reasoning**: creating a project and uploading into it are open to every
+authenticated account by design. On a shared install that makes filling the disk
+an ordinary use of the product rather than an exploit, and no other control
+bounds it. That is a missing control on a deployment surface, which is why it
+shipped with the deployment work rather than waiting.
+
+Permissive defaults are the load-bearing half of the decision. A limit that
+arrived switched on would mean an existing install began refusing uploads
+because it was updated — the same failure as a bad release, delivered by a
+security feature. So the file is absent by default, and a malformed one is
+ignored rather than obeyed. That inverts `filePolicy.php`, where a malformed
+override falls back to the *stricter* built-in allowlists; both fail towards not
+breaking the install, which points in opposite directions for a deny-list and a
+budget.
+
+Measuring by ownership follows from consuming the existing measurement, and has
+two consequences that were accepted rather than worked around. A project with
+two owners counts in full against both — ownership is a set, not a share, and
+that is the direction that cannot be gamed. And bytes belong to the project they
+land in, so an invited member's upload counts against the project's owner; an
+account owning nothing has no total to exceed. Attributing bytes to the writer
+would need per-file uploader records that do not exist, and the residual is
+gated by an invitation an owner chose to send. The rate axis is what bounds such
+an account, which is part of why there are two axes and not one.
+
+The rate axis is a count rather than a byte rate because volume is already
+bounded by the byte axis; what a count bounds is churn — upload, delete, upload
+again — which never grows a total but keeps the server working indefinitely.
+
+Enforcement had to defeat the measurement cache. Sizes are cached for five
+minutes, and a ceiling compared against a five-minute-old number is a ceiling a
+burst walks straight through. The write paths therefore drop the project's
+cached measurement after writing, so growth is always exact. A *deletion*
+elsewhere still ages out normally, which leaves a total reading high — stricter
+than reality, never looser — and the dashboard's existing refresh control
+already re-measures on the spot, so the escape hatch was there to point at
+rather than to build.
+
+**Alternatives considered**: re-walking every owned project on every upload
+(rejected — it pays for freshness on projects nothing touched, and the walk cost
+grows with the install); enforcing against the target project's owners rather
+than the caller (rejected — it lets one over-quota co-owner freeze a project for
+everyone, and the refusal names a budget the person reading it cannot act on);
+a byte rate as the second axis (rejected — it duplicates what the byte ceiling
+already does); making the per-category asset caps configurable in the same file
+(deferred — they are QuickSite policy about what an asset *is*, not a deployment
+budget, and mixing the two would put one number in two files).
+
+**Source**: `secure/src/functions/quota.php`,
+`secure/management/config/quota.php.example`,
+`secure/src/functions/spaceUsage.php` (`qs_invalidate_space_cache`).
+Behaviour: [COMMAND_API.md](COMMAND_API.md) *Per-user resource limits*.
+
+### nginx's body limit is generated from PHP's, and is required rather than suggested (locked 2026-08-16)
+
+**Decision**: the generated `dynamic_routes.conf` carries a
+`client_max_body_size` line on its `/management/` block, computed from the
+serving PHP's `post_max_size` and set deliberately above it. The shipped nginx
+vhost example carries it as a required line, and both the setup page and the
+README name it.
+
+**Reasoning**: nginx's default is 1 MB, which is *smaller* than the upload size
+a normal PHP configuration accepts. So an nginx deployment refuses uploads
+QuickSite advertises as fine — and refuses them in the way that hides the
+reason, because nginx answers 413 with an HTML error page before PHP runs at
+all. Apache's `LimitRequestBody` is unlimited by default, so an Apache install
+never sees it and cannot be used to find it.
+
+The value is derived rather than written down for the same reason every other
+limit in this engine is: `post_max_size` is `PHP_INI_PERDIR`, so it differs per
+server and can differ per directory, and a number in the source would be wrong
+on somebody's install while looking authoritative. It is set one megabyte above
+PHP's rather than equal to it so that PHP is always the component that refuses
+an oversized upload — PHP's refusal is JSON naming the real limit, nginx's is an
+HTML page naming nothing.
+
+It goes on the `/management/` block rather than at server level because that is
+the only namespace that accepts a file: raising the ceiling there raises it
+where uploads land and nowhere else. A vhost that proxies to a second server
+block needs its own copy in the public block, which is where the client's bytes
+actually arrive — that layout is common enough on hosting panels to be called
+out rather than left to be discovered.
+
+**Alternatives considered**: a fixed value in the example file only (rejected —
+it is wrong on any server whose PHP differs, and the generated file is the one
+deployers actually include); emitting it at server level (rejected — it raises
+the body limit for the free web root and everything else the vhost serves);
+documenting it as an optional note (rejected — the default is *smaller* than
+what the product claims to accept, so a deployment that skips it is broken, not
+merely untuned).
+
+**Source**: `secure/src/functions/uploadLimits.php`
+(`qs_nginx_client_max_body_size`), `secure/src/functions/NginxConfig.php`,
+`public/init.php` (setup page), `secure/deploy/nginx-vhosts.conf.example`.
+Behaviour: [COMMAND_API.md](COMMAND_API.md) *Upload size limits*.
+
+### An HTTP error is not assumed to be JSON (locked 2026-08-16)
+
+**Decision**: the admin panel reads every response body as text and parses it
+defensively. A non-JSON error becomes a structured envelope carrying the status
+code and a sentence derived from it, and the upstream body is never used as the
+message.
+
+**Reasoning**: not every answer to a QuickSite request comes from QuickSite.
+nginx refusing an oversized body, a proxy, a gateway timeout — each answers
+HTML, and `response.json()` throws on all of them. The upload path turned that
+throw into a message about unexpected tokens, shown to someone whose actual
+problem was a file that was too large. The status code survives where the body
+does not, and it is the part that carries meaning.
+
+Passing the upstream body through as the message was rejected on two counts: it
+is an unbounded HTML document, and the panel interpolates the message into the
+DOM. The status-derived sentence names the likely cause where there is one —
+413 is worth naming precisely, because on nginx it is a default that is smaller
+than what the product accepts.
+
+Successful responses were left exactly as they were, including an empty body
+still reading as null, so no working call site changed shape.
+
+**Alternatives considered**: catching the parse error at each call site
+(rejected — three upload paths had already been written independently and two
+had made the same assumption, which is what a shared reader exists to prevent);
+checking `Content-Type` before parsing (rejected — it decides on a header rather
+than on the bytes, and a misdeclared JSON error would then be discarded).
+
+**Source**: `public/admin/assets/js/core/api.js` (`readResponseBody`),
+`public/admin/assets/admin.js`, `public/admin/assets/js/pages/dashboard.js`.
+
+### The authoring hostname and a mapped domain stay separate (locked 2026-08-16)
+
+**Decision**: `QS_PROJECT` must never be set on the hostname serving `/admin/`.
+This is stated in the README and both shipped vhost examples, and the panel
+warns when it detects the combination. **No engine behaviour changed.**
+
+**Reasoning**: a vhost with `QS_PROJECT` serves one project at its root and
+answers 404 to any literal `/p/…` request — one domain, one site, which is what
+stops a production domain being used to enumerate the install's other projects.
+The visual editor previews by loading `/p/<projectId>/` in an iframe. Each is
+correct alone; together on one hostname they mean an editor whose preview 404s,
+for every project rather than only the mapped one.
+
+Since both halves are behaving as designed, the gap was never in the engine — it
+was that nothing said so where a deployer would read it, and nothing noticed when
+the configuration was wrong. A warning is the whole fix, and it names the project
+the vhost declares so the reader knows which line to remove.
+
+Pointing the preview at the mapped domain was considered and is worse than
+documenting it. A mapped domain is a different origin, so the panel's session
+cookie is not sent there: a public project would appear to work while a private
+one silently failed to load, turning a legible 404 into a bug that depends on
+project visibility.
+
+**Alternatives considered**: admitting `/p/<id>/` on a mapped domain when `<id>`
+equals `QS_PROJECT` (rejected — it puts a project id back into a routing decision
+on the surface where existence was deliberately removed from routing, and reopens
+the question the oracle probe exists to close); building the preview URL from the
+vhost root when `QS_PROJECT` names the edited project (rejected — it works only
+when the edited project happens to be the mapped one, and leaves every other
+project on that install unpreviewable with no warning at all).
+
+**Source**: `secure/admin/templates/layout.php`,
+`secure/deploy/apache-vhosts.conf.example`,
+`secure/deploy/nginx-vhosts.conf.example`, `README.md`. Engine behaviour is
+`secure/src/functions/surfaceB.php` and is unchanged.

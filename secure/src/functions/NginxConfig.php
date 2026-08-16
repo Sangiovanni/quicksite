@@ -9,6 +9,8 @@
  * Nginx users include the generated config in their server block.
  */
 
+require_once __DIR__ . '/uploadLimits.php'; // qs_nginx_client_max_body_size
+
 /**
  * Generate nginx location block content for QuickSite routing
  *
@@ -90,9 +92,21 @@ function generate_nginx_config(string $publicFolderSpace): string {
     $config .= "    try_files \$uri \$uri/ {$prefix}/admin/api/index.php\$is_args\$args;\n";
     $config .= "}\n\n";
 
-    // Management API
+    // Management API. This is the ONLY namespace that receives file uploads
+    // (uploadAsset and importProject; nothing under /admin/api/ takes a file),
+    // so the body-size directive belongs here rather than at server level — it
+    // raises the ceiling exactly where an upload lands and nowhere else.
     $config .= "# Management API (QuickSite command endpoint)\n";
     $config .= "location {$prefix}/management/ {\n";
+    $config .= "    # REQUIRED for uploads. nginx's own default is 1 MB — SMALLER than what\n";
+    $config .= "    # PHP on this server accepts (post_max_size = " . ini_get('post_max_size') . "), so without\n";
+    $config .= "    # this line nginx refuses files QuickSite says are fine, and refuses them\n";
+    $config .= "    # with its own HTML 413 page BEFORE PHP runs — no JSON, no explanation.\n";
+    $config .= "    # The value is one megabyte above PHP's own limit on purpose, so PHP is\n";
+    $config .= "    # always the component that refuses an oversized upload and can say why.\n";
+    $config .= "    # Computed from this server's PHP configuration when the file was\n";
+    $config .= "    # generated; change post_max_size and this file is regenerated with it.\n";
+    $config .= "    client_max_body_size " . qs_nginx_client_max_body_size() . ";\n";
     $config .= "    try_files \$uri \$uri/ {$prefix}/management/index.php\$is_args\$args;\n";
     $config .= "}\n\n";
 

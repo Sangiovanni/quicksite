@@ -231,6 +231,72 @@ window.QuickSiteAPI = (function() {
         };
     }
 
+    // Read a response body WITHOUT assuming the server produced JSON.
+    //
+    // Not every answer to a QuickSite request comes from QuickSite. Anything in
+    // front of PHP can reply on its own — an nginx `client_max_body_size`
+    // refusal is an HTML 413 page emitted before PHP runs at all, and a proxy,
+    // a WAF or a gateway timeout answers HTML the same way. `response.json()`
+    // throws on all of them, and the caller's catch then reports a JSON parse
+    // error where the user needed "your file is too large".
+    //
+    // The status code survives that, and it is the part that carries meaning, so
+    // this returns an envelope shaped like ApiResponse's with a sentence derived
+    // from the status. The upstream body is deliberately NOT used as the
+    // message: it is an unbounded HTML document, and panel code interpolates
+    // `data.message` into the DOM.
+    //
+    // 204 has no body by contract and is not an error — handled by the caller.
+    //
+    // A SUCCESSFUL response is passed through exactly as before (parsed JSON, or
+    // the raw text under `message`, or null for an empty body) — the synthesis
+    // below applies only when the status already says the request failed, so no
+    // working call site changes shape.
+    async function readResponseBody(response) {
+        const text = await response.text();
+        if (text) {
+            try {
+                return JSON.parse(text);
+            } catch {
+                if (response.ok) {
+                    return { message: text };
+                }
+            }
+        } else if (response.ok) {
+            return null;
+        }
+
+        const sentence = nonJsonMessage(response.status);
+        return {
+            success: false,
+            code: 'client.non_json_response',
+            message: sentence,
+            error: sentence,
+            http_status: response.status
+        };
+    }
+
+    // What to tell a user when the answer did not come from QuickSite. 413 is
+    // the one worth naming precisely: on nginx it is the default 1 MB request
+    // body limit, which is SMALLER than the upload size PHP accepts, so it is
+    // the failure a deployer actually hits.
+    function nonJsonMessage(status) {
+        if (status === 413) {
+            return 'The file is too large for this server to accept. It was refused by the web '
+                 + 'server before QuickSite saw it — on nginx this is client_max_body_size, '
+                 + 'which defaults to 1 MB (see secure/deploy/nginx-vhosts.conf.example).';
+        }
+        if (status === 502 || status === 503 || status === 504) {
+            return 'The server is not responding (HTTP ' + status + '). It may be restarting, '
+                 + 'or the request may have taken too long.';
+        }
+        if (status === 0) {
+            return 'The request did not complete.';
+        }
+        return 'The server answered HTTP ' + status + ' with a response QuickSite could not read. '
+             + 'It came from the web server or a proxy rather than from QuickSite itself.';
+    }
+
     // C8 8.4: the project-manager fence is LIFTED. Every project.data command
     // (backup/restore/clone/export/deleteBackup/listBackups) is now marker-contained
     // server-side (target bound to PROJECT_NAME, body mismatch → 400 project.mismatch)
@@ -333,16 +399,9 @@ window.QuickSiteAPI = (function() {
             // Handle 204 No Content responses
             let result = null;
             if (response.status !== 204) {
-                const text = await response.text();
-                if (text) {
-                    try {
-                        result = JSON.parse(text);
-                    } catch {
-                        result = { message: text };
-                    }
-                }
+                result = await readResponseBody(response);
             }
-            
+
             // For 204, create a success response
             if (response.status === 204) {
                 result = { status: 204, code: 'operation.success', message: 'Operation completed successfully' };
@@ -431,7 +490,13 @@ window.QuickSiteAPI = (function() {
                 body: formData
             });
 
-            const result = await response.json();
+            // NOT response.json(). This is the one call in the panel most likely
+            // to be answered by something that is not QuickSite: an oversized
+            // upload is refused by the web server in front of PHP, with an HTML
+            // error page. Parsing that as JSON threw, and the catch below then
+            // reported the parse error — a sentence about tokens where the user
+            // needed to be told the file was too big.
+            const result = await readResponseBody(response);
 
             // Same 401 handling as request(), kept symmetric.
             if (response.status === 401) {
@@ -523,13 +588,16 @@ window.QuickSiteAPI = (function() {
             }
         });
 
-        const result = await response.json();
-        
-        if (response.ok && result.success) {
+        // Same reasoning as upload(): a helper request can be answered by the
+        // web server rather than by QuickSite, and this function's contract is
+        // to throw a message a caller can show. A JSON parse error is not one.
+        const result = await readResponseBody(response);
+
+        if (response.ok && result && result.success) {
             return result.data;
         }
-        
-        throw new Error(result.error || 'Failed to fetch data');
+
+        throw new Error((result && (result.error || result.message)) || 'Failed to fetch data');
     }
 
     // ============================================
@@ -558,7 +626,13 @@ window.QuickSiteAPI = (function() {
         request,
         upload,
         fetchHelper,
-        helperPath
+        helperPath,
+
+        // For the few places that must hand-roll a fetch (importProject is
+        // GLOBAL, so upload()'s marker path does not fit it). Exported so they
+        // do not hand-roll the body reading too — that is where the assumption
+        // "an HTTP answer is JSON" keeps coming back.
+        readResponseBody
     };
 
 })();

@@ -167,6 +167,28 @@ function qs_project_space(string $project, bool $refresh = false): array {
 }
 
 /**
+ * Drop ONE project's measurement, so the next read re-walks it.
+ *
+ * Called by the write paths that a quota is enforced against. A ceiling read
+ * from a cached measurement is a ceiling a burst of uploads walks straight
+ * through: five minutes of writes would all compare against the same
+ * pre-burst number. Invalidating after a write costs one directory walk on the
+ * NEXT check — the same walk `refresh=true` would have cost — but only when
+ * something actually changed, so reads keep hitting the cache.
+ *
+ * This is a growth concern only. A shrink elsewhere (a deleted backup, export
+ * or project) still ages out on the TTL, which leaves a total stale-HIGH: a
+ * quota briefly stricter than reality, never looser. `refresh=true` on
+ * getMySpaceUsage is the user-facing escape hatch for that.
+ */
+function qs_invalidate_space_cache(string $project): void {
+    if ($project === '') {
+        return;
+    }
+    @unlink(qs_space_cache_path() . '/' . $project . '.json');
+}
+
+/**
  * Drop cache entries for projects that no longer exist, so a deleted project
  * cannot leave a measurement lying around until its TTL lapses.
  */

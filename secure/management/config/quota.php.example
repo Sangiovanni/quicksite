@@ -1,0 +1,87 @@
+<?php
+/**
+ * Per-user resource limits — OPTIONAL override
+ *
+ * Copy this file to `quota.php` to cap how much disk one account may consume
+ * and how often it may upload.
+ *
+ * You do NOT need this file. WITHOUT IT NOTHING IS LIMITED — that is the
+ * shipped behaviour and updating QuickSite never changes it, so an existing
+ * install cannot start refusing uploads because it was upgraded. A malformed
+ * file is ignored (with a line in the error log) and, again, nothing is
+ * limited: a typo here must not lock every author out of their own site.
+ *
+ * ⚠ On a SHARED install this file is the difference between "an ordinary signed-
+ * in account can fill the disk" and "it cannot". Creating a project and
+ * uploading into it are open to every authenticated user by design; nothing
+ * else bounds the total.
+ *
+ * Every limit is an integer, and 0 (or a missing key) means UNLIMITED for that
+ * axis — the same convention PHP uses for post_max_size. The two axes are
+ * independent: set either, both, or neither.
+ *
+ * ── WHAT "PER USER" MEANS ────────────────────────────────────────────────────
+ *
+ * Storage is measured across the projects an account OWNS — the same figure the
+ * dashboard shows under "space usage" and the `getMySpaceUsage` command
+ * returns, including each project's content, backups, exports and builds.
+ *
+ * Two things follow, and neither is a bug:
+ *
+ *   - A project with two owners counts in FULL against both. Ownership is a
+ *     set, not a share, and this is the direction that cannot be gamed.
+ *   - Bytes are attributed to the project they land in, so an invited member's
+ *     upload counts against the project's OWNER, not the member. An account
+ *     that owns nothing has no storage total to exceed; it can still only write
+ *     into projects it was invited to, and the rate limit below applies to it
+ *     normally.
+ *
+ * ── DELETING SPACE AND RETRYING ──────────────────────────────────────────────
+ *
+ * Sizes come from a 5-minute measurement cache, so immediately after deleting a
+ * backup the total can still read high and the refusal can outlive the problem.
+ * The dashboard's refresh control re-measures on the spot; the refusal message
+ * tells the user this.
+ */
+
+return [
+
+    // ── Axis 1: total bytes ──────────────────────────────────────────────────
+    // Ceiling on the combined size of everything an account owns. An upload is
+    // refused when current usage PLUS the incoming file would cross it, so the
+    // number is a ceiling and not a threshold that gets overshot.
+    //
+    // Refusal: HTTP 507, code `quota.storage_exceeded`, with the used / quota /
+    // remaining figures in the response data.
+    //
+    // 0 = unlimited (the default). 2 GB shown as an example of the shape:
+    // 'max_total_bytes' => 2 * 1024 * 1024 * 1024,
+    'max_total_bytes' => 0,
+
+    // ── Axis 2: upload rate ──────────────────────────────────────────────────
+    // How many uploads one account may perform per period. Counts both
+    // `uploadAsset` (file or URL) and `importProject`, and counts only uploads
+    // that actually WROTE something — a refused upload does not spend an
+    // allowance.
+    //
+    // This axis is a COUNT rather than a byte rate on purpose. Volume is
+    // already bounded by max_total_bytes above; what this bounds is churn —
+    // upload, delete, upload again, which never grows the total but does keep
+    // the server busy indefinitely.
+    //
+    // Windows are fixed, not sliding: the allowance refills on a period
+    // boundary. A caller can therefore burst across one boundary, which is the
+    // accepted cost of a state file that keeps no per-request history.
+    //
+    // Refusal: HTTP 429, code `quota.rate_limited`, with `retry_after` in
+    // seconds.
+    'upload_rate' => [
+        // 0 = unlimited (the default).
+        // 'max_uploads' => 60,
+        'max_uploads'    => 0,
+
+        // The window, in seconds. Only consulted when max_uploads is set.
+        // 3600 = one hour (the default), 86400 = one day.
+        'period_seconds' => 3600,
+    ],
+];

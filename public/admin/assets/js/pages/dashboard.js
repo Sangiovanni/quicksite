@@ -1094,7 +1094,12 @@
                     
                     QuickSiteAdmin.showToast(proj.exported || 'Project exported', 'success');
                 } else {
-                    const errorData = await response.json().catch(() => ({}));
+                    // The `.catch(() => ({}))` this replaces did not throw, so
+                    // this path was never broken — but it turned every non-JSON
+                    // failure into the same generic toast with the status code
+                    // thrown away. readResponseBody keeps the status in the
+                    // sentence and cannot throw either.
+                    const errorData = (await window.QuickSiteAPI.readResponseBody(response)) || {};
                     QuickSiteAdmin.showToast(errorData.message || 'Failed to export project', 'error');
                 }
             } catch (error) {
@@ -1121,7 +1126,15 @@
             try {
                 QuickSiteAdmin.showToast(proj.importing || 'Importing project...', 'info');
 
-                // importProject is GLOBAL (create-from-archive) — no project marker.
+                // importProject is GLOBAL (create-from-archive) — no project
+                // marker — so it cannot go through QuickSiteAPI.upload(), which
+                // builds a marker path. Hand-rolled here, but it must not
+                // hand-roll the body reading: an archive is the biggest upload
+                // QuickSite accepts, so it is the likeliest to be refused by the
+                // web server in front of PHP with an HTML error page.
+                // response.json() threw on that and the catch below reported
+                // "Failed to import project", hiding a size limit behind a
+                // generic failure.
                 const response = await fetch(window.QUICKSITE_CONFIG.apiBase + '/importProject', {
                     method: 'POST',
                     headers: {
@@ -1130,7 +1143,7 @@
                     body: formData
                 });
 
-                const result = await response.json();
+                const result = (await window.QuickSiteAPI.readResponseBody(response)) || {};
 
                 if (response.ok) {
                     QuickSiteAdmin.showToast(result.message || proj.imported || 'Project imported successfully', 'success');

@@ -4,6 +4,9 @@ require_once SECURE_FOLDER_PATH . '/src/classes/SvgSanitizer.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/AssetMetadataManager.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/OutboundUrlPolicy.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/uploadLimits.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/spaceUsage.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
 
 /**
  * Upload Asset Command
@@ -225,6 +228,22 @@ $cleanupTmpFile = null; // Temp file to delete on error (URL downloads only)
 // path keeps using the raw numbers.
 $sizeLimits = qs_asset_size_limits();
 
+// ============================================================
+// Per-user resource limits (quota.php — absent file = no limits)
+// ============================================================
+// The RATE axis is checked here, before either source is touched: a caller at
+// their limit should be refused before QuickSite dials out to a URL on their
+// behalf. Nothing is spent by this check — the counter is incremented only by a
+// write that actually succeeded, further down.
+$quotaUserId = (string)(getCurrentUser()['id'] ?? '');
+$rateWait = qs_quota_rate_wait($quotaUserId);
+if ($rateWait > 0) {
+    ApiResponse::create(429, 'quota.rate_limited')
+        ->withMessage(qs_quota_rate_message($rateWait))
+        ->withData(['retry_after' => $rateWait])
+        ->send();
+}
+
 // Priority: multipart file upload > URL
 $hasFileUpload = isset($_FILES['file']) && ($_FILES['file']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE;
 
@@ -437,6 +456,19 @@ if ($file['size'] > $sizeLimits[$category]) {
         ->send();
 }
 
+// The STORAGE axis, once the incoming size is known. Checked as
+// "usage + this file", so the configured number is a ceiling the total never
+// crosses rather than a threshold it overshoots by one file. Costs nothing —
+// not even a disk walk — on an install with no quota file.
+$quotaBreach = qs_quota_check_storage($quotaUserId, (int)$file['size']);
+if ($quotaBreach !== null) {
+    if ($cleanupTmpFile) @unlink($cleanupTmpFile);
+    ApiResponse::create(507, 'quota.storage_exceeded')
+        ->withMessage($quotaBreach['message'])
+        ->withData($quotaBreach['data'])
+        ->send();
+}
+
 // Validate MIME type based on resolved category
 $allowedMimes = [
     'images' => ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'],
@@ -646,6 +678,18 @@ if (isset($fileInfo['width'])) {
 // Store metadata
 $metaManager->set($category, $finalFilename, $assetMeta);
 $metaManager->save();
+
+// ============================================================
+// Per-user resource limits — record what this upload consumed
+// ============================================================
+// AFTER the write, not before: an upload refused for any reason has consumed
+// nothing and must not spend the caller's allowance. The cache drop is what
+// keeps the NEXT quota check honest — without it a burst of uploads would all
+// compare against the same pre-burst measurement for five minutes. Both are
+// no-ops on an install with no quota file, except the cache drop, which is
+// wanted regardless: the dashboard's figure now moves as soon as you upload.
+qs_invalidate_space_cache(defined('PROJECT_NAME') ? PROJECT_NAME : '');
+qs_quota_record_upload($quotaUserId);
 
 // Build response data
 $responseData = [

@@ -528,6 +528,59 @@ $langNames = [
     </div>
     <?php endif; ?>
 
+    <?php
+    // ================================================================
+    // Deployment warning: QS_PROJECT is set on the hostname serving the
+    // admin panel.
+    //
+    // A vhost with QS_PROJECT serves ONE project at its root and answers 404
+    // to every literal /p/… request (one domain, one site — it stops a
+    // production domain being used to enumerate the install's other
+    // projects). The visual editor previews by loading /p/<projectId>/ in an
+    // iframe. Both are correct on their own; together on one hostname they
+    // mean an editor whose preview 404s, for every project.
+    //
+    // The engine is behaving as designed, so this warns rather than changes
+    // anything. Pointing the preview at the mapped domain instead is NOT the
+    // fix: that is a different origin, so the panel's session cookie is not
+    // sent, and a private project would fail to load there for the same
+    // reason a public one would appear to work.
+    //
+    // Both spellings are read for the same reason surfaceB.php reads both —
+    // an internal redirect (FallbackResource, try_files) re-prefixes
+    // environment variables, so which one arrives depends on the server.
+    // ================================================================
+    $servedProjectEnv = '';
+    if (!$isLoginPage) {
+        $__envRaw = $_SERVER['QS_PROJECT'] ?? $_SERVER['REDIRECT_QS_PROJECT'] ?? '';
+        if (is_string($__envRaw)) {
+            $servedProjectEnv = trim($__envRaw);
+        }
+    }
+    ?>
+    <?php if ($servedProjectEnv !== ''): ?>
+    <div class="admin-security-warning" id="mapped-domain-warning">
+        <div class="admin-security-warning__content">
+            <svg class="admin-security-warning__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <span>
+                <strong>Deployment:</strong> this hostname is configured to serve one project
+                (<code><?= adminEscape($servedProjectEnv) ?></code>) at its root, and a hostname
+                that serves a project answers <code>404</code> to every <code>/p/&lt;projectId&gt;/</code>
+                URL — which is what the editor's preview loads.
+                <strong>The visual editor will not work here.</strong>
+                Remove <code>QS_PROJECT</code> from this vhost and reach the panel
+                on the install's own hostname instead; mapped domains are for serving, the authoring
+                hostname is for editing. See <code>secure/deploy/</code> for both vhost shapes.
+            </span>
+            <button type="button" class="admin-security-warning__dismiss" onclick="document.getElementById('mapped-domain-warning').remove()" aria-label="Dismiss">&times;</button>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <?php if ($isOperator): ?>
     <!-- Operator update notice (§2.6). Rendered EMPTY and filled by
          js/core/update-notice.js, which is loaded only on this branch: checking

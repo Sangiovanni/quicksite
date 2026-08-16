@@ -77,7 +77,24 @@ class ApiResponse {
         409 => [
             'conflict.duplicate' => 'Resource already exists',
         ],
-        
+        // 413: this REQUEST is too big. Both are emitted by the upload paths —
+        // `request.body_too_large` when PHP discarded the body over
+        // post_max_size, `validation.size_limit_exceeded` when an archive
+        // exceeds the import limits. Every emitter passes its own withMessage()
+        // with the real numbers; these are the fallbacks, and registering them
+        // stops the "Unregistered response code" line each refusal wrote.
+        413 => [
+            'request.body_too_large'         => 'Request body too large',
+            'validation.size_limit_exceeded' => 'Size limit exceeded',
+        ],
+        // 429: a rate limit refused the caller for now, not forever. Every
+        // emitter puts the wait in `retry_after` (seconds) — the auth throttles
+        // in SessionManagement.php and the per-user upload rate in quota.php.
+        429 => [
+            'auth.throttled'     => 'Too many attempts - retry later',
+            'quota.rate_limited' => 'Too many uploads - retry later',
+        ],
+
         // Server errors (5xx)
         500 => [
             'server.file_write_failed' => 'Failed to write file',
@@ -88,6 +105,12 @@ class ApiResponse {
             // Emitted by deleteProject and clearExports; registering it stops
             // the "Unregistered response code" line those already write.
             'server.delete_failed' => 'Failed to delete',
+        ],
+        // 507: the request is well-formed and permitted, and the server will not
+        // store it — a per-user quota, not a fault and not a size problem with
+        // this particular request (413 covers that).
+        507 => [
+            'quota.storage_exceeded' => 'Storage quota exceeded',
         ],
         503 => [
             'server.unavailable' => 'Service temporarily unavailable',

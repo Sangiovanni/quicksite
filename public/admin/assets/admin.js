@@ -473,7 +473,27 @@ const QuickSiteAdmin = {
             body: formData
         });
 
-        const result = await response.json();
+        // Same shape as the apiRequest fallback above, and for the sharper
+        // reason: an oversized upload is refused by the web server BEFORE PHP
+        // runs, with an HTML error page. response.json() throws on that, and the
+        // caller sees a parse error instead of "the file is too large".
+        let result = null;
+        const text = await response.text();
+        if (text) {
+            try {
+                result = JSON.parse(text);
+            } catch {
+                result = {
+                    success: false,
+                    code: 'client.non_json_response',
+                    message: response.status === 413
+                        ? 'The file is too large for this server to accept.'
+                        : 'The server answered HTTP ' + response.status + ' with a response QuickSite could not read.',
+                    http_status: response.status
+                };
+                result.error = result.message;
+            }
+        }
 
         return {
             ok: response.ok,
@@ -773,13 +793,25 @@ const QuickSiteAdmin = {
             }
         });
 
-        const result = await response.json();
-        
-        if (response.ok && result.success) {
+        // Same reasoning as apiUpload above: this can be answered by the web
+        // server or a proxy rather than by QuickSite, and the contract here is
+        // to throw a message a caller can show — never a JSON parse error.
+        let result = null;
+        const text = await response.text();
+        if (text) {
+            try {
+                result = JSON.parse(text);
+            } catch {
+                throw new Error('The server answered HTTP ' + response.status
+                    + ' with a response QuickSite could not read.');
+            }
+        }
+
+        if (response.ok && result && result.success) {
             return result.data;
         }
-        
-        throw new Error(result.error || 'Failed to fetch data');
+
+        throw new Error((result && (result.error || result.message)) || 'Failed to fetch data');
     },
 
     /**
