@@ -15,9 +15,15 @@
  *   1. QS_PUBLIC_BASE_URL server env — the DEPLOYMENT's word, declared per-vhost
  *      (SetEnv / fastcgi_param; .htaccess SetEnv works on shared hosting).
  *   2. Request-derived — always resolves, so "absent" is impossible and local
- *      dev needs zero config: the surfaceB-computed base on the render path
- *      (/p/<id>/ or a mapped domain's root), or the install base + p/<id>/ on
- *      the management path (getSiteMap's no-param default).
+ *      dev needs zero config: the surfaceB-computed /p/<id>/ base on the render
+ *      path, or the install base + p/<id>/ on the management path (getSiteMap's
+ *      no-param default).
+ *
+ * Tier 1 is what a site DESTINED FOR PRODUCTION needs. A project is developed at
+ * /p/<id>/ and deployed as a build, at a URL this install cannot derive from the
+ * request it is answering — so `sitemap.txt`, which is absolute by spec, has to
+ * be told. Declare the deployed base on the authoring vhost and the artifact is
+ * generated against it.
  * (getSiteMap's per-call `baseUrl` param rides ABOVE the chain at its own call
  * site — the author's word at generation time, unchanged since beta.8.)
  *
@@ -115,9 +121,9 @@ if (!function_exists('qs_resolve_public_base')) {
 
         // ---- tier 2: derived from the request — always resolves -----------
         if (defined('QS_SURFACE_B')) {
-            // Render path: surfaceB already computed the absolute base from the
-            // validated origin (/p/<id>/ on the authoring host, / on a mapped
-            // domain). Normalisation cannot fail on it by construction.
+            // Render path: surfaceB already computed the absolute /p/<id>/ base
+            // from the validated origin. Normalisation cannot fail on it by
+            // construction.
             $norm = qs_public_base_normalize(BASE_URL);
         } else {
             // Management path (e.g. getSiteMap's no-param default): the install
@@ -155,9 +161,10 @@ if (!function_exists('qs_render_public_base')) {
      *   - anywhere else    → the SAME resolution chain, whose management-path
      *     tier 2 composes the install base with this request's bound project.
      *
-     * The env tier is honoured in both, which is what makes a mapped domain
-     * agree: `QS_PUBLIC_BASE_URL` is declared per-VHOST, so the `/management/`
-     * call and the page render it is previewing read one identical value.
+     * The env tier is honoured in both, which is what keeps a declared base
+     * consistent: `QS_PUBLIC_BASE_URL` is declared per-VHOST, so the
+     * `/management/` call and the page render it is previewing read one
+     * identical value.
      */
     function qs_render_public_base(): string
     {

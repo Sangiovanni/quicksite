@@ -25,16 +25,19 @@ function __command_moveNode(array $params = [], array $urlParams = []): ApiRespo
     // Required parameters
     if (!isset($params['type'])) {
         return ApiResponse::create(400, 'validation.required')
+            ->withMessage('Missing required parameter: type')
             ->withErrors([['field' => 'type', 'reason' => 'missing']]);
     }
     
     if (!isset($params['sourceNodeId'])) {
         return ApiResponse::create(400, 'validation.required')
+            ->withMessage('Missing required parameter: sourceNodeId')
             ->withErrors([['field' => 'sourceNodeId', 'reason' => 'missing']]);
     }
     
     if (!isset($params['targetNodeId'])) {
         return ApiResponse::create(400, 'validation.required')
+            ->withMessage('Missing required parameter: targetNodeId')
             ->withErrors([['field' => 'targetNodeId', 'reason' => 'missing']]);
     }
     
@@ -55,6 +58,7 @@ function __command_moveNode(array $params = [], array $urlParams = []): ApiRespo
     // Name required for page/component
     if (($type === 'page' || $type === 'component') && empty($name)) {
         return ApiResponse::create(400, 'validation.required')
+            ->withMessage("Missing required parameter: name (required when type is {$type})")
             ->withErrors([['field' => 'name', 'reason' => "required for type={$type}"]]);
     }
     

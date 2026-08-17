@@ -7,12 +7,22 @@
  * `/p/<id>/`. C15 15.2: EVERY project is reached this way — there is no privileged root
  * project any more, and the web root is free (the renderer lives at public/p/index.php).
  *
+ * ONE ENTRY, ALWAYS. A project is reached at `/p/<id>/` and nowhere else. There
+ * was a second entry — a production domain declaring `SetEnv QS_PROJECT <id>`
+ * and serving that project at its root — and it is WITHDRAWN: production is
+ * build-only. A project stays in development at `/p/<id>/` for its whole life
+ * and the BUILD is the production artifact, so nothing needs a live, unbuilt
+ * project answering the public internet. The rule that made a declaring domain
+ * refuse every `/p/…` URL went with it; it existed only to stop such a domain
+ * being used to reach the install's other projects, and with no such domain
+ * left it did nothing but break the editor's preview iframe wherever the
+ * variable happened to be set.
+ *
  * Two-part flow, wired into public/p/index.php:
  *   1. qs_surface_b_maybe_handle()  — runs FIRST, BEFORE init.php. Binds the project
- *      from one of two entries: the vhost's QS_PROJECT env (a mapped production
- *      domain — C15 15.4) or a detected /p/<id>/ request (the authoring hostname;
- *      the id is the segment after the FIRST 'p' marker, so an optional
- *      PUBLIC_FOLDER_SPACE prefix that we cannot read pre-init does not matter).
+ *      from the detected /p/<id>/ request: the id is the segment after the FIRST
+ *      'p' marker, so an optional PUBLIC_FOLDER_SPACE prefix that we cannot read
+ *      pre-init does not matter.
  *      Whether that id names a real project is NOT asked here — the gate decides,
  *      and it is the same decision for "private" and for "does not exist", which
  *      is what keeps the two indistinguishable (see qs_surface_b_gate).
@@ -100,13 +110,9 @@ function qs_sb_valid_id(string $id): bool {
  * deployment configures it) but under nginx does — the same code deciding
  * access differently on the two supported targets. One credential path removes
  * that divergence, and it is the path that actually works: a preview iframe is
- * a plain browser navigation and can carry no header of its own.
- *
- * The trade this accepts: a project mapped to its OWN domain is a different
- * origin, so the panel's cookie is not sent there. That is irrelevant for a
- * public project (no credential needed) and means a PRIVATE project cannot be
- * previewed on its mapped domain — preview it at `/p/<id>/` on the panel's own
- * origin, which is where the editor points anyway.
+ * a plain browser navigation and can carry no header of its own. Every request
+ * this gate sees is same-origin with the panel now that `/p/<id>/` is the only
+ * way in, so the cookie is always the credential that is actually available.
  *
  * Safe to call with ANY id a URL can carry — malformed, oversized, naming
  * nothing. Those cases are refused by the ordinary private-project path, not by
@@ -166,55 +172,6 @@ function qs_surface_b_maybe_handle(): void {
     }
     $segs = array_values(array_filter(explode('/', $path), fn($s) => $s !== ''));
 
-    // ---- C15 15.4: ENV ENTRY MODE — a mapped production domain names its project --
-    // §15.1.3 mechanism (b): the vhost declares `SetEnv QS_PROJECT <id>` (Apache) /
-    // `fastcgi_param QS_PROJECT <id>` (nginx) and funnels every non-file request
-    // here (FallbackResource / try_files). No URL marker, no rewrite — the request
-    // path IS the route, and the domain root IS the site. REDIRECT_ fallback:
-    // FallbackResource's internal redirect re-prefixes environment variables, so
-    // both spellings are read. Never set on the authoring hostname, where the
-    // /p/<id>/ URL detection below stays the entry.
-    $envId = $_SERVER['QS_PROJECT'] ?? $_SERVER['REDIRECT_QS_PROJECT'] ?? '';
-    if (is_string($envId) && $envId !== '') {
-        // R5 (Sangio 2026-07-24) — one domain, one site: a mapped domain answers
-        // 404 to any literal /p/… request, so a production domain cannot be used
-        // to reach or enumerate OTHER projects on the install. PHP-side belt to
-        // the vhost's own RewriteRule; also closes the /p/ existence oracle here.
-        if (($segs[0] ?? '') === 'p') {
-            qs_sb_deny(404, 'This site is not available.');
-        }
-        if (!qs_sb_valid_id($envId) || !is_dir($secure . '/projects/' . $envId)) {
-            // Deployment config error, not a visitor error: the vhost names a
-            // project that does not exist. Degrade to 404 with a log (R4 posture)
-            // — there is no fallback project by design (C15 15.3).
-            //
-            // This IS an existence test ahead of the gate, and it is NOT the
-            // shape the /p/ lookup below had to give up: $envId comes from the
-            // vhost, so a visitor cannot vary it and cannot compare two answers.
-            // There is one id here and the deployment already knows it.
-            error_log(
-                "QuickSite: QS_PROJECT='{$envId}' names no existing project — "
-                . 'check the vhost SetEnv / fastcgi_param.'
-            );
-            qs_sb_deny(404, 'This site is not available.');
-        }
-        $denyStatus = qs_surface_b_gate($envId, $secure);
-        if ($denyStatus !== null) {
-            qs_sb_deny($denyStatus, 'This site is not available.');
-        }
-        $GLOBALS['__qs_sb'] = [
-            'id'         => $envId,
-            'secure'     => $secure,
-            'serverRoot' => $serverRoot,
-            'subpath'    => implode('/', $segs), // full path — the domain root IS the site
-            'projectDir' => $secure . '/projects/' . $envId,
-        ];
-        if (!defined('BASE_URL'))             define('BASE_URL', qs_request_origin() . '/');
-        if (!defined('QS_SURFACE_B_PROJECT')) define('QS_SURFACE_B_PROJECT', $envId);
-        if (!defined('QS_SURFACE_B'))         define('QS_SURFACE_B', true);
-        return;
-    }
-
     // The id this request NAMES: the segment after the FIRST 'p' marker. The
     // marker is anchored rather than searched for, so an optional space prefix
     // (`/<space>/p/<id>/…`) still resolves, and a project's own route that
@@ -237,11 +194,11 @@ function qs_surface_b_maybe_handle(): void {
         }
     }
     if ($idIndex < 0) {
-        // No id named at all — a bare `/p/`, or (on a misconfigured mapped
-        // domain) a path carrying no marker. Nothing to gate, and no id whose
-        // existence could leak: public/p/index.php answers the generic 404
-        // below its own require of init.php. There is no privileged project to
-        // fall back to (C15 15.3).
+        // No id named at all — a bare `/p/`, or a path funnelled here by a
+        // deployment's own FallbackResource / try_files that carries no marker.
+        // Nothing to gate, and no id whose existence could leak: public/p/index.php
+        // answers the generic 404 below its own require of init.php. There is no
+        // privileged project to fall back to (C15 15.3).
         return;
     }
 
@@ -711,7 +668,7 @@ function qs_surface_b_send_headers(): void {
  * `SetEnv QS_ERROR_PAGE_404 /404.html` (per-vhost, or .htaccess on shared
  * hosting) lets a deployment back QuickSite's project-less status pages with
  * its own root-level files — the same declare-and-obey mechanism as
- * QS_PROJECT / QS_PUBLIC_BASE_URL. Constraints, deliberately tight:
+ * QS_PUBLIC_BASE_URL. Constraints, deliberately tight:
  *
  *   - root-relative path only, realpath-jailed to the DOCUMENT ROOT (the L11
  *     idiom) — a config value can never read outside the web root;

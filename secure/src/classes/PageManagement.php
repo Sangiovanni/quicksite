@@ -162,15 +162,16 @@ class PageManagement {
 
         // Storage-namespace handoff — the project id qs.js prefixes every
         // browser-storage key with (`qsp_<id>_<key>`). It MUST come from the
-        // server: at /p/<id>/ the id is a URL segment, but on a MAPPED DOMAIN it
-        // comes from the vhost's QS_PROJECT and the path carries no id at all,
-        // so anything derived client-side from location.pathname would give the
-        // two serving modes different prefixes and the same site would store
-        // under different names in preview and in production. PROJECT_NAME is
-        // bound by qs_load_project_context() in both modes, which is why one
-        // emit covers both. Emitted unconditionally (editor mode included — the
-        // preview iframe shares the origin and so must share the namespace) and
-        // BEFORE qs.js, matching the QS_ROUTES ordering rule.
+        // server: at /p/<id>/ the id is a URL segment, but a BUILT site is
+        // served from its own root and the path carries no id at all, so
+        // anything derived client-side from location.pathname would give
+        // development and production different prefixes and the same site would
+        // store under different names in each. PROJECT_NAME is bound by
+        // qs_load_project_context() here and pinned into a build's own config by
+        // build.php, which is why one emit covers both. Emitted unconditionally
+        // (editor mode included — the preview iframe shares the origin and so
+        // must share the namespace) and BEFORE qs.js, matching the QS_ROUTES
+        // ordering rule.
         $body .= '<script>window.QS_PROJECT='
             . json_encode($projectKey, JSON_UNESCAPED_SLASHES) . ';</script>';
 

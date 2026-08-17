@@ -143,6 +143,7 @@ function __command_addComponentToNode(array $params = [], array $urlParams = [])
     foreach ($required as $field) {
         if (!isset($params[$field]) || $params[$field] === '') {
             return ApiResponse::create(400, 'validation.required')
+                ->withMessage("Missing required parameter: {$field}")
                 ->withErrors([['field' => $field, 'reason' => 'missing']]);
         }
     }
@@ -164,6 +165,7 @@ function __command_addComponentToNode(array $params = [], array $urlParams = [])
     
     if (($type === 'page' || $type === 'component') && empty($name)) {
         return ApiResponse::create(400, 'validation.required')
+            ->withMessage("Missing required parameter: name (required when type is {$type})")
             ->withErrors([['field' => 'name', 'reason' => "required for type={$type}"]]);
     }
     

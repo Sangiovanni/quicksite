@@ -8,147 +8,76 @@
 // zip_path, setupToken's path) — and it would miss the getData()/toArray()
 // readers that /admin/api and CommandRunner use instead of send().
 require_once __DIR__ . '/../functions/publicPaths.php';
+// qs_is_development() — pre-init safe and dependency-free by construction, so
+// requiring it here cannot reorder anything. Used only to decide how LOUDLY a
+// missing message fails; see requireMessage().
+require_once __DIR__ . '/../functions/environment.php';
+
+/**
+ * EVERY RESPONSE CARRIES ITS OWN MESSAGE. There is no default and no fallback.
+ *
+ * There used to be a registry mapping (status, code) to a default message, so
+ * that `create(400, 'validation.required')` could answer "Required parameter
+ * missing" on its own. It failed at both halves of its job:
+ *
+ *   - It was never the message anyone wanted. All 1417 call sites in the engine
+ *     pass their own withMessage(), because a useful message names the field,
+ *     the file or the limit — which a table keyed on a code cannot know.
+ *   - It covered a small and shrinking fraction of what the engine actually
+ *     emits. Measured before its removal: 99 distinct (status, code) pairs
+ *     unregistered, logging 65,498 "Unregistered response code" lines — 82% of
+ *     an 8 MB error log, and every one of them describing a response that was
+ *     already correct because the caller had supplied its own message.
+ *
+ * So the fallback existed to be unused, and the warning existed to fire on
+ * responses that were fine. Both are gone, and the message is now MANDATORY.
+ *
+ * "Mandatory" is enforced twice, because neither mechanism covers the other's
+ * blind spot:
+ *
+ *   1. STATICALLY, before anything ships — NOTES/tests/beta11/s210_create_scan.php
+ *      walks the token stream of every command and exits non-zero if any
+ *      create() reaches its terminating `;` without a withMessage(). That sees
+ *      branches no test ever executes, which is exactly where a forgotten
+ *      message would otherwise hide.
+ *   2. AT RUNTIME, in requireMessage() below — because the scanner cannot know
+ *      what a message evaluates to. A withMessage() fed an empty variable is
+ *      invisible to it and caught here.
+ */
 
 class ApiResponse {
     private $status;
     private $code;
-    private $message;
+    /**
+     * null until withMessage() sets it. NOT '' — an empty string is a message
+     * somebody chose, and telling the two apart is what lets requireMessage()
+     * name the actual mistake.
+     */
+    private $message = null;
     private $data;
     private $errors;
-    
+
     // Logging callback - called before send
     private static $beforeSendCallback = null;
 
-    // Registry of standard responses
-    private static $registry = [
-        // Success responses (2xx)
-        201 => [
-            'operation.success' => 'Operation completed successfully',
-            'route.created' => 'Route successfully created',
-            'menu.option.added' => 'Menu option added successfully',
-            'footer.option.added' => 'Footer option added successfully',
-        ],
-        200 => [
-            'route.retrieved' => 'Route retrieved successfully',
-            'operation.success' => 'Operation completed successfully',
-        ],
-        204 => [
-            'operation.success' => 'Operation completed successfully',
-            'route.deleted' => 'Route deleted successfully',
-            'menu.option.deleted' => 'Menu option deleted',
-        ],
-        // 207: the operation partly succeeded. Used by sweeps that act on a SET
-        // — some members done, some refused — where 200 would overstate and 5xx
-        // would understate. `deleteBuild` and `cleanBuilds` have emitted it since
-        // before this entry existed, which meant every partial failure wrote
-        // "Warning: Unregistered response code: 207.operation.partial_success"
-        // to the error log, and any caller that did not pass its own
-        // withMessage() would have been handed "Unknown response". Registering
-        // it fixes both, for them as well as for clearExports.
-        207 => [
-            'operation.partial_success' => 'Operation partially completed',
-        ],
-
-        // Client errors (4xx)
-        400 => [
-            'validation.required' => 'Required parameter missing',
-            'validation.invalid_format' => 'Invalid format provided',
-            'route.already_exists' => 'Route already exists',
-            'route.invalid_name' => 'Invalid route name',
-            'asset.invalid_category' => 'Invalid asset category',        
-            'asset.invalid_filename' => 'Invalid filename',              
-            'asset.invalid_file_type' => 'Invalid file type',            
-            'asset.invalid_extension' => 'Invalid file extension',       
-            'asset.file_too_large' => 'File exceeds maximum size',       
-            'asset.upload_failed' => 'File upload failed',               
-        ],
-        404 => [
-            'route.not_found' => 'Route not found',
-            'file.not_found' => 'File not found',
-            'asset.not_found' => 'Asset file not found',
-            'node.not_found' => 'Node not found at specified path',
-        ],
-        403 => [
-            'auth.forbidden' => 'Access denied',
-            'mode.requires_multilingual' => 'This command requires MULTILINGUAL_SUPPORT = true',
-            'mode.requires_mono' => 'This command requires MULTILINGUAL_SUPPORT = false',
-            'feature.disabled' => 'This feature is disabled in current configuration',
-        ],
-        409 => [
-            'conflict.duplicate' => 'Resource already exists',
-        ],
-        // 413: this REQUEST is too big. Both are emitted by the upload paths —
-        // `request.body_too_large` when PHP discarded the body over
-        // post_max_size, `validation.size_limit_exceeded` when an archive
-        // exceeds the import limits. Every emitter passes its own withMessage()
-        // with the real numbers; these are the fallbacks, and registering them
-        // stops the "Unregistered response code" line each refusal wrote.
-        413 => [
-            'request.body_too_large'         => 'Request body too large',
-            'validation.size_limit_exceeded' => 'Size limit exceeded',
-        ],
-        // 429: a rate limit refused the caller for now, not forever. Every
-        // emitter puts the wait in `retry_after` (seconds) — the auth throttles
-        // in SessionManagement.php and the per-user upload rate in quota.php.
-        429 => [
-            'auth.throttled'     => 'Too many attempts - retry later',
-            'quota.rate_limited' => 'Too many uploads - retry later',
-        ],
-
-        // Server errors (5xx)
-        500 => [
-            'server.file_write_failed' => 'Failed to write file',
-            'server.directory_create_failed' => 'Failed to create directory',
-            'server.internal_error' => 'Internal server error',
-            'asset.move_failed' => 'Failed to move uploaded file',
-            'asset.delete_failed' => 'Failed to delete file',
-            // Emitted by deleteProject and clearExports; registering it stops
-            // the "Unregistered response code" line those already write.
-            'server.delete_failed' => 'Failed to delete',
-        ],
-        // 507: the request is well-formed and permitted, and the server will not
-        // store it — a per-user quota, not a fault and not a size problem with
-        // this particular request (413 covers that).
-        507 => [
-            'quota.storage_exceeded' => 'Storage quota exceeded',
-        ],
-        503 => [
-            'server.unavailable' => 'Service temporarily unavailable',
-        ],
-    ];
-
     /**
-     * Create a response with a registered code
+     * Open a response. The caller MUST follow with withMessage() — see the
+     * class docblock for why there is no longer a default.
      */
     public static function create(int $status, string $code): self {
         $instance = new self();
         $instance->status = $status;
         $instance->code = $code;
-        
-        // Auto-set message from registry
-        if (isset(self::$registry[$status][$code])) {
-            $instance->message = self::$registry[$status][$code];
-        } else {
-            error_log("Warning: Unregistered response code: {$status}.{$code}");
-            $instance->message = "Unknown response";
-        }
-        
         return $instance;
     }
 
     /**
-     * Shortcut for success response (200 OK)
-     */
-    public static function success(?array $data = null): self {
-        $instance = self::create(200, 'operation.success');
-        if ($data !== null) {
-            $instance->data = qs_scrub_paths($data);
-        }
-        return $instance;
-    }
-
-    /**
-     * Create a custom response (not in registry)
+     * Create a response and its message in one call.
+     *
+     * The message-required form of create(): it cannot produce a response
+     * without a message, because PHP refuses the call. Preferred for new code
+     * where the message is already in hand; create()->withMessage() stays the
+     * right shape when the message is built from work done in between.
      */
     public static function custom(int $status, string $code, string $message): self {
         $instance = new self();
@@ -156,6 +85,86 @@ class ApiResponse {
         $instance->code = $code;
         $instance->message = qs_scrub_path_string($message);
         return $instance;
+    }
+
+    /**
+     * The message this response will send — or a hard failure if there is none.
+     *
+     * WHY THIS EXISTS ALONGSIDE THE STATIC SCAN. The scanner proves every
+     * create() is followed by a withMessage(); it cannot prove what that call
+     * evaluates to. `->withMessage($e->getMessage())` on an exception with an
+     * empty message reads as correct to any static check and produces a
+     * response that says nothing. This is the net under that.
+     *
+     * WHY IT DOES NOT INVENT A MESSAGE. Answering "Unknown response" is what
+     * the deleted registry did, and it is the failure mode that hides: the
+     * caller gets a 200-shaped envelope describing nothing, and nobody
+     * investigates a response that looks like an answer. A response with no
+     * message is a bug in the command, so it is reported as one.
+     *
+     * DEVELOPMENT THROWS, PRODUCTION DEGRADES. In development the exception
+     * stops the request where the mistake is, with a stack trace. In production
+     * the visitor gets a 500 — true, since the command really is malformed —
+     * and the operator gets one actionable log line naming the file and line,
+     * rather than the 65,498 unactionable ones this class used to write.
+     *
+     * ⚠ UNREACHABLE AS SHIPPED. Every one of the engine's 1417 create() sites
+     * carries a message, so nothing existing can reach this. That is what makes
+     * it safe to fail hard: it can only fire on code written after this change.
+     */
+    private function requireMessage(): string {
+        if (is_string($this->message) && $this->message !== '') {
+            return $this->message;
+        }
+        // ⚠ THE FILTER IS ON THE FILE, NOT THE CLASS. A backtrace frame's
+        // `class` names the method being CALLED while its `file`/`line` name
+        // where the call came FROM — so the frame that carries the command's
+        // location is `toArray`/`send`, whose class is this one. Filtering by
+        // class discards exactly the frame worth having and reports "unknown".
+        $where = 'unknown';
+        $self = __FILE__;
+        foreach (debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS) as $frame) {
+            if (isset($frame['file']) && $frame['file'] !== $self) {
+                $where = qs_scrub_path_string($frame['file']) . ':' . ($frame['line'] ?? '?');
+                break;
+            }
+        }
+        $why = $this->message === '' ? 'an EMPTY message' : 'no message at all';
+        $detail = "ApiResponse {$this->status}.{$this->code} was built with {$why}"
+                . " — every response must call withMessage(). Built at {$where}.";
+        error_log($detail);
+        if (qs_is_development()) {
+            throw new LogicException($detail);
+        }
+        return 'Internal server error';
+    }
+
+    /**
+     * The wire envelope, built in ONE place.
+     *
+     * send() and toArray() are the two ways a response leaves a command and
+     * they used to compose this shape independently, which is how a rule
+     * enforced in one of them would quietly not apply to the other.
+     */
+    private function envelope(): array {
+        $message = $this->requireMessage();
+        // A response with no message is a malformed command, not a result, so
+        // the status is corrected to match what is actually being said. In
+        // development requireMessage() has already thrown and this is dead.
+        $status = ($this->message === null || $this->message === '') ? 500 : $this->status;
+
+        $response = [
+            'status'  => $status,
+            'code'    => $status === $this->status ? $this->code : 'server.internal_error',
+            'message' => $message,
+        ];
+        if (!empty($this->data)) {
+            $response['data'] = $this->data;
+        }
+        if (!empty($this->errors)) {
+            $response['errors'] = $this->errors;
+        }
+        return $response;
     }
 
     /**
@@ -198,12 +207,18 @@ class ApiResponse {
 
     /**
      * Get response info without sending (for logging)
+     *
+     * DELIBERATELY DOES NOT ENFORCE. This is the logging path, and a logger
+     * that throws turns a diagnosable bug into a lost record — the exact
+     * moment the log matters most. It reports the missing message as a fact
+     * instead, and send()/toArray() do the enforcing on the paths that
+     * actually answer a caller.
      */
     public function getResponseInfo(): array {
         return [
             'status' => $this->status,
             'code' => $this->code,
-            'message' => $this->message
+            'message' => $this->message ?? '(no message set)'
         ];
     }
 
@@ -232,21 +247,7 @@ class ApiResponse {
      * Convert response to array (for internal use without HTTP)
      */
     public function toArray(): array {
-        $response = [
-            'status' => $this->status,
-            'code' => $this->code,
-            'message' => $this->message,
-        ];
-        
-        if (!empty($this->data)) {
-            $response['data'] = $this->data;
-        }
-        
-        if (!empty($this->errors)) {
-            $response['errors'] = $this->errors;
-        }
-        
-        return $response;
+        return $this->envelope();
     }
 
     /**
@@ -263,19 +264,9 @@ class ApiResponse {
             ob_end_clean();
         }
 
-        $response = [
-            'status' => $this->status,
-            'code' => $this->code,
-            'message' => $this->message,
-        ];
-
-        if (!empty($this->data)) {
-            $response['data'] = $this->data;
-        }
-
-        if (!empty($this->errors)) {
-            $response['errors'] = $this->errors;
-        }
+        // ONE composer, shared with toArray(), so the message rule cannot apply
+        // to one exit path and not the other.
+        $response = $this->envelope();
 
         // beta.10 C13 F-C13-14(b): SERIALISE FIRST, WRITE SECOND.
         //
@@ -301,33 +292,13 @@ class ApiResponse {
             exit;
         }
 
-        http_response_code($this->status);
+        // THE ENVELOPE'S STATUS, not $this->status. envelope() corrects the
+        // status to 500 when the message was missing, and sending the original
+        // here would put a 500-shaped body under a 200 header — the one
+        // combination a client cannot recover from.
+        http_response_code($response['status']);
         header('Content-Type: application/json');
         echo $body;
         exit;
-    }
-
-    /**
-     * Get all registered response codes (for documentation/UI)
-     */
-    public static function getAllCodes(): array {
-        $formatted = [];
-        foreach (self::$registry as $status => $codes) {
-            foreach ($codes as $code => $message) {
-                $formatted[] = [
-                    'status' => $status,
-                    'code' => $code,
-                    'message' => $message,
-                ];
-            }
-        }
-        return $formatted;
-    }
-
-    /**
-     * Export registry as JSON (for front-end consumption)
-     */
-    public static function exportRegistry(): string {
-        return json_encode(self::$registry, JSON_PRETTY_PRINT);
     }
 }

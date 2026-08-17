@@ -171,8 +171,9 @@ function generate_nginx_config(string $publicFolderSpace): string {
 
     // Public root — DELIBERATELY FREE (C15 15.2). No fallback into QuickSite: the root
     // serves real static files only (a user's own hand-made site), 404 otherwise. The
-    // renderer lives at /p/ above; a mapped production domain adds its OWN root fallback
-    // in its vhost (never in this shared, install-wide file).
+    // renderer lives at /p/ above, and that is the only place a project is served from
+    // on this install — a finished site goes to production as a BUILD, with its own
+    // vhost and its own root, never by pointing a domain at this one.
     $locationPath = $prefix !== '' ? "{$prefix}/" : '/';
     $config .= "# Public root — free for the user's own site (no QuickSite fallback)\n";
     $config .= "location {$locationPath} {\n";

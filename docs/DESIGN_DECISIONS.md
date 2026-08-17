@@ -7826,7 +7826,7 @@ than on the bytes, and a misdeclared JSON error would then be discarded).
 **Source**: `public/admin/assets/js/core/api.js` (`readResponseBody`),
 `public/admin/assets/admin.js`, `public/admin/assets/js/pages/dashboard.js`.
 
-### The authoring hostname and a mapped domain stay separate (locked 2026-08-16)
+### The authoring hostname and a mapped domain stay separate (locked 2026-08-16) (superseded 2026-08-16)
 
 **Decision**: `QS_PROJECT` must never be set on the hostname serving `/admin/`.
 This is stated in the README and both shipped vhost examples, and the panel
@@ -7862,3 +7862,148 @@ project on that install unpreviewable with no warning at all).
 `secure/deploy/apache-vhosts.conf.example`,
 `secure/deploy/nginx-vhosts.conf.example`, `README.md`. Engine behaviour is
 `secure/src/functions/surfaceB.php` and is unchanged.
+
+---
+
+## Production is build-only (beta.11)
+
+### Serving a live project at a mapped domain is withdrawn (locked 2026-08-16)
+
+**Supersedes**: *The authoring hostname and a mapped domain stay separate*
+(entry above).
+
+**Decision**: a project is served at `/p/<projectId>/` on the install's own
+hostname and nowhere else, for its whole life. **The build is the production
+artifact.** The second entry point — a vhost declaring `SetEnv QS_PROJECT <id>`
+/ `fastcgi_param QS_PROJECT <id>` and serving that project at its root — is
+removed from the engine, along with the rule that made such a domain answer 404
+to every literal `/p/…` request. `QS_PUBLIC_BASE_URL`, `QS_TRUSTED_HOSTS` and
+`QS_ERROR_PAGE_*` are a different mechanism that merely shares a prefix; they are
+unaffected and still read.
+
+**Reasoning**: the superseded entry treated the conflict between mapped-domain
+serving and the visual editor as a documentation problem, because both halves
+were behaving as designed. That was the right reading of the symptom and the
+wrong reading of the cause. The mode itself was the mistake, on two counts that
+have nothing to do with the editor.
+
+It put **unoptimised output on the public internet**. A mapped domain rendered
+the project live — parsing the page JSON on every request — which is precisely
+the work the build exists to do once. The deployment shape that was easiest to
+reach was therefore the slowest one a visitor could be given.
+
+And it made every project on the install a **neighbour of a production domain**.
+The `/p/` refusal existed only to keep that domain from being used to reach or
+enumerate the others, which is a boundary that has to be maintained rather than
+one that exists. A build has no such neighbours: it is one site, in its own
+folder, with its own vhost, and nothing to enumerate.
+
+Once the mode goes, that refusal has nothing left to protect, and its only
+remaining effect was breaking the editor's preview iframe wherever the variable
+happened to be set — so it goes with it. The panel warning added for the old
+shape is deleted rather than kept: it warned about a configuration that can no
+longer do anything.
+
+Nothing is stranded. `/p/<id>/` still serves for development and preview, and it
+is the surface the editor already points at.
+
+**Alternatives considered**: keeping the mode and fixing the editor instead
+(rejected — it preserves the two real costs above to save a deployment shape that
+should not be used, and the narrower variant of that fix puts a project id back
+into a routing decision on the one surface where existence was deliberately
+removed from routing); keeping the mode but documenting it as development-only
+(rejected — a documented footgun in a shipped vhost example is still a shipped
+vhost example, and this one was the first thing a deployer read); leaving the
+`/p/` refusal in place defensively (rejected — a rule whose stated purpose no
+longer exists is one nobody can later reason about, and this one has a measured
+cost).
+
+**Source**: `secure/src/functions/surfaceB.php` (the ENV entry branch and the
+`/p/` refusal, both removed), `secure/admin/templates/layout.php` (warning
+removed), `secure/deploy/apache-vhosts.conf.example`,
+`secure/deploy/nginx-vhosts.conf.example`, `README.md`, `docs/ARCHITECTURE.md`
+§5.1 / §6 / §10.
+
+### A build is not static and has no feature gap (locked 2026-08-16)
+
+**Decision**: a build is **precompiled pages plus the runtime that serves them**
+— a self-contained QuickSite serving exactly one project, in which resolvers,
+param routes, server-side auth and `serverFetch` all work. Documentation says so,
+and never describes a build as static or as a reduced form of the project.
+Anything a built site cannot do is recorded as a **defect in the build**, not as
+a property of builds.
+
+**Reasoning**: the difference matters because of what each framing licenses. If
+the build is "the static version", every gap found in it is a known limitation
+and closes no loop — a feature that fails there is behaving correctly. If the
+build is the same site compiled, the same gap is a bug with an owner. Only one of
+those framings ever produces a build that works, and the words in the docs are
+what decide which one a future reader inherits.
+
+The compilation removes *editing-time* computation: traversing the page JSON on
+every request, and the editor machinery around it. It does not remove runtime
+behaviour, and there is no point at which it was decided that it should.
+
+**Alternatives considered**: documenting what a static build can and cannot do
+(rejected — it was the original roadmap line, and it presumes the gap it would
+describe; writing the limitation down is what makes it permanent).
+
+**Source**: `docs/ARCHITECTURE.md` §10 and the renderer/compiler diagram in §4,
+`docs/COMMAND_API.md` (Builds), `README.md`. This entry records the framing only;
+build behaviour is unchanged by it.
+
+### `ApiResponse` has no default message, and `withMessage()` is mandatory (locked 2026-08-16)
+
+**Decision**: the response-code registry — a table mapping `(status, code)` to a
+default message — is deleted, along with `getAllCodes()`, `exportRegistry()` and
+the `success()` helper that existed to wrap a registry default. Every response
+supplies its own message. `create()` no longer sets one, and a response reaching
+`send()` or `toArray()` without a message is refused with a 500 rather than given
+a fallback.
+
+**Reasoning**: the registry failed at both halves of its job at once.
+
+It was **never the message anyone wanted**. All 1417 `create()` call sites in the
+engine pass their own `withMessage()`, because a useful message names the field,
+the file or the limit — which a table keyed on a code cannot know. The 28 sites
+that did not were not preferring the default; they were sites nobody had
+finished, and each was given a real message before the table was removed. The
+improvement is visible from outside: `addNode` with no parameters answered
+*"Required parameter missing"* and now answers *"Missing required parameter:
+type"*.
+
+And it **covered a small and shrinking fraction of what the engine emits**.
+Measured before removal: 99 distinct `(status, code)` pairs unregistered,
+producing 65,498 `Unregistered response code` lines — 82% of an 8 MB error log,
+every one of them describing a response that was already correct, because the
+caller had supplied its own message. The registry's only observable effect had
+become to fill the log with warnings about responses that were fine.
+
+**"Mandatory" is enforced twice, and neither mechanism is redundant.** A static
+scan walks the token stream of every command and exits non-zero if any `create()`
+reaches its terminating `;` without a `withMessage()` — that sees branches no test
+ever executes, which is exactly where a forgotten message would hide. A runtime
+check catches what the scan cannot: `->withMessage($e->getMessage())` on an
+exception with an empty message reads as correct to any static check and produces
+a response that says nothing.
+
+The runtime check **fails rather than inventing a message**, and answering 500 is
+not a severity choice — a response with no message is a malformed command, and
+saying so is true. Answering "Unknown response" instead is the failure mode that
+hides, because nobody investigates a response that looks like an answer. In
+development it throws where the mistake is; in production it degrades to a 500
+and writes **one** log line naming the file and line. That it can fail hard is
+safe precisely because all 1417 existing sites carry a message, so nothing
+shipped today can reach it — it can only fire on code written afterwards.
+
+**Alternatives considered**: keeping the registry and registering the missing 99
+pairs (rejected — it treats the log volume as the problem when the problem is a
+fallback nobody reads; the table would need extending on every new code forever);
+making the message a required third argument of `create()` (rejected — PHP would
+enforce it perfectly, but it means editing 1417 call sites that already pass a
+message, and leaves two ways to say one thing; `custom()` already offers that
+shape for new code); convention plus a code-review note (rejected — the 28
+unfinished sites are what convention alone produced over the project's life).
+
+**Source**: `secure/src/classes/ApiResponse.php`, and the 13 command files listed
+by `NOTES/tests/beta11/s210_create_scan.php`.

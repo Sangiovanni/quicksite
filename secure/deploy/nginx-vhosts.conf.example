@@ -1,13 +1,24 @@
 # =============================================================================
-# QuickSite — nginx server-block examples: one install, N projects, N domains.
+# QuickSite — nginx server-block example for the AUTHORING install.
 #
 # Same model as the Apache twin (apache-vhosts.conf.example, which also
-# documents every QS_* variable): the DEPLOYMENT declares which project a
-# domain serves via fastcgi_param; QuickSite holds no serving state.
+# documents every QS_* variable): QuickSite serves every project at
+# /p/<projectId>/ on the install's own hostname, for editing and for preview.
+# A finished site goes to production as a BUILD, with its own root and its own
+# server block, which is not this install.
 #
-# NOTE: this is separate from secure/nginx/dynamic_routes.conf (the generated
-# routing include for the AUTHORING install). Copy what you need into your
-# site config and adjust paths/domains/php upstream. Nothing reads this file.
+#   ⚠ fastcgi_param QS_PROJECT IS WITHDRAWN AND DOES NOTHING.
+#   A server block used to be able to declare which project it served, making
+#   that domain's root the site. That is gone: it put uncompiled pages on the
+#   public internet, and it broke the visual editor, because a domain serving
+#   one project had to refuse the /p/<projectId>/ URLs the editor's preview
+#   iframe loads. Delete the directive if you have it; the engine no longer
+#   reads it. QS_PUBLIC_BASE_URL, QS_TRUSTED_HOSTS and QS_ERROR_PAGE_* are
+#   unaffected and still read.
+#
+# NOTE: this file is separate from secure/nginx/dynamic_routes.conf (the
+# generated routing include). Copy what you need into your site config and
+# adjust paths/php upstream. Nothing reads this file.
 #
 # VERIFIED ON: nginx as configured by CloudPanel. Another nginx install differs
 # mainly in three places — the php-fpm upstream name (`fastcgi_pass php;`
@@ -35,25 +46,11 @@
 # it is in the generated `secure/nginx/dynamic_routes.conf`, on the
 # `/management/` block, and the nginx setup page prints it. Uploads reach
 # QuickSite only through `/management/`, so that one block is the whole story
-# for a single-server-block vhost — the value below is for the mapped-domain
-# blocks in this file, which serve the same install.
+# for a single-server-block vhost.
 #
 # ⚠ A PROXYING PUBLIC BLOCK NEEDS ITS OWN COPY. In the two-block layout
 # described further down, the public block terminates the client connection, so
 # its own 1 MB default rejects the body before the backend is ever dialled.
-#
-# ---- ⚠ NEVER SET QS_PROJECT ON THE HOSTNAME THAT SERVES /admin/ -------------
-# A mapped domain serves ONE project at its root and answers 404 to any literal
-# /p/… request — one domain, one site, and that is what stops a production
-# domain being used to enumerate the other projects on the install. The visual
-# editor's preview iframe is `/p/<projectId>/`. So a vhost that has QS_PROJECT
-# set AND serves the admin panel gives you an editor whose preview 404s.
-#
-# The two roles are separate hostnames on purpose: mapped domains SERVE, the
-# authoring hostname EDITS. Every project on the install — including the ones
-# with their own domains — is edited at /p/<projectId>/ on the authoring
-# hostname, which is where the panel already points. See the last block in this
-# file.
 #
 # ---- THE FOUR ENTRY POINTS --------------------------------------------------
 # QuickSite is four self-contained namespaces under the public folder, each with
@@ -77,17 +74,13 @@
 #
 #     location ~* ^.+\.(css|js|png|…)$ { expires max; }
 #
-# and in nginx a REGEX location outranks a PREFIX one. A mapped domain serves its
-# project's stylesheets, scripts and images THROUGH PHP — they live in
+# and in nginx a REGEX location outranks a PREFIX one. A project's stylesheets,
+# scripts and images are served THROUGH PHP — they live in
 # secure/projects/<id>/public/, not in the web root, so the visibility gate can
 # run before any byte is sent. A block like the one above will look for them on
 # disk, not find them, and answer 404, while extensionless page routes keep
-# rendering perfectly. If you have one, make it fall through instead:
-#
-#     location ~* ^.+\.(css|js|png|…)$ { try_files $uri @site; }
-#
-# The authoring surface at the bottom of this file solves the same problem a
-# different way, with `^~` — see the note there.
+# rendering perfectly. The generated include solves this with `^~` — see the
+# note at the bottom.
 #
 # ---- ⚠ AND IF YOUR PANEL GENERATES TWO SERVER BLOCKS ------------------------
 # CloudPanel (and panels like it) emit a PUBLIC block on 443 that proxies to a
@@ -113,8 +106,9 @@
 # itself, never the network.
 #
 # Verified on nginx 1.24.0 by reproducing the two-block layout: without this the
-# stylesheet is 404, with it the request reaches the project handler, and
-# /p/index.php still answers 404 end to end.
+# stylesheet is 404, with it the request reaches the project handler.
+#
+# One server block only? Then there is nothing to do here.
 #
 # ---- WHY ONLY /p/ USES `^~` -------------------------------------------------
 # `^~` means "if this prefix wins, do not consider regex locations at all". That
@@ -122,103 +116,10 @@
 # try_files fallback is a .php path, which re-enters location matching — with
 # regex suppressed it would land back in the same block, find the front
 # controller ON DISK, and serve it as plain text. `^~` plus a .php fallback
-# hands out your source. The three plain prefixes below are correct as written.
+# hands out your source. The three plain prefixes are correct as written.
 # =============================================================================
 
-# ---- example.com  ->  project "siteA" ---------------------------------------
-server {
-    listen      443 ssl;
-    server_name example.com;
-    root        /srv/quicksite/public;
-
-    # REQUIRED for uploads — see the note at the top. 51m suits a server whose
-    # post_max_size is 50M; use the value from your own generated
-    # dynamic_routes.conf, not this one.
-    client_max_body_size 51m;
-
-    # The engine's own namespaces keep working on every domain. Longest prefix
-    # first for readability — nginx picks by length, not by order.
-    location /admin/api/  { try_files $uri $uri/ /admin/api/index.php$is_args$args; }
-    location /management/ { try_files $uri $uri/ /management/index.php$is_args$args; }
-    location /admin/      { try_files $uri $uri/ /admin/index.php$is_args$args; }
-
-    # One domain, one site: /p/ is not this domain's surface.
-    # (The engine also enforces this itself when QS_PROJECT is set.)
-    location ^~ /p/ { return 404; }
-
-    # Real files first (your own root files; project assets resolve inside the
-    # engine), everything else renders the mapped project.
-    #
-    # No `$uri/` here on purpose: a directory should not produce an index
-    # listing or a directory redirect on a mapped domain — every non-file URL
-    # belongs to the project renderer.
-    location / { try_files $uri @site; }
-
-    location @site {
-        include        fastcgi_params;
-        fastcgi_param  QS_PROJECT          "siteA";
-        fastcgi_param  QS_PUBLIC_BASE_URL  "https://example.com/";
-        fastcgi_param  QS_TRUSTED_HOSTS    "example.com";
-        # fastcgi_param QS_ERROR_PAGE_404  "/404.html";
-        # fastcgi_param QS_ERROR_PAGE_403  "/403.html";
-        fastcgi_param  SCRIPT_FILENAME     $document_root/p/index.php;
-        fastcgi_pass   php;   # your php-fpm upstream
-    }
-
-    location ~ \.php$ {
-        # try_files FIRST. Without it, /whatever.jpg/x.php is handed to PHP with
-        # SCRIPT_FILENAME pointing at a path that does not exist, and a PHP built
-        # with cgi.fix_pathinfo=1 walks back up and executes whatever.jpg. The
-        # =404 is what makes this location refuse anything that is not a real
-        # file on disk.
-        try_files      $uri =404;
-        include        fastcgi_params;
-        fastcgi_param  SCRIPT_FILENAME $document_root$fastcgi_script_name;
-        fastcgi_pass   php;
-    }
-}
-
-# ---- shop.example.net  ->  project "siteB" ----------------------------------
-server {
-    listen      443 ssl;
-    server_name shop.example.net;
-    root        /srv/quicksite/public;
-
-    client_max_body_size 51m;   # REQUIRED — see the note at the top
-
-    location /admin/api/  { try_files $uri $uri/ /admin/api/index.php$is_args$args; }
-    location /management/ { try_files $uri $uri/ /management/index.php$is_args$args; }
-    location /admin/      { try_files $uri $uri/ /admin/index.php$is_args$args; }
-    location ^~ /p/          { return 404; }
-    location /               { try_files $uri @site; }
-
-    location @site {
-        include        fastcgi_params;
-        fastcgi_param  QS_PROJECT          "siteB";
-        fastcgi_param  QS_PUBLIC_BASE_URL  "https://shop.example.net/";
-        fastcgi_param  QS_TRUSTED_HOSTS    "shop.example.net";
-        fastcgi_param  SCRIPT_FILENAME     $document_root/p/index.php;
-        fastcgi_pass   php;
-    }
-
-    location ~ \.php$ {
-        try_files      $uri =404;
-        include        fastcgi_params;
-        fastcgi_param  SCRIPT_FILENAME $document_root$fastcgi_script_name;
-        fastcgi_pass   php;
-    }
-}
-
-# ---- the install's own hostname — the AUTHORING surface ---------------------
-# No QS_PROJECT / QS_PUBLIC_BASE_URL: every project serves at /p/<projectId>/
-# (visibility-gated) and the root stays free.
-#
-# ⚠ THE ABSENCE OF QS_PROJECT HERE IS LOAD-BEARING, NOT AN OMISSION. This is the
-# hostname you sign in to and edit on, and the visual editor previews a project
-# by loading /p/<projectId>/ in an iframe. Setting QS_PROJECT on this vhost
-# turns those URLs into 404s (one domain, one site) and the editor stops working
-# — for every project, not just the mapped one. Keep serving and authoring on
-# separate hostnames; that is what the two blocks above and this one are.
+# ---- the install's own hostname — the authoring surface ---------------------
 #
 # Do NOT hand-write the routing here. QuickSite generates it on the first page
 # load, from the folder names and URL space you chose in setup, and rewrites it
@@ -248,7 +149,16 @@ server {
 #     server_name quicksite.example.internal;
 #     root        /srv/quicksite/public;
 #
+#     client_max_body_size 51m;   # REQUIRED for uploads — see the note at the top
+#
 #     include     /srv/quicksite/secure/nginx/dynamic_routes.conf;
+#
+#     # Optional, and neither of these selects a project. Declare
+#     # QS_PUBLIC_BASE_URL when this install generates sitemaps for a site whose
+#     # deployed URL differs from this hostname — the normal case, since the
+#     # deployed site is a build living somewhere else.
+#     # fastcgi_param  QS_PUBLIC_BASE_URL  "https://example.com/";
+#     # fastcgi_param  QS_TRUSTED_HOSTS    "quicksite.example.internal";
 #
 #     location @quicksite_project {
 #         include        fastcgi_params;
@@ -260,6 +170,32 @@ server {
 #         fastcgi_param  SCRIPT_FILENAME $document_root/p/index.php;
 #         fastcgi_pass   php;
 #     }
+#
+#     location ~ \.php$ {
+#         # try_files FIRST. Without it, /whatever.jpg/x.php is handed to PHP with
+#         # SCRIPT_FILENAME pointing at a path that does not exist, and a PHP built
+#         # with cgi.fix_pathinfo=1 walks back up and executes whatever.jpg. The
+#         # =404 is what makes this location refuse anything that is not a real
+#         # file on disk.
+#         try_files      $uri =404;
+#         include        fastcgi_params;
+#         fastcgi_param  SCRIPT_FILENAME $document_root$fastcgi_script_name;
+#         fastcgi_pass   php;
+#     }
+# }
+
+# ---- a DEPLOYED BUILD, for reference ----------------------------------------
+# A build is not this install and does not share its configuration. It ships its
+# own public/ and secure/ folders (renamed at build time — the renaming is part
+# of the security model, since anyone scanning the deployed server cannot then
+# guess paths from the open-source repo layout) and it serves exactly one site
+# from its own root. Point `root` at the build's public folder; no QS_* variable
+# selects anything, because there is only one project there.
+#
+# server {
+#     listen      443 ssl;
+#     server_name example.com;
+#     root        /srv/example.com/www;
 #
 #     location ~ \.php$ {
 #         try_files      $uri =404;

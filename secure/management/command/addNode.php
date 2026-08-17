@@ -55,10 +55,12 @@ function __command_addNode(array $params = [], array $urlParams = []): ApiRespon
     // Required parameters
     if (!isset($params['type'])) {
         return ApiResponse::create(400, 'validation.required')
+            ->withMessage('Missing required parameter: type')
             ->withErrors([['field' => 'type', 'reason' => 'missing']]);
     }
     if (!isset($params['targetNodeId'])) {
         return ApiResponse::create(400, 'validation.required')
+            ->withMessage('Missing required parameter: targetNodeId')
             ->withErrors([['field' => 'targetNodeId', 'reason' => 'missing']]);
     }
     // nodeKind selects what we're adding: a tag element (default) or a bare
@@ -137,6 +139,7 @@ function __command_addNode(array $params = [], array $urlParams = []): ApiRespon
     
     if (($type === 'page' || $type === 'component') && empty($name)) {
         return ApiResponse::create(400, 'validation.required')
+            ->withMessage("Missing required parameter: name (required when type is {$type})")
             ->withErrors([['field' => 'name', 'reason' => "required for type={$type}"]]);
     }
     

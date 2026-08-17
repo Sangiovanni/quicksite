@@ -22,6 +22,7 @@ if (!isset($params['language']) || !isset($params['translations'])) {
     if (!isset($params['translations'])) $missing[] = 'translations';
     
     ApiResponse::create(400, 'validation.required')
+        ->withMessage('Missing required parameter' . (count($missing) > 1 ? 's' : '') . ': ' . implode(', ', $missing))
         ->withErrors(array_map(fn($f) => ['field' => $f, 'reason' => 'missing'], $missing))
         ->send();
 }

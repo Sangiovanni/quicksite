@@ -993,16 +993,16 @@
     // read or clear the ADMIN PANEL's own keys; generating `qs_<id>_<key>` would
     // mean carving an exception into the guard that exists to block that shape.
     //
-    // THE ID COMES FROM THE SERVER, NEVER FROM THE PATH. At /p/<id>/ the id is a
-    // URL segment; on a MAPPED DOMAIN it comes from the vhost's QS_PROJECT and
+    // THE ID COMES FROM THE SERVER, NEVER FROM THE PATH. In development the id
+    // is a URL segment of /p/<id>/; a BUILT site is served from its own root and
     // the path contains no id at all. Deriving it from location.pathname would
-    // give those two modes different prefixes, so the same site would store
-    // under different names in preview and in production. window.QS_PROJECT is
-    // emitted by the page renderer in both modes, and read lazily here so the
-    // ordering of the hydration tag against this file cannot matter.
+    // give those two different prefixes, so the same site would store under
+    // different names in development and in production. window.QS_PROJECT is
+    // emitted by the page renderer in both, and read lazily here so the ordering
+    // of the hydration tag against this file cannot matter.
     //
     // ALWAYS PREFIXED — live render and built output alike. Two behaviours would
-    // mean preview and production disagree on key names, which is the exact
+    // mean development and production disagree on key names, which is the exact
     // shape of "works in preview, broken in production".
 
     const QS_STORAGE_PREFIX = 'qsp_';

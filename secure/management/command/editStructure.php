@@ -182,6 +182,7 @@ $action = $params['action'] ?? 'update'; // 'update', 'delete', 'insertBefore', 
 // For full mode: type, structure
 if (!isset($params['type'])) {
     ApiResponse::create(400, 'validation.required')
+        ->withMessage('Missing required parameter: type')
         ->withErrors([['field' => 'type', 'reason' => 'missing']])
         ->send();
 }
@@ -189,6 +190,7 @@ if (!isset($params['type'])) {
 // Structure is required unless action is 'delete'
 if (!isset($params['structure']) && $action !== 'delete') {
     ApiResponse::create(400, 'validation.required')
+        ->withMessage('Missing required parameter: structure (required unless action is delete)')
         ->withErrors([['field' => 'structure', 'reason' => 'missing (required unless action is delete)']])
         ->send();
 }
@@ -380,6 +382,7 @@ if ($structure !== null && is_array($structure)) {
 if ($type === 'page' || $type === 'component') {
     if (!isset($params['name'])) {
         ApiResponse::create(400, 'validation.required')
+            ->withMessage("Missing required parameter: name (required when type is {$type})")
             ->withErrors([['field' => 'name', 'reason' => "required for type={$type}"]])
             ->send();
     }

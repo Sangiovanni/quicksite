@@ -65,7 +65,7 @@ quicksite/
 │   │   ├── core/                 #   shipped with the engine, read-only
 │   │   └── custom/               #   personal libraries — one folder per user
 │   │       └── usr_<id>/         #     that user's own snippets, private to them
-│   ├── deploy/                   # Apache + nginx vhost examples for mapped domains
+│   ├── deploy/                   # Apache + nginx vhost examples for the install
 │   ├── nginx/                    # Auto-generated nginx config (dynamic_routes.conf)
 │   ├── cron/                     # Optional cron scripts (nginx reload fallback)
 │   ├── tmp/                      # Scratch space (gitignored)

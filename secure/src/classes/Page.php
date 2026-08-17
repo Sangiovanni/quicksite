@@ -111,8 +111,8 @@ class Page {
     <?php
     // Storage-namespace handoff — mirrors PageManagement::render(). A built page
     // is still served by PHP, so it emits the same handoff from the same
-    // PROJECT_NAME. The prefix is NOT stripped at build time: preview and
-    // production must agree on key names, and /p/<id>/ and a mapped domain are
+    // PROJECT_NAME. The prefix is NOT stripped at build time: development and
+    // production must agree on key names, and /p/<id>/ and a deployed build are
     // different origins anyway, so storage never carried between them.
     //
     // ⚠ A build has no entry point at present (build.php's index.php/init.php

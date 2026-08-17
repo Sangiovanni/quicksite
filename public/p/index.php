@@ -12,9 +12,9 @@ qs_surface_b_maybe_handle();
 require_once __DIR__ . '/../init.php';
 
 // C15 15.3 — no project, no render. A request that reaches this file without resolving to
-// a project is either a bare /p/ or a /p/<id>/ naming nothing that exists. There is no
-// served project left to fall back on (that fallback WAS the served-project privilege),
-// and every constant below this line is project-scoped, so answer and stop.
+// a project named a `/p/` path with no id after the marker. There is no served project left
+// to fall back on (that fallback WAS the served-project privilege), and every constant
+// below this line is project-scoped, so answer and stop.
 if (!defined('QS_SURFACE_B_PROJECT')) {
     qs_sb_deny(404, 'This site is not available.');
 }

@@ -25,6 +25,7 @@ $params = $trimParametersManagement->params();
 // Validate required parameters
 if (!isset($params['lang'])) {
     ApiResponse::create(400, 'validation.required')
+        ->withMessage('Missing required parameter: lang')
         ->withErrors([['field' => 'lang', 'reason' => 'missing']])
         ->send();
 }

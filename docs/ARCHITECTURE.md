@@ -246,7 +246,7 @@ Page structure JSON becomes HTML in two ways depending on context:
    (runtime / dev / editor)      (build step)
               │                           │
               ▼                           ▼
-     HTML string per request      Static .php template
+     HTML string per request      Compiled .php template
      ?_editor=1 adds              No JSON parsing on
      data-qs-* attributes         hot path
 ```
@@ -262,19 +262,19 @@ Components are inlined at parse time. `{{var}}` placeholders inside a component 
 
 ### 5.1 Public site request
 
-Every project is served under `/p/<projectId>/`, from its own folder. The web root is
+Every project is served under `/p/<projectId>/`, from its own folder — in development and
+for preview, which is the whole of a project's life on the authoring install. The web root is
 deliberately **free**: QuickSite installs no fallback there, so an operator can put their own
-site at the domain root. A production deployment maps a domain onto one project in its own
-web-server config (§6) rather than QuickSite choosing a privileged project.
+site at the domain root. Production is a **build** (§10): a project reaches the public as a
+self-contained deliverable with its own deployment, never by pointing a domain at the
+authoring install.
 
 ```
-GET /p/mysite/fr/about            (or GET /fr/about on a mapped domain)
+GET /p/mysite/fr/about
   │
-  ▼  Apache public/p/.htaccess → public/p/index.php   (mapped domain: the
-  │                              vhost's FallbackResource /p/index.php)
+  ▼  Apache public/p/.htaccess → public/p/index.php
 surfaceB  (runs first, before init.php)
-  ├── binds the project: the vhost's QS_PROJECT env var (mapped domain),
-  │     else the /p/<projectId>/ URL marker (the install's own hostname)
+  ├── binds the project from the /p/<projectId>/ URL marker
   ├── gates it by visibility + membership
   └── sets BASE_URL from the validated request origin
   │
@@ -303,13 +303,13 @@ public/p/index.php
   │
 Page template
   ├── new Translator($lang)
-  ├── new JsonToHtmlRenderer (or in build mode, static PHP runs directly)
+  ├── new JsonToHtmlRenderer (or in build mode, the compiled PHP runs directly)
   ├── renders structure → HTML body
   └── Page::render() emits <!doctype>, <head>, menu, body, footer
 ```
 
 Emitted URLs are **root-relative**: a page links to `/p/mysite/about` on the install's own
-hostname and to `/about` on a mapped domain — the same rendered HTML carries no scheme or
+hostname and to `/about` once built and deployed — the same rendered HTML carries no scheme or
 host, so it survives domain moves, HTTPS switches, and reverse proxies. The absolute base
 exists only where a spec demands one (`sitemap.txt`).
 
@@ -319,7 +319,7 @@ point — an element added, edited, duplicated or inserted from a snippet comes 
 fragment the editor drops straight into the preview — and those fragments compose their URLs
 against the same base, resolved the same way. An `/assets/videos/intro.mp4` written by the author
 therefore reads `/p/mysite/assets/videos/intro.mp4` whether it arrives as part of a whole page or
-as a freshly inserted node, and on a mapped domain it reads `/assets/videos/intro.mp4` in both.
+as a freshly inserted node, and in a deployed build it reads `/assets/videos/intro.mp4` in both.
 The rule holds for every URL attribute the renderer rewrites — `href`, `src`, `srcset`, `poster`,
 `action`, `formaction`, `cite`, `data` — and for the language prefix a multilingual project adds
 to non-asset URLs.
@@ -432,7 +432,7 @@ secure/projects/
 └── documentation/
 ```
 
-A project is reachable two ways — the **two surfaces**:
+A project is reachable two ways on the authoring install — the **two surfaces**:
 
 - **Per-project live view — `/p/<projectId>/`.** Every project is live-rendered from its own `secure/projects/<id>/public/` folder under `/p/<projectId>/`. No project is privileged: they are all served the same way, from their own folder, with nothing materialised elsewhere. The HTML runs through the shared renderer; static sub-resources (style, scripts, images, fonts) are served through a canonicalised, prefix-checked passthrough that exposes **only** that project's `public/` subtree (§7). Access is gated by the project's visibility and the caller's membership — a private project answers the same refusal to a non-member as to a stranger, so membership is never leaked.
 
@@ -443,27 +443,28 @@ A project is reachable two ways — the **two surfaces**:
   How long a copy may be reused, and by whom, follows the project's visibility. Every asset is cacheable for five minutes, but a **public** project's assets are marked `public` — any cache may store them, shared proxies and CDNs included — while a project that is not public marks them `private`, which permits the visitor's own browser to keep a copy and forbids a shared cache from holding one it could hand to somebody the gate never admitted. `private` and not `no-store`: a member is entitled to the bytes they just fetched, and refusing them a stored copy would also throw away the revalidation above, making every navigation refetch in full to prevent something `private` already prevents. The answer comes from the visibility the gate already decided, so the two can never disagree.
 - **Visual editor.** The admin panel edits one project at a time, previewing it through that project's `/p/<id>/` view in editor mode.
 
-**Mapped domains — production serving.** Which project a real domain serves is a *deployment*
-decision, declared in web-server config and read per-request by the engine — QuickSite holds no
-serving state:
+**Production is a build.** The authoring install serves projects at `/p/<projectId>/` and
+nowhere else; a project reaches the public by being **built** (§10) and deployed as a
+self-contained site with its own web root and its own vhost. A domain is never pointed at the
+authoring install to serve a project directly out of it. That means the public gets compiled
+pages rather than JSON re-parsed on every request, and it means the authoring install's other
+projects are not reachable from a production domain at all — there is no path between them to
+secure.
 
-- `QS_PROJECT` (per-vhost `SetEnv` / `fastcgi_param`) names the project; the domain root **is**
-  that site, with no `/p/` marker in any URL. The same visibility/membership gate and the same
-  passthrough jail apply as on the `/p/<id>/` surface.
+Two per-vhost variables remain, and neither selects a project:
+
 - `QS_PUBLIC_BASE_URL` declares the public base that absolute-by-spec artifacts (`sitemap.txt`)
-  are generated against; it also covers sub-path mounts and reverse proxies, where the
-  request-derived origin would be wrong. In-page links are root-relative and need no declaration.
+  are generated against. A sitemap has to name the URL the site will be *deployed* at, which the
+  authoring install cannot derive from the request it is answering, so the deployer declares it.
+  It also covers sub-path mounts and reverse proxies, where the request-derived origin would be
+  wrong. In-page links are root-relative and need no declaration.
 - `QS_TRUSTED_HOSTS` (optional) pins the Host header: a request presenting any other host has
   its URLs composed against the first listed host instead.
-- On a mapped domain a literal `/p/…` request answers **404** — one domain, one site; other
-  projects on the install can be neither reached nor enumerated through it. `/p/<id>/` stays
-  open on the install's own hostname.
 
-Adding a domain touches server config only: no command, no PHP state. Copy-paste examples for
-both servers ship in `secure/deploy/apache-vhosts.conf.example` and
+Copy-paste vhosts for both servers ship in `secure/deploy/apache-vhosts.conf.example` and
 `secure/deploy/nginx-vhosts.conf.example` (shared hosting can put the same `SetEnv` lines in a
 `.htaccess`). A misdeclared value never takes a site down: the engine logs it and degrades to
-the derived base (or a generic status page for an unresolvable `QS_PROJECT`).
+the derived base.
 
 The **web root carries no QuickSite fallback**: it serves real files only. Nothing is rendered
 there, so an operator can place their own hand-made site at the domain root without QuickSite
@@ -472,7 +473,7 @@ squatting it (the shipped `.htaccess` also disables directory listings there).
 **Project visibility.** Each project's `config/members.json` carries a `visibility` flag:
 
 - `public` — the `/p/<id>/` view is open to anonymous visitors (a shareable site).
-- `private` — the `/p/<id>/` view requires membership (owner / member / viewer). Identity is the panel's own session cookie and nothing else: a preview iframe is a plain browser navigation and can carry no header of its own, and the cookie is scoped to the whole origin so `/p/<id>/` receives it. One consequence is worth knowing before mapping a domain: a project served on its OWN domain is a different origin, so the panel's cookie is not sent there. That is irrelevant for a public project, and it means a **private** project cannot be previewed on its mapped domain — preview it at `/p/<id>/` on the panel's own hostname, which is where the editor points anyway.
+- `private` — the `/p/<id>/` view requires membership (owner / member / viewer). Identity is the panel's own session cookie and nothing else: a preview iframe is a plain browser navigation and can carry no header of its own, and the cookie is scoped to the whole origin so `/p/<id>/` receives it. Every request this gate sees is therefore same-origin with the panel, since `/p/<id>/` is the only way a project is served here — the credential that is available is the credential that is required.
 
 A refused `/p/<id>/` request answers `404` with a plain, engine-owned status page — the **same status, headers and bytes** an id that names no project at all gets. Whether the visitor is anonymous or signed in as a non-member makes no difference: a private project is indistinguishable from one that does not exist, so `/p/` cannot be used to discover which project ids are real. (The cost is deliberate: a signed-out member of a private project also sees `404` rather than a prompt to sign in.) The page borrows no project's templates — rendering the requested project's own error page would hand a non-member that project's styling — and it names nothing. A deployment can substitute its own static pages for these engine-owned statuses by declaring `QS_ERROR_PAGE_<status>` (e.g. `SetEnv QS_ERROR_PAGE_404 /404.html`): the value must be a root-relative `.html`/`.htm` file inside the document root, is served with the real status code, and an invalid value is logged and ignored. (A missing *page* inside a project that did resolve is different — that renders the project's own 404 template, no configuration involved.)
 
@@ -565,7 +566,7 @@ Use the live `listJsFunctions` command for the authoritative list. The catalog i
 
 Beyond the `{{call:…}}` verbs, the auth-flows runtime adds **declarative bindings** read by `qs.js` on load + on `qs:auth:*` events — `data-auth-show` (with four modes: `in` / `out` for token presence, `connecting` / `failed` for the Tier 3 magic-link exchange lifecycle) / `data-auth-source` and the generic `data-storage-show` / `data-storage-value` (any storage key) and `data-consent-show="granted|denied:<category>"` (visibility gated on cookie-consent state) — plus the `QS.isAuthed(source)` query. The Tier 3 magic-link verbs (`exchangeMagicLink`, `requestMagicLink`, `logoutServer`) dispatch `qs:auth:exchange-started` / `qs:auth:exchange-failed` to drive the connecting/failed modes. All documented in `ADMIN_PANEL.md §9.5`.
 
-**Browser storage is namespaced per project.** Storage is scoped by origin and a path is not part of an origin, so every project served at `/p/<id>/` on one host shares a single `localStorage`. `qs.js` therefore writes and reads each key as `qsp_<projectId>_<key>` — the storage verbs, the `data-storage-*` / `data-auth-source` bindings and a state store's `localStorage:` / `sessionStorage:` init source all resolve through the same helper, so they always address the same slot. Everything an author writes names the bare key; the prefix exists only inside `qs.js`. The project id arrives from the server as `window.QS_PROJECT`, emitted before `qs.js` by `PageManagement::render()` (live) and `Page::render()` (built): at `/p/<id>/` the id is a URL segment but on a mapped domain it comes from the vhost's `QS_PROJECT` and the path carries no id at all, so deriving it client-side would give the two serving modes different prefixes. The prefix is never stripped at build time — preview and production must agree on key names. `qsp_` is deliberately outside the admin reservation (`quicksite_`/`quicksite-`/`qs_`/`qs-`, enforced by `secure/src/functions/reservedStorageKeys.php`), which is what keeps a project page from addressing panel state.
+**Browser storage is namespaced per project.** Storage is scoped by origin and a path is not part of an origin, so every project served at `/p/<id>/` on one host shares a single `localStorage`. `qs.js` therefore writes and reads each key as `qsp_<projectId>_<key>` — the storage verbs, the `data-storage-*` / `data-auth-source` bindings and a state store's `localStorage:` / `sessionStorage:` init source all resolve through the same helper, so they always address the same slot. Everything an author writes names the bare key; the prefix exists only inside `qs.js`. The project id arrives from the server as `window.QS_PROJECT`, emitted before `qs.js` by `PageManagement::render()` (live) and `Page::render()` (built): at `/p/<id>/` the id is a URL segment, but a deployed build is served from its own root and the path carries no id at all, so deriving it client-side would give development and production different prefixes. The prefix is never stripped at build time — the two must agree on key names. `qsp_` is deliberately outside the admin reservation (`quicksite_`/`quicksite-`/`qs_`/`qs-`, enforced by `secure/src/functions/reservedStorageKeys.php`), which is what keeps a project page from addressing panel state.
 
 **`QS.redirect` enforces a scheme allowlist** (`http`, `https`, `mailto`, `tel` — the same set as the server-side `UrlPolicy` that guards URL *attributes*), refusing anything else with a `console.warn`. Assigning a `javascript:` URL to `location.href` executes in the page's own origin, and the surface-B CSP cannot prevent it because engine pages require `script-src 'unsafe-inline'` for their own handlers. Three callers reach the sink with values the page did not choose: the `redirect` verb, the magic-link verbs' `returnTo` argument, and the `?return=` query parameter they fall back to.
 
@@ -926,8 +927,21 @@ CSS is modelled as four addressable layers, all manipulated through commands rat
 ## 10. Build & deploy
 
 ```
-POST /management/build  { "public": "www", "secure": "app" }
+POST /management/p/<projectId>/build  { "public": "www", "secure": "app" }
 ```
+
+**A build is the production form of a project, not a reduced one.** It is the
+project's pages precompiled to PHP *plus* the runtime that serves them — a
+self-contained QuickSite that serves exactly one site. Resolvers, param routes,
+server-side auth and `serverFetch` are part of what is built, so a built site
+does what the project did in development. What the build removes is
+*editing-time* computation: parsing the page JSON on every request, and the
+editor machinery around it. It does not remove features, and anything a built
+site cannot do is a defect in the build rather than a property of builds.
+
+Development and production are the two ends of one project's life: a project is
+authored and previewed at `/p/<projectId>/` on the install's own hostname for as
+long as it exists, and reaches the public as a build with its own deployment.
 
 Build steps, in order:
 

@@ -550,7 +550,7 @@
         },
         "step5": {
             "title": "5. Build & Deploy",
-            "desc": "Generate a static build of your site using the build command, then upload the files to your hosting provider."
+            "desc": "Compile your site with the build command, then upload the result to your hosting provider — a build is a self-contained copy of your site, ready to serve."
         },
         "next": {
             "title": "Next Steps",

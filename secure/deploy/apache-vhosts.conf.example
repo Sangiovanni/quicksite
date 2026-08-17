@@ -1,18 +1,34 @@
 # =============================================================================
-# QuickSite — Apache vhost examples: one install, N projects, N domains.
+# QuickSite — Apache vhost example for the AUTHORING install.
 #
-# QuickSite has NO "served project" state. Which project a domain serves is a
-# DEPLOYMENT decision, declared here and read per-request by the engine:
+# ONE VHOST IS ALL THIS FILE NEEDS. QuickSite serves every project at
+# /p/<projectId>/ on the install's own hostname, for editing and for preview,
+# for as long as the project exists. A finished site goes to production as a
+# BUILD — a self-contained deliverable with its own web root and its own vhost,
+# which is not this install and is not configured here.
 #
-#   SetEnv QS_PROJECT          <projectId>   which project this domain serves
-#   SetEnv QS_PUBLIC_BASE_URL  <base>        the public base the project's
-#                                            sitemap (and other absolute-by-spec
-#                                            artifacts) are generated against.
-#                                            In-page links are root-relative and
-#                                            do not need it; declare it anyway —
-#                                            it also covers sub-path mounts and
-#                                            reverse proxies where the request-
-#                                            derived origin would be wrong.
+#   ⚠ SetEnv QS_PROJECT IS WITHDRAWN AND DOES NOTHING.
+#   A vhost used to be able to declare which project it served, making that
+#   domain's root the site. That is gone: it put uncompiled pages on the public
+#   internet (re-parsing on every request what a build compiles once) and it
+#   broke the visual editor, because a domain serving one project had to refuse
+#   the /p/<projectId>/ URLs the editor's preview iframe loads. If you have the
+#   directive in a vhost, delete it — the engine no longer reads it.
+#
+# The variables below are read, and none of them selects a project:
+#
+#   SetEnv QS_PUBLIC_BASE_URL  <base>        the public base that absolute-by-
+#                                            spec artifacts are generated
+#                                            against — today that is sitemap.txt.
+#                                            A sitemap has to name the URL the
+#                                            BUILT site will be deployed at, and
+#                                            this install cannot derive that from
+#                                            the request in front of it, so the
+#                                            deployer declares it. It also covers
+#                                            sub-path mounts and reverse proxies,
+#                                            where the request-derived origin
+#                                            would be wrong. In-page links are
+#                                            root-relative and never need it.
 #   SetEnv QS_TRUSTED_HOSTS    a,b           optional Host-header pin (comma-
 #                                            separated host[:port]); a request
 #                                            with any other Host composes URLs
@@ -26,18 +42,15 @@
 #                                            deliberately indistinguishable);
 #                                            403/400 cover malformed or forbidden
 #                                            asset requests.
-#                                            (A missing PAGE inside a served
-#                                            project renders that project's own
-#                                            404 template — no config needed.)
+#                                            (A missing PAGE inside a project
+#                                            that resolved renders that project's
+#                                            own 404 template — no config needed.)
 #
 # Shared hosting (no vhost access): every SetEnv above is also legal in a
-# .htaccess file at the document root. So is FallbackResource. RewriteRule is
-# too, but the pattern loses its leading slash there — `^p(/|$)` in .htaccess,
-# `^/p(/|$)` in a vhost, which is why the mapped-domain examples below cannot be
-# pasted into .htaccess unchanged.
+# .htaccess file at the document root.
 #
-# VERIFIED ON: Apache 2.4 (WAMP). Needs mod_rewrite for the RewriteRule and
-# mod_env for SetEnv; FallbackResource is core.
+# VERIFIED ON: Apache 2.4 (WAMP). Needs mod_env for SetEnv; the per-directory
+# .htaccess files QuickSite ships need mod_rewrite.
 #
 # ---- UPLOADS: NOTHING TO DO HERE (unlike nginx) -----------------------------
 # Apache's LimitRequestBody defaults to 0 = unlimited, so PHP's own
@@ -61,72 +74,43 @@
 #
 # Those four .htaccess files ship with QuickSite and need no configuration —
 # they apply to every vhost pointed at the same DocumentRoot. There is
-# deliberately NO public/index.php: the web root is free, so your own hand-made
-# site can live there and QuickSite never squats the domain root. A mapped
-# domain is the one case that DOES want the root funnelled into the engine,
-# which is what the FallbackResource below adds — per vhost, never install-wide.
-#
-# ---- ⚠ NEVER SET QS_PROJECT ON THE HOSTNAME THAT SERVES /admin/ -------------
-# A mapped domain serves ONE project at its root and answers 404 to any literal
-# /p/… request — one domain, one site, and that is what stops a production
-# domain being used to enumerate the other projects on the install. The visual
-# editor's preview iframe is `/p/<projectId>/`. So a vhost that has QS_PROJECT
-# set AND serves the admin panel gives you an editor whose preview 404s.
-#
-# The two roles are separate hostnames on purpose: mapped domains SERVE, the
-# authoring hostname EDITS. Every project on the install — including the ones
-# with their own domains — is edited at /p/<projectId>/ on the authoring
-# hostname, which is where the panel already points. See the last vhost below.
+# deliberately NO public/index.php and no FallbackResource at the root: the web
+# root is FREE, so your own hand-made site can live there and QuickSite never
+# squats the domain root.
 # =============================================================================
 
-# ---- example.com  ->  project "siteA" ---------------------------------------
-<VirtualHost *:443>
-    ServerName   example.com
-    DocumentRoot /srv/quicksite/public
-
-    SetEnv QS_PROJECT         "siteA"
-    SetEnv QS_PUBLIC_BASE_URL "https://example.com/"
-    SetEnv QS_TRUSTED_HOSTS   "example.com"
-    # SetEnv QS_ERROR_PAGE_404 "/404.html"
-    # SetEnv QS_ERROR_PAGE_403 "/403.html"
-
-    RewriteEngine On
-    # One domain, one site: a direct /p/... hit is not this domain's surface.
-    # (The engine also enforces this itself when QS_PROJECT is set.)
-    RewriteRule ^/p(/|$)  -  [R=404,L]
-
-    # This domain's root IS the project. /admin/ /admin/api/ /management/ keep
-    # their own per-directory FallbackResource and are unaffected by this one.
-    FallbackResource /p/index.php
-
-    # SSL directives, logs, etc. as usual for your setup.
-</VirtualHost>
-
-# ---- shop.example.net  ->  project "siteB" ----------------------------------
-<VirtualHost *:443>
-    ServerName   shop.example.net
-    DocumentRoot /srv/quicksite/public
-
-    SetEnv QS_PROJECT         "siteB"
-    SetEnv QS_PUBLIC_BASE_URL "https://shop.example.net/"
-    SetEnv QS_TRUSTED_HOSTS   "shop.example.net"
-
-    RewriteEngine On
-    RewriteRule ^/p(/|$)  -  [R=404,L]
-    FallbackResource /p/index.php
-</VirtualHost>
-
-# ---- the install's own hostname — the AUTHORING surface ---------------------
+# ---- the install's own hostname — the authoring surface ---------------------
 <VirtualHost *:80>
     ServerName   quicksite.example.internal
     DocumentRoot /srv/quicksite/public
-    # No QS_PROJECT, no QS_PUBLIC_BASE_URL:
-    #   - every project is reachable at /p/<projectId>/ (visibility-gated),
-    #   - links compose against the request-derived /p/<projectId>/ base,
-    #   - the ROOT STAYS FREE for your own hand-made site (no FallbackResource),
-    #   - and THE VISUAL EDITOR WORKS. Its preview iframe is /p/<projectId>/,
-    #     which a QS_PROJECT vhost answers 404 by design (see the top of this
-    #     file). The missing SetEnv here is load-bearing, not an omission.
+
+    # Optional. Declare it when this install generates sitemaps for a site whose
+    # deployed URL differs from this hostname — which is the normal case, since
+    # the deployed site is a build living somewhere else.
+    # SetEnv QS_PUBLIC_BASE_URL "https://example.com/"
+    # SetEnv QS_TRUSTED_HOSTS   "quicksite.example.internal"
+    # SetEnv QS_ERROR_PAGE_404  "/404.html"
+    # SetEnv QS_ERROR_PAGE_403  "/403.html"
+
+    # Nothing else is needed. Every project is reachable at /p/<projectId>/
+    # (visibility-gated), links compose against the request-derived
+    # /p/<projectId>/ base, the visual editor works because its preview iframe
+    # is exactly that URL, and the ROOT STAYS FREE for your own site.
+    #
     # The shipped public/.htaccess already sets `Options -Indexes`, so a bare "/"
     # without an index file answers 403 rather than listing the install's folders.
 </VirtualHost>
+
+# ---- a DEPLOYED BUILD, for reference ----------------------------------------
+# A build is not this install and does not share its configuration. It ships its
+# own public/ and secure/ folders (renamed at build time — the renaming is part
+# of the security model, since anyone scanning the deployed server cannot then
+# guess paths from the open-source repo layout) and it serves exactly one site
+# from its own root. Point DocumentRoot at the build's public folder; no QS_*
+# variable selects anything, because there is only one project there.
+#
+# <VirtualHost *:443>
+#     ServerName   example.com
+#     DocumentRoot /srv/example.com/www
+#     # SSL directives, logs, etc. as usual for your setup.
+# </VirtualHost>

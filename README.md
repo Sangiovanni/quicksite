@@ -372,35 +372,40 @@ Open `http://localhost:8000/admin/`. Clean URLs (`/about`, `/en/contact`) won't 
 
 </details>
 
-### Serving a project on its own domain
+### Putting a project on its own domain
 
-One install can serve any number of projects, each on its own domain. The
-deployment declares which project a domain serves — `SetEnv QS_PROJECT <id>` on
-Apache, `fastcgi_param QS_PROJECT <id>` on nginx — and that domain's **root is
-that project**. QuickSite itself holds no "which project is live" state.
-Complete vhosts for both servers are in `secure/deploy/apache-vhosts.conf.example`
-and `secure/deploy/nginx-vhosts.conf.example`.
+**A project goes to production as a build.** One install can hold any number of
+projects, each edited and previewed at `/p/<projectId>/` on the install's own
+hostname for as long as it exists. When a site is ready for the public you
+**build** it (the `build` command, or **Builds** in the admin panel) and deploy
+that build to its own domain, with its own web root and its own vhost.
 
-> ### ⚠ Never set `QS_PROJECT` on the hostname that serves `/admin/`
+A build is not a stripped-down copy. It is the project's pages precompiled to
+PHP, plus the runtime that serves them: a self-contained QuickSite serving
+exactly one site, with resolvers, param routes, server-side auth and
+`serverFetch` all working as they did in development. What it removes is the
+work of re-reading the page structure on every request, not what the site can do.
+
+> **Why the install does not serve production directly.** It used to be possible
+> to point a domain at the install and declare which project it served. That put
+> uncompiled pages on the public internet — every request re-parsing JSON that a
+> build turns into PHP once — and it broke the visual editor on that hostname,
+> because a domain serving one project had to refuse the `/p/<projectId>/` URLs
+> the editor's preview iframe loads. Building is faster for visitors, keeps the
+> install's other projects off the public domain entirely, and leaves the
+> authoring hostname free to do the one thing it is for.
 >
-> A domain that serves a project answers **404 to any `/p/…` URL**. That is
-> deliberate — one domain, one site — and it is what stops a production domain
-> from being used to reach or enumerate the other projects on the install.
->
-> But `/p/<projectId>/` is exactly what the visual editor's preview iframe
-> loads. So a hostname that both serves a mapped project *and* serves the admin
-> panel gives you an editor whose preview 404s, **for every project, not just
-> the mapped one**. The panel shows a warning when it detects this.
->
-> **Keep the two roles on separate hostnames.** Mapped domains serve; the
-> install's own hostname is where you sign in and edit. Every project —
-> including the ones with their own domains — is edited at `/p/<projectId>/` on
-> that authoring hostname, which is where the panel already points.
->
-> This is not worked around by pointing the editor at the mapped domain: a
-> different domain is a different origin, so the panel's session cookie is not
-> sent there. A public project would appear to work and a **private** one would
-> not load at all.
+> If you have `SetEnv QS_PROJECT` or `fastcgi_param QS_PROJECT` left in a vhost,
+> it now does nothing and can be deleted. `QS_PUBLIC_BASE_URL` and
+> `QS_TRUSTED_HOSTS` are unaffected — see below.
+
+Two per-vhost variables remain on the authoring install, and neither picks a
+project. `QS_PUBLIC_BASE_URL` declares the public base your `sitemap.txt` is
+generated against — a sitemap has to name the URL the built site will live at,
+which the authoring install cannot work out from the request in front of it.
+`QS_TRUSTED_HOSTS` optionally pins the Host header. Complete vhosts for both
+servers are in `secure/deploy/apache-vhosts.conf.example` and
+`secure/deploy/nginx-vhosts.conf.example`.
 
 ### First load
 

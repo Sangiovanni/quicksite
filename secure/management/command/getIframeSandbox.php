@@ -30,6 +30,7 @@ function __command_getIframeSandbox(array $params = [], array $urlParams = []): 
     }
 
     return ApiResponse::create(200, 'operation.success')
+        ->withMessage('Iframe sandbox configuration retrieved')
         ->withData([
             'tags' => $normalizedTags,
             'default' => $config['default'],

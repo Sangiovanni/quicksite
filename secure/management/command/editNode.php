@@ -106,10 +106,12 @@ function __command_editNode(array $params = [], array $urlParams = []): ApiRespo
     // Required parameters
     if (!isset($params['type'])) {
         return ApiResponse::create(400, 'validation.required')
+            ->withMessage('Missing required parameter: type')
             ->withErrors([['field' => 'type', 'reason' => 'missing']]);
     }
     if (!isset($params['nodeId'])) {
         return ApiResponse::create(400, 'validation.required')
+            ->withMessage('Missing required parameter: nodeId')
             ->withErrors([['field' => 'nodeId', 'reason' => 'missing']]);
     }
     
@@ -204,6 +206,7 @@ function __command_editNode(array $params = [], array $urlParams = []): ApiRespo
     
     if (($type === 'page' || $type === 'component') && empty($name)) {
         return ApiResponse::create(400, 'validation.required')
+            ->withMessage("Missing required parameter: name (required when type is {$type})")
             ->withErrors([['field' => 'name', 'reason' => "required for type={$type}"]]);
     }
     

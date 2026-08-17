@@ -10,6 +10,7 @@ $params = $trimParametersManagement->params();
 // Validate required parameter
 if (!isset($params['code'])) {
     ApiResponse::create(400, 'validation.required')
+        ->withMessage('Missing required parameter: code')
         ->withErrors([['field' => 'code', 'reason' => 'missing']])
         ->send();
 }
