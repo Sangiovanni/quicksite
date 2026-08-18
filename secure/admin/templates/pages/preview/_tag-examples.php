@@ -112,8 +112,6 @@ function getTagExamples(): array {
         
         'summary' => '<details open class="tag-ex-details"><summary class="tag-ex-summary">▼ ' . __admin('preview.example.clickToToggle') . '</summary><p class="tag-ex-details-content">' . __admin('preview.example.expandedContent') . '</p></details>',
         
-        'dialog' => '<div class="tag-ex-dialog-backdrop"><div class="tag-ex-dialog"><strong class="tag-ex-dialog-title">' . __admin('preview.example.dialogTitle') . '</strong><p class="tag-ex-dialog-content">' . __admin('preview.example.dialogContent') . '</p><button class="tag-ex-dialog-btn">OK</button></div></div>',
-        
         // ===== LIST TAGS =====
         'ul' => '<ul class="tag-ex-ul"><li>' . __admin('preview.example.item1') . '</li><li>' . __admin('preview.example.item2') . '</li><li>' . __admin('preview.example.item3') . '</li></ul>',
         

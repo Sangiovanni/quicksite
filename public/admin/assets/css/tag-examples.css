@@ -458,43 +458,6 @@
     color: #333333;
 }
 
-.tag-ex-dialog-backdrop {
-    background: #00000066;
-    padding: 20px;
-    border-radius: 4px;
-}
-
-.tag-ex-dialog {
-    background: #ffffff;
-    padding: 16px;
-    border-radius: 8px;
-    box-shadow: 0 4px 20px #00000033;
-    max-width: 200px;
-    margin: auto;
-}
-
-.tag-ex-dialog-title {
-    margin: 0 0 8px;
-    font-weight: 600;
-    color: #212121;
-}
-
-.tag-ex-dialog-content {
-    margin: 0 0 12px;
-    font-size: 13px;
-    color: #424242;
-}
-
-.tag-ex-dialog-btn {
-    padding: 6px 16px;
-    background: #1976d2;
-    color: #ffffff;
-    border: none;
-    border-radius: 4px;
-    font-size: 13px;
-    cursor: pointer;
-}
-
 /* ==================== Lists ==================== */
 
 .tag-ex-ul, .tag-ex-ol {

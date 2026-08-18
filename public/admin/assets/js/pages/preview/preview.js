@@ -378,8 +378,10 @@
     const addTextField = document.getElementById('add-text-field');
     const addTextValueInput = document.getElementById('add-text-value');
     const addGeneratedTextKeyPreview = document.getElementById('add-generated-textkey-preview');
-    const addAltKeyInfo = document.getElementById('add-altkey-info');
-    const addGeneratedAltKeyPreview = document.getElementById('add-generated-altkey-preview');
+    // Translation-key params (alt on img/area, title on iframe — the set is
+    // TagRegistry::TRANSLATION_KEY_PARAMS, arriving via TAG_INFO).
+    const addTransKeyParams = document.getElementById('add-transkey-params');
+    const addTransKeyParamsContainer = document.getElementById('add-transkey-params-container');
     const addComponentVars = document.getElementById('add-component-vars');
     const addComponentVarsContainer = document.getElementById('add-component-vars-container');
     const addComponentNoVars = document.getElementById('add-component-no-vars');
@@ -5383,6 +5385,7 @@
         updateSidebarAddTypeTabs(sidebarAddNodeType);
         updateSidebarAddNodeTypeUI();
         updateSidebarAddMandatoryParams();
+        updateSidebarAddTransKeyParams();
         updateSidebarAddTextKeyPreview();
         
         // Refresh contextual suggestions for new selection context
@@ -5573,8 +5576,10 @@
         // Build mandatory-param widgets for this tag (the helper reads
         // addTagSelect.value, which we just set). Must run BEFORE we
         // fill in the mandatory values, since the inputs don't exist
-        // until this builds them.
+        // until this builds them. Same for the translation-key pickers,
+        // which _prepopulateEditForm fills from the saved params.
         updateSidebarAddMandatoryParams();
+        updateSidebarAddTransKeyParams();
 
         // Swap header + bottom-button text.
         const headerLabel = PreviewConfig.i18n.editParamsHeader || PreviewConfig.i18n.editParams || 'Edit Params';
@@ -5599,6 +5604,7 @@
      * Walk the saved params dict and route each entry to its widget:
      *  - 'class' tokens -> classCombobox.addClass() each
      *  - tag's mandatory params -> the matching #add-mandatory-<name> input
+     *  - tag's translation-key params -> the matching key picker
      *  - everything else -> a custom row (with picker auto-attached)
      */
     function _prepopulateEditForm(params, tag) {
@@ -5610,7 +5616,12 @@
 
         Object.keys(params).forEach(key => {
             const value = params[key];
-            if (key === 'class') {
+            if (transKeyPickers[key]) {
+                // alt / title — the key picker owns this param in BOTH flows,
+                // so editing an existing value uses the same widget that
+                // created it.
+                transKeyPickers[key].setValue(String(value));
+            } else if (key === 'class') {
                 if (classCombobox && typeof value === 'string') {
                     value.split(/\s+/).forEach(cls => {
                         const trimmed = cls.trim();
@@ -5689,6 +5700,9 @@
             const value = (field.value || '').trim();
             if (value) params[name] = value;
         });
+
+        // Translation-key params — same widgets, same semantics, in both flows.
+        Object.assign(params, _collectTransKeyParams());
 
         // Custom params rows — same empty-row rule as Add Element
         const customRows = addCustomParamsList?.querySelectorAll('.preview-contextual-form__param-row--custom') || [];
@@ -5864,6 +5878,7 @@
 
         // Update mandatory params visibility
         updateSidebarAddMandatoryParams();
+        updateSidebarAddTransKeyParams();
 
         // Component vars
         if (addComponentVars) addComponentVars.style.display = (isComponent && sidebarAddSelectedComponentData) ? 'block' : 'none';
@@ -5947,6 +5962,90 @@
                 populateRouteDatalist(datalistId);
             }
         });
+    }
+
+    // ---- Translation-key params (S2.9) -----------------------------
+    // Optional params whose value is a translation KEY rather than free text:
+    // `alt` on img/area, `title` on iframe. The renderer already translates
+    // these attributes when the value looks like a key; this is the author's
+    // way to choose which key. The set comes from the server
+    // (TagRegistry::TRANSLATION_KEY_PARAMS) — never hardcode it here.
+    //
+    // Live pickers for the current tag, keyed by param name. Rebuilt whenever
+    // the tag changes; read back by addTagNode() and _collectEditFormParams().
+    let transKeyPickers = {};
+
+    /** One labelled translation-key row. Returns ONE Element. */
+    function _renderTransKeyRow(param) {
+        const row = document.createElement('div');
+        row.className = 'preview-contextual-form__param-row';
+
+        const label = document.createElement('label');
+        label.className = 'preview-contextual-form__param-label';
+        label.textContent = param + ':';
+        row.appendChild(label);
+
+        const host = document.createElement('div');
+        host.className = 'preview-contextual-form__param-input-group';
+        row.appendChild(host);
+
+        // createTextKeyPicker appends its own root into the host and returns
+        // the controller (getValue / setValue / destroy).
+        transKeyPickers[param] = window.QSComplexWizard.createTextKeyPicker({
+            container: host,
+            placeholder: PreviewConfig.i18n.searchOrTypeKey
+                || 'Search or type a translation key'
+        });
+
+        return row;
+    }
+
+    /**
+     * Rebuild the translation-key param block for the currently selected tag.
+     * Hidden entirely when the tag declares none (most tags).
+     */
+    function updateSidebarAddTransKeyParams() {
+        if (!addTransKeyParams || !addTransKeyParamsContainer) return;
+
+        // Drop the previous tag's pickers before the DOM under them goes.
+        Object.keys(transKeyPickers).forEach(k => {
+            try { transKeyPickers[k].destroy(); } catch (e) {}
+        });
+        transKeyPickers = {};
+        addTransKeyParamsContainer.replaceChildren();
+
+        const tag = addTagSelect?.value;
+        const params = TAG_INFO?.TRANSLATION_KEY_PARAMS?.[tag] || [];
+
+        // The picker is a shared primitive loaded before preview.js. If it is
+        // absent the block would render as an empty box promising a field that
+        // never appears — hide it and say why instead.
+        const pickerAvailable = !!(window.QSComplexWizard
+            && typeof window.QSComplexWizard.createTextKeyPicker === 'function');
+        if (!pickerAvailable && params.length) {
+            console.error('[Preview] QSComplexWizard.createTextKeyPicker unavailable — '
+                + 'translation-key params (' + params.join(', ') + ') cannot be offered.');
+        }
+
+        if (sidebarAddNodeType !== 'tag' || params.length === 0 || !pickerAvailable) {
+            addTransKeyParams.style.display = 'none';
+            return;
+        }
+
+        addTransKeyParams.style.display = 'block';
+        params.forEach(param => {
+            addTransKeyParamsContainer.appendChild(_renderTransKeyRow(param));
+        });
+    }
+
+    /** Read the translation-key pickers back. Empty values are omitted. */
+    function _collectTransKeyParams() {
+        const out = {};
+        Object.keys(transKeyPickers).forEach(param => {
+            const value = (transKeyPickers[param].getValue() || '').trim();
+            if (value) out[param] = value;
+        });
+        return out;
     }
 
     // ---- Input wizard (Group A, beta.6) ----------------------------
@@ -6121,12 +6220,14 @@
                     picker.remove();
                     document.removeEventListener('mousedown', closeHandler);
                     
-                    // Auto-fill alt from asset metadata if available
-                    if (asset.alt) {
-                        const altInput = document.getElementById('add-mandatory-alt');
-                        if (altInput && !altInput.value) {
-                            altInput.value = asset.alt;
-                        }
+                    // Auto-fill alt from the asset's own metadata (set at
+                    // upload) if the author hasn't chosen anything yet. `alt`
+                    // now lives in the translation-key picker, which accepts a
+                    // typed literal as well as a key — the renderer translates
+                    // only values shaped like a key, so a sentence stays a
+                    // sentence.
+                    if (asset.alt && transKeyPickers.alt && !transKeyPickers.alt.getValue()) {
+                        transKeyPickers.alt.setValue(asset.alt);
                     }
                     
                     // Show inline media preview below the input group
@@ -7795,6 +7896,7 @@
     // Tag select change handler
     addTagSelect?.addEventListener('change', function() {
         updateSidebarAddMandatoryParams();
+        updateSidebarAddTransKeyParams();
         updateSidebarAddTextKeyPreview();
         
         // Show info message for iframe tag
@@ -8059,6 +8161,11 @@
             }
         }
         
+        // Translation-key params (alt / title). Optional — an empty picker
+        // writes nothing, so an image with no alt gets no alt attribute at all
+        // rather than an empty one nobody chose.
+        Object.assign(params, _collectTransKeyParams());
+
         // Collect custom params
         const customRows = addCustomParamsList?.querySelectorAll('.preview-contextual-form__param-row--custom') || [];
         customRows.forEach(row => {
@@ -8119,6 +8226,9 @@
             const keptOpen = _finalizeAdd(function() {
                 if (addIdInput) { addIdInput.value = ''; addIdInput.classList.remove('admin-input--error'); }
                 (addMandatoryParamsContainer?.querySelectorAll('input, select') || []).forEach(f => { f.value = ''; });
+                // alt / title are per-instance like the mandatory fields — the
+                // next image is not the same image.
+                Object.keys(transKeyPickers).forEach(k => transKeyPickers[k].setValue(''));
                 if (addCustomParamsList) addCustomParamsList.innerHTML = '';
                 if (addIdInput) addIdInput.focus();
             });
@@ -11224,43 +11334,21 @@
     
     // ==================== Tag Classification (Add/Edit Shared) ====================
     
-    // Tag classification and mandatory params (mirrors backend addNode.php)
-    const TAG_INFO = {
-        BLOCK_TAGS: ['div', 'section', 'article', 'header', 'footer', 'nav', 'main', 'aside', 
-                     'figure', 'figcaption', 'blockquote', 'pre', 'form', 'fieldset',
-                     'ul', 'ol', 'table', 'thead', 'tbody', 'tfoot', 'tr'],
-        INLINE_TAGS: ['span', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 
-                      'a', 'button', 'label', 'strong', 'em', 'b', 'i', 'u', 'small', 'mark',
-                      'li', 'td', 'th', 'dt', 'dd', 'caption', 'legend',
-                      'code', 'kbd', 'samp', 'var', 'cite', 'q', 'abbr', 'time', 'address'],
-        SELF_CLOSING_TAGS: ['img', 'input', 'br', 'hr', 'meta', 'link', 'area', 'base', 'col', 
-                            'embed', 'source', 'track', 'wbr'],
-        MANDATORY_PARAMS: {
-            'a': ['href'],
-            'img': ['src', 'alt'],
-            'input': ['type'],
-            'form': ['action'],
-            'iframe': ['src'],
-            'video': ['src'],
-            'audio': ['src'],
-            'source': ['src'],
-            'label': ['for'],
-            'select': ['name'],
-            'textarea': ['name'],
-            'area': ['href', 'alt'],
-            'embed': ['src'],
-            'object': ['data'],
-            'track': ['src'],
-            'link': ['href', 'rel'],
-            // S2.5 — mirrors TagRegistry::MANDATORY_PARAMS. Both are required
-            // by HTML and silently wrong without it: a <meter> with no value is
-            // an empty gauge, an <optgroup> with no label is an unnamed group.
-            'meter': ['value'],
-            'optgroup': ['label']
-        },
-        TAGS_WITH_ALT: ['img', 'area'],
-        RESERVED_PARAMS: ['placeholder', 'title', 'aria-label', 'aria-placeholder', 'aria-description']
-    };
+    // Tag classification, emitted by PHP from TagRegistry::editorPayload().
+    //
+    // ⚠ DO NOT WRITE A TAG LIST HERE. This used to be a hand-maintained mirror
+    // of the server's lists and it had drifted: it offered `embed` and `object`
+    // (both blocked server-side, so the editor advertised tags the server would
+    // refuse), it demanded `alt` on img/area as a MANDATORY param the server
+    // never required, and it had lost `dl`. TagRegistry is the single source of
+    // truth — add tags and params there and they arrive here for free.
+    const TAG_INFO = PreviewConfig.tagInfo || {};
+    if (!PreviewConfig.tagInfo) {
+        // Loud, because the silent version is an editor that quietly stops
+        // asking for mandatory params.
+        console.error('[Preview] PreviewConfig.tagInfo missing — tag classification '
+            + 'is unavailable. preview-config.php did not emit TagRegistry::editorPayload().');
+    }
 
     // Navigate structure tree to find node by path
     function navigateToNode(structure, nodePath) {

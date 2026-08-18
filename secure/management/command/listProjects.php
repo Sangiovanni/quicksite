@@ -17,6 +17,7 @@
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_format_size
 
 /**
  * Count routes recursively in a nested routes structure
@@ -155,7 +156,7 @@ function getProjectInfo(string $projectPath, string $projectName): array {
     
     // Get folder size (approximate)
     $info['size_bytes'] = getDirectorySize($projectPath);
-    $info['size_human'] = formatBytes($info['size_bytes']);
+    $info['size_human'] = qs_format_size($info['size_bytes']);
     
     // Get modification time
     $info['modified'] = date('Y-m-d H:i:s', filemtime($projectPath));
@@ -179,18 +180,8 @@ function getDirectorySize(string $path): int {
     return $size;
 }
 
-/**
- * Format bytes to human readable
- */
-function formatBytes(int $bytes): string {
-    $units = ['B', 'KB', 'MB', 'GB'];
-    $i = 0;
-    while ($bytes >= 1024 && $i < count($units) - 1) {
-        $bytes /= 1024;
-        $i++;
-    }
-    return round($bytes, 2) . ' ' . $units[$i];
-}
+// (Removed, S2.9) A local formatBytes(). qs_format_size() in
+// utilsManagement.php is the shared one — see the note in deleteProject.php.
 
 // Execute command if called directly via API (not internal call)
 if (!defined('COMMAND_INTERNAL_CALL')) {

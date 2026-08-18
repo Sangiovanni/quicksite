@@ -64,6 +64,10 @@ require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
 // is_valid_project_name — the F1 shape gate for the URL marker (the management
 // dispatcher requires this the same way).
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
+// qs_format_size — the shared byte formatter (S2.9). Required explicitly rather
+// than relied on arriving through a command file, because the asset-list
+// endpoint formats sizes before any command is loaded.
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 
 $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
 if ($authHeader === '' && function_exists('apache_request_headers')) {
@@ -332,7 +336,7 @@ switch ($action) {
                 // Use filename for value (what deleteAsset expects), full path for label
                 $files[] = [
                     'value' => $file['filename'], 
-                    'label' => $file['filename'] . ' (' . formatBytes($file['size'] ?? 0) . ')'
+                    'label' => $file['filename'] . ' (' . qs_format_size((int)($file['size'] ?? 0)) . ')'
                 ];
             }
             echo json_encode(['success' => true, 'data' => $files]);
@@ -928,16 +932,12 @@ default:
         echo json_encode(['error' => 'Unknown action: ' . $action]);
 }
 
-/**
- * Format bytes to human readable size
- */
-function formatBytes(int $bytes, int $precision = 1): string {
-    $units = ['B', 'KB', 'MB', 'GB'];
-    $bytes = max($bytes, 0);
-    $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
-    $pow = min($pow, count($units) - 1);
-    return round($bytes / pow(1024, $pow), $precision) . ' ' . $units[$pow];
-}
+// (Removed, S2.9) A local formatBytes(). qs_format_size() in
+// utilsManagement.php is the shared one — see the note in deleteProject.php.
+// It mattered more here than a duplicate usually does: makeInternalApiCall()
+// below `require_once`s a command file into THIS process, and two command
+// files declared a global formatBytes() of their own, so the two definitions
+// were one endpoint away from a fatal redeclare.
 
 /**
  * Execute a management command directly in-process (no HTTP call).

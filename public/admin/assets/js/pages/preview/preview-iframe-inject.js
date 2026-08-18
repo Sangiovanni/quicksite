@@ -73,9 +73,22 @@
     // Elements to ignore
     const ignoreTags = ['SCRIPT', 'STYLE', 'META', 'LINK', 'NOSCRIPT', 'BR', 'HR', 'HTML', 'HEAD'];
     
-    // Inject CSS for empty-element hints
+    // Inject CSS for empty-element hints, and for the empty-STRUCTURE
+    // placeholder the renderer emits in editor mode when a page has no nodes
+    // at all (JsonToHtmlRenderer::renderEmptyStructurePlaceholder). It is a
+    // real selectable element carrying data-qs-node="" — the editor's spelling
+    // for "the structure root" — so the author can click it and add the first
+    // element back. Styled here rather than inline in the markup: it is editor
+    // chrome, and the live site never sees it.
     var emptyHintStyle = document.createElement('style');
-    emptyHintStyle.textContent = '.qs-empty-hint { outline: 1px dashed rgba(128,128,128,0.5); }';
+    emptyHintStyle.textContent =
+        '.qs-empty-hint { outline: 1px dashed rgba(128,128,128,0.5); }'
+        + '.qs-empty-structure {'
+        + ' min-height: 120px; display: flex; align-items: center; justify-content: center;'
+        + ' padding: 24px; margin: 8px; text-align: center;'
+        + ' border: 2px dashed rgba(128,128,128,0.6); border-radius: 8px;'
+        + ' color: rgba(96,96,96,0.95); font: 14px/1.5 system-ui, sans-serif;'
+        + ' cursor: pointer; }';
     document.head.appendChild(emptyHintStyle);
     
     // Listen for messages from admin

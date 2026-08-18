@@ -8007,3 +8007,220 @@ unfinished sites are what convention alone produced over the project's life).
 
 **Source**: `secure/src/classes/ApiResponse.php`, and the 13 command files listed
 by `NOTES/tests/beta11/s210_create_scan.php`.
+
+---
+
+## Editor hygiene (beta.11)
+
+### The editor's tag lists are emitted by the server, never copied (locked 2026-08-17)
+
+**Decision**: `TagRegistry` gains `editorPayload()`, a single method returning
+every tag fact the visual editor needs — the classification lists, mandatory
+params, per-tag defaults, translation-key params and reserved params.
+`preview-config.php` emits it as `PreviewConfig.tagInfo`, and `preview.js` reads
+that as its `TAG_INFO`. The client keeps no tag list of its own.
+
+**Reasoning**: `TagRegistry`'s own header has always said *"NEVER define tag
+lists anywhere else. Always reference this class."* — and `preview.js` carried a
+hand-written mirror of it anyway. The mirror had drifted, which is what a mirror
+does: it offered `embed` and `object`, both on the security blacklist, so the
+editor advertised tags the server refuses; it listed `alt` as a **mandatory**
+param on `img` and `area`, which the server has never required, so the add form
+demanded a value nothing was asking for; and it had lost `dl` from its block-tag
+list. None of these drifts was introduced deliberately. They accumulated because
+adding a tag meant remembering a second file.
+
+The payload is the whole set rather than only the two fields the editor reads
+today, because a partial payload recreates the original problem the first time
+someone needs a third field: they either extend the payload (fine) or add a
+literal to the client (how the mirror started). Emitting everything makes the
+client's list-free property structural rather than a habit. It costs about 2 KB
+on a page that already carries a 200-field config object.
+
+**Alternatives considered**: a build step that generates the JS from the PHP
+(rejected — QuickSite has no build step for its own admin assets, and adding one
+to solve a copy-paste problem is the wrong shape); keeping the copy and adding a
+test that diffs the two (rejected — a test that guards a duplicate still leaves
+the duplicate, and the duplicate is the defect); emitting only `MANDATORY_PARAMS`
+(rejected, see above).
+
+**Source**: `secure/src/classes/TagRegistry.php`,
+`secure/admin/templates/pages/preview-config.php`,
+`public/admin/assets/js/pages/preview/preview.js`.
+
+### `alt` holds a translation key the author picks — in both writers (locked 2026-08-17)
+
+**Decision**: `alt` is an optional param whose value is a translation key,
+offered in the editor through the existing searchable key picker. `addNode` no
+longer writes an empty-string `alt`; `editNode` no longer generates a
+`<page>.itemN.alt` key or the empty translation entry behind it. Whatever the
+author chose is stored verbatim; choosing nothing writes no `alt` attribute. The
+same rule extends to `title` on `iframe`, expressed as a new
+`TagRegistry::TRANSLATION_KEY_PARAMS` map. `TAGS_WITH_ALT` is removed — it
+assumed the param is always `alt`, which the map no longer needs to.
+
+**Reasoning**: one attribute had two meanings depending on which command last
+touched the node. An image created in the editor got a literal empty `alt`; the
+first time it was edited, the same attribute became a generated translation key
+with an empty entry created for it. The author asked for neither, and could not
+see either. The panel had drifted a third way: it still promised *"Alt text key
+will be auto-generated"* next to an element nothing populated, because the
+generation it described had already been removed from `addNode`.
+
+Picking the key is what removes the ambiguity, not choosing which of the two
+behaviours to keep. The renderer already translates `alt` when the value looks
+like a key, so the only missing piece was a way to say which key — and the
+picker for that already existed, built for the Complex Element wizards. Reusing
+it also means the author can create the key inline, which is what made
+generation attractive in the first place.
+
+`title` is on `RESERVED_PARAMS`, and reaching it through the picker is not a
+weakening of that reservation: reserved means the translation system owns the
+value, which is exactly what a key picker enforces — what stays refused is
+typing a literal `title` into the free-text params.
+
+Existing empty `alt` values on disk are left alone. Nothing but test projects
+exists, and beta does not carry migrations.
+
+**Alternatives considered**: generating the key in `addNode` too, matching
+`editNode` (rejected — consistent, but it keeps inventing keys the author never
+asked for and never sees); dropping `alt` handling entirely and leaving it to
+the free-text custom-params row (rejected — `alt` is an accessibility attribute
+on the two tags where it is required, and burying it under *Advanced* is how it
+gets skipped); auto-filling from the asset's own alt metadata as the only source
+(rejected as the *only* source, kept as a pre-fill — an asset's alt text
+describes the asset, not its use on this page).
+
+**Source**: `secure/src/classes/TagRegistry.php`,
+`secure/management/command/addNode.php`,
+`secure/management/command/editNode.php`,
+`secure/admin/templates/pages/preview/contextual-add.php`.
+
+### `dialog` leaves the allowlist, and does not join the blacklist (locked 2026-08-17)
+
+**Decision**: `dialog` is removed from `ALLOWED_TAGS`, `CONTAINER_TAGS` and the
+editor's tag picker. It is **not** added to `BLOCKED_TAGS`.
+
+**Reasoning**: a `<dialog>` is not displayed until it is opened, and opening one
+properly means calling `showModal()` or `show()`. Authors cannot run
+JavaScript — `<script>` is blacklisted, `on*` handlers are refused server-side,
+and the custom-JS feature was removed in beta.3 — and none of the 26 `QS.*`
+verbs calls either method. So the editor was offering a tag that renders as
+nothing the author has any means to reveal.
+
+The two lists are not interchangeable, and putting it on the blacklist would
+have been the easier and wronger move. `BLOCKED_TAGS` is a **security** list:
+every entry is there because emitting it would let an author execute code or
+load a remote resource. A merely useless tag does not belong in it — and
+`isBlocked()` produces a different refusal message, so the author would be told
+their dialog was a security problem, which is false. Absent from both lists, it
+is refused as an unknown tag, which is what it now is.
+
+Recorded honestly: **it is not completely inert today.** `open` is not a
+reserved param, so an author who knows the HTML can type `open` into the custom
+params and get a visible — non-modal — box, which the class verbs can then show
+and hide like any other element. That path is obscure enough not to be a feature
+anyone would find, and it is the path this decision closes. It is named here so
+that a later reversal starts from the true picture rather than from "nothing
+used it".
+
+**Alternatives considered**: adding it to `BLOCKED_TAGS` (rejected — see above,
+it is a security list); adding a `QS.openDialog` verb so the tag becomes usable
+(rejected for this release — a new verb is engine surface with a picker,
+catalogue entry, renderer allowlist and build allowlist behind it, which is a
+feature decision and not editor hygiene); leaving it and documenting that it
+needs a hand-typed `open` (rejected — the tag picker is a list of things that
+work).
+
+**Source**: `secure/src/classes/TagRegistry.php`; reachability established by
+`NOTES/tests/beta11/s29_dialog_probe.php`.
+
+### An emptied page renders a selectable root, not nothing (locked 2026-08-17)
+
+**Decision**: two changes, and both are needed. The root-insert branch in
+`addNode` and `addComplexElement` tests for the empty array explicitly instead
+of relying on the key comparison. And in editor mode the renderer emits a dashed
+placeholder for a structure with no nodes, carrying `data-qs-struct` and an
+empty `data-qs-node` — the editor's existing spelling for "the structure root".
+The published page still renders nothing.
+
+**Reasoning**: PHP's `range(0, -1)` is a two-element array, not an empty one. So
+the key comparison answered false for an empty page, the page was read as
+node-shaped, and a root insert rewrote it into a children-wrapper object — a
+shape the renderer hands to `renderNode` as a single node, producing an empty
+page and an "unknown node type" comment. Verified against the live commands:
+after the corrupting insert, the node just added is not addressable at all
+(*"Node not found at index 0"*).
+
+The arithmetic fix alone would have been a fix that still stranded the author.
+`deleteNode` has no last-node guard — deleting every top-level element is
+allowed, and reaches an empty page through the ordinary UI — and selection is
+anchored to elements carrying `data-qs-node`. A page with no nodes therefore had
+nothing to click, and the add form only opens with a selection. The page was not
+merely broken, it was unrecoverable from the editor. "Does not crash" was not
+the bar; "the author can add the first element back" was.
+
+The placeholder is editor-only for the same reason the whole editor-mode
+apparatus is: a published page with no content is a page with no content, and
+inventing a visible box on the live site would be a rendering side effect of an
+authoring convenience.
+
+**Alternatives considered**: refusing to delete the last node (rejected — it
+forbids a legitimate action to avoid a bug in a different command, and leaves
+every already-emptied page stranded); seeding a wrapper node on delete
+(rejected — the author deleted it; putting one back silently is the same class
+of mistake as the generated alt key); making the whole `<body>` selectable in
+editor mode (rejected — it makes every page's root clickable to solve a case
+that only arises when a page is empty).
+
+**Source**: `secure/management/command/addNode.php`,
+`secure/management/command/addComplexElement.php`,
+`secure/src/classes/JsonToHtmlRenderer.php`,
+`public/admin/assets/js/pages/preview/preview-iframe-inject.js`.
+
+### `track` requires `kind` and `srclang` (locked 2026-08-17)
+
+**Decision**: the mandatory params for `track` become `src`, `kind`, `srclang`.
+
+**Reasoning**: `kind` defaults to `subtitles`, and HTML requires `srclang`
+whenever `kind` is `subtitles`. So a `track` carrying only `src` — exactly what
+the editor emitted — is invalid in the default case, names no language, and
+gives a player nothing to label the track with or decide when to offer it. Both
+are values the author supplies, which is what `MANDATORY_PARAMS` can express;
+`controls` on `video` is in `DEFAULT_PARAMS` instead precisely because a boolean
+attribute has no value to ask for.
+
+`source` was considered alongside it and deliberately left out: its valid
+parameters depend on its parent — a responsive-image source is selected by
+`srcset` with `media` or `type`, while a media source uses `src` — which is a
+conditional form like the `input` wizard rather than a registry line. The
+limitation is documented in `README.md` instead.
+
+**Source**: `secure/src/classes/TagRegistry.php`.
+
+### One byte formatter, and the duplicates were not equivalent (locked 2026-08-17)
+
+**Decision**: the three `formatBytes()` copies — in `deleteProject.php`,
+`listProjects.php` and `public/admin/api/index.php` — are deleted and their call
+sites moved to `qs_format_size()` in `utilsManagement.php`.
+
+**Reasoning**: they were three implementations of one idea and they disagreed
+with each other. Measured across a corpus straddling every rounding boundary:
+identical on ordinary sizes (13 of 17 values), but the admin-api copy rounded to
+one decimal where the other two used two, the shared helper rounds to whole
+numbers above 100 units where the copies kept hundredths, and **none of the
+three had a TB unit** — so a large deletion reported a four-digit GB figure.
+Consolidating changes what those three sites display at the edges; that was
+checked to be safe rather than assumed, by scanning the tree for anything that
+parses the strings back. Nothing does: they are display-only fields.
+
+There was also a latent failure with no formatting component at all. Two of the
+copies were **global functions declared in command files**, and
+`public/admin/api/index.php` both declared a third and requires command files
+into its own process — so a fatal redeclare was one endpoint away. Not reachable
+today, because the two endpoints that pass a variable command name only ever
+build an asset-list or a structure lookup. Reachable the moment anyone adds a
+third.
+
+**Source**: `secure/src/functions/utilsManagement.php` and the three former
+copies; measured by `NOTES/tests/beta11/s29_formatbytes_probe.php`.

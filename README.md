@@ -529,6 +529,17 @@ Browsers and CDNs cache CSS aggressively. After changing styles (via API, visual
 
 This affects the **deployed/built site only** — the admin panel preview and visual editor always load fresh styles.
 
+**Added a `<source>` and the browser ignores it?**
+
+`<source>` means two different things depending on where it sits, and the
+editor's parameter form does not yet distinguish them. Inside `<picture>` a
+source is selected by `srcset` plus `media` or `type`, and a plain `src` is
+invalid and ignored. Inside `<video>` or `<audio>` it is `src` (with `type`)
+that does the work. The editor asks for `src` in both cases, so a `<source>`
+added inside a `<picture>` needs its `srcset` — and its `media` or `type` —
+added by hand through the **Advanced → custom parameters** section, and the
+`src` removed. Video and audio sources need nothing extra.
+
 ## Vision
 
 QuickSite is built on a **file-based, zero-database philosophy**. It targets a specific niche: sites that don't need a database — landing pages, portfolios, documentation sites, microsites — but still deserve proper tooling for content management, translations, and deployment.

@@ -365,6 +365,69 @@
         renderQueue();
     }
 
+    // ─── Queue rendering ─────────────────────────────────────────────────────
+    // Built with createElement + textContent. Every value on a queue row comes
+    // from OUTSIDE the panel — `name` is a filename the user chose or a segment
+    // of a URL they pasted, `alt` and `description` are whatever they type —
+    // and the row used to be an interpolated HTML string with those values
+    // glued in. Each _render* helper returns exactly ONE Element.
+
+    /** One small labelled span in a queue row. Returns ONE Element. */
+    function _renderQueueCell(className, text) {
+        const span = document.createElement('span');
+        span.className = className;
+        span.textContent = text;
+        return span;
+    }
+
+    /** The remove (×) button for row `index`. Returns ONE Element. */
+    function _renderQueueRemoveButton(index) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'asset-queue__remove';
+        btn.dataset.remove = String(index);
+        btn.title = 'Remove';
+        btn.textContent = '×';   // × — matches the old `&times;` entity
+        return btn;
+    }
+
+    /** One metadata input (alt / description) for row `index`. Returns ONE Element. */
+    function _renderQueueMetaInput(field, placeholder, value, index) {
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'admin-input admin-input--sm';
+        input.dataset.queueField = field;
+        input.dataset.queueIndex = String(index);
+        input.placeholder = placeholder;
+        input.autocomplete = 'off';
+        input.value = value || '';
+        return input;
+    }
+
+    /** One complete queue row. Returns ONE Element. */
+    function _renderQueueItem(item, index) {
+        const li = document.createElement('li');
+        li.className = 'asset-queue__item';
+        li.dataset.index = String(index);
+
+        const row = document.createElement('div');
+        row.className = 'asset-queue__row';
+        row.appendChild(_renderQueueCell('asset-queue__icon', getFileIcon(item.category)));
+        row.appendChild(_renderQueueCell('asset-queue__name', item.name));
+        row.appendChild(_renderQueueCell('asset-queue__size', item.size ? formatSize(item.size) : 'URL'));
+        row.appendChild(_renderQueueCell('asset-queue__category', item.category));
+        row.appendChild(_renderQueueRemoveButton(index));
+        li.appendChild(row);
+
+        const meta = document.createElement('div');
+        meta.className = 'asset-queue__meta';
+        meta.appendChild(_renderQueueMetaInput('alt', 'Alt text', item.alt, index));
+        meta.appendChild(_renderQueueMetaInput('description', 'Description', item.description, index));
+        li.appendChild(meta);
+
+        return li;
+    }
+
     function renderQueue() {
         const container = document.getElementById('asset-queue');
         const list = document.getElementById('asset-queue-list');
@@ -380,23 +443,7 @@
         countEl.textContent = `${uploadQueue.length} file${uploadQueue.length !== 1 ? 's' : ''} ready`;
         btn.disabled = false;
 
-        list.innerHTML = uploadQueue.map((item, i) => `
-            <li class="asset-queue__item" data-index="${i}">
-                <div class="asset-queue__row">
-                    <span class="asset-queue__icon">${getFileIcon(item.category)}</span>
-                    <span class="asset-queue__name">${escapeHtml(item.name)}</span>
-                    <span class="asset-queue__size">${item.size ? formatSize(item.size) : 'URL'}</span>
-                    <span class="asset-queue__category">${escapeHtml(item.category)}</span>
-                    <button type="button" class="asset-queue__remove" data-remove="${i}" title="Remove">&times;</button>
-                </div>
-                <div class="asset-queue__meta">
-                    <input type="text" class="admin-input admin-input--sm" data-queue-field="alt" data-queue-index="${i}"
-                           placeholder="Alt text" autocomplete="off" value="${escapeHtml(item.alt)}">
-                    <input type="text" class="admin-input admin-input--sm" data-queue-field="description" data-queue-index="${i}"
-                           placeholder="Description" autocomplete="off" value="${escapeHtml(item.description)}">
-                </div>
-            </li>
-        `).join('');
+        list.replaceChildren(...uploadQueue.map(_renderQueueItem));
     }
 
     function initQueueControls() {

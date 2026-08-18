@@ -15,6 +15,12 @@
 // is bound to. Defensive fallbacks in case of a different inclusion context.
 require_once SECURE_FOLDER_PATH . '/src/functions/resolverHelpers.php';
 $__previewRouteResolvers = loadResolversSidecar($editProjectPath ?? null);
+
+// S2.9 — tag classification comes from TagRegistry, the single source of
+// truth. preview.js used to carry a hand-written copy that had drifted from
+// the server (it offered blocked tags and demanded params the server never
+// required). Adding a tag or a param is now one edit, in TagRegistry.
+require_once SECURE_FOLDER_PATH . '/src/classes/TagRegistry.php';
 if (!isset($editConfig)) {
     $editConfig = defined('CONFIG') ? CONFIG : [];
 }
@@ -127,6 +133,11 @@ window.PreviewConfig = {
     adminUrl: <?= json_encode($router->url('')) ?>,
     managementUrl: <?= json_encode($__previewMgmtBase) ?>,
     currentProject: <?= json_encode($__previewProject) ?>,
+
+    // S2.9 — tag classification, mandatory params, per-tag defaults and the
+    // per-tag translation-key params, emitted from TagRegistry::editorPayload().
+    // preview.js reads this as TAG_INFO and keeps NO list of its own.
+    tagInfo: <?= json_encode(TagRegistry::editorPayload(), JSON_UNESCAPED_SLASHES) ?>,
 
     // Beta.8 A2 — per-route resolver sidecar (only routes with a resolver).
     // Used by the editor's emulation panel to know which variables exist

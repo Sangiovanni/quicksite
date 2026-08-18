@@ -283,16 +283,21 @@
             <span><?= __admin('preview.textKeyWillGenerate') ?? 'Text key will be auto-generated' ?>: <code id="add-generated-textkey-preview">-</code></span>
         </div>
         
-        <!-- Alt Key Info for img/area -->
-        <div class="preview-contextual-form__info" id="add-altkey-info" style="display: none;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                <circle cx="8.5" cy="8.5" r="1.5"/>
-                <polyline points="21 15 16 10 5 21"/>
-            </svg>
-            <span><?= __admin('preview.altKeyWillGenerate') ?? 'Alt text key will be auto-generated' ?>: <code id="add-generated-altkey-preview">-</code></span>
+        <!-- Translation-key params (optional, per tag: alt on img/area, title
+             on iframe — TagRegistry::TRANSLATION_KEY_PARAMS). One searchable
+             key picker per param, built by JS; the picker can also create a
+             key inline. Replaces the old "alt key will be auto-generated"
+             notice, which promised a key no command generates any more. -->
+        <div class="preview-contextual-form__section" id="add-transkey-params" style="display: none;">
+            <label class="preview-contextual-form__section-label">
+                <?= __admin('preview.translationKeyParams', 'Translated attributes') ?>
+                <small>(<?= __admin('common.optional') ?? 'optional' ?>)</small>:
+            </label>
+            <div class="preview-contextual-form__transkey-fields" id="add-transkey-params-container">
+                <!-- Dynamically populated -->
+            </div>
         </div>
-        
+
         <!-- BOTTOM Action Buttons -->
         <div class="preview-contextual-form__actions preview-contextual-form__actions--bottom">
             <button type="button" class="admin-btn admin-btn--ghost" id="add-cancel"><?= __admin('common.cancel') ?></button>

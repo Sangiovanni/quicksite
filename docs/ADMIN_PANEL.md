@@ -248,7 +248,7 @@ Two other cookies exist, both HttpOnly and neither readable by page scripts. `QS
 | `templates/layout.php` | `window.QUICKSITE_CONFIG` | `apiBase`, `adminBase`, `baseUrl`, `publicSpace`, `currentProject`, `globalCommands`, `defaultLang`, `multilingual`, `translations`, `token` (the per-session token), `apiUrl`, `isOperator` (§9.14) |
 | `templates/pages/settings.php` | extends `QUICKSITE_CONFIG` | `commandUrl`, `aiSettingsUrl`, `quicksiteVersion` |
 | `templates/pages/apis.php` | inline `window.translations` | `apis` namespace |
-| `templates/pages/preview-config.php` | `window.PreviewConfig` | full preview runtime data — routes, components, settings, i18n, token (200+ fields) |
+| `templates/pages/preview-config.php` | `window.PreviewConfig` | full preview runtime data — routes, components, settings, i18n, token (200+ fields), plus `tagInfo` (`TagRegistry::editorPayload()` — the tag classification, mandatory params, per-tag defaults and translation-key params the editor works from) |
 | `templates/pages/ai/*.php` | `data-precomputed` on `.admin-ai-page` | precomputed components/routes snapshot |
 | `templates/pages/optimize.php` | inline readiness flag | `window.__cssRefinerLibReady` |
 | `templates/pages/memberships.php` | `window.QS_MEMBERSHIPS_CONFIG` + `window.QS_MEMBERSHIPS_I18N` | `myUserId` (the caller's own public id — no API response carries it), `editedProject`; JS-facing strings for dynamic rows |
@@ -324,6 +324,30 @@ Menu and footer are global — editing them in any page's preview applies site-w
 3. Sidebar shows properties of the selected node.
 4. Edit → API call to `editStructure` / `editNode` / `setStyleRule` / `editTranslation` / etc.
 5. Preview reloads, or updates inline for text-only changes.
+
+**A page with no nodes still has something to click.** Selection is anchored to
+elements carrying `data-qs-node`, so a page whose last element was deleted would
+otherwise render as a blank iframe with nothing selectable — and the add form
+only opens with a selection, leaving no way back in. In editor mode the renderer
+emits a dashed placeholder standing for the structure root; selecting it and
+adding an element inserts the first node. The placeholder is editor-only: the
+published page renders nothing.
+
+**Which tags the editor offers, and which params it asks for, come from the
+server.** `TagRegistry` is the single source of truth, and
+`preview-config.php` emits `TagRegistry::editorPayload()` as
+`PreviewConfig.tagInfo`; the editor keeps no list of its own. Adding a tag, a
+mandatory param, or a per-tag default is therefore one edit, in
+`secure/src/classes/TagRegistry.php`.
+
+**Translated attributes are picked, not typed.** Where an attribute on a tag
+holds a translation key — `alt` on `img` and `area`, `title` on `iframe` — the
+add and Edit-Params forms show the searchable translation-key picker (the same
+one the Complex Element wizards use, which can create a key inline) instead of a
+plain text box. It is optional: leaving it empty writes no attribute at all,
+and nothing is generated on the author's behalf. Picking an asset through the
+browse button pre-fills `alt` from that asset's own metadata when it has some
+and the field is still empty.
 
 ### 8.6 Commands the editor calls
 

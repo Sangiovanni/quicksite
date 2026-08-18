@@ -203,5 +203,6 @@ function qs_prune_space_cache(): void {
 
 // qs_format_size() moved to utilsManagement.php (required at the top of this
 // file) when uploadLimits.php became a second caller. It was never specific to
-// space measurement, and a second copy is how the three surviving formatBytes()
-// copies elsewhere in the tree came about.
+// space measurement, and a second copy is how the three formatBytes()
+// duplicates elsewhere in the tree came about — those were collapsed onto
+// qs_format_size in S2.9.

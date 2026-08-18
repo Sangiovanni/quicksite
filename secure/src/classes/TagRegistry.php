@@ -2,11 +2,14 @@
 
 /**
  * TagRegistry — Single source of truth for ALL HTML tag classification.
- * 
+ *
  * Used by: addNode, editNode, editStructure, JsonToHtmlRenderer,
- *          _tag-selector.php.
- * 
- * NEVER define tag lists anywhere else. Always reference this class.
+ *          _tag-selector.php, and the visual editor's client-side code
+ *          (via editorPayload() → PreviewConfig.tagInfo → preview.js).
+ *
+ * NEVER define tag lists anywhere else. Always reference this class —
+ * including from JavaScript, which reads editorPayload() rather than
+ * keeping a copy.
  */
 class TagRegistry
 {
@@ -18,6 +21,23 @@ class TagRegistry
         'script', 'noscript', 'style', 'template', 'slot',
         'object', 'embed', 'applet'
     ];
+
+    /**
+     * ⚠ NOT-BLOCKED-BUT-NOT-ALLOWED: `dialog`.
+     *
+     * BLOCKED_TAGS is a SECURITY list — every entry is there because emitting
+     * it would let an author execute code, load a remote resource, or escape
+     * the renderer. `dialog` does none of that; it is simply not usable, so it
+     * lives in neither list and the "is it allowed?" gate refuses it as an
+     * unknown tag.
+     *
+     * Why it is not usable: `<dialog>` is `display:none` until it is opened,
+     * and opening one properly means calling `showModal()` / `show()`. Authors
+     * cannot run JavaScript (`<script>` is blocked, `on*` handlers are refused
+     * server-side, the custom-JS feature was removed in beta.3), and no QS.*
+     * verb calls either method — so the tag renders as nothing an author can
+     * ever reveal by the means the product gives them.
+     */
 
     // =========================================================================
     // ALLOWED TAGS: All tags users can create/assign
@@ -41,7 +61,8 @@ class TagRegistry
         'img', 'input', 'br', 'hr', 'meta', 'link', 'area', 'base', 'col',
         'source', 'track', 'wbr',
         // Interactive
-        'details', 'summary', 'dialog', 'select', 'option', 'optgroup', 'textarea',
+        // ⚠ `dialog` is deliberately ABSENT — see the note above BLOCKED_TAGS.
+        'details', 'summary', 'select', 'option', 'optgroup', 'textarea',
         // Media / embed
         'iframe', 'video', 'audio', 'canvas', 'svg', 'picture',
         // Misc
@@ -87,7 +108,7 @@ class TagRegistry
         'ul', 'ol', 'dl', 'li', 'form', 'table', 'tr', 'thead', 'tbody', 'tfoot', 'figure',
         'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'span', 'a', 'button',
         'blockquote', 'pre', 'label', 'td', 'th', 'figcaption', 'strong', 'em',
-        'fieldset', 'legend', 'details', 'summary', 'dialog', 'dt', 'dd',
+        'fieldset', 'legend', 'details', 'summary', 'dt', 'dd',
         'code', 'kbd', 'samp', 'var', 'cite', 'q', 'abbr', 'time', 'address',
         'b', 'i', 'u', 'small', 'mark', 'caption', 'select', 'optgroup', 'datalist'
     ];
@@ -98,7 +119,8 @@ class TagRegistry
 
     /**
      * Mandatory parameters per tag type.
-     * NOTE: 'alt' handled separately — auto-generated as translation key.
+     * NOTE: 'alt' is NOT here — it is optional, and it is offered through the
+     * translation-key selector (see TRANSLATION_KEY_PARAMS below).
      *
      * ⚠ A mandatory param must be one the AUTHOR supplies a value for: the
      * writers reject an empty string as "missing" (addNode, editNode). A boolean
@@ -119,7 +141,11 @@ class TagRegistry
         'select' => ['name'],
         'textarea' => ['name'],
         'area' => ['href'],
-        'track' => ['src'],
+        // <track src> alone is invalid HTML in the common case: `kind` defaults
+        // to "subtitles", and the spec REQUIRES srclang whenever kind is
+        // subtitles. A track authored without them names no language, so a
+        // player cannot label the track or decide when to offer it.
+        'track' => ['src', 'kind', 'srclang'],
         'link' => ['href', 'rel'],
         // Required by HTML, and silently wrong without it rather than loudly:
         // a <meter> with no value renders as an empty gauge, and an <optgroup>
@@ -158,12 +184,40 @@ class TagRegistry
     ];
 
     /**
-     * Tags that get auto-generated alt translation key.
+     * (Removed, S2.9) TAGS_WITH_ALT. It named the tags whose `alt` got a
+     * server-generated translation key — a behaviour that no longer exists,
+     * and its last two readers (addNode, editNode) are gone. What replaces it
+     * is TRANSLATION_KEY_PARAMS below, which says which param on which tag,
+     * rather than assuming the param is always `alt`.
      */
-    const TAGS_WITH_ALT = ['img', 'area'];
 
     /**
-     * Reserved params: auto-managed by the translation system, cannot be set manually.
+     * OPTIONAL params, per tag, whose value is a TRANSLATION KEY.
+     *
+     * The renderer already translates these attributes when the value looks
+     * like a key (JsonToHtmlRenderer::renderAttribute → $translatableAttributes),
+     * so the only thing missing was a way for the author to *choose* the key.
+     * The editor renders one translation-key selector per entry — the same
+     * searchable picker the component-variables panel and the Complex Element
+     * wizards use, which can also create a key inline.
+     *
+     * ⚠ ADD A TAG HERE, NOT IN THE EDITOR. This map is emitted to the visual
+     * editor by editorPayload() below; the client has no list of its own.
+     *
+     * `title` is in RESERVED_PARAMS — reserved means "the translation system
+     * owns the value", not "the author may not have one". Offering it through
+     * the key selector is exactly what the reservation was protecting.
+     */
+    const TRANSLATION_KEY_PARAMS = [
+        'img'    => ['alt'],
+        'area'   => ['alt'],
+        'iframe' => ['title'],
+    ];
+
+    /**
+     * Reserved params: auto-managed by the translation system, cannot be set
+     * manually as free text. Reachable through the translation-key selector
+     * where a tag declares one in TRANSLATION_KEY_PARAMS.
      */
     const RESERVED_PARAMS = [
         'placeholder', 'title', 'aria-label',
@@ -251,6 +305,39 @@ class TagRegistry
     }
 
     /**
+     * Everything the VISUAL EDITOR needs to know about tags, in one array.
+     *
+     * Emitted into the preview page by
+     * secure/admin/templates/pages/preview-config.php as
+     * `PreviewConfig.tagInfo`, and read by preview.js as its `TAG_INFO`.
+     *
+     * ⚠ THIS METHOD EXISTS SO THERE IS NO SECOND COPY. preview.js used to
+     * carry a hand-written mirror of these lists, and it had drifted: it
+     * offered `embed` and `object` (both BLOCKED here), demanded `alt` on
+     * `img` / `area` (never mandatory here), and had lost `dl`. Adding a tag
+     * or a param is now ONE edit — this file — because the client has no list
+     * to forget.
+     *
+     * Keys are the constant names verbatim so a reader can diff the two sides
+     * by eye without a mapping table.
+     */
+    public static function editorPayload(): array
+    {
+        return [
+            'ALLOWED_TAGS'            => self::ALLOWED_TAGS,
+            'BLOCKED_TAGS'            => self::BLOCKED_TAGS,
+            'BLOCK_TAGS'              => self::BLOCK_TAGS,
+            'INLINE_TAGS'             => self::INLINE_TAGS,
+            'SELF_CLOSING_TAGS'       => self::SELF_CLOSING_TAGS,
+            'CONTAINER_TAGS'          => self::CONTAINER_TAGS,
+            'MANDATORY_PARAMS'        => self::MANDATORY_PARAMS,
+            'DEFAULT_PARAMS'          => self::DEFAULT_PARAMS,
+            'TRANSLATION_KEY_PARAMS'  => self::TRANSLATION_KEY_PARAMS,
+            'RESERVED_PARAMS'         => self::RESERVED_PARAMS,
+        ];
+    }
+
+    /**
      * Get tag category for textKey logic: 'self-closing', 'inline', or 'block'.
      */
     public static function getCategory(string $tag): string
@@ -316,7 +403,6 @@ class TagRegistry
                     'button' => ['desc' => __admin('preview.tagDesc.button') ?? 'Clickable button'],
                     'details' => ['desc' => __admin('preview.tagDesc.details') ?? 'Disclosure widget'],
                     'summary' => ['desc' => __admin('preview.tagDesc.summary') ?? 'Details summary'],
-                    'dialog' => ['desc' => __admin('preview.tagDesc.dialog') ?? 'Dialog box'],
                 ]
             ],
             'list' => [

@@ -765,7 +765,10 @@ function findReservedQsParamInStructure($node, int $depth = 0, int $maxDepth = 5
  *
  * Lives here rather than beside any one caller: it started in spaceUsage.php,
  * gained a second caller in uploadLimits.php, and a second copy is exactly how
- * the three surviving formatBytes() duplicates elsewhere in the tree happened.
+ * the three formatBytes() duplicates elsewhere in the tree happened. Those were
+ * collapsed onto this function in S2.9 — deleteProject, listProjects and
+ * public/admin/api/index.php now all call it. ⚠ THIS IS THE ONLY ONE. A new
+ * local copy is how the last three started.
  */
 function qs_format_size(int $bytes): string {
     $units = ['B', 'KB', 'MB', 'GB', 'TB'];

@@ -189,7 +189,7 @@ function __command_deleteProject(array $params = [], array $urlParams = []): Api
         'deleted' => true,
         'files_deleted' => $stats['files'],
         'directories_deleted' => $stats['directories'],
-        'size_freed' => formatBytes($stats['size']),
+        'size_freed' => qs_format_size($stats['size']),
         'size_bytes' => $stats['size'],
         'log_files_purged' => $logsPurged,
         'membership_cascade' => $cascade
@@ -267,21 +267,12 @@ function deleteDirectory(string $dir): bool {
     return rmdir($dir);
 }
 
-/**
- * Format bytes to human readable
- * 
- * @param int $bytes Byte count
- * @return string Formatted string
- */
-function formatBytes(int $bytes): string {
-    if ($bytes === 0) return '0 B';
-    
-    $units = ['B', 'KB', 'MB', 'GB'];
-    $exp = floor(log($bytes, 1024));
-    $exp = min($exp, count($units) - 1);
-    
-    return round($bytes / pow(1024, $exp), 2) . ' ' . $units[$exp];
-}
+// (Removed, S2.9) A local formatBytes(). Byte formatting lives in
+// qs_format_size() in utilsManagement.php, already required at the top of this
+// file. Three copies existed; they disagreed with each other and with the
+// shared one above 100 units, and none of them had a TB unit — so a large
+// deletion reported "1024 GB". Being global functions in command files, two of
+// them were also a latent redeclare collision for any process that loaded both.
 
 // Execute command if called directly via API (not internal call)
 if (!defined('COMMAND_INTERNAL_CALL')) {

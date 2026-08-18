@@ -300,8 +300,14 @@ function __command_addComplexElement(array $params = [], array $urlParams = []):
         // an object-shape `{"0": main, "children": [...]}` after the
         // first 'root' insert — every subsequent operation then failed
         // because NodeNavigator can no longer address nodes.
+        //
+        // ⚠ The empty case is explicit: `range(0, -1)` is `[0, -1]` in PHP, so
+        // the key comparison alone reads an EMPTY page as node-shaped and
+        // corrupts it into `{"children":[…]}`. A page with no nodes is a list
+        // with no entries. Same guard as addNode.php — keep them in step.
         $isListShapeRoot = is_array($structure)
-            && array_keys($structure) === range(0, count($structure) - 1);
+            && ($structure === []
+                || array_keys($structure) === range(0, count($structure) - 1));
         if ($isListShapeRoot) {
             array_unshift($structure, $newNode);
         } else {

@@ -330,8 +330,43 @@ class JsonToHtmlRenderer {
             return $this->renderNode($data);
         }
 
+        // A structure with NO nodes. On the live site that is correctly nothing
+        // at all. In the EDITOR it is a dead end: selection is anchored to
+        // elements carrying data-qs-node, so a page whose last node was deleted
+        // offers nothing to click, and the add form — which only opens with a
+        // selection — can never be reached. The author has emptied the page and
+        // cannot put anything back.
+        if ($data === []) {
+            return $this->editorMode ? $this->renderEmptyStructurePlaceholder() : '';
+        }
+
         // Array of nodes - render each
         return $this->renderNodes($data);
+    }
+
+    /**
+     * The editor-only stand-in for a structure with no nodes.
+     *
+     * Carries `data-qs-node=""`, which is the editor's existing spelling for
+     * "the structure root" (preview.js treats an empty selectedNode as root and
+     * sends targetNodeId='root', position='inside'). So selecting it and adding
+     * an element inserts the first node exactly as adding at root always has.
+     *
+     * Never emitted outside editor mode — a live page with no content stays a
+     * page with no content.
+     */
+    private function renderEmptyStructurePlaceholder(): string {
+        $struct = htmlspecialchars($this->currentStructure, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        // Plain English, not a translation lookup: Translator holds the
+        // PROJECT's strings, and asking it for an admin key would both render a
+        // "{translation missing}" marker and write to the project's error log on
+        // every render of an empty page. Editor chrome inside the preview iframe
+        // is the panel's concern — its styling is injected by
+        // preview-iframe-inject.js as `.qs-empty-structure`.
+        return '<div class="qs-empty-structure" data-qs-struct="' . $struct . '" data-qs-node="">'
+            . 'This page is empty. Select this area, then add your first element.'
+            . '</div>';
     }
 
     /**
