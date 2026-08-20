@@ -157,14 +157,19 @@ function qs_surface_b_gate(string $id, string $secure): ?int {
 }
 
 /**
- * PRE-INIT: detect a `/p/<id>/` request and set up the surface-B constant overrides.
- * No-op (returns) for every non-surface-B request. Call FIRST in public/index.php,
- * before require 'init.php'.
+ * Detect a `/p/<id>/` request and set up the surface-B constant overrides.
+ * No-op (returns) for every non-surface-B request.
+ *
+ * Called from init.php, for the /p/ entry point only, AFTER SECURE_FOLDER_PATH is
+ * resolved and BEFORE BASE_URL is derived — the overrides below have to win. The body
+ * stays independent of init.php's constants, so that ordering is the only thing it needs.
  */
 function qs_surface_b_maybe_handle(): void {
-    // Secure root without init.php constants: this file is secure/src/functions/…
+    // This file is <secure>/src/functions/, so its own grandparent IS the secure folder and
+    // its great-grandparent the server root — correct whatever those folders were renamed
+    // to. Never spell 'secure' here: setup can rename it.
+    $secure     = dirname(__DIR__, 2);
     $serverRoot = dirname(__DIR__, 3);
-    $secure     = $serverRoot . '/secure';
 
     $path = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH);
     if (!is_string($path) || $path === '') {
@@ -272,7 +277,7 @@ function qs_surface_b_finish(): void {
         // is engine-owned at secure/src/runtime/qs.js (unshadowable by a user file at
         // the now-free web root); it is reachable ONLY through this passthrough.
         if ($subpath === 'scripts/qs.js') {
-            qs_sb_send_file($sb['serverRoot'] . '/secure/src/runtime/qs.js');
+            qs_sb_send_file($sb['secure'] . '/src/runtime/qs.js');
         }
         $resolved = qs_surface_b_resolve_static($projectDir . '/public', $subpath);
         if (isset($resolved['file'])) {

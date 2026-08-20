@@ -4,11 +4,17 @@
 // free — no FallbackResource — so a user's own hand-made site can live there and
 // QuickSite never squats the domain root.
 //
-// C9 surface B — intercept `/p/<projectId>/` BEFORE init.php, so a project view is scoped
-// to its own secure/projects/<id>/public/ folder. (secure/src/functions/surfaceB.php)
-require_once __DIR__ . '/../../secure/src/functions/surfaceB.php';
-qs_surface_b_maybe_handle();
-
+// C9 surface B — the `/p/<projectId>/` gate. The DISPATCH lives in init.php, because this
+// file cannot name secure/ itself: both that folder's NAME and this file's depth below the
+// web root move (setup renames the folders, and a URL space nests the install), and nothing
+// here knows either yet. init.php does — so this entry point does what /admin/ and
+// /management/ do: require init.php by a sibling-relative path, which moves WITH the space
+// because init.php moves with it, then let SECURE_FOLDER_PATH resolve everything after.
+//
+// The marker is an ENTRY-POINT fact, deliberately not a URL one: a project-scoped command is
+// '/management/p/<projectId>/<command>' and carries a '/p/' segment of its own, so gating on
+// URL shape alone would treat every project-scoped API call as a project view.
+define('QS_SURFACE_B_ENTRY', true);
 require_once __DIR__ . '/../init.php';
 
 // C15 15.3 — no project, no render. A request that reaches this file without resolving to
@@ -28,7 +34,7 @@ qs_surface_b_finish();
 // install-wide constants, shared by every entry point). Resolves the PUBLIC BASE once
 // (QS_PUBLIC_BASE_URL env → request-derived) and defines QS_PUBLIC_BASE (root-relative
 // form every in-page URL composes against, R1) + QS_PUBLIC_BASE_ABS (sitemap/spec form).
-require_once __DIR__ . '/../../secure/src/functions/renderBootstrap.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/renderBootstrap.php';
 
 // --- Component Preview Mode (for Visual Editor) ---
 // If ?_component={name}&_editor=1 is present, render just the component in isolation

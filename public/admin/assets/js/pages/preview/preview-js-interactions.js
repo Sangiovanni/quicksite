@@ -608,9 +608,13 @@
         }
         
         try {
+            // managementUrl carries BOTH the URL space and the C7 /p/<projectId>/ marker
+            // (preview-config.php bakes them in), which a root-absolute path has neither of:
+            // listInteractions is project-scoped, so without the marker the dispatcher
+            // refuses it outright, and under a URL space the path does not exist at all.
             const url = pageName 
-                ? `/management/listInteractions/${structType}/${pageName}/${nodeId}`
-                : `/management/listInteractions/${structType}/${nodeId}`;
+                ? PreviewConfig.managementUrl + `listInteractions/${structType}/${pageName}/${nodeId}`
+                : PreviewConfig.managementUrl + `listInteractions/${structType}/${nodeId}`;
             
             const response = await fetch(url, {
                 method: 'GET',

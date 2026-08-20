@@ -112,6 +112,23 @@ if (!is_dir(SECURE_FOLDER_PATH)) {
 }
 
 // ============================================================================
+// SURFACE B: the /p/<projectId>/ gate  (C9)
+// ============================================================================
+// Runs HERE, and only for the /p/ entry point. Here because SECURE_FOLDER_PATH is
+// resolved by now — so surfaceB.php is found whatever the folders were renamed to, and
+// however deep a URL space nests the install — while BASE_URL is not derived until far
+// below, and the gate defines its own project-scoped BASE_URL that must win. It also sits
+// ahead of the first-install and nginx blocks below, so a REFUSED request still writes
+// nothing: everything above this line is constant definitions and one is_dir() check.
+//
+// The guard is the ENTRY POINT, never the URL: '/management/p/<projectId>/<command>' also
+// carries a '/p/' segment, and gating on that would refuse every project-scoped API call.
+if (defined('QS_SURFACE_B_ENTRY')) {
+    require_once SECURE_FOLDER_PATH . '/src/functions/surfaceB.php';
+    qs_surface_b_maybe_handle();
+}
+
+// ============================================================================
 // FIRST-INSTALL: Auto-create config files from .example templates
 // ============================================================================
 $configDir = SECURE_FOLDER_PATH . DIRECTORY_SEPARATOR . 'management' . DIRECTORY_SEPARATOR . 'config';

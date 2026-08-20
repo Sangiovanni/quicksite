@@ -524,7 +524,7 @@ echo $initFile = Join-Path $initDir 'init.php' >> "%PS_SPACE_TEMP%"
 echo if (Test-Path $initFile) { >> "%PS_SPACE_TEMP%"
 echo   $c = Get-Content $initFile -Raw >> "%PS_SPACE_TEMP%"
 echo   $c = $c -replace "define\('PUBLIC_FOLDER_SPACE',\s*'.*?'\)", "define('PUBLIC_FOLDER_SPACE', '$newSpace')" >> "%PS_SPACE_TEMP%"
-echo   [IO.File]::WriteAllText($initFile, $c, [System.Text.Encoding]::UTF8) >> "%PS_SPACE_TEMP%"
+echo   [IO.File]::WriteAllText($initFile, $c, (New-Object System.Text.UTF8Encoding $false)) >> "%PS_SPACE_TEMP%"
 echo } >> "%PS_SPACE_TEMP%"
 echo # Apache: retarget every FallbackResource to the new prefix. >> "%PS_SPACE_TEMP%"
 echo # FallbackResource takes a URL path relative to the DocumentRoot, so each >> "%PS_SPACE_TEMP%"
@@ -542,7 +542,7 @@ echo )) { >> "%PS_SPACE_TEMP%"
 echo   if (Test-Path $pair.File) { >> "%PS_SPACE_TEMP%"
 echo     $c = Get-Content $pair.File -Raw >> "%PS_SPACE_TEMP%"
 echo     $c = $c -replace 'FallbackResource .*', ('FallbackResource ' + $pair.Fallback) >> "%PS_SPACE_TEMP%"
-echo     [IO.File]::WriteAllText($pair.File, $c, [System.Text.Encoding]::UTF8) >> "%PS_SPACE_TEMP%"
+echo     [IO.File]::WriteAllText($pair.File, $c, (New-Object System.Text.UTF8Encoding $false)) >> "%PS_SPACE_TEMP%"
 echo   } >> "%PS_SPACE_TEMP%"
 echo } >> "%PS_SPACE_TEMP%"
 echo # nginx: drop the stale routing config, do NOT rewrite it here. The >> "%PS_SPACE_TEMP%"
@@ -633,7 +633,7 @@ REM reading it as a redirect, and a caret it does not need lands in the .ps1 as
 REM a literal '^', which turns the pattern into one that matches nothing. Only
 REM the trailing '>>' here is a real redirect.
 echo $c = $c -replace "'environment'\s*=>\s*'.*?'", ("'environment' => '" + $v + "'") >> "%PS_CFG_TEMP%"
-echo [IO.File]::WriteAllText($f, $c, [System.Text.Encoding]::UTF8) >> "%PS_CFG_TEMP%"
+echo [IO.File]::WriteAllText($f, $c, (New-Object System.Text.UTF8Encoding $false)) >> "%PS_CFG_TEMP%"
 powershell -NoProfile -ExecutionPolicy Bypass -File "%PS_CFG_TEMP%" <nul >nul 2>&1
 del "%PS_CFG_TEMP%" 2>nul
 
@@ -704,7 +704,7 @@ echo $f = '!AUTH_FILE!' > "%PS_CFG_TEMP%"
 echo $v = '!REG_VALUE!' >> "%PS_CFG_TEMP%"
 echo $c = Get-Content $f -Raw >> "%PS_CFG_TEMP%"
 echo $c = $c -replace "'allow_self_registration'\s*=>\s*\w+", ("'allow_self_registration' => " + $v) >> "%PS_CFG_TEMP%"
-echo [IO.File]::WriteAllText($f, $c, [System.Text.Encoding]::UTF8) >> "%PS_CFG_TEMP%"
+echo [IO.File]::WriteAllText($f, $c, (New-Object System.Text.UTF8Encoding $false)) >> "%PS_CFG_TEMP%"
 powershell -NoProfile -ExecutionPolicy Bypass -File "%PS_CFG_TEMP%" <nul >nul 2>&1
 del "%PS_CFG_TEMP%" 2>nul
 
@@ -812,7 +812,7 @@ echo $n = '%UIC_NAME%' >> "%PS_TEMP%"
 echo $v = '%UIC_VALUE%' >> "%PS_TEMP%"
 echo $c = Get-Content $f -Raw >> "%PS_TEMP%"
 echo $c = $c -replace "define\('$n',\s*'.*?'\)", "define('$n', '$v')" >> "%PS_TEMP%"
-echo [IO.File]::WriteAllText($f, $c, [System.Text.Encoding]::UTF8) >> "%PS_TEMP%"
+echo [IO.File]::WriteAllText($f, $c, (New-Object System.Text.UTF8Encoding $false)) >> "%PS_TEMP%"
 
 powershell -NoProfile -ExecutionPolicy Bypass -File "%PS_TEMP%" <nul 2>nul
 if errorlevel 1 (

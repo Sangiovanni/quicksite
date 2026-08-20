@@ -105,7 +105,9 @@ function generate_nginx_config(string $publicFolderSpace): string {
     $config .= "    # The value is one megabyte above PHP's own limit on purpose, so PHP is\n";
     $config .= "    # always the component that refuses an oversized upload and can say why.\n";
     $config .= "    # Computed from this server's PHP configuration when the file was\n";
-    $config .= "    # generated; change post_max_size and this file is regenerated with it.\n";
+    $config .= "    # generated, and NOT recomputed afterwards: this file is written only\n";
+    $config .= "    # when it is absent. After changing post_max_size, delete this file,\n";
+    $config .= "    # load any page to regenerate it, then reload nginx.\n";
     $config .= "    client_max_body_size " . qs_nginx_client_max_body_size() . ";\n";
     $config .= "    try_files \$uri \$uri/ {$prefix}/management/index.php\$is_args\$args;\n";
     $config .= "}\n\n";
