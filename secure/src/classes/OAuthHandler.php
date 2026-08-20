@@ -61,6 +61,7 @@
  */
 
 require_once __DIR__ . '/OutboundUrlPolicy.php';
+require_once __DIR__ . '/../functions/storageHelpers.php'; // qs_project_cookie_name
 
 class OAuthHandler
 {
@@ -290,7 +291,10 @@ class OAuthHandler
         return [
             'redirect' => $returnTo,
             'cookie'   => [
-                'name'    => 'qs_oauth_user',
+                // Namespaced per project: one host serves every project at
+                // /p/<id>/ and they share one cookie jar. Set, read and CLEAR
+                // must all compose through the same helper.
+                'name'    => qs_project_cookie_name(QS_OAUTH_COOKIE),
                 'value'   => $sessionId,
                 'options' => [
                     'expires'  => $now + self::SESSION_TTL_SECONDS,
@@ -373,7 +377,10 @@ class OAuthHandler
         return [
             'redirect' => $safeReturnTo,
             'cookie'   => [
-                'name'    => 'qs_oauth_user',
+                // Namespaced per project: one host serves every project at
+                // /p/<id>/ and they share one cookie jar. Set, read and CLEAR
+                // must all compose through the same helper.
+                'name'    => qs_project_cookie_name(QS_OAUTH_COOKIE),
                 'value'   => '',
                 'options' => [
                     'expires'  => time() - 3600,

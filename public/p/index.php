@@ -400,6 +400,7 @@ if (!empty($__resolverConfigs)) {
     if ($__firstKind === 'oauth-start' || $__firstKind === 'oauth-callback' || $__firstKind === 'oauth-logout') {
         require_once SECURE_FOLDER_PATH . '/src/classes/OAuthHandler.php';
         require_once SECURE_FOLDER_PATH . '/src/functions/oauthStateStore.php';
+        require_once SECURE_FOLDER_PATH . '/src/functions/storageHelpers.php'; // qs_project_cookie_name
 
         $__oauthCfg = $__resolverConfigs[0];
         $__routeParams = $trimParameters->routeParams();
@@ -427,13 +428,20 @@ if (!empty($__resolverConfigs)) {
         // generic /logout route — the cookie is the truth.
         $__logoutSessionId = '';
         if ($__firstKind === 'oauth-logout') {
-            $__logoutSessionId = isset($_COOKIE['qs_oauth_user']) ? (string) $_COOKIE['qs_oauth_user'] : '';
+            // Namespaced per project — the SAME composition the set and the
+            // clears below use. A mismatch here reads as "no session" and the
+            // logout silently leaves the real cookie in place.
+            $__qsOauthCookie   = qs_project_cookie_name(QS_OAUTH_COOKIE);
+            $__logoutSessionId = isset($_COOKIE[$__qsOauthCookie]) ? (string) $_COOKIE[$__qsOauthCookie] : '';
             $__logoutSession = $__logoutSessionId !== '' ? getOAuthSession($__logoutSessionId) : null;
             if ($__logoutSession === null) {
                 // No active session — logout is idempotent. Expire the
                 // cookie defensively (in case it lingers with a stale
                 // sessionId no longer in the store) and redirect.
-                setcookie('qs_oauth_user', '', [
+                // ⚠ A cookie is cleared by NAME and PATH. Both must match the
+                // set exactly, or this expires a cookie that does not exist
+                // and the session cookie survives a "successful" logout.
+                setcookie(qs_project_cookie_name(QS_OAUTH_COOKIE), '', [
                     'expires'  => time() - 3600,
                     'path'     => '/',
                     'secure'   => _oauthIsHttps(),
@@ -467,7 +475,10 @@ if (!empty($__resolverConfigs)) {
                     . '. Falling back to local-only logout.'
                 );
                 clearOAuthSession($__logoutSessionId);
-                setcookie('qs_oauth_user', '', [
+                // ⚠ A cookie is cleared by NAME and PATH. Both must match the
+                // set exactly, or this expires a cookie that does not exist
+                // and the session cookie survives a "successful" logout.
+                setcookie(qs_project_cookie_name(QS_OAUTH_COOKIE), '', [
                     'expires'  => time() - 3600,
                     'path'     => '/',
                     'secure'   => _oauthIsHttps(),

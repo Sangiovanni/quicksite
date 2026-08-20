@@ -2590,8 +2590,11 @@ translation happens once, inside `qs.js`, at the point of the read or write.
 - **While you type.** The add/edit form shows `qsp_<projectId>_` as a fixed,
   non-editable chip immediately before the key box, so the whole browser name
   reads left to right as you fill in the part you own. The chip disappears when
-  you switch the scope to `cookie` — `qs.js` writes no cookies, so a cookie is
-  stored under exactly the name you type.
+  you switch the scope to `cookie`: QuickSite does not write a cookie you
+  declare here — your own code does — so it is stored under exactly the name you
+  type. (The two cookies QuickSite writes for itself, the consent record and the
+  visitor OAuth session, are namespaced per project like storage keys are. They
+  are not registry entries and never appear in this form.)
 - **On each card.** `localStorage` / `sessionStorage` entries carry a `stored as`
   line, so you know what to search for in the browser's developer tools;
   `cookie`-scope entries have none.

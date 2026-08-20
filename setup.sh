@@ -233,6 +233,41 @@ selfreg_label() {
     esac
 }
 
+# Quota is the one config whose ABSENCE is a real setting: no quota.php means
+# nothing is limited, and a fresh install has none. So the label distinguishes
+# "no file" from "file present, both axes unlimited" — they behave the same
+# today but the second is a deliberate choice somebody made.
+quota_bytes_current() {
+    first_capture "$(CONFIG_DIR)/quota.php" \
+        "'max_total_bytes'[[:space:]]*=>[[:space:]]*\\([0-9]*\\)"
+}
+
+quota_uploads_current() {
+    first_capture "$(CONFIG_DIR)/quota.php" \
+        "'max_uploads'[[:space:]]*=>[[:space:]]*\\([0-9]*\\)"
+}
+
+quota_label() {
+    if [ ! -f "$(CONFIG_DIR)/quota.php" ]; then
+        echo -e "no limits  ${DIM}(default — quota.php not created yet)${NC}"
+        return
+    fi
+    local b u parts=""
+    b="$(quota_bytes_current)"; u="$(quota_uploads_current)"
+    if [ -n "$b" ] && [ "$b" != "0" ]; then
+        parts="$(( b / 1024 / 1024 )) MB per user"
+    fi
+    if [ -n "$u" ] && [ "$u" != "0" ]; then
+        [ -n "$parts" ] && parts="$parts, "
+        parts="${parts}${u} uploads per period"
+    fi
+    if [ -z "$parts" ]; then
+        echo -e "no limits  ${DIM}(quota.php present, both axes unlimited)${NC}"
+    else
+        echo -e "${YELLOW}${parts}${NC}"
+    fi
+}
+
 space_label() {
     if [ -n "$PUBLIC_SPACE" ]; then
         echo "$PUBLIC_SPACE  → http://your-domain/$PUBLIC_SPACE/"
@@ -756,6 +791,108 @@ item_token() {
 }
 
 # ==========================================================
+# Item 7 — storage quotas
+# ==========================================================
+# ⚠ ABSENT MEANS NO LIMITS, AND THAT IS A REAL SETTING, NOT A MISSING ONE.
+# A fresh install has no quota.php and must not refuse uploads out of the box,
+# so declining every prompt here LEAVES THE FILE ABSENT rather than writing
+# zeros. The two are equivalent to the engine today, but writing a file for
+# "no limits" would turn an install that opted out into one that opted in to
+# nothing, and the next person to read the folder could not tell them apart.
+item_quota() {
+    local cfg_dir; cfg_dir="$(CONFIG_DIR)"
+    local live="$cfg_dir/quota.php"
+    local example="$cfg_dir/quota.php.example"
+
+    echo ""
+    echo -e "${BOLD}Storage quotas${NC}"
+    echo ""
+    echo "  Limits applied per ACCOUNT, on two independent axes. Any signed-in"
+    echo "  user can otherwise upload until the disk is full."
+    echo ""
+    echo "    total bytes   the combined size of everything the account owns."
+    echo "                  Refused with 507 before the write, not after."
+    echo "    upload rate   how many uploads it may perform per period. Bounds"
+    echo "                  churn (upload, delete, repeat) rather than volume."
+    echo ""
+    echo -e "  Currently: $(quota_label)"
+    echo ""
+    echo -e "  ${DIM}Leave both blank for no limits. Full documentation of every${NC}"
+    echo -e "  ${DIM}option lives in quota.php.example, which is never modified.${NC}"
+    echo ""
+
+    if [ ! -d "$cfg_dir" ]; then
+        echo -e "  ${RED}✗ Error: config folder not found:${NC} $cfg_dir"
+        return 0
+    fi
+
+    local MB UPLOADS HOURS
+    read -r -p "  Max total size per user, in MB [blank = unlimited]: " MB || true
+    read -r -p "  Max uploads per period       [blank = unlimited]: " UPLOADS || true
+
+    # Non-numeric input is refused rather than silently coerced: "2GB" would
+    # otherwise become 0, i.e. unlimited, which is the opposite of the intent.
+    case "${MB:-}" in
+        "") ;;
+        *[!0-9]*) echo -e "  ${RED}✗ Not a whole number of MB: $MB${NC}"; return 0 ;;
+    esac
+    case "${UPLOADS:-}" in
+        "") ;;
+        *[!0-9]*) echo -e "  ${RED}✗ Not a whole number: $UPLOADS${NC}"; return 0 ;;
+    esac
+
+    HOURS=""
+    if [ -n "$UPLOADS" ] && [ "$UPLOADS" != "0" ]; then
+        read -r -p "  ...per how many hours [1]: " HOURS || true
+        [ -z "$HOURS" ] && HOURS=1
+        case "$HOURS" in
+            *[!0-9]*|0) echo -e "  ${RED}✗ Not a whole number of hours: $HOURS${NC}"; return 0 ;;
+        esac
+    fi
+
+    local BYTES=0 MAXUP=0 PERIOD=3600
+    [ -n "$MB" ]      && BYTES=$(( MB * 1024 * 1024 ))
+    [ -n "$UPLOADS" ] && MAXUP="$UPLOADS"
+    [ -n "$HOURS" ]   && PERIOD=$(( HOURS * 3600 ))
+
+    # Both axes unlimited — do NOT write a file to say so.
+    if [ "$BYTES" = "0" ] && [ "$MAXUP" = "0" ]; then
+        if [ ! -f "$live" ]; then
+            echo ""
+            echo -e "  ${GREEN}✓${NC} No limits — quota.php left absent, which is what a fresh"
+            echo "    install has. Nothing is refused."
+            return 0
+        fi
+        echo ""
+        echo -e "  ${DIM}quota.php already exists. To go back to no limits, delete it:${NC}"
+        echo -e "  ${DIM}$live${NC}"
+        echo -e "  ${DIM}Setup does not delete a config file you wrote.${NC}"
+        return 0
+    fi
+
+    # quota.php.example is the shipped documentation and is never edited: the
+    # live file is a COPY with the numbers patched, so every explanatory comment
+    # survives into the file the deployer will actually read later.
+    if [ ! -f "$live" ]; then
+        if [ ! -f "$example" ]; then
+            echo -e "  ${RED}✗ Error: quota.php.example is missing${NC}"
+            return 0
+        fi
+        cp "$example" "$live"
+    fi
+
+    # Anchored to start-of-line so the COMMENTED example value above each
+    # setting (those lines begin with //) is left alone.
+    sed -i "s|^\( *\)'max_total_bytes'[[:space:]]*=>.*|\1'max_total_bytes' => ${BYTES},|" "$live"
+    sed -i "s|^\( *\)'max_uploads'[[:space:]]*=>.*|\1'max_uploads'    => ${MAXUP},|" "$live"
+    sed -i "s|^\( *\)'period_seconds'[[:space:]]*=>.*|\1'period_seconds' => ${PERIOD},|" "$live"
+
+    echo ""
+    echo -e "  ${GREEN}✓${NC} Quotas written to quota.php"
+    echo -e "     $(quota_label)"
+}
+
+# ==========================================================
 # The menu
 # ==========================================================
 show_header() {
@@ -772,6 +909,7 @@ show_menu() {
     echo -e "  URL space:          $(space_label)"
     echo -e "  Environment:        $(env_label)"
     echo -e "  Self-registration:  $(selfreg_label)"
+    echo -e "  Storage quotas:     $(quota_label)"
     echo ""
     echo "    1) Rename the public folder"
     echo "    2) Rename the secure folder"
@@ -779,6 +917,7 @@ show_menu() {
     echo "    4) Switch environment (development / production)"
     echo "    5) Turn self-registration on / off"
     echo "    6) Show my setup token"
+    echo "    7) Storage quotas (per user)"
     echo "    q) Finish"
     echo ""
 }
@@ -803,6 +942,7 @@ while true; do
         4) item_environment; pause_for_menu ;;
         5) item_selfreg; pause_for_menu ;;
         6) item_token; pause_for_menu ;;
+        7) item_quota; pause_for_menu ;;
         q|Q|"") break ;;
         *) echo -e "  ${RED}Unknown choice: $CHOICE${NC}" ;;
     esac
@@ -822,6 +962,7 @@ if [ -n "$PUBLIC_SPACE" ]; then
 fi
 echo -e "  Environment:        $(env_label)"
 echo -e "  Self-registration:  $(selfreg_label)"
+echo -e "  Storage quotas:     $(quota_label)"
 echo ""
 
 if [ -n "$OWNERSHIP_WARNING" ]; then

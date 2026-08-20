@@ -328,8 +328,12 @@ function validateStorageItem(string $id, array $input): array {
  * nothing.
  *
  * Mirrors `_storageKey()` in secure/src/runtime/qs.js, which is the runtime's
- * single composition point. Cookies are NOT prefixed — qs.js does not write
- * them, so a cookie carries exactly its declared name.
+ * single composition point. A DECLARED cookie is still not prefixed here, and
+ * that part remains true: QuickSite is not in the write path for one, so it
+ * carries exactly the name the author's own code sets.
+ *
+ * ⚠ The ENGINE'S OWN cookies are the opposite case — QuickSite writes those,
+ * so they ARE namespaced. See qs_project_cookie_name() below.
  *
  * @param string $declaredKey The key as the author declared it
  * @param string $scope       localStorage | sessionStorage | cookie
@@ -344,4 +348,43 @@ function qs_storage_physical_key(string $declaredKey, string $scope, ?string $pr
         $projectId = defined('PROJECT_NAME') ? (string) PROJECT_NAME : '';
     }
     return 'qsp_' . $projectId . '_' . $declaredKey;
+}
+
+/**
+ * The physical name of an ENGINE-OWNED cookie for the bound project.
+ *
+ * ⚠ WHY COOKIES NEED THIS AT ALL. A cookie is scoped by origin and path, not
+ * by URL prefix, so every project served at /p/<id>/ on one host shares one
+ * jar. Before this, a visitor who accepted analytics on project A had it read
+ * back as consented on project B, whose banner then never appeared. That is
+ * the same cross-project collision the storage prefix exists to prevent.
+ *
+ * ⚠ THE NAME IS PREFIXED, NEVER THE PATH. Deriving Path=/p/<id>/ was rejected:
+ * a BUILT site serves at /, where Path=/ is correct, so a derived path would
+ * make preview and production behave differently — the exact mode split that
+ * was rejected when the same question came up about stripping the storage
+ * prefix at build time. One behaviour everywhere.
+ *
+ * ⚠ A COOKIE IS CLEARED BY NAME AND PATH. Every set, read AND clear has to
+ * compose through this function. A clear that still uses the bare name does
+ * not fail loudly — it silently leaves the cookie in place, which for
+ * qs_oauth_user would mean a logout that looks successful and is not.
+ *
+ * Mirrors _cookieName() in secure/src/runtime/qs.js. The fallback is
+ * 'default', matching what Page::render() and PageManagement::render() emit
+ * into window.QS_PROJECT when PROJECT_NAME is undefined, so the two sides
+ * compose the same name in that case too.
+ *
+ * @param string $bareName  The engine cookie name (e.g. "consent_prefs")
+ * @param string|null $projectId Defaults to the bound project (PROJECT_NAME)
+ * @return string The name that appears in the browser
+ */
+/** Engine-owned cookie: the author-site OAuth session id (an AUTH CREDENTIAL). */
+const QS_OAUTH_COOKIE = 'qs_oauth_user';
+
+function qs_project_cookie_name(string $bareName, ?string $projectId = null): string {
+    if ($projectId === null) {
+        $projectId = defined('PROJECT_NAME') ? (string) PROJECT_NAME : 'default';
+    }
+    return 'qsp_' . $projectId . '_' . $bareName;
 }

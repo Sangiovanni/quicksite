@@ -36,6 +36,8 @@
  * Function-level guard so commands can include this alongside other
  * helpers without double-declaration errors.
  */
+require_once __DIR__ . '/storageHelpers.php'; // qs_project_cookie_name, QS_OAUTH_COOKIE
+
 
 if (!function_exists('storeOAuthState')) {
 
@@ -168,7 +170,7 @@ function clearOAuthSession(string $sessionId): void {
 
 /**
  * Template/PHP-side helper: does this request belong to a logged-in
- * OAuth user? Reads $_COOKIE['qs_oauth_user'] (the opaque sessionId set
+ * OAuth user? Reads the project's namespaced OAuth cookie (the opaque sessionId set
  * by handleCallback), looks up the matching server-side record via
  * getOAuthSession, returns true when a non-expired record exists.
  *
@@ -179,7 +181,9 @@ function clearOAuthSession(string $sessionId): void {
  * Slice 2e (locked 2026-06-15).
  */
 function isOAuthLoggedIn(): bool {
-    $sessionId = isset($_COOKIE['qs_oauth_user']) ? (string) $_COOKIE['qs_oauth_user'] : '';
+    // Namespaced per project — see qs_project_cookie_name().
+    $__qsc     = qs_project_cookie_name(QS_OAUTH_COOKIE);
+    $sessionId = isset($_COOKIE[$__qsc]) ? (string) $_COOKIE[$__qsc] : '';
     if ($sessionId === '') {
         return false;
     }
@@ -205,7 +209,9 @@ function isOAuthLoggedIn(): bool {
  * @return array{provider:string,sub:string,email:?string,name:?string}|null
  */
 function getOAuthUser(): ?array {
-    $sessionId = isset($_COOKIE['qs_oauth_user']) ? (string) $_COOKIE['qs_oauth_user'] : '';
+    // Namespaced per project — see qs_project_cookie_name().
+    $__qsc     = qs_project_cookie_name(QS_OAUTH_COOKIE);
+    $sessionId = isset($_COOKIE[$__qsc]) ? (string) $_COOKIE[$__qsc] : '';
     if ($sessionId === '') {
         return null;
     }

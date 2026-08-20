@@ -1006,6 +1006,8 @@
     // shape of "works in preview, broken in production".
 
     const QS_STORAGE_PREFIX = 'qsp_';
+    /** Engine-owned cookie: the visitor consent record. Namespaced per project. */
+    const QS_CONSENT_COOKIE = 'consent_prefs';
     let _qsProjectWarned = false;
 
     /** The project id this page belongs to, per the server. '' when unknown. */
@@ -1034,6 +1036,44 @@
         return QS_STORAGE_PREFIX + _qsProjectId() + '_' + key;
     }
     QS.storageKey = _storageKey;
+
+    /**
+     * The physical name of an ENGINE-OWNED cookie, namespaced exactly as a
+     * storage key is. A cookie is scoped by origin and path, not by URL
+     * prefix, so every project at /p/<id>/ on one host shares one jar: without
+     * this, consent accepted on project A is read back as consented on project
+     * B and B never shows its banner.
+     *
+     * The NAME carries the namespace, never the Path. A built site serves at
+     * /, where Path=/ is correct, so deriving Path=/p/<id>/ would make preview
+     * and production disagree — the mode split that was rejected for the
+     * storage prefix too. One behaviour everywhere.
+     *
+     * Mirrors qs_project_cookie_name() in secure/src/functions/storageHelpers.php.
+     * @param {string} name Engine cookie name
+     * @returns {string}
+     */
+    function _cookieName(name) {
+        return QS_STORAGE_PREFIX + _qsProjectId() + '_' + name;
+    }
+    QS.cookieName = _cookieName;
+
+    /**
+     * Read one cookie by its FULL physical name. Split rather than matched by
+     * regex: the composed name embeds a project id, and building a pattern
+     * around it would need that id escaped.
+     * @param {string} name Full cookie name
+     * @returns {string|null} Raw (still URL-encoded) value, or null.
+     */
+    function _readCookie(name) {
+        var target = name + '=';
+        var parts = document.cookie ? document.cookie.split(';') : [];
+        for (var i = 0; i < parts.length; i++) {
+            var c = parts[i].replace(/^\s+/, '');
+            if (c.indexOf(target) === 0) return c.substring(target.length);
+        }
+        return null;
+    }
 
     /** Read an author key from `storage`. null when absent or unreadable. */
     function _storageGet(storage, key) {
@@ -1106,9 +1146,9 @@
     /** Parse the consent_prefs cookie → object, or null. */
     function _readConsentCookie() {
         try {
-            var m = document.cookie.match(/(?:^|;\s*)consent_prefs=([^;]*)/);
-            if (!m) return null;
-            var obj = JSON.parse(decodeURIComponent(m[1]));
+            var raw = _readCookie(_cookieName(QS_CONSENT_COOKIE));
+            if (raw === null) return null;
+            var obj = JSON.parse(decodeURIComponent(raw));
             return (obj && typeof obj === 'object') ? obj : null;
         } catch (e) {
             return null;
@@ -1143,7 +1183,7 @@
         };
         var maxAge = 180 * 24 * 60 * 60; // 180 days
         var secure = (location.protocol === 'https:') ? '; Secure' : '';
-        document.cookie = 'consent_prefs=' + encodeURIComponent(JSON.stringify(payload)) +
+        document.cookie = _cookieName(QS_CONSENT_COOKIE) + '=' + encodeURIComponent(JSON.stringify(payload)) +
             '; Max-Age=' + maxAge + '; Path=/; SameSite=Lax' + secure;
         document.dispatchEvent(new CustomEvent('qs:consent:changed', { detail: payload }));
         return payload;

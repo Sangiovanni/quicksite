@@ -101,6 +101,7 @@ echo   Secure folder:      !SECURE_FOLDER_NAME!
 echo   URL space:          !SPACE_LABEL!
 echo   Environment:        !ENV_LABEL!
 echo   Self-registration:  !SELFREG_LABEL!
+echo   Storage quotas:     !QUOTA_LABEL!
 echo.
 echo     1^) Rename the public folder
 echo     2^) Rename the secure folder
@@ -108,6 +109,7 @@ echo     3^) Change the URL space / prefix
 echo     4^) Switch environment (development / production)
 echo     5^) Turn self-registration on / off
 echo     6^) Show my setup token
+echo     7^) Storage quotas (per user)
 echo     q^) Finish
 echo.
 set "CHOICE="
@@ -119,6 +121,7 @@ if "!CHOICE!"=="3" goto :go_space
 if "!CHOICE!"=="4" goto :go_env
 if "!CHOICE!"=="5" goto :go_selfreg
 if "!CHOICE!"=="6" goto :go_token
+if "!CHOICE!"=="7" goto :go_quota
 if /i "!CHOICE!"=="q" goto :finish
 if "!CHOICE!"=="" goto :finish
 echo   Unknown choice: !CHOICE!
@@ -155,6 +158,11 @@ goto :menu
 
 :go_token
 call :item_token
+call :pause_menu
+goto :menu
+
+:go_quota
+call :item_quota
 call :pause_menu
 goto :menu
 
@@ -195,6 +203,120 @@ goto :eof
 REM ==========================================================
 REM State readers - the menu shows what is actually on disk
 REM ==========================================================
+REM ==========================================================
+REM Item 7 - storage quotas
+REM ==========================================================
+REM Absent means NO LIMITS, and that is a real setting rather than a missing
+REM one: a fresh install has no quota.php and must not refuse uploads out of
+REM the box. Leaving both prompts blank therefore leaves the file ABSENT — it
+REM does not write zeros. Setup also never deletes a quota.php somebody wrote;
+REM it says where the file is instead.
+:item_quota
+call :read_state
+echo.
+echo   Storage quotas
+echo.
+echo   Limits applied per ACCOUNT, on two independent axes. Any signed-in
+echo   user can otherwise upload until the disk is full.
+echo.
+echo     total bytes   the combined size of everything the account owns.
+echo                   Refused with 507 before the write, not after.
+echo     upload rate   how many uploads it may perform per period. Bounds
+echo                   churn (upload, delete, repeat) rather than volume.
+echo.
+echo   Currently: !QUOTA_LABEL!
+echo.
+echo   Leave both blank for no limits. Full documentation of every option
+echo   lives in quota.php.example, which is never modified.
+echo.
+
+set "Q_MB="
+set /p "Q_MB=  Max total size per user, in MB [blank = unlimited]: "
+set "Q_UP="
+set /p "Q_UP=  Max uploads per period       [blank = unlimited]: "
+
+REM Reject non-numeric input rather than coercing it: "2GB" would otherwise
+REM become 0, i.e. unlimited, which is the opposite of what was asked for.
+if not "!Q_MB!"=="" (
+    for /f "delims=0123456789" %%A in ("!Q_MB!") do (
+        echo   X Not a whole number of MB: !Q_MB!
+        goto :eof
+    )
+)
+if not "!Q_UP!"=="" (
+    for /f "delims=0123456789" %%A in ("!Q_UP!") do (
+        echo   X Not a whole number: !Q_UP!
+        goto :eof
+    )
+)
+
+set "Q_HOURS="
+if not "!Q_UP!"=="" if not "!Q_UP!"=="0" (
+    set /p "Q_HOURS=  ...per how many hours [1]: "
+    if "!Q_HOURS!"=="" set "Q_HOURS=1"
+    for /f "delims=0123456789" %%A in ("!Q_HOURS!") do (
+        echo   X Not a whole number of hours: !Q_HOURS!
+        goto :eof
+    )
+    if "!Q_HOURS!"=="0" (
+        echo   X Not a whole number of hours: 0
+        goto :eof
+    )
+)
+
+set "Q_BYTES=0"
+set "Q_MAXUP=0"
+set "Q_PERIOD=3600"
+if not "!Q_MB!"==""    set /a Q_BYTES=!Q_MB! * 1024 * 1024
+if not "!Q_UP!"==""    set "Q_MAXUP=!Q_UP!"
+if not "!Q_HOURS!"=="" set /a Q_PERIOD=!Q_HOURS! * 3600
+
+if "!Q_BYTES!"=="0" if "!Q_MAXUP!"=="0" (
+    if not exist "!QUOTA_FILE!" (
+        echo.
+        echo   + No limits - quota.php left absent, which is what a fresh
+        echo     install has. Nothing is refused.
+        goto :eof
+    )
+    echo.
+    echo   quota.php already exists. To go back to no limits, delete it:
+    echo   !QUOTA_FILE!
+    echo   Setup does not remove a config file you wrote.
+    goto :eof
+)
+
+REM quota.php.example is the shipped documentation and is never edited: the
+REM live file is a COPY with the numbers patched, so every explanatory comment
+REM survives into the file the deployer will actually read later.
+if not exist "!QUOTA_FILE!" (
+    if not exist "!CONFIG_DIR!\quota.php.example" (
+        echo   X Error: quota.php.example is missing
+        goto :eof
+    )
+    copy /y "!CONFIG_DIR!\quota.php.example" "!QUOTA_FILE!" >nul
+)
+
+set "PS_Q_TEMP=%TEMP%\qs_setup_quota.ps1"
+echo $f = '!QUOTA_FILE!' > "%PS_Q_TEMP%"
+echo $b = '!Q_BYTES!' >> "%PS_Q_TEMP%"
+echo $u = '!Q_MAXUP!' >> "%PS_Q_TEMP%"
+echo $p = '!Q_PERIOD!' >> "%PS_Q_TEMP%"
+echo $c = Get-Content $f -Raw >> "%PS_Q_TEMP%"
+REM Anchored per-line so the COMMENTED example value above each setting (those
+REM lines begin with //) is left alone. The '>' characters sit inside double
+REM quotes, which is what stops cmd reading them as redirects - no caret.
+echo $c = $c -replace "(?m)^(\s*)'max_total_bytes'\s*=>.*", ("${1}'max_total_bytes' => " + $b + ",") >> "%PS_Q_TEMP%"
+echo $c = $c -replace "(?m)^(\s*)'max_uploads'\s*=>.*", ("${1}'max_uploads'    => " + $u + ",") >> "%PS_Q_TEMP%"
+echo $c = $c -replace "(?m)^(\s*)'period_seconds'\s*=>.*", ("${1}'period_seconds' => " + $p + ",") >> "%PS_Q_TEMP%"
+echo [IO.File]::WriteAllText($f, $c, (New-Object System.Text.UTF8Encoding $false)) >> "%PS_Q_TEMP%"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%PS_Q_TEMP%" >nul 2>&1
+
+call :read_state
+echo.
+echo   + Quotas written to quota.php
+echo     !QUOTA_LABEL!
+goto :eof
+
 :read_state
 set "CONFIG_DIR=!SECURE_DIR!\management\config"
 set "ENV_FILE=!CONFIG_DIR!\environment.php"
@@ -215,6 +337,13 @@ if exist "!ENV_FILE!" (
     set "ENV_LABEL=production  (value unreadable - check environment.php)"
     findstr /c:"'environment' => 'production'" "!ENV_FILE!" >nul 2>&1 && set "ENV_LABEL=production"
     findstr /c:"'environment' => 'development'" "!ENV_FILE!" >nul 2>&1 && set "ENV_LABEL=development  (may call localhost / LAN addresses)"
+)
+
+set "QUOTA_FILE=!CONFIG_DIR!\quota.php"
+set "QUOTA_LABEL=no limits  (default - quota.php not created yet)"
+if exist "!QUOTA_FILE!" (
+    set "QUOTA_LABEL=limits set  (see quota.php)"
+    findstr /c:"'max_total_bytes' => 0," "!QUOTA_FILE!" >nul 2>&1 && findstr /c:"'max_uploads'    => 0," "!QUOTA_FILE!" >nul 2>&1 && set "QUOTA_LABEL=no limits  (quota.php present, both axes unlimited)"
 )
 
 set "SELFREG_LABEL=off  (default - auth.php not created yet)"

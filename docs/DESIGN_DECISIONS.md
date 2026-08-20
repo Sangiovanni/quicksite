@@ -7591,7 +7591,7 @@ different id than the caller asked for is its own surprise).
 
 ---
 
-### The storage prefix is shown everywhere and stored nowhere (locked 2026-08-16)
+### The storage prefix is shown everywhere and stored nowhere (locked 2026-08-16) (superseded 2026-08-20)
 
 **Decision**: `/admin/storage` shows `qsp_<projectId>_` as a non-editable chip in
 front of the key input, and the generated cookie-policy page prints the full
@@ -8224,3 +8224,58 @@ third.
 
 **Source**: `secure/src/functions/utilsManagement.php` and the three former
 copies; measured by `NOTES/tests/beta11/s29_formatbytes_probe.php`.
+
+---
+
+### The engine's own cookies are namespaced per project (locked 2026-08-20)
+
+**Supersedes**: *The storage prefix is shown everywhere and stored nowhere*
+(locked 2026-08-16), on one point only — that entry's cookie carve-out. Its
+rule for a DECLARED registry key is unchanged and still correct.
+
+**Decision**: the two cookies QuickSite writes for itself — the visitor consent
+record and the visitor OAuth session id — carry the same `qsp_<projectId>_`
+namespace a storage key does, composed through one helper on each side:
+`qs_project_cookie_name()` in `storageHelpers.php` and `_cookieName()` in
+`qs.js`. A cookie a site author declares in the storage registry is still NOT
+prefixed, because QuickSite is not in the write path for one.
+
+**Reasoning**: the earlier entry justified leaving cookies unprefixed with
+"`qs.js` writes no cookies". That was true when it was written and is not true
+now: `QS.setConsent` writes `consent_prefs`, and the OAuth callback writes
+`qs_oauth_user`. A cookie is scoped by origin and path, not by URL prefix, so
+every project served at `/p/<id>/` on one host shares one jar. A visitor who
+accepted analytics on one project had it read back as consented on the next,
+whose banner then never appeared — a consent record silently transferred
+between two unrelated sites. `qs_oauth_user` is the same collision applied to
+an authentication credential.
+
+The name carries the namespace rather than the path. `Path=/p/<id>/` would
+scope it correctly while a project is served under `/p/`, but a built site
+serves at `/`, where `Path=/` is right — so the same code would behave one way
+in preview and another in production. That is the mode split rejected when the
+same question was asked about stripping the storage prefix at build time.
+
+One helper per side rather than a composed name at each call site, because a
+cookie is removed by NAME and PATH: a clear that still used the bare name
+would not raise anything — it would expire a cookie that does not exist and
+leave the real one in the browser, which for the OAuth cookie is a logout that
+reports success and does not log anybody out.
+
+Cookies already in a visitor's browser under the old names are orphaned. That
+is accepted: the visible effect is a consent banner shown once more, which is
+the correct outcome for a record that was never that project's to begin with.
+
+**Alternatives considered**: deriving `Path=/p/<id>/` (rejected — preview and
+production would disagree, see above). Prefixing the cookie name at each call
+site without a helper (rejected — the set/clear pair is exactly where drift
+goes unnoticed). Leaving the OAuth cookie alone as "not a privacy surface"
+(rejected — it is a session credential, and the collision is worse there than
+for consent). Migrating old cookies to the new names (rejected — no backward
+compatibility during beta, and the orphan is harmless).
+
+**Source**: `secure/src/functions/storageHelpers.php`
+(`qs_project_cookie_name`), `secure/src/runtime/qs.js` (`_cookieName`),
+`secure/src/classes/OAuthHandler.php`, `secure/src/functions/oauthStateStore.php`,
+`public/p/index.php`. Found during the beta.11 deployment pass, raised by Sangio
+from the storage-prefix precedent.
