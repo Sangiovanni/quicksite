@@ -613,6 +613,21 @@
                 if (val) val.textContent = cats[cat]?.size_formatted || formatSize(bytes);
             });
 
+            // Free space: shown only when a quota is actually configured. On the
+            // default install there is no ceiling, so there is no "remaining" to
+            // report and the row stays hidden rather than reading 0 or Unlimited.
+            const quota = data.quota || {};
+            const freeRow = document.getElementById('owner-space-legend-free');
+            const freeVal = document.getElementById('owner-space-val-free');
+            if (freeRow) freeRow.style.display = quota.configured ? '' : 'none';
+            if (freeVal && quota.configured) {
+                freeVal.textContent = quota.over
+                    ? t('dashboard.storage.overQuota', 'none — over the {limit} limit')
+                        .replace('{limit}', quota.limit_formatted || formatSize(quota.limit || 0))
+                    : (quota.free_formatted || formatSize(quota.free || 0))
+                        + ' / ' + (quota.limit_formatted || formatSize(quota.limit || 0));
+            }
+
             const list = document.getElementById('owner-space-projects');
             list.replaceChildren(
                 ...(data.projects || []).map(p => _renderOwnerSpaceRow(p, total))

@@ -1,4 +1,4 @@
-﻿/* =============================================================================
+/* =============================================================================
    QUICKSITE ADMIN PANEL STYLES
    =============================================================================
    Admin-specific styles with self-contained variables.
@@ -2892,6 +2892,14 @@ kbd {
 .storage-overview__segment--builds,
 .storage-overview__legend-color--builds {
     background: #ef4444;
+}
+
+/* Free space is the one legend entry that is not a slice of the bar: the bar
+   shows what IS used, this shows what is left of the quota. Hollow rather than
+   filled, so it does not read as another consumed category. */
+.storage-overview__legend-color--free {
+    background: transparent;
+    border: 1px dashed var(--admin-text-muted, #6b7280);
 }
 
 .storage-overview__legend {

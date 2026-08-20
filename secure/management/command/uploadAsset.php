@@ -236,6 +236,24 @@ $sizeLimits = qs_asset_size_limits();
 // behalf. Nothing is spent by this check — the counter is incremented only by a
 // write that actually succeeded, further down.
 $quotaUserId = (string)(getCurrentUser()['id'] ?? '');
+
+// ⚠ TWO DIFFERENT ACCOUNTS, DELIBERATELY.
+//   $quotaUserId  — the CALLER. Bounds the upload RATE, which is about what one
+//                   actor does, so it follows the actor.
+//   $quotaOwnerId — the OWNER of the project being written to. Bounds STORAGE,
+//                   which is about whose disk grows. These are the same account
+//                   most of the time and are NOT the same when a member uploads
+//                   into somebody else's project: charging the caller there
+//                   measured the caller's own projects, found them small, and
+//                   let the write through — so any member could push an owner
+//                   past their quota without spending any of their own.
+// Falls back to the caller when no owner is recorded, which keeps a malformed
+// members.json enforcing something rather than nothing.
+$quotaOwnerId = (string)(loadProjectMembers(defined('PROJECT_NAME') ? PROJECT_NAME : '')['owner'] ?? '');
+if ($quotaOwnerId === '') {
+    $quotaOwnerId = $quotaUserId;
+}
+
 $rateWait = qs_quota_rate_wait($quotaUserId);
 if ($rateWait > 0) {
     ApiResponse::create(429, 'quota.rate_limited')
@@ -460,7 +478,9 @@ if ($file['size'] > $sizeLimits[$category]) {
 // "usage + this file", so the configured number is a ceiling the total never
 // crosses rather than a threshold it overshoots by one file. Costs nothing —
 // not even a disk walk — on an install with no quota file.
-$quotaBreach = qs_quota_check_storage($quotaUserId, (int)$file['size']);
+// Storage is charged to the OWNER; the caller is passed so the refusal can be
+// generic when they are not that owner (see qs_quota_check_storage).
+$quotaBreach = qs_quota_check_storage($quotaOwnerId, (int)$file['size'], $quotaUserId);
 if ($quotaBreach !== null) {
     if ($cleanupTmpFile) @unlink($cleanupTmpFile);
     ApiResponse::create(507, 'quota.storage_exceeded')

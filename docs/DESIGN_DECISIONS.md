@@ -7690,7 +7690,7 @@ Behaviour: [ARCHITECTURE.md](ARCHITECTURE.md) §5.1.
 
 ## Deployment resource limits and front-end truthfulness (beta.11)
 
-### Per-user quotas exist, and default to unlimited (locked 2026-08-16)
+### Per-user quotas exist, and default to unlimited (locked 2026-08-16) (superseded 2026-08-20)
 
 **Decision**: `uploadAsset` and `importProject` enforce two optional per-user
 ceilings — total bytes owned, and uploads per period — configured in
@@ -8279,3 +8279,49 @@ compatibility during beta, and the orphan is harmless).
 `secure/src/classes/OAuthHandler.php`, `secure/src/functions/oauthStateStore.php`,
 `public/p/index.php`. Found during the beta.11 deployment pass, raised by Sangio
 from the storage-prefix precedent.
+
+---
+
+### A storage quota is charged to the project's owner, not the uploader (locked 2026-08-20)
+
+**Supersedes**: *Per-user quotas exist, and default to unlimited* (locked
+2026-08-16), on one point only — which account the storage axis is measured
+against. That entry's decision that the quotas exist, and that an absent
+`quota.php` limits nothing, is unchanged.
+
+**Decision**: `uploadAsset` charges the incoming bytes to the account that owns
+the project being written to, and passes the caller separately so the refusal
+can be phrased for them. The upload **rate** axis still follows the caller.
+`importProject` is unaffected — an import creates a project owned by the caller,
+so there the two accounts are the same one.
+
+**Reasoning**: the storage axis measured the CALLER's owned projects while the
+bytes landed in a project owned by someone else. A member with upload rights on
+another account's project therefore had their own (possibly empty) projects
+weighed, was found to have room, and the write went through — so any member
+could push an owner past their ceiling indefinitely while spending none of
+their own allowance. The two axes answer different questions: storage is about
+whose disk grows, rate is about what one actor does, so they follow different
+accounts by design rather than by oversight.
+
+A caller who is not the owner is told the outcome and the install-wide ceiling,
+and nothing else. The owner's usage total and project count aggregate every
+project that account owns, including ones the caller is not a member of and
+cannot otherwise see, so naming them in a refusal would disclose them. The
+ceiling itself is a property of the install rather than of the owner, so it can
+be stated.
+
+When no owner is recorded the check falls back to the caller, so a malformed
+`members.json` still enforces something rather than nothing.
+
+**Alternatives considered**: charging both accounts (rejected — the uploader's
+disk does not grow, so it would refuse writes for no reason). Refusing
+cross-owner uploads outright (rejected — collaborating on someone else's
+project is the point of membership). Giving the non-owner the full figures
+(rejected on disclosure, see above). Leaving it and documenting the gap
+(rejected — it is a resource control that any member could bypass, which is
+the failure the control exists to prevent).
+
+**Source**: `secure/management/command/uploadAsset.php`,
+`secure/src/functions/quota.php` (`qs_quota_check_storage`). Found by Sangio
+during the beta.11 deployment pass, uploading into another account's project.

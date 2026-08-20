@@ -3280,7 +3280,7 @@ $GLOBALS['__help_commands'] = [
     ],
     
     'getMySpaceUsage' => [
-        'description' => 'Disk footprint of the projects the CALLER OWNS — an owner-wide total plus a per-project breakdown. Global-scoped (no /management/p/<id>/ marker) and takes no project parameter: ownership is resolved per project from members.json, so the response describes only projects you own. Owning nothing returns an empty, zeroed report.',
+        'description' => 'Disk footprint of the projects the CALLER OWNS — an owner-wide total plus a per-project breakdown. Global-scoped (no /management/p/<id>/ marker) and takes no project parameter: ownership is resolved per project from members.json, so the response describes only projects you own. Owning nothing returns an empty, zeroed report. quota reports the per-account storage ceiling this install enforces and what is left of it; configured is false when no quota.php exists, in which case nothing is limited and limit/ree are 0.',
         'method' => 'POST',
         'parameters' => [
             'refresh' => [
@@ -3316,6 +3316,7 @@ $GLOBALS['__help_commands'] = [
                     ]
                 ],
                 'project_count' => 1,
+                'quota' => ['configured' => true, 'limit' => 52428800, 'limit_formatted' => '50.00 MB', 'free' => 31457280, 'free_formatted' => '30.00 MB', 'over' => false],
                 'cache' => ['ttl' => 300, 'from_cache' => true, 'refreshed' => false]
             ]
         ],

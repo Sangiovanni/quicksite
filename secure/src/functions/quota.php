@@ -177,22 +177,54 @@ function qs_quota_usage(string $userId): array
  * quota file, which is the common case and costs no disk walk at all: the
  * unlimited check short-circuits BEFORE the measurement.
  *
+ * ⚠ $ownerId IS THE ACCOUNT THAT RECEIVES THE BYTES, not the one sending them.
+ * An asset uploaded into a project is charged to that project's OWNER, because
+ * that is whose disk grows. Charging the caller instead let any member with
+ * upload rights push an owner past their quota while spending none of their
+ * own — the caller's own projects were measured, found small, and waved
+ * through. The upload RATE limit is the opposite case and stays on the caller:
+ * it bounds what one actor does, not where the bytes land.
+ *
+ * @param string      $ownerId  Account whose disk receives the bytes
+ * @param int         $incomingBytes
+ * @param string|null $callerId Who is asking, when that is not the owner.
+ *                              Null means caller === owner (the usual case).
  * @return array{message:string, data:array}|null
  */
-function qs_quota_check_storage(string $userId, int $incomingBytes): ?array
+function qs_quota_check_storage(string $ownerId, int $incomingBytes, ?string $callerId = null): ?array
 {
     $quota = qs_quota_config();
     if ($quota['max_total_bytes'] <= 0) {
         return null; // unlimited — do not pay for a measurement nobody reads
     }
 
-    $usage = qs_quota_usage($userId);
+    $usage = qs_quota_usage($ownerId);
     $after = $usage['bytes'] + max(0, $incomingBytes);
     if ($after <= $quota['max_total_bytes']) {
         return null;
     }
 
     $remaining = max(0, $quota['max_total_bytes'] - $usage['bytes']);
+
+    // A caller who is NOT the owner is told the outcome and nothing else. The
+    // usage total and project count aggregate every project that owner has,
+    // including ones this caller is not a member of and cannot otherwise see,
+    // so spelling them out here would disclose them. The quota ceiling itself
+    // is install-wide and not owner-specific, so it may still be named.
+    if ($callerId !== null && $callerId !== $ownerId) {
+        return [
+            'message' => 'The owner of this project has no storage space left, so nothing '
+                . 'more can be added to it. Ask them to free space — the ceiling on this '
+                . 'server is ' . qs_format_size($quota['max_total_bytes']) . ' per account.',
+            'data' => [
+                'incoming_bytes' => max(0, $incomingBytes),
+                'incoming_human' => qs_format_size(max(0, $incomingBytes)),
+                'quota_bytes'    => $quota['max_total_bytes'],
+                'quota_human'    => qs_format_size($quota['max_total_bytes']),
+                'owner_scoped'   => true,
+            ],
+        ];
+    }
 
     return [
         'message' => 'This would put your projects over your storage quota. They currently use '

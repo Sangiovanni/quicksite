@@ -448,6 +448,8 @@
             "exportsCleared": "Exports cleared",
             "backupsTip": "Switch project to manage other projects\u2019 backups.",
             "ownerTitle": "My total space",
+            "free": "Free space",
+            "overQuota": "none — over the {limit} limit",
             "ownerProjects": "{n} projects",
             "ownerOneProject": "1 project",
             "content": "Content",

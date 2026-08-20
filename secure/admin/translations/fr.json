@@ -384,6 +384,8 @@
             "exportsCleared": "Exports supprimés",
             "backupsTip": "Changez de projet pour gérer les sauvegardes d\u2019autres projets.",
             "ownerTitle": "Mon espace total",
+            "free": "Espace libre",
+            "overQuota": "aucun — au-delà de la limite de {limit}",
             "ownerProjects": "{n} projets",
             "ownerOneProject": "1 projet",
             "content": "Contenu",

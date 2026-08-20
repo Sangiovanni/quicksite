@@ -32,6 +32,7 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/spaceUsage.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php';   // qs_quota_config
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -100,6 +101,11 @@ function __command_getMySpaceUsage(array $params = [], array $urlParams = []): A
 
     $grand = $totContent + $totBackups + $totExports + $totBuilds;
 
+    // Same ceiling qs_quota_check_storage enforces, read from the same config, so
+    // the figure on the dashboard and the number in a refusal cannot disagree.
+    $quotaLimit = (int) (qs_quota_config()['max_total_bytes'] ?? 0);
+    $quotaFree  = $quotaLimit > 0 ? max(0, $quotaLimit - $grand) : 0;
+
     return ApiResponse::create(200, 'operation.success')
         ->withMessage('Owner space usage retrieved successfully')
         ->withData([
@@ -114,6 +120,18 @@ function __command_getMySpaceUsage(array $params = [], array $urlParams = []): A
                 'backups' => ['size' => $totBackups, 'size_formatted' => qs_format_size($totBackups)],
                 'builds'  => ['size' => $totBuilds,  'size_formatted' => qs_format_size($totBuilds)],
                 'exports' => ['size' => $totExports, 'size_formatted' => qs_format_size($totExports)],
+            ],
+            // The ceiling this account is measured against, and what is left of
+            // it. `configured` is false on an install with no quota.php — the
+            // default — where there is no remaining figure to state at all, and
+            // the dashboard hides the row rather than inventing one.
+            'quota' => [
+                'configured'      => $quotaLimit > 0,
+                'limit'           => $quotaLimit,
+                'limit_formatted' => $quotaLimit > 0 ? qs_format_size($quotaLimit) : null,
+                'free'            => $quotaFree,
+                'free_formatted'  => $quotaLimit > 0 ? qs_format_size($quotaFree) : null,
+                'over'            => $quotaLimit > 0 && $grand > $quotaLimit,
             ],
             'projects'      => $projects,
             'project_count' => count($projects),

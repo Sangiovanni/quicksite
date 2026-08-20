@@ -85,6 +85,13 @@ if (isset($_GET['denied'])): ?>
                 <span class="storage-overview__legend-label"><?= __admin('dashboard.storage.exports') ?></span>
                 <span class="storage-overview__legend-value" id="owner-space-val-exports">--</span>
             </div>
+            <!-- What is LEFT of this account's quota. Hidden on an install with no
+                 quota.php (the default), where there is no ceiling to have room in. -->
+            <div class="storage-overview__legend-item" id="owner-space-legend-free" style="display: none;">
+                <span class="storage-overview__legend-color storage-overview__legend-color--free"></span>
+                <span class="storage-overview__legend-label"><?= __admin('dashboard.storage.free', 'Free space') ?></span>
+                <span class="storage-overview__legend-value" id="owner-space-val-free">--</span>
+            </div>
         </div>
 
         <!-- Per-owned-project rows (built in JS: dynamic structure) -->
