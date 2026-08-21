@@ -1,10 +1,15 @@
 /**
  * QuickSite Admin — operator update notice.
  *
- * DISCOVERY, NOT ACTION. An update is APPLIED by `update.sh` / `update.bat` on
- * the server, which have no HTTP surface at all. Nothing here applies anything;
- * it only tells the person who maintains the machine that there is something to
- * apply, because a CLI script cannot tell you — you have to remember to run it.
+ * DISCOVERY, NOT ACTION. An update is applied on the server with git, which has
+ * no HTTP surface at all. Nothing here applies anything; it only tells the
+ * person who maintains the machine that there is something to apply, because a
+ * procedure cannot tell you — you have to remember to run it.
+ *
+ * ⚠ THIS FILE NAMES NO SCRIPT. It used to point at update.sh / update.bat, which
+ * were removed: on a git install the whole procedure is `git pull`, and three
+ * platforms of shell wrapping one command produced more defects than the command
+ * ever would. If a notice string ever names a file again, that file has to exist.
  *
  * WHO SEES IT is decided SERVER-SIDE, in layout.php, from
  * secure/management/config/operator.php. This file is not even loaded into a
@@ -89,7 +94,7 @@
             text.appendChild(D.el('span', { text: ' ' + t('availableSuffix', 'is available.') + ' ' }));
         }
         text.appendChild(D.el('span', {
-            text: t('howTo', 'Run ./update.sh (or update.bat) on the server to apply it.')
+            text: t('howTo', 'Update on the server with git pull, then reload this page.')
         }));
 
         if (url) {

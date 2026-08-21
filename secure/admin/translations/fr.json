@@ -133,7 +133,7 @@
         "available": "la version",
         "availableSuffix": "est disponible.",
         "youHave": "est disponible — vous avez la",
-        "howTo": "Lancez ./update.sh (ou update.bat) sur le serveur pour l'appliquer.",
+        "howTo": "Mettez à jour sur le serveur avec git pull, puis rechargez cette page.",
         "releaseNotes": "Notes de version",
         "dismiss": "Fermer"
     },

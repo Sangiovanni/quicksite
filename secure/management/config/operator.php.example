@@ -41,8 +41,8 @@
  * QuickSite's whole permission model is built on there being no such principal.
  *
  * If an action genuinely needs an operator, it does not belong on the web
- * surface at all: it belongs in a script run from a shell, where the credential
- * is filesystem access. That is why updating QuickSite is update.sh and not an
+ * surface at all: it belongs at a shell on the server, where the credential is
+ * filesystem access. That is why updating QuickSite is `git pull` and not an
  * API call. A thing only an operator may do is a thing a shell does.
  *
  * ── WHO THE OPERATOR IS ──────────────────────────────────────────────────────

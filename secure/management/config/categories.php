@@ -343,9 +343,9 @@ return [
     // itself: hasPermission resolved it as "owns ANY project anywhere",
     // target-independent, while projects.create is access 'any' — so any account
     // minted that ownership in one call (the F-C8-8.1-1 mechanism). Its last member
-    // applied updates; that is now `update.sh` / `update.bat` at the install root,
-    // an operator/CLI entry point with no HTTP surface at all, so no token can reach
-    // the code that git-pulls the installation. checkForUpdates stays routed under
+    // applied updates; that is now `git pull` on the server, which has no HTTP
+    // surface at all, so no token can reach the code that updates the
+    // installation. checkForUpdates stays routed under
     // system.read, so the panel still reports available updates.
     // (The generateToken/listTokens/revokeToken trio was REMOVED in C5b; switchProject
     // was deleted in C15 along with the served-project concept it existed to repoint.)

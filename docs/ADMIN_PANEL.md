@@ -2841,9 +2841,9 @@ built with `QSDom` helpers; the static shell and every label live in
 
 A banner above the main content, on every authenticated page, saying that a
 newer QuickSite release exists. It reports; it cannot act. Applying an update is
-done on the server with `update.sh` / `update.bat`, which have no HTTP surface
-at all — the panel's job is only to tell somebody there is something to do,
-because a script cannot.
+done on the server with `git pull`, which has no HTTP surface at all — the
+panel's job is only to tell somebody there is something to do, because a
+procedure cannot.
 
 **Who sees it** is `secure/management/config/operator.php`: a list of user ids,
 written at first run naming the account that created the install, and edited by

@@ -7284,7 +7284,7 @@ script execution is exactly what the storage namespace assumes cannot happen).
 
 ---
 
-### Applying an update is a CLI script, not a command; discovery stays in the panel (locked 2026-08-15)
+### Applying an update is a CLI script, not a command; discovery stays in the panel (locked 2026-08-15) (superseded 2026-08-21)
 
 **Decision**: `secure/management/command/applyUpdate.php` is deleted. Applying an
 update is done by `update.sh` / `update.bat` at the install root, which have no
@@ -8325,3 +8325,52 @@ the failure the control exists to prevent).
 **Source**: `secure/management/command/uploadAsset.php`,
 `secure/src/functions/quota.php` (`qs_quota_check_storage`). Found by Sangio
 during the beta.11 deployment pass, uploading into another account's project.
+
+---
+
+### The update scripts are removed; updating is `git pull` (locked 2026-08-21)
+
+**Supersedes**: *Applying an update is a CLI script, not a command; discovery
+stays in the panel* (locked 2026-08-15). That entry's SECOND half stands
+unchanged — discovery is still the panel's job, `checkForUpdates` is still
+routed, and `operator.php` still decides who sees the notice. What is reversed
+is the first half: the scripts it introduced are deleted.
+
+**Decision**: `update.sh`, `update.ps1` and `update.bat` are removed. A git
+install is updated with `git pull`, documented in README. The operator notice
+stays and now points at that procedure instead of naming a script.
+
+**Reasoning**: the evidence changed, which is why this is a reversal and not a
+change of mind.
+
+The scripts wrapped one command — `git pull` — in roughly 1400 lines of shell
+across three platforms, to cover a case that does not arise: the repository
+publishes no releases, so the archive path they existed for had never run, and
+a deployer with a git install already has the command.
+
+And the wrapping cost more than it saved. Every shell script in this beta has
+produced a defect: `grep -P` refusing to run under a non-UTF-8 locale,
+PowerShell draining stdin so a menu read a half-line, an LF `.bat`
+mis-resolving `goto`, a UTF-8 BOM in a written config breaking every panel API
+call, `sed -i` stripping every CR from a file it edited, and — in the updater
+itself, found the week it was removed — a version comparison that silently
+degraded to string equality on the project's own version format, and a lookup
+that ignored tags so a repository without releases looked un-updatable. That
+is a measured rate, not a worry.
+
+The asymmetry that remains is deliberate: DISCOVERY is worth code because a
+procedure cannot tell you it is time to run it, while APPLYING is one command
+a person already knows.
+
+**Alternatives considered**: keeping them and fixing the two defects found
+(rejected — it fixes this round, not the rate). Keeping only `update.sh` and
+dropping the Windows pair (rejected — the split is what produced the `.bat`
+and BOM defects, and a half-supported feature is worse than none). Removing
+the notice as well (rejected — discovery is the half that earns its keep;
+nothing else tells an operator to look). Waiting until releases are published
+(rejected — that is the condition for bringing it BACK, recorded in
+`NOTES/planning/POST_1_0_IF_REQUESTED.md`, not for keeping it now).
+
+**Source**: deletion of `update.sh` / `update.ps1` / `update.bat`;
+`public/admin/assets/js/core/update-notice.js`, `README.md` (*Keeping QuickSite
+up to date*). Sangio's ruling, 2026-08-21, at the close of beta.11 sequence 2.

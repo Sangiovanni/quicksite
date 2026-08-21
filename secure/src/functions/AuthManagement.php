@@ -75,8 +75,8 @@ function loadRolesConfig(): array {
  * privilege escalation. Authority in this model is per-project only (AUTH_REWORK
  * L4/§2.2 — no superadmin, no global tier), so a global category can only sanely be
  * "any authenticated user" or "nobody"; anything installation-wide (applying an
- * update, the served-project pointer) is operator/CLI-side per GAP A — update.sh /
- * update.bat are that side, and have no HTTP surface to gate. Do not reintroduce a
+ * update, the served-project pointer) is operator/CLI-side per GAP A — a shell on
+ * the server is that side, and has no HTTP surface to gate. Do not reintroduce a
  * value here without a global authority PRINCIPAL to gate on — there isn't one.
  */
 const QS_GLOBAL_ACCESS_GRANTING = ['any'];

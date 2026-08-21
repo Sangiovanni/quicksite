@@ -15,7 +15,8 @@
 # "bad interpreter: /bin/bash^M" on the servers it is meant to run on.
 *.sh  text eol=lf
 
-# PowerShell reads either ending, but update.ps1 is invoked by a .bat on a
-# Windows box and there is no reason for the pair to disagree. Pinned so a
-# release archive carries the same bytes a Windows clone does.
+# No .ps1 ships today (update.ps1 was removed), but the pin stays: a PowerShell
+# script here would be invoked by a .bat on a Windows box, and there is no
+# reason for the pair to disagree. Keeping the rule means a future one cannot
+# arrive with the wrong endings — a defect this project has already paid for.
 *.ps1 text eol=crlf

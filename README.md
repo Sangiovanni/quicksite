@@ -42,7 +42,7 @@ For a deeper view of how QuickSite is organized:
 - **Production Builds** — one-command compilation, optimization, and ZIP packaging
 - **File-Based** — no database, no migrations. JSON + PHP files, deployable anywhere
 - **Role-Based Access** — username + password login establishes a session; authority is **per project**, with six fixed roles (viewer, editor, designer, developer, admin, owner)
-- **Self-Updating** — the panel reports a new release; `update.sh` / `update.bat` apply it from the server
+- **Update Notices** — the panel tells the operator when a newer version exists; updating itself is done on the server, with git
 - **AI Integration (BYOK)** — the admin panel calls AI providers **directly from the browser** with your own API keys (OpenAI, Anthropic, Google, Mistral); no key ever reaches the server
 
 ## Requirements
@@ -66,6 +66,26 @@ cd quicksite
 cd /path/to/your/site
 git clone https://github.com/Sangiovanni/quicksite.git .
 ```
+
+If that directory is **not empty** — a control panel has already put a `public/`
+folder, an `index.html` or a `.htaccess` there — `git clone .` refuses with
+*"destination path '.' already exists and is not an empty directory"*. Fetch
+into it instead; your existing files are kept:
+
+```bash
+cd /path/to/your/site
+git init
+git remote add origin https://github.com/Sangiovanni/quicksite.git
+git fetch origin
+git checkout -t origin/main
+```
+
+> **Reserved paths.** QuickSite claims `public/admin/`, `public/management/`,
+> `public/p/` and `public/init.php`. On Apache it also claims `public/.htaccess`
+> and one `.htaccess` inside each of those three folders. Anything of yours
+> already at those paths will collide — move it first, and merge your own
+> rewrite rules into the shipped `.htaccess` files rather than letting either
+> side win.
 
 After cloning, configure your web server's virtual host to point its document root to the `public/` folder, then run the setup wizard.
 
@@ -428,49 +448,45 @@ choose, and you can edit or delete it by hand at any time.
 
 ## Keeping QuickSite up to date
 
-Updating is done **on the server**, with `update.sh` (Linux/macOS) or
-`update.bat` (Windows). It is not something the admin panel can do, and that is
-deliberate: applying an update rewrites the engine every project on the
-installation runs on, and QuickSite has no installation-wide role that could
-authorise it. The credential is filesystem access to the machine — whoever can
-run this script can already edit `users.php`, so they hold strictly more than
-any role could grant. It is the same principle as the first-run setup token.
+Updating is done **on the server**, with git. It is not something the admin panel
+can do, and that is deliberate: applying an update rewrites the engine every
+project on the installation runs on, and QuickSite has no installation-wide role
+that could authorise it. The credential is filesystem access to the machine —
+whoever can update the code can already edit `users.php`, so they hold strictly
+more than any role could grant. It is the same principle as the first-run setup
+token.
 
 ```bash
-./update.sh --check
+cd /path/to/your/site
+git pull
 ```
 
-Reports whether a newer release exists and exits — it changes nothing, asks
-nothing, and is safe to run from `cron`. Its exit code says what it found:
-**0** up to date, **10** an update is available, anything else an error.
+That is the whole procedure for a git install, which is how QuickSite is meant to
+be deployed. If you installed with the non-empty-directory variant above, `git
+pull` works there too — it is an ordinary clone with an extra file or two of your
+own.
 
-```bash
-./update.sh
-```
+**What it never touches.** Your own files are not in the repository, so an update
+has nothing to overwrite them with: `users.php`, `auth.php`, `environment.php`,
+`operator.php`, `quota.php`, `deploy-roots.php`, and every project under
+`secure/projects/`. Git only knows tracked files, so it cannot reach any of them.
 
-Checks, shows you what it found, asks for confirmation, then applies. Use
-`--yes` to skip the question in a script of your own. On Windows:
-`update.bat --check` / `update.bat`.
+**If you have local edits**, git will say so and stop rather than pulling over
+them. Commit or stash, then pull again.
 
-**How it applies.** A git clone is updated with `git fetch` + `git pull`; any
-other install downloads the release archive and unpacks it. Either way a copy
-of your configuration is taken first, into `.quicksite-backups/`.
+**Check what you are running** on `/admin/` — the version is shown in the panel,
+and `VERSION` at the install root holds the same string.
 
-**What it never touches.** Your own files are not in the repository, so an
-update has nothing to overwrite them with: `users.php`, `auth.php`,
-`environment.php`, `operator.php`, `deploy-roots.php`, and every project under
-`secure/projects/`. The git path cannot reach them at all — git only knows
-tracked files — and the archive path skips them by name.
+**Finding out there is an update at all** is the panel's job: a procedure cannot
+tell you something you have to remember to run. The panel shows "an update is
+available" to the accounts listed in `secure/management/config/operator.php` —
+see *Create your first account*. That list decides who sees the notice and
+nothing else.
 
-**On a git install with local edits**, the update stops and tells you rather
-than pulling over your changes. Commit or stash them and run it again.
-
-**Finding out there is an update at all** is the panel's job, not the script's:
-a script cannot tell you something you have to remember to run. The panel shows
-"an update is available" to the accounts listed in
-`secure/management/config/operator.php` — see *Create your first account*. That
-list decides who sees the notice and nothing else; the update is still applied
-from the server.
+> **Not installed with git?** Download the current archive from GitHub and unpack
+> it over the install, keeping the files listed under *What it never touches*
+> above. Take a copy of `secure/` first. A git install avoids all of this, which
+> is why it is the documented path.
 
 ## Project structure
 
@@ -478,7 +494,7 @@ QuickSite has a strict public/private split:
 
 - `public/` — web root. The `p/` per-project front controller, the admin UI, and the `management/` API gateway. Nothing else — the root itself serves real files only, so it stays free for your own site. (Setup may leave a deletable `index.html` placeholder there on a fresh install; it is gitignored, like anything else you put at the root.)
 - `secure/` — backend, outside the web root. API engine, admin backend, shared `src/`, isolated `projects/` (each holding its own public files, builds, exports and backups), snippets, logs.
-- `docs/`, `tests/`, `setup.sh`/`setup.bat`, `update.sh`/`update.bat` (+ `update.ps1`, the Windows implementation), `VERSION`, `LICENSE`, `README.md` at the repo root.
+- `docs/`, `tests/`, `setup.sh`/`setup.bat`, `VERSION`, `LICENSE`, `README.md` at the repo root.
 
 Full tree, key concepts, and folder-customization details: **[docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md)**.
 

@@ -434,7 +434,7 @@ One command reports upgrades against the GitHub repo:
 |---|---|---|
 | `checkForUpdates` | GET | Reads the local `VERSION` file, fetches the latest GitHub release tag, compares with PHP's `version_compare`. Returns `update_available`, `current_version`, `latest_version`, `release_url`, `install_method` (`git`\|`zip`). |
 
-Applying an update is **not** an API command, and there is no unrouted command file for it either. It replaces the code that runs every project on the installation, and authority in QuickSite is per-project — a project role cannot sanely imply "may rewrite the shared engine". Applying is done by `update.sh` / `update.bat` at the install root, which are operator/CLI entry points with no HTTP surface; the panel only *reports* available updates, through `checkForUpdates`.
+Applying an update is **not** an API command, and there is no unrouted command file for it either. It replaces the code that runs every project on the installation, and authority in QuickSite is per-project — a project role cannot sanely imply "may rewrite the shared engine". Applying is done on the server with `git pull`, which has no HTTP surface; the panel only *reports* available updates, through `checkForUpdates`.
 
 Who sees that report in the panel is decided by `secure/management/config/operator.php` — a list of user ids, written at first run, that grants nothing and only controls whether the notice renders. The command itself stays callable by any authenticated account.
 
