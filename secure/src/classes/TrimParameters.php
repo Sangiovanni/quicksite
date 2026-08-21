@@ -12,6 +12,10 @@
  */
 
 require_once __DIR__ . '/../functions/String.php';
+// The single point that answers "what language is this request, for this
+// project?". TrimParameters used to answer it twice on its own (a default seed
+// here, a URL override in parseUrl) and Translator answered it twice more.
+require_once __DIR__ . '/../functions/projectLanguage.php';
 
 class TrimParameters {
     /** @var string|null Current language code */
@@ -45,16 +49,17 @@ class TrimParameters {
 
     public function __construct() {
         // Initialize static config
-        self::$supportedLangs = (defined('MULTILINGUAL_SUPPORT') && MULTILINGUAL_SUPPORT) 
-            ? (CONFIG['LANGUAGES_SUPPORTED'] ?? []) 
-            : [];
+        self::$supportedLangs = qs_project_languages();
         self::$routes = defined('ROUTES') ? ROUTES : [];
-        
-        // Set default language
-        if (defined('MULTILINGUAL_SUPPORT') && MULTILINGUAL_SUPPORT) {
-            $this->lang = CONFIG['LANGUAGE_DEFAULT'] ?? 'en';
+
+        // Seed the language from the single detection point. A mono-language
+        // project exposes no language at all (lang() stays null) — the URL of
+        // such a site carries no language segment, so there is nothing to
+        // report and callers treat null as "not applicable".
+        if (qs_project_is_multilingual()) {
+            $this->lang = qs_resolve_project_language();
         }
-        
+
         // Parse URL
         $this->parseUrl();
     }
@@ -85,11 +90,11 @@ class TrimParameters {
         // Split into segments, filter empty
         $parts = array_values(array_filter(explode('/', $path), fn($p) => $p !== ''));
         
-        // Extract language if multilingual
-        if (!empty($parts) && in_array($parts[0], self::$supportedLangs)) {
-            if (defined('MULTILINGUAL_SUPPORT') && MULTILINGUAL_SUPPORT) {
-                $this->lang = array_shift($parts);
-            }
+        // Extract language if multilingual. qs_is_project_language() answers
+        // false for every segment on a mono-language project, so the old
+        // second MULTILINGUAL_SUPPORT gate is folded into the same check.
+        if (!empty($parts) && qs_is_project_language($parts[0])) {
+            $this->lang = array_shift($parts);
         }
         
         // Resolve route against routes structure

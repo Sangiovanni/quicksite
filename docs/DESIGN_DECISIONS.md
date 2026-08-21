@@ -8374,3 +8374,129 @@ nothing else tells an operator to look). Waiting until releases are published
 **Source**: deletion of `update.sh` / `update.ps1` / `update.bat`;
 `public/admin/assets/js/core/update-notice.js`, `README.md` (*Keeping QuickSite
 up to date*). Sangio's ruling, 2026-08-21, at the close of beta.11 sequence 2.
+
+---
+
+### One function answers "what language is this request?" (locked 2026-08-21)
+
+**Decision**: project-language detection lives in a single shared file,
+`secure/src/functions/projectLanguage.php`, whose
+`qs_resolve_project_language()` is the only place the question is answered.
+`TrimParameters` and `Translator` call it and decide nothing themselves.
+`Translator::getLang()` is deleted.
+
+**Reasoning**: the answer was written four times. `TrimParameters` seeded a
+default in its constructor and overrode it from the URL in `parseUrl()`.
+`Translator` re-derived the same thing in its own constructor — the same
+membership test against the same config, written a second time — and then, in
+`loadTranslations()`, fell back to a method that **did not exist**. Anything
+that called `Translator::translate()` statically without constructing a
+`Translator` first reached that fourth copy and took the whole request down:
+`ApiEndpointManager` does it when compiling a count-sentence binding, and
+`CallTransformer` does it when resolving a translation-key argument on an
+interaction verb. On the per-project public view the failure arrived as a PHP
+fatal on every page of the site.
+
+Four copies is also how a request ends up with the router on one language and
+the translator on another, which is the quieter version of the same defect.
+
+The file sits in `src/functions/` and not in `utilsManagement.php` — the usual
+home for shared helpers — because both callers travel into a production build,
+and `utilsManagement.php` does not. Putting the answer there would have made
+every built site fatal on its first page. The build copies this file alongside
+`String.php` for the same reason.
+
+The resolver reads the request path the way the router reads it: the optional
+`PUBLIC_FOLDER_SPACE` prefix removed, and on `/p/<projectId>/` serving the
+project marker removed too. That surface rewrites `REQUEST_URI` part-way
+through a request, so without the marker strip the single point would have
+answered differently depending on when it was asked — which is not a single
+point.
+
+An explicit candidate that the project does not declare is discarded rather
+than trusted, so a language value that reached a caller from the request cannot
+select a translation file the project never declared.
+
+`Translator`'s loaded table is also dropped when the language changes.
+`Translator` caches translations in a static and never invalidated it; that was
+harmless only because the static-first path used to be fatal, so a request
+could never load one language and then be asked for another. With the fatal
+gone that ordering is ordinary — on the per-project view the artifact
+regeneration translates before the page template constructs its own
+`Translator` — and without the invalidation the first language served would
+win every lookup after it. Fixing the fatal without this would have traded a
+loud failure for a silent wrong-language render.
+
+**This is the author's site's language only.** The admin panel runs a separate
+system — `AdminTranslation`, its own files, chosen by `?lang=` then the admin
+session then `Accept-Language`. The two share nothing, and the boundary is
+deliberate: they look alike, and merging them would put a visitor-controlled
+URL segment in a position to choose what language an operator's own panel
+speaks.
+
+**Alternatives considered**: a static method on `Translator` (rejected — the
+router needs the answer before a translator exists, and the dependency would
+run the wrong way). A static method on `TrimParameters` (rejected — it makes
+the translator depend on the URL parser for a question that is not about URLs,
+and the static callers have no parser). Leaving the duplication and only
+defining the missing method (rejected — it fixes the fatal and keeps the three
+remaining copies, so the router/translator split stays possible). Putting it in
+`utilsManagement.php` per the usual convention (rejected on evidence: it does
+not travel into a build). Folding the admin panel's detection into the same
+function (rejected — see the boundary above).
+
+**Source**: `secure/src/functions/projectLanguage.php` (new);
+`secure/src/classes/TrimParameters.php`, `secure/src/classes/Translator.php`,
+`secure/management/command/build.php`. Sangio's ruling, 2026-08-21, during
+beta.11 sequence 3.
+
+---
+
+### The public project view registers the fatal handler too (locked 2026-08-21)
+
+**Decision**: the per-project view at `/p/<projectId>/` registers the shared
+fatal handler (`errorHygiene.php`, HTML shape), the way `/management`,
+`/admin/api` and `/admin` already do. It is registered inside `init.php`'s
+`/p/` block rather than in the view's own entry file.
+
+**Reasoning**: it was the only entry point without one, and the only one facing
+anonymous internet visitors. A fatal anywhere in a project render answered
+**HTTP 200** with PHP's own error text in the body — absolute server path
+included — to whoever asked. The status is wrong on every deployment
+regardless of `php.ini`; the disclosure additionally depends on
+`display_errors`, which the handler turns off for itself on a production
+install. Both close with one call.
+
+Registering in `init.php` rather than in the view's entry file is forced: that
+file cannot name `secure/` until `SECURE_FOLDER_PATH` has been resolved, which
+is `init.php`'s job. Registering at the first line of the `/p/` block that may
+load engine code also puts the **visibility gate** inside the handler's reach,
+which registering later would not.
+
+The HTML shape is reused rather than given a fourth variant. A rendered site
+cannot answer with a JSON envelope, and the panel's page shape already says the
+only two things a visitor may be told: something failed, and the details are in
+the server log.
+
+The constraint that shaped the work: refusals on this surface are
+byte-identical across identities and targets, so that a private project is
+indistinguishable from one that does not exist. A handler that altered the
+status, the headers, their order, or the deny body would have reopened that.
+It does none of those — on a request with no fatal it emits nothing at all —
+and the guarantee was re-proven across three identities (anonymous, an invented
+cookie, and a real signed-in non-member) against both a private project and a
+nonexistent id.
+
+**Alternatives considered**: registering in `public/p/index.php` after the
+`init.php` require (rejected — it leaves `init.php` itself and the whole
+visibility gate uncovered, which is the window the worst disclosures live in).
+A fourth response shape written for public sites (rejected — the shared file's
+whole point is that a fourth hand-rolled copy is how the surfaces drift apart;
+the existing HTML shape already discloses nothing). Relying on `display_errors
+= Off` in the deployment's `php.ini` instead (rejected — it closes the
+disclosure and leaves the `200`, so a broken site still reports healthy to
+every monitor).
+
+**Source**: `public/init.php` (`QS_SURFACE_B_ENTRY` block);
+`secure/src/functions/errorHygiene.php` (unchanged, reused). Sangio's ruling,
+2026-08-21, during beta.11 sequence 3.

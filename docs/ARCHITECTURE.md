@@ -273,7 +273,10 @@ authoring install.
 GET /p/mysite/fr/about
   │
   ▼  Apache public/p/.htaccess → public/p/index.php
-surfaceB  (runs first, before init.php)
+fatal handler  (registered as soon as SECURE_FOLDER_PATH resolves, so the
+                gate below is already covered — §7, "Error + path disclosure")
+  │
+surfaceB  (runs first, before the rest of init.php)
   ├── binds the project from the /p/<projectId>/ URL marker
   ├── gates it by visibility + membership
   └── sets BASE_URL from the validated request origin
@@ -505,7 +508,7 @@ Other layered protections:
 | CSRF on admin | The session cookie alone never authorizes: a call must also carry the per-session token, which is page-embedded and unreadable to another origin. A cross-site request can make the browser send the cookie but cannot supply the token. The same rule covers the panel's own state-changing forms — signing out is a POST carrying that token, not a link. The three pre-session forms (login, register, first-run) have no session to draw a token from, so they use a double-submit pair instead: an HttpOnly, `SameSite=Strict` cookie scoped to the admin path plus a hidden field, accepted only when the two match. |
 | CORS | Configurable per deployment. |
 | Per-project serving (`/p/<id>/`) | Static sub-resources are served **only** from the project's own `public/` subtree via a `realpath` canonicalisation + prefix check (a jail): any path resolving outside `…/public/` is refused, so `config/` (members.json), `data/` (api-endpoints.json), `routes.php`, `config.php`, `templates/`, `translate/` are unreachable, and encoded / backslash / absolute traversals are rejected. Hidden paths are refused as well — no segment of a served path may begin with a dot, so neither a dotfile nor anything inside a hidden directory such as `.git/` is reachable (§5.1). HTML is always live-rendered, never served as raw project files; the view runs the same render/compile sanitisation as the built site, plus a Content-Security-Policy. Private projects require membership, and that decision is taken before a single byte is read: conditional and range requests are answered inside the same passthrough, so `Range` and `If-None-Match` reach no file the caller could not have fetched whole. |
-| Error + path disclosure | A PHP fatal happens outside every `try` a program can write, so all three entry points (`/management`, `/admin/api`, `/admin`) register a shared shutdown handler (`secure/src/functions/errorHygiene.php`) that discards the partial output and answers `500` — as a JSON envelope on the API surfaces and as a plain page on the panel. The error's type, message, file and line reach the response **only** on an install that declares itself development (`environment.php`); otherwise they go to the PHP error log. Separately, no response publishes where the installation lives: paths in a response body are rewritten to be relative before the envelope is assembled (`secure/src/functions/publicPaths.php`), so the disk layout is not disclosed by an ordinary success either. See the note below on `display_errors`. |
+| Error + path disclosure | A PHP fatal happens outside every `try` a program can write, so all four entry points (`/management`, `/admin/api`, `/admin`, and the per-project view at `/p/<id>/`) register a shared shutdown handler (`secure/src/functions/errorHygiene.php`) that discards the partial output and answers `500` — as a JSON envelope on the API surfaces, as a plain page on the panel and on the public project view. The error's type, message, file and line reach the response **only** on an install that declares itself development (`environment.php`); otherwise they go to the PHP error log. The project view registers it inside `init.php`'s `/p/` block rather than in its own entry file, because that entry file cannot name `secure/` until `SECURE_FOLDER_PATH` has been resolved; registering there also puts the visibility gate itself inside the handler's reach. Separately, no response publishes where the installation lives: paths in a response body are rewritten to be relative before the envelope is assembled (`secure/src/functions/publicPaths.php`), so the disk layout is not disclosed by an ordinary success either. See the note below on `display_errors`. |
 
 **Deployment requirement — `display_errors` must be off in production.** The fatal handler
 above can only replace a response that has not started going out. On a full admin page the
@@ -973,6 +976,46 @@ project/translate/
 Files are nested JSON objects. `{ "textKey": "home.hero.title" }` resolves at render time via `Translator::translate('home.hero.title')`. Interpolation supports `{{name}}` placeholders.
 
 **Multilingual vs monolingual.** When `MULTILINGUAL_SUPPORT = true`, `Translator` loads `{active-lang}.json` (`default.json` is the fallback when a key is missing from the active language). When `MULTILINGUAL_SUPPORT = false`, `Translator` loads `default.json` exclusively — `LANGUAGES_SUPPORTED` entries are NOT consulted at render time. The admin's Translation Manager mode is `default.json`-aware in monolingual mode (the language picker hides and writes target `default.json`).
+
+### 11.1 Which language a request is
+
+One function answers it, in `secure/src/functions/projectLanguage.php`:
+
+| function | answers |
+|---|---|
+| `qs_project_is_multilingual()` | is this project multilingual at all? |
+| `qs_project_languages()` | the supported codes — empty when it is not |
+| `qs_project_default_language()` | the configured fallback (never empty) |
+| `qs_is_project_language($segment)` | is this URL segment one of them? |
+| `qs_project_language_from_path()` | the language this request's URL names, or `null` |
+| `qs_resolve_project_language($candidate)` | **the answer** |
+
+`qs_resolve_project_language()` takes, in order: the project default on a
+monolingual project; an explicit candidate the caller already resolved, if the
+project declares it; the language segment leading the request path; the project
+default. An undeclared candidate is discarded rather than trusted, so a value
+that reached a caller from the request cannot select a translation file the
+project does not declare. The return is always a non-empty code — a caller that
+needs to tell "this URL names no language" from "the default" asks
+`qs_project_language_from_path()` instead.
+
+`TrimParameters` and `Translator` both call it and neither decides anything on
+its own. `TrimParameters::lang()` reports `null` on a monolingual project,
+because such a site's URLs carry no language segment and there is nothing to
+report.
+
+The path it reads is normalised the way `TrimParameters` normalises it: the
+optional `PUBLIC_FOLDER_SPACE` prefix is removed, and on `/p/<projectId>/`
+serving the project marker is removed too. The marker matters because that
+surface rewrites `REQUEST_URI` part-way through a request — without the strip,
+the same request would resolve to different languages depending on when the
+question was asked.
+
+**This is the author's site's language, not the admin panel's.** The panel runs
+a separate system — `AdminTranslation`, files under
+`secure/admin/translations/`, chosen by `?lang=` then the admin session then
+`Accept-Language`. The two share no code, no files and no configuration. See
+[ADMIN_PANEL.md](ADMIN_PANEL.md) for the panel's own language handling.
 
 Health is checked by dedicated commands:
 

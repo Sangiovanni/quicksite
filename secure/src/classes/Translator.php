@@ -1,27 +1,46 @@
 <?php
 
+// The single point that answers "what language is this request, for this
+// project?" — see the file's header for why it is not a method here.
+require_once __DIR__ . '/../functions/projectLanguage.php';
+
 class Translator {
     private static $translations = null;
     private static $lang = null;
-    private static $supportedLangs = CONFIG['LANGUAGES_SUPPORTED'];
-    private static $defaultLang = CONFIG['LANGUAGE_DEFAULT'];
 
-    public function __construct($langFromRouter) {
-        if(!MULTILINGUAL_SUPPORT){
-            self::$lang = CONFIG['LANGUAGE_DEFAULT'];
-            return;
+    /**
+     * @param string|null $langFromRouter The language the router already
+     *                                    resolved, if any. Null (or a code the
+     *                                    project does not declare) falls
+     *                                    through to the shared detector rather
+     *                                    than being trusted.
+     */
+    public function __construct($langFromRouter = null) {
+        $resolved = qs_resolve_project_language(is_string($langFromRouter) ? $langFromRouter : null);
+
+        // The loaded table belongs to the language it was loaded for. Drop it
+        // when the language changes, or the first language served in a request
+        // wins every lookup after it. That ordering is real: on the per-project
+        // view the artifact regeneration calls translate() statically before
+        // the page template constructs its own Translator.
+        if ($resolved !== self::$lang) {
+            self::$translations = null;
         }
-        $determinedLang = self::$defaultLang;
-        if (in_array($langFromRouter, self::$supportedLangs)) {            
-            $determinedLang =  $langFromRouter;
-        }
-        self::$lang = $determinedLang;
+        self::$lang = $resolved;
     }
 
     public static function loadTranslations() {
-        $lang = self::$lang ?: self::determineLang();
-        
-        $fileTranslate = PROJECT_PATH . "/translate/{$lang}.json";        
+        // Reached with self::$lang unset whenever translate() is called
+        // statically and no Translator was constructed in this request —
+        // ApiEndpointManager and CallTransformer both do that. Resolving from
+        // the shared detector is what makes those paths work; they used to
+        // call a method that did not exist and took the whole request down.
+        if (self::$lang === null || self::$lang === '') {
+            self::$lang = qs_resolve_project_language();
+        }
+        $lang = self::$lang;
+
+        $fileTranslate = PROJECT_PATH . "/translate/{$lang}.json";
         if(!MULTILINGUAL_SUPPORT){
             $fileTranslate = PROJECT_PATH . "/translate/default.json";
         }
@@ -107,10 +126,5 @@ class Translator {
         }
 
         return $result;
-    }
-
-    // A simple method to get the current language without needing to decode
-    public static function getLang() {
-        return self::$currentLang ?? self::determineLang();
     }
 }

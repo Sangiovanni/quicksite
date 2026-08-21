@@ -488,12 +488,26 @@ foreach ($classFiles as $file) {
     }
 }
 
-// Copy String.php function
-if (!copy(SECURE_FOLDER_PATH . '/src/functions/String.php', $buildFullPath . '/' . $buildSecureName . '/src/functions/String.php')) {
-    release_build_lock();
-    ApiResponse::create(500, 'server.file_write_failed')
-        ->withMessage("Failed to copy String.php")
-        ->send();
+// Copy the function files the compiled pages' runtime requires.
+// String.php: removePrefix() + friends, used by TrimParameters.
+// projectLanguage.php: the single project-language detection point, required
+// by BOTH TrimParameters and Translator — omit it and a built site fatals on
+// its first page at a require_once, not at a translation lookup.
+$functionFiles = [
+    'String.php',
+    'projectLanguage.php',
+];
+
+foreach ($functionFiles as $file) {
+    $source = SECURE_FOLDER_PATH . '/src/functions/' . $file;
+    $dest   = $buildFullPath . '/' . $buildSecureName . '/src/functions/' . $file;
+
+    if (!copy($source, $dest)) {
+        release_build_lock();
+        ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage("Failed to copy function file: {$file}")
+            ->send();
+    }
 }
 
 // Copy /translate/ directory (only default.json in mono-language mode)

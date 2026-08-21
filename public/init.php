@@ -124,6 +124,26 @@ if (!is_dir(SECURE_FOLDER_PATH)) {
 // The guard is the ENTRY POINT, never the URL: '/management/p/<projectId>/<command>' also
 // carries a '/p/' segment, and gating on that would refuse every project-scoped API call.
 if (defined('QS_SURFACE_B_ENTRY')) {
+    // Fatal hygiene, registered BEFORE the gate runs. The other three
+    // dispatchers register their own shape at the top of their own entry file;
+    // surface B could not, because public/p/index.php cannot name secure/ until
+    // this file has resolved SECURE_FOLDER_PATH. So it registers here, at the
+    // first line of surface B that is allowed to load engine code — which also
+    // puts the visibility gate itself inside the handler's reach.
+    //
+    // Without it, a fatal anywhere in a project render answered HTTP 200 with
+    // PHP's own error text in the body — absolute server path included — to
+    // whoever asked, and the only surface facing anonymous internet visitors
+    // was the only one that did. HTML shape: a rendered site cannot answer with
+    // a JSON envelope.
+    //
+    // Two separate defects, closed by the same call: the status (200 → 500),
+    // which is wrong on every deployment regardless of php.ini, and the
+    // disclosure, which qs_register_fatal_handler() also closes by forcing
+    // display_errors off on a production install.
+    require_once SECURE_FOLDER_PATH . '/src/functions/errorHygiene.php';
+    qs_register_fatal_handler(QS_FATAL_SHAPE_HTML);
+
     require_once SECURE_FOLDER_PATH . '/src/functions/surfaceB.php';
     qs_surface_b_maybe_handle();
 }
