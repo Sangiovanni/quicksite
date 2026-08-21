@@ -550,6 +550,14 @@ echo     $oldParent = Split-Path $oldParent >> "%PS_SEC_TEMP%"
 echo   } else { break } >> "%PS_SEC_TEMP%"
 echo } >> "%PS_SEC_TEMP%"
 echo Write-Host "  + Renamed to $name" >> "%PS_SEC_TEMP%"
+REM The vhost holds an ABSOLUTE include pointing INTO the secure folder, so a
+REM rename moves that file out from under it and nginx refuses the next reload.
+REM The failure surfaces later, when nobody connects it back to this menu.
+echo Write-Host "" >> "%PS_SEC_TEMP%"
+echo Write-Host "  ! nginx: your vhost still points at the OLD folder." >> "%PS_SEC_TEMP%"
+echo Write-Host "    Update the include line in your server block to:" >> "%PS_SEC_TEMP%"
+echo Write-Host "      include $dest\nginx\dynamic_routes.conf;" >> "%PS_SEC_TEMP%"
+echo Write-Host "    then reload nginx. An Apache install needs nothing here." >> "%PS_SEC_TEMP%"
 echo exit 0 >> "%PS_SEC_TEMP%"
 
 powershell -NoProfile -ExecutionPolicy Bypass -File "%PS_SEC_TEMP%" <nul
@@ -684,6 +692,15 @@ echo   Remove-Item $nginxConf -Force >> "%PS_SPACE_TEMP%"
 echo   Write-Host '  + Removed the old nginx routing config' >> "%PS_SPACE_TEMP%"
 echo   Write-Host '  ! nginx: load any page once - that regenerates it for the new' >> "%PS_SPACE_TEMP%"
 echo   Write-Host '    prefix. Reload nginx after that, not before.' >> "%PS_SPACE_TEMP%"
+REM The regenerated include cannot reach the ONE block that lives in the vhost:
+REM location @quicksite_project carries the URL prefix inside SCRIPT_FILENAME and
+REM is pasted by hand, because it needs a fastcgi_pass only the operator knows.
+REM Left stale, every /p/ request posts at an entry point that is not there.
+echo   Write-Host '' >> "%PS_SPACE_TEMP%"
+echo   Write-Host '  ! nginx: also update the block you pasted by hand.' >> "%PS_SPACE_TEMP%"
+echo   Write-Host '    location @quicksite_project must read:' >> "%PS_SPACE_TEMP%"
+echo   if ($newSpace) { Write-Host "      fastcgi_param SCRIPT_FILENAME `$document_root/$newSpace/p/index.php;" } else { Write-Host "      fastcgi_param SCRIPT_FILENAME `$document_root/p/index.php;" } >> "%PS_SPACE_TEMP%"
+echo   Write-Host '    Miss it and /p/ answers a bare File-not-found while /admin/ works.' >> "%PS_SPACE_TEMP%"
 echo } >> "%PS_SPACE_TEMP%"
 echo if ($newSpace) { Write-Host "  + Space set: $newSpace" } else { Write-Host '  + Space removed - serving from the root' } >> "%PS_SPACE_TEMP%"
 echo exit 0 >> "%PS_SPACE_TEMP%"

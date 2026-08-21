@@ -115,7 +115,16 @@ function generate_nginx_config(string $publicFolderSpace): string {
     // Admin panel
     $config .= "# Admin panel\n";
     $config .= "location {$prefix}/admin/ {\n";
-    $config .= "    try_files \$uri \$uri/ {$prefix}/admin/index.php\$is_args\$args;\n";
+    $config .= "    # NO \$uri/ IN THIS LIST, DELIBERATELY. The panel has a PAGE route\n";
+    $config .= "    # named /admin/assets, and public/admin/ also holds a real assets/\n";
+    $config .= "    # directory (the panel's own css + js). With \$uri/ present, nginx\n";
+    $config .= "    # matches that DIRECTORY, finds no index inside it and answers 403 —\n";
+    $config .= "    # so the asset manager is the one admin page that cannot be opened.\n";
+    $config .= "    # Apache never showed this: FallbackResource does not resolve a\n";
+    $config .= "    # directory the way try_files does. Real files under /admin/assets/\n";
+    $config .= "    # still resolve through \$uri, and a bare /admin/ still reaches\n";
+    $config .= "    # index.php through the fallback below.\n";
+    $config .= "    try_files \$uri {$prefix}/admin/index.php\$is_args\$args;\n";
     $config .= "}\n\n";
 
     // Project renderer (surface B) — see the function docblock for why this one

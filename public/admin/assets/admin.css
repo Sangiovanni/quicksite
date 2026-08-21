@@ -2894,12 +2894,13 @@ kbd {
     background: #ef4444;
 }
 
-/* Free space is the one legend entry that is not a slice of the bar: the bar
-   shows what IS used, this shows what is left of the quota. Hollow rather than
-   filled, so it does not read as another consumed category. */
+/* Free space is the one legend entry with no segment of its own: it names the
+   UNFILLED remainder of the bar. The swatch therefore takes the bar's own track
+   colour, so the legend points at something visibly present rather than at a
+   colour that appears nowhere. */
 .storage-overview__legend-color--free {
-    background: transparent;
-    border: 1px dashed var(--admin-text-muted, #6b7280);
+    background: var(--admin-bg-tertiary);
+    border: 1px solid var(--admin-border, #d1d5db);
 }
 
 .storage-overview__legend {

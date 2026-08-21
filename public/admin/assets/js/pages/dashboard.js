@@ -602,12 +602,25 @@
                 : t('dashboard.storage.ownerProjects', '{n} projects').replace('{n}', data.project_count);
 
             const cats = data.by_category || {};
+            const quota = data.quota || {};
+
+            // WHAT THE FULL BAR MEANS depends on whether a quota exists. With one,
+            // the bar is the ALLOWANCE and the unfilled remainder is the free space —
+            // the gap IS the figure, which is why free space needs no segment of its
+            // own. With no quota there is no allowance to draw, so the bar falls back
+            // to meaning "100% = what you have used" and only the proportions between
+            // categories are readable. Over quota, the denominator becomes the total
+            // again so the segments still add up to a full bar instead of overflowing.
+            const denom = (quota.configured && quota.limit > 0)
+                ? Math.max(quota.limit, total)
+                : total;
+
             ['content', 'backups', 'builds', 'exports'].forEach(cat => {
                 const bytes = cats[cat]?.size || 0;
                 const seg = document.getElementById('owner-space-seg-' + cat);
                 const val = document.getElementById('owner-space-val-' + cat);
                 if (seg) {
-                    const pct = total > 0 ? (bytes / total) * 100 : 0;
+                    const pct = denom > 0 ? (bytes / denom) * 100 : 0;
                     seg.style.width = pct > 0 ? Math.max(pct, 1) + '%' : '0%';
                 }
                 if (val) val.textContent = cats[cat]?.size_formatted || formatSize(bytes);
@@ -616,7 +629,6 @@
             // Free space: shown only when a quota is actually configured. On the
             // default install there is no ceiling, so there is no "remaining" to
             // report and the row stays hidden rather than reading 0 or Unlimited.
-            const quota = data.quota || {};
             const freeRow = document.getElementById('owner-space-legend-free');
             const freeVal = document.getElementById('owner-space-val-free');
             if (freeRow) freeRow.style.display = quota.configured ? '' : 'none';

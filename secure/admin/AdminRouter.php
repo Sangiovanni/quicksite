@@ -25,6 +25,27 @@ class AdminRouter {
      * explain; the honest answer is that the URL does not exist. Reading the list
      * answers 404 for all six, and for any partial added to that directory later.
      */
+    /**
+     * ⚠ RESERVED SEGMENTS — a page name here must NOT match a real entry under
+     * public/admin/. Today those are `assets/` (the panel's own css + js) and
+     * `api/` (the AJAX helper), so NEITHER may be used as a page name.
+     *
+     * A collision is not a 404, which is what makes it hard to spot. The URL
+     * becomes ambiguous between a route and a path on disk, and the two web
+     * servers resolved it differently: nginx matched the DIRECTORY, found no
+     * index in it and answered 403, so /admin/assets was the one admin page
+     * that could not be opened, while Apache resolved the same URL to the page
+     * and looked perfectly healthy. It survived that long precisely because
+     * the dev machine runs Apache.
+     *
+     * That is why the Asset Management page is routed as `media`. The same
+     * reserved-name idea already exists for project aliases — see
+     * $reservedPaths in secure/management/command/createAlias.php.
+     *
+     * NOTES/tests/beta11/s27_admin_route_collision_probe.php checks this list
+     * against what is actually on disk, so a new collision is caught rather
+     * than discovered on somebody else's web server.
+     */
     private array $validPages = [
         'login',       // Authentication page
         'register',    // Self-registration page (C8; renders only when auth.php allows it)
@@ -44,7 +65,8 @@ class AdminRouter {
         'memberships', // My Memberships — inbox / requests / proposals / notices (C8 8.3c; any authenticated user)
         'members',     // Project Members — roster / queue / invite / policy for the EDITED project (C8 8.3c)
         'account',     // My Account — password, sign out everywhere, delete account (any authenticated user)
-        'assets',      // Asset Management page
+        'media',       // Asset Management page. ⚠ NOT 'assets' — see the
+                       //   reserved-segment note above.
         'sitemap',     // Visual Sitemap & Route Management
         'optimize',    // Optimization Tools
         'logout'       // Logout action — POST only (everywhere=1 ends the account's other sessions too)
@@ -504,7 +526,7 @@ class AdminRouter {
      * expanded categories). Pages not listed here are open to all authenticated users.
      */
     private const PAGE_PERMISSIONS = [
-        'assets'         => ['listAssets', 'uploadAsset'],
+        'media'          => ['listAssets', 'uploadAsset'],
         'sitemap'        => ['getSiteMap', 'addRoute'],
         'optimize'       => ['getStyles', 'editStyles'],
         // 'ai-connections' has no permission gate: it is a UI over

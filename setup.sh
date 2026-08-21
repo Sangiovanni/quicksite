@@ -437,6 +437,18 @@ item_secure() {
 
     save_conf
     echo -e "  ${GREEN}✓${NC} Renamed → ${BOLD}$NEW_NAME${NC}"
+
+    # The vhost holds an ABSOLUTE include pointing INTO the secure folder.
+    # Renaming the folder moves that file, and nginx then refuses to reload on
+    # a path that no longer exists — a failure that surfaces at the next reload
+    # rather than here, which is precisely when nobody connects it to this menu.
+    echo ""
+    echo -e "  ${YELLOW}⚠ nginx: your vhost still points at the OLD folder.${NC}"
+    echo "    Update the include line in your server {} block to:"
+    echo ""
+    echo -e "      ${BOLD}include $SECURE_DIR/nginx/dynamic_routes.conf;${NC}"
+    echo ""
+    echo "    then reload nginx. An Apache install needs nothing here."
 }
 
 # ==========================================================
@@ -569,6 +581,25 @@ item_space() {
         echo "    $NGINX_CONF"
         echo "    for the new prefix. Reload nginx after that, not before: the"
         echo "    include points at a file that does not exist right now."
+        echo ""
+        # The regenerated include cannot fix the ONE block that lives in the
+        # vhost instead: `location @quicksite_project` carries the URL prefix
+        # inside its SCRIPT_FILENAME, and it is pasted by hand because it needs
+        # a fastcgi_pass only the operator knows. Leave it stale and every
+        # /p/<id>/ request posts at an entry point that is not there, which
+        # php-fpm answers with a bare "File not found." while the admin panel —
+        # served entirely from the regenerated include — keeps working.
+        echo -e "  ${YELLOW}⚠ nginx: also update the block you pasted by hand.${NC}"
+        echo "    In your server {} block, location @quicksite_project must read:"
+        echo ""
+        if [ -n "$PUBLIC_SPACE" ]; then
+            echo -e "      ${BOLD}fastcgi_param SCRIPT_FILENAME \$document_root/$PUBLIC_SPACE/p/index.php;${NC}"
+        else
+            echo -e "      ${BOLD}fastcgi_param SCRIPT_FILENAME \$document_root/p/index.php;${NC}"
+        fi
+        echo ""
+        echo "    Miss this and /p/<id>/ answers \"File not found.\" while the"
+        echo "    admin panel still works — the two are served by different blocks."
     fi
 
     save_conf
@@ -760,6 +791,33 @@ item_token() {
         echo ""
         echo "  Expected location:"
         echo "    $token_file"
+        return 0
+    fi
+
+    # ⚠ EXISTS BUT UNREADABLE IS NOT "ALREADY USED". The engine mints this file
+    # as the WEB SERVER's user and chmods it 0600 (setupToken.php), so on a real
+    # Linux host it belongs to php-fpm rather than to whoever runs this script.
+    # `-f` above still succeeds — that needs only search permission on the
+    # directory — and the `cat` below then fails silently behind its `|| true`,
+    # leaving an empty value that fails the shape test and lands in the
+    # "already been used" branch. A live token was reported as spent, with
+    # nothing pointing at permissions. Windows never showed it: chmod is a no-op
+    # there, which is why this only appears on a deployed install.
+    if [ ! -r "$token_file" ]; then
+        echo -e "  ${YELLOW}The token exists, but this account cannot read it.${NC}"
+        echo ""
+        echo "  It is created by the web server and is owner-only, so it belongs"
+        echo "  to the PHP-FPM user and not to you:"
+        echo ""
+        echo "    $(ls -l "$token_file" 2>/dev/null || echo "$token_file")"
+        echo "    you are $(id -un 2>/dev/null || echo 'this shell user')"
+        echo ""
+        echo "  Read it as that user, or with elevated rights:"
+        echo ""
+        echo -e "    ${BOLD}sudo cat $token_file${NC}"
+        echo ""
+        echo -e "  ${DIM}This is not a broken install — the token is live and the${NC}"
+        echo -e "  ${DIM}first-run form will accept it.${NC}"
         return 0
     fi
 

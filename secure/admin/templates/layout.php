@@ -170,7 +170,7 @@ $langNames = [
             $membersPages = ['memberships', 'members'];
             $isBuildActive = in_array($currentPage, $buildPages);
             $isSettingsActive = in_array($currentPage, $settingsPages);
-            $isAssetsActive = ($currentPage === 'assets');
+            $isAssetsActive = ($currentPage === 'media');
             $isComplianceActive = in_array($currentPage, $compliancePages);
             $isMembersActive = in_array($currentPage, $membersPages);
         ?>
@@ -228,7 +228,7 @@ $langNames = [
             </div>
 
             <!-- Assets - Top-level tab -->
-            <a href="<?= $router->url('assets') ?>" 
+            <a href="<?= $router->url('media') ?>" 
                class="admin-nav__link<?= $isAssetsActive ? ' admin-nav__link--active' : '' ?>"
                data-requires-command="listAssets">
                 <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
