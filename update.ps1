@@ -39,6 +39,8 @@ $GithubOwner = 'Sangiovanni'
 $GithubRepo  = 'quicksite'
 
 $DefaultApi = "https://api.github.com/repos/$GithubOwner/$GithubRepo/releases/latest"
+# Consulted only when releases/latest answers 404 - see the fallback below.
+$TagsApi    = "https://api.github.com/repos/$GithubOwner/$GithubRepo/tags?per_page=1"
 
 # Overridable so a fork or an internal mirror can be updated from, and so the
 # probe can point at a fixture instead of the live internet. Grants nothing new:
@@ -180,16 +182,38 @@ try {
 } catch {
     $LatestTag = $null
 }
+$ReleaseStatus = [string]$script:HttpStatus
+
+# NO RELEASE, BUT PERHAPS A TAG. Mirrors update.sh, which mirrors the admin
+# panel notice: checkForUpdates asks releases/latest and then the tags list. A
+# repository that tags without publishing releases otherwise had the panel
+# announcing an update while both updaters reported none. A tag is enough to
+# act on - the ZIP URL points at the archive GitHub makes for every tag.
+# Only for the DEFAULT endpoint: an override was aimed somewhere deliberately.
+$LatestFromTag = $false
+if ((-not $LatestTag) -and $ReleaseStatus -eq '404' -and $Api -eq $DefaultApi) {
+    try {
+        $rawTags   = Get-Text $TagsApi
+        $LatestTag = (ConvertFrom-Json $rawTags)[0].name
+        if ($LatestTag) { $LatestFromTag = $true }
+    } catch {
+        $LatestTag = $null
+    }
+}
 
 if (-not $LatestTag) {
     # SAY WHICH — mirrors update.sh. These need different things from the
     # operator, and one message told them apart from nothing.
-    switch -Regex ([string]$script:HttpStatus) {
+    # ReleaseStatus, not HttpStatus: after the tags fallback above, HttpStatus
+    # describes THAT request and would misreport the cause.
+    switch -Regex ($ReleaseStatus) {
         '^404$' {
-            Write-Bad 'GitHub has no published release for this repository.'
-            Write-Dim 'GitHub answered (404). Either the repository is private to this'
-            Write-Dim 'machine, or no release has been published yet. Outbound access'
-            Write-Dim 'is working, so there is nothing to fix here.'
+            Write-Bad 'GitHub has no published release OR tag for this repository.'
+            Write-Dim 'releases/latest answered 404 and the tags list gave nothing'
+            Write-Dim 'either, so there is no version to compare against. Most likely'
+            Write-Dim 'the repository is private to this machine, or nothing has been'
+            Write-Dim 'tagged yet. Outbound access is working, so there is nothing to'
+            Write-Dim 'fix on this server.'
         }
         '^(403|429)$' {
             Write-Bad "GitHub refused the request (HTTP $script:HttpStatus) - most likely rate-limited."
@@ -218,6 +242,7 @@ if (-not $LatestTag) {
 
 $Latest = $LatestTag -replace '^[vV]', ''
 Write-Host "  Latest:   $Latest  ($LatestTag)"
+if ($LatestFromTag) { Write-Dim '          from the tag list - this repository publishes no releases' }
 Write-Host ''
 
 # ==========================================================

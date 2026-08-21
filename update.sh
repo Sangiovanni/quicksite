@@ -77,6 +77,8 @@ GITHUB_REPO="quicksite"
 QS_UPDATE_API="${QS_UPDATE_API:-https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases/latest}"
 QS_UPDATE_ZIP="${QS_UPDATE_ZIP:-https://github.com/$GITHUB_OWNER/$GITHUB_REPO/archive/refs/tags/__TAG__.zip}"
 QS_UPDATE_DEFAULT_API="https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases/latest"
+# Consulted only when releases/latest answers 404 — see the fallback below.
+QS_UPDATE_TAGS_API="https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/tags?per_page=1"
 
 # Exit codes — documented because --check is meant to be scripted against.
 EXIT_OK=0             # up to date, or the apply succeeded
@@ -199,6 +201,12 @@ extract_tag() {
     sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1
 }
 
+# The tags endpoint returns an ARRAY whose entries carry "name" rather than
+# "tag_name". per_page=1 means there is exactly one, so the first match is it.
+extract_tag_name() {
+    sed -n 's/.*"name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1
+}
+
 say ""
 say "${BOLD}QuickSite update${NC}"
 say ""
@@ -223,6 +231,28 @@ fi
 
 LATEST_TAG="$(extract_tag < "$BODY_FILE")"
 rm -f "$BODY_FILE"
+RELEASE_STATUS="${HTTP_STATUS:-}"
+
+# NO RELEASE, BUT PERHAPS A TAG. checkForUpdates — the admin panel notice — asks
+# releases/latest and then falls back to the tags endpoint. This script stopped
+# at the 404, so on a repository that tags without publishing releases the panel
+# announced an update while the updater reported it could not find one: two
+# surfaces, one question, two answers. A tag is enough to act on, because
+# QS_UPDATE_ZIP already points at the archive GitHub generates for every tag.
+#
+# ⚠ ONLY for the DEFAULT endpoint. An operator who set QS_UPDATE_API aimed it
+# somewhere deliberately, and silently redirecting them to github.com would
+# answer a question they did not ask.
+LATEST_FROM_TAG=no
+if [ -z "$LATEST_TAG" ] && [ "$RELEASE_STATUS" = 404 ] && [ "$QS_UPDATE_API" = "$QS_UPDATE_DEFAULT_API" ]; then
+    TAGS_FILE="$(mktemp 2>/dev/null || echo "${TMPDIR:-/tmp}/qs_update_tags.$$")"
+    http_get "$QS_UPDATE_TAGS_API" > "$TAGS_FILE" 2>/dev/null
+    LATEST_TAG="$(extract_tag_name < "$TAGS_FILE")"
+    rm -f -- "$TAGS_FILE"
+    if [ -n "$LATEST_TAG" ]; then
+        LATEST_FROM_TAG=yes
+    fi
+fi
 
 if [ -z "$LATEST_TAG" ]; then
     # SAY WHICH. These four need different things from the operator, and a
@@ -231,12 +261,16 @@ if [ -z "$LATEST_TAG" ]; then
     # guess costs real time: somebody whose firewall blocks outbound HTTPS and
     # somebody whose repository simply has no release yet would otherwise read
     # the same sentence and go looking in the same wrong place.
-    case "${HTTP_STATUS:-}" in
+    # RELEASE_STATUS, not HTTP_STATUS: once the tags fallback above has run,
+    # HTTP_STATUS describes THAT request and would misreport the cause.
+    case "${RELEASE_STATUS:-}" in
         404)
-            fail "GitHub has no published release for this repository."
-            say  "    ${DIM}GitHub answered (404). Either the repository is private to this${NC}"
-            say  "    ${DIM}machine, or no release has been published yet. Outbound access${NC}"
-            say  "    ${DIM}is working, so there is nothing to fix here.${NC}"
+            fail "GitHub has no published release OR tag for this repository."
+            say  "    ${DIM}releases/latest answered 404 and the tags list gave nothing${NC}"
+            say  "    ${DIM}either, so there is no version to compare against. Most likely${NC}"
+            say  "    ${DIM}the repository is private to this machine, or nothing has been${NC}"
+            say  "    ${DIM}tagged yet. Outbound access is working, so there is nothing to${NC}"
+            say  "    ${DIM}fix on this server.${NC}"
             ;;
         403|429)
             fail "GitHub refused the request (HTTP $HTTP_STATUS) — most likely rate-limited."
@@ -375,6 +409,9 @@ else
 fi
 
 say "  Latest:   ${BOLD}$LATEST${NC}  ${DIM}($LATEST_TAG)${NC}"
+if [ "${LATEST_FROM_TAG:-no}" = yes ]; then
+    say "  ${DIM}          from the tag list — this repository publishes no releases${NC}"
+fi
 say ""
 
 if [ "$COMPARE_WAS_APPROXIMATE" = yes ]; then
