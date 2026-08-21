@@ -301,9 +301,17 @@ qs_version_rank() {
     esac
 }
 
-# Splits `1.0.0-beta.11` into the five fields `1 0 0 beta 11` on stdout, and a
-# plain `1.0.0` into `1 0 0 none 0`. Anything that is not one of those shapes
+# Splits `1.0.0-beta.11` into the six fields `1 0 0 beta 11 0` on stdout, and a
+# plain `1.0.0` into `1 0 0 none 0 0`. Anything that is not one of those shapes
 # yields nothing, and the caller falls back (and says so).
+#
+# ⚠ THE SIXTH FIELD IS A POINT RELEASE — `1.0.0-beta.10.2`. The project tags
+# those at the end of a work sequence, and without this the shape matched no
+# expression at all: the comparison silently degraded to "the strings differ",
+# which happens to answer correctly when the remote IS newer and answers
+# WRONGLY the moment it is older. PHP's version_compare, which the admin panel
+# uses for the same decision, has always ordered these correctly — so the two
+# update surfaces disagreed on the project's own version numbers.
 #
 # ⚠ `none` IS AN EXPLICIT PLACEHOLDER, not decoration. Emitting an empty field
 # instead does not work: the caller splits on whitespace, which collapses runs,
@@ -312,9 +320,10 @@ qs_version_rank() {
 # what happens the day 1.0.0 ships) aborted the whole run.
 qs_version_parts() {
     printf '%s' "$1" | sed -n \
-      's/^\([0-9][0-9]*\)\.\([0-9][0-9]*\)\.\([0-9][0-9]*\)$/\1 \2 \3 none 0/p;
-       s/^\([0-9][0-9]*\)\.\([0-9][0-9]*\)\.\([0-9][0-9]*\)-\([A-Za-z][A-Za-z]*\)\.\([0-9][0-9]*\)$/\1 \2 \3 \4 \5/p;
-       s/^\([0-9][0-9]*\)\.\([0-9][0-9]*\)\.\([0-9][0-9]*\)-\([A-Za-z][A-Za-z]*\)$/\1 \2 \3 \4 0/p'
+      's/^\([0-9][0-9]*\)\.\([0-9][0-9]*\)\.\([0-9][0-9]*\)$/\1 \2 \3 none 0 0/p;
+       s/^\([0-9][0-9]*\)\.\([0-9][0-9]*\)\.\([0-9][0-9]*\)-\([A-Za-z][A-Za-z]*\)\.\([0-9][0-9]*\)\.\([0-9][0-9]*\)$/\1 \2 \3 \4 \5 \6/p;
+       s/^\([0-9][0-9]*\)\.\([0-9][0-9]*\)\.\([0-9][0-9]*\)-\([A-Za-z][A-Za-z]*\)\.\([0-9][0-9]*\)$/\1 \2 \3 \4 \5 0/p;
+       s/^\([0-9][0-9]*\)\.\([0-9][0-9]*\)\.\([0-9][0-9]*\)-\([A-Za-z][A-Za-z]*\)$/\1 \2 \3 \4 0 0/p'
 }
 
 compare_versions() {
@@ -332,9 +341,9 @@ compare_versions() {
     fi
 
     # shellcheck disable=SC2086
-    set -- $_pa; _a1=$1; _a2=$2; _a3=$3; _aw=$4; _an=$5
+    set -- $_pa; _a1=$1; _a2=$2; _a3=$3; _aw=$4; _an=$5; _ap=$6
     # shellcheck disable=SC2086
-    set -- $_pb; _b1=$1; _b2=$2; _b3=$3; _bw=$4; _bn=$5
+    set -- $_pb; _b1=$1; _b2=$2; _b3=$3; _bw=$4; _bn=$5; _bp=$6
 
     [ "$_b1" -gt "$_a1" ] && return 0
     [ "$_b1" -lt "$_a1" ] && return 1
@@ -349,6 +358,12 @@ compare_versions() {
     [ "$_br" -lt "$_ar" ] && return 1
 
     [ "$_bn" -gt "$_an" ] && return 0
+    [ "$_bn" -lt "$_an" ] && return 1
+
+    # Point release last: 1.0.0-beta.10.2 is newer than 1.0.0-beta.10, and a
+    # version with no point carries 0 here, so the two compare without a
+    # special case.
+    [ "$_bp" -gt "$_ap" ] && return 0
     return 1
 }
 
@@ -363,8 +378,9 @@ say "  Latest:   ${BOLD}$LATEST${NC}  ${DIM}($LATEST_TAG)${NC}"
 say ""
 
 if [ "$COMPARE_WAS_APPROXIMATE" = yes ]; then
-    warn "No PHP CLI found — versions were compared for equality only."
-    say  "    ${DIM}\"Update available\" below means \"the versions differ\".${NC}"
+    warn "Could not read one of the version numbers, so they were compared"
+    say  "    ${DIM}for equality only. \"Update available\" below means \"they differ\".${NC}"
+    say  "    ${DIM}installed: $CURRENT   ·   latest: $LATEST${NC}"
     say  ""
 fi
 

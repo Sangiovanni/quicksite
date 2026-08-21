@@ -2,7 +2,7 @@
 
 A file-based PHP CMS with a built-in visual admin panel. Define page structures in JSON, manage everything through a REST API or the admin UI, and deploy production builds — no database required.
 
-> **Current version: `1.0.0-beta.11`** — Actively developed.
+> **Current version: `1.0.0-beta.10.2`** — Actively developed.
 
 <a href="https://www.youtube.com/watch?v=LHheKkI1rLw">
   <img src="https://img.youtube.com/vi/LHheKkI1rLw/maxresdefault.jpg" alt="Watch the demo" width="50%">
