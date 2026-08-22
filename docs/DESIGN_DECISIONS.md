@@ -8500,3 +8500,57 @@ every monitor).
 **Source**: `public/init.php` (`QS_SURFACE_B_ENTRY` block);
 `secure/src/functions/errorHygiene.php` (unchanged, reused). Sangio's ruling,
 2026-08-21, during beta.11 sequence 3.
+
+---
+
+### A substitution that yields a complete URL is not re-processed (locked 2026-08-22)
+
+**Decision**: an attribute value containing `{{__current_page;lang=xx}}` is
+exempt from `processUrl()` in the live renderer, matching the exemption the
+compiler already applied. The recognition happens BEFORE substitution, and both
+writers use the same predicate as the substitution they guard.
+
+**Reasoning**: the language switch resolves to a complete URL — base, language
+and route all present. `processUrl()`'s job is to turn an author's
+root-relative path into a full one, so running it over a value that is already
+full composed the base twice. On the per-project view the visible result was a
+language picker pointing at `/p/<id>/fr/p/<id>/en/`: the project marker doubled
+and the language not switched, on every page and in both directions.
+
+The guard that was supposed to prevent it — "does this URL already start with a
+language code?" — is anchored at the start of the string, and a per-project URL
+starts with the project marker, so it never matched. Making that guard hunt for
+a language anywhere in the string was rejected: it would invent a third
+behaviour where two already disagreed, and it does not describe the defect. The
+base is composed a second time whether or not a language is involved, which is
+why a mono-language project doubled too, with no language anywhere in the value.
+
+The exemption is expressed as "this substitution returns a complete URL", not as
+"this URL looks complete". A value is exempt because of what produced it, which
+is knowable before substitution and unknowable after — once substituted, a
+complete URL is indistinguishable from an ordinary root-relative path.
+
+**Which codes count as a language is the project's own set.** The trailing-slash
+rule for a URL that is exactly a language code was written as a literal `en|fr`
+in both writers and consulted no configuration, so a project speaking `es`/`de`
+never received it while `/en` received it on a site with no English at all. Both
+writers now read the declared languages. On a mono-language project the set is
+empty and the rule does not fire, which is correct: there, a URL that looks like
+a language code is an ordinary route.
+
+**Alternatives considered**: widening `processUrl()`'s language guard to find a
+code anywhere in the path (rejected — a third behaviour, and it leaves the
+mono-language and base-only cases broken). Making `buildLanguageSwitchUrl()`
+return a root-relative fragment for `processUrl()` to complete (rejected — it
+already has to resolve the base to know the target, so the completion would run
+twice and the two results could differ). Detecting completeness after
+substitution by testing whether the value starts with the base (rejected —
+brittle, and it would exempt any author-written URL that happened to begin with
+the base). Fixing the renderer alone and leaving the language codes hardcoded
+(rejected by Sangio — the codes are a live defect for any project that speaks
+neither English nor French).
+
+**Source**: `secure/src/classes/JsonToHtmlRenderer.php` (`renderAttribute`,
+`isLanguageSwitchPlaceholder`, `hasLanguageSwitchPlaceholder`, `processUrl`),
+`secure/src/classes/JsonToPhpCompiler.php` (the emitted `processUrl`). Sangio's
+ruling, 2026-08-22, during beta.11 sequence 3.

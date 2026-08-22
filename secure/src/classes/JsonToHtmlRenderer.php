@@ -5,6 +5,9 @@ require_once __DIR__ . '/CallTransformer.php';
 require_once __DIR__ . '/IframeSandbox.php';
 require_once __DIR__ . '/Translator.php';
 require_once __DIR__ . '/../functions/qsVerbCatalog.php';
+// The single point for the project's language set — processUrl() asks it which
+// codes count as a language rather than carrying its own list.
+require_once __DIR__ . '/../functions/projectLanguage.php';
 // Beta.8 A1 — paramRoutePathToFs for sanitising ':slug' → '__slug' in file lookup
 require_once __DIR__ . '/../functions/routeHelpers.php';
 // S2.8 — qs_render_public_base(): the base relative URLs compose against, in
@@ -884,8 +887,19 @@ class JsonToHtmlRenderer {
         // (R-6, the same class the compiler uses). BASE_URL/language rewriting
         // stays scoped to the classic rewritable set. Closes F-b + F-d.
         if (UrlPolicy::isUrlAttribute($name) && is_string($value) && $value !== '') {
+            // A language-switch substitution ({{__current_page;lang=xx}}) resolves
+            // to a COMPLETE URL — base, language and route already in place. It has
+            // to be recognised BEFORE the substitution, because afterwards the
+            // result is indistinguishable from an ordinary root-relative path, and
+            // processUrl() would compose it against the base a second time.
+            //
+            // The compiler already exempts exactly this case (JsonToPhpCompiler's
+            // $isLanguageSwitch, "these return complete URLs"); this is the same
+            // rule on the render path, so one node yields one href either way.
+            $isLanguageSwitch = false;
             // Process placeholders first (e.g., {{__current_page;lang=en}})
             if (strpos($value, '{{__') !== false) {
+                $isLanguageSwitch = $this->hasLanguageSwitchPlaceholder($value);
                 $value = $this->processDataPlaceholders($value);
             }
             // Scheme safety FIRST: allowlist + strip/deny control chars.
@@ -893,6 +907,7 @@ class JsonToHtmlRenderer {
             // Then rewrite (add base URL, language prefix, etc.) — classic set
             // only, and only if not already a complete URL.
             if (UrlPolicy::isRewritableUrlAttribute($name)
+                && !$isLanguageSwitch
                 && !preg_match('/^(https?:)?\/\//i', $value)) {
                 $value = $this->processUrl($value);
             }
@@ -1070,10 +1085,10 @@ class JsonToHtmlRenderer {
                 $params = isset($matches[2]) ? $this->parseParameters($matches[2]) : [];
                 
                 // Special handling for __current_page with lang parameter
-                if ($key === '__current_page' && isset($params['lang'])) {
+                if ($this->isLanguageSwitchPlaceholder($key, $params)) {
                     return $this->buildLanguageSwitchUrl($params['lang']);
                 }
-                
+
                 return $systemPlaceholders[$key] ?? $matches[0];
             }, $data);
         }
@@ -1095,6 +1110,40 @@ class JsonToHtmlRenderer {
      * @param string $paramString Parameter string
      * @return array Parsed parameters
      */
+    /**
+     * Whether one parsed placeholder is the language switch.
+     *
+     * The single test, so the substitution and the URL-rewrite exemption in
+     * renderAttribute() can never disagree about what a language switch is.
+     *
+     * @param string $key    The placeholder name, e.g. '__current_page'.
+     * @param array  $params Its parsed `;k=v` parameters.
+     */
+    private function isLanguageSwitchPlaceholder(string $key, array $params): bool {
+        return $key === '__current_page' && isset($params['lang']);
+    }
+
+    /**
+     * Whether an attribute value contains a language-switch placeholder.
+     *
+     * Asked BEFORE substitution: the value it resolves to is a complete URL,
+     * and once substituted it looks exactly like an ordinary root-relative
+     * path. Same scan and same predicate as processDataPlaceholders(), so the
+     * two cannot drift.
+     */
+    private function hasLanguageSwitchPlaceholder(string $value): bool {
+        if (!preg_match_all('/\{\{(__\w+)(?:;([^}]+))?\}\}/', $value, $matches, PREG_SET_ORDER)) {
+            return false;
+        }
+        foreach ($matches as $match) {
+            $params = isset($match[2]) ? $this->parseParameters($match[2]) : [];
+            if ($this->isLanguageSwitchPlaceholder($match[1], $params)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private function parseParameters(string $paramString): array {
         $params = [];
         $pairs = explode(';', $paramString);
@@ -1226,11 +1275,19 @@ class JsonToHtmlRenderer {
             return $fullUrl;
         }
         
-        // Ensure trailing slash if URL is just language code
-        if (preg_match('/^(en|fr)$/i', $url)) {
-            $url .= '/';
+        // Ensure trailing slash if URL is just a language code. The codes are the
+        // PROJECT's own, not a fixed pair: a site that speaks es/de has to get the
+        // same treatment en/fr used to get for free. Empty on a mono-language
+        // project, where a URL that looks like a language code is an ordinary
+        // route and must not gain a slash.
+        $langCodes = qs_project_languages();
+        if (!empty($langCodes)) {
+            $langOnly = '/^(' . implode('|', array_map(static fn($l) => preg_quote((string) $l, '/'), $langCodes)) . ')$/i';
+            if (preg_match($langOnly, $url)) {
+                $url .= '/';
+            }
         }
-        
+
         return $fullUrl . $url;
     }
 

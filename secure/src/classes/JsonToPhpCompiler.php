@@ -223,11 +223,23 @@ class JsonToPhpCompiler {
                 return $fullUrl;
             }
             
-            // Ensure trailing slash if URL is just language code
-            if (preg_match('/^(en|fr)$/i', ltrim($url, '/'))) {
-                $fullUrl .= '/';
+            // Ensure trailing slash if URL is just a language code. The codes are
+            // the PROJECT's own (projectLanguage.php travels into the build and is
+            // already loaded by the page's TrimParameters require), not a fixed
+            // pair — a built site that speaks es/de gets the same treatment en/fr
+            // used to get for free. Empty on a mono-language build, where a URL
+            // that looks like a language code is an ordinary route.
+            $__langCodes = function_exists('qs_project_languages') ? qs_project_languages() : [];
+            if (!empty($__langCodes)) {
+                $__quoted = [];
+                foreach ($__langCodes as $__lc) {
+                    $__quoted[] = preg_quote((string) $__lc, '/');
+                }
+                if (preg_match('/^(' . implode('|', $__quoted) . ')$/i', ltrim($url, '/'))) {
+                    $fullUrl .= '/';
+                }
             }
-            
+
             return $fullUrl;
         }
     }

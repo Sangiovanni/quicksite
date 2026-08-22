@@ -325,7 +325,15 @@ therefore reads `/p/mysite/assets/videos/intro.mp4` whether it arrives as part o
 as a freshly inserted node, and in a deployed build it reads `/assets/videos/intro.mp4` in both.
 The rule holds for every URL attribute the renderer rewrites — `href`, `src`, `srcset`, `poster`,
 `action`, `formaction`, `cite`, `data` — and for the language prefix a multilingual project adds
-to non-asset URLs.
+to non-asset URLs. Which codes count as a language is the project's own declared set, so a site
+that speaks `es` and `de` is treated exactly as one that speaks `en` and `fr`.
+
+One value is exempt from that rewriting: `{{__current_page;lang=xx}}`, the language-switch link.
+It resolves to a **complete** URL — base, language and route already in place — so composing it
+against the base again would produce a doubled path. Both writers, the live renderer and the
+compiler, recognise it before substituting and leave the result alone, which is what makes a
+language picker resolve to the same address in the editor's preview, on the per-project view and
+in a deployed build.
 
 A request for a **static sub-resource** under `/p/<projectId>/` — an image, a stylesheet, or the
 shared `qs.js` runtime — is served by the same entry point through a prefix-checked passthrough
