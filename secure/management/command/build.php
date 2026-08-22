@@ -15,12 +15,16 @@
  * build is refused, and a FAILED build removes its own partial directory.
  * No zip is stored; downloadBuild archives the folder on demand and streams it.
  *
+ * The site it produces is self-contained: a front controller copied from
+ * src/runtime/site/index.php, parameterised by one generated data file beside
+ * it, plus the pre-compiled pages and the small runtime that renders them. A
+ * build that cannot answer a request is discarded rather than reported as a
+ * success (see the servability gate near the end).
+ *
  * Security:
  * - File locking prevents concurrent builds
  * - Public and secure folders must have different root directories
- * - Secure folder restricted to single name (no nesting) for init.php compatibility
  * - Build size must not exceed MAX_BUILD_SIZE_MB
- * - Config file sanitized (DB credentials removed)
  */
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/JsonToPhpCompiler.php';
@@ -29,6 +33,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/filePolicy.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/LockManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/buildSiteRuntime.php';
 
 // Get optional parameters for renaming folders in build
 // Defaults are standard names (public/secure/''), NOT the QuickSite installation's own folder names
@@ -353,123 +358,76 @@ foreach ($directories as $dir) {
     }
 }
 
-// Step 2: Copy public folder files
-$publicFiles = [
-    'index.php',
-    'init.php',
-    '.htaccess'
-];
+// Step 2: Emit the entry point
+//
+// A build's entry point is COPIED from src/runtime/site/index.php and
+// PARAMETERISED WITH DATA — one small generated file beside it holding the
+// project id, the folder names and the URL space.
+//
+// It used to be copied from the project's own public/ and then rewritten with
+// four preg_replace calls. No project has ever held an index.php or an init.php
+// there, so the file_exists() guard skipped both silently and the build emitted
+// no entry point at all while answering 201; the block those patches targeted
+// had also been moved into qs_load_project_context(), so all four matched
+// nothing. There was no source to copy and no block to patch, because a
+// QuickSite INSTALL has no root entry point either — its web root is
+// deliberately free so the engine never squats the domain. A built site is the
+// opposite case: it is the whole site at its root, and every request must
+// funnel into it. That entry point is now a real file in the repository, which
+// is what lets it be linted, grepped and opened rather than existing only
+// inside a build nobody served.
+$entryPointSource = qs_site_runtime_source();
+if (!is_file($entryPointSource)) {
+    abort_build(
+        ApiResponse::create(500, 'server.internal_error')
+            ->withMessage('The built-site entry point is missing from this QuickSite installation')
+            ->withData(['expected' => 'src/runtime/site/index.php'])
+    );
+}
 
-foreach ($publicFiles as $file) {
-    $source = PUBLIC_CONTENT_PATH . '/' . $file;
-    $dest = $publicContentPath . '/' . $file;  // Use publicContentPath (includes space if set)
-    
-    if (file_exists($source)) {
-        $content = file_get_contents($source);
-        
-        if ($file === 'init.php') {
-            // === ALWAYS patch init.php for production builds ===
-            
-            // Strip FIRST-INSTALL config auto-creation block (management layer not present in builds)
-            $content = preg_replace(
-                '/\/\/ =+\r?\n\/\/ FIRST-INSTALL: Auto-create config files.*?(?=\/\/ =+\r?\n\/\/ FIRST-INSTALL: Auto-generate nginx)/s',
-                '',
-                $content
-            );
-            
-            // Strip FIRST-INSTALL nginx auto-generation + setup wizard block (NginxConfig.php not in builds)
-            $content = preg_replace(
-                '/\/\/ =+\r?\n\/\/ FIRST-INSTALL: Auto-generate nginx.*?(?=\/\/ =+\r?\n\/\/ PROJECT PATH)/s',
-                '',
-                $content
-            );
-            
-            // Replace PROJECT_PATH block: a production build pins its own project path
-            // All project files are at SECURE_FOLDER_PATH root (config.php, routes.php, templates/, translate/)
-            //
-            // PROJECT_NAME pins the REAL project id, not a literal. It used to be
-            // the fixed string 'production', which made every built site claim
-            // the same identity — and PROJECT_NAME is what names this site's
-            // browser-storage namespace (`qsp_<PROJECT_NAME>_<key>`, see
-            // Page::render) and its theme key. A fixed literal meant the same
-            // project stored under one name at /p/<id>/ and another once built:
-            // precisely the "works in preview, broken in production" split the
-            // always-prefix rule exists to prevent. It also put two built sites
-            // deployed under one origin back in a shared namespace.
-            //
-            // The id is F1-validated (letters, digits, underscore, hyphen), so it
-            // carries no quote to break out of the literal and no `$` or `\` for
-            // preg_replace to read as a backreference; escaped anyway, because a
-            // replacement string is the wrong place to rely on a caller's
-            // validation holding.
-            $buildProjectName = str_replace(
-                ['\\', '$'], ['\\\\', '\\$'],
-                var_export((string) PROJECT_NAME, true)
-            );
-            $content = preg_replace(
-                "/if\s*\(\s*!defined\('PROJECT_PATH'\)\s*\)\s*\{.*?\n\}/s",
-                "if (!defined('PROJECT_PATH')) {\n    define('PROJECT_PATH', SECURE_FOLDER_PATH);\n    define('PROJECT_NAME', " . $buildProjectName . ");\n}",
-                $content
-            );
-            
-            // Always patch folder name constants to match build target values
-            // (source init.php may have different values from the QuickSite installation)
-            
-            // Update SECURE_FOLDER_PATH in init.php (use SERVER_ROOT, not dirname)
-            $content = preg_replace(
-                "/define\('SECURE_FOLDER_PATH',\s*[^)]+\);/",
-                "define('SECURE_FOLDER_PATH', SERVER_ROOT . DIRECTORY_SEPARATOR . '" . $buildSecureName . "');",
-                $content
-            );
-            
-            // Update PUBLIC_FOLDER_NAME constant
-            $content = preg_replace(
-                "/define\('PUBLIC_FOLDER_NAME',\s*'[^']+'\);/",
-                "define('PUBLIC_FOLDER_NAME', '" . $buildPublicName . "');",
-                $content
-            );
-            
-            // Update SECURE_FOLDER_NAME constant
-            $content = preg_replace(
-                "/define\('SECURE_FOLDER_NAME',\s*'[^']+'\);/",
-                "define('SECURE_FOLDER_NAME', '" . $buildSecureName . "');",
-                $content
-            );
-            
-            // Update PUBLIC_FOLDER_SPACE constant
-            $content = preg_replace(
-                "/define\('PUBLIC_FOLDER_SPACE',\s*'[^']*'\);/",
-                "define('PUBLIC_FOLDER_SPACE', '" . $buildPublicSpace . "');",
-                $content
-            );
-        }
-        
-        // Update .htaccess fallback path if space is used
-        if ($file === '.htaccess' && $buildPublicSpace !== '') {
-            $fallback = '/' . $buildPublicSpace . '/index.php';
-            $content = preg_replace(
-                "/FallbackResource\s+.*/",
-                "FallbackResource " . $fallback,
-                $content
-            );
-        }
-        
-        // Strip component preview section from index.php (dev-only feature, requires JsonToHtmlRenderer)
-        if ($file === 'index.php') {
-            $content = preg_replace(
-                '/\/\/ --- Component Preview Mode.*?exit;\s*\}\s*\n/s',
-                '',
-                $content
-            );
-        }
-        
-        if (file_put_contents($dest, $content) === false) {
-            abort_build(
-                ApiResponse::create(500, 'server.file_write_failed')
-                    ->withMessage("Failed to copy file: {$file}")
-            );
-        }
-    }
+if (!copy($entryPointSource, $publicContentPath . '/index.php')) {
+    abort_build(
+        ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage('Failed to write the site entry point (index.php)')
+    );
+}
+
+// The parameters the entry point reads. PROJECT_NAME is the REAL project id:
+// it names this site's browser-storage namespace (`qsp_<PROJECT_NAME>_<key>`)
+// and its theme key, so a built site claiming a different identity from the
+// same project at /p/<id>/ would read back none of the visitor's stored state.
+$siteConfigPhp = qs_site_config_php(
+    (string) PROJECT_NAME,
+    $buildPublicName,
+    $buildSecureName,
+    $buildPublicSpace
+);
+if (file_put_contents($publicContentPath . '/qs-site.php', $siteConfigPhp) === false) {
+    abort_build(
+        ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage('Failed to write the site parameters (qs-site.php)')
+    );
+}
+
+// The funnel, beside the content it serves.
+if (file_put_contents($publicContentPath . '/.htaccess', qs_site_htaccess($buildPublicSpace)) === false) {
+    abort_build(
+        ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage('Failed to write the request funnel (.htaccess)')
+    );
+}
+
+// With a URL space the content sits one or more levels below the document
+// root, so the funnel above covers /<space>/ and the root gets nothing at all.
+// Give the root its own guard, so a bare "/" does not answer with a listing of
+// the deployment's folders. It deliberately does not funnel: the root is not
+// this site's.
+if ($buildPublicSpace !== ''
+    && file_put_contents($publicBasePath . '/.htaccess', qs_site_root_htaccess()) === false) {
+    abort_build(
+        ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage('Failed to write the document-root .htaccess')
+    );
 }
 
 // SECURITY (C11 11.0) — the PUBLISH boundary. These two copies are the point
@@ -554,9 +512,17 @@ foreach ($classFiles as $file) {
 // projectLanguage.php: the single project-language detection point, required
 // by BOTH TrimParameters and Translator — omit it and a built site fatals on
 // its first page at a require_once, not at a translation lookup.
+// routeHelpers.php: the canonical ':name' ↔ '__name' mapping. The compiler
+// writes this build's page folders through it, so the entry point must READ
+// them through the same function — a second spelling is how a param route
+// stops resolving on one surface and keeps resolving on the other.
+// aliasRouting.php: URL aliases, applied by the /p/<id>/ renderer and by a
+// built site through one implementation.
 $functionFiles = [
     'String.php',
     'projectLanguage.php',
+    'routeHelpers.php',
+    'aliasRouting.php',
 ];
 
 foreach ($functionFiles as $file) {
@@ -835,7 +801,19 @@ foreach ($allRoutes as $route) {
     $compiledPages[] = $route;
 }
 
-// Step 6: Create README.txt with deployment instructions
+// Step 6: Create README.txt with deployment instructions.
+//
+// The URL space used to be absent from these instructions entirely: they said
+// "point your document root to <public>/" while the site actually lived one or
+// more levels below it, so a deployer following them exactly reached a root
+// that serves nothing.
+$spaceNote = $buildPublicSpace !== ''
+    ? "\n  This site is mounted under a URL SPACE: it answers at\n"
+    . "    http://your-domain/{$buildPublicSpace}/\n"
+    . "  The document root is still {$buildPublicName}/, and the site's own files\n"
+    . "  live in {$buildPublicName}/{$buildPublicSpace}/. A bare \"/\" is NOT this site.\n"
+    : '';
+
 $readme = <<<README
 =======================================================
 PRODUCTION BUILD - DEPLOYMENT INSTRUCTIONS
@@ -856,14 +834,20 @@ DEPLOYMENT STEPS:
    Example with a typical hosting layout:
      /home/user/htdocs/{$buildPublicName}/    <- document root
      /home/user/htdocs/{$buildSecureName}/    <- private, not web-accessible
+{$spaceNote}
 
 2. Permissions (should already be correct from the build):
    - Directories: 755
    - Files: 644
    - PHP must be able to read {$buildSecureName}/
 
-3. nginx only — .htaccess is not supported by nginx:
-   A ready-to-use config snippet is included:
+3. Apache: mod_rewrite must be enabled and the document root must allow
+   .htaccess to take effect (AllowOverride All, or at least FileInfo +
+   Options + Indexes). Without it the request funnel is ignored and every
+   page except the home page answers 404.
+
+   nginx: .htaccess is not read at all. A ready-to-use snippet describing
+   THIS site is included:
      {$buildSecureName}/nginx_routes.conf
    Add this inside your server { } block:
      include /path/to/{$buildSecureName}/nginx_routes.conf;
@@ -874,6 +858,10 @@ DEPLOYMENT STEPS:
    - Visit your domain
    - Check all pages load correctly
    - Test language switching (if multilingual)
+
+REQUIREMENTS:
+- PHP 8.0 or newer, with mod_php / php-fpm serving the document root
+- No PHP extensions beyond the defaults, no Composer, no database
 
 NOTES:
 - This is a production build (no management API included)
@@ -893,9 +881,16 @@ $readme = str_replace('%LANG_MODE%', $langMode, $readme);
 
 file_put_contents($buildFullPath . '/README.txt', $readme);
 
-// Step 6a: Generate nginx config snippet for nginx users
-require_once SECURE_FOLDER_PATH . '/src/functions/NginxConfig.php';
-$nginxConfig = generate_nginx_config($buildPublicSpace);
+// Step 6a: Generate nginx config snippet for nginx users.
+//
+// The BUILT SITE's config, not the install's. It used to call
+// generate_nginx_config() — the installer's own generator — so every build
+// shipped locations for /admin/, /management/, /admin/api/ and /p/, none of
+// which exist in a build, plus instructions to include a differently-named file
+// from a path that is not there and to define a named location "or every
+// project URL answers 500". A deployer must not be handed configuration for
+// namespaces that do not exist.
+$nginxConfig = qs_site_nginx_config($buildPublicName, $buildSecureName, $buildPublicSpace);
 file_put_contents($buildFullPath . '/' . $buildSecureName . '/nginx_routes.conf', $nginxConfig);
 
 // Step 6b: Create build manifest. Written LAST on purpose: its presence is
@@ -935,6 +930,44 @@ if ($buildSizeMB > $maxBuildSizeMB) {
                 'build_size_mb' => $buildSizeMB,
                 'max_size_mb' => $maxBuildSizeMB,
                 'note' => 'Increase MAX_BUILD_SIZE_MB in config.php if needed'
+            ])
+    );
+}
+
+// === CAN THIS BUILD SERVE A REQUEST? ===
+//
+// Asked before success is reported, because "the build completed" and "the
+// build can serve" were never the same claim and only the first was ever
+// checked. A build could write its pages, its styles and its assets, answer
+// 201 operation.success, and contain no entry point of any kind — with an
+// .htaccess funnelling every request to a file that was not there.
+//
+// The gate walks the request path: the funnel target, the parameters it reads,
+// the project data, the runtime the compiled pages require, the menu and
+// footer they pull in, every compiled route's page at the exact path routing
+// will compute for it, and the 404. Structural, not a render — rendering is
+// proven by serving the build — but it fails on exactly what used to pass.
+//
+// Placed AFTER the manifest so a build that fails here is already marked
+// complete-then-removed rather than half-marked, and it goes out through
+// abort_build() like every other failure: lock released, partial removed,
+// removal verified.
+$servabilityProblems = qs_site_verify_servable(
+    $buildFullPath,
+    $buildPublicName,
+    $buildSecureName,
+    $buildPublicSpace,
+    $compiledPages
+);
+
+if (!empty($servabilityProblems)) {
+    abort_build(
+        ApiResponse::create(500, 'server.internal_error')
+            ->withMessage('The build completed but cannot serve requests, so it was discarded')
+            ->withData([
+                'problems'       => $servabilityProblems,
+                'problems_count' => count($servabilityProblems),
+                'explanation'    => 'A build is pre-compiled pages plus the runtime that serves them. This one is missing part of the request path, so deploying it would produce a site that answers nothing.'
             ])
     );
 }
@@ -979,6 +1012,12 @@ ApiResponse::create(201, 'operation.success')
         'secure_folder_name' => $buildSecureName,
         'public_folder_space' => $buildPublicSpace,
         'config_sanitized' => true,
+        // The site's own front controller, its parameters and its request
+        // funnel — all three verified present and consistent before this
+        // response was allowed to be a success.
+        'entry_point_written' => true,
+        'entry_point_verified' => true,
+        'project_name' => (string) PROJECT_NAME,
         'menu_compiled' => file_exists($buildFullPath . '/' . $buildSecureName . '/templates/menu.php'),
         'footer_compiled' => file_exists($buildFullPath . '/' . $buildSecureName . '/templates/footer.php'),
         'scripts_copied' => file_exists($scriptsDir . '/qs.js'),

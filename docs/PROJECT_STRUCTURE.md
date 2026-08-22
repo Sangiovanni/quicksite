@@ -41,7 +41,10 @@ quicksite/
 │   ├── src/                      # Shared engine code
 │   │   ├── classes/              # Core classes (ApiResponse, JsonToHtmlRenderer,
 │   │   │                         #   JsonToPhpCompiler, CssParser, Translator, etc.)
-│   │   └── functions/            # Utility functions (auth, paths, logging, etc.)
+│   │   ├── functions/            # Utility functions (auth, paths, logging, etc.)
+│   │   └── runtime/              # What ships to a SITE rather than running the engine
+│   │       ├── qs.js             #   the browser runtime, copied into every build
+│   │       └── site/index.php    #   a built site's front controller, copied verbatim
 │   ├── projects/                 # Project data (one folder per project)
 │   │   └── quicksite/            # Default project
 │   │       ├── config.php        # Project config (languages, settings)
@@ -58,8 +61,11 @@ quicksite/
 │   │       │   ├── scripts/      #   generated qs-api-config / qs-enums / qs-route-schema
 │   │       │   └── sitemap.txt   #   published sitemap (generated)
 │   │       ├── qs_build/         # The project's build (generated, gitignored)
-│   │       │                     #   OUTSIDE public/, so no URL reaches it;
-│   │       │                     #   at most one build, fetched via downloadBuild
+│   │       │   └── <name>/       #   OUTSIDE public/, so no URL reaches it; at most one
+│   │       │                     #   build, fetched via downloadBuild. A self-contained
+│   │       │                     #   site: <public>/ (front controller, qs-site.php,
+│   │       │                     #   .htaccess, style, assets, scripts) beside <secure>/
+│   │       │                     #   (precompiled pages, runtime, translations)
 │   │       ├── snippets/         # Snippets belonging to this project alone
 │   │       ├── exports/          # This project's export ZIPs (generated)
 │   │       └── backups/          # Project backups (gitignored)
@@ -97,6 +103,7 @@ operator's own site.
 - **`public/`** is the only folder exposed to the web. Everything else is behind the firewall.
 - **`public/management/`** is the API gateway. Any client (admin panel, curl, Flutter app, custom UI) talks to QuickSite through this endpoint.
 - **The shared `qs.js` runtime is engine-owned** (`secure/src/runtime/qs.js`) and served to every project. It handles front-end features like show/hide triggers, filtering, fetches, and state stores. What lands in a project's own `public/scripts/` is generated per-project config — the `qs-api-config` / `qs-enums` / `qs-route-schema` trio.
+- **`secure/src/runtime/` is what ships to a site**, as opposed to `src/classes/` and `src/functions/`, which run the engine. `qs.js` is its browser half; `site/index.php` is its server half — the front controller a build copies verbatim into the site it produces. Neither is used by the install itself: the install's own web root is deliberately free of an entry point, so QuickSite never squats the domain.
 - **`secure/management/config/`** holds sensitive files (sessions, auth policy, the user registry) that are gitignored. `auth.php` and `roles.php` are auto-created from `.example` templates on first load; `users.php` is written when the first account is created.
 - **Projects** are fully isolated in `secure/projects/`. Each has its own pages, translations, routes, and assets, and each is served from its own folder under its own `/p/<projectId>/` view — no project is privileged. Change which one you are *editing* with `setSelectedProject` (the admin header picker).
 - **Snippets live in three tiers.** `secure/snippets/core/` ships with the engine and is read-only. `secure/snippets/custom/<userId>/` is one author's own library — private to them, and available to them in every project they work on. `secure/projects/<id>/snippets/` belongs to that project alone. See [COMMAND_API.md](COMMAND_API.md) for how a snippet is saved to each and how reads resolve between them.

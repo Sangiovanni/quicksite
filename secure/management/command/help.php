@@ -204,6 +204,9 @@ $GLOBALS['__help_commands'] = [
                 'build_path' => '<project>/qs_build/build_20251206_143022',
                 'build_size_mb' => 2.24,
                 'total_pages' => 7,
+                'entry_point_written' => true,
+                'entry_point_verified' => true,
+                'project_name' => 'myproject',
                 'download_with' => 'downloadBuild'
             ]
         ],
@@ -215,9 +218,9 @@ $GLOBALS['__help_commands'] = [
             '409.conflict.operation_in_progress' => 'Another build is already running',
             '413.validation.size_limit_exceeded' => 'Build exceeds MAX_BUILD_SIZE_MB',
             '500.server.file_write_failed' => 'Failed to create build directory or copy files',
-            '500.server.internal_error' => 'Build compilation failed'
+            '500.server.internal_error' => 'Build compilation failed, OR the finished build cannot serve requests and was discarded (data.problems names what is missing)'
         ],
-        'notes' => 'Compiles JSON templates to PHP using JsonToPhpCompiler. Output goes to qs_build/<name>/ inside the project - OUTSIDE its public/, so no URL reaches a build; downloadBuild is the only way to fetch one. RETENTION IS ONE BUILD PER PROJECT: a second build is refused rather than overwriting the first, so use deleteBuild between builds. A build that FAILS removes its own partial directory; if that removal also fails the leftover carries no build_manifest.json and getBuild reports it as incomplete. No ZIP is stored - downloadBuild archives the folder on demand. The "space" parameter controls PUBLIC_FOLDER_SPACE - when set (e.g., "web"), all public files go inside {public}/{space}/ creating access URL like http://site.com/web/. Public and secure folders MUST have different root directories for security. Secure folder restricted to single name (no nesting) for init.php compatibility. Uses file locking to prevent concurrent builds.'
+        'notes' => 'Compiles JSON templates to PHP using JsonToPhpCompiler and emits a self-contained single-project site: a front controller, the parameters it reads, an .htaccess that funnels requests into it, and the small runtime the compiled pages need. Before answering success the command checks that the finished build can actually serve - funnel target, parameters, project data, runtime, menu/footer, every route reachable at the path routing will compute, and the 404 - and DISCARDS the build with a 500 if any of that is missing. Output goes to qs_build/<name>/ inside the project - OUTSIDE its public/, so no URL reaches a build; downloadBuild is the only way to fetch one. RETENTION IS ONE BUILD PER PROJECT: a second build is refused rather than overwriting the first, so use deleteBuild between builds. A build that FAILS removes its own partial directory; if that removal also fails the leftover carries no build_manifest.json and getBuild reports it as incomplete. No ZIP is stored - downloadBuild archives the folder on demand. The "space" parameter controls PUBLIC_FOLDER_SPACE - when set (e.g., "web"), all public files go inside {public}/{space}/ creating access URL like http://site.com/web/, and the document root gets its own non-browsable .htaccess since the site is not there. Public and secure folders MUST have different root directories for security. The built site stores visitor state under the REAL project id, so it shares a browser-storage namespace with the same project served at /p/<projectId>/. Uses file locking to prevent concurrent builds.'
     ],
     
     'getBuild' => [

@@ -955,19 +955,105 @@ Development and production are the two ends of one project's life: a project is
 authored and previewed at `/p/<projectId>/` on the install's own hostname for as
 long as it exists, and reaches the public as a build with its own deployment.
 
-Build steps, in order:
+### 10.1 What a built site is made of
 
-1. Acquire build lock (one at a time).
-2. Validate output names and free space.
-3. Create the build directory.
-4. Compile every page JSON → PHP via `JsonToPhpCompiler`.
-5. Compile menu and footer the same way.
-6. Build interactions JS if the project uses them.
-7. Copy `assets/` and `style/`.
-8. Sanitise `config.php` (strip credentials).
-9. Generate an `init.php` adjusted for the renamed public/secure folders.
-10. Write the build under the project's own `qs_build/<name>/`.
-11. Return build stats.
+```
+your-server/
+├── <public>/[<space>/]        document root — the site answers from here
+│   ├── index.php              the front controller
+│   ├── qs-site.php            its four parameters (project id, folder names, space)
+│   ├── .htaccess              funnels every non-file request into index.php
+│   └── style/  assets/  scripts/  sitemap.txt
+└── <secure>/                  sibling, never web-accessible
+    ├── config.php  routes.php  data/aliases.json  nginx_routes.conf
+    ├── src/classes/    Page, Translator, TrimParameters, RegexPatterns
+    ├── src/functions/  String, projectLanguage, routeHelpers, aliasRouting
+    ├── templates/menu.php  templates/footer.php
+    ├── templates/pages/<route>/<leaf>.php   one precompiled page per route
+    └── translate/
+```
+
+**The front controller is a real file, shipped verbatim.** It lives in the
+engine at `src/runtime/site/index.php` — the same directory as `qs.js`, which
+is the browser half of the same idea: code that runs on a *site* rather than in
+the engine. The build copies it and writes `qs-site.php` beside it; no PHP
+source is rewritten by pattern matching, so the entry point can be linted,
+grepped and opened on its own instead of existing only inside a build.
+
+`qs-site.php` is PHP rather than a data file because it sits in the document
+root: PHP is executed and never served as text, so the secure folder's name
+stays out of reach. A direct request for it answers 404.
+
+An install has no equivalent file, and that is deliberate rather than an
+omission — an install's web root is free so a user's own site can occupy the
+domain and QuickSite stays inside its namespaces, while a built site *is* the
+whole site at its root. The two answer opposite questions.
+
+The front controller derives its paths from its own location, not from
+`DOCUMENT_ROOT`: the build created the layout, so the depth is known. Every URL
+the site emits composes against a root-relative base built from the URL space,
+which survives a domain move, a scheme change and a reverse proxy.
+
+### 10.2 Build steps, in order
+
+Before the lock:
+
+1. Read and validate `name`, `public`, `secure`, `space` (type, length, allowed
+   characters, at most five levels).
+2. Refuse when the public and secure root segments are the same directory.
+3. Confirm the source public and secure folders exist.
+4. Refuse when the project already has a build; otherwise settle the build
+   folder name.
+5. Acquire the build lock, scoped to that name.
+
+Then:
+
+6. Create the build directory and its skeleton.
+7. **Emit the entry point** — copy `src/runtime/site/index.php`, write
+   `qs-site.php`, write the `.htaccess` that funnels requests into it, and,
+   when a URL space is set, a second `.htaccess` at the document root so the
+   root is not browsable.
+8. Copy `style/` and `assets/` through the **publish allowlist** — the boundary
+   where a file stops being project data and becomes something a web server
+   hands to the public.
+9. Copy `LICENSE`, and `sitemap.txt` when the project has one.
+10. Copy `routes.php` and `config.php`, the four runtime classes, the four
+    runtime function files, the translations (all languages when the project is
+    multilingual, `default.json` otherwise) and `data/aliases.json`.
+11. Compile `menu.php` and `footer.php`.
+12. Write `qs-api-config.js`, `qs-route-schema.js` and `qs-enums.js`, and copy
+    `qs.js`.
+13. Load the project's page events and state stores, which compile inline into
+    the pages that use them.
+14. Compile the 404 page, then every route, via `JsonToPhpCompiler`. Param
+    segments are written as `__name` folders, because a filesystem cannot hold
+    the `:` that `routes.php` uses.
+15. Write `README.txt` with deployment instructions, and `nginx_routes.conf`
+    describing **this site** for servers that do not read `.htaccess`.
+16. Write `build_manifest.json` — last, so its presence marks the build
+    complete.
+17. Refuse the build if it exceeds `MAX_BUILD_SIZE_MB`.
+18. **Check that the build can serve** (§10.3).
+19. Release the lock and return build stats.
+
+Interactions do not get their own artifact: they compile into each page's
+`on*` attributes and ride the shared `qs.js`.
+
+### 10.3 A build that cannot serve is not a success
+
+Completing and being servable are different claims, and the command checks the
+second one before answering. It walks the request path over the finished tree:
+the file the `.htaccess` funnels to, the parameters that file reads, the
+project's `config.php` and `routes.php`, the runtime the compiled pages
+require, the menu and footer they pull in, every compiled route's page at the
+exact path routing will compute for it — asked through the same helper the
+compiler used to write it, so reader and writer cannot drift — and the 404
+page, because a wrong URL is a request too.
+
+Anything missing makes the build a `500` whose `data.problems` names it, and
+the partial directory is removed like any other failure. The check is
+structural: it proves the request path is complete, not that a given page
+renders.
 
 **Where a build lives, and how it is fetched.** The output goes to
 `secure/projects/<id>/qs_build/<name>/` — outside the project's `public/`, which
@@ -984,7 +1070,17 @@ removes its own partial directory; if that removal also fails, the leftover
 carries no `build_manifest.json` — written last, precisely so its absence marks
 an unfinished build — and `getBuild` reports it as incomplete.
 
-Deploy is a separate command (`deployBuild`) that copies the build folder into a target path. The renamed `public/` and `secure/` folders are part of the security model — anyone scanning the deployed server cannot guess paths from the open-source repo layout.
+**Renaming the folders is part of the security model** — anyone scanning the
+deployed server cannot guess paths from the open-source repo layout — so the
+names have to hold everywhere, not only in the directory listing. They reach
+the front controller as data, the compiled pages compose every internal path
+from the constants it defines rather than naming a folder, and the one file in
+the document root that knows the secure folder's name is PHP, so it is executed
+instead of read. A URL space works the same way: the site answers under it, its
+`.htaccess` funnels only under it, and every link, asset and script URL the page
+emits carries it.
+
+Deploy is a separate command (`deployBuild`) that copies the build folder into a target path.
 
 ---
 

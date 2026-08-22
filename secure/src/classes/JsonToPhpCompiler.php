@@ -177,16 +177,23 @@ class JsonToPhpCompiler {
         $output = "// System variables for {{__placeholder}} support\n";
         $output .= "\$__current_page = trim(parse_url(\$_SERVER['REQUEST_URI'], PHP_URL_PATH), '/');\n\n";
         
-        // Remove PUBLIC_FOLDER_SPACE prefix
+        // Remove PUBLIC_FOLDER_SPACE prefix, then the language prefix.
+        //
+        // The emitted patterns end `\/` — an escaped SLASH, the delimiter. They
+        // used to be emitted with an escaped BACKSLASH, so every one of them
+        // matched a literal backslash and stripped nothing: on a built site
+        // with a URL space or a language segment, {{__current_page}} kept the
+        // prefix it exists to remove. Nothing in a source install noticed,
+        // because this code is only ever written into a build.
         $output .= "if (defined('PUBLIC_FOLDER_SPACE') && PUBLIC_FOLDER_SPACE !== '') {\n";
-        $output .= "    \$__current_page = preg_replace('/^' . preg_quote(PUBLIC_FOLDER_SPACE, '/') . '\\\\\\\\/', '', \$__current_page);\n";
+        $output .= "    \$__current_page = preg_replace('/^' . preg_quote(trim(PUBLIC_FOLDER_SPACE, '/'), '/') . '\\\\//', '', \$__current_page);\n";
         $output .= "}\n\n";
-        
+
         // Remove language prefix
         $output .= "if (defined('CONFIG') && isset(CONFIG['LANGUAGES_SUPPORTED'])) {\n";
-        $output .= "    \$__current_page = preg_replace('/^(' . implode('|', CONFIG['LANGUAGES_SUPPORTED']) . ')\\\\\\\\/', '', \$__current_page);\n";
+        $output .= "    \$__current_page = preg_replace('/^(' . implode('|', array_map(function (\$l) { return preg_quote(\$l, '/'); }, CONFIG['LANGUAGES_SUPPORTED'])) . ')\\\\//', '', \$__current_page);\n";
         $output .= "} else {\n";
-        $output .= "    \$__current_page = preg_replace('/^(en|fr)\\\\\\\\/', '', \$__current_page);\n";
+        $output .= "    \$__current_page = preg_replace('/^(en|fr)\\\\//', '', \$__current_page);\n";
         $output .= "}\n\n";
         $output .= "\$__current_page = empty(\$__current_page) ? '' : \$__current_page;\n";
         // Every variable emitted here REPORTS a value. None of them composes a

@@ -8715,3 +8715,156 @@ refusal), `getBuild.php`, `deleteBuild.php`, `downloadBuild.php`,
 `secure/src/functions/utilsManagement.php`. [COMMAND_API.md](COMMAND_API.md),
 [ARCHITECTURE.md §10](ARCHITECTURE.md). Sangio's ruling, design conversation
 2026-08-21.
+
+---
+
+### A built site's entry point is a checked-in file, copied and parameterised with data (locked 2026-08-22)
+
+**Decision**: The front controller of a built site lives in the repository at
+`secure/src/runtime/site/index.php`. `build` copies it verbatim and writes one
+small generated file beside it, `qs-site.php`, carrying the four values that
+differ between builds: the project id, the public and secure folder names, and
+the URL space. No PHP source is rewritten by pattern matching. The `.htaccess`
+and the nginx snippet are generated text, because a web server reads them before
+any code runs and they cannot consult a parameter file.
+
+**Reasoning**: A checked-in entry point can be linted, grepped, opened and
+tested on its own. A regex-patched one is invisible until somebody runs a build
+*and serves it* — which is exactly how a build could answer
+`201 operation.success` for a long time while emitting no entry point at all.
+The command read `index.php`, `init.php` and `.htaccess` from the project's own
+`public/`, behind a `file_exists()` guard; no project has ever held an
+`index.php` or `init.php` there, so the guard skipped both silently. It then
+rewrote a `PROJECT_PATH` block inside the copied `init.php` that had since moved
+into `qs_load_project_context()`, so all four constant patches matched nothing.
+
+There was no source to copy and no block to patch, and the reason is structural
+rather than accidental: **a QuickSite install has no root entry point either.**
+Its web root is deliberately free — no `FallbackResource`, no index — so a
+user's own hand-made site can live at the domain root and QuickSite never squats
+it; the engine lives in namespaced directories, each with its own `.htaccess`. A
+built site is the opposite case: it *is* the whole site at its root, and every
+request must funnel into it. Copy-and-patch was trying to derive one artifact
+from another that answers the opposite question.
+
+**Where it lives.** `src/runtime/` already means "what ships to a site rather
+than what runs the engine" — `qs.js` is its browser half, and the front
+controller is its server half. `src/classes/` and `src/functions/` are engine
+code that a build only partly carries; a command's directory would tie a shipped
+artifact to one command's private detail.
+
+**Why the parameters are PHP and not JSON.** Project data defaults to JSON, but
+this file sits in the document root, so a data file would be fetchable and would
+hand out the secure folder's name — the one thing the folder renaming exists to
+keep out of reach of anyone comparing a deployment against the open-source
+layout. PHP is executed and never served as text, and a guard makes a direct
+request answer 404 rather than a blank 200. It is also not the author's website
+data; it is plumbing.
+
+**The parameters have to reach the PHP, not only the directory names.** The
+renaming is a security property, so it holds in the front controller (which
+reads the folder names as data), in the compiled pages (which compose every
+internal path from constants rather than naming a folder), and in the URL space
+(which prefixes every link, asset and script URL the page emits). A site mounted
+under a space also gets a second, non-funnelling `.htaccess` at the document
+root, because the funnel covers only the space and a bare `/` would otherwise be
+browsable.
+
+**Alternatives considered**: generating the entry point from a template string
+in the command (rejected — same invisibility as patching: the artifact only
+exists inside a build); discovering the secure folder by probing parent
+directories (rejected — filesystem probes on every request, ambiguous when a
+deployment holds more than one candidate, and it cannot discover the project id
+at all, which forces a parameter file regardless); deriving paths from
+`DOCUMENT_ROOT` as the install does (rejected — the install must, because it
+cannot know its own depth; a build created its layout and knows it exactly, so
+deriving from the file's own location survives an oddly-configured document root
+and a moved tree); a JSON sidecar protected by an `.htaccess` deny rule
+(rejected — depends on per-server configuration to keep a secret that PHP keeps
+for free).
+
+**Source**: `secure/src/runtime/site/index.php`,
+`secure/src/functions/buildSiteRuntime.php`,
+`secure/management/command/build.php` (step 2).
+[ARCHITECTURE.md §10](ARCHITECTURE.md), [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md).
+Sangio's ruling, design conversation during beta.11.
+
+---
+
+### A build that cannot serve does not answer success (locked 2026-08-22)
+
+**Decision**: Before `build` reports `201`, it checks that the finished tree can
+answer a request: the file the `.htaccess` funnels to, that file's parameters,
+`config.php` and `routes.php`, the runtime the compiled pages require, the menu
+and footer they pull in, every compiled route's page at the exact path routing
+will compute for it, and the 404 page. Anything missing makes the build a `500`
+whose `data.problems` names it, discarded through the same cleanup path as every
+other failure. The check is structural — it proves the request path is complete,
+not that a given page renders.
+
+**Reasoning**: "The build completed" and "the build can serve" were never the
+same claim, and only the first was ever checked. A build could write its pages,
+its styles and its assets, answer `201 operation.success`, and contain no entry
+point of any kind — with an `.htaccess` funnelling every request to a file that
+was not there. Reporting success is what kept that invisible; a command that
+answers `201` is not re-examined.
+
+The route check asks the **same helper the compiler used to write the page**
+for the filesystem form of each route path. Reader and writer sharing one
+function is what makes the check meaningful for parameterised routes, where
+`routes.php` says `:name` and the filesystem says `__name`: a second spelling of
+that translation would let the gate agree with a layout the front controller
+cannot read.
+
+**Alternatives considered**: rendering a page in-process (rejected — the built
+site defines the same constants the builder already holds, so it would either
+collide or silently read the builder's values); rendering through a PHP
+subprocess (rejected — a web request spawning an interpreter it has to locate,
+on hosting that may forbid it, to prove something a structural walk already
+proves); trusting the manifest as a completeness marker (rejected — the manifest
+already existed and a build with no entry point still wrote one; it marks
+"finished", not "servable").
+
+**Source**: `secure/src/functions/buildSiteRuntime.php`
+(`qs_site_verify_servable`), `secure/management/command/build.php`.
+[ARCHITECTURE.md §10](ARCHITECTURE.md), [COMMAND_API.md](COMMAND_API.md).
+
+---
+
+### URL aliases are applied by one function on both surfaces (locked 2026-08-22)
+
+**Decision**: Alias resolution lives in
+`secure/src/functions/aliasRouting.php` and is called by the `/p/<projectId>/`
+renderer and by a built site's front controller. The file travels into builds
+alongside the other runtime helpers. A redirect alias composes its `Location`
+against the site's public base; an internal alias composes the rewritten
+`REQUEST_URI` against the URL space.
+
+**Reasoning**: Two surfaces serve the same project's pages, and an alias that
+resolves on one and 404s on the other is the "works in preview, broken in
+production" split in its purest form — which is what a built site did, because
+alias handling lived only in the renderer's own entry point.
+
+**The two outcomes compose against different bases, and conflating them is what
+made the redirect wrong.** A redirect is a URL the *browser* will request, so it
+belongs to the site's public base — `/p/<projectId>/` on the renderer, the URL
+space in a build. A rewrite is a value the *router* reads back out of
+`REQUEST_URI`, and the router strips only the URL space. Sharing one prefix for
+both sent renderer redirects out of the project's namespace entirely.
+
+Two further defects were fixed in the move, both reachable: the language prefix
+was read from `CONFIG['DEFAULT_LANGUAGE']`, a key no project config holds (it is
+`LANGUAGE_DEFAULT`), so on a multilingual project reached without a language in
+the URL the prefix came out empty and the `Location` became protocol-relative —
+`//home`, which a browser resolves as a different **host**; and the redirect
+half omitted the URL space that the rewrite half included.
+
+**Alternatives considered**: duplicating the block into the built site's entry
+point (rejected — it is the divergence this exists to prevent, and it would have
+carried both defects into a second place); returning a description of the match
+and letting each caller act on it (rejected — both callers want identical
+behaviour, so the shared part would have been the lookup and the divergent part
+would have been the half that was already wrong).
+
+**Source**: `secure/src/functions/aliasRouting.php`, `public/p/index.php`,
+`secure/src/runtime/site/index.php`.
