@@ -61,7 +61,6 @@ class CommandRunner {
         'listStyleRules',
         // Read-only: assets & builds
         'listAssets',
-        'listBuilds',
         'getBuild',
         // Read-only: system info
         'help',

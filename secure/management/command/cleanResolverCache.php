@@ -26,8 +26,8 @@
  *                                      (@apiId/endpointId) to clear.
  *                                      Most surgical option.
  *
- * Mirrors cleanBuilds's surface (no params = housekeeping; richer params
- * for targeted sweeps). Mutually-exclusive priority order:
+ * Surface shape: no params = housekeeping, richer params for targeted
+ * sweeps. Mutually-exclusive priority order:
  *   1. endpoint (most specific)
  *   2. apiId
  *   3. before / all

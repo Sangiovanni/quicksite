@@ -12,7 +12,7 @@
  * - templates/model/json/ (JSON structures only)
  * - translate/*.json
  * - data/*.json
- * - public/assets/, public/style/, public/build/
+ * - public/assets/, public/style/
  * 
  * @method GET
  * @route /management/exportProject
@@ -336,8 +336,13 @@ function addJsonFilesOnly(ZipArchive $zip, string $dir, string $zipBase, array &
  * Add public assets to ZIP (images, CSS, JS - no PHP)
  */
 function addPublicAssetsToZip(ZipArchive $zip, string $dir, string $zipBase, array &$stats): void {
-    // Allowed folders in public/
-    $allowedFolders = ['assets', 'style', 'build'];
+    // Allowed folders in public/.
+    //
+    // 'build' is GONE from this list, and its removal is the point rather than an
+    // omission: builds no longer live under public/ at all, and while they did,
+    // every export carried every build. Exports are dramatically smaller now and
+    // carry only what an export is for — the project's own content.
+    $allowedFolders = ['assets', 'style'];
     
     foreach ($allowedFolders as $folder) {
         $folderPath = $dir . '/' . $folder;

@@ -20,11 +20,6 @@
             "default": ""
         },
         {
-            "id": "buildExists",
-            "type": "hidden",
-            "default": "false"
-        },
-        {
             "id": "publicFolder",
             "type": "text",
             "labelKey": "workflows.specs.buildAndDeploy.params.publicFolder.label",
@@ -79,37 +74,20 @@
             "default": false
         }
     ],
-    "loadPreset": {
-        "command": "listBuilds",
-        "dataPath": "builds",
-        "labelKey": "workflows.specs.buildAndDeploy.loadPreset.label",
-        "placeholderKey": "workflows.specs.buildAndDeploy.loadPreset.placeholder",
-        "valueField": "name",
-        "setParam": "buildExists",
-        "fieldMap": {
-            "buildName": "name",
-            "publicFolder": "public",
-            "secureFolder": "secure",
-            "spaceFolder": "space"
-        }
-    },
     "relatedCommands": ["build", "deployBuild", "deleteBuild"],
     "steps": [
         {
-            "comment": "=== PHASE 0: DELETE EXISTING BUILD (optional) ===",
+            "comment": "=== PHASE 0: DELETE THE EXISTING BUILD (optional) — build refuses while one exists ===",
             "command": "deleteBuild",
-            "method": "DELETE",
+            "method": "POST",
             "condition": "param.deletePrevious === true",
             "abortOnFail": false,
-            "params": {
-                "name": "{{param.buildName}}"
-            }
+            "params": {}
         },
         {
-            "comment": "=== PHASE 1: BUILD (skip if using existing build) ===",
+            "comment": "=== PHASE 1: BUILD — 409s if a build already exists and PHASE 0 was skipped ===",
             "command": "build",
             "method": "POST",
-            "condition": "param.buildExists !== true",
             "abortOnFail": true,
             "params": {
                 "name": "{{param.buildName}}",

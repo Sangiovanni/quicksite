@@ -105,10 +105,9 @@ function __command_clearExports(array $params = [], array $urlParams = []): ApiR
     // archive was gone while it was still on disk and still readable. Reproduced
     // live in 13.4 against a genuinely undeletable file.
     //
-    // The shape follows the two sibling sweeps in this tree rather than
-    // inventing a third: `deleteBuild` and `cleanBuilds` answer 207
-    // operation.partial_success when part of a set survives, and `deleteBuild`
-    // answers 5xx when NOTHING was deleted. Same here.
+    // The shape follows the sibling sweep in this tree rather than inventing
+    // its own: `cleanOrphanTranslations` answers 207 operation.partial_success
+    // when part of a set survives. Nothing deleted at all is a 5xx. Same here.
     if (!empty($failed)) {
         $errors = array_map(static function (string $name): array {
             return ['file' => $name, 'reason' => 'delete_failed'];

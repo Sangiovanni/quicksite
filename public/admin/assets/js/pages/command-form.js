@@ -149,9 +149,10 @@ async function initEnhancedFeatures() {
         case 'setKeyframes':
             await initSetKeyframesForm();
             break;
-        case 'getBuild':
-        case 'deleteBuild':
-        case 'downloadBuild':
+        // deployBuild ONLY. getBuild / deleteBuild / downloadBuild stopped
+        // taking a build name when retention went to one build per project:
+        // there is nothing to pick between, so they render with no name field
+        // and this picker would have had nothing to put in it.
         case 'deployBuild':
             await initBuildSelectForm();
             break;
@@ -995,7 +996,10 @@ async function initEditTitleForm() {
 }
 
 /**
- * Initialize build select form (getBuild, deleteBuild, downloadBuild)
+ * Initialize the build-name select (deployBuild).
+ *
+ * At one build per project this is a 0-or-1 option list, and deployBuild is the
+ * only command still named against a specific build.
  */
 async function initBuildSelectForm() {
     const form = document.getElementById('command-form');
@@ -1006,14 +1010,14 @@ async function initBuildSelectForm() {
         nameSelect.name = 'name';
         nameSelect.className = 'admin-select';
         nameSelect.required = nameInput.required;
-        // Preserve data-url-param attribute if present (for GET commands like getBuild, downloadBuild)
+        // Preserve data-url-param attribute if present (for GET commands)
         if (nameInput.dataset.urlParam !== undefined) {
             nameSelect.dataset.urlParam = '';
         }
         nameInput.replaceWith(nameSelect);
         await QuickSiteAdmin.populateSelect(nameSelect, 'builds', [], 'Select build...');
 
-        // Refresh build list after successful delete
+        // Refresh after a delete performed elsewhere in the panel.
         form.addEventListener('command-success', async (e) => {
             if (e.detail.command === 'deleteBuild') {
                 await QuickSiteAdmin.populateSelect(nameSelect, 'builds', [], 'Select build...');
@@ -3137,6 +3141,19 @@ function renderCommandForm(doc) {
     methodBadge.textContent = method;
     methodBadge.className = 'badge badge--' + method.toLowerCase();
     form.dataset.method = method;
+
+    // Commands that answer BYTES rather than a JSON envelope (downloadBuild,
+    // downloadExport) are declared as such in help.php with the code 'binary'.
+    // The executor reads this flag and saves the response as a file instead of
+    // parsing it — without it the page reads a ZIP as text, fails to parse it,
+    // and prints megabytes of mangled binary into the response panel.
+    // Driven by the spec, not by a list of command names, so declaring a new
+    // streaming command in help.php is all that is needed.
+    if (doc.success_response && doc.success_response.code === 'binary') {
+        form.dataset.binaryResponse = '1';
+    } else {
+        delete form.dataset.binaryResponse;
+    }
     
     // Generate form fields
     const params = doc.parameters || {};

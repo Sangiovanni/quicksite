@@ -313,22 +313,20 @@ Shows a dropdown that loads existing data into the parameter form. Useful for "e
 
 ```json
 "loadPreset": {
-    "command": "listBuilds",
-    "dataPath": "builds",
-    "labelKey": "workflows.specs.buildAndDeploy.loadPreset.label",
-    "placeholderKey": "workflows.specs.buildAndDeploy.loadPreset.placeholder",
+    "command": "listBackups",
+    "dataPath": "backups",
+    "labelKey": "workflows.specs.restoreBackup.loadPreset.label",
+    "placeholderKey": "workflows.specs.restoreBackup.loadPreset.placeholder",
     "valueField": "name",
-    "setParam": "buildExists",
+    "setParam": "backupExists",
     "fieldMap": {
-        "buildName": "name",
-        "publicFolder": "public",
-        "secureFolder": "secure"
+        "backupName": "name"
     }
 }
 ```
 
 - `command` — API endpoint to call for the preset list
-- `dataPath` — path in the response to the items array (e.g., `"builds"`)
+- `dataPath` — path in the response to the items array (e.g., `"backups"`)
 - `valueField` — field used as the unique identifier in each item
 - `setParam` — hidden parameter toggled to `"true"` when a preset is selected
 - `fieldMap` — maps form parameter IDs to data fields (fills the form on selection)

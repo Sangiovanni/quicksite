@@ -1367,10 +1367,6 @@
                         "label": "Overwrite existing files",
                         "help": "If checked, existing files at the target path will be replaced. Otherwise the deploy will abort if conflicts are found."
                     }
-                },
-                "loadPreset": {
-                    "label": "Load an existing build",
-                    "placeholder": "-- New build (default) --"
                 }
             },
             "freshStart": {

@@ -122,7 +122,7 @@ const QS_API_ARM_COMMANDS = [
     'routes'                   => ['getRoutes'],
     'languages'                => ['getLangList'],
     'assets'                   => ['listAssets'],
-    'builds'                   => ['listBuilds'],
+    'builds'                   => ['getBuild'],
     'aliases'                  => ['listAliases'],
     'translation-keys'         => ['getTranslation'],
     'translation-full'         => ['getTranslation'],
@@ -382,20 +382,30 @@ switch ($action) {
         break;
         
     case 'builds':
-        // Return list of builds
-        $result = makeInternalApiCall('listBuilds');
+        // The project's build, as a 0-or-1 option list.
+        //
+        // Sourced from getBuild since retention went to one build per project and
+        // listBuilds was deleted. Only deployBuild still names a build, so this arm
+        // exists for that one picker; getBuild / deleteBuild / downloadBuild take no
+        // name at all any more. A 404 here means "no build yet", which is an empty
+        // list rather than an error the form should show.
+        $result = makeInternalApiCall('getBuild');
         if ($result['success']) {
-            $buildsData = $result['data']['builds'] ?? [];
-            $builds = array_map(function($build) {
-                // Handle both array and object formats
-                $name = is_array($build) ? $build['name'] : (isset($build->name) ? $build->name : $build);
-                // Size is in folder_size_mb or zip_size_mb fields
-                $folderSize = is_array($build) ? ($build['folder_size_mb'] ?? null) : (isset($build->folder_size_mb) ? $build->folder_size_mb : null);
-                $zipSize = is_array($build) ? ($build['zip_size_mb'] ?? null) : (isset($build->zip_size_mb) ? $build->zip_size_mb : null);
-                $sizeStr = $folderSize !== null ? $folderSize . ' MB' : ($zipSize !== null ? $zipSize . ' MB (zip)' : 'Unknown');
-                return ['value' => $name, 'label' => $name . ' (' . $sizeStr . ')'];
-            }, $buildsData);
+            $build = $result['data'] ?? [];
+            $name  = is_array($build) ? ($build['name'] ?? null) : null;
+            $builds = [];
+            if ($name !== null) {
+                $sizeMb   = is_array($build) ? ($build['size_mb'] ?? null) : null;
+                $complete = is_array($build) ? ($build['complete'] ?? true) : true;
+                $label    = $name . ($sizeMb !== null ? ' (' . $sizeMb . ' MB)' : '');
+                if (!$complete) {
+                    $label .= ' - INCOMPLETE';
+                }
+                $builds[] = ['value' => $name, 'label' => $label];
+            }
             echo json_encode(['success' => true, 'data' => $builds]);
+        } elseif (($result['status'] ?? 0) === 404) {
+            echo json_encode(['success' => true, 'data' => []]);
         } else {
             echo json_encode(['success' => false, 'error' => $result['error'] ?? 'Unknown error']);
         }
@@ -942,7 +952,7 @@ default:
 /**
  * Execute a management command directly in-process (no HTTP call).
  * 
- * Parses endpoint like "listBuilds" or "getTranslation/en" or "getStructure/page/home/showIds"
+ * Parses endpoint like "getBuild" or "getTranslation/en" or "getStructure/page/home/showIds"
  * into command name + URL params, then calls the __command_* function directly.
  */
 function makeInternalApiCall(string $endpoint): array {
@@ -990,7 +1000,14 @@ function makeInternalApiCall(string $endpoint): array {
             return ['success' => true, 'data' => $data ?? []];
         }
         
-        return ['success' => false, 'error' => $response->toArray()['message'] ?? 'Command error'];
+        // 'status' is carried so a caller can tell a MEANINGFUL non-2xx from a
+        // broken one — the builds arm needs "404, there is no build yet" (an empty
+        // picker) to be distinguishable from a genuine failure (an error).
+        return [
+            'success' => false,
+            'status'  => $status,
+            'error'   => $response->toArray()['message'] ?? 'Command error'
+        ];
     } catch (\Throwable $e) {
         // beta.10 C12 12.5. This relay is the one path-leak site that does NOT
         // go through ApiResponse, so the central scrub cannot see it — and PHP's

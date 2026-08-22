@@ -1,87 +1,66 @@
 <?php
 /**
- * getBuild - Returns detailed information for a specific build
- * 
+ * getBuild - Returns the project's build
+ *
  * @method GET
- * @url /management/getBuild/{name}
+ * @url /management/getBuild
  * @auth required
  * @permission read
- * 
- * URL Parameters:
- * - name: Build folder name (e.g., build_20251213_185955)
- * 
- * Returns full manifest data plus file listings and download URL
+ *
+ * Takes no parameters. Retention is N = 1, so a project has one build or none,
+ * and this command reports whichever it is. It replaces the old listBuilds:
+ * a 0-or-1 element array carried strictly less than this does.
+ *
+ * Reports COMPLETENESS. build_manifest.json is written last, so its absence
+ * means the build did not finish. `build` removes its own partial on failure,
+ * but if that removal itself fails the survivor is reported here as incomplete
+ * rather than passing for a usable build.
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
-require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 
 /**
  * Command function for internal execution via CommandRunner
- * 
+ *
  * @param array $params Body parameters (unused for this command)
- * @param array $urlParams URL segments - [0] = build name
+ * @param array $urlParams URL segments (unused for this command)
  * @return ApiResponse
  */
 function __command_getBuild(array $params = [], array $urlParams = []): ApiResponse {
-    $buildName = $urlParams[0] ?? null;
+    $buildName = qs_build_current();
 
-    // Validate build name is provided
-    if (empty($buildName)) {
-        return ApiResponse::create(400, 'validation.required')
-            ->withMessage('Build name is required')
-            ->withErrors([
-                ['field' => 'name', 'reason' => 'missing', 'usage' => 'GET /management/getBuild/{name}']
-            ]);
-    }
-
-    // Validate build name format
-    if (!RegexPatterns::match('build_name', $buildName)) {
-        return ApiResponse::create(400, 'validation.invalid_format')
-            ->withMessage('Invalid build name format')
-            ->withErrors([RegexPatterns::validationError('build_name', 'name', $buildName)]);
-    }
-
-    $buildPath = PUBLIC_CONTENT_PATH . '/build';
-    $buildFolder = $buildPath . '/' . $buildName;
-
-    // Check if build folder exists
-    if (!is_dir($buildFolder)) {
+    if ($buildName === null) {
         return ApiResponse::create(404, 'build.not_found')
-            ->withMessage('Build not found')
+            ->withMessage('This project has no build')
             ->withData([
-                'requested_build' => $buildName,
-                'build_directory' => $buildPath
+                'exists' => false,
+                'hint'   => 'Run build to create one.'
             ]);
     }
 
-    $manifestPath = $buildFolder . '/build_manifest.json';
-    $zipPath = $buildPath . '/' . $buildName . '.zip';
+    $buildFolder = qs_build_path($buildName);
+    $complete    = qs_build_is_complete($buildName);
 
-    // Build response data
     $buildData = [
-        'name' => $buildName,
-        'path' => $buildFolder,
-        'has_manifest' => file_exists($manifestPath),
-        'has_zip' => file_exists($zipPath)
+        'exists'   => true,
+        'name'     => $buildName,
+        'path'     => $buildFolder,
+        'complete' => $complete
     ];
 
-    // Load manifest if available
-    if (file_exists($manifestPath)) {
-        $manifest = json_decode(file_get_contents($manifestPath), true);
-        if ($manifest) {
+    // Merge the manifest when the build finished. A build with no manifest has
+    // no trustworthy metadata to report, so nothing is invented for it.
+    if ($complete) {
+        $manifest = json_decode((string) file_get_contents($buildFolder . '/build_manifest.json'), true);
+        if (is_array($manifest)) {
             $buildData = array_merge($buildData, $manifest);
         }
     } else {
-        // Fallback for legacy builds without manifest
-        if (RegexPatterns::matchWithCapture('build_name_parse', $buildName, $matches)) {
-            $dateStr = "{$matches[1]}-{$matches[2]}-{$matches[3]}T{$matches[4]}:{$matches[5]}:{$matches[6]}";
-            $buildData['created'] = $dateStr;
-            $buildData['created_timestamp'] = strtotime($dateStr);
-        }
+        $buildData['warning'] = 'This build is incomplete — it carries no build_manifest.json, so it did not finish. Remove it with deleteBuild before building again.';
     }
 
-    // Calculate folder size
+    // Size and file count
     $folderSize = 0;
     $fileCount = 0;
     $iterator = new RecursiveIteratorIterator(
@@ -91,49 +70,41 @@ function __command_getBuild(array $params = [], array $urlParams = []): ApiRespo
         $folderSize += $file->getSize();
         $fileCount++;
     }
-    $buildData['folder_size_mb'] = round($folderSize / 1024 / 1024, 2);
+    $buildData['size_bytes'] = $folderSize;
+    $buildData['size_mb'] = round($folderSize / 1024 / 1024, 2);
     $buildData['file_count'] = $fileCount;
 
-    // Get ZIP info if exists
-    if (file_exists($zipPath)) {
-        $buildData['zip_path'] = $zipPath;
-        $buildData['zip_size_mb'] = round(filesize($zipPath) / 1024 / 1024, 2);
-        // C15 15.4: through the /p/<id>/ passthrough (see qs_build_download_url).
-        require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
-        $buildData['download_url'] = qs_build_download_url($buildName . '.zip');
-        
-        // Calculate compression ratio
-        if ($folderSize > 0) {
-            $buildData['compression_ratio'] = round((1 - (filesize($zipPath) / $folderSize)) * 100, 1) . '%';
-        }
-    }
+    // No download_url: the build is not reachable by URL. downloadBuild zips it
+    // on demand and streams the bytes; nothing is served statically.
+    $buildData['download_with'] = 'downloadBuild';
 
     // List top-level contents (public and secure folders)
     $contents = [];
     foreach (scandir($buildFolder) as $item) {
         if ($item === '.' || $item === '..') continue;
-        
+
         $itemPath = $buildFolder . '/' . $item;
         $itemInfo = [
             'name' => $item,
             'type' => is_dir($itemPath) ? 'directory' : 'file'
         ];
-        
+
         if (is_file($itemPath)) {
             $itemInfo['size_bytes'] = filesize($itemPath);
         }
-        
+
         $contents[] = $itemInfo;
     }
     $buildData['contents'] = $contents;
 
     return ApiResponse::create(200, 'operation.success')
-        ->withMessage('Build details retrieved successfully')
+        ->withMessage($complete
+            ? 'Build details retrieved successfully'
+            : 'Build details retrieved — the build is INCOMPLETE')
         ->withData($buildData);
 }
 
 // Execute via HTTP (only when not called internally)
 if (!defined('COMMAND_INTERNAL_CALL')) {
-    $urlSegments = $trimParametersManagement->additionalParams();
-    __command_getBuild([], $urlSegments)->send();
+    __command_getBuild()->send();
 }

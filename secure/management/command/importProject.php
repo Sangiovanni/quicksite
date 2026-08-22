@@ -266,8 +266,7 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
         '/data',
         '/public',
         '/public/assets',
-        '/public/style',
-        '/public/build'
+        '/public/style'
     ];
     foreach ($requiredDirs as $dir) {
         @mkdir($projectPath . $dir, 0755, true);

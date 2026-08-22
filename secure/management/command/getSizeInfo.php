@@ -170,7 +170,8 @@ function __command_getSizeInfo(array $params = [], array $urlParams = []): ApiRe
     $publicFolders = [
         'admin' => sizeinfo_getFolderInfo($publicRoot . '/admin', 'admin'),
         'assets' => sizeinfo_getFolderInfo($publicRoot . '/assets', 'assets'),
-        'build' => sizeinfo_getFolderInfo($publicRoot . '/build', 'build'),
+        // No 'build' entry: the build lives in the project's qs_build/, a sibling
+        // of public/, not inside it. Reported in the summary below instead.
         'management' => sizeinfo_getFolderInfo($publicRoot . '/management', 'management'),
         'style' => sizeinfo_getFolderInfo($publicRoot . '/style', 'style'),
     ];
@@ -302,13 +303,18 @@ function __command_getSizeInfo(array $params = [], array $urlParams = []): ApiRe
     // SUMMARY BY CATEGORY
     // ========================================
     
-    // Project-related: public/assets + public/style + secure/projects (without builds)
+    // Project-related: public/assets + public/style + secure/projects.
+    // NOTE: the project total is the whole project directory, so it already
+    // contains the build — the builds line below is a breakdown of part of this
+    // figure, not an addition to it. (That was equally true when builds lived in
+    // public/build/; the "without builds" this comment used to claim was never
+    // accurate. Left as-is: changing the arithmetic changes reported numbers.)
     $projectSpace = $publicFolders['assets']['size'] 
                   + $publicFolders['style']['size'] 
                   + $projectsData['total']['size'];
     
-    // Builds: public/build (production deployments)
-    $buildsSpace = $publicFolders['build']['size'];
+    // Builds: the project's qs_build/ (production deployment, outside public/)
+    $buildsSpace = sizeinfo_getDirectorySize($projectDir . '/qs_build');
     
     // Admin-related: public/admin + secure/admin
     $adminSpace = $publicFolders['admin']['size'] 

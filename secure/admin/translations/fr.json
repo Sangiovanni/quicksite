@@ -1383,10 +1383,6 @@
                         "label": "Écraser les fichiers existants",
                         "help": "Si coché, les fichiers existants au chemin cible seront remplacés. Sinon le déploiement sera annulé si des conflits sont trouvés."
                     }
-                },
-                "loadPreset": {
-                    "label": "Charger un build existant",
-                    "placeholder": "-- Nouveau build (par défaut) --"
                 }
             },
             "freshStart": {

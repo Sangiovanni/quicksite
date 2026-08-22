@@ -447,6 +447,24 @@ const QuickSiteAdmin = {
     },
 
     /**
+     * Download a command's response as a file - delegates to QuickSiteAPI.
+     *
+     * For the commands that answer BYTES instead of a JSON envelope
+     * (downloadBuild, downloadExport). A plain link cannot be used: this
+     * surface needs an Authorization header as well as the session cookie.
+     * There is no fallback implementation - without QuickSiteAPI there is no
+     * token plumbing to hand-roll this against.
+     *
+     * @returns {Promise<{ok: boolean, status: number, data: Object|null, filename?: string}>}
+     */
+    async downloadFile(command, urlParams = [], queryParams = {}, opts = {}) {
+        if (window.QuickSiteAPI) {
+            return window.QuickSiteAPI.downloadFile(command, urlParams, queryParams, opts);
+        }
+        return { ok: false, status: 0, data: { message: 'Download unavailable: QuickSiteAPI not loaded' } };
+    },
+
+    /**
      * Make an API request with file upload - delegates to QuickSiteAPI
      */
     async apiUpload(command, formData, urlParams = []) {
@@ -631,12 +649,33 @@ const QuickSiteAdmin = {
             submitBtn.innerHTML = '<span class="admin-spinner"></span> Executing...';
             
             try {
-                const result = await this.apiRequest(command, method, method === 'GET' ? null : data, urlParams);
-                this.displayResponse(responseDiv, result);
+                // A command declared 'binary' in help.php streams a FILE. Route it
+                // through downloadFile, which fetches with the Authorization header
+                // and hands the blob to the browser. apiRequest would read the ZIP
+                // as text, fail to parse it, and print the mangled bytes into the
+                // response panel.
+                const result = form.dataset.binaryResponse === '1'
+                    ? await this.downloadFile(command, urlParams, method === 'GET' ? data : {})
+                    : await this.apiRequest(command, method, method === 'GET' ? null : data, urlParams);
+
+                // A successful download has no envelope to show — displayResponse
+                // would print "null". Describe what was saved instead. Errors keep
+                // their real envelope: a refusal IS JSON on these commands.
+                this.displayResponse(
+                    responseDiv,
+                    (result.ok && result.filename)
+                        ? { ok: true, status: result.status, data: { downloaded: result.filename } }
+                        : result
+                );
                 
                 // Show toast notification
                 if (result.ok) {
-                    this.showToast('Command executed successfully!', 'success');
+                    this.showToast(
+                        result.filename
+                            ? 'Downloaded: ' + result.filename
+                            : 'Command executed successfully!',
+                        'success'
+                    );
                     
                     // Dispatch custom event for command success
                     // This allows forms to react (e.g., refresh selects after deletion)

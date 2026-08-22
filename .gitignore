@@ -209,8 +209,9 @@ public/index.html
 public/index.htm
 public/index.php
 
-# Build output (per-project)
-secure/projects/*/public/build/
+# Build output (per-project). Load-bearing for quicksite, the one project that
+# is NOT covered by the secure/projects/* rule above.
+secure/projects/*/qs_build/
 
 # Generated sitemap files (per-project, regenerated via admin)
 secure/projects/quicksite/public/sitemap.txt

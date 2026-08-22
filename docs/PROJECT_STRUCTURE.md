@@ -56,8 +56,10 @@ quicksite/
 │   │       │   ├── assets/       #   images / font / audio / videos
 │   │       │   ├── style/        #   style.css (editable via API)
 │   │       │   ├── scripts/      #   generated qs-api-config / qs-enums / qs-route-schema
-│   │       │   ├── sitemap.txt   #   published sitemap (generated)
-│   │       │   └── build/        #   production builds (generated, gitignored)
+│   │       │   └── sitemap.txt   #   published sitemap (generated)
+│   │       ├── qs_build/         # The project's build (generated, gitignored)
+│   │       │                     #   OUTSIDE public/, so no URL reaches it;
+│   │       │                     #   at most one build, fetched via downloadBuild
 │   │       ├── snippets/         # Snippets belonging to this project alone
 │   │       ├── exports/          # This project's export ZIPs (generated)
 │   │       └── backups/          # Project backups (gitignored)

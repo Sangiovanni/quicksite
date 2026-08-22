@@ -4,13 +4,17 @@
  * 
  * Parameters:
  * - name (optional): Custom build folder name. If omitted, auto-generates build_YYYYMMDD_HHMMSS.
- *                     Must not already exist (delete first if reusing a name).
  * - public (optional): Custom public folder name/path (max 5 levels, e.g., 'www/v1/public')
  * - secure (optional): Custom secure folder name (max 1 level, e.g., 'backend')
  * - space (optional): URL path prefix - creates subdirectory inside public folder (max 5 levels, e.g., '' or 'space')
  *                     When set, all public files are placed in: {public}/{space}/
  *                     This allows multiple sub-websites on the same domain (e.g., http://site.com/space/en/)
  * 
+ * Output: secure/projects/<id>/qs_build/<name>/ — outside the project's public/,
+ * so no URL reaches it. Retention is N = 1: a project holds one build, a second
+ * build is refused, and a FAILED build removes its own partial directory.
+ * No zip is stored; downloadBuild archives the folder on demand and streams it.
+ *
  * Security:
  * - File locking prevents concurrent builds
  * - Public and secure folders must have different root directories
@@ -24,7 +28,6 @@ require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/filePolicy.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/LockManagement.php';
-require_once SECURE_FOLDER_PATH . '/src/functions/ZipUtilities.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 
 // Get optional parameters for renaming folders in build
@@ -191,15 +194,33 @@ if (!is_dir(SECURE_FOLDER_PATH)) {
         ->send();
 }
 
-// Define build path before locking (so we can scope the lock to this build)
-$buildPath = PUBLIC_CONTENT_PATH . '/build';
+// Define build path before locking (so we can scope the lock to this build).
+// qs_build_root() — secure/projects/<id>/qs_build/, OUTSIDE the served public/.
+$buildPath = qs_build_root();
 $timestamp = date('Ymd_His');
+// Retention is N = 1: a project holds ONE build, and a second build is REFUSED
+// rather than overwriting it. Refused HERE — before the lock, before any
+// directory is created — so a build that was never going to be allowed to
+// replace the existing one never touches it.
+$existingBuild = qs_build_current();
+if ($existingBuild !== null) {
+    ApiResponse::create(409, 'conflict.already_exists')
+        ->withMessage('This project already has a build. Delete it before building again.')
+        ->withData([
+            'existing_build' => $existingBuild,
+            'complete'       => qs_build_is_complete($existingBuild),
+            'hint'           => 'Download it first with downloadBuild if you want to keep a copy, then remove it with deleteBuild and run build again.',
+            'next_steps'     => ['download' => 'downloadBuild', 'delete' => 'deleteBuild']
+        ])
+        ->send();
+}
 // beta.10 C13 13.6b: the auto name is second-resolution, and it used to be
 // mkdir'd with no existence check — so two builds inside the same second made
 // the second one answer 500 server.directory_create_failed on an operation that
-// is perfectly legitimate. Disambiguate with a suffix instead. A CUSTOM name is
-// left alone on purpose: it already gets an explicit 409 conflict.already_exists
-// below, which is the right answer for a name the caller chose.
+// is perfectly legitimate. Disambiguate with a suffix instead. At N = 1 the
+// refusal above already guarantees an empty qs_build/, so this loop is belt and
+// braces against a stray same-second directory rather than the load-bearing
+// guard it was when builds accumulated.
 if ($buildCustomName !== '') {
     $buildFolderName = $buildCustomName;
 } else {
@@ -224,7 +245,16 @@ if (!$lock) {
         ->send();
 }
 
-// Helper function to release lock and cleanup on error (uses global $lock)
+// Release the lock. SUCCESS PATH ONLY — a failed build must call
+// abort_build() instead, which also removes the partial directory.
+//
+// This function used to be named for a cleanup it did not do: its comment said
+// "release lock and cleanup on error" and its body released the lock and
+// nothing else. Of ~30 failure exits exactly one (the size-limit breach) also
+// deleted the directory, so every other failure left a partial build on disk
+// forever — quota-counted, and indistinguishable from a good build. Under N = 1
+// that partial would BLOCK the next build, which is what makes the cleanup
+// below load-bearing rather than tidy-up.
 function release_build_lock() {
     global $lock;
     if ($lock) {
@@ -232,34 +262,65 @@ function release_build_lock() {
     }
 }
 
+/**
+ * Abandon a build in progress: release the lock, then remove everything this
+ * run created, and answer.
+ *
+ * The partial must not survive. If the removal itself fails we say so in the
+ * response AND leave the build without a manifest — build_manifest.json is
+ * written last, so "no manifest" is the durable incomplete marker that getBuild
+ * reports and that the next build's refusal message carries.
+ *
+ * @param ApiResponse $response The refusal to send once the disk is clean.
+ */
+function abort_build(ApiResponse $response) {
+    global $buildFullPath;
+
+    release_build_lock();
+
+    $removed = null;
+    if (isset($buildFullPath) && $buildFullPath !== '' && is_dir($buildFullPath)) {
+        $removed = deleteDirectory($buildFullPath) && !is_dir($buildFullPath);
+    }
+
+    // withData() REPLACES; merge so the caller's own diagnosis survives.
+    if ($removed === false) {
+        $response->withData(array_merge($response->getData() ?? [], [
+            'partial_build_removed' => false,
+            'warning'               => 'The incomplete build directory could not be removed. It carries no build_manifest.json, so getBuild reports it as incomplete; remove it with deleteBuild before building again.'
+        ]));
+    } elseif ($removed === true) {
+        $response->withData(array_merge($response->getData() ?? [], [
+            'partial_build_removed' => true
+        ]));
+    }
+
+    $response->send();
+}
+
 // Step 1: Create/clear build directory
 if (!file_exists($buildPath)) {
     if (!mkdir($buildPath, 0755, true)) {
-        release_build_lock();
-        ApiResponse::create(500, 'server.directory_create_failed')
-            ->withMessage("Failed to create build directory")
-            ->send();
+        abort_build(
+            ApiResponse::create(500, 'server.directory_create_failed')
+                ->withMessage("Failed to create build directory")
+        );
     }
 }
 
-// Check if custom-named folder already exists
-if ($buildCustomName !== '' && is_dir($buildFullPath)) {
-    release_build_lock();
-    ApiResponse::create(409, 'conflict.already_exists')
-        ->withMessage("A build with this name already exists")
-        ->withData([
-            'name' => $buildCustomName,
-            'hint' => 'Delete the existing build first with deleteBuild, or choose a different name'
-        ])
-        ->send();
-}
+// The per-name "already exists" 409 that used to sit here is GONE, and its
+// removal is deliberate rather than an oversight. At N = 1 the retention
+// refusal above has already established that qs_build/ holds no build at all,
+// so this branch was unreachable — and it was the single call site where the
+// cleanup below would have deleted a GOOD build rather than a partial. One
+// refusal, raised before anything is created, replaces it.
 
 // Create build folder
 if (!mkdir($buildFullPath, 0755, true)) {
-    release_build_lock();
-    ApiResponse::create(500, 'server.directory_create_failed')
-        ->withMessage("Failed to create timestamped build folder")
-        ->send();
+    abort_build(
+        ApiResponse::create(500, 'server.directory_create_failed')
+            ->withMessage("Failed to create timestamped build folder")
+    );
 }
 
 // Create build directory structure using configured names
@@ -285,10 +346,10 @@ $directories = [
 
 foreach ($directories as $dir) {
     if (!file_exists($dir) && !mkdir($dir, 0755, true)) {
-        release_build_lock();
-        ApiResponse::create(500, 'server.directory_create_failed')
-            ->withMessage("Failed to create directory: {$dir}")
-            ->send();
+        abort_build(
+            ApiResponse::create(500, 'server.directory_create_failed')
+                ->withMessage("Failed to create directory: {$dir}")
+        );
     }
 }
 
@@ -403,10 +464,10 @@ foreach ($publicFiles as $file) {
         }
         
         if (file_put_contents($dest, $content) === false) {
-            release_build_lock();
-            ApiResponse::create(500, 'server.file_write_failed')
-                ->withMessage("Failed to copy file: {$file}")
-                ->send();
+            abort_build(
+                ApiResponse::create(500, 'server.file_write_failed')
+                    ->withMessage("Failed to copy file: {$file}")
+            );
         }
     }
 }
@@ -421,26 +482,26 @@ foreach ($publicFiles as $file) {
 $skippedUnpublishable = [];
 
 if (!qs_copy_publishable_directory(PUBLIC_CONTENT_PATH . '/style', $publicContentPath . '/style', $skippedUnpublishable)) {
-    release_build_lock();
-    ApiResponse::create(500, 'server.file_write_failed')
-        ->withMessage("Failed to copy /style/ directory")
-        ->send();
+    abort_build(
+        ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage("Failed to copy /style/ directory")
+    );
 }
 
 if (!qs_copy_publishable_directory(PUBLIC_CONTENT_PATH . '/assets', $publicContentPath . '/assets', $skippedUnpublishable)) {
-    release_build_lock();
-    ApiResponse::create(500, 'server.file_write_failed')
-        ->withMessage("Failed to copy /assets/ directory")
-        ->send();
+    abort_build(
+        ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage("Failed to copy /assets/ directory")
+    );
 }
 
 // Copy LICENSE file to build root (MIT License requirement)
 if (file_exists(SERVER_ROOT . '/LICENSE')) {
     if (!copy(SERVER_ROOT . '/LICENSE', $buildFullPath . '/LICENSE')) {
-        release_build_lock();
-        ApiResponse::create(500, 'server.file_write_failed')
-            ->withMessage("Failed to copy LICENSE file")
-            ->send();
+        abort_build(
+            ApiResponse::create(500, 'server.file_write_failed')
+                ->withMessage("Failed to copy LICENSE file")
+        );
     }
 }
 
@@ -454,18 +515,18 @@ if (file_exists($projectSitemapPath)) {
 
 // Copy routes.php
 if (!copy(PROJECT_PATH . '/routes.php', $buildFullPath . '/' . $buildSecureName . '/routes.php')) {
-    release_build_lock();
-    ApiResponse::create(500, 'server.file_write_failed')
-        ->withMessage("Failed to copy routes.php")
-        ->send();
+    abort_build(
+        ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage("Failed to copy routes.php")
+    );
 }
 
 // Copy config.php
 if (!copy(PROJECT_PATH . '/config.php', $buildFullPath . '/' . $buildSecureName . '/config.php')) {
-    release_build_lock();
-    ApiResponse::create(500, 'server.file_write_failed')
-        ->withMessage("Failed to write sanitized config.php")
-        ->send();
+    abort_build(
+        ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage("Failed to write sanitized config.php")
+    );
 }
 
 // Copy specific class files
@@ -481,10 +542,10 @@ foreach ($classFiles as $file) {
     $dest = $buildFullPath . '/' . $buildSecureName . '/src/classes/' . $file;
     
     if (!copy($source, $dest)) {
-        release_build_lock();
-        ApiResponse::create(500, 'server.file_write_failed')
-            ->withMessage("Failed to copy class file: {$file}")
-            ->send();
+        abort_build(
+            ApiResponse::create(500, 'server.file_write_failed')
+                ->withMessage("Failed to copy class file: {$file}")
+        );
     }
 }
 
@@ -503,10 +564,10 @@ foreach ($functionFiles as $file) {
     $dest   = $buildFullPath . '/' . $buildSecureName . '/src/functions/' . $file;
 
     if (!copy($source, $dest)) {
-        release_build_lock();
-        ApiResponse::create(500, 'server.file_write_failed')
-            ->withMessage("Failed to copy function file: {$file}")
-            ->send();
+        abort_build(
+            ApiResponse::create(500, 'server.file_write_failed')
+                ->withMessage("Failed to copy function file: {$file}")
+        );
     }
 }
 
@@ -522,26 +583,26 @@ if (MULTILINGUAL_SUPPORT) {
     // the SECURE sibling folder, which a deployment never serves, so this is
     // not a publish boundary and filtering here would drop files for no gain.
     if (!copyDirectory(PROJECT_PATH . '/translate', $translateDestPath)) {
-        release_build_lock();
-        ApiResponse::create(500, 'server.file_write_failed')
-            ->withMessage("Failed to copy /translate/ directory")
-            ->send();
+        abort_build(
+            ApiResponse::create(500, 'server.file_write_failed')
+                ->withMessage("Failed to copy /translate/ directory")
+        );
     }
 } else {
     // Mono-language: copy only default.json
     $defaultJsonPath = PROJECT_PATH . '/translate/default.json';
     if (file_exists($defaultJsonPath)) {
         if (!copy($defaultJsonPath, $translateDestPath . '/default.json')) {
-            release_build_lock();
-            ApiResponse::create(500, 'server.file_write_failed')
-                ->withMessage("Failed to copy default.json")
-                ->send();
+            abort_build(
+                ApiResponse::create(500, 'server.file_write_failed')
+                    ->withMessage("Failed to copy default.json")
+            );
         }
     } else {
-        release_build_lock();
-        ApiResponse::create(404, 'file.not_found')
-            ->withMessage("default.json not found - required for mono-language mode")
-            ->send();
+        abort_build(
+            ApiResponse::create(404, 'file.not_found')
+                ->withMessage("default.json not found - required for mono-language mode")
+        );
     }
 }
 
@@ -553,10 +614,10 @@ if (file_exists($aliasesSource)) {
         mkdir($dataDir, 0755, true);
     }
     if (!copy($aliasesSource, $dataDir . '/aliases.json')) {
-        release_build_lock();
-        ApiResponse::create(500, 'server.file_write_failed')
-            ->withMessage("Failed to copy aliases.json")
-            ->send();
+        abort_build(
+            ApiResponse::create(500, 'server.file_write_failed')
+                ->withMessage("Failed to copy aliases.json")
+        );
     }
 }
 
@@ -568,18 +629,18 @@ $menuJsonPath = PROJECT_PATH . '/templates/model/json/menu.json';
 if (file_exists($menuJsonPath)) {
     $menuJson = json_decode(file_get_contents($menuJsonPath), true);
     if ($menuJson === null) {
-        release_build_lock();
-        ApiResponse::create(500, 'server.internal_error')
-            ->withMessage("Failed to parse menu.json")
-            ->send();
+        abort_build(
+            ApiResponse::create(500, 'server.internal_error')
+                ->withMessage("Failed to parse menu.json")
+        );
     }
     
     $menuPhp = $compiler->compileMenuOrFooter($menuJson);
     if (file_put_contents($buildFullPath . '/' . $buildSecureName . '/templates/menu.php', $menuPhp) === false) {
-        release_build_lock();
-        ApiResponse::create(500, 'server.file_write_failed')
-            ->withMessage("Failed to write compiled menu.php")
-            ->send();
+        abort_build(
+            ApiResponse::create(500, 'server.file_write_failed')
+                ->withMessage("Failed to write compiled menu.php")
+        );
     }
 }
 
@@ -588,18 +649,18 @@ $footerJsonPath = PROJECT_PATH . '/templates/model/json/footer.json';
 if (file_exists($footerJsonPath)) {
     $footerJson = json_decode(file_get_contents($footerJsonPath), true);
     if ($footerJson === null) {
-        release_build_lock();
-        ApiResponse::create(500, 'server.internal_error')
-            ->withMessage("Failed to parse footer.json")
-            ->send();
+        abort_build(
+            ApiResponse::create(500, 'server.internal_error')
+                ->withMessage("Failed to parse footer.json")
+        );
     }
     
     $footerPhp = $compiler->compileMenuOrFooter($footerJson);
     if (file_put_contents($buildFullPath . '/' . $buildSecureName . '/templates/footer.php', $footerPhp) === false) {
-        release_build_lock();
-        ApiResponse::create(500, 'server.file_write_failed')
-            ->withMessage("Failed to write compiled footer.php")
-            ->send();
+        abort_build(
+            ApiResponse::create(500, 'server.file_write_failed')
+                ->withMessage("Failed to write compiled footer.php")
+        );
     }
 }
 
@@ -616,10 +677,10 @@ if (!is_dir($scriptsDir)) {
 
 // Write compiled API config
 if (!$apiManager->writeCompiledJs($apiConfigPath)) {
-    release_build_lock();
-    ApiResponse::create(500, 'server.file_write_failed')
-        ->withMessage("Failed to write qs-api-config.js")
-        ->send();
+    abort_build(
+        ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage("Failed to write qs-api-config.js")
+    );
 }
 
 // Step 4.6: Compile routes schema to JavaScript (beta.8 A1 Build Slice 1).
@@ -628,10 +689,10 @@ if (!$apiManager->writeCompiledJs($apiConfigPath)) {
 // is loaded via utilsManagement which build.php already depends on.
 $routesMetaPath = $scriptsDir . '/qs-route-schema.js';
 if (!writeRoutesMetaFile(ROUTES, $routesMetaPath)) {
-    release_build_lock();
-    ApiResponse::create(500, 'server.file_write_failed')
-        ->withMessage("Failed to write qs-route-schema.js")
-        ->send();
+    abort_build(
+        ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage("Failed to write qs-route-schema.js")
+    );
 }
 
 // Write qs-enums.js for the build. The runtime QS.enum() (and the
@@ -641,10 +702,10 @@ if (!writeRoutesMetaFile(ROUTES, $routesMetaPath)) {
 require_once SECURE_FOLDER_PATH . '/src/classes/EnumSyncHelper.php';
 $enumsSyncResult = EnumSyncHelper::sync(PROJECT_PATH, $scriptsDir);
 if (!($enumsSyncResult['ok'] ?? false)) {
-    release_build_lock();
-    ApiResponse::create(500, 'server.file_write_failed')
-        ->withMessage("Failed to write qs-enums.js: " . ($enumsSyncResult['error'] ?? 'unknown'))
-        ->send();
+    abort_build(
+        ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage("Failed to write qs-enums.js: " . ($enumsSyncResult['error'] ?? 'unknown'))
+    );
 }
 
 // Copy qs.js (required for all interaction/event functionality).
@@ -655,10 +716,10 @@ if (!($enumsSyncResult['ok'] ?? false)) {
 $qsJsSource = SECURE_FOLDER_PATH . '/src/runtime/qs.js';
 if (file_exists($qsJsSource)) {
     if (!copy($qsJsSource, $scriptsDir . '/qs.js')) {
-        release_build_lock();
-        ApiResponse::create(500, 'server.file_write_failed')
-            ->withMessage("Failed to copy qs.js")
-            ->send();
+        abort_build(
+            ApiResponse::create(500, 'server.file_write_failed')
+                ->withMessage("Failed to copy qs.js")
+        );
     }
 }
 
@@ -695,10 +756,10 @@ $page404JsonPath = resolvePageJsonPath('404');
 if ($page404JsonPath !== null && file_exists($page404JsonPath)) {
     $page404Json = json_decode(file_get_contents($page404JsonPath), true);
     if ($page404Json === null) {
-        release_build_lock();
-        ApiResponse::create(500, 'server.internal_error')
-            ->withMessage("Failed to parse 404.json")
-            ->send();
+        abort_build(
+            ApiResponse::create(500, 'server.internal_error')
+                ->withMessage("Failed to parse 404.json")
+        );
     }
     
     // Get layout for 404 page (inherits from root)
@@ -711,10 +772,10 @@ if ($page404JsonPath !== null && file_exists($page404JsonPath)) {
     $page404FilePath = $buildFullPath . '/' . $buildSecureName . '/templates/pages/404/404.php';
     
     if (file_put_contents($page404FilePath, $page404Php) === false) {
-        release_build_lock();
-        ApiResponse::create(500, 'server.file_write_failed')
-            ->withMessage("Failed to write compiled 404.php")
-            ->send();
+        abort_build(
+            ApiResponse::create(500, 'server.file_write_failed')
+                ->withMessage("Failed to write compiled 404.php")
+        );
     }
     
     $compiledPages[] = '404';
@@ -734,10 +795,10 @@ foreach ($allRoutes as $route) {
     
     $pageJson = json_decode(file_get_contents($pageJsonPath), true);
     if ($pageJson === null) {
-        release_build_lock();
-        ApiResponse::create(500, 'server.internal_error')
-            ->withMessage("Failed to parse {$route}.json")
-            ->send();
+        abort_build(
+            ApiResponse::create(500, 'server.internal_error')
+                ->withMessage("Failed to parse {$route}.json")
+        );
     }
     
     // Use route name as title (capitalize first letter of last segment).
@@ -765,10 +826,10 @@ foreach ($allRoutes as $route) {
     $pageFilePath = $buildPageDir . '/' . $fsRouteName . '.php';
     
     if (file_put_contents($pageFilePath, $pagePhp) === false) {
-        release_build_lock();
-        ApiResponse::create(500, 'server.file_write_failed')
-            ->withMessage("Failed to write compiled page: {$route}.php")
-            ->send();
+        abort_build(
+            ApiResponse::create(500, 'server.file_write_failed')
+                ->withMessage("Failed to write compiled page: {$route}.php")
+        );
     }
     
     $compiledPages[] = $route;
@@ -837,7 +898,9 @@ require_once SECURE_FOLDER_PATH . '/src/functions/NginxConfig.php';
 $nginxConfig = generate_nginx_config($buildPublicSpace);
 file_put_contents($buildFullPath . '/' . $buildSecureName . '/nginx_routes.conf', $nginxConfig);
 
-// Step 6b: Create build manifest for listBuilds/getBuild commands
+// Step 6b: Create build manifest. Written LAST on purpose: its presence is
+// what marks the build COMPLETE (qs_build_is_complete), which is how a build
+// that survived a failed cleanup stays distinguishable from a good one.
 $manifest = [
     'name' => $buildFolderName,
     'created' => date('c'), // ISO 8601 format
@@ -859,51 +922,31 @@ $manifest = [
 ];
 qs_json_write($buildFullPath . '/build_manifest.json', $manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
 
-// Check build size before creating ZIP (prevent resource exhaustion)
+// Check build size (prevent resource exhaustion)
 $buildSizeBytes = getDirectorySize($buildFullPath);
 $buildSizeMB = round($buildSizeBytes / 1024 / 1024, 2);
 $maxBuildSizeMB = CONFIG['MAX_BUILD_SIZE_MB'] ?? 500;
 
 if ($buildSizeMB > $maxBuildSizeMB) {
-    release_build_lock();
-    // Clean up failed build folder
-    deleteDirectory($buildFullPath);
-    
-    ApiResponse::create(413, 'validation.size_limit_exceeded')
-        ->withMessage("Build size exceeds maximum allowed size")
-        ->withData([
-            'build_size_mb' => $buildSizeMB,
-            'max_size_mb' => $maxBuildSizeMB,
-            'note' => 'Increase MAX_BUILD_SIZE_MB in config.php if needed'
-        ])
-        ->send();
+    abort_build(
+        ApiResponse::create(413, 'validation.size_limit_exceeded')
+            ->withMessage("Build size exceeds maximum allowed size")
+            ->withData([
+                'build_size_mb' => $buildSizeMB,
+                'max_size_mb' => $maxBuildSizeMB,
+                'note' => 'Increase MAX_BUILD_SIZE_MB in config.php if needed'
+            ])
+    );
 }
 
-// Step 7: Create ZIP archive
-$zipFilename = $buildFolderName . '.zip';
-$zipPath = $buildPath . '/' . $zipFilename;
-
-// Use ZipArchive to create compressed archive (using ZipUtilities)
-$zip = new ZipArchive();
-if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
-    release_build_lock();
-    ApiResponse::create(500, 'server.file_write_failed')
-        ->withMessage("Failed to create ZIP archive")
-        ->send();
-}
-
-// Add all build files to ZIP (using ZipUtilities function)
-addDirectoryToZip($zip, $buildFullPath, basename($buildFullPath));
-$zip->close();
-
-// Get ZIP file size
-$zipSize = filesize($zipPath);
-$zipSizeMB = round($zipSize / 1024 / 1024, 2);
-
-// Calculate original folder size for comparison (using FileSystem utility)
-$originalSize = getDirectorySize($buildFullPath);
-$originalSizeMB = round($originalSize / 1024 / 1024, 2);
-$compressionRatio = round((1 - ($zipSize / $originalSize)) * 100, 1);
+// NO ZIP IS WRITTEN HERE, and that is the point.
+//
+// The build used to emit BOTH an expanded folder and a zip of that same folder,
+// paying disk for the deliverable twice and leaving the archive to go stale
+// against the folder beside it. The folder is the build; downloadBuild zips it
+// on demand and streams the bytes without storing them, so there is exactly one
+// copy on disk and the download can never be out of date. deployBuild copies
+// the expanded folder, so it never wanted the archive either.
 
 // Release lock before sending response
 release_build_lock();
@@ -920,12 +963,9 @@ foreach ($allPageEvents as $routeKey => $routeEvents) {
 ApiResponse::create(201, 'operation.success')
     ->withMessage('Production build completed successfully')
     ->withData([
+        'build_name' => $buildFolderName,
         'build_path' => $buildFullPath,
-        'zip_path' => $zipPath,
-        'zip_filename' => $zipFilename,
-        'zip_size_mb' => $zipSizeMB,
-        'original_size_mb' => $originalSizeMB,
-        'compression_ratio' => $compressionRatio . '%',
+        'build_size_mb' => $buildSizeMB,
         'compiled_pages' => $compiledPages,
         'total_pages' => count($compiledPages),
         'skipped_pages' => $skippedPages,
@@ -944,8 +984,8 @@ ApiResponse::create(201, 'operation.success')
         'scripts_copied' => file_exists($scriptsDir . '/qs.js'),
         'build_date' => date('Y-m-d H:i:s'),
         'readme_created' => true,
-        // C15 15.4: builds live in the project's own public/build/, reached through the
-        // /p/<id>/ passthrough (BASE_URL alone pointed at the freed webroot since 15.3).
-        'download_url' => qs_build_download_url($zipFilename)
+        // No download_url: the build is not reachable by URL at all. It lives
+        // outside public/, and downloadBuild streams it on request.
+        'download_with' => 'downloadBuild'
     ])
     ->send();

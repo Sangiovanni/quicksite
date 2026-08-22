@@ -8612,3 +8612,106 @@ they carry no defect, and `{{__current_page}}` is genuinely used).
 (`getSystemPlaceholders`), `secure/src/classes/JsonToPhpCompiler.php`
 (`generateSystemVariables`, `convertPlaceholdersToPhp`, `SYSTEM_PLACEHOLDERS`).
 Sangio's ruling, 2026-08-22, during beta.11 sequence 3.
+
+
+### A build lives outside the served directory, not behind a deny rule (locked 2026-08-22)
+
+**Decision**: A project's build is written to `secure/projects/<id>/qs_build/<name>/`
+— a sibling of the project's `public/`, not a child of it. `downloadBuild` is the
+only way to fetch one: it archives the folder on demand, streams it, and stores
+nothing.
+
+**Reasoning**: `/p/<id>/` serves out of a project's `public/` and nowhere else, so
+moving the output one level up makes a build unreachable by construction rather
+than by rule. That mattered because the boundary did not compose where it stood:
+on a public project an anonymous request for the build's `.zip` returned the whole
+archive, and `build_manifest.json` — which carries the complete compiled route
+list, unlinked pages included — returned 200 as well, while the individual files
+inside the same build correctly answered 403. Three doors into one directory, two
+of them open.
+
+**A deny file would not have fixed it.** `/p/` serving runs through PHP's
+passthrough, not the web server's own file handling, so an `.htaccess` dropped in
+that directory is not consulted the way its presence suggests. A rule that looks
+like protection and is not is worse than no rule.
+
+**The exposure and the missing download were one defect.** `downloadBuild`
+contained no `header()` call and no `readfile`: it answered a JSON envelope whose
+`download_url` pointed at that static path. The archive was anonymously reachable
+*because* the static URL was the only fetch path that existed. So moving the
+build and making the command actually stream could not be separated — either
+alone leaves the feature broken. Streaming also puts the download behind the
+dispatcher's authentication, which a statically served file never had.
+
+**No stored zip.** The build used to write both an expanded folder and an archive
+of that same folder, paying disk twice for one deliverable and leaving the archive
+free to go stale against the folder beside it. Generating on download removes both
+problems and costs a compression pass per download — the folder is what `deployBuild`
+copies, so nothing wanted the stored archive in the first place.
+
+**Alternatives considered**: an `.htaccess` deny inside `public/build/` (rejected —
+not consulted on this path, see above); tightening the passthrough's extension
+allowlist so `.zip` and `.json` are refused (rejected — it fixes two spellings of
+the hole rather than the hole, and every future artifact type reopens the
+question); keeping the static URL and gating it on membership (rejected — that
+rebuilds the dispatcher's authentication in a second place, which is where the
+two copies drift apart).
+
+**Source**: `secure/src/functions/utilsManagement.php` (`qs_build_root`,
+`qs_build_path`, `qs_build_current`, `qs_build_is_complete` — the one derivation
+every caller uses), `secure/management/command/build.php`,
+`secure/management/command/downloadBuild.php`,
+`public/admin/assets/js/core/api.js` (`downloadFile`).
+[ARCHITECTURE.md §10](ARCHITECTURE.md), [COMMAND_API.md](COMMAND_API.md).
+Sangio's ruling, design conversation 2026-08-21.
+
+### One build per project, and a second build is refused rather than overwriting (locked 2026-08-22)
+
+**Decision**: A project holds at most one build. `build` answers
+`409 conflict.already_exists` while one exists and names `downloadBuild` and
+`deleteBuild` in the response. A build that FAILS removes its own partial
+directory. `listBuilds` and `cleanBuilds` are deleted; `getBuild`, `deleteBuild`
+and `downloadBuild` take no parameters at all.
+
+**Reasoning**: A build is a regenerable artifact of the project's current state,
+and builds count toward the owner's space quota — so keeping a history of them
+charges the user for copies of something they can always rebuild. At one build
+the retention question disappears: "delete builds older than X" has nothing to
+range over, and a 0-or-1 element array carries strictly less than a command that
+answers with the build itself.
+
+**Refusing is what makes it safe, and it is simpler than the alternative.** With
+a single slot, overwriting would destroy a good build to make one that might
+fail. Refusing means the only thing that destroys a build is the user's own
+`deleteBuild`, so there is never an old build to protect during a build — which
+is why a build-to-staging-then-promote swap was weighed and dropped: it buys the
+same safety with more machinery.
+
+**Cleanup on failure is load-bearing, not tidying.** `release_build_lock()`'s
+comment claimed "release lock and cleanup on error" and its body released the
+lock and nothing else; of roughly thirty failure exits exactly one also removed
+the directory. Every other failure left a partial on disk forever, quota-counted
+and indistinguishable from a good build. Under refuse-if-exists that partial
+would block the next build outright — so the cleanup the comment already claimed
+is what the design needs to be true.
+
+**Belt and braces.** `build_manifest.json` is written last, so its absence marks
+an unfinished build. If the cleanup itself fails, the survivor is still
+identifiable: `getBuild` reports `complete: false`, `downloadBuild` refuses it
+(`409 build.incomplete`) rather than handing over a broken deliverable, and
+`deleteBuild` removes it — the user recovers without touching the filesystem.
+
+**Alternatives considered**: keeping the newest N builds (rejected — N > 1 is a
+history of regenerable artifacts charged to the user's quota, and it keeps every
+retention question alive); overwriting the existing build (rejected — destroys a
+good artifact to attempt one that may fail); building to a staging directory and
+promoting on success (rejected — equivalent safety, more moving parts, and
+nothing to protect once the user has deliberately deleted the old build);
+keeping `listBuilds` as a convenience (rejected — at one build it is `getBuild`
+with a weaker shape and one more command to keep registered in nine places).
+
+**Source**: `secure/management/command/build.php` (`abort_build`, the retention
+refusal), `getBuild.php`, `deleteBuild.php`, `downloadBuild.php`,
+`secure/src/functions/utilsManagement.php`. [COMMAND_API.md](COMMAND_API.md),
+[ARCHITECTURE.md §10](ARCHITECTURE.md). Sangio's ruling, design conversation
+2026-08-21.

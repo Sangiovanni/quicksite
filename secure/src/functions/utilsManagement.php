@@ -106,16 +106,80 @@ function qs_json_write(string $path, $data, int $jsonFlags = 0, int $fileFlags =
 }
 
 /**
- * C15 15.4 — the absolute download URL of a build zip in the bound project's
- * own public/build/, reached through the /p/<id>/ passthrough (the visibility
- * gate applies: a private project's builds need a member's session cookie,
- * a public project's are public). Shared by build /
- * getBuild / downloadBuild — one derivation, not three.
+ * ---------------------------------------------------------------------------
+ * BUILD LOCATION — the single derivation of where a project's build lives.
+ * ---------------------------------------------------------------------------
+ *
+ * `secure/projects/<id>/qs_build/<name>/`. OUTSIDE the project's public/, so no
+ * URL reaches it: the /p/<id>/ passthrough serves out of public/ and nothing
+ * else, which is what makes the boundary compose. A deny file inside public/
+ * would NOT have been equivalent — /p/ serving runs through PHP, not the web
+ * server's own file handling, so an .htaccess there is not consulted the way it
+ * appears to be. The qs_ prefix is defensive naming, kept even though the
+ * directory is already unreachable.
+ *
+ * The build is downloaded through `downloadBuild`, which zips on demand and
+ * streams; nothing static is served and no zip is stored.
+ *
+ * Retention is N = 1: qs_build/ holds at most one build directory. `build`
+ * refuses while one exists rather than overwriting it, so the user's deliberate
+ * delete is the only thing that destroys a build.
+ *
+ * Every caller uses these four functions. There is no second spelling of the
+ * path anywhere in the tree.
  */
-function qs_build_download_url(string $zipFilename): string
+
+/** Root that holds the single build. Does not create it. */
+function qs_build_root(): string
 {
-    require_once __DIR__ . '/renderBootstrap.php'; // qs_resolve_public_base
-    return qs_resolve_public_base()['abs'] . 'build/' . $zipFilename;
+    return PROJECT_PATH . DIRECTORY_SEPARATOR . 'qs_build';
+}
+
+/** Absolute path of one named build directory. */
+function qs_build_path(string $buildName): string
+{
+    return qs_build_root() . DIRECTORY_SEPARATOR . $buildName;
+}
+
+/**
+ * The name of the single existing build, or null when there is none.
+ *
+ * Scans rather than trusting a pointer file: the directory IS the record, so a
+ * build cannot be present-but-unlisted (which is exactly how a failed build's
+ * partial used to hide among the good ones).
+ */
+function qs_build_current(): ?string
+{
+    $root = qs_build_root();
+    if (!is_dir($root)) {
+        return null;
+    }
+    $entries = @scandir($root);
+    if ($entries === false) {
+        return null;
+    }
+    foreach ($entries as $entry) {
+        if ($entry === '.' || $entry === '..') {
+            continue;
+        }
+        if (is_dir($root . DIRECTORY_SEPARATOR . $entry)) {
+            return $entry;
+        }
+    }
+    return null;
+}
+
+/**
+ * Is this build complete?
+ *
+ * `build_manifest.json` is written last, so its presence is the completion
+ * marker. This is the belt to cleanup-on-failure's braces: if the cleanup
+ * itself fails, the survivor is still identifiable as incomplete instead of
+ * passing for a good build.
+ */
+function qs_build_is_complete(string $buildName): bool
+{
+    return is_file(qs_build_path($buildName) . DIRECTORY_SEPARATOR . 'build_manifest.json');
 }
 
 /**

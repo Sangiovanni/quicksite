@@ -40,7 +40,7 @@ return [
             'listStyleRules', 'getStyleRule', 'listKeyframes', 'getKeyframes',
             'getAnimatedSelectors', 'listAliases', 'getSizeInfo', 'listJsFunctions',
             'listDataBindings', 'listInteractions', 'getPageEvents', 'getStateStores',
-            'listSnippets', 'getSnippet', 'getIframeSandbox', 'getBuild', 'listBuilds',
+            'listSnippets', 'getSnippet', 'getIframeSandbox', 'getBuild',
         ],
     ],
 
@@ -124,10 +124,10 @@ return [
         ],
     ],
 
-    // Build lifecycle (reads listBuilds/getBuild are content.read). developer+.
+    // Build lifecycle (the getBuild read is content.read). developer+.
     'build' => [
         'scope' => 'project',
-        'commands' => ['build', 'deleteBuild', 'cleanBuilds', 'cleanResolverCache', 'downloadBuild'],
+        'commands' => ['build', 'deleteBuild', 'cleanResolverCache', 'downloadBuild'],
     ],
 
     // Push to production. admin+.

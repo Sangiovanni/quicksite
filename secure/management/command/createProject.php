@@ -99,8 +99,7 @@ function __command_createProject(array $params = [], array $urlParams = []): Api
         '/public/assets/font',
         '/public/assets/audio',
         '/public/assets/videos',
-        '/public/style',
-        '/public/build'
+        '/public/style'
     ];
     
     foreach ($folders as $folder) {

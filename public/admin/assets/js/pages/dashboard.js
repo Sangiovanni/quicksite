@@ -722,75 +722,117 @@
                 // call api.js refuses client-side and then render "Error loading
                 // data" three times over. Gated at the CALL SITE rather than inside
                 // each loader so the loaders stay untouched.
-                if (canRun('listBuilds'))   loadManageSpaceBuilds();
+                if (canRun('getBuild'))     loadManageSpaceBuilds();
                 if (canRun('getSizeInfo'))  loadManageSpaceExports();
                 if (canRun('listBackups'))  loadManageSpaceBackups();
             }
         });
     }
 
+    // Retention is one build per project, so this panel shows THE build or an
+    // empty row - never a list. getBuild answers 404 when there is none, which
+    // is the empty state rather than an error.
     async function loadManageSpaceBuilds() {
         const list = document.getElementById('manage-builds-list');
         const count = document.getElementById('manage-builds-count');
         if (!list) return;
 
-        list.innerHTML = '<div class="manage-space__loading">' + t('common.loading', 'Loading...') + '</div>';
+        const emptyRow = () => QSDom.el('div', { class: 'manage-space__empty', text: t('dashboard.storage.noItems', 'No items') });
+
+        QSDom.clear(list);
+        list.appendChild(QSDom.el('div', { class: 'manage-space__loading', text: t('common.loading', 'Loading...') }));
 
         try {
-            const result = await QuickSiteAdmin.apiRequest('listBuilds');
-            const builds = result.data?.data?.builds || [];
-            count.textContent = builds.length;
+            const result = await QuickSiteAdmin.apiRequest('getBuild');
+            const build = (result.ok && result.data?.data?.exists) ? result.data.data : null;
 
-            if (builds.length === 0) {
-                list.innerHTML = '<div class="manage-space__empty">' + t('dashboard.storage.noItems', 'No items') + '</div>';
-                return;
-            }
+            count.textContent = build ? '1' : '0';
+            QSDom.clear(list);
+            if (!build) { list.appendChild(emptyRow()); return; }
 
-            list.innerHTML = builds.map(b => {
-                const sizeMb = (b.folder_size_mb || 0) + (b.zip_size_mb || 0);
-                const sizeStr = sizeMb < 1 ? (sizeMb * 1024).toFixed(0) + ' KB' : sizeMb.toFixed(2) + ' MB';
-                const date = b.created ? new Date(b.created).toLocaleDateString() : '--';
-                return `<div class="manage-space__item" data-build="${QuickSiteAdmin.escapeHtml(b.name)}">
-                    <div class="manage-space__item-info">
-                        <span class="manage-space__item-name">${QuickSiteAdmin.escapeHtml(b.name)}</span>
-                        <span class="manage-space__item-meta">${date} · ${sizeStr}</span>
-                    </div>
-                    <button type="button" class="manage-space__delete-btn" title="${t('common.delete', 'Delete')}">
-                        ${QuickSiteUtils.iconTrash()}
-                    </button>
-                </div>`;
-            }).join('');
-
-            list.querySelectorAll('.manage-space__delete-btn').forEach(btn => {
-                btn.addEventListener('click', async function() {
-                    const item = this.closest('.manage-space__item');
-                    const name = item.dataset.build;
-                    if (!confirm(t('dashboard.storage.confirmDelete', 'Delete this item?') + '\n' + name)) return;
-                    this.disabled = true;
-                    try {
-                        const res = await QuickSiteAdmin.apiRequest('deleteBuild', 'POST', { name });
-                        if (res.ok) {
-                            item.remove();
-                            const remaining = list.querySelectorAll('.manage-space__item').length;
-                            count.textContent = remaining;
-                            if (remaining === 0) {
-                                list.innerHTML = '<div class="manage-space__empty">' + t('dashboard.storage.noItems', 'No items') + '</div>';
-                            }
-                            loadStorageOverview();
-                            QuickSiteAdmin.showToast(t('dashboard.storage.deleted', 'Deleted') + ': ' + name, 'success');
-                        } else {
-                            QuickSiteAdmin.showToast(res.data?.message || 'Delete failed', 'error');
-                            this.disabled = false;
-                        }
-                    } catch (e) {
-                        QuickSiteAdmin.showToast('Delete failed', 'error');
-                        this.disabled = false;
-                    }
-                });
-            });
+            list.appendChild(_renderManageSpaceBuild(build, list, count, emptyRow));
         } catch (error) {
-            list.innerHTML = '<div class="manage-space__empty">' + t('common.error', 'Error loading data') + '</div>';
+            QSDom.clear(list);
+            list.appendChild(QSDom.el('div', { class: 'manage-space__empty', text: t('common.error', 'Error loading data') }));
         }
+    }
+
+    function _renderManageSpaceBuild(build, list, count, emptyRow) {
+        const sizeMb = build.size_mb || 0;
+        const sizeStr = sizeMb < 1 ? (sizeMb * 1024).toFixed(0) + ' KB' : sizeMb.toFixed(2) + ' MB';
+        const date = build.created ? new Date(build.created).toLocaleDateString() : '--';
+
+        const nameChildren = [build.name];
+        if (build.complete === false) {
+            nameChildren.push(QSDom.el('span', {
+                class: 'manage-space__item-badge',
+                text: t('dashboard.storage.incomplete', 'incomplete')
+            }));
+        }
+
+        // An incomplete build cannot be downloaded - the command refuses it, so
+        // the button would only ever produce an error toast.
+        const dlBtn = build.complete === false ? null : QSDom.el('button', {
+            type: 'button',
+            class: 'manage-space__delete-btn',
+            title: t('dashboard.storage.download', 'Download')
+        }, [QSDom.svgIcon('M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2', 14)]);
+
+        const delBtn = QSDom.el('button', {
+            type: 'button',
+            class: 'manage-space__delete-btn',
+            title: t('common.delete', 'Delete')
+        }, [QSDom.svgIcon('M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6', 14)]);
+
+        const item = QSDom.el('div', { class: 'manage-space__item', dataset: { build: build.name } }, [
+            QSDom.el('div', { class: 'manage-space__item-info' }, [
+                QSDom.el('span', { class: 'manage-space__item-name' }, nameChildren),
+                QSDom.el('span', { class: 'manage-space__item-meta', text: date + ' \u00b7 ' + sizeStr }),
+            ]),
+            dlBtn,
+            delBtn,
+        ]);
+
+        if (dlBtn) {
+            dlBtn.addEventListener('click', async function () {
+                this.disabled = true;
+                try {
+                    // Not a link: the management surface needs an Authorization
+                    // header, which an anchor cannot send. downloadFile fetches
+                    // with the header and hands the blob to the browser.
+                    const res = await QuickSiteAdmin.downloadFile('downloadBuild');
+                    if (!res.ok) {
+                        QuickSiteAdmin.showToast(res.data?.message || 'Download failed', 'error');
+                    }
+                } catch (e) {
+                    QuickSiteAdmin.showToast('Download failed', 'error');
+                }
+                this.disabled = false;
+            });
+        }
+
+        delBtn.addEventListener('click', async function () {
+            if (!confirm(t('dashboard.storage.confirmDelete', 'Delete this item?') + '\n' + build.name)) return;
+            this.disabled = true;
+            try {
+                const res = await QuickSiteAdmin.apiRequest('deleteBuild', 'POST', {});
+                if (res.ok) {
+                    item.remove();
+                    count.textContent = '0';
+                    list.appendChild(emptyRow());
+                    loadStorageOverview();
+                    QuickSiteAdmin.showToast(t('dashboard.storage.deleted', 'Deleted') + ': ' + build.name, 'success');
+                } else {
+                    QuickSiteAdmin.showToast(res.data?.message || 'Delete failed', 'error');
+                    this.disabled = false;
+                }
+            } catch (e) {
+                QuickSiteAdmin.showToast('Delete failed', 'error');
+                this.disabled = false;
+            }
+        });
+
+        return item;
     }
 
     async function loadManageSpaceExports() {
@@ -798,7 +840,10 @@
         const count = document.getElementById('manage-exports-count');
         if (!list) return;
 
-        list.innerHTML = '<div class="manage-space__loading">' + t('common.loading', 'Loading...') + '</div>';
+        const emptyRow = () => QSDom.el('div', { class: 'manage-space__empty', text: t('dashboard.storage.noItems', 'No items') });
+
+        QSDom.clear(list);
+        list.appendChild(QSDom.el('div', { class: 'manage-space__loading', text: t('common.loading', 'Loading...') }));
 
         try {
             const result = await QuickSiteAdmin.apiRequest('getSizeInfo');
@@ -810,43 +855,57 @@
             const fileCount = exports.files || 0;
             count.textContent = fileCount;
 
-            if (fileCount === 0) {
-                list.innerHTML = '<div class="manage-space__empty">' + t('dashboard.storage.noItems', 'No items') + '</div>';
-                return;
-            }
+            QSDom.clear(list);
+            if (fileCount === 0) { list.appendChild(emptyRow()); return; }
 
-            list.innerHTML = `<div class="manage-space__item manage-space__item--summary">
-                <div class="manage-space__item-info">
-                    <span class="manage-space__item-name">${fileCount} ${t('dashboard.storage.exportFiles', 'export file(s)')}</span>
-                    <span class="manage-space__item-meta">${formatSize(totalBytes)}</span>
-                </div>
-                <button type="button" class="manage-space__clear-btn" id="clear-exports-btn">
-                    ${t('dashboard.storage.clearAll', 'Clear All')}
-                </button>
-            </div>`;
+            list.appendChild(_renderManageSpaceExports(fileCount, totalBytes, list, count, emptyRow));
+        } catch (error) {
+            QSDom.clear(list);
+            list.appendChild(QSDom.el('div', { class: 'manage-space__empty', text: t('common.error', 'Error loading data') }));
+        }
+    }
 
-            document.getElementById('clear-exports-btn').addEventListener('click', async function() {
-                if (!confirm(t('dashboard.storage.confirmClearExports', 'Clear all export files?'))) return;
-                this.disabled = true;
-                try {
-                    const res = await QuickSiteAdmin.apiRequest('clearExports', 'POST', { confirm: true });
-                    if (res.ok) {
-                        count.textContent = '0';
-                        list.innerHTML = '<div class="manage-space__empty">' + t('dashboard.storage.noItems', 'No items') + '</div>';
-                        loadStorageOverview();
-                        QuickSiteAdmin.showToast(t('dashboard.storage.exportsCleared', 'Exports cleared'), 'success');
-                    } else {
-                        QuickSiteAdmin.showToast(res.data?.message || 'Clear failed', 'error');
-                        this.disabled = false;
-                    }
-                } catch (e) {
-                    QuickSiteAdmin.showToast('Clear failed', 'error');
+    function _renderManageSpaceExports(fileCount, totalBytes, list, count, emptyRow) {
+        const clearBtn = QSDom.el('button', {
+            type: 'button',
+            class: 'manage-space__clear-btn',
+            id: 'clear-exports-btn',
+            text: t('dashboard.storage.clearAll', 'Clear All')
+        });
+
+        const item = QSDom.el('div', { class: 'manage-space__item manage-space__item--summary' }, [
+            QSDom.el('div', { class: 'manage-space__item-info' }, [
+                QSDom.el('span', {
+                    class: 'manage-space__item-name',
+                    text: fileCount + ' ' + t('dashboard.storage.exportFiles', 'export file(s)')
+                }),
+                QSDom.el('span', { class: 'manage-space__item-meta', text: formatSize(totalBytes) }),
+            ]),
+            clearBtn,
+        ]);
+
+        clearBtn.addEventListener('click', async function () {
+            if (!confirm(t('dashboard.storage.confirmClearExports', 'Clear all export files?'))) return;
+            this.disabled = true;
+            try {
+                const res = await QuickSiteAdmin.apiRequest('clearExports', 'POST', { confirm: true });
+                if (res.ok) {
+                    count.textContent = '0';
+                    item.remove();
+                    list.appendChild(emptyRow());
+                    loadStorageOverview();
+                    QuickSiteAdmin.showToast(t('dashboard.storage.exportsCleared', 'Exports cleared'), 'success');
+                } else {
+                    QuickSiteAdmin.showToast(res.data?.message || 'Clear failed', 'error');
                     this.disabled = false;
                 }
-            });
-        } catch (error) {
-            list.innerHTML = '<div class="manage-space__empty">' + t('common.error', 'Error loading data') + '</div>';
-        }
+            } catch (e) {
+                QuickSiteAdmin.showToast('Clear failed', 'error');
+                this.disabled = false;
+            }
+        });
+
+        return item;
     }
 
     async function loadManageSpaceBackups() {

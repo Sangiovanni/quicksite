@@ -1,103 +1,142 @@
 <?php
 /**
- * Download Build Command - Returns ZIP download URL and file info
- * 
- * Method: GET
- * Endpoint: /management/downloadBuild/{name}
- * 
- * Parameters:
- * - name: Build folder name (e.g., build_20251213_185955)
- * 
- * Returns the direct download URL for the build ZIP file
+ * downloadBuild - Streams the project's build as a ZIP archive
+ *
+ * @method GET
+ * @url /management/downloadBuild
+ * @auth required
+ *
+ * Takes no parameters. Retention is N = 1, so there is one build or none.
+ *
+ * This command USED TO BE A URL GENERATOR: it contained no header() call and no
+ * readfile, and answered a JSON envelope whose download_url pointed at a static
+ * archive under the project's public/build/. That static path was the only fetch
+ * mechanism that existed, and on a public project it served the whole archive to
+ * anonymous callers. Builds now live outside public/ where no URL reaches them,
+ * and this command is the fetch mechanism — so the download inherits the
+ * dispatcher's authentication instead of bypassing it.
+ *
+ * The archive is built ON DEMAND into a temporary file, streamed, and removed.
+ * Nothing is stored: the expanded folder is the only copy of a build on disk,
+ * so a download can never be stale against the build it claims to be.
+ *
+ * Everything the old JSON envelope returned (manifest, sizes, file listing) is
+ * covered by getBuild, so nothing was lost in the rewrite.
  */
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
-require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
-
-// Get build name from URL path: /management/downloadBuild/{name}
-$urlSegments = $trimParametersManagement->additionalParams();
-$buildName = $urlSegments[0] ?? null;
-
-// Validate build name is provided
-if (empty($buildName)) {
-    ApiResponse::create(400, 'validation.required')
-        ->withMessage('Build name is required')
-        ->withErrors([
-            ['field' => 'name', 'reason' => 'missing', 'usage' => 'GET /management/downloadBuild/{name}']
-        ])
-        ->send();
-}
-
-// Validate build name format
-if (!RegexPatterns::match('build_name', $buildName)) {
-    ApiResponse::create(400, 'validation.invalid_format')
-        ->withMessage('Invalid build name format')
-        ->withErrors([RegexPatterns::validationError('build_name', 'name', $buildName)])
-        ->send();
-}
-
-$buildPath = PUBLIC_CONTENT_PATH . '/build';
-$zipPath = $buildPath . '/' . $buildName . '.zip';
-
-// Check if ZIP file exists
-if (!file_exists($zipPath)) {
-    // Check if folder exists (ZIP might not have been created)
-    if (is_dir($buildPath . '/' . $buildName)) {
-        ApiResponse::create(404, 'build.zip_not_found')
-            ->withMessage('Build exists but ZIP file was not found')
-            ->withData([
-                'build' => $buildName,
-                'build_folder_exists' => true,
-                'zip_exists' => false,
-                'hint' => 'The ZIP file may have been deleted. Re-run the build command to create a new one.'
-            ])
-            ->send();
-    }
-    
-    ApiResponse::create(404, 'build.not_found')
-        ->withMessage('Build not found')
-        ->withData([
-            'requested_build' => $buildName,
-            'build_directory' => $buildPath
-        ])
-        ->send();
-}
-
-// Get file info
-$fileSize = filesize($zipPath);
-$fileSizeMB = round($fileSize / 1024 / 1024, 2);
-$fileMTime = filemtime($zipPath);
-
-// Get manifest info if available
-$manifestPath = $buildPath . '/' . $buildName . '/build_manifest.json';
-$manifestInfo = null;
-if (file_exists($manifestPath)) {
-    $manifest = json_decode(file_get_contents($manifestPath), true);
-    if ($manifest) {
-        $manifestInfo = [
-            'public' => $manifest['public'] ?? null,
-            'secure' => $manifest['secure'] ?? null,
-            'space' => $manifest['space'] ?? null,
-            'multilingual' => $manifest['multilingual'] ?? null,
-            'languages' => $manifest['languages'] ?? null,
-            'pages_count' => $manifest['pages_count'] ?? null
-        ];
-    }
-}
-
-// Build download URL — C15 15.4: through the /p/<id>/ passthrough (see qs_build_download_url).
+require_once SECURE_FOLDER_PATH . '/src/functions/ZipUtilities.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
-$downloadUrl = qs_build_download_url($buildName . '.zip');
 
-ApiResponse::create(200, 'operation.success')
-    ->withMessage('Download URL retrieved successfully')
-    ->withData([
-        'build' => $buildName,
-        'download_url' => $downloadUrl,
-        'filename' => $buildName . '.zip',
-        'file_size_bytes' => $fileSize,
-        'file_size_mb' => $fileSizeMB,
-        'file_modified' => date('c', $fileMTime),
-        'content_type' => 'application/zip',
-        'manifest' => $manifestInfo
-    ])
-    ->send();
+/** Prefix for the on-demand archives, so the sweep below can recognise its own. */
+const QS_BUILD_DOWNLOAD_TMP_PREFIX = '.qs-download-';
+
+/**
+ * Remove archives a previous download left behind.
+ *
+ * The happy path unlinks its own file and a shutdown hook covers an aborted
+ * transfer, but neither survives the process being killed outright. Sweeping
+ * on entry means a leftover costs one download's delay rather than living in
+ * the project's quota forever. Only files older than the grace period go, so a
+ * concurrent download in progress is never pulled out from under itself.
+ */
+function qs_build_sweep_stale_downloads(int $graceSeconds = 900): void
+{
+    $root = qs_build_root();
+    if (!is_dir($root)) {
+        return;
+    }
+    foreach ((array) @scandir($root) as $entry) {
+        if (!is_string($entry) || strpos($entry, QS_BUILD_DOWNLOAD_TMP_PREFIX) !== 0) {
+            continue;
+        }
+        $path = $root . DIRECTORY_SEPARATOR . $entry;
+        if (is_file($path) && (time() - (int) @filemtime($path)) > $graceSeconds) {
+            @unlink($path);
+        }
+    }
+}
+
+$buildName = qs_build_current();
+
+if ($buildName === null) {
+    ApiResponse::create(404, 'build.not_found')
+        ->withMessage('This project has no build to download')
+        ->withData([
+            'exists' => false,
+            'hint'   => 'Run build to create one.'
+        ])
+        ->send();
+}
+
+// An incomplete build is refused rather than shipped. A partial carries no
+// build_manifest.json, would not deploy, and handing one to the user as a zip
+// is how a broken deliverable gets mistaken for a good one.
+if (!qs_build_is_complete($buildName)) {
+    ApiResponse::create(409, 'build.incomplete')
+        ->withMessage('This build is incomplete and cannot be downloaded')
+        ->withData([
+            'build' => $buildName,
+            'hint'  => 'It carries no build_manifest.json, so it did not finish. Remove it with deleteBuild and run build again.'
+        ])
+        ->send();
+}
+
+$buildFolder = qs_build_path($buildName);
+
+qs_build_sweep_stale_downloads();
+
+// The temporary archive lives in qs_build/ — the same volume as its source (no
+// cross-device copy), outside public/ (no URL reaches it), and inside the
+// project's own space rather than a shared system temp directory.
+$tmpZip = qs_build_root() . DIRECTORY_SEPARATOR
+        . QS_BUILD_DOWNLOAD_TMP_PREFIX . bin2hex(random_bytes(8)) . '.zip';
+
+// Guarantees removal even if the client aborts mid-transfer and the script dies
+// between here and the unlink below.
+register_shutdown_function(static function () use ($tmpZip) {
+    if (is_file($tmpZip)) {
+        @unlink($tmpZip);
+    }
+});
+
+$zip = new ZipArchive();
+if ($zip->open($tmpZip, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+    ApiResponse::create(500, 'server.file_write_failed')
+        ->withMessage('Failed to create the download archive')
+        ->withData(['build' => $buildName])
+        ->send();
+}
+
+addDirectoryToZip($zip, $buildFolder, $buildName);
+
+if (!$zip->close() || !is_file($tmpZip)) {
+    @unlink($tmpZip);
+    ApiResponse::create(500, 'server.file_write_failed')
+        ->withMessage('Failed to finalise the download archive')
+        ->withData(['build' => $buildName])
+        ->send();
+}
+
+// The name comes from a directory listing, not from request input, so `build`'s
+// own charset validation is not in force on it — a directory created out of band
+// could carry a quote or a newline and reach Content-Disposition. Reduce it to
+// the charset `build` accepts and fall back to a fixed name if nothing survives.
+$safeName = preg_replace('/[^A-Za-z0-9._-]/', '_', $buildName);
+if ($safeName === null || $safeName === '' || $safeName[0] === '.') {
+    $safeName = 'build';
+}
+$filename = $safeName . '.zip';
+
+// Stream it. Same shape as downloadExport, which is the working control for
+// file delivery on this surface.
+header('Content-Type: application/zip');
+header('Content-Disposition: attachment; filename="' . $filename . '"');
+header('Content-Length: ' . filesize($tmpZip));
+header('Cache-Control: no-cache');
+header('Pragma: no-cache');
+header('Expires: 0');
+
+readfile($tmpZip);
+
+@unlink($tmpZip);
+exit;

@@ -162,13 +162,13 @@ $GLOBALS['__help_commands'] = [
     ],
     
     'build' => [
-        'description' => 'Creates a production-ready build with compiled PHP files, optional folder renaming, config sanitization, and ZIP archive creation',
+        'description' => 'Creates a production-ready build with compiled PHP files and optional folder renaming. One build per project: refuses while a build already exists.',
         'method' => 'POST',
         'parameters' => [
             'name' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => 'Custom build folder name. If omitted, auto-generates build_YYYYMMDD_HHMMSS. Fails if name already exists.',
+                'description' => 'Custom build folder name. If omitted, auto-generates build_YYYYMMDD_HHMMSS.',
                 'example' => 'v2-staging',
                 'validation' => 'Max 100 chars, alphanumeric/dots/hyphens/underscores, must start with alphanumeric'
             ],
@@ -200,158 +200,75 @@ $GLOBALS['__help_commands'] = [
             'code' => 'operation.success',
             'message' => 'Build completed successfully',
             'data' => [
-                'build_path' => '/path/to/build_20251206_143022',
-                'zip_file' => '/path/to/build_20251206_143022.zip',
-                'zip_size' => 1234567,
-                'timestamp' => '20251206_143022',
-                'original_size' => 2345678,
-                'compression_ratio' => '52.6%'
+                'build_name' => 'build_20251206_143022',
+                'build_path' => '<project>/qs_build/build_20251206_143022',
+                'build_size_mb' => 2.24,
+                'total_pages' => 7,
+                'download_with' => 'downloadBuild'
             ]
         ],
         'error_responses' => [
             '400.validation.invalid_type' => 'Parameter must be a string',
             '400.validation.invalid_format' => 'Invalid path format (check max depth and allowed characters)',
             '400.validation.shared_parent' => 'Public and secure folders cannot share the same root directory (security requirement)',
-            '423.locked' => 'Build operation locked by another process',
-            '500.server.build_too_large' => 'Build exceeds maximum size limit',
+            '409.conflict.already_exists' => 'This project already has a build - delete it first with deleteBuild',
+            '409.conflict.operation_in_progress' => 'Another build is already running',
+            '413.validation.size_limit_exceeded' => 'Build exceeds MAX_BUILD_SIZE_MB',
             '500.server.file_write_failed' => 'Failed to create build directory or copy files',
-            '500.server.internal_error' => 'Build compilation or ZIP creation failed'
+            '500.server.internal_error' => 'Build compilation failed'
         ],
-        'notes' => 'Compiles JSON templates to PHP using JsonToPhpCompiler. Removes management/ folder from build. Sanitizes config.php (removes DB credentials). Creates timestamped build folder and ZIP. The "space" parameter controls PUBLIC_FOLDER_SPACE - when set (e.g., "web"), all public files go inside {public}/{space}/ creating access URL like http://site.com/web/. Public and secure folders MUST have different root directories for security. Secure folder restricted to single name (no nesting) for init.php compatibility. Uses file locking to prevent concurrent builds.'
-    ],
-    
-    'listBuilds' => [
-        'description' => 'Lists all production builds with metadata including folder names, sizes, and language settings',
-        'method' => 'GET',
-        'parameters' => [],
-        'success_response' => [
-            'status' => 200,
-            'code' => 'operation.success',
-            'message' => 'Build list retrieved successfully',
-            'data' => [
-                'builds' => [
-                    ['name' => 'build_20251214_084504', 'created' => '2025-12-14T08:45:04+00:00', 'public' => 'www', 'secure' => 'backend', 'space' => '', 'multilingual' => true, 'languages' => ['en', 'fr'], 'pages_count' => 7, 'has_zip' => true, 'has_manifest' => true, 'folder_size_mb' => 3.46, 'zip_size_mb' => 2.3]
-                ],
-                'total' => 1,
-                'total_folder_size_mb' => 3.46,
-                'total_zip_size_mb' => 2.3,
-                'build_directory' => '/path/to/public/build'
-            ]
-        ],
-        'error_responses' => [],
-        'notes' => 'Reads build_manifest.json from each build folder for accurate metadata. Legacy builds without manifest show partial info parsed from folder structure. Sorted by creation date (newest first).'
+        'notes' => 'Compiles JSON templates to PHP using JsonToPhpCompiler. Output goes to qs_build/<name>/ inside the project - OUTSIDE its public/, so no URL reaches a build; downloadBuild is the only way to fetch one. RETENTION IS ONE BUILD PER PROJECT: a second build is refused rather than overwriting the first, so use deleteBuild between builds. A build that FAILS removes its own partial directory; if that removal also fails the leftover carries no build_manifest.json and getBuild reports it as incomplete. No ZIP is stored - downloadBuild archives the folder on demand. The "space" parameter controls PUBLIC_FOLDER_SPACE - when set (e.g., "web"), all public files go inside {public}/{space}/ creating access URL like http://site.com/web/. Public and secure folders MUST have different root directories for security. Secure folder restricted to single name (no nesting) for init.php compatibility. Uses file locking to prevent concurrent builds.'
     ],
     
     'getBuild' => [
-        'description' => 'Returns detailed information for a specific build including manifest data, file counts, and download URL',
+        'description' => 'Returns the build of this project - manifest data, size, file count and completeness. Takes no parameters: there is one build or none.',
         'method' => 'GET',
-        'parameters' => [
-            '{name}' => [
-                'required' => true,
-                'type' => 'string',
-                'description' => 'Build folder name (URL path segment)',
-                'example' => 'build_20251214_084504',
-                'validation' => 'Must match format build_YYYYMMDD_HHMMSS'
-            ]
-        ],
-        'example_get' => 'GET /management/getBuild/build_20251214_084504',
+        'parameters' => [],
+        'example_get' => 'GET /management/getBuild',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
             'message' => 'Build details retrieved successfully',
             'data' => [
+                'exists' => true,
                 'name' => 'build_20251214_084504',
+                'complete' => true,
                 'created' => '2025-12-14T08:45:04+00:00',
                 'public' => 'www',
                 'secure' => 'backend',
-                'folder_size_mb' => 3.46,
+                'size_mb' => 3.46,
                 'file_count' => 49,
-                'download_url' => 'http://site.com/build/build_20251214_084504.zip',
+                'download_with' => 'downloadBuild',
                 'contents' => ['LICENSE', 'README.txt', 'backend/', 'www/']
             ]
         ],
         'error_responses' => [
-            '400.validation.required' => 'Build name missing from URL',
-            '400.validation.invalid_format' => 'Invalid build name format',
-            '404.build.not_found' => 'Build folder does not exist'
+            '404.build.not_found' => 'This project has no build'
         ],
-        'notes' => 'Returns full manifest data if available, plus calculated folder size, file count, and ZIP info. Contents shows top-level items in build folder.'
+        'notes' => 'The complete field is the completeness marker - build_manifest.json is written last, so a build without one did not finish and should be removed with deleteBuild before building again. No download URL is returned because a build is not reachable by URL; downloadBuild streams it.'
     ],
     
     'deleteBuild' => [
-        'description' => 'Deletes a build folder and its associated ZIP archive',
-        'method' => 'DELETE',
-        'parameters' => [
-            'name' => [
-                'required' => true,
-                'type' => 'string',
-                'description' => 'Build folder name to delete',
-                'example' => 'build_20251214_084504',
-                'validation' => 'Must match format build_YYYYMMDD_HHMMSS'
-            ]
-        ],
-        'example_delete' => 'DELETE /management/deleteBuild with body: {"name": "build_20251214_084504"}',
+        'description' => 'Deletes the build of this project. Takes no parameters: there is one build or none.',
+        'method' => 'POST',
+        'parameters' => [],
+        'example_post' => 'POST /management/deleteBuild with an empty body',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
             'message' => 'Build deleted successfully',
             'data' => [
                 'deleted_build' => 'build_20251214_084504',
-                'deleted_items' => [
-                    ['type' => 'folder', 'name' => 'build_20251214_084504', 'size_mb' => 3.46],
-                    ['type' => 'zip', 'name' => 'build_20251214_084504.zip', 'size_mb' => 2.3]
-                ],
-                'space_freed_mb' => 5.76
+                'was_complete' => true,
+                'space_freed_bytes' => 3627418,
+                'space_freed_mb' => 3.46
             ]
         ],
         'error_responses' => [
-            '400.validation.required' => 'Missing name parameter',
-            '400.validation.invalid_format' => 'Invalid build name format',
-            '404.build.not_found' => 'Build not found (neither folder nor ZIP exists)',
-            '207.operation.partial_success' => 'Some items could not be deleted',
+            '404.build.not_found' => 'This project has no build to delete',
             '500.server.file_delete_failed' => 'Failed to delete build'
         ],
-        'notes' => 'Deletes both folder and ZIP if they exist. Reports freed disk space. Build name format prevents path traversal attacks.'
-    ],
-    
-    'cleanBuilds' => [
-        'description' => 'Deletes all builds older than a specified timestamp',
-        'method' => 'DELETE',
-        'parameters' => [
-            'before' => [
-                'required' => true,
-                'type' => 'integer|string',
-                'ui_type' => 'datetime', // Renders date/time picker in admin UI
-                'description' => 'Unix timestamp or ISO 8601 date - delete builds created before this time',
-                'example' => '2024-12-13T00:00:00',
-                'validation' => 'Must be valid timestamp or parseable date string'
-            ],
-            'dry_run' => [
-                'required' => false,
-                'type' => 'boolean',
-                'description' => 'If true, only list what would be deleted without actually deleting',
-                'example' => true,
-                'validation' => 'Boolean true/false'
-            ]
-        ],
-        'example_delete' => 'DELETE /management/cleanBuilds with body: {"before": "2024-12-01", "dry_run": true}',
-        'success_response' => [
-            'status' => 200,
-            'code' => 'operation.success',
-            'message' => 'Old builds cleaned successfully',
-            'data' => [
-                'before_timestamp' => 1701388800,
-                'before_date' => '2024-12-01T00:00:00+00:00',
-                'builds_processed' => 3,
-                'space_freed_mb' => 15.5
-            ]
-        ],
-        'error_responses' => [
-            '400.validation.required' => 'Missing before parameter',
-            '400.validation.invalid_format' => 'Invalid timestamp format',
-            '207.operation.partial_success' => 'Some builds could not be deleted'
-        ],
-        'notes' => 'Use dry_run=true first to preview what will be deleted. Useful for automated cleanup scripts. Compares build creation time from manifest or folder name.'
+        'notes' => 'This is what unblocks build, which refuses while a build exists rather than overwriting one. It also removes an INCOMPLETE build, so a partial whose own cleanup failed is recoverable without touching the filesystem. No longer answers 207: with a single directory to remove there is no partial outcome to report.'
     ],
     
     'deployBuild' => [
@@ -410,38 +327,22 @@ $GLOBALS['__help_commands'] = [
     ],
     
     'downloadBuild' => [
-        'description' => 'Returns the download URL and file info for a build ZIP archive',
+        'description' => 'Streams the build of this project as a ZIP archive. Takes no parameters: there is one build or none.',
         'method' => 'GET',
-        'parameters' => [
-            '{name}' => [
-                'required' => true,
-                'type' => 'string',
-                'description' => 'Build folder name (URL path segment)',
-                'example' => 'build_20251214_084504',
-                'validation' => 'Must match format build_YYYYMMDD_HHMMSS'
-            ]
-        ],
-        'example_get' => 'GET /management/downloadBuild/build_20251214_084504',
+        'parameters' => [],
+        'example_get' => 'GET /management/downloadBuild',
         'success_response' => [
             'status' => 200,
-            'code' => 'operation.success',
-            'message' => 'Download URL retrieved successfully',
-            'data' => [
-                'build' => 'build_20251214_084504',
-                'download_url' => 'http://site.com/build/build_20251214_084504.zip',
-                'filename' => 'build_20251214_084504.zip',
-                'file_size_mb' => 2.3,
-                'content_type' => 'application/zip',
-                'manifest' => ['public' => 'www', 'secure' => 'backend', 'multilingual' => true]
-            ]
+            'code' => 'binary',
+            'message' => 'Streams application/zip as an attachment named after the build. NOT a JSON envelope.',
+            'data' => null
         ],
         'error_responses' => [
-            '400.validation.required' => 'Build name missing from URL',
-            '400.validation.invalid_format' => 'Invalid build name format',
-            '404.build.not_found' => 'Build not found',
-            '404.build.zip_not_found' => 'Build exists but ZIP file not found'
+            '404.build.not_found' => 'This project has no build to download',
+            '409.build.incomplete' => 'The build did not finish and cannot be downloaded',
+            '500.server.file_write_failed' => 'Failed to create the download archive'
         ],
-        'notes' => 'Returns direct download URL for the ZIP file. Includes manifest summary if available. Use this URL to download the build via browser or wget/curl.'
+        'notes' => 'The ZIP is created ON DEMAND from the build folder, streamed, and removed - no archive is stored, so a download can never be stale against the build it claims to be. Errors still answer the usual JSON envelope; success answers bytes. A browser cannot fetch this with a plain link because the surface requires an Authorization header as well as the session cookie: fetch it with the header, then hand the blob to the user (the admin panel does this through QuickSiteAdmin.downloadFile).'
     ],
     
     'getCommandHistory' => [
@@ -4311,14 +4212,17 @@ $GLOBALS['__help_commands'] = [
         ],
         'example_get' => 'GET /management/p/quicksite/downloadExport?file=quicksite_export_20250120_143022.zip',
         'success_response' => [
-            'description' => 'Streams ZIP file with appropriate headers'
+            'status' => 200,
+            'code' => 'binary',
+            'message' => 'Streams application/zip as an attachment. NOT a JSON envelope.',
+            'data' => null
         ],
         'error_responses' => [
             '400.validation.missing_field' => 'Missing file parameter',
             '400.validation.invalid_filename' => 'Invalid filename (path traversal blocked)',
             '404.resource.not_found' => 'Export file not found or expired'
         ],
-        'notes' => 'Export files expire after 24 hours. This command only serves archives that exportProject was asked to SAVE (save=true); for an immediate download call exportProject with no options - streaming is its default and stores nothing.'
+        'notes' => 'Export files expire after 24 hours. This command only serves archives that exportProject was asked to SAVE (save=true); for an immediate download call exportProject with no options - streaming is its default and stores nothing. A browser cannot fetch this with a plain link: the surface requires an Authorization header as well as the session cookie, so the archive has to be fetched with the header and handed to the user as a blob (the admin panel does this through QuickSiteAdmin.downloadFile).'
     ],
     
     // =========================================================================
@@ -6618,7 +6522,7 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'css_variables_rules' => ['getRootVariables', 'setRootVariables', 'listStyleRules', 'getStyleRule', 'setStyleRule', 'deleteStyleRule'],
                 'css_animations' => ['getKeyframes', 'setKeyframes', 'deleteKeyframes'],
                 'site_customization' => ['editFavicon', 'editTitle'],
-                'build_deployment' => ['build', 'listBuilds', 'getBuild', 'deleteBuild', 'cleanBuilds', 'deployBuild', 'downloadBuild'],
+                'build_deployment' => ['build', 'getBuild', 'deleteBuild', 'deployBuild', 'downloadBuild'],
                 'project_management' => ['listProjects', 'setSelectedProject', 'createProject', 'deleteProject'],
                 'member_management' => ['listMembers', 'getProjectRoster', 'inviteMember', 'cancelInvitation', 'changeMemberRole', 'removeMember', 'transferOwnership', 'approveJoinRequest', 'denyJoinRequest', 'proposeMember', 'setJoinPolicy', 'setProjectVisibility', 'reconcileMemberships'],
                 'my_memberships' => ['findUser', 'listMyInvitations', 'listMyProposals', 'acceptInvitation', 'declineInvitation', 'leaveProject', 'dismissProjectNotice', 'requestToJoin', 'withdrawJoinRequest'],

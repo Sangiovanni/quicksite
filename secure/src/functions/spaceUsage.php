@@ -107,7 +107,7 @@ function qs_measure_project(string $project): array {
     $total   = qs_dir_size($dir);
     $backups = qs_dir_size($dir . '/backups');
     $exports = qs_dir_size($dir . '/exports');
-    $builds  = qs_dir_size($dir . '/public/build');
+    $builds  = qs_dir_size($dir . '/qs_build');
 
     return [
         'total'   => $total,

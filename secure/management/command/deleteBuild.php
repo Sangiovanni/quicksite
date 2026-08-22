@@ -1,144 +1,59 @@
 <?php
 /**
- * Delete Build Command - Removes a build folder and its ZIP archive
- * 
+ * Delete Build Command - Removes the project's build
+ *
  * Method: POST
  * Endpoint: /management/deleteBuild
- * 
- * Parameters:
- * - name: Build folder name (e.g., build_20251213_185955)
- * 
- * Deletes both the build folder and associated ZIP file
+ *
+ * Takes no parameters. Retention is N = 1, so there is nothing to choose
+ * between: the project has one build or none, and this removes it.
+ *
+ * This is also the only thing that unblocks `build`, which refuses while a
+ * build exists rather than overwriting one. An INCOMPLETE build (a partial
+ * whose own cleanup failed) is removed by this command too — that is how the
+ * user recovers without touching the filesystem.
  */
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php';
-require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 
-$params = $trimParametersManagement->params();
-$buildName = $params['name'] ?? null;
+$buildName = qs_build_current();
 
-// Validate build name is provided
-if (empty($buildName)) {
-    ApiResponse::create(400, 'validation.required')
-        ->withMessage('Build name is required')
-        ->withErrors([
-            ['field' => 'name', 'reason' => 'missing']
-        ])
-        ->send();
-}
-
-// Type validation
-if (!is_string($buildName)) {
-    ApiResponse::create(400, 'validation.invalid_type')
-        ->withMessage('Build name must be a string')
-        ->withErrors([
-            ['field' => 'name', 'expected' => 'string', 'received' => gettype($buildName)]
-        ])
-        ->send();
-}
-
-// Validate build name format (strict pattern to prevent path traversal)
-if (!RegexPatterns::match('build_name', $buildName)) {
-    ApiResponse::create(400, 'validation.invalid_format')
-        ->withMessage('Invalid build name format')
-        ->withErrors([RegexPatterns::validationError('build_name', 'name', $buildName)])
-        ->send();
-}
-
-$buildPath = PUBLIC_CONTENT_PATH . '/build';
-$buildFolder = $buildPath . '/' . $buildName;
-$zipPath = $buildPath . '/' . $buildName . '.zip';
-
-// Check if build exists (either folder or ZIP)
-$folderExists = is_dir($buildFolder);
-$zipExists = file_exists($zipPath);
-
-if (!$folderExists && !$zipExists) {
+if ($buildName === null) {
     ApiResponse::create(404, 'build.not_found')
-        ->withMessage('Build not found')
-        ->withData([
-            'requested_build' => $buildName,
-            'build_directory' => $buildPath
-        ])
+        ->withMessage('This project has no build to delete')
+        ->withData(['exists' => false])
         ->send();
 }
 
-$deletedItems = [];
-$errors = [];
+$buildFolder = qs_build_path($buildName);
+$wasComplete = qs_build_is_complete($buildName);
 
-// Delete folder if exists
-if ($folderExists) {
-    // Get folder size before deletion
-    $folderSize = 0;
-    $iterator = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator($buildFolder, RecursiveDirectoryIterator::SKIP_DOTS)
-    );
-    foreach ($iterator as $file) {
-        $folderSize += $file->getSize();
-    }
-    
-    if (deleteDirectory($buildFolder)) {
-        $deletedItems[] = [
-            'type' => 'folder',
-            'name' => $buildName,
-            'size_mb' => round($folderSize / 1024 / 1024, 2)
-        ];
-    } else {
-        $errors[] = [
-            'type' => 'folder',
-            'name' => $buildName,
-            'reason' => 'Failed to delete folder'
-        ];
-    }
+// Size before deletion, for the freed-space report.
+$folderSize = 0;
+$iterator = new RecursiveIteratorIterator(
+    new RecursiveDirectoryIterator($buildFolder, RecursiveDirectoryIterator::SKIP_DOTS)
+);
+foreach ($iterator as $file) {
+    $folderSize += $file->getSize();
 }
 
-// Delete ZIP if exists
-if ($zipExists) {
-    $zipSize = filesize($zipPath);
-    
-    if (unlink($zipPath)) {
-        $deletedItems[] = [
-            'type' => 'zip',
-            'name' => $buildName . '.zip',
-            'size_mb' => round($zipSize / 1024 / 1024, 2)
-        ];
-    } else {
-        $errors[] = [
-            'type' => 'zip',
-            'name' => $buildName . '.zip',
-            'reason' => 'Failed to delete ZIP file'
-        ];
-    }
+if (!deleteDirectory($buildFolder) || is_dir($buildFolder)) {
+    ApiResponse::create(500, 'server.file_delete_failed')
+        ->withMessage('Failed to delete the build')
+        ->withData([
+            'build' => $buildName,
+            'hint'  => 'The build directory could not be removed, so build will keep refusing. Check filesystem permissions.'
+        ])
+        ->send();
 }
-
-// Check if there were any errors
-if (!empty($errors)) {
-    if (empty($deletedItems)) {
-        // Complete failure
-        ApiResponse::create(500, 'server.file_delete_failed')
-            ->withMessage('Failed to delete build')
-            ->withErrors($errors)
-            ->send();
-    } else {
-        // Partial success
-        ApiResponse::create(207, 'operation.partial_success')
-            ->withMessage('Build partially deleted')
-            ->withData([
-                'deleted' => $deletedItems,
-                'errors' => $errors
-            ])
-            ->send();
-    }
-}
-
-// Calculate total freed space
-$totalFreedMB = array_sum(array_column($deletedItems, 'size_mb'));
 
 ApiResponse::create(200, 'operation.success')
     ->withMessage('Build deleted successfully')
     ->withData([
-        'deleted_build' => $buildName,
-        'deleted_items' => $deletedItems,
-        'space_freed_mb' => round($totalFreedMB, 2)
+        'deleted_build'  => $buildName,
+        'was_complete'   => $wasComplete,
+        'space_freed_bytes' => $folderSize,
+        'space_freed_mb' => round($folderSize / 1024 / 1024, 2)
     ])
     ->send();

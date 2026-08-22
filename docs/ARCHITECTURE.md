@@ -13,7 +13,7 @@ QuickSite separates concerns into three top-level layers. Each one has a clear b
 | Layer | Folder | Audience | Purpose |
 |---|---|---|---|
 | **Project** | `secure/projects/{name}/` | Site owner | The actual website data: routes, page structures (JSON), translations, components, interactions, styles, assets. |
-| **Management** | `secure/management/` | API client (admin panel, scripts) | The 176 commands that read or mutate project data. Single entry point: `public/management/index.php`. Session + role enforced. AI calls bypass this layer entirely (browser-direct). |
+| **Management** | `secure/management/` | API client (admin panel, scripts) | The 174 commands that read or mutate project data. Single entry point: `public/management/index.php`. Session + role enforced. AI calls bypass this layer entirely (browser-direct). |
 | **Admin** | `public/admin/` + `secure/admin/` | Human operator | The browser UI that calls Management commands. Includes the visual editor, sitemap, theme editor, AI workspace, workflow runner. |
 
 ```
@@ -72,8 +72,9 @@ secure/projects/{name}/
 │   ├── style/           # Project CSS source
 │   ├── assets/          # Project images / fonts / videos
 │   ├── scripts/         # Generated client artifacts (the qs-*.js trio)
-│   ├── sitemap.txt      # Published sitemap
-│   └── build/           # Production builds (generated)
+│   └── sitemap.txt      # Published sitemap
+├── qs_build/            # The project's build (generated) — OUTSIDE public/,
+│                        # so no URL reaches it; fetched via downloadBuild
 ├── exports/             # Export ZIPs (generated)
 └── backups/
 ```
@@ -173,7 +174,7 @@ ApiResponse::create(201, 'route.created')
     ->send();
 ```
 
-The full list of 176 commands is registered in `secure/management/routes.php`. See [COMMAND_API.md](COMMAND_API.md) for the catalogue and a per-command reference (also obtainable at runtime via `GET /management/help`).
+The full list of 174 commands is registered in `secure/management/routes.php`. See [COMMAND_API.md](COMMAND_API.md) for the catalogue and a per-command reference (also obtainable at runtime via `GET /management/help`).
 
 ### Response shape
 
@@ -371,7 +372,7 @@ addRoute.php
   └── ApiResponse::create(201, 'route.created')->send()
 ```
 
-The same pattern — parse → validate → mutate files → `ApiResponse` — is used by all 176 commands.
+The same pattern — parse → validate → mutate files → `ApiResponse` — is used by all 174 commands.
 
 ### 5.3 Routing — exact and parameterised routes
 
@@ -965,10 +966,25 @@ Build steps, in order:
 7. Copy `assets/` and `style/`.
 8. Sanitise `config.php` (strip credentials).
 9. Generate an `init.php` adjusted for the renamed public/secure folders.
-10. Package into a ZIP under the project's own `public/build/`.
+10. Write the build under the project's own `qs_build/<name>/`.
 11. Return build stats.
 
-Deploy is a separate command (`deployBuild`) that copies the ZIP contents into a target path. The renamed `public/` and `secure/` folders are part of the security model — anyone scanning the deployed server cannot guess paths from the open-source repo layout.
+**Where a build lives, and how it is fetched.** The output goes to
+`secure/projects/<id>/qs_build/<name>/` — outside the project's `public/`, which
+is the only directory `/p/<id>/` serves. No URL reaches a build, and no
+web-server configuration is needed to keep it that way. `downloadBuild` is the
+fetch path: it archives the folder on demand, streams it, and keeps nothing, so
+the download inherits the management surface's authentication and can never be
+stale against the build it claims to be.
+
+**One build per project.** A project holds at most one build. `build` refuses
+while one exists rather than overwriting it (`409 conflict.already_exists`),
+so replacing a build is a deliberate `deleteBuild` first. A build that FAILS
+removes its own partial directory; if that removal also fails, the leftover
+carries no `build_manifest.json` — written last, precisely so its absence marks
+an unfinished build — and `getBuild` reports it as incomplete.
+
+Deploy is a separate command (`deployBuild`) that copies the build folder into a target path. The renamed `public/` and `secure/` folders are part of the security model — anyone scanning the deployed server cannot guess paths from the open-source repo layout.
 
 ---
 

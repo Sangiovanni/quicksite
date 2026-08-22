@@ -451,6 +451,111 @@ window.QuickSiteAPI = (function() {
     }
 
     /**
+     * Download a command's response as a FILE the browser saves.
+     *
+     * A plain <a href> cannot do this. The management surface requires the
+     * session cookie AND an Authorization header, and an anchor sends no
+     * headers — which is why downloadExport has never been reachable from a
+     * link, and why downloadBuild used to answer a URL pointing at a statically
+     * served copy instead of streaming (that static path was also how a public
+     * project's build ended up anonymously downloadable).
+     *
+     * So: fetch with the header, take the body as a blob, and hand it to the
+     * user through an object URL and a synthetic click. Dependency-free, and one
+     * implementation for every command that answers bytes.
+     *
+     * The filename comes from Content-Disposition when the server sent one,
+     * because the server is what knows the real name.
+     *
+     * ERRORS STILL ARRIVE AS JSON. A refusal (404, 409, 401) answers the usual
+     * envelope, so a non-OK response is read as JSON and returned in the same
+     * {ok, status, data} shape request() uses — the caller branches once, not
+     * twice.
+     *
+     * @param {string} command - Command that streams a file (downloadBuild, downloadExport)
+     * @param {Array}  [urlParams=[]] - URL path segments
+     * @param {Object} [queryParams={}] - Query string parameters
+     * @param {Object} [opts] - { project?: string, filename?: string }
+     * @returns {Promise<{ok: boolean, status: number, data: Object|null, filename?: string}>}
+     *
+     * @example
+     * const res = await QuickSiteAdmin.downloadFile('downloadBuild');
+     * if (!res.ok) showToast(res.data?.message || 'Download failed', 'error');
+     */
+    async function downloadFile(command, urlParams = [], queryParams = {}, opts = {}) {
+        const token = getToken();
+        if (!token) {
+            return clientError('client.no_token', 'No authentication token', 401);
+        }
+
+        const commandPath = buildCommandPath(command, opts.project);
+        if (commandPath === null) {
+            return noProjectError(command);
+        }
+        let url = `${config.apiBase}/${commandPath}`;
+        if (urlParams.length > 0) {
+            url += '/' + urlParams.join('/');
+        }
+        const searchParams = new URLSearchParams();
+        for (const [key, value] of Object.entries(queryParams)) {
+            if (value !== null && value !== undefined && value !== '') {
+                searchParams.append(key, value);
+            }
+        }
+        const queryString = searchParams.toString();
+        if (queryString) {
+            url += '?' + queryString;
+        }
+
+        let response;
+        try {
+            response = await fetch(url, {
+                method: 'GET',
+                credentials: 'same-origin',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+        } catch (error) {
+            console.error('Download error:', error);
+            return clientError('client.network_error', error.message || 'Network error', 0);
+        }
+
+        // A refusal is a normal envelope — read it as one and let the caller
+        // show the message rather than saving an error page as a .zip.
+        if (!response.ok) {
+            const result = await readResponseBody(response);
+            if (response.status === 401 && !redirectingToLogin) {
+                redirectingToLogin = true;
+                clearToken();
+                window.location.href = config.adminBase + '/login';
+            }
+            return { ok: false, status: response.status, data: result };
+        }
+
+        const blob = await response.blob();
+
+        // Prefer the server's own name.
+        let filename = opts.filename || command;
+        const disposition = response.headers.get('Content-Disposition') || '';
+        const match = disposition.match(/filename="?([^"\n;]+)"?/i);
+        if (match && match[1]) {
+            filename = match[1].trim();
+        }
+
+        const objectUrl = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = objectUrl;
+        anchor.download = filename;
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+        // Revoked on the next tick: revoking synchronously can cancel the
+        // download the click just started.
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+
+        return { ok: true, status: response.status, data: null, filename };
+    }
+
+    /**
      * Upload a file via the API
      * 
      * @param {string} command - The upload command/endpoint
@@ -625,6 +730,10 @@ window.QuickSiteAPI = (function() {
         // API Methods
         request,
         upload,
+        // Commands that answer BYTES rather than a JSON envelope
+        // (downloadBuild, downloadExport). See the note on downloadFile: a
+        // plain link cannot carry the Authorization header this surface needs.
+        downloadFile,
         fetchHelper,
         helperPath,
 
