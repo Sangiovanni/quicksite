@@ -8554,3 +8554,61 @@ neither English nor French).
 `isLanguageSwitchPlaceholder`, `hasLanguageSwitchPlaceholder`, `processUrl`),
 `secure/src/classes/JsonToPhpCompiler.php` (the emitted `processUrl`). Sangio's
 ruling, 2026-08-22, during beta.11 sequence 3.
+
+---
+
+### `{{__base_url}}` and `{{__space}}` are removed, not exempted (locked 2026-08-22)
+
+**Decision**: the `{{__base_url}}` and `{{__space}}` system placeholders are
+deleted from both writers. The system placeholders that remain —
+`{{__current_page}}`, `{{__lang}}`, `{{__public_folder}}`, `{{__current_route}}`
+— all REPORT a value; none composes a URL. An author who needs a URL writes a
+root-relative one and the engine composes it against the base.
+
+**Reasoning**: both placeholders resolved to an already-based value, which was
+then pasted in front of a path the engine bases again. `{{__base_url}}style.css`
+rendered as `/p/<id>/<lang>/p/<id>/style.css` — the project marker twice.
+`{{__space}}` carried the identical defect, dormant only because a URL space is
+empty on most installs.
+
+They were also redundant. `processUrl()` already turns `/style/style.css` into
+the correct absolute URL, in every render context, and it is the only thing that
+knows the base for the request actually being served. The placeholders were a
+hand-rolled version of that, and having both is precisely what produced the
+double.
+
+Neither was authored anywhere: zero uses across every project on the install,
+zero mentions in the documentation, zero entries in the command help. In
+compiled pages `$__base_url` was assigned and never read — dead weight in every
+built site.
+
+**Why removed rather than exempted.** Exempting them from re-processing works —
+it is what the language switch needed, because that one has to resolve a
+complete URL to do its job. But an exemption leaves authors an invisible rule:
+some placeholders yield already-based values and must not be re-processed,
+others do not, and guessing wrong produces a silently malformed URL with no
+error anywhere. A placeholder that nothing uses, that duplicates a mechanism
+that already works, and that is wrong when used does not earn that rule.
+Removing it deletes the question instead of answering it a third time.
+
+**An unknown placeholder is now emitted verbatim by the compiler**, which is
+what the renderer has always done with one. This had to land in the same change:
+the compiler turned every unrecognised `{{__name}}` into `$__name`, so a removal
+that made two names unrecognised would have put an undefined-variable warning
+and an empty string into built pages while the live render showed the literal
+text — the same writer-drift the removal exists to reduce. The recognised set is
+now a named list in the compiler, mirroring the renderer's map.
+
+**Alternatives considered**: exempting them the way the language switch is
+exempted (rejected — see above; it preserves a footgun for a feature with no
+users). Keeping them and documenting the rule (rejected — the documentation
+would exist only to warn against the feature it documents). Removing
+`{{__base_url}}` alone (rejected — `{{__space}}` has the same defect and the
+same zero usage; leaving it would mean doing this twice). Removing the reporting
+placeholders too (rejected — they return a value rather than composing a URL, so
+they carry no defect, and `{{__current_page}}` is genuinely used).
+
+**Source**: `secure/src/classes/JsonToHtmlRenderer.php`
+(`getSystemPlaceholders`), `secure/src/classes/JsonToPhpCompiler.php`
+(`generateSystemVariables`, `convertPlaceholdersToPhp`, `SYSTEM_PLACEHOLDERS`).
+Sangio's ruling, 2026-08-22, during beta.11 sequence 3.

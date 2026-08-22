@@ -18,7 +18,22 @@ require_once __DIR__ . '/TagRegistry.php';
  * Converts JSON nodes into PHP string concatenation with translator calls.
  */
 class JsonToPhpCompiler {
-    
+
+    /**
+     * The system placeholders a compiled page defines as variables.
+     *
+     * Mirrors JsonToHtmlRenderer::getSystemPlaceholders()'s map — the two
+     * writers must recognise the same set or the same page says different
+     * things in preview and in production. Every entry REPORTS a value; none
+     * composes a URL, which is why there is no `__base_url` here.
+     */
+    private const SYSTEM_PLACEHOLDERS = [
+        '__current_page',
+        '__lang',
+        '__public_folder',
+        '__current_route',
+    ];
+
     /**
      * Compile a full page JSON structure to PHP code
      * 
@@ -174,11 +189,12 @@ class JsonToPhpCompiler {
         $output .= "    \$__current_page = preg_replace('/^(en|fr)\\\\\\\\/', '', \$__current_page);\n";
         $output .= "}\n\n";
         $output .= "\$__current_page = empty(\$__current_page) ? '' : \$__current_page;\n";
+        // Every variable emitted here REPORTS a value. None of them composes a
+        // URL: an author who needs one writes a root-relative path and
+        // processUrl() composes it against the base, correctly and once.
         $output .= "\$__lang = \$lang;\n";
-        $output .= "\$__base_url = defined('BASE_URL') ? BASE_URL : '';\n";
         $output .= "\$__public_folder = defined('PUBLIC_FOLDER_NAME') ? PUBLIC_FOLDER_NAME : 'public';\n";
-        $output .= "\$__current_route = basename(parse_url(\$_SERVER['REQUEST_URI'], PHP_URL_PATH));\n";
-        $output .= "\$__space = (defined('PUBLIC_FOLDER_SPACE') && PUBLIC_FOLDER_SPACE !== '') ? '/' . PUBLIC_FOLDER_SPACE : '';\n\n";
+        $output .= "\$__current_route = basename(parse_url(\$_SERVER['REQUEST_URI'], PHP_URL_PATH));\n\n";
         
         // Add processUrl helper function WITH function_exists check
         $output .= <<<'PHP'
@@ -599,9 +615,17 @@ class JsonToPhpCompiler {
                     $targetLang = $langMatch[1] ?? 'en';
                     // Generate call to buildLanguageSwitchUrl function
                     $phpParts[] = "buildLanguageSwitchUrl(" . var_export($targetLang, true) . ")";
-                } else {
+                } elseif (in_array($key, self::SYSTEM_PLACEHOLDERS, true)) {
                     // Regular placeholder - convert to PHP variable
                     $phpParts[] = '$' . $key;
+                } else {
+                    // Not a placeholder this engine defines. Emit the text
+                    // VERBATIM, which is what the renderer does with it
+                    // (getSystemPlaceholders() lookup, `?? $matches[0]`).
+                    // Emitting `$__whatever` instead would put an
+                    // undefined-variable warning and an empty string into a
+                    // built page where the live render shows the literal.
+                    $phpParts[] = var_export($part, true);
                 }
             } else {
                 // Static string

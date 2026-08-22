@@ -40,8 +40,10 @@ class JsonToHtmlRenderer {
     /**
      * The base every relative URL this render emits composes against — resolved
      * ONCE, at construction, from the request context (S2.8). Read by
-     * processUrl(), the `{{__base_url}}` placeholder and the 404 branch of the
-     * language switcher, so those three can no longer disagree.
+     * processUrl() and the 404 branch of the language switcher, so the two can
+     * no longer disagree. It is deliberately NOT exposed to authors as a
+     * placeholder: a value that is already based, pasted in front of a path
+     * that processUrl() will base again, produces a doubled URL.
      */
     private $publicBase = '';
 
@@ -1207,19 +1209,14 @@ class JsonToHtmlRenderer {
         // Keep empty for home page (will result in /lang/ with trailing slash)
         $currentPage = empty($currentPage) ? '' : $currentPage;
         
-        // Build space prefix
-        $space = '';
-        if (defined('PUBLIC_FOLDER_SPACE') && PUBLIC_FOLDER_SPACE !== '') {
-            $space = '/' . PUBLIC_FOLDER_SPACE;
-        }
-        
+        // Every placeholder here REPORTS a value. None of them composes a URL:
+        // an author who needs a URL writes a root-relative one and processUrl()
+        // composes it against the base, correctly and once.
         return [
             '__current_page' => $currentPage,
             '__lang' => $this->context['lang'] ?? (defined('LANGUAGE_DEFAULT') ? LANGUAGE_DEFAULT : 'en'),
-            '__base_url' => $this->publicBase,
             '__public_folder' => defined('PUBLIC_FOLDER_NAME') ? PUBLIC_FOLDER_NAME : 'public',
             '__current_route' => $this->context['page'] ?? 'home',
-            '__space' => $space,
         ];
     }
 
