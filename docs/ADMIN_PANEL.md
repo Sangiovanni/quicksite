@@ -1958,8 +1958,8 @@ splits).
 | Cache layer | `secure/src/functions/resolverCache.php` + `cleanResolverCache` command |
 | Read / write commands | `setRouteResolver` (set / clear / patch / append / remove single slot) |
 | Page emit — flat namespace | `secure/src/classes/Page.php` (templates read via `{{resolved:NAME}}` substitution) |
-| Page emit — `r0`/`r1` namespaced | Same, plus `secure/src/classes/PageManagement.php` for the JS-side mirror |
-| Hydration handoff to client | `secure/src/classes/PageManagement.php` → `window.QS_RESOLVED` + `window.QS_RESOLVED_BY_INDEX` |
+| Page emit — `r0`/`r1` namespaced | Same, plus `secure/src/functions/runtimeHandoff.php` for the JS-side mirror |
+| Hydration handoff to client | `secure/src/functions/runtimeHandoff.php` → `window.QS_RESOLVED` + `window.QS_RESOLVED_BY_INDEX`. One writer, so a built site emits the same blocks the live view does. |
 | Admin UI — list view + per-config modal | `/admin/sitemap` → context menu ⋯ → "Configure resolver" — partials `sitemap-resolver-list.php` + `sitemap-resolver.php`; logic in `public/admin/assets/js/pages/sitemap.js` |
 
 #### Sidecar shape

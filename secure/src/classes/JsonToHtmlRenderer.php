@@ -3,6 +3,9 @@ require_once __DIR__ . '/TagRegistry.php';
 require_once __DIR__ . '/UrlPolicy.php';
 require_once __DIR__ . '/CallTransformer.php';
 require_once __DIR__ . '/IframeSandbox.php';
+// {{param:}} / {{resolved:}} — request-time placeholders, defined once and
+// shared with the compiler so a built page substitutes them identically.
+require_once __DIR__ . '/../functions/runtimePlaceholders.php';
 require_once __DIR__ . '/Translator.php';
 require_once __DIR__ . '/../functions/qsVerbCatalog.php';
 // The single point for the project's language set — processUrl() asks it which
@@ -539,17 +542,7 @@ class JsonToHtmlRenderer {
      *   so the substituted value is properly escaped.
      */
     private function applyRouteParams(string $text): string {
-        if (empty($this->context['routeParams']) || strpos($text, '{{param:') === false) {
-            return $text;
-        }
-        $routeParams = $this->context['routeParams'];
-        return preg_replace_callback(
-            '/\{\{param:([a-zA-Z_][a-zA-Z0-9_]*)\}\}/',
-            function ($m) use ($routeParams) {
-                return $routeParams[$m[1]] ?? $m[0];
-            },
-            $text
-        );
+        return qs_apply_route_params($text, $this->context['routeParams'] ?? []);
     }
 
     /**
@@ -576,50 +569,7 @@ class JsonToHtmlRenderer {
      *   substitution so the substituted value is properly escaped.
      */
     private function applyResolved(string $text): string {
-        if (strpos($text, '{{resolved:') === false) {
-            return $text;
-        }
-        $resolved = $this->context['resolved'] ?? null;
-        if ($resolved === null) {
-            // Fall back to the request-scoped global stash populated by
-            // public/index.php after DataResolver runs. require_once is
-            // idempotent — the helper file may already be loaded.
-            require_once __DIR__ . '/../functions/resolverHelpers.php';
-            $resolved = getResolvedVars();
-        }
-        if (empty($resolved) || !is_array($resolved)) {
-            return $text;
-        }
-        return preg_replace_callback(
-            '/\{\{resolved:([a-zA-Z_][a-zA-Z0-9_.]*)\}\}/',
-            function ($m) use ($resolved) {
-                $parts = explode('.', $m[1]);
-                $cursor = $resolved;
-                foreach ($parts as $part) {
-                    // Beta.8 A2 Slice 6 — once we walk into a null
-                    // ancestor, deeper segments have no meaning. Render
-                    // the placeholder as empty (consistent with how a
-                    // direct {{resolved:nullKey}} renders) rather than
-                    // leaving it literal. Matters for onMiss:render-empty
-                    // mode where the top-level expose keys are set to null
-                    // and deeper paths like {{resolved:product.name}}
-                    // would otherwise show as raw '{{...}}' text.
-                    if ($cursor === null) return '';
-                    if (!is_array($cursor) || !array_key_exists($part, $cursor)) {
-                        return $m[0]; // unknown / wrong-type — leave literal (typo detection)
-                    }
-                    $cursor = $cursor[$part];
-                }
-                if (is_array($cursor) || is_object($cursor)) {
-                    return json_encode($cursor, JSON_UNESCAPED_SLASHES);
-                }
-                if (is_bool($cursor)) {
-                    return $cursor ? 'true' : 'false';
-                }
-                return (string) ($cursor ?? '');
-            },
-            $text
-        );
+        return qs_apply_resolved($text, $this->context['resolved'] ?? null);
     }
 
     private function renderTextNode(array $node): string {

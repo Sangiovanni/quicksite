@@ -1,5 +1,6 @@
 <?php
-require_once __DIR__ . '/../functions/utilsManagement.php'; // qs_json_write
+require_once __DIR__ . '/../functions/jsonIo.php'; // qs_json_write
+require_once __DIR__ . '/../functions/apiRegistry.php';   // the READ half, shared with a build
 /**
  * ApiEndpointManager
  * 
@@ -65,11 +66,10 @@ class ApiEndpointManager {
      * marker (Track A4)".
      */
     public static function deriveCallableFrom(string $authType): string {
-        // apiKey is the only shape whose secret needs server-side
-        // storage by convention; everything else is client-friendly
-        // by default.
-        if ($authType === 'apiKey') return 'server';
-        return 'both';
+        // One definition, in apiRegistry.php — a build carries that file and
+        // not this class, and the two must not drift on what may be called
+        // from a server.
+        return qs_api_derive_callable_from($authType);
     }
 
     /**
@@ -81,17 +81,8 @@ class ApiEndpointManager {
      * Returns one of 'client' | 'server' | 'both'.
      */
     public static function effectiveCallableFrom(array $api, array $endpoint): string {
-        // Endpoint-level explicit value always wins.
-        if (isset($endpoint['callableFrom'])
-            && in_array($endpoint['callableFrom'], self::VALID_CALLABLE_FROM, true)) {
-            return $endpoint['callableFrom'];
-        }
-        // Otherwise derive from the effective auth type — endpoint
-        // override takes precedence over API-level auth.
-        $authType = $endpoint['auth']['type']
-            ?? $api['auth']['type']
-            ?? 'none';
-        return self::deriveCallableFrom($authType);
+        // One definition, in apiRegistry.php (see deriveCallableFrom above).
+        return qs_api_effective_callable_from($api, $endpoint);
     }
     
     /**
@@ -140,31 +131,9 @@ class ApiEndpointManager {
      * @return array
      */
     public function loadConfig(): array {
-        if (!file_exists($this->configPath)) {
-            return [
-                'version' => '1.0',
-                'updated' => null,
-                'apis' => []
-            ];
-        }
-        
-        $content = file_get_contents($this->configPath);
-        $data = json_decode($content, true);
-        
-        if ($data === null) {
-            return [
-                'version' => '1.0',
-                'updated' => null,
-                'apis' => []
-            ];
-        }
-        
-        // Ensure apis is an array
-        if (!isset($data['apis']) || !is_array($data['apis'])) {
-            $data['apis'] = [];
-        }
-        
-        return $data;
+        // One reader, in apiRegistry.php, which a build carries and this class
+        // does not travel with.
+        return qs_api_load_config(dirname(dirname($this->configPath)));
     }
     
     /**
@@ -215,8 +184,7 @@ class ApiEndpointManager {
      * @return array|null
      */
     public function getApi(string $apiId): ?array {
-        $config = $this->loadConfig();
-        return $config['apis'][$apiId] ?? null;
+        return qs_api_get($apiId, dirname(dirname($this->configPath)));
     }
     
     /**
@@ -617,27 +585,7 @@ class ApiEndpointManager {
      * @return array|null Endpoint with apiId added, or null
      */
     public function getEndpoint(string $endpointId, ?string $apiId = null): ?array {
-        $config = $this->loadConfig();
-        
-        foreach ($config['apis'] as $aid => $api) {
-            if ($apiId !== null && $aid !== $apiId) {
-                continue;
-            }
-            
-            foreach ($api['endpoints'] as $endpoint) {
-                if ($endpoint['id'] === $endpointId) {
-                    return array_merge($endpoint, [
-                        'apiId' => $aid,
-                        'apiName' => $api['name'],
-                        'baseUrl' => $api['baseUrl'],
-                        'fullUrl' => $api['baseUrl'] . $endpoint['path'],
-                        'apiAuth' => $api['auth']
-                    ]);
-                }
-            }
-        }
-        
-        return null;
+        return qs_api_get_endpoint($endpointId, $apiId, dirname(dirname($this->configPath)));
     }
     
     /**

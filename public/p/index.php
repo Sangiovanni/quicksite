@@ -232,25 +232,6 @@ if (!file_exists($templateFile)) {
 // SERVER-SIDE DATA RESOLVER (beta.8 A2)
 // ============================================================================
 
-/**
- * Detect whether a resolver failure is a LOCAL config bug (endpoint
- * missing from registry, callableFrom=client, apiKey not configured,
- * etc.) — those go to the inline 500 surface so devs see them loudly,
- * even when the route opted into onMiss: 'render-empty' for upstream
- * failures. Status === 0 + an error string we know we emit from
- * serverFetch / DataResolver = config bug.
- */
-function _qsIsResolverConfigBug(string $errMsg, int $status): bool {
-    if ($status !== 0) return false;
-    return (
-        stripos($errMsg, 'not found in registry') !== false ||
-        stripos($errMsg, 'API not found')         !== false ||
-        stripos($errMsg, 'callableFrom')          !== false ||
-        stripos($errMsg, 'apiKey not configured') !== false ||
-        stripos($errMsg, 'missing endpoint')      !== false ||
-        stripos($errMsg, 'missing required field')!== false
-    );
-}
 
 // Lifecycle position (locked Q4 in BETA8_DATA_RESOLVER.md): AFTER the
 // route/auth gate, BEFORE the page template runs. Templates pick up the
@@ -263,6 +244,11 @@ function _qsIsResolverConfigBug(string $errMsg, int $status): bool {
 // getResolverForRoute so static routes pay no cost on the hot path
 // beyond the helper require.
 require_once SECURE_FOLDER_PATH . '/src/functions/resolverHelpers.php';
+// The resolver LIFECYCLE — firing a route's resolvers, publishing what they
+// returned, and routing a failure to the right page. Shared with a built
+// site's front controller, which runs the identical sequence.
+require_once SECURE_FOLDER_PATH . '/src/functions/resolverRuntime.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/oauthRuntime.php';
 // Beta.8 A2 Slice 7.5.A — array-aware accessor. Routes with no
 // resolver return []; single-resolver routes return a 1-element
 // array; multi-resolver routes return N elements. DataResolver's
@@ -349,274 +335,19 @@ if ($__editorMode && !$__editorLiveMode) {
 }
 
 if (!empty($__resolverConfigs)) {
-    // ── beta.9 A1 Slice 2b/2c/2d/2e — side-effect resolver short-circuit ──
-    // OAuth resolver kinds (oauth-start, oauth-callback, oauth-logout)
-    // replace the data-fetch + render pipeline with a 302 + optional
-    // session-cookie response. validateResolverConfigs enforces all-
-    // same-kind per route, so the first config's kind is authoritative
-    // for the whole array.
-    $__firstKind = $__resolverConfigs[0]['kind'] ?? 'data';
-    if ($__firstKind === 'oauth-start' || $__firstKind === 'oauth-callback' || $__firstKind === 'oauth-logout') {
-        require_once SECURE_FOLDER_PATH . '/src/classes/OAuthHandler.php';
-        require_once SECURE_FOLDER_PATH . '/src/functions/oauthStateStore.php';
-        require_once SECURE_FOLDER_PATH . '/src/functions/storageHelpers.php'; // qs_project_cookie_name
-
-        $__oauthCfg = $__resolverConfigs[0];
-        $__routeParams = $trimParameters->routeParams();
-        // Substitute {:routeParam} placeholders in every config string
-        // field BEFORE the handler runs — handler operates on already-
-        // resolved values. Covers `provider` (one resolver entry on
-        // /auth/oauth/:provider/callback can serve every provider) AND
-        // `callback_url` (lets the start-flow target match the user's
-        // route shape, e.g. /auth/oauth/{:provider}/callback). See
-        // DESIGN_DECISIONS.md "OAuth handleStart shape" for why
-        // substitution lives in the dispatcher, not the handler.
-        foreach (['provider', 'callback_url'] as $__phField) {
-            if (isset($__oauthCfg[$__phField]) && is_string($__oauthCfg[$__phField])) {
-                $__oauthCfg[$__phField] = substituteRouteParams(
-                    $__oauthCfg[$__phField],
-                    $__routeParams
-                );
-            }
-        }
-
-        // Slice 2e: oauth-logout takes a different path to derive the
-        // provider id. start/callback get the provider from the config
-        // (URL-driven); logout auto-detects from the active session,
-        // because the user might have logged in via Meta and now hit a
-        // generic /logout route — the cookie is the truth.
-        $__logoutSessionId = '';
-        if ($__firstKind === 'oauth-logout') {
-            // Namespaced per project — the SAME composition the set and the
-            // clears below use. A mismatch here reads as "no session" and the
-            // logout silently leaves the real cookie in place.
-            $__qsOauthCookie   = qs_project_cookie_name(QS_OAUTH_COOKIE);
-            $__logoutSessionId = isset($_COOKIE[$__qsOauthCookie]) ? (string) $_COOKIE[$__qsOauthCookie] : '';
-            $__logoutSession = $__logoutSessionId !== '' ? getOAuthSession($__logoutSessionId) : null;
-            if ($__logoutSession === null) {
-                // No active session — logout is idempotent. Expire the
-                // cookie defensively (in case it lingers with a stale
-                // sessionId no longer in the store) and redirect.
-                // ⚠ A cookie is cleared by NAME and PATH. Both must match the
-                // set exactly, or this expires a cookie that does not exist
-                // and the session cookie survives a "successful" logout.
-                setcookie(qs_project_cookie_name(QS_OAUTH_COOKIE), '', [
-                    'expires'  => time() - 3600,
-                    'path'     => '/',
-                    'secure'   => _oauthIsHttps(),
-                    'httponly' => true,
-                    'samesite' => 'Lax',
-                ]);
-                header('Location: ' . ($_GET['return'] ?? '/'), true, 302);
-                exit;
-            }
-            $__provider = (string) ($__logoutSession['provider'] ?? '');
-        } else {
-            $__provider = $__oauthCfg['provider'] ?? '';
-        }
-
-        try {
-            $__oauthHandler = new OAuthHandler($__provider);
-        } catch (RuntimeException $__oauthErr) {
-            // Surface OAuth misconfig loudly — missing presets file,
-            // unknown provider id, missing secrets entry. Mirrors the
-            // existing data-resolver config-bug treatment.
-            //
-            // Exception for logout: if the handler can't be built (e.g.,
-            // preset was removed after the user logged in), fall back to
-            // local-only logout — the user's intent of "log me out" must
-            // succeed even when the provider catalogue changed under
-            // them. The provider-side token will expire naturally.
-            if ($__firstKind === 'oauth-logout') {
-                error_log(
-                    "OAuth logout: handler construction failed (provider='{$__provider}'): "
-                    . $__oauthErr->getMessage()
-                    . '. Falling back to local-only logout.'
-                );
-                clearOAuthSession($__logoutSessionId);
-                // ⚠ A cookie is cleared by NAME and PATH. Both must match the
-                // set exactly, or this expires a cookie that does not exist
-                // and the session cookie survives a "successful" logout.
-                setcookie(qs_project_cookie_name(QS_OAUTH_COOKIE), '', [
-                    'expires'  => time() - 3600,
-                    'path'     => '/',
-                    'secure'   => _oauthIsHttps(),
-                    'httponly' => true,
-                    'samesite' => 'Lax',
-                ]);
-                header('Location: ' . ($_GET['return'] ?? '/'), true, 302);
-                exit;
-            }
-            // C12 (F9): this is the PUBLIC site. It used to echo the raw
-            // exception message plus the names of the secret files to any
-            // anonymous visitor who hit a misconfigured OAuth route. The
-            // operator's diagnosis now goes to the error log; the visitor gets
-            // the fact that it is misconfigured and nothing about the server.
-            require_once SECURE_FOLDER_PATH . '/src/functions/errorHygiene.php';
-            $__oauthSafe = qs_safe_error_message($__oauthErr, 'oauth:' . $routePath);
-            http_response_code(500);
-            echo "<h1>500 — OAuth misconfigured</h1>\n";
-            echo "<p>This sign-in route is not correctly configured.</p>\n";
-            if (qs_is_development()) {
-                echo '<p>Route: <code>' . htmlspecialchars($routePath) . "</code></p>\n";
-                echo '<p>Provider: <code>' . htmlspecialchars((string) $__provider) . "</code></p>\n";
-                echo '<p>Error: ' . htmlspecialchars($__oauthSafe) . "</p>\n";
-                echo "<p><small>Fix the OAuth config (oauth-presets.json / oauth-secrets.php) and reload.</small></p>\n";
-            }
-            exit;
-        }
-
-        switch ($__firstKind) {
-            case 'oauth-start':
-                $__oauthResult = $__oauthHandler->handleStart($__oauthCfg, $_GET['return'] ?? null);
-                break;
-            case 'oauth-callback':
-                $__oauthResult = $__oauthHandler->handleCallback($__oauthCfg, $_GET);
-                break;
-            default: // 'oauth-logout'
-                $__oauthResult = $__oauthHandler->handleLogout($__oauthCfg, $__logoutSessionId, $_GET['return'] ?? null);
-        }
-
-        // Apply optional session cookie + 302 redirect. Return shape
-        // locked in OAuthHandler's docblock: ['redirect' => $url,
-        // 'cookie' => null | ['name'=>..., 'value'=>..., 'options'=>[...]]].
-        if (!empty($__oauthResult['cookie'])) {
-            $__c = $__oauthResult['cookie'];
-            setcookie($__c['name'], $__c['value'], $__c['options'] ?? []);
-        }
-        $__redirect = $__oauthResult['redirect'] ?? '/';
-        header('Location: ' . $__redirect, true, 302);
-        exit;
-    }
-
-    // ── existing data-resolver path (kind=data, the only beta.8 path) ──
-    require_once SECURE_FOLDER_PATH . '/src/classes/DataResolver.php';
-    $__resolver = new DataResolver();
-    $__resolverContext = [
-        'routeParams' => $trimParameters->routeParams(),
-        'query'       => $_GET,
-        // Server-side session (token, userId, etc.) is wired by Tier 3
-        // server-session integration — empty for now. Bearer-authed
-        // server fetches without a session token will 401 upstream;
-        // public resolvers (auth=none) work today.
-        'session'     => [],
-        'cookieHeader'=> $_SERVER['HTTP_COOKIE'] ?? null,
-    ];
-    // Beta.8 A2 Slice 7.5.C — resolveMany handles single- AND multi-
-    // resolver routes uniformly via serverFetchMulti. Failure semantics
-    // (per-resolver onMiss, page-level short-circuit on unrecovered
-    // failure) baked into its return: ok=false ONLY when a resolver
-    // failed AND onMiss didn't catch it; firstError carries the
-    // resolverIndex for the 404/500 path.
-    $__resolverResult = $__resolver->resolveMany($__resolverConfigs, $__resolverContext);
-
-    // Beta.8 A2 Slice 4 + 7.5.C — emit cache observability header.
-    // serverFetchMulti sets $GLOBALS['__qs_resolver_cache_statuses']
-    // (array, in resolver order) so multi-resolver routes show
-    // "hit,miss,disabled" instead of clobbering each other's status.
-    // headers_sent() guards against late emission when the template
-    // already started outputting.
-    if (!headers_sent() && isset($GLOBALS['__qs_resolver_cache_statuses'])) {
-        $__cacheStatusesHeader = implode(',', $GLOBALS['__qs_resolver_cache_statuses']);
-        header('X-QS-Resolver-Cache: ' . $__cacheStatusesHeader);
-    }
-
-    if ($__resolverResult['ok']) {
-        // Beta.8 A2 Slice 7.5.C — flat namespace + namespaced-by-index.
-        // The flat namespace is collision-free (validated at save time).
-        // The namespaced form gives templates {{resolved:r0.title}} as
-        // a stable alternative when authors want to keep expose names
-        // overlapping across resolvers (intentional shadowing is then
-        // explicit in the template).
-        $__resolvedNamespace = $__resolverResult['exposed'];
-        foreach ($__resolverResult['exposedByIndex'] as $__idx => $__vars) {
-            $__resolvedNamespace['r' . $__idx] = $__vars;
-        }
-        setResolvedVars($__resolvedNamespace);
-    } else {
-        // Status-aware failure routing (Track 1, after Test B feedback).
-        //
-        //   Upstream 4xx (item not found / unauthorized / forbidden):
-        //     "the requested resource doesn't exist for this URL" — render
-        //     the project's 404.php template at HTTP 404. Matches the
-        //     /products/red-vase pattern in every CMS — a missing slug is
-        //     a not-found, not a server crash.
-        //
-        //   Upstream 5xx OR transport failure (status=0 from curl error):
-        //     "upstream broke" — render the project's 500.php template at
-        //     HTTP 500. The server proxied the user's request and the API
-        //     it depends on is down or returned a 5xx. Falls back to
-        //     plain text when the project has no 500.php.
-        //
-        //   Local config bug (endpoint missing from registry, apiKey not
-        //   configured, callableFrom=client, etc.): the resolver itself is
-        //   misconfigured. status=0 + a known config-error text in 'error'.
-        //   Render the ugly inline 500 so devs see the misconfig loudly
-        //   instead of a styled 404 page that hides the bug.
-        //
-        // Beta.8 A2 Slice 7.5.C — failure details now come from
-        // resolveMany's firstError (the FIRST unrecovered resolver
-        // failure across the array). Per-resolver onMiss='render-empty'
-        // is handled inside resolveMany — those failures don't reach
-        // here, the page renders with null vars for that resolver's
-        // expose keys instead.
-        $__firstError = $__resolverResult['firstError'] ?? null;
-        $__status = (int) ($__firstError['status'] ?? 0);
-        $__errMsg = $__firstError['error'] ?? 'unknown resolver error';
-        $__isConfigBug = _qsIsResolverConfigBug($__errMsg, $__status);
-
-        if ($__isConfigBug) {
-            http_response_code(500);
-            echo "<h1>500 — Data resolver misconfigured</h1>\n";
-            echo '<p>Route: <code>' . htmlspecialchars($routePath) . "</code></p>\n";
-            echo '<p>Error: ' . htmlspecialchars($__errMsg) . "</p>\n";
-            echo "<p><small>This is a config bug — the resolver references something that doesn't exist or is invalid. Fix the resolver config (or the API registry) and reload.</small></p>\n";
-            exit;
-        }
-
-        if ($__status >= 400 && $__status < 500) {
-            // Upstream "not found / unauthorized / forbidden" → render the
-            // project's 404 template. Stash the resolver status so the
-            // template (or future logging) can branch on it if needed.
-            $GLOBALS['__qs_resolver_failure'] = [
-                'route'  => $routePath,
-                'status' => $__status,
-                'error'  => $__errMsg,
-            ];
-            http_response_code(404);
-            $__notFoundFile = PROJECT_PATH . '/templates/pages/404/404.php';
-            if (!file_exists($__notFoundFile)) {
-                $__notFoundFile = PROJECT_PATH . '/templates/pages/404.php';
-            }
-            if (file_exists($__notFoundFile)) {
-                require_once $__notFoundFile;
-            } else {
-                echo "<h1>404 — Not Found</h1>\n";
-                echo "<p>The requested content was not found.</p>\n";
-            }
-            exit;
-        }
-
-        // Anything else (status >= 500 or status === 0 with non-config
-        // error) → upstream / transport failure → 500 template.
-        $GLOBALS['__qs_resolver_failure'] = [
-            'route'  => $routePath,
-            'status' => $__status,
-            'error'  => $__errMsg,
-        ];
-        http_response_code(500);
-        $__serverErrFile = PROJECT_PATH . '/templates/pages/500/500.php';
-        if (!file_exists($__serverErrFile)) {
-            $__serverErrFile = PROJECT_PATH . '/templates/pages/500.php';
-        }
-        if (file_exists($__serverErrFile)) {
-            require_once $__serverErrFile;
-        } else {
-            echo "<h1>500 — Server Error</h1>\n";
-            echo "<p>Something went wrong while fetching data for this page. Please try again later.</p>\n";
-        }
-        exit;
-    }
+    // ── sign-in routes ──
+    // A resolver whose KIND is an OAuth step replaces the render entirely with
+    // a redirect (and, on the callback, a session cookie). Shared with a built
+    // site's front controller, which runs the identical sequence — this is the
+    // AUTHOR'S site's own sign-in, and it needs nothing from QuickSite's
+    // management API or admin panel.
+    qs_run_oauth_route($__resolverConfigs, $routePath, $trimParameters->routeParams());
+    // ── the data-resolver path (kind=data) ──
+    // Fires the route's resolvers, publishes the values the page's
+    // {{resolved:NAME}} placeholders read, and — when the data did not arrive —
+    // answers with the project's own 404 / 500 and exits rather than rendering
+    // a page whose content is missing. A built site runs this same function.
+    qs_resolve_route_data($__resolverConfigs, $routePath, $trimParameters->routeParams());
 }
 
 require_once $templateFile;

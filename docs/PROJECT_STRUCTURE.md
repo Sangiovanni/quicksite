@@ -65,7 +65,9 @@ quicksite/
 │   │       │                     #   build, fetched via downloadBuild. A self-contained
 │   │       │                     #   site: <public>/ (front controller, qs-site.php,
 │   │       │                     #   .htaccess, style, assets, scripts) beside <secure>/
-│   │       │                     #   (precompiled pages, runtime, translations)
+│   │       │                     #   (precompiled pages, the request-time runtime,
+│   │       │                     #   translations, and the project data a served
+│   │       │                     #   page reads — resolvers, API registry, consent)
 │   │       ├── snippets/         # Snippets belonging to this project alone
 │   │       ├── exports/          # This project's export ZIPs (generated)
 │   │       └── backups/          # Project backups (gitignored)

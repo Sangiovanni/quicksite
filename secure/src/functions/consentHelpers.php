@@ -23,6 +23,9 @@ if (!defined('SECURE_FOLDER_PATH')) {
 
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/storageHelpers.php';
+// qs_consent_hydration_script() lives with the runtime handoff, because a built
+// site emits the tag and cannot carry this authoring file.
+require_once SECURE_FOLDER_PATH . '/src/functions/runtimeHandoff.php';
 
 const CONSENT_CONFIG_DEFAULTS = ['enabled' => false, 'policyRoute' => null, 'version' => 1];
 
@@ -74,14 +77,34 @@ function consentCategoryMap(): array {
  * callers skip this in editor mode.
  */
 function consentHydrationScript(): string {
-    $cfg = loadConsentConfig();
-    if (empty($cfg['enabled'])) {
+    $payload = qs_consent_payload();
+    if ($payload === null) {
         return '';
     }
-    $payload = [
+    return qs_consent_hydration_script($payload);
+}
+
+/**
+ * The consent payload for THIS project, or null when the layer is off.
+ *
+ * Split out from the emitter so a production build can precompute it. Deriving
+ * the payload reads data/consent.json and walks the storage registry — that is
+ * authoring code, it pulls in translationHelpers and the shared utility drawer,
+ * and none of it belongs in a deployed site. The answer only changes when the
+ * author edits the consent config or the registry, so the build computes it
+ * once and ships the result as data.
+ *
+ * @return array{enabled: bool, version: int, categories: array<string,string>}|null
+ */
+function qs_consent_payload(): ?array
+{
+    $cfg = loadConsentConfig();
+    if (empty($cfg['enabled'])) {
+        return null;
+    }
+    return [
         'enabled'    => true,
         'version'    => (int) ($cfg['version'] ?? 1),
         'categories' => consentCategoryMap(),
     ];
-    return '<script>window.QS_CONSENT=' . json_encode($payload, JSON_UNESCAPED_SLASHES) . ';</script>';
 }

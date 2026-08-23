@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/utilsManagement.php'; // qs_json_write
+require_once __DIR__ . '/jsonIo.php'; // qs_json_write — NOT the whole utility drawer: this file runs on every served page, built ones included
 /**
  * resolverCache.php — File-based response cache for the server-side
  * data resolver (beta.8 A2 Slice 4).

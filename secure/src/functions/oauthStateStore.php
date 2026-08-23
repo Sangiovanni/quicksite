@@ -36,7 +36,9 @@
  * Function-level guard so commands can include this alongside other
  * helpers without double-declaration errors.
  */
-require_once __DIR__ . '/storageHelpers.php'; // qs_project_cookie_name, QS_OAUTH_COOKIE
+// Only qs_project_cookie_name() is needed; it lives in requestRuntime.php so
+// this file can travel into a production build.
+require_once __DIR__ . '/requestRuntime.php'; // qs_project_cookie_name, QS_OAUTH_COOKIE
 
 
 if (!function_exists('storeOAuthState')) {

@@ -8868,3 +8868,277 @@ would have been the half that was already wrong).
 
 **Source**: `secure/src/functions/aliasRouting.php`, `public/p/index.php`,
 `secure/src/runtime/site/index.php`.
+
+---
+
+### The runtime handoff has one writer, and each surface supplies the values (locked 2026-08-23)
+
+**Decision**: `secure/src/functions/runtimeHandoff.php` emits the whole run of
+`<script>` tags a rendered page hands the browser runtime — route schema,
+storage namespace, `qs.js`, consent map, theme wiring, API config, enums, state
+stores, both resolver blocks, and the page-events chain — in one fixed order.
+The live `/p/<projectId>/` render and a compiled page both call it. Gathering
+stays with each caller, because the SOURCES differ: a live render reads this
+route's stores and events out of `data/`, a compiled page already has them baked
+in.
+
+**Reasoning**: the contract had two writers that had drifted. The live render
+emitted seven blocks; a compiled page emitted four, with the compiler
+independently emitting a fifth. A built site therefore lost `QS_CONSENT`,
+`QS_RESOLVED` and `QS_RESOLVED_BY_INDEX`, and neither writer was obviously
+wrong when read on its own — the gap only exists between them.
+
+**The consent block is where the drift was worst, because absence is
+meaningful.** `qs.js` reads a missing `window.QS_CONSENT` as "this project has
+no consent layer" and lets every storage write through. That is correct for a
+project that never configured one, so a build that simply forgot to emit the
+payload did not look broken: the gate failed open silently while the project's
+own generated policy pages went on promising a banner. A block whose absence is
+indistinguishable from a legitimate configuration is exactly the kind that must
+not have two writers.
+
+**Order is part of the contract, not formatting.** The route schema and the
+storage namespace precede `qs.js` because its IIFE reads them synchronously at
+load; the state stores follow `qs-api-config.js` because a store's endpoint
+resolves against `window.QS_API_ENDPOINTS`; the page-events script goes last
+because an onload chain can call `fetchState`. Three ordering constraints that
+were previously satisfied by coincidence in two places.
+
+**Alternatives considered**: routing compiled pages through `PageManagement` so
+there is one render path (rejected, and this recommendation was WITHDRAWN after
+being made — `PageManagement::render()` constructs a `JsonToHtmlRenderer`, so it
+IS the live-render path; routing compiled pages through it would carry the
+JSON→HTML renderer into every build, which is precisely the cost precompilation
+exists to remove); having the emitter gather its own values (rejected — the
+sources genuinely differ per surface, and forcing one gatherer would mean a
+built site reading `data/state-stores.json` files that deliberately do not
+travel); leaving the compiler to emit `QS_STATE_STORES` itself (rejected — it
+was a third writer of one block, and the emitter needs the stores as data anyway
+to match them against the route's resolvers).
+
+**Source**: `secure/src/functions/runtimeHandoff.php`,
+`secure/src/classes/PageManagement.php`, `secure/src/classes/Page.php`,
+`secure/src/classes/JsonToPhpCompiler.php`.
+[ARCHITECTURE.md §8.5](ARCHITECTURE.md), [ADMIN_PANEL.md §9.7](ADMIN_PANEL.md).
+
+---
+
+### A build carries the runtime that serves a page, not the code that edits one (locked 2026-08-23)
+
+**Decision**: files that mix authoring and request-time concerns are split, with
+the authoring file requiring the runtime one. A production build carries only
+the runtime halves.
+
+| Authoring — install only | Runtime — travels |
+|---|---|
+| `ApiEndpointManager` | `apiRegistry.php` |
+| `resolverHelpers.php` | `resolverRegistry.php` |
+| `consentHelpers.php` | the precomputed payload + `qs_consent_hydration_script()` |
+| `storageHelpers.php`, `projectContext.php` | `requestRuntime.php` |
+| `utilsManagement.php` | `jsonIo.php` |
+
+**Reasoning**: the no-feature-gap ruling says a built site does what a
+development one does, and resolvers, `serverFetch`, param values and OAuth are
+all request-time work that no amount of precompilation can do in advance. So the
+engine that performs them has to travel. What must NOT travel is the code that
+edits a site — and the two were tangled in single files, so carrying one meant
+carrying both.
+
+The measurements made the split obvious rather than arbitrary. `serverFetch`
+needed three lookups out of `ApiEndpointManager`'s 1,100 lines. The resolver
+lifecycle needed two accessors out of `resolverHelpers`' 840. Three runtime
+files needed exactly one function — `qs_json_write` — out of
+`utilsManagement.php`'s 850. OAuth needed one function out of `storageHelpers`
+and one out of `projectContext`. In every case the runtime half was small and
+the authoring half was the bulk.
+
+**One definition, not a copy.** The authoring file requires the runtime one and
+delegates, so every existing caller is unchanged and there is a single
+definition of each behaviour in the tree. A duplicated lookup is how preview and
+production start disagreeing about what an endpoint is.
+
+**Two consequences worth stating.** `qs_json_write` guards against a
+`json_encode` failure silently truncating a file to zero bytes — a rule that
+must hold identically in both places, which is an argument for one definition
+rather than for a convenient copy. And `apiRegistry` deliberately never writes
+or creates a directory, unlike the manager's constructor, which `mkdir`s
+`data/` and seeds an empty config: acceptable for an authoring surface, wrong
+for a page render, and wrong on a read-only deployment.
+
+**Alternatives considered**: shipping the whole classes (rejected — drags the
+authoring surface and its dependencies into every deployed site, which is what
+precompilation exists to avoid); precompiling the resolver into a fully-resolved
+request plan and giving a build a small bespoke executor (rejected — a second
+implementation of the fetch/expose path is exactly the drift these splits exist
+to prevent, and the same argument that withdrew the `PageManagement`
+recommendation applies); copying the needed functions into build-only files
+(rejected — same reason, with the added cost that nothing would keep the copies
+in step).
+
+**Source**: `secure/src/functions/{apiRegistry,resolverRegistry,requestRuntime,jsonIo}.php`,
+`secure/management/command/build.php`. [ARCHITECTURE.md §8.6](ARCHITECTURE.md).
+
+---
+
+### `{{param:}}` and `{{resolved:}}` are substituted at request time, by one implementation (locked 2026-08-23)
+
+**Decision**: `secure/src/functions/runtimePlaceholders.php` defines what both
+placeholders mean. The live renderer delegates to it; a compiled page emits a
+CALL to it rather than a literal. Resolved values are substituted BEFORE params.
+
+**Reasoning**: these are the only placeholders whose values are not knowable
+when a page is compiled — a param comes from the URL being served right now, a
+resolved value from an HTTP call made during that request. The compiler had no
+notion of either, so a built page shipped `slug=[{{param:slug}}]` and
+`product=[{{resolved:product}}]` to the visitor as literal text.
+
+**The ordering rule is a security property.** A route param is visitor-supplied.
+Substituting params first would let a URL like `/products/{{resolved:secret}}`
+place a live placeholder into the text for the resolved pass to expand.
+Substituting resolved values first means anything a param introduces afterwards
+is never re-scanned. This rule already existed in the renderer, in a comment; it
+is now in the function that both surfaces call, with a test that shows the wrong
+order really does leak.
+
+**The substitution points match the renderer's exactly** — text nodes only, both
+the raw-literal and the translated branches. The compiler was deliberately NOT
+taught to substitute in attributes, even though it easily could: the renderer
+does not, and adding it on one side would create a new divergence while closing
+an old one.
+
+**Alternatives considered**: giving the compiler its own copy (rejected — the
+rules have real subtleties, and two copies of "an unknown name stays literal, a
+null ancestor renders empty, an array renders as compact JSON" is a divergence
+waiting to happen); emitting the substitution call unconditionally for raw
+literals (rejected for raw text only — a literal is fully known at compile time,
+so the call is emitted only when it could match; a translated string's value
+depends on the request's language, so there the call is always emitted).
+
+**Source**: `secure/src/functions/runtimePlaceholders.php`,
+`secure/src/classes/JsonToHtmlRenderer.php`,
+`secure/src/classes/JsonToPhpCompiler.php`.
+
+---
+
+### A built site's environment comes from the server, and its OAuth secret can too (locked 2026-08-23)
+
+**Decision**: a built site is `production` unless the deployment sets
+`QS_ENVIRONMENT=development`. OAuth client credentials are read from
+`QS_OAUTH_<PROVIDER>_CLIENT_ID` / `_CLIENT_SECRET` first and from the shipped
+`data/oauth-secrets.json` second. The build still copies the secrets file when
+the project has one, and reports that it did.
+
+**Reasoning**: the environment is a property of WHERE a site runs, not of the
+artifact that was shipped — the same build should be safe in production and
+usable against a LAN API on a developer's machine, and only the deployment knows
+which it is. It is what the outbound-URL policy reads before allowing a resolver
+to reach an internal address, so it is also a security setting: absent means
+production means refused. Before this, a built site had no way to declare its
+environment at all, so a deliberate local test was impossible.
+
+**The OAuth secret is the same shape of question with a sharper edge.** A build
+folder is handed over whole by `downloadBuild`, so a client secret inside it
+travels with a deliverable. It has to reach the deployer's server either way,
+which is what makes shipping it defensible — but a deployer who would rather not
+carry it can set the variables and delete the file, and the handler prefers the
+server's value regardless. The response names `oauth_secrets_included` because
+it changes what the deliverable IS.
+
+**Alternatives considered**: never shipping the secret (rejected — the build
+stops working out of the box, which edges toward the feature gap this sequence
+exists to close); shipping it with no alternative (rejected — a build artifact
+becomes a credential with no way to opt out); putting the environment in the
+build's own `qs-site.php` (rejected — that is build-time data, and it would
+brand an artifact as development regardless of where it lands).
+
+**Source**: `secure/src/runtime/site/index.php`,
+`secure/src/classes/OAuthHandler.php`, `secure/management/command/build.php`.
+Sangio's ruling on the secret, design conversation during beta.11.
+
+---
+
+### URL aliases, resolvers and OAuth routes run from shared lifecycles (locked 2026-08-23)
+
+**Decision**: `resolverRuntime.php` fires a route's data resolvers and routes a
+failure; `oauthRuntime.php` runs a sign-in route's OAuth step. The
+`/p/<projectId>/` renderer and a built site's front controller both call them.
+Editor emulation is deliberately NOT in either.
+
+**Reasoning**: same argument as `projectLanguage.php` and `aliasRouting.php`
+before them — two surfaces serving the same project's pages must not each carry
+their own copy of what a route does. The failure routing is the part that would
+have drifted worst: an upstream 4xx renders the project's own 404, a 5xx or a
+transport failure renders its 500, and a local misconfiguration renders a plain
+inline 500 that names the error, because a resolver pointing at an endpoint that
+is not in the registry is a developer's problem and must not be disguised as a
+styled not-found.
+
+**Editor emulation stays out, and that is a boundary rather than an omission.**
+The visual editor previews a resolver-backed page by passing mock values in the
+query string instead of firing the real resolver. That belongs to the admin
+preview surface alone: a built site is a public website, and honouring
+`?_editor=1&_emulate=…` there would let any visitor dictate what the page says.
+The renderer decides which configs to pass in; the shared function fires
+whatever it is given.
+
+**Two live defects were fixed in the alias extraction**, both reachable on the
+public renderer: the language prefix was read from a config key no project has
+(`DEFAULT_LANGUAGE` rather than `LANGUAGE_DEFAULT`), which made a redirect
+`Location` protocol-relative — a different HOST — and the redirect half omitted
+the URL space the rewrite half included. A redirect composes against the site's
+public base; a rewrite composes against the URL space the router strips. They
+are different bases, and conflating them was the root of the second defect.
+
+**Source**: `secure/src/functions/{resolverRuntime,oauthRuntime,aliasRouting}.php`,
+`public/p/index.php`, `secure/src/runtime/site/index.php`.
+[ARCHITECTURE.md §8.4](ARCHITECTURE.md).
+
+---
+
+### A page-event chain is transformed whole, never call by call (locked 2026-08-23)
+
+**Decision**: each handler's list of `{{call:…}}` entries is joined into one
+chain string and transformed once, in the compiler as well as in the live
+render.
+
+**Reasoning**: the awaitable-verb detection can only see a chain it is handed
+whole. Transforming entry by entry gives every call its own isolated async IIFE,
+so a later step runs before an awaited earlier one has resolved. Measured on an
+`onload` chain of `exchangeMagicLink` → `saveToken` → `redirect`:
+
+```
+per-entry: (async()=>{await QS.exchangeMagicLink('tok')})()… ;QS.saveToken(…);QS.redirect('/home')
+joined:    (async()=>{await QS.exchangeMagicLink('tok');await QS.saveToken(…);await QS.redirect('/home')})()…
+```
+
+The per-entry form redirects before the token is ever saved. The live render was
+already fixed; the compiler was not, so the defect existed only in built sites —
+and only for chains containing an awaitable verb, which is why a synchronous
+chain looked identical on both surfaces and hid it.
+
+**Source**: `secure/src/classes/JsonToPhpCompiler.php`,
+`secure/src/classes/PageManagement.php`.
+
+---
+
+### The iframe sandbox policy is enforced by the compiler too (locked 2026-08-23)
+
+**Decision**: a compiled page emits `IframeSandbox::getSandboxAttribute()` for
+every `<iframe>`, drops any author-supplied `sandbox`, and pulls the class in
+only when the page actually has an iframe. The policy file travels with the
+build.
+
+**Reasoning**: the renderer enforced this and the compiler had no notion of it,
+so a per-domain sandbox policy held in preview and vanished in production —
+a security control that disappeared precisely where it mattered. An
+author-supplied `sandbox` is dropped rather than merged, because the system
+decides this attribute; letting page JSON widen it would make the policy
+advisory.
+
+**The attribute is computed at REQUEST time even though the src is known at
+compile time**, because the POLICY is project data that can change without the
+page changing. The argument passed is the raw authored src — exactly what the
+renderer passes — so the two cannot disagree.
+
+**Source**: `secure/src/classes/JsonToPhpCompiler.php`,
+`secure/src/classes/IframeSandbox.php`, `secure/management/command/build.php`.

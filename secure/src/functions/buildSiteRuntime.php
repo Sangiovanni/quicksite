@@ -335,6 +335,22 @@ if (!function_exists('qs_site_verify_servable')) {
             'src/functions/projectLanguage.php',
             'src/functions/routeHelpers.php',
             'src/functions/aliasRouting.php',
+            'src/functions/runtimePlaceholders.php',
+            'src/functions/runtimeHandoff.php',
+            'src/functions/resolverRegistry.php',
+            'src/functions/resolverRuntime.php',
+            'src/functions/apiRegistry.php',
+            'src/functions/serverFetch.php',
+            'src/functions/resolverCache.php',
+            'src/functions/environment.php',
+            'src/functions/jsonIo.php',
+            'src/classes/DataResolver.php',
+            'src/classes/OutboundUrlPolicy.php',
+            'src/classes/IframeSandbox.php',
+            'src/classes/OAuthHandler.php',
+            'src/functions/oauthRuntime.php',
+            'src/functions/oauthStateStore.php',
+            'src/functions/requestRuntime.php',
         ];
         foreach ($runtime as $relative) {
             if (!is_file($securePath . DIRECTORY_SEPARATOR . $toNative($relative))) {

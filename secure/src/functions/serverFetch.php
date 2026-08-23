@@ -18,7 +18,7 @@
  * Refusing client-only endpoints:
  *
  *   Endpoints carry a `callableFrom` marker (beta.8 Track A4 — see
- *   ApiEndpointManager::effectiveCallableFrom). Endpoints whose effective
+ *   qs_api_effective_callable_from). Endpoints whose effective
  *   value is `client` cannot be invoked here — serverFetch returns
  *   ok=false with a clear error. This is the server-side mirror of the
  *   client-side guard in QS.fetch + the qs-api-config.js filtering that
@@ -82,7 +82,10 @@
  * @return array              Normalised response (see above).
  */
 
-require_once __DIR__ . '/../classes/ApiEndpointManager.php';
+// The API registry READ half only — this file runs on every served page,
+// including a built one, and must not drag the authoring class (and its
+// utilsManagement dependency) along with it.
+require_once __DIR__ . '/apiRegistry.php';
 require_once __DIR__ . '/../classes/OutboundUrlPolicy.php';
 
 /**
@@ -120,8 +123,7 @@ function _serverFetchPrepare(string $endpointRef, array $inputs, array $context)
     }
 
     // Resolve the endpoint via the project's registry.
-    $manager = new ApiEndpointManager();
-    $endpoint = $manager->getEndpoint($endpointId, $apiId);
+    $endpoint = qs_api_get_endpoint($endpointId, $apiId);
     if ($endpoint === null) {
         return ['state' => 'error', 'result' => [
             'ok' => false,
@@ -134,7 +136,7 @@ function _serverFetchPrepare(string $endpointRef, array $inputs, array $context)
     // callableFrom enforcement. Need the merged API config for
     // effectiveCallableFrom; getEndpoint gives us apiAuth + apiId but not
     // the full $api array, so re-fetch via getApi.
-    $api = $manager->getApi($endpoint['apiId']);
+    $api = qs_api_get($endpoint['apiId']);
     if ($api === null) {
         return ['state' => 'error', 'result' => [
             'ok' => false,
@@ -143,7 +145,7 @@ function _serverFetchPrepare(string $endpointRef, array $inputs, array $context)
             'error' => "API not found for resolved endpoint: {$endpoint['apiId']}",
         ]];
     }
-    $callableFrom = ApiEndpointManager::effectiveCallableFrom($api, $endpoint);
+    $callableFrom = qs_api_effective_callable_from($api, $endpoint);
     if ($callableFrom === 'client') {
         return ['state' => 'error', 'result' => [
             'ok' => false,

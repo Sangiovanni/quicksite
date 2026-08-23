@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../functions/utilsManagement.php'; // qs_json_write
+require_once __DIR__ . '/../functions/jsonIo.php'; // qs_json_write only — this class is applied at render time, in a build too // qs_json_write
 
 /**
  * IframeSandbox — Centralized iframe sandbox permission manager

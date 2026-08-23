@@ -7,16 +7,19 @@ class Page {
     private $showMenu;
     private $showFooter;
     private $pageEventsScript;
-    private $stateStoresScript;
+    /** @var array This route's state stores, as data — the <script> tag is the handoff's job. */
+    private $stateStores;
 
-    public function __construct($title, $content, $lang, $showMenu = true, $showFooter = true, $pageEventsScript = '', $stateStoresScript = '') {
+    public function __construct($title, $content, $lang, $showMenu = true, $showFooter = true, $pageEventsScript = '', $stateStores = []) {
         $this->title = $title;
         $this->content = $content;
         $this->lang = $lang;
         $this->showMenu = $showMenu;
         $this->showFooter = $showFooter;
         $this->pageEventsScript = $pageEventsScript;
-        $this->stateStoresScript = $stateStoresScript;
+        // Tolerate the old pre-rendered-tag form so a page compiled by an
+        // earlier build cannot fatal here; it simply carries no stores.
+        $this->stateStores = is_array($stateStores) ? $stateStores : [];
     }
 
     public function render() {
@@ -26,7 +29,7 @@ class Page {
         $showMenu = $this->showMenu;
         $showFooter = $this->showFooter;
         $pageEventsScript = $this->pageEventsScript;
-        $stateStoresScript = $this->stateStoresScript;
+        $stateStores = $this->stateStores;
         $spacePrefix = PUBLIC_FOLDER_SPACE !== '' ? PUBLIC_FOLDER_SPACE . '/' : '';
         $stylePath = (defined('PUBLIC_CONTENT_PATH') ? PUBLIC_CONTENT_PATH : dirname(__DIR__, 3) . '/' . (defined('PUBLIC_FOLDER_NAME') ? PUBLIC_FOLDER_NAME : 'public')) . '/style/style.css';
         $cssVersion = file_exists($stylePath) ? filemtime($stylePath) : time();
@@ -100,78 +103,62 @@ class Page {
     </footer>
     <?php endif; ?>
     <?php
-    // Beta.8 A1 Build Slice 2 — emit routes schema BEFORE qs.js so the
-    // client-side path matcher (which runs synchronously in qs.js's
-    // IIFE) can read window.QS_ROUTES and populate QS.routeParams +
-    // QS.routePath. Mirrors PageManagement::render() ordering.
-    $routesMetaPath = PUBLIC_CONTENT_PATH . '/scripts/qs-route-schema.js';
-    if (file_exists($routesMetaPath)): ?>
-    <script src="/<?= PUBLIC_FOLDER_SPACE !== '' ? PUBLIC_FOLDER_SPACE . '/' : '' ?>scripts/qs-route-schema.js"></script>
-    <?php endif; ?>
+    // The consent banner + popup, compiled at build time and site-wide (not
+    // per-route like the menu and footer). Hidden by default; qs.js reveals
+    // them when the project's consent layer is on and the visitor has not
+    // answered yet. Emitted before the handoff so the markup exists by the time
+    // the runtime looks for it.
+    foreach (['consent-banner', 'consent-popup'] as $__consentPart) {
+        $__consentFilePart = PROJECT_PATH . '/templates/' . $__consentPart . '.php';
+        if (is_file($__consentFilePart)) {
+            require $__consentFilePart;
+        }
+    }
+    ?>
     <?php
-    // Storage-namespace handoff — mirrors PageManagement::render(). A built page
-    // is still served by PHP, so it emits the same handoff from the same
-    // PROJECT_NAME. The prefix is NOT stripped at build time: development and
-    // production must agree on key names, and /p/<id>/ and a deployed build are
-    // different origins anyway, so storage never carried between them.
+    // ── The runtime handoff ───────────────────────────────────────────────
+    // Every <script> the server hands the browser runtime — route schema,
+    // storage namespace, qs.js, consent map, theme wiring, API config, enums,
+    // this route's state stores, and what the server-side resolver already
+    // fetched — in the one order they have to be in.
     //
-    // ⚠ A build has no entry point at present (build.php's index.php/init.php
-    // copy reads paths no project has), so nothing defines PROJECT_NAME in a
-    // built site and $projectKey falls back to 'default' — which also affects
-    // the theme key above. Pre-existing and S3's to fix; recorded in
-    // NOTES/planning/BETA11_S2_QUICKSITE_DEPLOY.md §6 with a tripwire in
-    // NOTES/tests/beta11/s24_build_probe.php.
-    ?>
-    <script>window.QS_PROJECT=<?= json_encode($projectKey, JSON_UNESCAPED_SLASHES) ?>;</script>
-    <script src="/<?= PUBLIC_FOLDER_SPACE !== '' ? PUBLIC_FOLDER_SPACE . '/' : '' ?>scripts/qs.js"></script>
-    <?php
-    // Inject theme toggle behaviour (mirrors PageManagement implementation)
-    if ($themeEnabled && $toggleEnabled):
-        $key = 'qs-theme-' . $projectKey;
-        $js  = '(function(){';
-        $js .= 'var key="' . $key . '";';
-        $js .= 'function apply(t){document.documentElement.setAttribute("data-theme",t);try{localStorage.setItem(key,t);}catch(e){}}';
-        $js .= 'function sync(t){document.querySelectorAll("[data-theme-toggle]").forEach(function(b){';
-        $js .= 'var icon=b.querySelector(".theme-switch-icon");';
-        $js .= 'var lbl=b.querySelector(".theme-switch-label");';
-        $js .= 'if(icon)icon.textContent=t==="dark"?"☀️":"🌙";';
-        $js .= 'if(lbl)lbl.textContent=t==="dark"?"Light mode":"Dark mode";';
-        $js .= 'b.setAttribute("aria-pressed",t==="dark"?"true":"false");';
-        $js .= '});}';
-        $js .= 'document.addEventListener("DOMContentLoaded",function(){';
-        $js .= 'var cur=document.documentElement.getAttribute("data-theme")||"light";';
-        $js .= 'sync(cur);';
-        $js .= 'document.querySelectorAll("[data-theme-toggle]").forEach(function(b){';
-        $js .= 'b.addEventListener("click",function(){';
-        $js .= 'var cur=document.documentElement.getAttribute("data-theme")||"light";';
-        $js .= 'var next=cur==="dark"?"light":"dark";apply(next);sync(next);';
-        $js .= '});});';
-        $js .= '});';
-        $js .= '})();';
-    ?>
-    <script><?= $js ?></script>
-    <?php endif; ?>
-    <?php
-    // Include API endpoint config if file exists and has real content
-    $apiConfigPath = PUBLIC_CONTENT_PATH . '/scripts/qs-api-config.js';
-    if (file_exists($apiConfigPath) && filesize($apiConfigPath) > 100): ?>
-    <script src="/<?= PUBLIC_FOLDER_SPACE !== '' ? PUBLIC_FOLDER_SPACE . '/' : '' ?>scripts/qs-api-config.js"></script>
-    <?php endif; ?>
-    <?php
-    // Enum registry — generated by EnumSyncHelper. Loaded
-    // unconditionally when the file exists so QS.enum has a
-    // (possibly empty) table to look against without warning.
-    $enumsPath = PUBLIC_CONTENT_PATH . '/scripts/qs-enums.js';
-    if (file_exists($enumsPath)): ?>
-    <script src="/<?= PUBLIC_FOLDER_SPACE !== '' ? PUBLIC_FOLDER_SPACE . '/' : '' ?>scripts/qs-enums.js"></script>
-    <?php endif; ?>
-    <?php if (!empty($stateStoresScript)): ?>
-    <?= $stateStoresScript ?>
-    <?php endif; ?>
-    <?php if (!empty($pageEventsScript)): ?>
-    <?= $pageEventsScript ?>
-    <?php endif; ?>
-</body>
+    // Emitted through the SHARED writer, which the live /p/<projectId>/ render
+    // also uses. A built page used to emit its own shorter version of this run
+    // and silently lost the consent map and both resolver blocks.
+    require_once SECURE_FOLDER_PATH . '/src/functions/runtimeHandoff.php';
+    require_once SECURE_FOLDER_PATH . '/src/functions/resolverRegistry.php';
+
+    // Consent, PRECOMPUTED at build time. The live site derives this payload by
+    // walking the storage registry through the authoring helpers; a build ships
+    // the answer instead, because it only changes when the author rebuilds.
+    $__consentPayload = null;
+    $__consentFile = PROJECT_PATH . '/data/consent-runtime.json';
+    if (is_file($__consentFile)) {
+        $__decoded = json_decode((string) @file_get_contents($__consentFile), true);
+        if (is_array($__decoded) && !empty($__decoded['enabled'])) {
+            $__consentPayload = $__decoded;
+        }
+    }
+
+    $__routePath = '';
+    if (class_exists('TrimParameters')) {
+        $__tp = new TrimParameters();
+        $__routePath = $__tp->routePath();
+    }
+
+    echo qs_runtime_handoff([
+        'base'               => '/' . $spacePrefix,
+        'contentPath'        => defined('PUBLIC_CONTENT_PATH') ? PUBLIC_CONTENT_PATH : '',
+        'projectKey'         => $projectKey,
+        'themeEnabled'       => $themeEnabled,
+        'themeToggleEnabled' => $toggleEnabled,
+        'consentPayload'     => $__consentPayload,
+        'stateStores'        => $stateStores,
+        'resolverConfigs'    => $__routePath !== '' ? qs_resolvers_for_route($__routePath) : [],
+        'resolvedVars'       => qs_get_resolved_vars(),
+        'pageEventsScript'   => $pageEventsScript,
+    ]);
+    ?></body>
 </html>
         <?php
     }

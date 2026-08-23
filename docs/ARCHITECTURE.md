@@ -844,13 +844,13 @@ crawlers are even more conservative about running JS).
 |---|---|
 | Storage (per project) | `secure/projects/<project>/data/route-resolvers.json` |
 | Server-side execution | `secure/src/classes/DataResolver.php` → `resolveMany()` (handles single- and multi-resolver routes uniformly) |
-| Server-side fetch | `secure/src/functions/serverFetch.php` → `serverFetch()` (single) / `serverFetchMulti()` (parallel via `curl_multi_*`) |
+| Server-side fetch | `secure/src/functions/serverFetch.php` → `serverFetch()` (single) / `serverFetchMulti()` (parallel via `curl_multi_*`). Endpoint lookup goes through `secure/src/functions/apiRegistry.php`, the read half of the API registry. |
 | Outbound SSRF guard | `secure/src/classes/OutboundUrlPolicy.php` — every server-side fetch is restricted to `http`/`https`, and in `production` the target is refused if it resolves to a loopback, private, or cloud-metadata address; the validated IP is pinned so DNS cannot rebind between check and connect. `development` (see `secure/management/config/environment.php`) lifts the internal-address block so a local/LAN API can be reached while building. Resolver fetches do **not** follow HTTP redirects. |
-| Storage + validation helpers | `secure/src/functions/resolverHelpers.php` |
+| Storage + validation helpers | `secure/src/functions/resolverHelpers.php` (authoring) — the READ half a served page needs is `secure/src/functions/resolverRegistry.php`, which a build carries instead |
 | File-based cache + observability | `secure/src/functions/resolverCache.php` + `X-QS-Resolver-Cache` header |
 | Commands | `setRouteResolver` (set / clear / patch / append / remove), `cleanResolverCache` |
-| Lifecycle position | `public/p/index.php` — AFTER auth gate (yes/no), BEFORE template render (`DataResolver::resolveMany()` fires once per request) |
-| Hydration handoff | `secure/src/classes/PageManagement.php` → `window.QS_RESOLVED` (store-keyed for state-store skip-fetch) + `window.QS_RESOLVED_BY_INDEX` (resolver-index-keyed mirror of PHP `$r0` / `$r1`) |
+| Lifecycle | `secure/src/functions/resolverRuntime.php` → `qs_resolve_route_data()`. AFTER the auth gate and the route match, BEFORE the page renders — fires once per request. Called by the `/p/<projectId>/` renderer AND by a built site's front controller, so both surfaces run one implementation. |
+| Hydration handoff | `secure/src/functions/runtimeHandoff.php` → `window.QS_RESOLVED` (store-keyed, for state-store skip-fetch) + `window.QS_RESOLVED_BY_INDEX` (resolver-index-keyed mirror of PHP `$r0` / `$r1`). One writer for every surface — see §8.5. |
 | Admin UI | `/admin/sitemap` context menu — list view + per-config modal — see [ADMIN_PANEL.md §9.7](ADMIN_PANEL.md). |
 
 Sidecar shape supports both **scalar** (single config object) and **array** (list
@@ -921,6 +921,85 @@ lives in [DESIGN_DECISIONS.md](DESIGN_DECISIONS.md) OAuth section.
 
 ---
 
+### 8.5 The runtime handoff
+
+Every rendered page ends with a run of `<script>` tags — the contract between
+PHP and the browser runtime:
+
+| Block | Carries |
+|---|---|
+| `qs-route-schema.js` | `window.QS_ROUTES` — the client-side path matcher's table |
+| `window.QS_PROJECT` | the project id every browser-storage key is prefixed with |
+| `qs.js` | the runtime itself |
+| `window.QS_CONSENT` | the key→category map that gates storage writes |
+| theme wiring | `[data-theme-toggle]` behaviour, keyed per project |
+| `qs-api-config.js` | `window.QS_API_ENDPOINTS` |
+| `qs-enums.js` | `window.QS_ENUMS` |
+| `window.QS_STATE_STORES` | this route's stores |
+| `window.QS_RESOLVED` | store-keyed resolver values, so a hydrated store skips its first fetch |
+| `window.QS_RESOLVED_BY_INDEX` | the same values under the `r0` / `r1` addresses templates use |
+| page events | the compiled `onload` / `onresize` / `onscroll` chain |
+
+**Order is part of the contract.** The route schema and the storage namespace go
+before `qs.js`, because its IIFE reads them synchronously at load. The state
+stores go after `qs-api-config.js`, because a store's endpoint resolves against
+`window.QS_API_ENDPOINTS`. The page-events script goes last, because an onload
+chain can call `fetchState` and needs the stores to exist.
+
+**One writer: `secure/src/functions/runtimeHandoff.php`.** The live renderer and
+a compiled page both call it. What each surface supplies is the *values* —
+gathering legitimately differs, because a live render reads this route's stores
+and events out of `data/`, while a compiled page has them baked in — but the
+order and the content of every block are decided in one place.
+
+`window.QS_CONSENT` is the block where absence is meaningful rather than
+neutral: `qs.js` reads a missing value as "this project has no consent layer"
+and lets every storage write through. That is correct for a project that never
+configured one, and it is why a surface that simply forgot to emit the payload
+did not look broken — the gate failed open silently. A build now precomputes the
+payload (the live derivation walks the storage registry through authoring
+helpers that do not belong in a deployed site) and ships it as data.
+
+### 8.6 What a build carries, and what it does not
+
+A production build runs the same request-time engine the live surface runs; what
+it leaves behind is the code that EDITS a site rather than serves one. Several
+files were split along that line so both halves could not drift:
+
+| Authoring (install only) | Runtime (travels into a build) |
+|---|---|
+| `ApiEndpointManager` — add/edit/validate, compile the client bundle | `apiRegistry.php` — look up an API, an endpoint, its `callableFrom` |
+| `resolverHelpers.php` — validate a config, generate schema samples | `resolverRegistry.php` — read the sidecar, hold the per-request values |
+| `consentHelpers.php` — derive the payload from the storage registry | the precomputed payload, plus `qs_consent_hydration_script()` |
+| `storageHelpers.php`, `projectContext.php` | `requestRuntime.php` — the validated host, the project-namespaced cookie name |
+| `utilsManagement.php` | `jsonIo.php` — the one JSON writer three runtime files needed |
+
+The authoring file requires the runtime one, so there is a single definition of
+each and existing callers are unchanged.
+
+**`{{param:NAME}}` and `{{resolved:NAME}}` are request-time placeholders.** Their
+values are not knowable when a page is compiled — a param comes from the URL
+being served, a resolved value from an HTTP call made during that request — so a
+compiled page emits a CALL to `runtimePlaceholders.php` rather than folding them
+in. Both surfaces substitute through the same two functions, including the rule
+that resolved values are substituted BEFORE params: a param is visitor-supplied,
+and doing params first would let a URL inject a placeholder for the resolved
+pass to expand.
+
+**A built site is `production` unless the deployment says otherwise.** The
+environment is a property of where a site runs, not of the artifact, so it comes
+from a server variable (`QS_ENVIRONMENT`) rather than from anything inside the
+build. This is what the outbound-URL policy reads before allowing a resolver to
+call an internal address; in production it may not.
+
+**OAuth in a built site** is the AUTHOR's site's own sign-in, not QuickSite's. It
+needs PHP sessions, an outbound HTTPS call and a route to return to, and a built
+site has all three; it needs nothing from the management API or the admin panel,
+neither of which exists in a build. The client secret is read from the server
+first (`QS_OAUTH_<PROVIDER>_CLIENT_ID` / `_CLIENT_SECRET`) and from the shipped
+`data/oauth-secrets.json` second, so a deployer can keep the credential out of a
+build folder that `downloadBuild` hands over whole.
+
 ## 9. Style management
 
 CSS is modelled as four addressable layers, all manipulated through commands rather than free-text edits:
@@ -965,10 +1044,14 @@ your-server/
 │   ├── .htaccess              funnels every non-file request into index.php
 │   └── style/  assets/  scripts/  sitemap.txt
 └── <secure>/                  sibling, never web-accessible
-    ├── config.php  routes.php  data/aliases.json  nginx_routes.conf
-    ├── src/classes/    Page, Translator, TrimParameters, RegexPatterns
-    ├── src/functions/  String, projectLanguage, routeHelpers, aliasRouting
-    ├── templates/menu.php  templates/footer.php
+    ├── config.php  routes.php  nginx_routes.conf
+    ├── data/       aliases, route-resolvers, api-endpoints, iframe_sandbox,
+    │               the precomputed consent payload, OAuth presets + secrets
+    ├── src/classes/    render + route + translate, plus the server-side data
+    │                   path: DataResolver, OutboundUrlPolicy, IframeSandbox,
+    │                   OAuthHandler
+    ├── src/functions/  the request-time engine (§8.6) — no authoring code
+    ├── templates/menu.php  footer.php  consent-banner.php  consent-popup.php
     ├── templates/pages/<route>/<leaf>.php   one precompiled page per route
     └── translate/
 ```
@@ -1017,10 +1100,15 @@ Then:
    where a file stops being project data and becomes something a web server
    hands to the public.
 9. Copy `LICENSE`, and `sitemap.txt` when the project has one.
-10. Copy `routes.php` and `config.php`, the four runtime classes, the four
-    runtime function files, the translations (all languages when the project is
-    multilingual, `default.json` otherwise) and `data/aliases.json`.
-11. Compile `menu.php` and `footer.php`.
+10. Copy `routes.php` and `config.php`, the runtime classes and function files
+    (§8.6), the translations (all languages when the project is multilingual,
+    `default.json` otherwise), and the project data a served page reads:
+    aliases, route resolvers, the API registry, the iframe-sandbox policy, and
+    the OAuth presets. The consent payload is PRECOMPUTED here rather than
+    copied, because deriving it is authoring work. OAuth **secrets** are copied
+    separately and reported separately — a build that carries them is a
+    credential, not just a website.
+11. Compile `menu.php`, `footer.php`, and the consent banner + popup.
 12. Write `qs-api-config.js`, `qs-route-schema.js` and `qs-enums.js`, and copy
     `qs.js`.
 13. Load the project's page events and state stores, which compile inline into

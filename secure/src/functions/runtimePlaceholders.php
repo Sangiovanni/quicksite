@@ -1,0 +1,128 @@
+<?php
+/**
+ * `{{param:NAME}}` and `{{resolved:NAME}}` — one definition of what they mean.
+ *
+ * ⚠ THESE ARE REQUEST-TIME PLACEHOLDERS, not compile-time ones. Their values
+ * are not knowable when a page is compiled: a param comes from the URL that is
+ * being served right now, and a resolved value comes from an HTTP call made
+ * during that request. That is why the compiler cannot fold them into the
+ * generated PHP the way it folds a translation key — it has to emit a CALL to
+ * these functions, and a built page evaluates them exactly like a live one.
+ *
+ * WHY A SHARED FILE. The renderer (live `/p/<projectId>/`) had these as private
+ * methods and the compiler had no notion of them at all, so a built page shipped
+ * `slug=[{{param:slug}}]` and `product=[{{resolved:product}}]` to the visitor as
+ * literal text. Giving the compiler its own copy would have produced two
+ * definitions of a substitution rule that has real subtleties — an unknown name
+ * stays literal so a typo is visible, a null ancestor renders empty, an array
+ * renders as compact JSON. Both surfaces now call the same two functions.
+ *
+ * ESCAPING IS THE CALLER'S JOB. These return raw substituted text; the caller
+ * runs it through htmlspecialchars, exactly as the renderer always did.
+ */
+
+require_once __DIR__ . '/resolverRegistry.php';
+
+if (!function_exists('qs_apply_route_params')) {
+    /**
+     * Replace `{{param:NAME}}` with this request's URL path params.
+     *
+     * An unknown name is left as the literal placeholder, on purpose: a
+     * silently-empty value hides a typo, a visible `{{param:slgu}}` does not.
+     *
+     * @param string               $text        Text possibly containing placeholders.
+     * @param array<string,string> $routeParams Matched params, e.g. ['slug' => 'red-vase'].
+     */
+    function qs_apply_route_params(string $text, array $routeParams): string
+    {
+        if (empty($routeParams) || strpos($text, '{{param:') === false) {
+            return $text;
+        }
+        return preg_replace_callback(
+            '/\{\{param:([a-zA-Z_][a-zA-Z0-9_]*)\}\}/',
+            static function ($m) use ($routeParams) {
+                return $routeParams[$m[1]] ?? $m[0];
+            },
+            $text
+        );
+    }
+}
+
+if (!function_exists('qs_apply_resolved')) {
+    /**
+     * Replace `{{resolved:NAME}}` and `{{resolved:NAME.dot.path}}` with values
+     * the server-side resolver fetched for this request.
+     *
+     * Source order: an explicit array when the caller has one, otherwise the
+     * per-request stash the resolver lifecycle wrote.
+     *
+     * Rules, all of which the live renderer already established:
+     *   - unknown name or wrong-typed path  → the literal placeholder survives,
+     *     so a typo is visible
+     *   - a NULL ancestor                   → empty string, matching how a
+     *     direct `{{resolved:nullKey}}` renders. This is what makes
+     *     `onMiss: render-empty` produce a blank rather than raw `{{...}}`
+     *     text on the page
+     *   - array / object                    → compact JSON
+     *   - bool                              → `true` / `false`
+     *
+     * @param string     $text     Text possibly containing placeholders.
+     * @param array|null $resolved Explicit values; null falls back to the stash.
+     */
+    function qs_apply_resolved(string $text, ?array $resolved = null): string
+    {
+        if (strpos($text, '{{resolved:') === false) {
+            return $text;
+        }
+        if ($resolved === null) {
+            $resolved = qs_get_resolved_vars();
+        }
+        if (empty($resolved)) {
+            return $text;
+        }
+        return preg_replace_callback(
+            '/\{\{resolved:([a-zA-Z_][a-zA-Z0-9_.]*)\}\}/',
+            static function ($m) use ($resolved) {
+                $cursor = $resolved;
+                foreach (explode('.', $m[1]) as $part) {
+                    if ($cursor === null) {
+                        return '';
+                    }
+                    if (!is_array($cursor) || !array_key_exists($part, $cursor)) {
+                        return $m[0];
+                    }
+                    $cursor = $cursor[$part];
+                }
+                if (is_array($cursor) || is_object($cursor)) {
+                    return json_encode($cursor, JSON_UNESCAPED_SLASHES);
+                }
+                if (is_bool($cursor)) {
+                    return $cursor ? 'true' : 'false';
+                }
+                return (string) ($cursor ?? '');
+            },
+            $text
+        );
+    }
+}
+
+if (!function_exists('qs_apply_runtime_placeholders')) {
+    /**
+     * Both substitutions, in the order the live renderer applies them.
+     *
+     * ⚠ RESOLVED FIRST, PARAMS SECOND, and the order is load-bearing. A route
+     * param comes straight out of the URL, so it is visitor-controlled; doing
+     * params first would let `/products/{{resolved:secret}}` land a real
+     * placeholder in the text and have the resolved pass expand it. Substituting
+     * resolved values first means anything a param introduces afterwards is
+     * never re-scanned.
+     *
+     * This is the entry point compiled pages call.
+     *
+     * @param array<string,string> $routeParams
+     */
+    function qs_apply_runtime_placeholders(string $text, array $routeParams, ?array $resolved = null): string
+    {
+        return qs_apply_route_params(qs_apply_resolved($text, $resolved), $routeParams);
+    }
+}

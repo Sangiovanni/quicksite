@@ -382,9 +382,6 @@ function qs_storage_physical_key(string $declaredKey, string $scope, ?string $pr
 /** Engine-owned cookie: the author-site OAuth session id (an AUTH CREDENTIAL). */
 const QS_OAUTH_COOKIE = 'qs_oauth_user';
 
-function qs_project_cookie_name(string $bareName, ?string $projectId = null): string {
-    if ($projectId === null) {
-        $projectId = defined('PROJECT_NAME') ? (string) PROJECT_NAME : 'default';
-    }
-    return 'qsp_' . $projectId . '_' . $bareName;
-}
+// qs_project_cookie_name() now lives in requestRuntime.php — a production
+// build's OAuth flow needs it and cannot carry this authoring file.
+require_once __DIR__ . '/requestRuntime.php';

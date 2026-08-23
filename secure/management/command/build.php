@@ -488,11 +488,25 @@ if (!copy(PROJECT_PATH . '/config.php', $buildFullPath . '/' . $buildSecureName 
 }
 
 // Copy specific class files
+// The classes a SERVED page needs — which is not the same set as the classes
+// that RENDER one. A build carries no JsonToHtmlRenderer: its pages are already
+// compiled, and that is the whole point of compiling them. It does carry the
+// server-side data path, because a resolver-backed page fetches its data on
+// every request and no amount of precompilation can do that ahead of time.
+//
+//   Page / Translator / TrimParameters / RegexPatterns  render + route + translate
+//   DataResolver                                        fires a route's resolvers
+//   OutboundUrlPolicy                                   vets the URL before the call
+//   IframeSandbox                                       per-domain sandbox policy
 $classFiles = [
     'Page.php',
     'Translator.php',
     'TrimParameters.php',
-    'RegexPatterns.php'
+    'RegexPatterns.php',
+    'DataResolver.php',
+    'OutboundUrlPolicy.php',
+    'IframeSandbox.php',
+    'OAuthHandler.php'
 ];
 
 foreach ($classFiles as $file) {
@@ -518,11 +532,33 @@ foreach ($classFiles as $file) {
 // stops resolving on one surface and keeps resolving on the other.
 // aliasRouting.php: URL aliases, applied by the /p/<id>/ renderer and by a
 // built site through one implementation.
+// aliasRouting.php: URL aliases, applied by the /p/<id>/ renderer and by a
+// built site through one implementation.
+//
+// The rest are the REQUEST-time half of the engine. Each has an authoring
+// counterpart that deliberately does NOT travel: apiRegistry is the read half
+// of ApiEndpointManager, resolverRegistry the read half of resolverHelpers,
+// jsonIo the one function resolverCache needed out of utilsManagement. A build
+// carries the half that serves a page and leaves the half that edits one behind.
 $functionFiles = [
     'String.php',
     'projectLanguage.php',
     'routeHelpers.php',
     'aliasRouting.php',
+    'jsonIo.php',
+    'environment.php',
+    'apiRegistry.php',
+    'resolverRegistry.php',
+    'runtimePlaceholders.php',
+    'runtimeHandoff.php',
+    'resolverCache.php',
+    'serverFetch.php',
+    'resolverRuntime.php',
+    'oauthRuntime.php',
+    'requestRuntime.php',
+    'oauthStateStore.php',
+    'oauthProviderHelpers.php',
+    'errorHygiene.php',
 ];
 
 foreach ($functionFiles as $file) {
@@ -572,17 +608,99 @@ if (MULTILINGUAL_SUPPORT) {
     }
 }
 
-// Copy aliases.json if it exists (for URL alias/redirect support)
-$aliasesSource = PROJECT_PATH . '/data/aliases.json';
-if (file_exists($aliasesSource)) {
-    $dataDir = $buildFullPath . '/' . $buildSecureName . '/data';
-    if (!is_dir($dataDir)) {
-        mkdir($dataDir, 0755, true);
+// Copy the project data the SERVED page reads at request time.
+//
+// These four are the difference between a build that renders markup and a build
+// that runs a site. Each is read on the request path, not at authoring time:
+//
+//   aliases.json          alias resolution, before routing
+//   route-resolvers.json  which resolvers a route fires
+//   api-endpoints.json    what `@api/endpoint` resolves to
+//   iframe_sandbox.json   the per-domain sandbox policy
+//
+// Everything else under data/ stays behind on purpose: page-events and
+// state-stores are compiled INTO the pages, privacy/assets metadata feed the
+// authoring UI, and the OAuth secrets are handled separately (see below).
+$runtimeDataFiles = [
+    'aliases.json',
+    'route-resolvers.json',
+    'api-endpoints.json',
+    'iframe_sandbox.json',
+    'oauth-presets.json',
+];
+$dataDir = $buildFullPath . '/' . $buildSecureName . '/data';
+foreach ($runtimeDataFiles as $dataFile) {
+    $dataSource = PROJECT_PATH . '/data/' . $dataFile;
+    if (!file_exists($dataSource)) {
+        continue;
     }
-    if (!copy($aliasesSource, $dataDir . '/aliases.json')) {
+    if (!is_dir($dataDir) && !mkdir($dataDir, 0755, true)) {
+        abort_build(
+            ApiResponse::create(500, 'server.directory_create_failed')
+                ->withMessage("Failed to create the build's data directory")
+        );
+    }
+    if (!copy($dataSource, $dataDir . '/' . $dataFile)) {
         abort_build(
             ApiResponse::create(500, 'server.file_write_failed')
-                ->withMessage("Failed to copy aliases.json")
+                ->withMessage("Failed to copy {$dataFile}")
+        );
+    }
+}
+
+// OAuth client secrets — copied, but SEPARATELY from the rest, because copying
+// a credential into a distributable artifact is its own decision.
+//
+// A build folder is handed whole to anyone with build permission, so the secret
+// travels with the deliverable. It has to reach the deployer's server either
+// way, which is what makes shipping it defensible; a deployer who would rather
+// not carry it sets QS_OAUTH_<PROVIDER>_CLIENT_ID / _CLIENT_SECRET per-vhost
+// and deletes this file, and OAuthHandler prefers the server's value anyway.
+$oauthSecretsSource = PROJECT_PATH . '/data/oauth-secrets.json';
+$buildCarriesOAuthSecrets = false;
+if (file_exists($oauthSecretsSource)) {
+    if (!is_dir($dataDir) && !mkdir($dataDir, 0755, true)) {
+        abort_build(
+            ApiResponse::create(500, 'server.directory_create_failed')
+                ->withMessage("Failed to create the build's data directory")
+        );
+    }
+    if (!copy($oauthSecretsSource, $dataDir . '/oauth-secrets.json')) {
+        abort_build(
+            ApiResponse::create(500, 'server.file_write_failed')
+                ->withMessage('Failed to copy oauth-secrets.json')
+        );
+    }
+    $buildCarriesOAuthSecrets = true;
+}
+
+// The consent runtime, PRECOMPUTED.
+//
+// The live site builds this payload by reading data/consent.json and walking
+// the storage registry through consentHelpers + storageHelpers — authoring code
+// that pulls in translationHelpers and the whole utility drawer. None of that
+// belongs in a deployed site, and none of it needs to run per request: the
+// answer only changes when the author edits the consent config or the storage
+// registry, which means it changes when they rebuild.
+//
+// So the build computes it once and ships the result as data. Without this the
+// consent layer silently FAILED OPEN in production: qs.js treats an absent
+// window.QS_CONSENT as "no consent layer configured" and lets every write
+// through, so a project that had configured consent lost the gate entirely
+// while its policy pages went on promising it.
+require_once SECURE_FOLDER_PATH . '/src/functions/consentHelpers.php';
+$consentPayload = qs_consent_payload();
+if ($consentPayload !== null) {
+    if (!is_dir($dataDir) && !mkdir($dataDir, 0755, true)) {
+        abort_build(
+            ApiResponse::create(500, 'server.directory_create_failed')
+                ->withMessage("Failed to create the build's data directory")
+        );
+    }
+    if (!qs_json_write($dataDir . '/consent-runtime.json', $consentPayload, JSON_UNESCAPED_SLASHES)) {
+        abort_build(
+            ApiResponse::create(500, 'server.file_write_failed')
+                ->withMessage("Failed to write the consent runtime payload")
         );
     }
 }
@@ -606,6 +724,36 @@ if (file_exists($menuJsonPath)) {
         abort_build(
             ApiResponse::create(500, 'server.file_write_failed')
                 ->withMessage("Failed to write compiled menu.php")
+        );
+    }
+}
+
+// Compile the consent layer — the banner and the popup.
+//
+// Site-wide rather than per-route, like the live render treats them. They are
+// ordinary structures, so they compile the same way the menu and footer do.
+//
+// Without these a built site shipped the consent MAP but none of the markup:
+// qs.js would gate every non-essential storage write and the visitor would
+// never be shown anything to consent to.
+foreach (['consent-banner', 'consent-popup'] as $consentStructure) {
+    $consentJsonPath = PROJECT_PATH . '/templates/model/json/' . $consentStructure . '.json';
+    if (!file_exists($consentJsonPath)) {
+        continue;
+    }
+    $consentJson = json_decode(file_get_contents($consentJsonPath), true);
+    if ($consentJson === null) {
+        abort_build(
+            ApiResponse::create(500, 'server.internal_error')
+                ->withMessage("Failed to parse {$consentStructure}.json")
+        );
+    }
+    $consentPhp = $compiler->compileMenuOrFooter($consentJson);
+    $consentDest = $buildFullPath . '/' . $buildSecureName . '/templates/' . $consentStructure . '.php';
+    if (file_put_contents($consentDest, $consentPhp) === false) {
+        abort_build(
+            ApiResponse::create(500, 'server.file_write_failed')
+                ->withMessage("Failed to write compiled {$consentStructure}.php")
         );
     }
 }
@@ -1018,6 +1166,9 @@ ApiResponse::create(201, 'operation.success')
         'entry_point_written' => true,
         'entry_point_verified' => true,
         'project_name' => (string) PROJECT_NAME,
+        // Named because it changes what the deliverable IS: a build that
+        // carries OAuth secrets is a credential, not just a website.
+        'oauth_secrets_included' => $buildCarriesOAuthSecrets,
         'menu_compiled' => file_exists($buildFullPath . '/' . $buildSecureName . '/templates/menu.php'),
         'footer_compiled' => file_exists($buildFullPath . '/' . $buildSecureName . '/templates/footer.php'),
         'scripts_copied' => file_exists($scriptsDir . '/qs.js'),

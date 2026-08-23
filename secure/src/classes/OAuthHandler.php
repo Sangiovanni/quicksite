@@ -61,7 +61,10 @@
  */
 
 require_once __DIR__ . '/OutboundUrlPolicy.php';
-require_once __DIR__ . '/../functions/storageHelpers.php'; // qs_project_cookie_name
+// Only qs_project_cookie_name() and qs_request_host() are needed, and both
+// live in requestRuntime.php — storageHelpers and projectContext are
+// authoring files that cannot travel into a production build.
+require_once __DIR__ . '/../functions/requestRuntime.php'; // qs_project_cookie_name
 
 class OAuthHandler
 {
@@ -556,6 +559,29 @@ class OAuthHandler
      */
     private static function loadSecret(string $providerId): array
     {
+        // The SERVER's word first, the shipped file second.
+        //
+        // A production build is a distributable artifact: downloadBuild hands
+        // the whole folder to anyone with build permission, so a client secret
+        // sitting inside it is a credential travelling with a deliverable. The
+        // secret has to reach the deployer's machine either way, so shipping it
+        // is defensible — but a deployer who would rather not carry it can set
+        //
+        //   QS_OAUTH_<PROVIDER>_CLIENT_ID
+        //   QS_OAUTH_<PROVIDER>_CLIENT_SECRET
+        //
+        // per-vhost (Apache SetEnv, nginx fastcgi_param) and delete the file.
+        // The provider id is upper-cased with non-alphanumerics folded to '_',
+        // so `fixture-sso` reads QS_OAUTH_FIXTURE_SSO_CLIENT_SECRET.
+        $envKey = strtoupper(preg_replace('/[^A-Za-z0-9]+/', '_', $providerId));
+        $envId  = self::serverEnv('QS_OAUTH_' . $envKey . '_CLIENT_ID');
+        if ($envId !== null && $envId !== '') {
+            return self::normaliseSecretEntry([
+                'client_id'     => $envId,
+                'client_secret' => self::serverEnv('QS_OAUTH_' . $envKey . '_CLIENT_SECRET'),
+            ]);
+        }
+
         $projectPath = self::projectConfigPath('oauth-secrets.json');
         if ($projectPath !== null && file_exists($projectPath)) {
             $projectSecrets = self::readJsonFile($projectPath, 'OAuth secrets');
@@ -594,6 +620,23 @@ class OAuthHandler
      * such config file — callers must `file_exists()` check before
      * reading.
      */
+    /**
+     * One server-supplied value, from the places a web SAPI puts them.
+     *
+     * `REDIRECT_` is checked too: Apache prefixes environment variables with it
+     * once a request has been through an internal redirect, which is exactly
+     * what a build's FallbackResource does to every page request.
+     *
+     * @return string|null null when unset or empty.
+     */
+    private static function serverEnv(string $name): ?string
+    {
+        $raw = $_SERVER[$name] ?? $_SERVER['REDIRECT_' . $name] ?? getenv($name);
+        if (!is_string($raw) || $raw === '') {
+            return null;
+        }
+        return $raw;
+    }
     private static function projectConfigPath(string $fileName): ?string
     {
         if (!defined('PROJECT_PATH')) {
@@ -681,7 +724,7 @@ class OAuthHandler
         // X-Forwarded-Proto, which the origin helper does not, and taking the
         // whole origin instead would have downgraded every reverse-proxy
         // deployment to http.
-        require_once __DIR__ . '/../functions/projectContext.php';
+        
         $scheme = _oauthIsHttps() ? 'https' : 'http';
         $host = qs_request_host();
         if ($url === '' || $url[0] !== '/') {

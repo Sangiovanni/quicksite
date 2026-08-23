@@ -149,93 +149,14 @@ function qs_project_context_die(string $fileName, string $absPath, string $proje
 }
 
 /**
- * C15 15.4 (R6) — the request's scheme+host, derived ONCE and validated.
+ * qs_request_origin() and qs_request_host() now live in requestRuntime.php.
  *
- * Every URL the engine composes against the request used to read
- * $_SERVER['HTTP_HOST'] raw (init.php's BASE_URL, surfaceB's /p/ base) — an
- * attacker-controlled header on any catch-all vhost. This is the single
- * replacement for those reads. PRE-INIT-safe: touches no constants.
- *
- * Validation, in order:
- *   1. Shape — the host must look like a hostname/IPv4 (RFC-1123 labels) or a
- *      bracketed IPv6 literal, with an optional :port. Anything else (CRLF,
- *      slashes, spaces, userinfo @, a scheme…) is discarded and the fallback
- *      chain runs: SERVER_NAME (same shape check) → 'localhost', with an
- *      error_log so a misconfigured proxy is visible.
- *   2. Trust (optional) — when the deployment sets QS_TRUSTED_HOSTS
- *      (comma-separated exact host[:port] values, per-vhost SetEnv /
- *      fastcgi_param), a host not in the list is replaced by the FIRST entry.
- *      Degrade-not-die (R4's posture): links point at the canonical host
- *      instead of the request being refused over a config mismatch, and the
- *      spoofed value never reaches any output either way.
- *
- * @return string "http(s)://host[:port]" — NO trailing slash; callers append.
+ * They are request-shaped helpers, not project-context ones — they were only
+ * here because this is where the first caller happened to be. Moving them out
+ * is what lets a production build carry them: OAuth needs the validated host,
+ * and this file (which resolves secure/projects/<id>/) cannot travel.
  */
-function qs_request_origin(): string
-{
-    $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-        || ((int) ($_SERVER['SERVER_PORT'] ?? 0) === 443);
-
-    return ($https ? 'https://' : 'http://') . qs_request_host();
-}
-
-/**
- * The validated host[:port] alone — same validation as qs_request_origin(),
- * without a scheme.
- *
- * C12 split this out for ONE caller: OAuthHandler::makeAbsoluteUrl(), which
- * builds the OAuth `redirect_uri` and decides its scheme with _oauthIsHttps().
- * That helper is a SUPERSET of the scheme test above — it also honours
- * X-Forwarded-Proto — so handing OAuth a whole origin would have silently
- * regressed every reverse-proxy deployment from https to http. It needs the
- * validated host and its own scheme, so that is exactly what it now gets. One
- * validator, two accessors; qs_request_origin() is unchanged in behaviour.
- *
- * @return string "host" or "host:port" — never empty, never attacker-shaped.
- */
-function qs_request_host(): string
-{
-    $shapeOk = static function ($host): bool {
-        if (!is_string($host) || $host === '' || strlen($host) > 255) {
-            return false;
-        }
-        // Bracketed IPv6 literal, optional port: [::1] / [::1]:8443
-        if (preg_match('/^\[[0-9A-Fa-f:.]+\](:\d{1,5})?$/', $host) === 1) {
-            return true;
-        }
-        // RFC-1123 labels (letters/digits/hyphen, dot-separated), optional port.
-        return preg_match(
-            '/^[A-Za-z0-9]([A-Za-z0-9-]{0,62}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,62}[A-Za-z0-9])?)*(:\d{1,5})?$/',
-            $host
-        ) === 1;
-    };
-
-    $host = $_SERVER['HTTP_HOST'] ?? '';
-    if (!$shapeOk($host)) {
-        $fallback = $_SERVER['SERVER_NAME'] ?? '';
-        $host     = $shapeOk($fallback) ? $fallback : 'localhost';
-        error_log(
-            'QuickSite: rejected malformed Host header'
-            . ' — falling back to ' . $host
-            . ' (set QS_TRUSTED_HOSTS to pin the canonical host).'
-        );
-    }
-
-    $trusted = $_SERVER['QS_TRUSTED_HOSTS'] ?? $_SERVER['REDIRECT_QS_TRUSTED_HOSTS'] ?? '';
-    if (is_string($trusted) && trim($trusted) !== '') {
-        $list = array_values(array_filter(array_map('trim', explode(',', $trusted)), $shapeOk));
-        if ($list !== [] && !in_array($host, $list, true)) {
-            error_log(
-                "QuickSite: Host '{$host}' is not in QS_TRUSTED_HOSTS"
-                . " — using canonical '{$list[0]}' instead."
-            );
-            $host = $list[0];
-        }
-    }
-
-    return $host;
-}
-
+require_once __DIR__ . '/requestRuntime.php';
 /**
  * Define safe, empty project-scoped constants for the tolerant (non-strict)
  * path — a GLOBAL command whose UX-default project could not be resolved

@@ -40,9 +40,12 @@
  */
 
 require_once __DIR__ . '/../classes/ApiEndpointManager.php';
+// The sidecar READ half, shared with a production build (which carries that
+// file and not this one). Every reader below delegates to it.
+require_once __DIR__ . '/resolverRegistry.php';
 
 function getResolverSidecarPath(?string $projectPath = null): string {
-    return ($projectPath ?? PROJECT_PATH) . '/data/route-resolvers.json';
+    return qs_resolver_sidecar_path($projectPath);
 }
 
 /**
@@ -55,16 +58,7 @@ function getResolverSidecarPath(?string $projectPath = null): string {
  * that the global PROJECT_PATH constant is bound to. Default = active project.
  */
 function loadResolversSidecar(?string $projectPath = null): array {
-    $path = getResolverSidecarPath($projectPath);
-    if (!file_exists($path)) {
-        return [];
-    }
-    $content = @file_get_contents($path);
-    if ($content === false || $content === '') {
-        return [];
-    }
-    $data = json_decode($content, true);
-    return is_array($data) ? $data : [];
+    return qs_resolvers_load_sidecar($projectPath);
 }
 
 function saveResolversSidecar(array $resolvers): bool {
@@ -124,8 +118,7 @@ function saveResolversSidecar(array $resolvers): bool {
  * this for array_is_list would make an empty entry take the array-shape branch.
  */
 function _isResolverArrayShape(array $arr): bool {
-    if (empty($arr)) return false;
-    return array_keys($arr) === range(0, count($arr) - 1);
+    return qs_resolver_is_array_shape($arr);
 }
 
 /**
@@ -134,14 +127,7 @@ function _isResolverArrayShape(array $arr): bool {
  * input; downstream code treats empty as "no resolver."
  */
 function _normalizeResolverEntry($entry): array {
-    if (!is_array($entry) || empty($entry)) return [];
-    if (_isResolverArrayShape($entry)) {
-        // Array shape — filter out any non-array (malformed) entries
-        // so downstream code can iterate safely.
-        return array_values(array_filter($entry, 'is_array'));
-    }
-    // Scalar (single config) — wrap into a 1-element array.
-    return [$entry];
+    return qs_resolver_normalize_entry($entry);
 }
 
 /**
@@ -154,8 +140,7 @@ function _normalizeResolverEntry($entry): array {
  * getResolverForRoute (backward-compat wrapper below).
  */
 function getResolversForRoute(string $routePath): array {
-    $all = loadResolversSidecar();
-    return _normalizeResolverEntry($all[$routePath] ?? null);
+    return qs_resolvers_for_route($routePath);
 }
 
 /**
@@ -240,10 +225,10 @@ function deleteResolverForRoute(string $routePath): bool {
  * caller to pass the array through 3+ layers of constructor options.
  */
 function setResolvedVars(array $vars): void {
-    $GLOBALS['__qs_resolved_vars'] = $vars;
+    qs_set_resolved_vars($vars);
 }
 function getResolvedVars(): array {
-    return $GLOBALS['__qs_resolved_vars'] ?? [];
+    return qs_get_resolved_vars();
 }
 
 /**

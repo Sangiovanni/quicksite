@@ -170,6 +170,27 @@ define('QS_PUBLIC_BASE', '/' . (PUBLIC_FOLDER_SPACE !== '' ? PUBLIC_FOLDER_SPACE
 define('BASE_URL', QS_PUBLIC_BASE);
 
 // ---------------------------------------------------------------------------
+// 3b. Environment
+// ---------------------------------------------------------------------------
+// PRODUCTION unless the DEPLOYMENT says otherwise, and it says so through the
+// server rather than through anything in the build — the environment is a
+// property of where a site is running, not of the artifact that was shipped.
+//
+// This is what the outbound-URL policy reads to decide whether a resolver may
+// call an internal address. In production it may not, which is the SSRF guard
+// and is the right default for a public site. A deployer running the build
+// locally against a LAN or loopback API opts in per-vhost:
+//
+//   Apache:  SetEnv QS_ENVIRONMENT development
+//   nginx:   fastcgi_param QS_ENVIRONMENT development;
+//
+// Only the exact string 'development' counts; anything else, including the
+// variable being absent, is production. Without this a built site had no way to
+// declare its environment at all, so a deliberate local test was impossible.
+$qsEnv = $_SERVER['QS_ENVIRONMENT'] ?? $_SERVER['REDIRECT_QS_ENVIRONMENT'] ?? getenv('QS_ENVIRONMENT');
+define('ENVIRONMENT', $qsEnv === 'development' ? 'development' : 'production');
+
+// ---------------------------------------------------------------------------
 // 4. Aliases, then routing
 // ---------------------------------------------------------------------------
 // Aliases run BEFORE the router, because an internal alias works by rewriting
@@ -216,5 +237,38 @@ if ($templateFile === null || !is_file($templateFile)) {
     }
     exit;
 }
+
+// ---------------------------------------------------------------------------
+// 6. Server-side data
+// ---------------------------------------------------------------------------
+// A resolver fetches this route's data over HTTP before the page renders, so
+// the values are in the HTML at first paint. That is request-time work by
+// definition — precompilation cannot make an upstream call in advance — which
+// is why a built site runs the same lifecycle the live renderer runs, from the
+// same file. Routes without a resolver pay one file-existence check.
+//
+// ⚠ The lifecycle EXITS on an unrecovered failure, answering with this
+// project's own 404 or 500. That is deliberate: a page whose data did not
+// arrive must not render as though it did.
+//
+// ⚠ No editor emulation here, and that is a security boundary rather than an
+// omission. The visual editor previews a resolver-backed page by passing mock
+// values in the query string; a built site is a public website, and honouring
+// that would let any visitor dictate what the page says.
+require_once SECURE_FOLDER_PATH . '/src/functions/resolverRuntime.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/oauthRuntime.php';
+$qsResolvers = qs_resolvers_for_route($routePath);
+
+// A sign-in route is a resolver whose KIND is an OAuth step rather than a data
+// fetch. It replaces the render entirely with a redirect (and, on the callback,
+// a session cookie), so it has to be handled before anything renders.
+//
+// A built site can do this: the flow needs PHP sessions, an outbound HTTPS call
+// and a route to come back to, and it has all three. What it does NOT have is
+// QuickSite's management API or admin panel — and the flow never wanted them.
+// This is the AUTHOR'S site's own sign-in, not QuickSite's.
+qs_run_oauth_route($qsResolvers, $routePath, $trimParameters->routeParams());
+
+qs_resolve_route_data($qsResolvers, $routePath, $trimParameters->routeParams());
 
 require $templateFile;
