@@ -151,8 +151,8 @@ const QS_API_ARM_COMMANDS = [
 // project and every caller, so it belongs here rather than with the
 // project-bound arms.)
 const QS_API_STATIC_ARMS = [
-    'structure-types', 'asset-categories', 'asset-extensions', 'alias-types', 'edit-actions',
-    'upload-limits',
+    'structure-types', 'asset-categories', 'asset-extensions', 'favicon-extensions',
+    'alias-types', 'edit-actions', 'upload-limits',
 ];
 
 if (isset(QS_API_ARM_COMMANDS[$action])) {
@@ -354,9 +354,21 @@ switch ($action) {
         break;
 
     case 'asset-extensions':
-        // Return allowed extensions per category
-        $extensions = require SECURE_FOLDER_PATH . '/management/config/assetExtensions.php';
-        echo json_encode(['success' => true, 'data' => $extensions]);
+        // Allowed extensions per category, read from the ONE asset taxonomy in
+        // filePolicy.php — the same array uploadAsset gates on and the same one
+        // the import/publish allowlists are derived from. The media page states
+        // it to the user, so a UI hint cannot promise a type the gate refuses.
+        require_once SECURE_FOLDER_PATH . '/src/functions/filePolicy.php';
+        echo json_encode(['success' => true, 'data' => qs_asset_extensions()]);
+        break;
+
+    case 'favicon-extensions':
+        // The favicon-capable SUBSET of the images category. A separate arm
+        // rather than another key on 'asset-extensions', because both callers
+        // of that arm do Object.values(data).flat() to build one flat list —
+        // an extra key there would quietly land in it.
+        require_once SECURE_FOLDER_PATH . '/src/functions/filePolicy.php';
+        echo json_encode(['success' => true, 'data' => qs_favicon_extensions()]);
         break;
 
     case 'upload-limits':

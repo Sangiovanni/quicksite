@@ -9404,3 +9404,185 @@ started this happens mid-render).
 **Source**: `secure/src/runtime/site/index.php`,
 `secure/src/functions/errorHygiene.php` (`QS_FATAL_SHAPE_SITE`,
 `qs_fatal_site_page`).
+
+### One asset taxonomy, three gates derived from it (locked 2026-08-23)
+
+**Decision**: `filePolicy.php` holds a single category-to-extension map and every
+extension gate is built from it. `uploadAsset` resolves an upload's category from
+that map; the import and publish allowlists are the structural and text types
+plus every asset type in it. The separate `assetExtensions.php` config file is
+gone, and the detected-MIME list `uploadAsset` gated on moved in beside the map.
+
+**Reasoning**: the two lists disagreed, and the file holding one of them claimed
+to be derived from the other. `filePolicy.php` said its import list came from
+"the asset types the engine already accepts at upload"; measured, it was a
+superset by four — `ico`, `avif`, `bmp` and `eot` were importable and
+publishable but could not be uploaded. A comment asserting a relationship the
+code does not maintain is worse than no comment, because the next reader reasons
+from it. Deriving the lists makes the sentence true by construction: the only way
+to widen one gate is to widen the taxonomy, which widens all three together.
+
+The MIME list came along because it is the other half of the same decision, and
+keeping it in the command hid a defect. It listed neither of the types real fonts
+actually detect as, so **no genuine `.ttf` or `.otf` could be uploaded at all** —
+an upload passed the extension gate, the size gate and the quota gate, then
+failed a type check nobody had exercised with a real font. Splitting one decision
+across two files is how half of it goes unmaintained.
+
+**Alternatives considered**: keeping `assetExtensions.php` as a thin shim
+returning the taxonomy (rejected — two files that both look like the config leave
+the next reader guessing which to edit); making the deployer override's existing
+`import_extensions` key govern uploads too (rejected — its shipped documentation
+and its warning text are about archives specifically, so extending its reach
+silently would change a published contract; it got its own `asset_extensions` key
+instead); leaving the MIME list in the command (rejected — it is the lock on the
+door the taxonomy names).
+
+**Source**: `secure/src/functions/filePolicy.php` (`qs_asset_extensions`,
+`qs_asset_extension_map`, `qs_asset_mime_types`, `qs_favicon_extensions`),
+`secure/management/config/import-policy.php.example`.
+
+### Magic-byte alternatives are read per offset (locked 2026-08-23)
+
+**Decision**: in the import content check, signature entries at the SAME offset
+are alternatives, and every offset that appears must be satisfied by one of them.
+Entries at DIFFERENT offsets remain conjunctive.
+
+**Reasoning**: the check looped a flat list and denied on any mismatch, which
+ANDs everything. Four formats list alternatives at offset zero — a GIF begins
+either `GIF87a` or `GIF89a`, and `ico`, `ttf` and `otf` are shaped the same — so
+their conditions could never all hold and **no real file of those formats could
+be imported**. Measured with genuine files: a real GIF89a, a real ICO, a real TTF
+and a real OTF were each refused for a signature mismatch. So `.ico` favicon
+support was not merely un-widened, it was unreachable.
+
+Grouping by offset is what preserves the cases that genuinely need the
+conjunction. WebP and WAV are the same container and are told apart only by a
+second marker eight bytes in; reading every entry as an alternative would let
+each satisfy the other's signature. The two cases look identical in the table and
+mean opposite things, which is why the table now says so.
+
+**Alternatives considered**: a separate "alternatives" key per format (rejected —
+the offsets already carry the information, and a second key is a second thing to
+get wrong); dropping the multi-signature formats from the allowlist (rejected —
+that removes the formats rather than the defect).
+
+**Source**: `secure/src/functions/filePolicy.php` (`qs_policy_magic_signatures`,
+`qs_import_validate_content`).
+
+### The PHP-block rule is class-dependent, because the pattern is noise in binary (locked 2026-08-23)
+
+**Decision**: text-class content may never open a PHP block. Binary content is
+refused for it only when the file ALSO fails to prove it is a real file of a
+named format — detected as something specific, and reported as binary rather than
+as text. A matching signature no longer ends the check.
+
+**Reasoning**: a matching signature returned success immediately, skipping the
+rule the comment above it stated, so a two-byte prefix followed by a PHP block was
+accepted as an image. Making the code match the comment literally — run the
+pattern over everything — was tried and **measured against real files: it refuses
+4.4% of them**. An opening short tag followed by whitespace is two bytes, and
+across 1738 genuine signature-valid files on the development machine it occurs by
+chance in 77: dozens of real system fonts, and a 4.4 MB PNG inside a real
+project. QuickSite's own shipped sample video trips it too, on the existing
+fall-through path. A rule that refuses one real font in twenty-five is a worse
+defect than the one it closes.
+
+The conjunction is what separates the cases. A few honest magic bytes followed by
+a script detects as plain text, as nothing in particular, or as a named format
+that the same library simultaneously reports as ASCII — and is refused. A real
+image or font detects as itself and reports as binary, and is accepted despite
+the chance bytes. Measured: zero false positives across all 57, and every cheap
+disguise refused. Both signals come from one detection pass, because an archive
+entry may be 50 MB and a second scan of it is not free.
+
+What this deliberately does not catch is stated in the code rather than implied:
+a genuinely valid image with a script appended, and a disguise padded with NUL
+bytes to restore both signals. Neither is distinguishable from real content by
+inspecting bytes. Both stay inert because no extension either allowlist permits
+is mapped to an interpreter — that, and not the content check, is the control
+that actually holds.
+
+**Alternatives considered**: applying the pattern to everything (rejected —
+measured to refuse real user content); scanning only a bounded prefix (rejected —
+the false positives are in the body of large fonts, and a script anywhere in a
+file executes); a printable-byte ratio (rejected — it separates the cases cleanly
+but costs a byte loop over entries up to 50 MB, and is defeated by the same NUL
+padding, for no gain).
+
+**Source**: `secure/src/functions/filePolicy.php` (`qs_import_validate_content`).
+
+### The favicon is a pointer, not a copy (locked 2026-08-23)
+
+**Decision**: `editFavicon` writes the chosen asset's path into the project config
+and touches no file. Any favicon-capable image already in `assets/images/` may be
+chosen; passing null clears the choice. Renaming the chosen asset follows the
+pointer, and deleting it clears the pointer.
+
+**Reasoning**: the command copied the chosen image over
+`assets/images/favicon.png` and renamed the previous one to a timestamped backup.
+Those backups accumulated in the asset folder permanently, appeared in the media
+browser as assets, counted against the project's storage quota, and were read by
+nothing. The copy also meant the favicon existed twice, so editing the original
+changed nothing.
+
+The pointer was already half-built. Both page renderers read
+`CONFIG['FAVICON_PATH']`, accept an absolute URL or a root-relative path, honour
+the public-folder rename, and fall back to a default when the key is absent — and
+nothing anywhere wrote it. The missing half was the writer, which is why this cost
+far less than the shape suggests. A build copies the project config verbatim, so
+the choice reaches a built site with no extra step.
+
+A pointer can dangle where a copy could not, so the lifecycle travels with it: the
+asset commands clear or follow the pointer when the file they touch is the one it
+names. The alternative — checking on the read side — would put a filesystem call
+in the head of every page render to catch a rare case.
+
+Being a pointer is also what widened the format support. The old command enforced
+PNG three separate ways, the last by re-deriving the image type from the file.
+Validating an asset's bytes is `uploadAsset`'s job and it does it more
+thoroughly; a second, weaker opinion about a file the engine has already accepted
+is what kept `.ico` and `.svg` out. What remains is a narrower question the upload
+gate cannot answer: which formats a browser will render as an icon, which is not
+the same set as "images".
+
+**Alternatives considered**: keeping the copy and pruning old backups (rejected —
+it keeps the duplicate and the stale copy, and only bounds the mess); storing the
+pointer in project data rather than config (rejected — the renderers already read
+it from config, and moving it would mean writing the read side too); checking
+existence at render time (rejected — a stat on every page to catch a deletion the
+delete command can report for free).
+
+**Source**: `secure/management/command/editFavicon.php`,
+`secure/src/functions/utilsManagement.php` (`qs_config_mutate`,
+`qs_favicon_repoint`), `secure/src/classes/Page.php`,
+`secure/src/classes/PageManagement.php`.
+
+### The favicon control is a second mark, not the existing star (locked 2026-08-23)
+
+**Decision**: the media page's favicon control is its own radio in the opposite
+corner of the card. The star beside it keeps meaning "include in AI prompts" and
+is untouched.
+
+**Reasoning**: the obvious implementation was to make the card's existing star set
+the favicon. That star is already a shipped feature with a different meaning — it
+marks assets for inclusion in AI workflow prompts, is multi-select, is capped at
+15, and is read by the site-building workflows and by an option on the AI
+connections page. Overloading it would have silently broken all of that.
+
+The two marks also differ in kind, which is why they are different widgets rather
+than two buttons that look alike. Starring is many-of; the favicon is one-of, so
+it is a radio in a shared group and choosing a new asset clears the old without
+the previous card having to be found. The control renders only on formats a
+browser will render as an icon, and its absence on a `.bmp` says "this format
+cannot be an icon" — more honest than a disabled control with no explanation.
+
+**Alternatives considered**: taking the star for the favicon and re-homing AI
+starring (rejected — it breaks two shipped workflows to save one glyph); a toggle
+rather than a radio (rejected — it makes two favicons expressible, which the
+config cannot represent); a dropdown elsewhere on the page (rejected — it
+separates the choice from the thing being chosen, which is the picture in front
+of you).
+
+**Source**: `public/admin/assets/js/pages/assets.js` (`_renderFaviconControl`,
+`setFavicon`), `public/admin/assets/admin.css`.

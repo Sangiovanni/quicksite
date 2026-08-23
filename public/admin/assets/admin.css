@@ -17397,6 +17397,67 @@ body[data-page="preview"] .global-miniplayer {
     opacity: 1;
 }
 
+/* --- Favicon control (radio, not toggle) ---
+   Sits opposite the star so the two never read as one control: the star (top
+   right) marks an asset for AI prompts and is multi-select; this (top left)
+   points the site favicon at exactly one asset. Only rendered on
+   favicon-capable image formats, so an absent control means "this format
+   cannot be a favicon" rather than "you may not". */
+.asset-card__favicon {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 2px;
+    line-height: 1;
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 1;
+    filter: grayscale(1);
+}
+
+/* The radio itself is the accessible control and the click target, but the
+   native widget would sit beside the glyph rather than behind it. Kept in the
+   layout (not display:none) so it stays focusable and keyboard-operable. */
+.asset-card__favicon-input {
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.asset-card__favicon-glyph {
+    font-size: 1.1rem;
+    pointer-events: none;
+}
+
+.asset-card__favicon--active {
+    opacity: 1;
+    filter: none;
+}
+
+.asset-card:hover .asset-card__favicon {
+    opacity: 1;
+}
+
+.asset-card__favicon-input:focus-visible + .asset-card__favicon-glyph {
+    outline: 2px solid var(--admin-primary);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+/* The video thumbnail's two siblings are wrapped so the _renderThumb helper can
+   return ONE element; `display: contents` keeps them laid out exactly as they
+   were as direct children of .asset-card__thumb, which is what the overlay's
+   absolute positioning is measured against. */
+.asset-card__video-wrap {
+    display: contents;
+}
+
 .asset-card__image {
     max-width: 100%;
     max-height: 100%;

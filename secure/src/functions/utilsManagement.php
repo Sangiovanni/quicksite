@@ -811,3 +811,135 @@ function qs_format_size(int $bytes): string {
     }
     return $text . ' ' . $units[$i];
 }
+
+/**
+ * Read a project's config.php under an exclusive lock, let a callback patch it,
+ * and write it back.
+ *
+ * Four commands need the same eight steps — lock, invalidate, re-read FRESH (the
+ * `CONFIG` constant is the request's stale snapshot), patch, `var_export`, write,
+ * unlock, invalidate again — and each hand-rolled them. `setThemeMode`,
+ * `setMultilingual` and `addLang` still do; they hold the lock across other work
+ * (translation-file merges) and cannot be folded in without restructuring what
+ * runs inside the critical section. New writers use this.
+ *
+ * `var_export` is what makes the write safe: a config value ends up as PHP
+ * source in an array literal, so anything a caller stores must be re-parsable
+ * rather than interpolated. Callers still validate their VALUES — this
+ * guarantees the file's syntax, not the sense of what is in it.
+ *
+ * The callback receives the fresh config by reference and returns true to
+ * commit, false to abandon (lock released, file untouched).
+ *
+ * @param string   $configPath Absolute path to the project's config.php
+ * @param callable $patch      fn(array &$config): bool
+ * @return array{ok:bool, reason:string, config:array} `reason` is one of
+ *         'lock_failed', 'read_failed', 'write_failed', 'abandoned', or ''.
+ */
+function qs_config_mutate(string $configPath, callable $patch): array
+{
+    $fail = static fn(string $why): array => ['ok' => false, 'reason' => $why, 'config' => []];
+
+    $lockFile   = $configPath . '.lock';
+    $lockHandle = @fopen($lockFile, 'w');
+    if ($lockHandle === false) {
+        return $fail('lock_failed');
+    }
+    if (!flock($lockHandle, LOCK_EX)) {
+        fclose($lockHandle);
+        return $fail('lock_failed');
+    }
+
+    $release = static function ($handle, string $file): void {
+        flock($handle, LOCK_UN);
+        fclose($handle);
+        @unlink($file);
+    };
+
+    // Read FRESH. `include` rather than `require` so a missing file is a
+    // reported failure, not a fatal; opcache is invalidated first because the
+    // last writer may have been this same request.
+    clearstatcache(true, $configPath);
+    if (function_exists('opcache_invalidate')) {
+        opcache_invalidate($configPath, true);
+    }
+    $config = @include $configPath;
+    if (!is_array($config)) {
+        $release($lockHandle, $lockFile);
+        return $fail('read_failed');
+    }
+
+    if ($patch($config) !== true) {
+        $release($lockHandle, $lockFile);
+        return ['ok' => false, 'reason' => 'abandoned', 'config' => $config];
+    }
+
+    $written = @file_put_contents(
+        $configPath,
+        "<?php\n\nreturn " . var_export($config, true) . ";\n",
+        LOCK_EX
+    );
+    $release($lockHandle, $lockFile);
+
+    if ($written === false) {
+        return $fail('write_failed');
+    }
+    if (function_exists('opcache_invalidate')) {
+        opcache_invalidate($configPath, true);
+    }
+    clearstatcache(true, $configPath);
+
+    return ['ok' => true, 'reason' => '', 'config' => $config];
+}
+
+/**
+ * Keep `CONFIG['FAVICON_PATH']` honest when the asset it points at moves or goes.
+ *
+ * `editFavicon` stores a POINTER rather than copying the image, which is what
+ * stops backup files piling up in `assets/images/` — but a pointer can dangle,
+ * and the old copy-based command could not. Deleting or renaming the chosen
+ * image has to travel to the pointer, or the site emits an icon link to a file
+ * that is not there.
+ *
+ * Deliberately silent about the common case: if the pointer names some OTHER
+ * asset (or is unset), nothing is written and nothing is reported. Callers
+ * delete assets in batches, and a config rewrite per file would be wasteful and
+ * noisy.
+ *
+ * @param string      $projectPath Project root (the one holding config.php)
+ * @param string      $oldName     Asset filename as it was
+ * @param string|null $newName     Its new filename, or null when it was deleted
+ * @return bool True when the pointer was actually changed
+ */
+function qs_favicon_repoint(string $projectPath, string $oldName, ?string $newName): bool
+{
+    $configPath = $projectPath . '/config.php';
+    if (!is_file($configPath)) {
+        return false;
+    }
+
+    // Cheap pre-check against the request's own snapshot, so the overwhelmingly
+    // common "this asset is not the favicon" case costs no lock and no re-read.
+    // qs_config_mutate re-reads FRESH under the lock and re-tests before
+    // writing, so a stale CONSTANT here can only skip work, never corrupt.
+    $current = (defined('CONFIG') && isset(CONFIG['FAVICON_PATH'])) ? CONFIG['FAVICON_PATH'] : null;
+    if ($current !== null && $current !== '/assets/images/' . $oldName) {
+        return false;
+    }
+
+    $changed = false;
+    qs_config_mutate($configPath, function (array &$config) use ($oldName, $newName, &$changed): bool {
+        if (($config['FAVICON_PATH'] ?? null) !== '/assets/images/' . $oldName) {
+            return false;   // not ours — abandon, leave the file untouched
+        }
+        if ($newName === null) {
+            unset($config['FAVICON_PATH']);
+        } else {
+            $config['FAVICON_PATH'] = '/assets/images/' . $newName;
+        }
+        $changed = true;
+        return true;
+    });
+
+    return $changed;
+}

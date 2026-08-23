@@ -1,26 +1,36 @@
 <?php
 /**
- * Import / Publish Policy — OPTIONAL override
+ * Import / Publish / Asset Policy — OPTIONAL override
  *
- * Copy this file to `import-policy.php` to change what an imported archive may
- * carry into a project, what a build may copy into a web-served directory, and
- * the resource limits applied to an uploaded archive.
+ * Copy this file to `import-policy.php` to change what the engine treats as an
+ * uploadable asset, what an imported archive may carry into a project, what a
+ * build may copy into a web-served directory, and the resource limits applied
+ * to an uploaded archive.
  *
  * You do NOT need this file. Without it the built-in defaults apply (they are
  * the values shown below). A malformed file is ignored and the defaults stay in
  * force — the policy never fails open.
  *
- * Both extension lists are ALLOWLISTS. Anything not listed is refused. An entry
+ * ONE TAXONOMY, THREE GATES. `asset_extensions` is the source. The import and
+ * publish allowlists are DERIVED from it — structural/text types plus every
+ * asset type — so adding a media type in one place widens all three gates
+ * together and they cannot drift apart. Override `asset_extensions` alone and
+ * the other two follow; override them explicitly and your list wins for that
+ * gate.
+ *
+ * All three lists are ALLOWLISTS. Anything not listed is refused. An entry
  * refused at import is skipped and reported in the import response under
  * `security.skipped_disallowed`; a file refused at build is reported under
- * `skipped_unpublishable`. Neither aborts the operation.
+ * `skipped_unpublishable`. Neither aborts the operation. An upload of an
+ * unlisted extension is refused outright, because there is no category to put
+ * it in.
  *
  * Extensions are compared lowercased, so listing 'png' also covers '.PNG'.
  * A leading dot is accepted and stripped ('.png' and 'png' are equivalent).
  *
- * NOTE: providing either list REPLACES the corresponding default entirely, so
- * you can narrow as well as widen. Copy the full list below and edit it rather
- * than listing only your additions.
+ * NOTE: providing a list REPLACES the corresponding default entirely, so you
+ * can narrow as well as widen. Copy the full list below and edit it rather than
+ * listing only your additions.
  *
  * WARNING: adding an extension your web server maps to an interpreter (php,
  * phtml, phar, cgi, pl, asp, aspx, jsp) or treats as configuration (htaccess,
@@ -31,29 +41,60 @@
 
 return [
 
-    // What an archive may carry into a project.
-    'import_extensions' => [
-        // structural + text
-        'json', 'css', 'js', 'mjs', 'map', 'txt', 'xml', 'csv', 'pdf',
-        // images
-        'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'ico', 'avif', 'bmp',
-        // fonts
-        'woff', 'woff2', 'ttf', 'otf', 'eot',
-        // media
-        'mp4', 'webm', 'ogv', 'ogg', 'mp3', 'wav',
+    // ── The taxonomy ──────────────────────────────────────────────────────
+    // Which media types the engine handles, and which category each lands in.
+    // `uploadAsset` resolves an upload's category from this, and the two
+    // allowlists below are built from it.
+    //
+    // The four CATEGORIES are fixed: each needs a `public/assets/<category>/`
+    // directory that only createProject creates, so an unknown category key is
+    // ignored rather than invented. Extensions within a category are free.
+    //
+    // An extension listed here also needs an entry in `qs_asset_mime_types()`
+    // (in `secure/src/functions/filePolicy.php`) for an upload of it to
+    // succeed: the extension names the door, the detected MIME type is the
+    // lock. Import and publish are unaffected by that second list.
+    'asset_extensions' => [
+        'images' => ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'ico', 'avif', 'bmp'],
+        'font'   => ['ttf', 'otf', 'woff', 'woff2', 'eot'],
+        'audio'  => ['mp3', 'wav', 'ogg'],
+        'videos' => ['mp4', 'webm', 'ogv'],
     ],
+
+    // ── The two derived gates ─────────────────────────────────────────────
+    // Both default to: the structural/text types an export legitimately
+    // carries — json, css, js, mjs, map, txt, xml, csv, pdf — PLUS every
+    // extension in `asset_extensions` above.
+    //
+    // Leave these OUT unless you want a gate to differ from the taxonomy. They
+    // are shown here spelled out so you can see what the default resolves to;
+    // uncommenting them PINS the list, and it will no longer follow a later
+    // change to `asset_extensions`.
+
+    // What an archive may carry into a project.
+    // 'import_extensions' => [
+    //     // structural + text
+    //     'json', 'css', 'js', 'mjs', 'map', 'txt', 'xml', 'csv', 'pdf',
+    //     // images
+    //     'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'ico', 'avif', 'bmp',
+    //     // fonts
+    //     'ttf', 'otf', 'woff', 'woff2', 'eot',
+    //     // media
+    //     'mp3', 'wav', 'ogg', 'mp4', 'webm', 'ogv',
+    // ],
 
     // What a build may copy into a web-served directory.
-    'publish_extensions' => [
-        'json', 'css', 'js', 'mjs', 'map', 'txt', 'xml', 'csv', 'pdf',
-        'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'ico', 'avif', 'bmp',
-        'woff', 'woff2', 'ttf', 'otf', 'eot',
-        'mp4', 'webm', 'ogv', 'ogg', 'mp3', 'wav',
-    ],
+    // 'publish_extensions' => [
+    //     'json', 'css', 'js', 'mjs', 'map', 'txt', 'xml', 'csv', 'pdf',
+    //     'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'ico', 'avif', 'bmp',
+    //     'ttf', 'otf', 'woff', 'woff2', 'eot',
+    //     'mp3', 'wav', 'ogg', 'mp4', 'webm', 'ogv',
+    // ],
 
-    // Archive resource limits. Reading an archive entry loads it fully into
-    // memory, so an unbounded archive is an unbounded allocation. An archive
-    // exceeding any of these is refused before a single file is written.
+    // ── Archive resource limits ───────────────────────────────────────────
+    // Reading an archive entry loads it fully into memory, so an unbounded
+    // archive is an unbounded allocation. An archive exceeding any of these is
+    // refused before a single file is written.
     'limits' => [
         // Maximum number of entries in the archive.
         'max_entries'     => 10000,

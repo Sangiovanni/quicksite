@@ -2,6 +2,7 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/AssetMetadataManager.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_favicon_repoint
 
 /**
  * Edit Asset Command
@@ -67,10 +68,7 @@ if (!RegexPatterns::match('file_name_with_ext', $filename)) {
 }
 
 // --- Resolve category from extension ---
-$metaManager = new AssetMetadataManager(
-    PROJECT_PATH . '/data',
-    SECURE_FOLDER_PATH . '/management/config/assetExtensions.php'
-);
+$metaManager = new AssetMetadataManager(PROJECT_PATH . '/data');
 
 $category = $metaManager->resolveCategory($filename);
 if ($category === null) {
@@ -233,6 +231,13 @@ if ($newFilename !== null) {
     $metaManager->rename($category, $filename, $newFilename);
     $currentFilename = $newFilename;
     $updated[] = 'filename';
+
+    // editFavicon stores a POINTER, not a copy, so a rename has to travel to it
+    // or the site emits an icon link to the old name. Only images can be the
+    // favicon, so nothing else needs asking.
+    if ($category === 'images') {
+        qs_favicon_repoint(PROJECT_PATH, $filename, $newFilename);
+    }
 }
 
 // 2. Update metadata fields

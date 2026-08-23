@@ -838,7 +838,7 @@ The AI call is browser-direct via `QSAiCall.call(...)` (see `public/admin/assets
 | **Settings** (`settings.js`) | User profile, language, theme, AI provider config status. |
 | **My account** (`account.js`) | The caller's own account — change password, sign out everywhere, delete the account. See §9.13. Commands: `changePassword`, `logoutSession`, `deleteMyAccount`. |
 | **APIs** (`apis.js`) | External API registry — see §9.1. Commands: `listApiEndpoints`, `addApi`, `editApi`, `deleteApi`, `getApiEndpoint`, `testApiEndpoint`. |
-| **Assets** (`assets.js`) | Asset browser + uploader: `listAssets`, `uploadAsset`, `editAsset`, `deleteAsset`. |
+| **Assets** (`assets.js`) | Asset browser + uploader — see §9.15. Commands: `listAssets`, `uploadAsset`, `editAsset`, `deleteAsset`, `editFavicon`. |
 | **Sitemap** (`sitemap.js`) | Route tree, reachability, ordering. |
 | **Embed security** (`embed-security.js`) | Iframe sandbox config: `getIframeSandbox` / `setIframeSandbox` / `removeIframeSandbox`. |
 | **Optimize** (`optimize.js`) | UI for the CSS Refiner library; runs analyzers, presents diffs, applies edits via `editStyles` / `setRootVariables`. |
@@ -2871,6 +2871,31 @@ call. Dismissing it stores the **version** that was dismissed, so the next
 release shows the notice again instead of it staying gone for good.
 
 ---
+
+### 9.15 Media library (/admin/media)
+
+A grid of every asset in the project, filtered by category or by a name search, with drag-and-drop upload and paste-a-URL upload above it. The dropzone states what may be uploaded and how large each category may be **before** a user finds out by hitting a limit; both come from the server on each page load, because the size ceilings are per-directory PHP settings a deployer can change without QuickSite knowing.
+
+#### Two independent marks per asset
+
+An image card can carry two controls, in opposite corners, and they mean unrelated things. Keeping them apart matters: they look alike and one is multi-select while the other is not.
+
+| Corner | Control | Meaning |
+|---|---|---|
+| Top right | ☆ / ⭐ star | Include this asset in AI workflow prompts. **Multi-select**, capped at 15. Read by the site-building workflows so generated pages use real images instead of placeholders. |
+| Top left | Favicon radio | Make this asset the site favicon. **Single-select** — exactly one asset can hold it. |
+
+Both appear on hover and stay visible while set.
+
+#### The favicon control
+
+It is a **radio, not a toggle**, because a site has exactly one favicon. Choosing a new asset clears the previous one without the old card having to be found or unset — the choice is a single value in the project config, and the grid re-reads it. Clicking the asset that is *already* the favicon clears the setting, which is the only route back to the site default.
+
+It is only rendered on formats a browser will actually render as an icon — `ico`, `png`, `svg`, `gif`, `jpg`, `jpeg`, `webp`, `avif`. The list comes from the server, so the control appears on exactly the formats `editFavicon` accepts rather than on a copy of that list kept in the page. A `.bmp` is a perfectly good image and has no favicon control at all: an absent control says "this format cannot be an icon", which is more honest than a disabled one nobody can explain. Non-image assets never show it.
+
+Clicking marks the card immediately and then reconciles against the server's answer, restoring the previous choice and reporting the reason if the command refuses. Without that the radio would appear to swallow the click while the request was in flight, since the browser has already moved it by the time the handler runs.
+
+`editFavicon` stores a **pointer** — it writes the asset's path into the project config and copies nothing. Renaming the chosen asset follows the pointer; deleting it clears the pointer. So the grid can never show a favicon that is no longer there, and choosing one does not leave duplicate or backup images cluttering the library.
 
 ## 10. Data attribute reference
 

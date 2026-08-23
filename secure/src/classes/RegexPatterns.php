@@ -85,12 +85,6 @@ class RegexPatterns
             'examples' => ['image.png', 'my-file.pdf', 'document.json']
         ],
         
-        'favicon_file' => [
-            'pattern' => '/^[a-z0-9_-]+\.png$/i',
-            'description' => 'PNG favicon filename (alphanumeric with .png extension)',
-            'examples' => ['favicon.png', 'icon-32.png', 'logo_small.png']
-        ],
-        
         'token_name' => [
             'pattern' => '/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,49}$/',
             'description' => 'Token name (alphanumeric, hyphens, underscores, max 50 chars)',

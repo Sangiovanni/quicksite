@@ -127,13 +127,13 @@ Each row enumerates the commands in that category — comma-separated, alphabeti
 |---|---|
 | **Meta** | `help` — self-documenting endpoint, callable without authentication. |
 | **Session & account** | `login`, `logoutSession`, `register`, `changePassword`, `deleteMyAccount` — username+password login → a session (cookie + session token); explicit logout, optionally everywhere; flag-gated flood-controlled self-registration (public); self-service password change and account deletion (authenticated — both require the current password; deletion also needs `confirm=true`, is refused while the caller solely owns a project, and ends every session). See *Authentication* above. |
-| **Pages** | `listPages`, `createAlias`, `deleteAlias`, `listAliases`, `editFavicon`, `editTitle` — page metadata, title, favicon, alias routes. |
+| **Pages** | `listPages`, `createAlias`, `deleteAlias`, `listAliases`, `editFavicon`, `editTitle` — page metadata, title, favicon, alias routes. `editFavicon` stores a **pointer**: it writes the chosen asset's path into the project config and copies nothing, so choosing a favicon neither duplicates the image nor leaves timestamped backups behind. Any favicon-capable image already in `assets/images/` may be chosen — `ico`, `png`, `svg`, `gif`, `jpg`, `jpeg`, `webp`, `avif` — and passing `null` clears the choice, returning the site to its default. Exactly one asset is the favicon, so choosing another replaces it. Renaming the chosen asset follows the pointer and deleting it clears the pointer, so the setting cannot outlive the file it names. Because a build copies the project config verbatim, the choice travels into a built site with no extra step. |
 | **Routes & sitemap** | `addRoute`, `deleteRoute`, `getRoutes`, `getSiteMap`, `setSiteMapConfig`, `setRouteLayout`, `analyzeReachability` — URL routing tree CRUD, sitemap export, dead-route audit. `getSiteMap` is **read-only**; `setSiteMapConfig` owns the two sitemap writes (the excluded-routes / custom-URLs sidecar, and publishing the project's own `public/sitemap.txt`) and needs a write role, because both decide what the published sitemap contains. `getSiteMap` URLs are absolute: a `baseUrl` body param (validated URL) wins; otherwise the deployment's `QS_PUBLIC_BASE_URL` env var, else the project's own `/p/<id>/` URL on the install. `setRouteResolver` is under "Server-side data resolvers" below since the route layer just hosts the resolver config. |
 | **Structure** | `getStructure`, `editStructure`, `addNode`, `addComplexElement`, `addComponentToNode`, `editComponentToNode`, `editNode`, `moveNode`, `deleteNode`, `duplicateNode` — edit nodes inside a page tree. |
 | **Components** | `listComponents`, `getComponent`, `findComponentUsages`, `renameComponent`, `duplicateComponent` — reusable component definitions (NOT the in-tree snippet shortcuts below). |
 | **Translations** | `getTranslation`, `getTranslations`, `getTranslationKeys`, `setTranslationKeys`, `deleteTranslationKeys`, `cleanOrphanTranslations`, `validateTranslations`, `getUnusedTranslationKeys`, `analyzeTranslations`, `importStructureTranslations` — translation keys per language; audits + structure-aware bulk operations. |
 | **Languages** | `getLangList`, `getLanguageList`, `addLang`, `deleteLang`, `setDefaultLang`, `setMultilingual`, `checkStructureMulti` — site language config (add/remove, default, multilingual gate). |
-| **Assets** | `uploadAsset`, `listAssets`, `editAsset`, `deleteAsset` — upload, list, delete files in the project's own `public/assets/{images,font,audio,videos}/`, with metadata (alt text, dimensions). |
+| **Assets** | `uploadAsset`, `listAssets`, `editAsset`, `deleteAsset` — upload, list, delete files in the project's own `public/assets/{images,font,audio,videos}/`, with metadata (alt text, dimensions). An upload is checked twice: its extension must be one the taxonomy knows (which is what decides its category), and its server-detected type must belong to that category. `listAssets` also reports which asset is the site favicon, so a caller can show the current choice without a second request. |
 | **Styles** | `getStyles`, `editStyles`, `listStyleRules`, `getStyleRule`, `setStyleRule`, `deleteStyleRule` — `style.css` blocks + scoped CSS rule management. |
 | **CSS variables** | `getRootVariables`, `setRootVariables`, `setThemeMode` — CSS custom-property registries used by the color picker and theme switcher. |
 | **Animations** | `listKeyframes`, `getKeyframes`, `setKeyframes`, `deleteKeyframes`, `getAnimatedSelectors` — named keyframes + per-element animation bindings. |
@@ -275,13 +275,54 @@ The two byte caps are the real ceiling: whatever ratio an entry declares, no ent
 
 Exceeding any limit answers `413 validation.size_limit_exceeded`, reporting the value measured and the limit it crossed — plus the offending entry's name, where a single entry is at fault. This is stricter than a refused *entry*: an entry rejected by the extension allowlist or the content check is skipped and reported while the rest of the archive still imports, but a limit breach refuses the archive whole and no project is created.
 
-### Changing the limits
+### What may enter, and what may be published
 
-The defaults are built into the engine and apply with no configuration at all. To change them, copy `secure/management/config/import-policy.php.example` to `secure/management/config/import-policy.php` and edit the values — that file also carries the import and publish extension allowlists.
+Three gates decide what a file type is allowed to do, and all three read one taxonomy:
 
-The two kinds of setting merge differently. Limits merge **per key**: a limit you omit keeps its default, and a value that is not a positive whole number is ignored. Each extension list **replaces** the corresponding default outright, so you can narrow as well as widen — copy the full list and edit it rather than listing only your additions.
+| Gate | What it governs |
+|---|---|
+| **upload** | Which file types `uploadAsset` accepts, and which category each lands in. |
+| **import** | Which archive entries `importProject` may carry into a project. |
+| **publish** | Which files `build` may copy into a web-served directory. |
+
+The taxonomy names the media types the engine handles, keyed by asset category:
+
+| Category | Extensions |
+|---|---|
+| `images` | jpg, jpeg, png, gif, webp, svg, ico, avif, bmp |
+| `font` | ttf, otf, woff, woff2, eot |
+| `audio` | mp3, wav, ogg |
+| `videos` | mp4, webm, ogv |
+
+The import and publish allowlists are **derived** from it: the structural and text types an export legitimately carries — `json`, `css`, `js`, `mjs`, `map`, `txt`, `xml`, `csv`, `pdf` — plus every extension above. So a type is never uploadable but unimportable, and adding a media type widens all three gates in one edit. The structural types are import and publish only: there is no asset category to put a `.json` or a `.pdf` in, so uploading one is refused.
+
+An extension also needs a detected-MIME entry for an *upload* of it to succeed — the extension names the door, the server-side type detection is the lock. Import and publish do not use that list; they check content against the format's signature instead.
+
+### Changing the limits and the lists
+
+The defaults are built into the engine and apply with no configuration at all. To change them, copy `secure/management/config/import-policy.php.example` to `secure/management/config/import-policy.php` and edit the values — that file carries the taxonomy, both extension allowlists, and the limits.
+
+The kinds of setting merge differently:
+
+- **The taxonomy** (`asset_extensions`) merges **per category**. A category you omit keeps its default; a category you supply has its list replaced. The four categories are fixed, because each needs a `public/assets/<category>/` directory that only project creation makes — an unknown category key is ignored rather than invented, and an empty list is treated as "not configured" rather than as a way to disable a category.
+- **The two allowlists** (`import_extensions`, `publish_extensions`) default to the derived list and follow the taxonomy. Supplying one **pins** that gate to exactly what you wrote — it replaces the default outright, so you can narrow as well as widen, and it will no longer follow a later taxonomy change.
+- **Limits** merge **per key**: a limit you omit keeps its default, and a value that is not a positive whole number is ignored.
 
 If the file is absent or malformed, the built-in defaults stay in force; the policy never fails open. A syntax error in it is recorded in the server error log rather than taking every import down, so the mistake is discoverable.
+
+### How an entry's content is checked
+
+Passing the extension gate is not enough: an entry's bytes must match what its name claims, so a name cannot lie about what a file is. What that means depends on the class of file.
+
+**Text types** — `json`, `css`, `js`, `mjs`, `map`, `txt`, `xml`, `csv`, `svg` — may never open a PHP block. All three spellings are refused, not only the long one: a server with short tags enabled executes the shorthand forms too, and file-type detection reports only the long form as PHP source. A `.json` entry must also parse as JSON, and an SVG is run through the same sanitiser the upload path applies, so what lands on disk is the cleaned markup rather than the bytes uploaded.
+
+**Binary types** must match their format's signature, where one is known. A format may list several signatures: alternatives at the same position (a GIF begins either `GIF87a` or `GIF89a`), and requirements at different positions that must all hold (a WebP and a WAV share the same container marker and are told apart only by a second marker further in). Formats whose signature is ambiguous or absent — avif, mp4, mp3 — are not signature-checked; instead they must not be detected as text at all, which is the shape a disguised payload takes.
+
+A binary entry that *looks* like it opens a PHP block gets one further test: it must also be detected as a real file of a named format, and reported as binary content. That conjunction is what separates a genuine image from a disguise. A few honest bytes followed by a script is detected as plain text, as nothing in particular, or as a named format that is simultaneously reported as ASCII — and is refused. A real image or font is detected as itself and reported as binary, and is accepted even though the byte pattern appears in it by chance, which it does in roughly one real file in twenty-five.
+
+What this deliberately does not refuse is a genuinely valid image with script bytes appended. It cannot be told apart from an ordinary large image by inspecting bytes, and it is inert: no extension either allowlist permits is mapped to an interpreter, so the file is served as the image it is. The control that holds there is the allowlist itself, not the content check.
+
+A refused entry is skipped and reported with its reason under `security.skipped_disallowed`; the rest of the archive still imports.
 
 ## Calling the API
 

@@ -183,10 +183,27 @@ function __command_listAssets(array $params = [], array $urlParams = []): ApiRes
             ? "Assets retrieved for category '{$category}'" 
             : "All assets retrieved");
 
+    // The favicon POINTER, so a caller can render which asset is selected
+    // without a second round trip. Reported as the bare filename (never a path)
+    // when it names an asset in this project's assets/images/, so the media
+    // page can match it against a filename directly; null otherwise, which
+    // covers both "no favicon chosen" and "the pointer names something outside
+    // the asset folder, such as an absolute URL".
+    $faviconFile = null;
+    $faviconPath = (defined('CONFIG') && isset(CONFIG['FAVICON_PATH'])) ? (string) CONFIG['FAVICON_PATH'] : '';
+    if (strpos($faviconPath, '/assets/images/') === 0) {
+        $candidate = substr($faviconPath, strlen('/assets/images/'));
+        if ($candidate !== '' && $candidate === basename($candidate)) {
+            $faviconFile = $candidate;
+        }
+    }
+
     return ApiResponse::create(200, 'operation.success')
         ->withMessage($message)
         ->withData([
             'assets' => $result,
+            'favicon' => $faviconFile,
+            'favicon_path' => $faviconPath !== '' ? $faviconPath : null,
             'total_categories' => count($result),
             'total_files' => array_sum(array_map('count', $result))
         ]);

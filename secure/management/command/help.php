@@ -490,37 +490,38 @@ $GLOBALS['__help_commands'] = [
     ],
 
     'editFavicon' => [
-        'description' => 'Updates the site favicon with a new image from assets/images folder (PNG only)',
-        'method' => 'PATCH',
+        'description' => 'Points the site favicon at an existing image in assets/images. Writes CONFIG[FAVICON_PATH]; copies nothing.',
+        'method' => 'POST',
         'parameters' => [
             'imageName' => [
                 'required' => true,
-                'type' => 'string',
-                'description' => 'Filename from assets/images folder (must be PNG)',
-                'example' => 'logo.png',
-                'validation' => 'Must exist in assets/images/, PNG format only'
+                'type' => 'string|null',
+                'description' => 'Filename of an existing asset in assets/images. Pass null to clear the favicon and fall back to the site default.',
+                'example' => 'logo.svg',
+                'validation' => 'Must exist in assets/images/ and be a favicon-capable format: ico, png, svg, gif, jpg, jpeg, webp, avif'
             ]
         ],
-        'example_patch' => 'PATCH /management/editFavicon with body: {"imageName": "logo.png"}',
+        'example_post' => 'POST /management/p/<projectId>/editFavicon with body: {"imageName": "logo.svg"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
             'message' => 'Favicon updated successfully',
             'data' => [
-                'old_favicon' => '/assets/favicon.png',
-                'new_favicon' => '/assets/favicon.png',
-                'backup_created' => '/assets/images/favicon_backup_20251206_143022.png',
-                'source_image' => '/assets/images/logo.png'
+                'favicon_path' => '/assets/images/logo.svg',
+                'previous_path' => '/assets/images/old.png',
+                'source_image' => 'logo.svg',
+                'changed' => true
             ]
         ],
         'error_responses' => [
-            '400.validation.required' => 'Missing imageName parameter',
-            '400.validation.invalid_format' => 'Invalid filename (path traversal blocked)',
-            '400.asset.invalid_file_type' => 'File is not a PNG image (MIME type validation)',
-            '404.file.not_found' => 'Source image not found in assets/images/',
-            '500.server.file_write_failed' => 'Failed to copy or backup favicon'
+            '400.validation.missing_field' => 'Missing imageName parameter',
+            '400.validation.invalid_type' => 'imageName is not a string',
+            '400.validation.invalid_format' => 'Invalid filename, or a format that cannot be a favicon',
+            '400.validation.invalid_length' => 'Filename exceeds 100 characters',
+            '404.file.not_found' => 'Named image does not exist in assets/images/',
+            '500.server.file_write_failed' => 'Could not read or write the project config'
         ],
-        'notes' => 'Validates actual PNG MIME type, not just extension. Creates timestamped backup of old favicon. Uses basename() to prevent path traversal. Favicon must be in /assets/ root as favicon.png.'
+        'notes' => 'Stores a POINTER, not a copy: the chosen asset stays where it is and no favicon.png or favicon_backup_* file is written. The value is written with var_export and the filename is validated before the write, so it lands in config.php as data. Selecting a different asset REPLACES the pointer (exactly one favicon per site). Renaming the chosen asset follows the pointer; deleting it clears the pointer. Because a build copies config.php verbatim, the choice travels into a built site. File validity is uploadAsset\'s job and is not re-checked here.'
     ],
     
     'editTitle' => [
@@ -1552,6 +1553,8 @@ $GLOBALS['__help_commands'] = [
                         ]
                     ]
                 ],
+                'favicon' => 'logo.png',
+                'favicon_path' => '/assets/images/logo.png',
                 'total_categories' => 1,
                 'total_files' => 2
             ]
@@ -1559,7 +1562,7 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.asset.invalid_category' => 'Invalid category'
         ],
-        'notes' => 'Returns files sorted alphabetically. Excludes index.php files. Shows size in bytes and last modified timestamp. Includes metadata (description, alt, dimensions) when available.'
+        'notes' => 'Returns files sorted alphabetically. Excludes index.php files. Shows size in bytes and last modified timestamp. Includes metadata (description, alt, dimensions) when available. Also reports the site favicon: `favicon` is the bare filename when the pointer names an asset in this project (so a caller can match it against a listed file), and null otherwise; `favicon_path` is the raw stored value, which may be an absolute URL.'
     ],
     
     'editAsset' => [

@@ -18,4 +18,5 @@ return array (
   'THEME_MODE_ENABLED' => false,
   'THEME_DEFAULT' => 'light',
   'THEME_USER_TOGGLE_ENABLED' => false,
+  'FAVICON_PATH' => '/assets/images/logo.svg',
 );

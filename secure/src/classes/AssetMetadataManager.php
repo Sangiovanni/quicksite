@@ -1,11 +1,12 @@
 <?php
 require_once __DIR__ . '/../functions/utilsManagement.php'; // qs_json_write
+require_once __DIR__ . '/../functions/filePolicy.php';        // qs_asset_extension_map
 /**
  * AssetMetadataManager
  * 
  * Centralized management of asset metadata (assets_metadata.json).
  * Handles load/save, per-asset get/set/remove/rename, file info detection,
- * and extension-to-category resolution.
+ * and extension-to-category resolution (from filePolicy.php's taxonomy).
  * 
  * Used by: uploadAsset, deleteAsset, editAsset
  */
@@ -16,21 +17,17 @@ class AssetMetadataManager
     private array $extensionMap = [];
 
     /**
-     * @param string $dataPath      Directory containing assets_metadata.json
-     * @param string $extensionsConfigPath  Path to assetExtensions.php config
+     * @param string $dataPath Directory containing assets_metadata.json
+     *
+     * The extension => category map comes from `qs_asset_extension_map()`, the
+     * single asset taxonomy in filePolicy.php. It used to be a config-file path
+     * each caller passed in separately, which let the upload gate disagree with
+     * the import and publish gates about what a `.ico` was.
      */
-    public function __construct(string $dataPath, string $extensionsConfigPath)
+    public function __construct(string $dataPath)
     {
         $this->metadataPath = rtrim($dataPath, '/\\') . '/assets_metadata.json';
-
-        // Build reverse extension → category map
-        $extensions = require $extensionsConfigPath;
-        foreach ($extensions as $category => $exts) {
-            foreach ($exts as $ext) {
-                $this->extensionMap[strtolower($ext)] = $category;
-            }
-        }
-
+        $this->extensionMap = qs_asset_extension_map();
         $this->load();
     }
 

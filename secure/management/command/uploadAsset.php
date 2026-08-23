@@ -4,6 +4,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/SvgSanitizer.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/AssetMetadataManager.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/OutboundUrlPolicy.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/uploadLimits.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/filePolicy.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/quota.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/spaceUsage.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
@@ -12,7 +13,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
  * Upload Asset Command
  * 
  * Uploads files to assets folders with auto-detected category.
- * Category is resolved from the file extension using assetExtensions.php.
+ * Category is resolved from the file extension using filePolicy.php's asset taxonomy.
  * Supports two sources (first available wins):
  *   1. Multipart file upload ($_FILES['file'])
  *   2. HTTPS URL download (url parameter)
@@ -155,10 +156,7 @@ $description = $params['description'] ?? null;
 $alt = $params['alt'] ?? null;
 
 // Initialize AssetMetadataManager for category resolution and metadata storage
-$metaManager = new AssetMetadataManager(
-    PROJECT_PATH . '/data',
-    SECURE_FOLDER_PATH . '/management/config/assetExtensions.php'
-);
+$metaManager = new AssetMetadataManager(PROJECT_PATH . '/data');
 
 // Validate description if provided (optional parameter)
 if ($description !== null) {
@@ -489,13 +487,12 @@ if ($quotaBreach !== null) {
         ->send();
 }
 
-// Validate MIME type based on resolved category
-$allowedMimes = [
-    'images' => ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'],
-    'font' => ['font/ttf', 'font/otf', 'font/woff', 'font/woff2', 'application/x-font-ttf', 'application/x-font-otf', 'application/font-woff', 'application/font-woff2', 'application/octet-stream'], // fonts often detected as octet-stream
-    'audio' => ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/ogg', 'audio/x-wav'],
-    'videos' => ['video/mp4', 'video/webm', 'video/ogg']
-];
+// Validate MIME type based on resolved category. The list lives with the
+// extension taxonomy in filePolicy.php so the two halves of the same decision
+// cannot drift: an extension the taxonomy allows through the door needs a MIME
+// entry here or the upload is refused after passing every other check, which is
+// exactly how .ttf and .otf uploads were silently impossible.
+$allowedMimes = qs_asset_mime_types();
 
 // Get actual MIME type (server-side detection, not client-provided)
 $finfo = finfo_open(FILEINFO_MIME_TYPE);

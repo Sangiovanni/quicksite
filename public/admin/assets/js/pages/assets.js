@@ -19,6 +19,12 @@
     let uploadQueue = [];        // [{ type: 'file'|'url', file?, url?, name, size, category }]
     let allowedExtensions = [];
     let extensionsMap = {};      // { images: ['jpg',...], font: ['ttf',...], ... }
+    // The favicon is a POINTER to one asset, so exactly one filename can hold
+    // it. Null means no favicon chosen (the site falls back to its default) OR
+    // that the pointer names something that is not an asset in this project,
+    // such as an absolute URL — either way no card is marked.
+    let currentFavicon = null;
+    let faviconExtensions = [];  // favicon-capable subset, from the server
     let currentlyPlaying = null; // Audio element currently playing
     let editingAsset = null;     // Asset currently being edited
     let fontStyleElements = {};  // Track injected @font-face style elements
@@ -35,6 +41,7 @@
             return;
         }
         loadExtensions();
+        loadFaviconExtensions();
         loadUploadLimits();
         loadAssets();
         initUploadZone();
@@ -46,6 +53,24 @@
     }
 
     // ─── Data Loading ────────────────────────────────────────────────────────
+    /**
+     * The favicon-capable subset of the images category, from its own helper
+     * arm. Separate from loadExtensions() because 'asset-extensions' is
+     * flattened wholesale by two callers — an extra key on that arm would end
+     * up in the upload accept list.
+     */
+    async function loadFaviconExtensions() {
+        try {
+            faviconExtensions = await QuickSiteAdmin.fetchHelperData('favicon-extensions');
+            if (!Array.isArray(faviconExtensions)) faviconExtensions = [];
+            renderGrid();
+        } catch (e) {
+            // Non-critical: the control stays hidden and editFavicon is still
+            // reachable from /admin/command.
+            faviconExtensions = [];
+        }
+    }
+
     async function loadExtensions() {
         try {
             extensionsMap = await QuickSiteAdmin.fetchHelperData('asset-extensions');
@@ -102,11 +127,16 @@
             const result = await QuickSiteAdmin.apiRequest('listAssets', 'GET');
             if (result.ok && result.data?.data?.assets) {
                 allAssets = result.data.data.assets;
+                // listAssets reports the pointer as a bare filename when it
+                // names an asset in this project, so it matches a card directly.
+                currentFavicon = result.data.data.favicon ?? null;
             } else {
                 allAssets = {};
+                currentFavicon = null;
             }
         } catch (e) {
             allAssets = {};
+            currentFavicon = null;
         }
         flattenAssets();
         renderGrid();
@@ -144,6 +174,21 @@
             if (exts.includes(ext)) return cat;
         }
         return null;
+    }
+
+    /**
+     * Can this asset be the site favicon?
+     *
+     * The list comes from the SERVER (filePolicy.php's qs_favicon_extensions),
+     * so the control appears on exactly the formats editFavicon will accept —
+     * a UI that offers a choice the command refuses is worse than no control.
+     * Until it arrives the answer is no, which hides the control rather than
+     * showing one that would fail.
+     */
+    function isFaviconCapable(asset) {
+        if (!asset || asset.category !== 'images') return false;
+        const ext = getExtension(asset.filename).replace(/^\./, '').toLowerCase();
+        return faviconExtensions.includes(ext);
     }
 
     function getFileIcon(category) {
@@ -608,7 +653,7 @@
         const assets = getFilteredAssets();
 
         if (assets.length === 0) {
-            grid.innerHTML = '';
+            grid.replaceChildren();
             if (empty) {
                 empty.style.display = '';
                 if (emptyText) {
@@ -626,63 +671,228 @@
 
         if (empty) empty.style.display = 'none';
 
-        grid.innerHTML = assets.map(asset => renderCard(asset)).join('');
+        grid.replaceChildren(...assets.map(_renderCard));
 
         // Inject @font-face for font assets
         assets.filter(a => a.category === 'font').forEach(injectFontFace);
     }
 
-    function renderCard(asset) {
-        const thumb = renderThumb(asset);
-        const isSelected = selectedFiles.has(asset.filename);
-        const checkboxHtml = selectMode
-            ? `<label class="asset-card__checkbox"><input type="checkbox" data-select="${escapeHtml(asset.filename)}" ${isSelected ? 'checked' : ''}></label>`
-            : '';
+    // ─── Card Rendering ──────────────────────────────────────────────────────
+    // Same rule as the upload queue above: every value on a card comes from
+    // OUTSIDE the panel — the filename the user chose, the alt text they typed —
+    // and the card used to be a multi-line interpolated HTML string with all of
+    // it glued in, assembled with `grid.innerHTML = assets.map(...).join('')`.
+    // Each _render* helper below returns exactly ONE Element.
 
-        const actionsHtml = selectMode ? '' : `
-                    <button type="button" class="asset-card__action asset-card__rename" data-rename="${escapeHtml(asset.filename)}" title="Rename">✏️</button>`;
-        const starHtml = selectMode ? '' : `<button type="button" class="asset-card__star${asset.starred ? ' asset-card__star--active' : ''}" data-star="${escapeHtml(asset.filename)}" title="${asset.starred ? 'Unstar' : 'Star'}">${asset.starred ? '⭐' : '☆'}</button>`;
-        const infoActionsHtml = selectMode ? '' : `
-                    <div class="asset-card__actions">
-                        <button type="button" class="asset-card__action" data-edit="${escapeHtml(asset.filename)}" title="Edit alt/description">✏️</button>
-                        <button type="button" class="asset-card__action asset-card__delete" data-delete="${escapeHtml(asset.filename)}" title="Delete">🗑️</button>
-                    </div>`;
-
-        return `
-        <div class="asset-card${isSelected ? ' asset-card--selected' : ''}${selectMode ? ' asset-card--selectable' : ''}" data-filename="${escapeHtml(asset.filename)}" data-category="${asset.category}">
-            ${checkboxHtml}
-            <div class="asset-card__thumb">${thumb}${starHtml}</div>
-            <div class="asset-card__footer">
-                <div class="asset-card__name">
-                    <span class="asset-card__name-text" title="${escapeHtml(asset.filename)}">${escapeHtml(stripExtension(asset.filename))}</span>${actionsHtml}
-                </div>
-                <div class="asset-card__info">
-                    <span class="asset-card__size">${formatSize(asset.size)}${activeCategory === 'all' ? ' · <span class="asset-card__category">' + escapeHtml(asset.category) + '</span>' : ''}</span>${infoActionsHtml}
-                </div>
-            </div>
-        </div>`;
+    /** A small square action button on a card. Returns ONE Element. */
+    function _renderCardButton(className, dataKey, filename, title, label) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = className;
+        btn.dataset[dataKey] = filename;
+        btn.title = title;
+        btn.textContent = label;
+        return btn;
     }
 
-    function renderThumb(asset) {
+    /**
+     * The favicon control: a RADIO, not a toggle. Exactly one asset can be the
+     * site favicon, so choosing a new one clears the old — which is why this is
+     * an <input type="radio"> in a shared group rather than a second star.
+     *
+     * Deliberately NOT the ⭐ next to it: that star means "include this asset in
+     * AI prompts", is multi-select, is capped at 15, and is read by the
+     * create-landing / create-website workflows. The two are unrelated choices
+     * and each keeps its own control.
+     *
+     * Only rendered for favicon-capable formats — a .bmp or a .mp3 has no
+     * favicon affordance at all, rather than a disabled one nobody can explain.
+     *
+     * Returns ONE Element, or null when this asset cannot be a favicon.
+     */
+    function _renderFaviconControl(asset) {
+        if (!isFaviconCapable(asset)) return null;
+
+        const label = document.createElement('label');
+        label.className = 'asset-card__favicon';
+        const isCurrent = currentFavicon === asset.filename;
+        label.title = isCurrent
+            ? 'This is the site favicon — click to clear it'
+            : 'Use as the site favicon';
+        label.classList.toggle('asset-card__favicon--active', isCurrent);
+
+        const input = document.createElement('input');
+        input.type = 'radio';
+        input.name = 'asset-favicon';
+        input.className = 'asset-card__favicon-input';
+        input.checked = isCurrent;
+        input.dataset.favicon = asset.filename;
+        input.setAttribute('aria-label', 'Use ' + asset.filename + ' as the site favicon');
+        label.appendChild(input);
+
+        const glyph = document.createElement('span');
+        glyph.className = 'asset-card__favicon-glyph';
+        glyph.setAttribute('aria-hidden', 'true');
+        glyph.textContent = '🌐';
+        label.appendChild(glyph);
+
+        return label;
+    }
+
+    /** The select-mode checkbox for a card. Returns ONE Element. */
+    function _renderCardCheckbox(asset, isSelected) {
+        const label = document.createElement('label');
+        label.className = 'asset-card__checkbox';
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.dataset.select = asset.filename;
+        input.checked = isSelected;
+        label.appendChild(input);
+        return label;
+    }
+
+    /** The thumbnail area's inner preview. Returns ONE Element. */
+    function _renderThumb(asset) {
         const url = getAssetUrl(asset);
         switch (asset.category) {
-            case 'images':
-                return `<img src="${url}" alt="${escapeHtml(asset.alt || asset.filename)}" loading="lazy" class="asset-card__image">`;
-            case 'font':
-                return `<span class="asset-font-preview" style="font-family:'qs-font-${escapeHtml(asset.filename)}'">AaBbCc</span>`;
-            case 'audio':
-                return `
-                    <div class="asset-audio-player" data-audio-src="${url}">
-                        <button type="button" class="asset-audio-player__btn" data-play-audio="${escapeHtml(asset.filename)}">▶</button>
-                        <div class="asset-audio-player__bar"><div class="asset-audio-player__progress"></div></div>
-                        <audio preload="none" src="${url}"></audio>
-                    </div>`;
-            case 'videos':
-                return `<video src="${url}" class="asset-card__video" preload="metadata" muted></video>
-                        <button type="button" class="asset-video-overlay" data-play-video="${escapeHtml(asset.filename)}">▶</button>`;
-            default:
-                return `<span class="asset-card__icon-fallback">${getFileIcon(asset.category)}</span>`;
+            case 'images': {
+                const img = document.createElement('img');
+                img.src = url;
+                img.alt = asset.alt || asset.filename;
+                img.loading = 'lazy';
+                img.className = 'asset-card__image';
+                return img;
+            }
+            case 'font': {
+                const span = document.createElement('span');
+                span.className = 'asset-font-preview';
+                span.style.fontFamily = `'qs-font-${asset.filename}'`;
+                span.textContent = 'AaBbCc';
+                return span;
+            }
+            case 'audio': {
+                const wrap = document.createElement('div');
+                wrap.className = 'asset-audio-player';
+                wrap.dataset.audioSrc = url;
+                wrap.appendChild(_renderCardButton('asset-audio-player__btn', 'playAudio', asset.filename, 'Play', '▶'));
+                const bar = document.createElement('div');
+                bar.className = 'asset-audio-player__bar';
+                const progress = document.createElement('div');
+                progress.className = 'asset-audio-player__progress';
+                bar.appendChild(progress);
+                wrap.appendChild(bar);
+                const audio = document.createElement('audio');
+                audio.preload = 'none';
+                audio.src = url;
+                wrap.appendChild(audio);
+                return wrap;
+            }
+            case 'videos': {
+                // Two siblings (the video and its overlay button) — wrapped so
+                // this helper keeps its one-Element contract.
+                const wrap = document.createElement('div');
+                wrap.className = 'asset-card__video-wrap';
+                const video = document.createElement('video');
+                video.src = url;
+                video.className = 'asset-card__video';
+                video.preload = 'metadata';
+                video.muted = true;
+                wrap.appendChild(video);
+                wrap.appendChild(_renderCardButton('asset-video-overlay', 'playVideo', asset.filename, 'Play', '▶'));
+                return wrap;
+            }
+            default: {
+                const span = document.createElement('span');
+                span.className = 'asset-card__icon-fallback';
+                span.textContent = getFileIcon(asset.category);
+                return span;
+            }
         }
+    }
+
+    /** The name row: the (extension-stripped) name plus the rename pencil. */
+    function _renderCardName(asset) {
+        const wrap = document.createElement('div');
+        wrap.className = 'asset-card__name';
+
+        const text = document.createElement('span');
+        text.className = 'asset-card__name-text';
+        text.title = asset.filename;
+        text.textContent = stripExtension(asset.filename);
+        wrap.appendChild(text);
+
+        if (!selectMode) {
+            wrap.appendChild(_renderCardButton(
+                'asset-card__action asset-card__rename', 'rename', asset.filename, 'Rename', '✏️'));
+        }
+        return wrap;
+    }
+
+    /** The info row: size, optional category chip, and the edit/delete actions. */
+    function _renderCardInfo(asset) {
+        const wrap = document.createElement('div');
+        wrap.className = 'asset-card__info';
+
+        const size = document.createElement('span');
+        size.className = 'asset-card__size';
+        size.textContent = formatSize(asset.size);
+        if (activeCategory === 'all') {
+            size.appendChild(document.createTextNode(' · '));
+            const cat = document.createElement('span');
+            cat.className = 'asset-card__category';
+            cat.textContent = asset.category;
+            size.appendChild(cat);
+        }
+        wrap.appendChild(size);
+
+        if (!selectMode) {
+            const actions = document.createElement('div');
+            actions.className = 'asset-card__actions';
+            actions.appendChild(_renderCardButton(
+                'asset-card__action', 'edit', asset.filename, 'Edit alt/description', '✏️'));
+            actions.appendChild(_renderCardButton(
+                'asset-card__action asset-card__delete', 'delete', asset.filename, 'Delete', '🗑️'));
+            wrap.appendChild(actions);
+        }
+        return wrap;
+    }
+
+    /** One complete asset card. Returns ONE Element. */
+    function _renderCard(asset) {
+        const isSelected = selectedFiles.has(asset.filename);
+
+        const card = document.createElement('div');
+        card.className = 'asset-card';
+        card.classList.toggle('asset-card--selected', isSelected);
+        card.classList.toggle('asset-card--selectable', selectMode);
+        card.dataset.filename = asset.filename;
+        card.dataset.category = asset.category;
+
+        if (selectMode) {
+            card.appendChild(_renderCardCheckbox(asset, isSelected));
+        }
+
+        const thumb = document.createElement('div');
+        thumb.className = 'asset-card__thumb';
+        thumb.appendChild(_renderThumb(asset));
+        if (!selectMode) {
+            thumb.appendChild(_renderCardButton(
+                'asset-card__star' + (asset.starred ? ' asset-card__star--active' : ''),
+                'star', asset.filename,
+                asset.starred ? 'Unstar (used in AI prompts)' : 'Star for AI prompts',
+                asset.starred ? '⭐' : '☆'));
+            const favicon = _renderFaviconControl(asset);
+            if (favicon) thumb.appendChild(favicon);
+        }
+        card.appendChild(thumb);
+
+        const footer = document.createElement('div');
+        footer.className = 'asset-card__footer';
+        footer.appendChild(_renderCardName(asset));
+        footer.appendChild(_renderCardInfo(asset));
+        card.appendChild(footer);
+
+        return card;
     }
 
     function stripExtension(filename) {
@@ -760,10 +970,19 @@
             return;
         }
 
-        // Star toggle button
+        // Star toggle button (AI prompts — unrelated to the favicon below)
         const starBtn = e.target.closest('[data-star]');
         if (starBtn) {
             toggleStar(starBtn.dataset.star);
+            return;
+        }
+
+        // Favicon radio. The <label> wraps the input, so a click reaches here
+        // twice — once for the label and once for the input it activates.
+        // Acting only on the input keeps it to one request.
+        const faviconInput = e.target.closest('[data-favicon]');
+        if (faviconInput) {
+            setFavicon(faviconInput.dataset.favicon);
             return;
         }
 
@@ -1085,6 +1304,48 @@
             }
         } catch (error) {
             QuickSiteAdmin.showToast('Star toggle failed: ' + error.message, 'error');
+        }
+    }
+
+    // ─── Favicon (radio, not toggle) ─────────────────────────────────────────
+    /**
+     * Point the site favicon at `filename`, or clear it when `filename` is
+     * already the current one.
+     *
+     * RADIO SEMANTICS. Exactly one asset is the favicon, so this never has to
+     * unset the previous card — `editFavicon` overwrites a single config value
+     * and the re-render reads the new one. Clicking the CURRENT favicon clears
+     * it, which is the only way back to the site default.
+     */
+    async function setFavicon(filename) {
+        const asset = flatAssets.find(a => a.filename === filename);
+        if (!asset) return;
+
+        const clearing = (currentFavicon === filename);
+        const previous = currentFavicon;
+
+        // Optimistic, then reconciled against the server's answer: the radio
+        // has already moved visually by the time the click handler runs, so
+        // leaving it stale until the response lands looks like a dropped click.
+        currentFavicon = clearing ? null : filename;
+        renderGrid();
+
+        try {
+            const result = await QuickSiteAdmin.apiRequest('editFavicon', 'POST', {
+                imageName: clearing ? null : filename
+            });
+            if (result.ok) {
+                QuickSiteAdmin.showToast(
+                    clearing ? 'Favicon cleared' : `Favicon set to ${filename}`, 'success');
+            } else {
+                currentFavicon = previous;
+                renderGrid();
+                QuickSiteAdmin.showToast(result.data?.message || 'Could not set the favicon', 'error');
+            }
+        } catch (error) {
+            currentFavicon = previous;
+            renderGrid();
+            QuickSiteAdmin.showToast('Could not set the favicon: ' + error.message, 'error');
         }
     }
 
