@@ -348,6 +348,7 @@ if (!function_exists('qs_site_verify_servable')) {
             'src/classes/OutboundUrlPolicy.php',
             'src/classes/IframeSandbox.php',
             'src/classes/OAuthHandler.php',
+            'src/classes/UrlPolicy.php',
             'src/functions/oauthRuntime.php',
             'src/functions/oauthStateStore.php',
             'src/functions/requestRuntime.php',

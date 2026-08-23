@@ -129,9 +129,9 @@ A small vocabulary of markers controls rendering. They are described by intent �
 - **`__LIT__`** — for **attribute or component params**. Marks the value as literal so it is used as-is everywhere it can appear. In the renderer `__LIT__` and `__RAW__` overlap for text and translatable attributes; the distinction is one of intent for the next reader, not a behavioural difference.
 - **`__enums__`** — a root-level metadata block on a component template that derives variables from a single source key. Each entry maps a derived variable name to a value map plus an optional default. Use `listComponents` at runtime to see what a component exposes.
 - **`{{var}}` and `{{$var}}`** — placeholders interpolated from the caller's `data` when a component is inlined. Variable names accept letters, digits, underscores, and hyphens.
-- **`{{__system__}}` placeholders** — runtime values resolved by the renderer, for example `{{__current_page;lang=en}}`. The full list lives in the relevant command's `help` output, not here.
+- **`{{__system__}}` placeholders** — request-time values (`{{__lang}}`, `{{__current_page}}`, `{{__current_route}}`, `{{__public_folder}}`, and the language-switch form `{{__current_page;lang=en}}`). Substituted in text AND in attributes, identically on the served site and in a build — see §8.7 for the order and why it matters.
 - **Translatable attributes** (`placeholder`, `title`, `alt`, `aria-label`, `aria-placeholder`, `aria-description`) auto-resolve their value as a translation key when it looks like one — lowercase identifiers separated by dots, e.g. `form.contact.placeholder`. Prefix with `__RAW__` or `__LIT__` to opt out. Where an attribute is meaningful on a tag, the visual editor offers it as a translation-key picker rather than a text box — `alt` on `img` and `area`, `title` on `iframe`. Both commands that write nodes (`addNode`, `editNode`) treat these as ordinary optional params: whatever the author chose is stored verbatim, and choosing nothing writes no attribute.
-- **URL attributes** (`href`, `src`, `data`, `poster`, `action`, `formaction`, `cite`, `srcset`) get base-URL and language-prefix processing automatically. System placeholders inside them (`{{__current_page;…}}`) are resolved before URL processing.
+- **URL attributes** (`href`, `src`, `data`, `poster`, `action`, `formaction`, `cite`, `srcset`) get base-URL and language-prefix processing automatically. EVERY placeholder inside them is substituted before the URL policy inspects the value, so the policy sees what the browser will receive (§8.7).
 
 This is the single source of truth for page content. Everything the admin panel does ultimately writes back to one of these JSON files (or to `routes.php` / `translate/*.json` / `style/style.css`).
 
@@ -412,7 +412,7 @@ Captured values are URL-decoded before exposure, matching PHP's `$_GET` conventi
 
 #### How captured params flow
 
-- **Server (PHP)** — `Page::render()` injects each captured value as a template variable named after the param. Inside a page's PHP template, `$slug`, `$id`, etc. sit alongside `$translator` and other request-scoped variables. Inside renderer-driven JSON pages, a `{{param:NAME}}` placeholder is substituted in both raw text and translated text by `JsonToHtmlRenderer::renderTextNode`. The literal `param:` prefix is required so it doesn't collide with component-variable patterns.
+- **Server (PHP)** — `Page::render()` injects each captured value as a template variable named after the param. Inside a page's PHP template, `$slug`, `$id`, etc. sit alongside `$translator` and other request-scoped variables. Inside JSON pages a `{{param:NAME}}` placeholder is substituted in raw text, translated text and attributes, on both the served site and a build (§8.7). The literal `param:` prefix is required so it doesn't collide with component-variable patterns.
 - **Client (qs.js)** — The build emits the project's own `public/scripts/qs-route-schema.js` listing every route's pattern + param shape. qs.js's synchronous IIFE walks the schema against `location.pathname` on load and exposes three globals: `QS.routeParams` (a dict of captured values), `QS.routePath` (the matched pattern), `QS.routeFound` (a boolean). State stores can initialise a field from `init: 'param:slug'` — a fifth source kind alongside the existing `query:` / `localStorage:` / `sessionStorage:` / literal. The matcher is purely client-side; for a deeper URL → live data loop (server-rendered authed pages, SEO) the server data resolver builds on the same schema.
 
 #### Conflict detection
@@ -1000,6 +1000,80 @@ first (`QS_OAUTH_<PROVIDER>_CLIENT_ID` / `_CLIENT_SECRET`) and from the shipped
 `data/oauth-secrets.json` second, so a deployer can keep the credential out of a
 build folder that `downloadBuild` hands over whole.
 
+### 8.7 Render parity — one contract, two implementations
+
+`JsonToHtmlRenderer` renders a page from JSON on every request;
+`JsonToPhpCompiler` turns the same JSON into PHP once, at build time. They are
+two implementations of a single contract: **the same node must produce the same
+HTML on both surfaces**, minus editor-only emissions, which a build has no use
+for.
+
+Nothing enforced that until a differential harness was pointed at them, and the
+answer was that they disagreed about most of what an attribute can hold. The
+rules below are now shared or mirrored, and each names the surface that had it
+right.
+
+**Placeholders.** Four kinds, and they are substituted in a fixed order.
+
+| Kind | Value known at | Substituted in |
+|---|---|---|
+| `{{__lang}}`, `{{__current_page}}`, `{{__current_route}}`, `{{__public_folder}}` | request time | text and attributes |
+| `{{resolved:NAME}}` | request time (a server-side fetch) | text and attributes |
+| `{{param:NAME}}` | request time (the URL) | text and attributes |
+| a translation key | request time (the language) | text and translatable attributes |
+
+⚠ **The order is a security property.** System placeholders first, resolved
+values second, **params last** — a param comes straight out of the URL, so it is
+the one visitor-controlled input, and substituting it last means nothing it
+introduces is re-scanned as a placeholder.
+
+⚠ **And substitution precedes the URL policy.** `UrlPolicy` has to inspect the
+value the browser will actually receive. Sanitising the literal placeholder and
+substituting afterwards let a route param carry a scheme past the check:
+`xlink:href="{{param:slug}}"` served from `/products/javascript:alert(1)` emitted
+the raw value, while the same literal authored directly is refused. Path-rewritten
+attributes survived only because the base was prefixed in front of the injected
+value.
+
+The one exception is `{{__current_page;lang=xx}}`, the language switch: it
+resolves to a COMPLETE URL, so both surfaces recognise it *before* substituting
+and exempt the result from being composed against the base a second time.
+
+**Attribute values.** An attribute carries a string, a boolean, or nothing.
+
+| Authored | Emitted |
+|---|---|
+| `""` on `alt` / `aria-label` | `alt=""` — empty is the meaning there; it marks an image decorative, and dropping it makes a screen reader announce the file name |
+| `""` anywhere else | attribute dropped |
+| `null` | attribute dropped |
+| `true` | the bare attribute name |
+| `false` | attribute dropped — **not** `=""`, which HTML reads as TRUE |
+| an array | attribute dropped, and logged |
+| a translation key in a translatable attribute | the translation |
+| `__RAW__` / `__LIT__` prefix | the prefix stripped, no translation |
+
+Arrays are dropped rather than interpreted. The conditional form
+(`{"condition": …, "value": …}`) was the only array shape either surface
+understood; no command writes one, no project authors one, and the editor has no
+control for it. The compiler emitted `htmlspecialchars(array(…))` for it — a
+TypeError at REQUEST time, so a built page answered `200` with a fatal in the
+body and everything after the offending tag missing.
+
+**The system placeholders have one source**, `runtimePlaceholders.php`. The
+renderer derived them; the compiler GENERATED PHP that re-derived them into every
+page, with its own regexes for stripping the URL space and the language prefix
+and a hardcoded `(en|fr)` fallback. The language question already has one answer
+in `projectLanguage.php`, which travels into a build, so both surfaces ask it —
+which is also what makes a mono-language project safe: it answers "no language
+here", so a route legitimately named `en/` is not mistaken for a language prefix
+and stripped.
+
+`{{__current_route}}` is always the leaf of `{{__current_page}}`, never a
+caller-supplied value: the renderer's context is populated differently by
+different callers (a page loader passes the whole route path, `PageManagement`
+passes the leaf), so honouring it made the same nested route report two
+different things.
+
 ## 9. Style management
 
 CSS is modelled as four addressable layers, all manipulated through commands rather than free-text edits:
@@ -1115,7 +1189,8 @@ Then:
     the pages that use them.
 14. Compile the 404 page, then every route, via `JsonToPhpCompiler`. Param
     segments are written as `__name` folders, because a filesystem cannot hold
-    the `:` that `routes.php` uses.
+    the `:` that `routes.php` uses. The compiler and the renderer are two
+    implementations of one contract — see §8.7.
 15. Write `README.txt` with deployment instructions, and `nginx_routes.conf`
     describing **this site** for servers that do not read `.htaccess`.
 16. Write `build_manifest.json` — last, so its presence marks the build

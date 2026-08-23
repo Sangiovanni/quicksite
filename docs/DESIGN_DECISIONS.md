@@ -9142,3 +9142,150 @@ renderer passes — so the two cannot disagree.
 
 **Source**: `secure/src/classes/JsonToPhpCompiler.php`,
 `secure/src/classes/IframeSandbox.php`, `secure/management/command/build.php`.
+
+---
+
+### Render parity: the renderer and the compiler answer to one contract (locked 2026-08-23)
+
+**Decision**: `JsonToHtmlRenderer` and `JsonToPhpCompiler` must produce the same
+HTML from the same node, minus editor-only emissions. Where they disagreed, the
+rules are now shared (system placeholders) or mirrored with the mirroring said
+out loud (attribute value shapes). A differential harness compares them node by
+node, keyed on element id.
+
+**Reasoning**: they are two implementations of one contract and nobody had been
+diffing them, so every divergence found before this slice was found by accident.
+Pointed at a fixture covering each node kind, attribute class and placeholder
+form, the harness reported that **11 of 26 nodes rendered differently** —
+including two that made a built page fatal.
+
+**What the reference was, case by case.** The served site won on value shapes,
+because those rules were reasoned about when they were written; the build won on
+placeholder scope, because restricting substitution to URL attributes was an
+artefact of placeholders having been introduced for URL composition, not a
+decision. Two were settled by neither:
+
+- `alt=""` is PRESERVED on both. §8.5 had locked "the compiler adopts the
+  renderer's null/empty guard", which drops it — but an empty `alt` is the HTML
+  marker for a decorative image, and dropping it makes a screen reader announce
+  the file name instead. Five live images in the starter project were affected.
+  Empty still drops everywhere else, including on boolean-ish attributes where
+  `=""` is read by HTML as TRUE.
+- `{{__current_route}}` is always the leaf of `{{__current_page}}`, never a
+  caller-supplied value. The renderer's context is populated differently by
+  different callers — a page loader passes the whole route path, `PageManagement`
+  passes the leaf — so honouring it made one nested route report two things.
+
+**Arrays are dropped, not interpreted.** The conditional-attribute form
+(`{"condition": …, "value": …}`) was the only array shape either surface
+understood, and nothing produces one: no command writes it, no project authors
+it, the editor has no control for it. Keeping a branch for it meant the two
+surfaces still had to agree about every OTHER array, and they did not — the
+compiler emitted `htmlspecialchars(array(…))`, a TypeError at REQUEST time, so a
+built page answered `200` with a fatal in its body and everything after the tag
+missing. Dropping the class removes the fatal and the disagreement together.
+
+**Alternatives considered**: making the compiler emit the renderer's exact code
+path (rejected — that is routing compiled pages through the renderer, the cost
+precompilation exists to remove, withdrawn once already in this sequence);
+keeping the conditional-attribute branch and fixing only the compiler's crash
+(rejected — it preserves a feature with no producer and leaves every other array
+value diverging); dropping `alt=""` to match the locked rule exactly (rejected by
+Sangio — parity at the cost of an accessibility regression on both surfaces is
+the wrong trade).
+
+**Source**: `secure/src/classes/JsonToHtmlRenderer.php`,
+`secure/src/classes/JsonToPhpCompiler.php`,
+`secure/src/functions/runtimePlaceholders.php`.
+[ARCHITECTURE.md §8.7](ARCHITECTURE.md).
+
+---
+
+### Placeholders are substituted before the URL policy, and params are substituted last (locked 2026-08-23)
+
+**Decision**: in an attribute, every placeholder is substituted BEFORE
+`UrlPolicy` inspects the value, and within the substitutions the order is system
+placeholders, then resolved values, then route params.
+
+**Reasoning**: both halves are security properties rather than housekeeping.
+
+**The policy must see the final value.** Sanitising a literal `{{param:slug}}`
+and substituting afterwards means the check ran on a placeholder and the browser
+received something else. Measured: `xlink:href="{{param:slug}}"` served from
+`/products/javascript:alert(1)` emitted `xlink:href="javascript:alert(1)"`, while
+the same literal authored directly is refused and rewritten to `#`. Rewritable
+attributes such as `href` happened to survive because the base was prefixed in
+front of the injected value — luck, not design, and it does not extend to the
+non-rewritable URL sinks.
+
+**Params go last because a param is the visitor's input.** It arrives as a URL
+path segment, so anything it contains must not be re-scanned; substituting it
+last guarantees that. The same rule already governed resolved-vs-params in text
+nodes, and this extends it to the third kind and to attributes.
+
+The language-switch form `{{__current_page;lang=xx}}` is the one exception in the
+pipeline: it resolves to a complete URL, so both surfaces detect it before
+substituting and exempt the result from base composition, which would otherwise
+be applied twice.
+
+**Alternatives considered**: re-sanitising after substitution (rejected — the
+value would be sanitised twice with the rewrite in between, and a base prefix in
+front of an injected scheme is exactly the accident that made this look safe);
+refusing placeholders in URL attributes altogether (rejected — an author linking
+to `/products/{{param:slug}}` is doing something ordinary and correct).
+
+**Source**: `secure/src/classes/JsonToHtmlRenderer.php` (`renderAttribute`),
+`secure/src/classes/JsonToPhpCompiler.php` (the attribute loop),
+`secure/src/functions/runtimePlaceholders.php`.
+
+---
+
+### The system placeholders have one source, and it asks the language question once (locked 2026-08-23)
+
+**Decision**: `qs_system_placeholders()` in `runtimePlaceholders.php` is the only
+derivation. The renderer calls it; a compiled page calls it at request time. The
+compiler no longer generates the derivation into each page.
+
+**Reasoning**: the compiler used to emit, into every compiled page, its own regex
+for stripping the URL space, another for the language prefix built by
+interpolating `CONFIG`'s language list, and a hardcoded `(en|fr)` fallback for
+when `CONFIG` was absent — three ways to reach an answer the renderer reached a
+fourth way. One of them had been silently broken for a long time: the emitted
+pattern ended in an escaped BACKSLASH rather than an escaped slash, so it matched
+a literal backslash and could never match a URL path, and a built multilingual
+site never stripped its language prefix.
+
+`projectLanguage.php` travels into a build, so the language question already had
+a single answer available to both surfaces. Asking it — instead of interpolating
+a list into a pattern — also makes mono-language projects correct rather than
+accidentally safe: `qs_project_language_from_path()` answers null for a project
+that declares no languages, so a route legitimately named `en/` is not mistaken
+for a language prefix and eaten. The hardcoded fallback would have eaten it.
+
+**Alternatives considered**: fixing the emitted regexes in place (rejected — it
+keeps four derivations of one answer and only repairs the one that was noticed);
+precomputing the values at build time (rejected — `{{__current_page}}` is a
+property of the request being served, not of the build).
+
+**Source**: `secure/src/functions/runtimePlaceholders.php`,
+`secure/src/classes/JsonToPhpCompiler.php` (`generateSystemVariables`),
+`secure/src/classes/JsonToHtmlRenderer.php` (`getSystemPlaceholders`).
+
+---
+
+### An OAuth callback composes against the site's public base (locked 2026-08-23)
+
+**Decision**: `OAuthHandler::makeAbsoluteUrl()` composes a root-relative
+`callback_url` against `QS_PUBLIC_BASE`, not against the bare origin. An
+absolute `callback_url` is still used as given.
+
+**Reasoning**: an author configures `callback_url: /auth/callback`, meaning the
+route relative to their own site. That site is at `/` in a build and at
+`/p/<projectId>/` in preview, so composing against the origin alone produced a
+`redirect_uri` pointing outside the project — and every OAuth provider validates
+`redirect_uri` by exact match, so the flow could not be previewed at all. Same
+class as the alias redirect that composed a browser-facing URL against the wrong
+base: the two bases are the router's and the browser's, and they are not the same
+thing.
+
+**Source**: `secure/src/classes/OAuthHandler.php`.

@@ -33,6 +33,25 @@ class JsonToPhpCompiler {
      * things in preview and in production. Every entry REPORTS a value; none
      * composes a URL, which is why there is no `__base_url` here.
      */
+    /**
+     * Attributes where an EMPTY value is a statement, not an omission.
+     *
+     * Mirrors JsonToHtmlRenderer::EMPTY_MEANINGFUL_ATTRIBUTES — `alt=""` marks
+     * an image as decorative, and dropping it makes a screen reader announce the
+     * file name instead. Every other empty attribute drops on both surfaces.
+     */
+    private const EMPTY_MEANINGFUL_ATTRIBUTES = ['alt', 'aria-label'];
+
+    /**
+     * Attributes whose value is translated when it looks like a translation key.
+     *
+     * Mirrors the renderer's list. The compiler had no such branch at all, so a
+     * built page shipped the raw key (`alt="parity.altKey"`) where preview
+     * showed the translated text.
+     */
+    private const TRANSLATABLE_ATTRIBUTES = [
+        'placeholder', 'title', 'alt', 'aria-label', 'aria-placeholder', 'aria-description',
+    ];
     private const SYSTEM_PLACEHOLDERS = [
         '__current_page',
         '__lang',
@@ -62,6 +81,9 @@ class JsonToPhpCompiler {
         // cannot fold them in the way it folds a translation key. It calls the
         // same two functions the live renderer calls, with this request's params.
         $output .= "require_once SECURE_FOLDER_PATH . '/src/functions/runtimePlaceholders.php';\n";
+        // UrlPolicy vets a URL attribute AFTER its placeholders are
+        // substituted, so it has to be present at request time.
+        $output .= "require_once SECURE_FOLDER_PATH . '/src/classes/UrlPolicy.php';\n";
         $output .= "\$__routeParams = \$trimParameters->routeParams();\n\n";
         
         // Add system variables for placeholders
@@ -175,6 +197,9 @@ class JsonToPhpCompiler {
         // cannot fold them in the way it folds a translation key. It calls the
         // same two functions the live renderer calls, with this request's params.
         $output .= "require_once SECURE_FOLDER_PATH . '/src/functions/runtimePlaceholders.php';\n";
+        // UrlPolicy vets a URL attribute AFTER its placeholders are
+        // substituted, so it has to be present at request time.
+        $output .= "require_once SECURE_FOLDER_PATH . '/src/classes/UrlPolicy.php';\n";
         $output .= "\$__routeParams = \$trimParameters->routeParams();\n\n";
         
         // Add system variables for placeholders
@@ -202,35 +227,23 @@ class JsonToPhpCompiler {
      * Generate PHP code for system variables ({{__placeholder}} support)
      */
     private function generateSystemVariables(): string {
-        $output = "// System variables for {{__placeholder}} support\n";
-        $output .= "\$__current_page = trim(parse_url(\$_SERVER['REQUEST_URI'], PHP_URL_PATH), '/');\n\n";
-        
-        // Remove PUBLIC_FOLDER_SPACE prefix, then the language prefix.
+        // ⚠ ASKED AT REQUEST TIME, FROM THE SOURCE THE RENDERER USES.
         //
-        // The emitted patterns end `\/` — an escaped SLASH, the delimiter. They
-        // used to be emitted with an escaped BACKSLASH, so every one of them
-        // matched a literal backslash and stripped nothing: on a built site
-        // with a URL space or a language segment, {{__current_page}} kept the
-        // prefix it exists to remove. Nothing in a source install noticed,
-        // because this code is only ever written into a build.
-        $output .= "if (defined('PUBLIC_FOLDER_SPACE') && PUBLIC_FOLDER_SPACE !== '') {\n";
-        $output .= "    \$__current_page = preg_replace('/^' . preg_quote(trim(PUBLIC_FOLDER_SPACE, '/'), '/') . '\\\\//', '', \$__current_page);\n";
-        $output .= "}\n\n";
-
-        // Remove language prefix
-        $output .= "if (defined('CONFIG') && isset(CONFIG['LANGUAGES_SUPPORTED'])) {\n";
-        $output .= "    \$__current_page = preg_replace('/^(' . implode('|', array_map(function (\$l) { return preg_quote(\$l, '/'); }, CONFIG['LANGUAGES_SUPPORTED'])) . ')\\\\//', '', \$__current_page);\n";
-        $output .= "} else {\n";
-        $output .= "    \$__current_page = preg_replace('/^(en|fr)\\\\//', '', \$__current_page);\n";
-        $output .= "}\n\n";
-        $output .= "\$__current_page = empty(\$__current_page) ? '' : \$__current_page;\n";
-        // Every variable emitted here REPORTS a value. None of them composes a
-        // URL: an author who needs one writes a root-relative path and
-        // processUrl() composes it against the base, correctly and once.
-        $output .= "\$__lang = \$lang;\n";
-        $output .= "\$__public_folder = defined('PUBLIC_FOLDER_NAME') ? PUBLIC_FOLDER_NAME : 'public';\n";
-        $output .= "\$__current_route = basename(parse_url(\$_SERVER['REQUEST_URI'], PHP_URL_PATH));\n\n";
-        
+        // This used to GENERATE the derivation into every page: a regex to strip
+        // the URL space, another to strip the language prefix built by
+        // interpolating CONFIG's language list, and a hardcoded `(en|fr)`
+        // fallback for when CONFIG was absent. Three ways to get the same answer
+        // slightly wrong, none of them the way the renderer got it — so a built
+        // page and a preview could disagree about what page they were on.
+        //
+        // projectLanguage.php travels into a build, so the language question has
+        // one answer on both surfaces and there is nothing left to interpolate.
+        $output  = "// System variables for {{__placeholder}} support\n";
+        $output .= "\$__qsSystem = qs_system_placeholders(['lang' => \$lang]);\n";
+        $output .= "\$__current_page  = \$__qsSystem['__current_page'];\n";
+        $output .= "\$__lang          = \$__qsSystem['__lang'];\n";
+        $output .= "\$__public_folder = \$__qsSystem['__public_folder'];\n";
+        $output .= "\$__current_route = \$__qsSystem['__current_route'];\n\n";
         // Add processUrl helper function WITH function_exists check
         $output .= <<<'PHP'
     // Helper function to process URLs (add language prefix, handle absolute URLs)
@@ -362,7 +375,11 @@ class JsonToPhpCompiler {
         $textKey = $node['textKey'];
         $prefix = $echo ? 'echo ' : '$content .= ';
 
-        if (strpos($textKey, '__RAW__') === 0) {
+        // __LIT__ is the renderer's second literal prefix, and the compiler
+        // did not know it: a __LIT__ node fell through to the translation
+        // branch, so a built page rendered
+        // `{translation missing: __LIT__…}` where preview showed the text.
+        if (strpos($textKey, '__RAW__') === 0 || strpos($textKey, '__LIT__') === 0) {
             // Raw text. A literal is fully known here, so the substitution call
             // is emitted ONLY when the text actually carries a placeholder —
             // most raw text does not, and a built page should not pay for a
@@ -372,6 +389,9 @@ class JsonToPhpCompiler {
             if ($this->hasRuntimePlaceholder($rawText)) {
                 $expr = 'qs_apply_runtime_placeholders(' . $expr . ', $__routeParams)';
             }
+            if (strpos($rawText, '{{__') !== false) {
+                $expr = 'qs_apply_system_placeholders(' . $expr . ', [\'lang\' => $lang])';
+            }
             return $prefix . 'htmlspecialchars(' . $expr . ', ENT_QUOTES | ENT_HTML5, \'UTF-8\');' . "\n";
         } else {
             // Translation key. The TRANSLATED string is what may carry a
@@ -380,9 +400,12 @@ class JsonToPhpCompiler {
             // text this cannot be decided at compile time and the call is
             // always emitted. qs_apply_runtime_placeholders fast-paths on a
             // strpos when there is nothing to substitute.
-            return $prefix . 'htmlspecialchars(qs_apply_runtime_placeholders($translator->translate('
+            // A TRANSLATED string can carry either kind of placeholder, and
+            // which file it comes from depends on the request's language, so
+            // both calls are always emitted. Each fast-paths on a strpos.
+            return $prefix . 'htmlspecialchars(qs_apply_system_placeholders(qs_apply_runtime_placeholders($translator->translate('
                    . var_export($textKey, true)
-                   . '), $__routeParams), ENT_QUOTES | ENT_HTML5, \'UTF-8\');' . "\n";
+                   . '), $__routeParams), [\'lang\' => $lang]), ENT_QUOTES | ENT_HTML5, \'UTF-8\');' . "\n";
         }
     }
 
@@ -465,6 +488,39 @@ class JsonToPhpCompiler {
             // URL-sink recognition + rewriting scope come from the shared
             // UrlPolicy (R-6, same class the renderer uses) — see per-attr below.
             foreach ($params as $attrName => $attrValue) {
+                // ── VALUE SHAPES ──────────────────────────────────────────
+                // The renderer decides these at render time; the compiler knows
+                // the authored value now, so it decides them here. Same rules,
+                // same outcomes — they used to differ on every one of them.
+
+                // An ARRAY is not a value an attribute can carry. This used to
+                // compile to htmlspecialchars(array(…)), a TypeError at REQUEST
+                // time: the built page answered 200 with a fatal in the body and
+                // everything after the offending tag missing.
+                if (is_array($attrValue)) {
+                    error_log("Compiler: attribute '{$attrName}' has an array value — attribute dropped");
+                    continue;
+                }
+
+                // A boolean attribute is present or absent, never `="1"` or
+                // `=""`. `controls=""` in particular is read by HTML as TRUE,
+                // so the compiled form of `false` said the opposite of what was
+                // authored.
+                if (is_bool($attrValue)) {
+                    if ($attrValue) {
+                        $output .= ' ' . $attrName;
+                    }
+                    continue;
+                }
+
+                // Null drops; empty drops unless empty is the meaning.
+                if ($attrValue === null) {
+                    continue;
+                }
+                if ($attrValue === '' && !in_array($attrName, self::EMPTY_MEANINGFUL_ATTRIBUTES, true)) {
+                    continue;
+                }
+
                 // Handle event handler attributes (on*) - only allow {{call:...}} syntax
                 if (preg_match('/^on[a-z]+$/i', $attrName)) {
                     if (is_string($attrValue) && strpos($attrValue, '{{call:') !== false) {
@@ -501,12 +557,51 @@ class JsonToPhpCompiler {
                     } else {
                         $output .= ' ' . $attrName . '=\\"" . htmlspecialchars(' . $phpValue . ', ENT_QUOTES | ENT_HTML5, \'UTF-8\') . "\\"';
                     }
+                } elseif (is_string($attrValue) && in_array($attrName, self::TRANSLATABLE_ATTRIBUTES, true)
+                          && strpos($attrValue, '__RAW__') !== 0 && strpos($attrValue, '__LIT__') !== 0
+                          && preg_match('/^[a-z0-9_]+(\.[a-z0-9_]+)+$/i', $attrValue)) {
+                    // A translation KEY in a translatable attribute. Emitted as a
+                    // runtime lookup for the same reason a text node is: which
+                    // translation file answers depends on the request's language.
+                    $output .= ' ' . $attrName . '=\\"" . htmlspecialchars($translator->translate('
+                             . var_export($attrValue, true)
+                             . '), ENT_QUOTES | ENT_HTML5, \'UTF-8\') . "\\"';
                 } else {
+                    // A literal prefix marks "use this verbatim, do not translate".
+                    // The renderer strips both; the compiler stripped neither, so
+                    // a built page shipped the marker to the visitor.
+                    if (is_string($attrValue)
+                        && (strpos($attrValue, '__RAW__') === 0 || strpos($attrValue, '__LIT__') === 0)) {
+                        $attrValue = substr($attrValue, 7);
+                    }
+
                     // Static value — the attacker-controlled case. Make it
                     // scheme-SAFE at COMPILE time (shared UrlPolicy) so the
                     // deployed literal can never carry a dangerous scheme; this
                     // covers the non-rewritable sinks (xlink:href, …) too.
-                    if ($isUrlAttr && is_string($attrValue)) {
+                    if (is_string($attrValue) && $this->hasRuntimePlaceholder($attrValue)) {
+                        // {{param:}} / {{resolved:}} carry REQUEST-time values, so
+                        // the substitution is a call, not a fold. Neither surface
+                        // used to do this in an attribute at all — a visitor was
+                        // served data-slug="{{param:slug}}" verbatim.
+                        //
+                        // ⚠ THE POLICY MUST SEE THE SUBSTITUTED VALUE. Sanitising
+                        // the literal placeholder and substituting afterwards lets
+                        // a route param inject a scheme past the check — the same
+                        // hole the renderer had. So UrlPolicy::sanitize wraps the
+                        // substitution at RUNTIME rather than folding at compile
+                        // time, and processUrl composes on top of the safe value.
+                        $expr = 'qs_apply_runtime_placeholders(' . var_export($attrValue, true) . ', $__routeParams)';
+                        if ($isUrlAttr) {
+                            $expr = 'UrlPolicy::sanitize(' . $expr . ')';
+                            if ($needsRewrite) {
+                                $expr = 'processUrl(' . $expr . ', $__lang)';
+                            }
+                        }
+                        $output .= ' ' . $attrName . '=\\"" . htmlspecialchars(' . $expr . ', ENT_QUOTES | ENT_HTML5, \'UTF-8\') . "\\"';
+                    } elseif ($isUrlAttr && is_string($attrValue)) {
+                        // No runtime placeholder: the value is fully known, so the
+                        // policy can be applied once, here.
                         $safeValue = UrlPolicy::sanitize($attrValue);
                         if ($needsRewrite) {
                             // Still BASE_URL/lang-rewritten at deploy, on a safe value.

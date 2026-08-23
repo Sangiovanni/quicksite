@@ -730,7 +730,22 @@ class OAuthHandler
         if ($url === '' || $url[0] !== '/') {
             $url = '/' . $url;
         }
-        return $scheme . '://' . $host . $url;
+
+        // The site's PUBLIC BASE, not the bare origin.
+        //
+        // An author configures `callback_url: /auth/callback`, which is the
+        // route relative to their own site. That site is at `/` in a build
+        // and at `/p/<projectId>/` in preview, so composing against the
+        // origin alone produced a redirect_uri pointing outside the project
+        // — the flow could not be previewed against any provider that
+        // validates redirect URIs, which is all of them. Same class as the
+        // alias redirect that composed against the wrong base.
+        //
+        // An absolute callback_url still wins (returned above); this only
+        // affects the root-relative form, which is what the base is for.
+        $base = defined('QS_PUBLIC_BASE') ? rtrim(QS_PUBLIC_BASE, '/') : '';
+
+        return $scheme . '://' . $host . $base . $url;
     }
 
     /**

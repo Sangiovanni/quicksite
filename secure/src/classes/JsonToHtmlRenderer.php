@@ -541,6 +541,20 @@ class JsonToHtmlRenderer {
      * - Caller is responsible for htmlspecialchars after substitution
      *   so the substituted value is properly escaped.
      */
+    /**
+     * System placeholders in a string, from the source both surfaces share.
+     *
+     * Kept as a thin method rather than a direct call so the renderer's context
+     * (its already-resolved language and page) reaches the shared function —
+     * one request must not answer the language question twice.
+     */
+    private function applySystemPlaceholders(string $text): string {
+        return qs_apply_system_placeholders($text, [
+            'lang'  => $this->context['lang'] ?? null,
+            'route' => $this->context['page'] ?? null,
+        ]);
+    }
+
     private function applyRouteParams(string $text): string {
         return qs_apply_route_params($text, $this->context['routeParams'] ?? []);
     }
@@ -602,6 +616,11 @@ class JsonToHtmlRenderer {
             // from the server-side data resolver. resolved first so a
             // routeParam value containing a literal {{resolved:...}} can't
             // accidentally inject a real placeholder.
+            // ⚠ ORDER: system, then resolved, then PARAMS LAST. A param comes
+            // straight out of the URL, so it is the one visitor-controlled
+            // input here; substituting it last means nothing it introduces is
+            // ever re-scanned as a placeholder.
+            $rawText = $this->applySystemPlaceholders($rawText);
             $rawText = $this->applyResolved($rawText);
             $rawText = $this->applyRouteParams($rawText);
             $escapedRaw = htmlspecialchars($rawText, ENT_QUOTES | ENT_HTML5, 'UTF-8');
@@ -636,7 +655,9 @@ class JsonToHtmlRenderer {
         // an EN string "Welcome, {{param:slug}}!" renders as the URL value.
         // Beta.8 A2 — also substitute `{{resolved:NAME[.dot.path]}}` from
         // the server-side data resolver, applied first (see applyResolved).
-        $translatedRaw = $this->applyResolved($this->translator->translate($textKey));
+        // Same order as the raw branch above: params last.
+        $translatedRaw = $this->applySystemPlaceholders($this->translator->translate($textKey));
+        $translatedRaw = $this->applyResolved($translatedRaw);
         $translatedRaw = $this->applyRouteParams($translatedRaw);
         $translatedText = htmlspecialchars($translatedRaw, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         
@@ -773,6 +794,15 @@ class JsonToHtmlRenderer {
      * @param mixed $value Attribute value
      * @return string Rendered attribute (e.g., ' class="value"')
      */
+    /**
+     * Attributes where an EMPTY value is a statement, not an omission.
+     *
+     * `alt=""` marks an image as decorative so assistive technology skips it;
+     * with no alt at all a screen reader reads the file name instead. Both
+     * surfaces preserve these and drop every other empty attribute.
+     */
+    private const EMPTY_MEANINGFUL_ATTRIBUTES = ['alt', 'aria-label'];
+
     private function renderAttribute(string $name, $value): string {
         // Sanitize attribute name
         if (!preg_match('/^[a-z0-9_:-]+$/i', $name)) {
@@ -797,13 +827,18 @@ class JsonToHtmlRenderer {
             return '';
         }
 
-        // Handle conditional attributes
-        if (is_array($value) && isset($value['condition'])) {
-            // Format: {"condition": "someKey", "value": "attrValue"}
-            if (empty($this->context[$value['condition']])) {
-                return '';
-            }
-            $value = $value['value'];
+        // An ARRAY is not a value an attribute can carry. The conditional form
+        // ({"condition": …, "value": …}) was the only array shape either surface
+        // understood, and nothing in the engine has ever produced one — no
+        // command writes it, no project authors it, and the visual editor has no
+        // control for it. Dropping the whole class rather than the one shape
+        // keeps the two surfaces from disagreeing about the rest: the compiler
+        // emitted htmlspecialchars(array(…)), which is a TypeError at REQUEST
+        // time, so a built page carrying any array attribute answered 200 with a
+        // fatal in the body and the rest of the page missing.
+        if (is_array($value)) {
+            error_log("Attribute '{$name}': array values are not supported — attribute dropped");
+            return '';
         }
 
         // Handle boolean attributes
@@ -811,8 +846,17 @@ class JsonToHtmlRenderer {
             return $value ? ' ' . htmlspecialchars($name, ENT_QUOTES | ENT_HTML5, 'UTF-8') : '';
         }
 
-        // Handle null/empty values
-        if ($value === null || $value === '') {
+        // Null drops. An EMPTY STRING drops too — except where empty is itself
+        // the meaning. `alt=""` is the HTML marker for a decorative image, and
+        // dropping it makes a screen reader fall back to announcing the file
+        // name; `aria-label=""` is the same idea. Everywhere else an empty
+        // attribute is noise at best, and on a boolean-ish attribute like
+        // `controls=""` HTML reads it as TRUE, which is the opposite of what an
+        // empty value looks like it says.
+        if ($value === null) {
+            return '';
+        }
+        if ($value === '' && !in_array($name, self::EMPTY_MEANINGFUL_ATTRIBUTES, true)) {
             return '';
         }
 
@@ -834,37 +878,45 @@ class JsonToHtmlRenderer {
             }
         }
 
-        // Special handling for URL attributes. Scheme safety is value-based +
-        // namespace-aware (covers xlink:href, ping, …) via the shared UrlPolicy
-        // (R-6, the same class the compiler uses). BASE_URL/language rewriting
-        // stays scoped to the classic rewritable set. Closes F-b + F-d.
-        if (UrlPolicy::isUrlAttribute($name) && is_string($value) && $value !== '') {
-            // A language-switch substitution ({{__current_page;lang=xx}}) resolves
-            // to a COMPLETE URL — base, language and route already in place. It has
-            // to be recognised BEFORE the substitution, because afterwards the
-            // result is indistinguishable from an ordinary root-relative path, and
-            // processUrl() would compose it against the base a second time.
-            //
-            // The compiler already exempts exactly this case (JsonToPhpCompiler's
-            // $isLanguageSwitch, "these return complete URLs"); this is the same
-            // rule on the render path, so one node yields one href either way.
-            $isLanguageSwitch = false;
-            // Process placeholders first (e.g., {{__current_page;lang=en}})
+        // ── SUBSTITUTION FIRST, POLICY SECOND ─────────────────────────────
+        //
+        // ⚠ THE ORDER HERE IS A SECURITY PROPERTY, not tidiness. UrlPolicy has
+        // to inspect the value the browser will actually receive. When
+        // substitution ran AFTER sanitisation, a route param could inject a
+        // scheme past it: xlink:href="{{param:slug}}" served from
+        // /products/javascript:alert(1) emitted the raw value, while the same
+        // literal authored directly is refused. Path-rewritten attributes
+        // happened to survive because the base was prefixed in front of the
+        // injected value — luck, not design.
+        //
+        // Within the substitutions, PARAMS GO LAST: a param is the one
+        // visitor-controlled input, so nothing it introduces is re-scanned.
+        $isLanguageSwitch = false;
+        if (is_string($value)) {
+            // The language-switch form has to be recognised BEFORE it is
+            // substituted: afterwards the result is indistinguishable from an
+            // ordinary root-relative path, and would be composed against the
+            // base a second time.
             if (strpos($value, '{{__') !== false) {
                 $isLanguageSwitch = $this->hasLanguageSwitchPlaceholder($value);
                 $value = $this->processDataPlaceholders($value);
             }
-            // Scheme safety FIRST: allowlist + strip/deny control chars.
+            $value = $this->applyResolved($value);
+            $value = $this->applyRouteParams($value);
+        }
+
+        // Special handling for URL attributes. Scheme safety is value-based +
+        // namespace-aware (covers xlink:href, ping, …) via the shared UrlPolicy
+        // (R-6, the same class the compiler uses). BASE_URL/language rewriting
+        // stays scoped to the classic rewritable set.
+        if (UrlPolicy::isUrlAttribute($name) && is_string($value) && $value !== '') {
             $value = UrlPolicy::sanitize($value);
-            // Then rewrite (add base URL, language prefix, etc.) — classic set
-            // only, and only if not already a complete URL.
             if (UrlPolicy::isRewritableUrlAttribute($name)
                 && !$isLanguageSwitch
                 && !preg_match('/^(https?:)?\/\//i', $value)) {
                 $value = $this->processUrl($value);
             }
         }
-
         // Strip __LIT__ prefix from any attribute value (literal values used as-is everywhere)
         if (is_string($value) && strpos($value, '__LIT__') === 0) {
             $value = substr($value, 7);
@@ -1143,31 +1195,13 @@ class JsonToHtmlRenderer {
      * @return array System placeholders
      */
     private function getSystemPlaceholders(): array {
-        // Get current page from URL
-        $currentPage = trim(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), '/');
-        
-        // Remove PUBLIC_FOLDER_SPACE prefix if present
-        if (defined('PUBLIC_FOLDER_SPACE') && PUBLIC_FOLDER_SPACE !== '') {
-            $currentPage = preg_replace('/^' . preg_quote(PUBLIC_FOLDER_SPACE, '/') . '\//', '', $currentPage);
-        }
-        
-        // Remove language prefix if present
-        if (defined('CONFIG') && isset(CONFIG['LANGUAGES_SUPPORTED'])) {
-            $currentPage = preg_replace('/^(' . implode('|', CONFIG['LANGUAGES_SUPPORTED']) . ')\//', '', $currentPage);
-        }
-        
-        // Keep empty for home page (will result in /lang/ with trailing slash)
-        $currentPage = empty($currentPage) ? '' : $currentPage;
-        
-        // Every placeholder here REPORTS a value. None of them composes a URL:
-        // an author who needs a URL writes a root-relative one and processUrl()
-        // composes it against the base, correctly and once.
-        return [
-            '__current_page' => $currentPage,
-            '__lang' => $this->context['lang'] ?? (defined('LANGUAGE_DEFAULT') ? LANGUAGE_DEFAULT : 'en'),
-            '__public_folder' => defined('PUBLIC_FOLDER_NAME') ? PUBLIC_FOLDER_NAME : 'public',
-            '__current_route' => $this->context['page'] ?? 'home',
-        ];
+        // One source, shared with compiled pages (runtimePlaceholders.php).
+        // Both surfaces used to derive these separately and had drifted on
+        // how the language prefix is stripped.
+        return qs_system_placeholders([
+            'lang'  => $this->context['lang'] ?? null,
+            'route' => $this->context['page'] ?? null,
+        ]);
     }
 
     /**

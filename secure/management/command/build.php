@@ -506,7 +506,8 @@ $classFiles = [
     'DataResolver.php',
     'OutboundUrlPolicy.php',
     'IframeSandbox.php',
-    'OAuthHandler.php'
+    'OAuthHandler.php',
+    'UrlPolicy.php'
 ];
 
 foreach ($classFiles as $file) {
