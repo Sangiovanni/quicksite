@@ -533,8 +533,9 @@ foreach ($classFiles as $file) {
 // stops resolving on one surface and keeps resolving on the other.
 // aliasRouting.php: URL aliases, applied by the /p/<id>/ renderer and by a
 // built site through one implementation.
-// aliasRouting.php: URL aliases, applied by the /p/<id>/ renderer and by a
-// built site through one implementation.
+// errorHygiene.php: turns a fatal into a neutral 500 instead of a 200 with the
+// server's absolute paths in the visitor's page. Required by the front
+// controller on EVERY request, not only by the OAuth path that first needed it.
 //
 // The rest are the REQUEST-time half of the engine. Each has an authoring
 // counterpart that deliberately does NOT travel: apiRegistry is the read half
@@ -963,6 +964,11 @@ $spaceNote = $buildPublicSpace !== ''
     . "  live in {$buildPublicName}/{$buildPublicSpace}/. A bare \"/\" is NOT this site.\n"
     : '';
 
+// The verification URLs in step 4 have to carry the space, or a spaced build's
+// instructions ask the deployer to test a path that is deliberately not theirs.
+$readmeSpacePrefix = $buildPublicSpace !== '' ? '/' . $buildPublicSpace : '';
+$readmeHome        = $readmeSpacePrefix . '/';
+
 $readme = <<<README
 =======================================================
 PRODUCTION BUILD - DEPLOYMENT INSTRUCTIONS
@@ -990,23 +996,69 @@ DEPLOYMENT STEPS:
    - Files: 644
    - PHP must be able to read {$buildSecureName}/
 
-3. Apache: mod_rewrite must be enabled and the document root must allow
+3. Web server. Every build ships configuration for BOTH Apache and nginx —
+   the .htaccess files and {$buildSecureName}/nginx_routes.conf. Each is
+   ignored by the server it is not for, so there is nothing to choose here
+   and nothing to rebuild if you move hosts.
+
+   APACHE — mod_rewrite must be enabled and the document root must allow
    .htaccess to take effect (AllowOverride All, or at least FileInfo +
    Options + Indexes). Without it the request funnel is ignored and every
    page except the home page answers 404.
 
-   nginx: .htaccess is not read at all. A ready-to-use snippet describing
-   THIS site is included:
+   NGINX — .htaccess is not read at all. A snippet describing THIS site is
+   included at:
      {$buildSecureName}/nginx_routes.conf
-   Add this inside your server { } block:
+   Add it inside your server { } block:
      include /path/to/{$buildSecureName}/nginx_routes.conf;
-   Then test and reload:
+   then reload:
      nginx -t && nginx -s reload
 
-4. Test:
-   - Visit your domain
-   - Check all pages load correctly
-   - Test language switching (if multilingual)
+   If your vhost has more than one server block — some hosting panels
+   generate two — the right one is the block containing `location ~ \.php$`.
+
+   YOUR SITE MAY ALREADY SERVE PAGES BEFORE YOU DO THIS, and that is
+   normal — not a sign you can skip it, and not a sign something is
+   wrong. Panel-generated vhosts usually already carry
+   `try_files $uri $uri/ /index.php...` plus `index index.php`, because
+   that is what every front-controller app needs, and a build is one.
+   Measured on CloudPanel: every page, the 404 page, styling and
+   language switching all worked with no include at all.
+
+   What the include adds on top of that:
+     - a directory URL such as /assets/ answers with YOUR 404 page
+       instead of nginx's grey "403 Forbidden"
+     - the security headers reach your static files
+     - the routing is stated by this build instead of inherited from a
+       panel template that the panel may regenerate
+
+   The snippet is a fragment, not a vhost: it assumes you already have a
+   server block that serves .php from {$buildPublicName}/ through php-fpm.
+   It also needs one line in your own PHP handler — `try_files \$uri =404;`
+   — without which a request like /assets/anything.png/x.php makes PHP
+   execute the image. Read the top of nginx_routes.conf before reloading;
+   it explains both, and what to do if your panel generates TWO server
+   blocks (CloudPanel does).
+
+4. Test — by FETCHING PAGES, not by reloading the server.
+   `nginx -t` and `apachectl configtest` only parse the configuration. Both
+   report success for a deployment that answers 500 or 404 on every page.
+   Three requests tell you it is really working:
+
+     a) your-domain{$readmeHome}
+        -> your home page.
+
+     b) your-domain{$readmeSpacePrefix}/<a page from COMPILED PAGES below>
+        -> that page. A ":name" segment in that list is a placeholder —
+           put a real value there, e.g. products/:slug -> products/anything.
+
+     c) your-domain{$readmeSpacePrefix}/no-such-page
+        -> YOUR 404 page, not the web server's grey one.
+
+   (c) is the one that matters: it is what proves the request funnel is
+   reaching the site. (a) and (b) can both pass while it is not.
+
+   Then check that styling loads, and language switching if multilingual.
 
 REQUIREMENTS:
 - PHP 8.0 or newer, with mod_php / php-fpm serving the document root

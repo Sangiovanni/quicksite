@@ -9289,3 +9289,118 @@ base: the two bases are the router's and the browser's, and they are not the sam
 thing.
 
 **Source**: `secure/src/classes/OAuthHandler.php`.
+
+---
+
+### The nginx funnel omits `$uri/` (locked 2026-08-23)
+
+**Decision**: the `location` block a build ships for nginx uses
+`try_files $uri /index.php$is_args$args;`. The `$uri/` entry that would sit
+between them is deliberately absent, and the generated file says so where a
+maintainer would otherwise "fix" it.
+
+**Reasoning**: with `$uri/` present, nginx resolves a directory request to the
+directory, looks for an index file inside it, finds none, and — with listings
+off, which a built site requires — answers `403`. A built site has no index file
+in any directory, so this hits every directory URL, and `/` is a directory
+request: the home page of a built site answered `403` on nginx while every other
+page worked. Removing the entry sends directory requests through the front
+controller, which answers with the site's own 404 page — byte-identical to what
+Apache's `FallbackResource` already did. Measured on nginx 1.24.0 against a real
+build: with `$uri/`, four URLs including `/` diverged from Apache; without it,
+21 of 22 URLs matched Apache byte for byte, and the twenty-second is nginx
+reaching the same 404 in one hop where Apache takes a redirect first.
+
+The install's own generator already omits `$uri/` from the `/admin/` block, for
+a variant of the same failure. This is that trap reached by a different door,
+and it is now the same answer in both places.
+
+**Alternatives considered**: adding `index index.php;` (rejected — it repairs
+`/` and leaves every other directory answering 403, and once `$uri/` is gone the
+directive is unreachable config); `autoindex on` (rejected — it fixes a 403 by
+publishing a directory listing of the site's assets); accepting the divergence
+and documenting 403 as nginx behaviour (rejected — the home page not loading is
+not a documentation problem).
+
+**Source**: `secure/src/functions/buildSiteRuntime.php`
+(`qs_site_nginx_config`).
+
+---
+
+### A built site sends its own security headers (locked 2026-08-23)
+
+**Decision**: the front controller sends `X-Content-Type-Options`,
+`X-Frame-Options` and `Referrer-Policy` on every response it produces. The
+`.htaccess` and the nginx snippet keep the same three, for static files.
+
+**Reasoning**: both server configs claimed to be "the .htaccess equivalents, for
+parity", and neither delivered that for the thing a visitor loads. On nginx,
+`add_header` does not follow the internal redirect into the deployer's PHP
+handler, so pages left the location that set them; a vhost's own static-asset
+regex outranks a plain prefix, so stylesheets and images left it too. Measured:
+of five response kinds, the block reached one — `sitemap.txt`. On Apache the
+`.htaccess` block is wrapped in `<IfModule mod_headers.c>` and is skipped
+silently on a server without the module. Sending them from the front controller
+makes them a property of the site rather than of its hosting: every page carries
+them on Apache, on nginx, on PHP's built-in server, with or without
+`mod_headers`. Only a web server can put a header on a stylesheet, so the server
+configs keep their copies for that.
+
+**Alternatives considered**: hoisting the three `add_header` lines to `server`
+level in the generated file (measured — it does cover every response on nginx,
+and it is offered in the file as an option; rejected as the default because a
+spaced build shares its vhost with content that is not the site's, and stamping
+`X-Frame-Options` on a neighbour is not the build's call); leaving the server
+configs as the only source and documenting the gap (rejected — the gap is on
+every page of every nginx deployment).
+
+**Source**: `secure/src/runtime/site/index.php`,
+`secure/src/functions/buildSiteRuntime.php`.
+
+---
+
+### A built site gets the fatal handler, with a shape of its own (locked 2026-08-23)
+
+**Decision**: the front controller registers `qs_register_fatal_handler()` with
+a fourth response shape, `QS_FATAL_SHAPE_SITE`, and renders inside an output
+buffer. It reads the environment and turns `display_errors` off before anything
+else runs.
+
+**Reasoning**: a build was the one request surface with no fatal handling left,
+and the only one whose reader is the general public. Measured before the change:
+a fatal part-way through a page answered `200` with the interpreter's own
+message and three absolute server paths in the visitor's body, on both servers.
+
+The fourth shape exists because the audience is different, not because the logic
+is: a visitor cannot "ask whoever administers this installation to check the PHP
+error log", which is what the admin shape says. Everything else is shared — one
+registration function, one redaction rule, one development gate.
+
+The output buffer is what makes the handler able to repair rather than only stop
+leaking. A compiled page echoes as it renders, and the handler stops once
+`headers_sent()` is true because status and content type are already on the
+wire. Buffering keeps them repairable, so the measured `200`-with-a-fatal became
+`500` with a neutral page. The residual is honest and was measured too: force
+output past every buffer with an explicit `flush()` and the status stays `200`
+with a truncated page — but still no path, because `display_errors` was turned
+off in the first lines of the request.
+
+That suppression runs before the handler is even registered, because the handler
+lives in the secure folder and the secure folder's location comes from a file
+that can itself fail. Reading the environment first is also what makes the
+development gate work at all: `qs_is_development()` memoises its answer and
+prefers an `ENVIRONMENT` constant, so registering the handler before that
+constant existed would have pinned every deployment to "production" from a
+config file a build does not ship.
+
+**Alternatives considered**: reusing `QS_FATAL_SHAPE_HTML` (rejected — the copy
+addresses a panel operator); a fifth hand-written handler in the front
+controller (rejected — this is the duplication the shared file exists to
+prevent); registering the handler earlier (impossible — its own file is inside
+the folder whose name the boot sequence has not yet read); no output buffer
+(rejected — it leaves the measured defect half-fixed, since the fatal that
+started this happens mid-render).
+
+**Source**: `secure/src/runtime/site/index.php`,
+`secure/src/functions/errorHygiene.php` (`QS_FATAL_SHAPE_SITE`,
+`qs_fatal_site_page`).

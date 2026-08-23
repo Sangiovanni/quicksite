@@ -1151,6 +1151,27 @@ The front controller derives its paths from its own location, not from
 the site emits composes against a root-relative base built from the URL space,
 which survives a domain move, a scheme change and a reverse proxy.
 
+It also carries the two things a public surface owes its visitors regardless of
+which web server is in front of it:
+
+- **Fatal hygiene.** A PHP fatal happens outside every `try`, so without a
+  handler the interpreter's own message — class, absolute path, line — goes into
+  the page under the status that was already set, which is `200`. The front
+  controller registers the shared handler (`errorHygiene.php`, the same one
+  `/management`, `/admin/api` and `/admin` use) as soon as the secure folder is
+  located, and renders inside an output buffer so a fatal part-way through a
+  page is still repairable: the visitor gets a neutral page and a `500`. Before
+  that point — a missing or malformed `qs-site.php`, an absent secure folder —
+  the controller's own boot failure path answers, logging the path and printing
+  none. Detail is shown only when the deployment declares itself development
+  (`QS_ENVIRONMENT=development`, set on the vhost); production prints nothing
+  about the filesystem, and `display_errors` is turned off before anything can
+  fail so that holds even where the handler cannot reach.
+- **Response headers.** `X-Content-Type-Options`, `X-Frame-Options` and
+  `Referrer-Policy` are sent by the site itself, so every page carries them on
+  any server. The `.htaccess` and the nginx snippet carry the same three for the
+  static files only a web server touches.
+
 ### 10.2 Build steps, in order
 
 Before the lock:
@@ -1244,6 +1265,60 @@ instead of read. A URL space works the same way: the site answers under it, its
 emits carries it.
 
 Deploy is a separate command (`deployBuild`) that copies the build folder into a target path.
+
+### 10.4 Serving a build: Apache and nginx
+
+Every build ships configuration for both servers, and each is inert on the
+other, so moving a site between them needs no rebuild.
+
+| server | file | what it does |
+|---|---|---|
+| Apache | `<public>/[<space>/].htaccess` | `FallbackResource` into the front controller, `Options -Indexes`, the security headers when `mod_headers` is present |
+| Apache | `<public>/.htaccess` (spaced builds only) | makes the document root unbrowsable; deliberately does **not** funnel, because the root is not the site's |
+| nginx | `<secure>/nginx_routes.conf` | one `location` block the deployer includes in their own `server { }` |
+
+**A build usually serves before the nginx file is included at all**, and an
+install does not — the same asymmetry as §10.1's "an install has no entry point
+to copy". A panel-generated vhost carries `try_files $uri $uri/ /index.php…`
+plus `index index.php`, because that is what a front-controller application
+needs. A build **is** one: `index.php` sits in its document root and every asset
+is a real file beneath it, so the panel's own default already routes it. An
+install's web root holds no `index.php` — only the `/admin/`, `/management/` and
+`/p/` namespaces — so that same fallback lands on a file that does not exist,
+and `/p/`'s files are outside the web root entirely, which is why an install
+genuinely cannot serve without its generated config. What a build's file adds is
+narrower: directory URLs answered by the site rather than by nginx's 403,
+headers on static files, and routing declared by the build instead of inherited
+from a template the panel may regenerate.
+
+**The nginx file is a fragment, not a vhost.** It has no `server`, no `root` and
+no PHP handler: it assumes a working PHP vhost already serves the document root
+and adds the routing that turns it into a QuickSite site. Two properties of the
+surrounding vhost decide whether it works, and neither can be fixed from inside
+an included file — which is why the file itself states both:
+
+- The deployer's `location ~ \.php$` must carry `try_files $uri =404;`.
+  Without it, PHP's default path-info resolution executes a real file found
+  earlier in the path, so `/assets/images/logo.png/x.php` runs the image as a
+  script. Apache does not have this behaviour.
+- A vhost split across **two** server blocks — a public one holding the
+  static-asset regex, proxying to a backend one holding the PHP handler — puts
+  the include in the block that cannot answer assets. Pages then work while
+  every stylesheet, script and image 404s. The fix is in the public block, by
+  hand.
+
+**The funnel deliberately omits `$uri/`.** nginx's `try_files` resolves a
+directory when that entry is present; with no index file inside and listings
+off, the answer is `403` — and `/` is a directory request, so the home page of a
+built site is what breaks first. Without it, a directory request falls through
+to the front controller and gets the site's own 404 page, which is what Apache
+does. The install's own `/admin/` block omits `$uri/` for the same reason.
+
+**`nginx -t` is not a test of the deployment.** It parses the configuration; it
+does not resolve it, so it reports success for a setup that answers `500` on
+every page. What confirms a build is serving is fetching a page — and
+specifically fetching a URL that does not exist: the site's own 404 page proves
+the request funnel was reached, where the home page alone does not.
 
 ---
 

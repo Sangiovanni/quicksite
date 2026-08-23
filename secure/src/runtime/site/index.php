@@ -34,10 +34,11 @@
  *       ├── templates/pages/<route>/<route>.php   (pre-compiled)
  *       └── translate/
  *
- * WHAT IT DOES, in order: bind the constants → bind the project → resolve
- * aliases → route → pick the compiled page (or the 404) → run it. The compiled
- * page requires Page.php itself and renders. There is no JSON parsing and no
- * structure walking at request time; that is the whole point of a build.
+ * WHAT IT DOES, in order: read the environment → bind the constants → install
+ * fatal hygiene → bind the project → resolve aliases → route → pick the
+ * compiled page (or the 404) → run it. The compiled page requires Page.php
+ * itself and renders. There is no JSON parsing and no structure walking at
+ * request time; that is the whole point of a build.
  */
 
 /**
@@ -68,7 +69,50 @@ function qs_site_fail(string $reason, string $absPath): void
 }
 
 // ---------------------------------------------------------------------------
-// 0. Parameters
+// 0. Environment — FIRST, because everything below can fail
+// ---------------------------------------------------------------------------
+// PRODUCTION unless the DEPLOYMENT says otherwise, and it says so through the
+// server rather than through anything in the build — the environment is a
+// property of where a site is running, not of the artifact that was shipped.
+//
+// This is what the outbound-URL policy reads to decide whether a resolver may
+// call an internal address. In production it may not, which is the SSRF guard
+// and is the right default for a public site. It is also what decides whether
+// a fatal may print anything about the server. A deployer running the build
+// locally against a LAN or loopback API opts in per-vhost:
+//
+//   Apache:  SetEnv QS_ENVIRONMENT development
+//   nginx:   fastcgi_param QS_ENVIRONMENT development;
+//
+// Only the exact string 'development' counts; anything else, including the
+// variable being absent, is production. Without this a built site had no way to
+// declare its environment at all, so a deliberate local test was impossible.
+//
+// ⚠ IT RUNS BEFORE EVERYTHING ELSE, and that ordering is load-bearing twice
+// over. It reads nothing but $_SERVER, so it CAN run first — and two things
+// below depend on it having done so:
+//
+//   - the display_errors suppression immediately after it covers the one window
+//     the fatal handler cannot: a fatal raised before, or inside, the require
+//     that locates the secure folder, which is where the handler itself lives.
+//     Same reasoning as the suppression inside qs_register_fatal_handler()
+//     (beta.10 C13): where the handler cannot repair the response, at least
+//     nothing about the filesystem is printed into it.
+//   - qs_is_development() memoises its answer on first call and prefers an
+//     ENVIRONMENT constant over any config file. Registering the handler while
+//     ENVIRONMENT was still undefined would memoise "production" from a config
+//     file a build does not ship, and a development deployment would then never
+//     see a fatal's detail no matter what the vhost said.
+$qsEnv = $_SERVER['QS_ENVIRONMENT'] ?? $_SERVER['REDIRECT_QS_ENVIRONMENT'] ?? getenv('QS_ENVIRONMENT');
+define('ENVIRONMENT', $qsEnv === 'development' ? 'development' : 'production');
+
+if (ENVIRONMENT !== 'development') {
+    ini_set('display_errors', '0');
+    ini_set('display_startup_errors', '0');
+}
+
+// ---------------------------------------------------------------------------
+// 1. Parameters
 // ---------------------------------------------------------------------------
 // qs-site.php refuses to answer unless it is being INCLUDED by this file, so a
 // direct request for it is a 404 rather than a blank 200. It is PHP and not
@@ -91,7 +135,7 @@ if (!is_array($qsSite)
 }
 
 // ---------------------------------------------------------------------------
-// 1. Where everything is
+// 2. Where everything is
 // ---------------------------------------------------------------------------
 // Derived from __DIR__, not from DOCUMENT_ROOT. The install has to read
 // DOCUMENT_ROOT because it cannot know its own depth below the web root; a
@@ -131,7 +175,54 @@ if (!is_dir(SECURE_FOLDER_PATH)) {
 }
 
 // ---------------------------------------------------------------------------
-// 2. The project
+// 3. Fatal hygiene
+// ---------------------------------------------------------------------------
+// A PHP fatal happens outside every `try` an application can write, so without
+// this the interpreter's own message — class, file, ABSOLUTE PATH and line —
+// goes straight into the visitor's page, under whatever status was already set.
+// Nothing had failed yet, so that status is 200: a public website answering
+// "OK" with the server's directory layout in the body. The install closed this
+// for /management, /admin/api and /admin; a built site is the fourth surface,
+// and the only one whose reader is the general public.
+//
+// Registered HERE — the first line after SECURE_FOLDER_PATH resolves — because
+// this is the earliest point at which the handler's own file can be located.
+// Everything above it is covered instead by qs_site_fail() (which logs the path
+// and prints none) and by the display_errors suppression in section 0.
+//
+// The output buffer is what makes the handler able to REPAIR a response rather
+// than only stop leaking into one. A compiled page echoes as it renders, so a
+// fatal halfway through would otherwise arrive after headers were sent — and
+// the handler bails once that is true, because status and content type are
+// already on the wire. Buffering keeps them repairable, so a mid-render fatal
+// answers 500 with the error page instead of 200 with half a page. On the
+// normal path the buffer is simply flushed at the end of the request: shutdown
+// callbacks run BEFORE PHP's final flush, and this one returns immediately when
+// the request did not die.
+require_once SECURE_FOLDER_PATH . '/src/functions/errorHygiene.php';
+qs_register_fatal_handler(QS_FATAL_SHAPE_SITE);
+ob_start();
+
+// The site's own response headers, sent from the one component both servers
+// run. The .htaccess and the nginx snippet each carry the same three, and they
+// still need to — only the web server can put a header on a stylesheet — but
+// neither of them covers a PAGE reliably:
+//
+//   Apache  the .htaccess block is wrapped in <IfModule mod_headers.c>, and a
+//           server without that module skips it silently.
+//   nginx   a page leaves through the deployer's PHP handler, which is a
+//           different location from the one the snippet configures, and
+//           add_header does not follow an internal redirect.
+//
+// So the claim "the .htaccess equivalents, for parity" was true of neither
+// server for the thing a visitor actually loads. Here it is true of both, and
+// of PHP's built-in server, and of anything else that can run this file.
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: SAMEORIGIN');
+header('Referrer-Policy: strict-origin-when-cross-origin');
+
+// ---------------------------------------------------------------------------
+// 4. The project
 // ---------------------------------------------------------------------------
 // A build is ONE project, and its files sit at the secure root rather than
 // under projects/<id>/ — so PROJECT_PATH is SECURE_FOLDER_PATH. PROJECT_NAME
@@ -159,7 +250,7 @@ define('THEME_DEFAULT',             CONFIG['THEME_DEFAULT'] ?? 'light');
 define('THEME_USER_TOGGLE_ENABLED', CONFIG['THEME_USER_TOGGLE_ENABLED'] ?? false);
 
 // ---------------------------------------------------------------------------
-// 3. The base every in-page URL composes against
+// 5. The base every in-page URL composes against
 // ---------------------------------------------------------------------------
 // ROOT-RELATIVE, never absolute: a built site is served from wherever the
 // deployer points a document root, and a root-relative base survives a domain
@@ -170,28 +261,7 @@ define('QS_PUBLIC_BASE', '/' . (PUBLIC_FOLDER_SPACE !== '' ? PUBLIC_FOLDER_SPACE
 define('BASE_URL', QS_PUBLIC_BASE);
 
 // ---------------------------------------------------------------------------
-// 3b. Environment
-// ---------------------------------------------------------------------------
-// PRODUCTION unless the DEPLOYMENT says otherwise, and it says so through the
-// server rather than through anything in the build — the environment is a
-// property of where a site is running, not of the artifact that was shipped.
-//
-// This is what the outbound-URL policy reads to decide whether a resolver may
-// call an internal address. In production it may not, which is the SSRF guard
-// and is the right default for a public site. A deployer running the build
-// locally against a LAN or loopback API opts in per-vhost:
-//
-//   Apache:  SetEnv QS_ENVIRONMENT development
-//   nginx:   fastcgi_param QS_ENVIRONMENT development;
-//
-// Only the exact string 'development' counts; anything else, including the
-// variable being absent, is production. Without this a built site had no way to
-// declare its environment at all, so a deliberate local test was impossible.
-$qsEnv = $_SERVER['QS_ENVIRONMENT'] ?? $_SERVER['REDIRECT_QS_ENVIRONMENT'] ?? getenv('QS_ENVIRONMENT');
-define('ENVIRONMENT', $qsEnv === 'development' ? 'development' : 'production');
-
-// ---------------------------------------------------------------------------
-// 4. Aliases, then routing
+// 6. Aliases, then routing
 // ---------------------------------------------------------------------------
 // Aliases run BEFORE the router, because an internal alias works by rewriting
 // REQUEST_URI. Same function the /p/<id>/ renderer calls, so an alias behaves
@@ -207,7 +277,7 @@ $routePath  = $trimParameters->routePath();
 $routeFound = $trimParameters->routeFound();
 
 // ---------------------------------------------------------------------------
-// 5. Pick the compiled page
+// 7. Pick the compiled page
 // ---------------------------------------------------------------------------
 // The build writes every page at  templates/pages/<route>/<leaf>.php  — one
 // convention, no fallbacks, because the build wrote the tree itself and there
@@ -239,7 +309,7 @@ if ($templateFile === null || !is_file($templateFile)) {
 }
 
 // ---------------------------------------------------------------------------
-// 6. Server-side data
+// 8. Server-side data
 // ---------------------------------------------------------------------------
 // A resolver fetches this route's data over HTTP before the page renders, so
 // the values are in the HTML at first paint. That is request-time work by

@@ -182,6 +182,30 @@ if (!function_exists('qs_site_nginx_config')) {
      * project URL answers 500". A deployer must not be handed configuration for
      * namespaces that are not there.
      *
+     * ⚠ EVERY BEHAVIOURAL CLAIM BELOW WAS MEASURED on nginx 1.24.0 serving a
+     * real build, not reasoned about. Three of them contradicted what this file
+     * shipped when it was written from first principles:
+     *
+     *   - `$uri/` in the try_files list made the HOME PAGE answer 403. A
+     *     directory request resolves the directory, finds no index inside it,
+     *     and `autoindex off` refuses — and "/" is a directory request. Apache's
+     *     FallbackResource does not resolve a directory that way, which is why
+     *     the same build served correctly there. It is the same trap the
+     *     install's own generator documents for `/admin/`, reached by a
+     *     different door. Removing `$uri/` gives byte-for-byte parity with
+     *     Apache on every URL, directories included.
+     *   - `add_header` inside this location reached ONE of the five response
+     *     kinds a built site produces. Pages leave through the vhost's PHP
+     *     handler, which is a different location, and `add_header` does not
+     *     follow an internal redirect; stylesheets and images are usually
+     *     claimed by a vhost's own static-asset regex, which outranks a plain
+     *     prefix. The front controller now sends the three headers itself, so
+     *     every PAGE carries them on any server; what stays here covers the
+     *     static files this location actually serves.
+     *   - `nginx -t` does not catch the mistake that actually happens. It
+     *     parses; it does not resolve. So the file tells the deployer to fetch
+     *     a page, which is the only check that discriminates.
+     *
      * @param string $public Public folder name/path — the document root.
      * @param string $secure Secure folder name/path — outside it.
      * @param string $space  URL space, or '' when the site is at the root.
@@ -191,7 +215,16 @@ if (!function_exists('qs_site_nginx_config')) {
         $space  = trim($space, '/');
         $prefix = $space !== '' ? '/' . $space : '';
         $entry  = $prefix . '/index.php';
+        $home   = $prefix . '/';
+        $notFnd = $prefix . '/nope';
         $date   = date('Y-m-d H:i:s');
+
+        // The two example URLs are shown one above the other with their arrows
+        // lined up, so pad the shorter to the longer rather than letting the
+        // space length decide whether the block reads as a table.
+        $urlWidth = max(strlen($home), strlen($notFnd));
+        $homePad  = str_pad($home, $urlWidth);
+        $notFndPad = str_pad($notFnd, $urlWidth);
 
         $rootNote = $space !== ''
             ? "# This site is mounted under {$prefix}/. The document root itself is left\n"
@@ -208,24 +241,157 @@ if (!function_exists('qs_site_nginx_config')) {
 # Apache users can ignore this file: the build ships .htaccess files that do
 # the same job. nginx does not read .htaccess, so this is the equivalent.
 #
-# Add this inside your server { } block, then:  nginx -t && nginx -s reload
-#
 # Document root:  {$public}/
 # Engine + pages: {$secure}/     <-- MUST stay outside the document root
 {$rootNote}#
 # There is no management API and no admin panel in a build, so there is nothing
 # here for them.
+#
+# ----------------------------------------------------------
+# WHAT YOU MUST ALREADY HAVE
+# ----------------------------------------------------------
+# This file is a fragment. It is NOT a vhost and it cannot make a site serve on
+# its own: it has no server block, no listen, no root, and no PHP handler. It
+# assumes you already have a working PHP vhost — one that serves .php files
+# from {$public}/ through php-fpm — and it adds the routing that turns that into
+# a QuickSite site. If you can put a file with <?php phpinfo(); ?> in
+# {$public}/ and see it run, you have what this needs.
+#
+# Your PHP handler must also refuse a path that is not a real file:
+#
+#     location ~ \.php$ {
+#         try_files \$uri =404;          # <-- this line
+#         include        fastcgi_params;
+#         fastcgi_param  SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+#         fastcgi_pass   ...;            # your own php-fpm socket or address
+#     }
+#
+# Without it, a request for /assets/images/logo.png/x.php is handed to PHP,
+# which walks back to the part of the path that DOES exist and executes
+# logo.png as a script. Measured on nginx 1.24.0 against a real build: the
+# image came back with 200 and PHP's own headers on it. With the line, the same
+# request answers 404 and every real page still serves. This is a property of
+# YOUR handler, not of the block below, which is why it cannot be fixed here.
+# Apache is not affected — it answers that request 404 on its own.
+#
+# ----------------------------------------------------------
+# INSTALL IT
+# ----------------------------------------------------------
+#   1. include /path/to/{$secure}/nginx_routes.conf;   (inside your server { })
+#   2. nginx -t && nginx -s reload
+#   3. FETCH A PAGE. Step 2 is not a test of this file.
+#
+# If your vhost has more than one server block, the right one is the block that
+# contains `location ~ \.php$`. See the two-server-block section below.
+#
+# ----------------------------------------------------------
+# "MY SITE ALREADY WORKS AND I HAVE NOT ADDED THIS"
+# ----------------------------------------------------------
+# Expected, on a panel-generated vhost. Nothing is wrong and you have not
+# misread the instructions.
+#
+# A hosting panel's default vhost usually already contains something like
+#
+#     try_files \$uri \$uri/ /index.php?\$args;
+#     index index.php index.html;
+#
+# because that is what every front-controller application needs — Laravel,
+# WordPress, Symfony — and a QuickSite build is one of those. `index index.php`
+# resolves "/" to the front controller and the fallback catches every page
+# route, so the site serves before this file is included at all. Measured on
+# CloudPanel with a real build: every page, the 404 page, styling and language
+# switching all correct with no include.
+#
+# What this file adds on top of that, and it is the whole list:
+#
+#   - A directory URL — /assets/, /style/ — answers with the SITE's 404 page.
+#     Without it those give nginx's grey "403 Forbidden", because the panel's
+#     `\$uri/` resolves the directory, finds no index file in it, and refuses.
+#   - The three headers below reach your static files.
+#   - `autoindex off` is stated rather than left to nginx's default.
+#   - The routing is declared by the build instead of inherited from a template
+#     the panel may regenerate.
+#
+# Pages behave identically either way — verified byte for byte on ten URLs. So
+# this is worth adding, and it is not an emergency if you have not.
+#
+# If this server also runs a QuickSite INSTALL, that install has its own
+# generated file, `<its secure>/nginx/dynamic_routes.conf`. It is a different
+# file for a different thing: it describes /admin/, /management/ and /p/, which
+# a build does not have. The two do not overlap and can both be included — but
+# do not point this include at that file, or the site gets routing for
+# namespaces that are not here and none for the ones that are.
+#
+# ⚠ nginx -t parses the configuration; it does not resolve it. It will report
+# "test is successful" for a setup that answers 500 on every page — a missing
+# named location, for instance, is only discovered per request. So a green
+# nginx -t means "nginx will start", not "the site works". What tells you the
+# site works:
+#
+#     curl -i http://your-domain{$homePad}    -> 200, and HTML that is your home page
+#     curl -i http://your-domain{$notFndPad}    -> 404, and YOUR 404 page, not nginx's
+#
+# The second one is the real check. If it returns nginx's grey "404 Not Found"
+# instead of your site's own 404 page, the funnel below is not being reached —
+# the include is in the wrong server block, or another location is winning.
+#
+# ----------------------------------------------------------
+# ⚠ IF YOUR VHOST IS TWO SERVER BLOCKS  (skip this if it is one)
+# ----------------------------------------------------------
+# Most vhosts are a single server { }. Some hosting panels generate two: a
+# public one on :443 that holds the static-asset rules and proxies everything
+# else to a second, internal server block (often on :8080) that holds the PHP
+# handler. CloudPanel does this.
+#
+# On that layout an include lands in ONE block and cannot reach the other, so
+# where you put this file decides what works:
+#
+#   - Put it in the block that has the PHP handler (the internal one). That is
+#     the block with `location ~ \.php$` in it. Pages will work.
+#   - The public block still answers stylesheets, scripts and images from its
+#     own regex, from ITS OWN document root, before the request is ever proxied.
+#
+# Whether that second point is a problem depends on one thing: does the public
+# block's root point at this build's {$public}/ too?
+#
+#   - Both blocks share a root (what a panel normally generates): assets are
+#     answered from disk by the public block and the site looks right. The only
+#     difference is that those files get the public block's headers instead of
+#     the three below — worth knowing, not worth chasing.
+#   - The roots differ: every stylesheet, script and image 404s while pages are
+#     fine, and you get a site with no styling. The fix is in the public block
+#     and has to be made by hand — point it at this build's document root, or
+#     exclude this site's paths from its asset regex. Nothing in an included
+#     file can do it for you.
 # ==========================================================
 
 location {$prefix}/ {
     # Real files (style/, assets/, scripts/, sitemap.txt) are served directly;
     # everything else is a page and goes to the front controller.
-    try_files \$uri \$uri/ {$entry}\$is_args\$args;
+    #
+    # ⚠ NO \$uri/ IN THIS LIST, DELIBERATELY — the same omission, for the same
+    # reason, as the install's own /admin/ block. With \$uri/ present a request
+    # for a directory resolves the directory, finds no index file inside it,
+    # and answers 403 with nginx's page. That includes "{$home}": the home page
+    # of a built site answered 403 while every other URL worked. Without it,
+    # directories fall through to the front controller and get this site's own
+    # 404 page — which is what Apache does.
+    try_files \$uri {$entry}\$is_args\$args;
 
     # No directory listings. The build ships no per-folder index guards.
     autoindex off;
 
-    # The .htaccess equivalents, for parity between the two server configs.
+    # Static files served by THIS location. Pages do not pass through here —
+    # they leave through your PHP handler, and nginx does not carry add_header
+    # across that boundary — so the front controller sends these three itself
+    # on every page. Nothing is missing from a page if you delete them.
+    #
+    # If your vhost has its own `location ~* \.(css|js|png|...)$` block, that
+    # regex outranks this prefix and those files get whatever it sets. To cover
+    # them too, move these three lines OUT of this location, up into the
+    # server { } block: at that level nginx inherits them into every location
+    # that does not set its own. Measured: inside the location they reach
+    # sitemap.txt only; at server level they reach every response.
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
@@ -343,6 +509,7 @@ if (!function_exists('qs_site_verify_servable')) {
             'src/functions/serverFetch.php',
             'src/functions/resolverCache.php',
             'src/functions/environment.php',
+            'src/functions/errorHygiene.php',
             'src/functions/jsonIo.php',
             'src/classes/DataResolver.php',
             'src/classes/OutboundUrlPolicy.php',

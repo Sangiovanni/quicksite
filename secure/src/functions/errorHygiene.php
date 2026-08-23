@@ -18,7 +18,7 @@
  *
  * This is that logic, extracted rather than copied. C11 spent a slice unifying
  * seven hand-copied marker binds; adding an eighth copy of anything is the
- * shape that beta was fixing. One implementation, three response shapes, one
+ * shape that beta was fixing. One implementation, four response shapes, one
  * place where the development gate is consulted.
  *
  * C13 added the third shape and the third caller: the admin PAGE surface
@@ -31,6 +31,15 @@
  * `..._json_handler` that returns HTML is how a fourth hand-rolled copy gets
  * written.
  *
+ * The fourth shape and the fourth caller are a BUILT site's front controller.
+ * A build had no fatal handling at all, so the identical defect was live on a
+ * surface whose visitor is the general public: a fatal reached the page body as
+ * a raw error with absolute server paths, at HTTP 200. It gets its own shape
+ * rather than reusing the admin one because the audience is different — a
+ * visitor cannot "ask whoever administers this installation", and the page must
+ * read as the site's, not as a panel's. Everything else is shared: the same
+ * status, the same redaction, the same one development gate.
+ *
  * Not a general error handler: it deliberately handles ONLY the fatal classes
  * (E_ERROR / E_PARSE / E_CORE_ERROR / E_COMPILE_ERROR / E_USER_ERROR). Warnings
  * and notices are left to PHP's own logging, exactly as before.
@@ -42,6 +51,7 @@ require_once __DIR__ . '/environment.php';
 const QS_FATAL_SHAPE_ENVELOPE = 'envelope';   // /management — ApiResponse's {status,code,message,data}
 const QS_FATAL_SHAPE_ERROR    = 'error';      // /admin/api  — its own {error: …}
 const QS_FATAL_SHAPE_HTML     = 'html';       // /admin      — the panel's page surface
+const QS_FATAL_SHAPE_SITE     = 'site';       // a BUILT site — the author's public website
 
 /**
  * Register the fatal → 500 converter for the current request.
@@ -114,9 +124,11 @@ function qs_register_fatal_handler(string $shape = QS_FATAL_SHAPE_ENVELOPE): voi
             ]
             : null;
 
-        if ($shape === QS_FATAL_SHAPE_HTML) {
+        if ($shape === QS_FATAL_SHAPE_HTML || $shape === QS_FATAL_SHAPE_SITE) {
             header('Content-Type: text/html; charset=utf-8');
-            echo qs_fatal_html_page($debug);
+            echo $shape === QS_FATAL_SHAPE_SITE
+                ? qs_fatal_site_page($debug)
+                : qs_fatal_html_page($debug);
             return;
         }
 
@@ -174,6 +186,72 @@ function qs_fatal_html_page(?array $debug): string
     if ($debug !== null) {
         $page .= '<p><strong>Development mode</strong> — details below are shown because this'
             . ' install declares <code>environment.php</code> as development.</p><pre>'
+            . htmlspecialchars(
+                $debug['type'] . ': ' . $debug['message'] . "\n"
+                . $debug['file'] . ':' . $debug['line'],
+                ENT_QUOTES,
+                'UTF-8'
+            )
+            . '</pre>';
+    }
+
+    return $page . '</main></body></html>';
+}
+
+/**
+ * A BUILT site's fatal body — the author's public website, not a control panel.
+ *
+ * Written for a visitor, which is the whole reason it is not the admin page
+ * above: someone who followed a link to a shop or a blog cannot check a PHP
+ * error log and should not be told to. So it says only that the page could not
+ * be shown, and offers the one thing a visitor can act on — try again, or go to
+ * the home page.
+ *
+ * Same rules as every other shape: no filesystem detail unless the DEPLOYMENT
+ * declares itself development (the caller passes the gate's result, so the
+ * decision stays in one place), `noindex` so a transient failure is not
+ * indexed, and self-contained markup — by the time this runs the site's own
+ * stylesheet may be exactly what failed, and an error page that needs a second
+ * request to look right can fail twice.
+ *
+ * The voice matches `qs_site_fail()` in the front controller, which covers the
+ * other half of the same problem: that one answers a site that cannot BOOT
+ * (logging the path, printing none), this one answers a site that booted and
+ * then died.
+ *
+ * @param array|null $debug type/message/file/line, or null in production.
+ */
+function qs_fatal_site_page(?array $debug): string
+{
+    // The site's own root, which is '/<space>/' when the build is mounted under
+    // one. Guarded rather than assumed: a fatal early enough to beat the front
+    // controller's constants must still produce a page, and '/' is the right
+    // answer for the build layout that has no space.
+    $home = htmlspecialchars(
+        defined('QS_PUBLIC_BASE') ? (string) QS_PUBLIC_BASE : '/',
+        ENT_QUOTES,
+        'UTF-8'
+    );
+
+    $page = '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">'
+        . '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        . '<meta name="robots" content="noindex, nofollow">'
+        . '<title>Page unavailable</title>'
+        . '<style>body{margin:0;padding:4rem 1.5rem;background:#fff;color:#1c1e24;'
+        . 'font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}'
+        . 'main{max-width:34rem;margin:0 auto}h1{font-size:1.5rem;margin:0 0 .75rem}'
+        . 'p{margin:0 0 .75rem;color:#4b5060}a{color:inherit}'
+        . 'pre{white-space:pre-wrap;word-break:break-all;background:#f4f5f8;'
+        . 'border:1px solid #dfe2ea;border-radius:6px;padding:1rem;font-size:.85rem;'
+        . 'color:#1c1e24}</style></head><body><main>'
+        . '<h1>This page is temporarily unavailable</h1>'
+        . '<p>Something went wrong while building this page. Nothing you did caused it.</p>'
+        . '<p>Please try again in a moment, or return to the'
+        . ' <a href="' . $home . '">home page</a>.</p>';
+
+    if ($debug !== null) {
+        $page .= '<p><strong>Development mode</strong> — details below are shown because this'
+            . ' deployment sets <code>QS_ENVIRONMENT=development</code>.</p><pre>'
             . htmlspecialchars(
                 $debug['type'] . ': ' . $debug['message'] . "\n"
                 . $debug['file'] . ':' . $debug['line'],
