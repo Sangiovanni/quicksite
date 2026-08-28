@@ -1,18 +1,31 @@
 <?php
 /**
  * Deploy Build Command - Copies a build to a target root directory
- * 
+ *
  * Method: POST
  * Endpoint: /management/deployBuild
- * 
+ *
  * Parameters:
- * - name: Build folder name (e.g., build_20251213_185955)
+ * - name: (optional) Build folder name. Retention is N = 1, so the project has
+ *               one build or none and this command finds it on its own. Supply
+ *               the name only to assert WHICH build you meant; a name that is
+ *               not the current build is a 404 rather than a silent substitution.
  * - targetPath: Absolute path to the root directory where the build will be deployed
  *               The build's public and secure folders will be placed inside this path.
  *               Example: /var/www/mysite -> creates /var/www/mysite/{publicFolder}/ and /var/www/mysite/{secureFolder}/
  * - overwrite: (optional) If true, overwrite existing files (default: false)
  *              When false, the command scans for file conflicts first and returns them.
- * 
+ * - acceptRouteCollisions: (optional) If true, deploy even though one of the
+ *              site's routes is shadowed by a directory that already exists at
+ *              the target. Default false, which refuses with the collisions named.
+ *
+ * THREE INDEPENDENT GATES, all of which must pass:
+ *   1. deploy.php    — may this installation deploy at all? ABSENT MEANS NO.
+ *                      (src/functions/deployPolicy.php)
+ *   2. roles.php     — may this caller? `deployBuild` is alone in the `deploy`
+ *                      category, granted to admin and owner.
+ *   3. deploy-roots.php — where may it write? Absent ⇒ SERVER_ROOT only.
+ *
  * SECURITY NOTE:
  * - This command allows copying to arbitrary paths on the filesystem
  * - Protect your API token - anyone with access can deploy anywhere the PHP process can write
@@ -22,6 +35,21 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/LockManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/deployPolicy.php';   // qs_deploy_allowed
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_build_* (the one build-location derivation)
+
+// === GATE 1: IS DEPLOY ENABLED ON THIS INSTALLATION AT ALL? ===
+// Asked FIRST, before any parameter is read, so a disabled install answers the
+// same way whatever it is asked — no probing the target allowlist or the build
+// inventory through the shape of a refusal. Absent config ⇒ denied.
+if (!qs_deploy_allowed()) {
+    ApiResponse::create(403, 'deploy.disabled')
+        ->withMessage('Deploying is disabled on this installation')
+        ->withData([
+            'hint' => 'The operator enables it on the server: copy secure/management/config/deploy.php.example to deploy.php and set allow_deploy => true (setup.sh / setup.bat offers this). Building, downloading and deleting a build are unaffected.',
+        ])
+        ->send();
+}
 
 $params = $trimParametersManagement->params();
 $buildName = $params['name'] ?? null;
@@ -34,6 +62,14 @@ if (is_string($rawOverwrite)) {
     $overwrite = (bool) $rawOverwrite;
 }
 
+// Same cast for the route-collision opt-in — one spelling of "the form said yes".
+$rawAcceptCollisions = $params['acceptRouteCollisions'] ?? false;
+if (is_string($rawAcceptCollisions)) {
+    $acceptRouteCollisions = in_array(strtolower($rawAcceptCollisions), ['true', '1', 'yes'], true);
+} else {
+    $acceptRouteCollisions = (bool) $rawAcceptCollisions;
+}
+
 // Default targetPath to SERVER_ROOT (the project root where public/ and secure/ live)
 if (empty($targetPath)) {
     $targetPath = SERVER_ROOT;
@@ -41,12 +77,21 @@ if (empty($targetPath)) {
 
 // === VALIDATION ===
 
-// Validate build name
-if (empty($buildName)) {
-    ApiResponse::create(400, 'validation.required')
-        ->withMessage('Build name is required')
-        ->withErrors([['field' => 'name', 'reason' => 'missing']])
-        ->send();
+// Retention is N = 1, so the build is discoverable: `name` became optional when
+// the seven-command family shrank. Supplying it still means something — it
+// asserts WHICH build the caller meant, and a stale name is a 404 below rather
+// than a silent deploy of a different build.
+if ($buildName === null || $buildName === '') {
+    $buildName = qs_build_current();
+    if ($buildName === null) {
+        ApiResponse::create(404, 'build.not_found')
+            ->withMessage('This project has no build to deploy')
+            ->withData([
+                'exists' => false,
+                'hint'   => 'Run build to create one.'
+            ])
+            ->send();
+    }
 }
 
 if (!is_string($buildName) || !RegexPatterns::match('build_name', $buildName)) {
@@ -163,13 +208,34 @@ if (isLocked($buildLockId)) {
         ->send();
 }
 
-$buildDir = PUBLIC_CONTENT_PATH . '/build';
-$buildFolder = $buildDir . '/' . $buildName;
+// The build lives at secure/projects/<id>/qs_build/<name>/ — outside public/,
+// where no URL reaches it. This command read PUBLIC_CONTENT_PATH . '/build'
+// until beta.11 S3.8, a directory that stopped existing when the output moved,
+// so every deploy answered "Build not found" no matter what was on disk.
+// qs_build_path() is the single derivation every caller shares.
+$buildFolder = qs_build_path($buildName);
 
 if (!is_dir($buildFolder)) {
     ApiResponse::create(404, 'build.not_found')
         ->withMessage('Build not found')
-        ->withData(['requested_build' => $buildName])
+        ->withData([
+            'requested_build' => $buildName,
+            'hint'            => 'Retention is one build per project. Call getBuild to see which build exists, if any.'
+        ])
+        ->send();
+}
+
+// An incomplete build is refused rather than deployed. A partial carries no
+// build_manifest.json, so it did not finish — deploying one puts a half-written
+// site on a server, which is the one place a broken deliverable does damage.
+// Same rule downloadBuild applies to the archive.
+if (!qs_build_is_complete($buildName)) {
+    ApiResponse::create(409, 'build.incomplete')
+        ->withMessage('This build is incomplete and cannot be deployed')
+        ->withData([
+            'build' => $buildName,
+            'hint'  => 'It carries no build_manifest.json, so it did not finish. Remove it with deleteBuild and run build again.'
+        ])
         ->send();
 }
 
@@ -251,6 +317,100 @@ if (!is_dir($sourceSecure)) {
 // Determine destination paths
 $destPublic = $targetPath . DIRECTORY_SEPARATOR . $buildPublicName;
 $destSecure = $targetPath . DIRECTORY_SEPARATOR . $buildSecureName;
+
+// === ROUTE COLLISIONS AT THE TARGET (Sangio's ruling, 2026-08-16) ===
+//
+// The default deploy target is the installation's own web root, and `addRoute`
+// reserves nothing — so a project with a route named `admin`, `management` or
+// `p` lands its pages beside QuickSite's own namespaces and loses. The site's
+// entry point funnels requests through a FallbackResource, which only applies
+// when the URL is NOT a real file or directory: a real directory beside the
+// front controller therefore SHADOWS a same-named route, permanently and
+// silently.
+//
+// Blacklisting those names in `addRoute` was considered and rejected. They are
+// reserved in exactly ONE of three deployment shapes (marker form `/p/<id>/x`
+// and a build on its own domain both have no conflict), so blocking them
+// everywhere punishes every author for a layout most never use, and the rule
+// would have to be threaded through route creation, editing and import to hold.
+//
+// The check belongs HERE: the target layout is known, the collision is real
+// rather than hypothetical, and the person answering for it is the deployer
+// rather than a content author.
+//
+// DERIVED FROM DISK, NOT FROM A LIST OF NAMES. What shadows a route is whatever
+// directory happens to sit beside the site's front controller at this target —
+// QuickSite's own three on an install root, plus anything else the deployer put
+// there. Reading the target says which, and says it correctly for a target this
+// code has never seen.
+$deployedSiteDir = $destPublic . ($buildSpace !== '' ? DIRECTORY_SEPARATOR . $buildSpace : '');
+
+$routeCollisions = [];
+$buildRoutesFile = $buildFolder . '/' . $buildSecureName . '/routes.php';
+if (is_dir($deployedSiteDir) && is_file($buildRoutesFile)) {
+    // Same containment the config readers use: a broken routes.php in a build
+    // must not end the request, and a file that is not PHP must not echo itself
+    // into the envelope.
+    $builtRoutes = null;
+    ob_start();
+    try {
+        $builtRoutes = require $buildRoutesFile;
+    } catch (Throwable $e) {
+        error_log('QuickSite: unreadable routes.php in build ' . $buildName . ' (' . $e->getMessage() . ') — route-collision check skipped.');
+        $builtRoutes = null;
+    } finally {
+        ob_end_clean();
+    }
+
+    if (is_array($builtRoutes)) {
+        // URLs are case-sensitive on Linux and not on Windows; fold only where
+        // the filesystem does, so the check matches how the target will serve.
+        $fold = static fn(string $s): string => (PHP_OS_FAMILY === 'Windows') ? strtolower($s) : $s;
+
+        $existingDirs = [];
+        foreach ((array) @scandir($deployedSiteDir) as $entry) {
+            if (!is_string($entry) || $entry === '.' || $entry === '..') {
+                continue;
+            }
+            if (is_dir($deployedSiteDir . DIRECTORY_SEPARATOR . $entry)) {
+                $existingDirs[$fold($entry)] = $entry;
+            }
+        }
+
+        foreach (array_keys($builtRoutes) as $routeKey) {
+            $routeKey = (string) $routeKey;
+            // Only the FIRST segment can be shadowed — a directory named `admin`
+            // takes `/admin` and everything under it, and a nested route only
+            // exists below its own first segment anyway.
+            $firstSegment = explode('/', ltrim($routeKey, '/'))[0];
+            if ($firstSegment === '') {
+                continue;
+            }
+            if (isset($existingDirs[$fold($firstSegment)])) {
+                $routeCollisions[] = [
+                    'route'       => $routeKey,
+                    'segment'     => $firstSegment,
+                    'shadowed_by' => $deployedSiteDir . DIRECTORY_SEPARATOR . $existingDirs[$fold($firstSegment)],
+                ];
+            }
+        }
+    }
+}
+
+if ($routeCollisions !== [] && !$acceptRouteCollisions) {
+    ApiResponse::create(409, 'conflict.route_collision')
+        ->withMessage(count($routeCollisions) === 1
+            ? 'One of this site\'s routes is already a directory at the deploy target and would never be reachable'
+            : count($routeCollisions) . ' of this site\'s routes are already directories at the deploy target and would never be reachable')
+        ->withData([
+            'build'       => $buildName,
+            'target'      => $targetPath,
+            'served_from' => $deployedSiteDir,
+            'collisions'  => $routeCollisions,
+            'hint'        => 'A directory beside the site\'s entry point wins over its routing, so these pages would answer with the directory instead. Rename the route, deploy to a target that does not carry these directories, or set acceptRouteCollisions=true to deploy anyway and leave them unreachable.',
+        ])
+        ->send();
+}
 
 // === SAFETY CHECK: Warn when deploying without space to existing multi-project directory ===
 $spaceWarning = null;
@@ -526,6 +686,16 @@ $responseData = [
 
 if ($spaceWarning) {
     $responseData['warning'] = $spaceWarning;
+}
+
+// An accepted collision is REPORTED, not forgotten. The deployer opted in, and
+// the pages really are unreachable — a success envelope that said nothing would
+// be the same silence the check exists to break.
+if ($routeCollisions !== []) {
+    $responseData['route_collisions'] = $routeCollisions;
+    $responseData['route_collisions_accepted'] = true;
+    $responseData['route_collision_warning'] =
+        'Deployed with ' . count($routeCollisions) . ' shadowed route(s): a directory of the same name sits beside the site\'s entry point, so those pages are not reachable at this target.';
 }
 
 ApiResponse::create(200, 'operation.success')

@@ -68,6 +68,7 @@ class AdminRouter {
         'media',       // Asset Management page. ⚠ NOT 'assets' — see the
                        //   reserved-segment note above.
         'sitemap',     // Visual Sitemap & Route Management
+        'builds',      // Builds — build / download / delete the project's single build
         'optimize',    // Optimization Tools
         'logout'       // Logout action — POST only (everywhere=1 ends the account's other sessions too)
     ];
@@ -528,6 +529,13 @@ class AdminRouter {
     private const PAGE_PERMISSIONS = [
         'media'          => ['listAssets', 'uploadAsset'],
         'sitemap'        => ['getSiteMap', 'addRoute'],
+        // Builds: gated on the READ only. getBuild is content.read, so every
+        // member rank reaches the page and can see whether a build exists, how
+        // big it is and what the project's space situation looks like; the
+        // build / download / delete CONTROLS are separately gated in the page,
+        // because those three live in the `build` category (developer+). A
+        // non-member has no role at all and bounces, like every other page.
+        'builds'         => ['getBuild'],
         'optimize'       => ['getStyles', 'editStyles'],
         // 'ai-connections' has no permission gate: it is a UI over
         // browser-stored data. Any authenticated admin can view it.

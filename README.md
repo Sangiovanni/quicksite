@@ -131,6 +131,8 @@ re-run, so changing one setting later never means answering the others again:
 | **4** | Switch environment | `production` (default) or `development` — see below |
 | **5** | Self-registration on / off | may visitors create their own accounts at `/admin/register`? Default off |
 | **6** | Show my setup token | reads the first-run credential off disk once it exists |
+| **7** | Storage quotas | per-account ceilings on total size and upload rate. Leave both blank for no limits, which is the default |
+| **8** | Self-deploy on / off | may this installation copy a built site onto a filesystem path? **Default off** — building and downloading still work either way |
 
 The menu header always shows the values currently on disk, so nothing is
 guessed. Every item is optional — skip anything you do not need.

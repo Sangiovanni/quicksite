@@ -28,6 +28,7 @@ quicksite/
 │   │   │   ├── environment.php   # production | development — SSRF/error gate (gitignored; default production)
 │   │   │   ├── operator.php      # Accounts that see operator notices — display only, grants nothing (gitignored; written at first run; default: nobody)
 │   │   │   ├── setup-token.txt   # First-run credential (gitignored; minted when the first-run page renders, destroyed on use)
+│   │   │   ├── deploy.php        # allow_deploy — may this install deploy at all (gitignored; ABSENT MEANS NO)
 │   │   │   ├── deploy-roots.php  # deployBuild allowed target roots (gitignored; default SERVER_ROOT only)
 │   │   │   └── import-policy.php # Archive import + publish allowlists and archive size limits (gitignored; optional, built-in defaults apply without it)
 │   │   └── routes.php            # Command whitelist

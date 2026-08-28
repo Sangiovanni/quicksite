@@ -97,11 +97,10 @@
     /**
      * Format bytes to human readable size
      */
+    // The builds page needed the same formatting, so the implementation moved to
+    // QuickSiteUtils rather than being copied. Same output, one definition.
     function formatSize(bytes) {
-        if (bytes < 1024) return bytes + ' B';
-        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
-        if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
-        return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+        return window.QuickSiteUtils.formatSize(bytes);
     }
 
     /**

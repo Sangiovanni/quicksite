@@ -134,6 +134,7 @@ $langNames = [
     <link rel="stylesheet" href="<?= $versionedAsset('/css/storage-admin.css') ?>">
     <link rel="stylesheet" href="<?= $versionedAsset('/css/privacy-admin.css') ?>">
     <link rel="stylesheet" href="<?= $versionedAsset('/css/members-admin.css') ?>">
+    <link rel="stylesheet" href="<?= $versionedAsset('/css/builds-admin.css') ?>">
     <link rel="stylesheet" href="<?= $versionedAsset('/css/searchable-select.css') ?>">
     <link rel="stylesheet" href="<?= $versionedAsset('/css/preview-ai-tools.css') ?>">
     <!-- Storage key registry — must load before any page script that references QuickSiteStorageKeys -->
@@ -164,7 +165,7 @@ $langNames = [
             // API Endpoints moved Settings → Build (N1): it's an authoring
             // surface used constantly during build (fetch picker, interactions,
             // component-list bindings), not a config setting.
-            $buildPages = ['workflows', 'command', 'preview', 'apis'];
+            $buildPages = ['workflows', 'command', 'preview', 'apis', 'builds'];
             $settingsPages = ['settings', 'ai-settings', 'ai-connections', 'embed-security'];
             $compliancePages = ['storage', 'privacy'];
             $membersPages = ['memberships', 'members'];
@@ -223,6 +224,16 @@ $langNames = [
                             <polyline points="22 6 12 13 2 6"/>
                         </svg>
                         <span><?= __admin('nav.apiEndpoints') ?></span>
+                    </a>
+                    <a href="<?= $router->url('builds') ?>"
+                       class="admin-nav__link<?= $currentPage === 'builds' ? ' admin-nav__link--active' : '' ?>"
+                       data-requires-command="getBuild">
+                        <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                            <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                            <line x1="12" y1="22.08" x2="12" y2="12"/>
+                        </svg>
+                        <span><?= __admin('nav.builds', 'Builds') ?></span>
                     </a>
                 </div>
             </div>

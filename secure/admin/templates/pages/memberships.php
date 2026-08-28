@@ -20,12 +20,33 @@ $baseUrl = rtrim(BASE_URL, '/');
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
 $__myAuth = qs_session_auth();
 $__myUserId = !empty($__myAuth['valid']) ? (string)($__myAuth['userId'] ?? '') : '';
+
+// Which roles can actually use the builds page, DERIVED from roles.php +
+// categories.php rather than named here.
+//
+// This page lists projects, and the caller's role differs per project — so the
+// panel-wide permission set (getMyPermissions, which answers for the EDITED
+// project only) cannot gate a per-project link. The row already carries
+// `my_role`; this is the other half of the comparison. `getBuild` is the read
+// the page itself is gated on, so a role that holds it is a role that can open
+// the page and see something.
+//
+// Server-derived on purpose: a change to roles.php moves this with it, and no
+// list of role names is written down twice.
+$__buildRoles = [];
+foreach (array_keys(loadRolesConfig()) as $__role) {
+    if (in_array('getBuild', getRoleCommands($__role) ?? [], true)) {
+        $__buildRoles[] = $__role;
+    }
+}
 ?>
 
 <script>
 window.QS_MEMBERSHIPS_CONFIG = {
     myUserId: <?= json_encode($__myUserId) ?>,
-    editedProject: <?= json_encode($router->getCurrentProject()) ?>
+    editedProject: <?= json_encode($router->getCurrentProject()) ?>,
+    buildRoles: <?= json_encode($__buildRoles) ?>,
+    buildsUrl: <?= json_encode($router->url('builds')) ?>
 };
 window.QS_MEMBERSHIPS_I18N = <?= json_encode([
     'loading'            => __admin('common.loading'),
@@ -35,6 +56,8 @@ window.QS_MEMBERSHIPS_I18N = <?= json_encode([
     'ownedChip'          => __admin('memberships.myProjects.ownedChip', 'OWNED'),
     'editingChip'        => __admin('memberships.myProjects.editingChip', 'editing'),
     'editBtn'            => __admin('memberships.myProjects.editBtn', 'Edit this project'),
+    'buildsBtn'          => __admin('memberships.myProjects.buildsBtn', 'Builds'),
+    'buildsTitle'        => __admin('memberships.myProjects.buildsTitle', 'Build, download or delete this project\'s build'),
     'leaveBtn'           => __admin('memberships.myProjects.leaveBtn', 'Leave'),
     'leaveTitle'         => __admin('memberships.myProjects.leaveTitle', 'Leave project'),
     'leaveConfirm'       => __admin('memberships.myProjects.leaveConfirm', 'You are about to leave {project}. You will need a fresh invitation to rejoin.'),

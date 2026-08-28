@@ -123,6 +123,7 @@ File lists are grouped by role. Where useful, the entry point or main exported f
 | `pages/apis.js` | External API registry CRUD + endpoint test UI. |
 | `pages/assets.js` | Asset browser, upload, edit, delete. |
 | `pages/sitemap.js` | Route tree + reachability graph + sitemap controls + resolver authoring. |
+| `pages/builds.js` | Builds page: the project's single build — create, download, delete — plus the space picture and the near-the-limit warning (§9.16). |
 | `pages/embed-security.js` | Iframe sandbox configuration UI. |
 | `pages/optimize.js` | Admin shell for the CSS Refiner library. |
 | `pages/oauth-providers.js` | OAuth provider preset CRUD (§9.5 Tier 4). |
@@ -840,6 +841,7 @@ The AI call is browser-direct via `QSAiCall.call(...)` (see `public/admin/assets
 | **APIs** (`apis.js`) | External API registry — see §9.1. Commands: `listApiEndpoints`, `addApi`, `editApi`, `deleteApi`, `getApiEndpoint`, `testApiEndpoint`. |
 | **Assets** (`assets.js`) | Asset browser + uploader — see §9.15. Commands: `listAssets`, `uploadAsset`, `editAsset`, `deleteAsset`, `editFavicon`. |
 | **Sitemap** (`sitemap.js`) | Route tree, reachability, ordering. |
+| **Builds** (`builds.js`) | The project's single build — create, download, delete, and how much room is left for the next one. See §9.16. Commands: `getBuild`, `build`, `downloadBuild`, `deleteBuild`, `getMySpaceUsage`. |
 | **Embed security** (`embed-security.js`) | Iframe sandbox config: `getIframeSandbox` / `setIframeSandbox` / `removeIframeSandbox`. |
 | **Optimize** (`optimize.js`) | UI for the CSS Refiner library; runs analyzers, presents diffs, applies edits via `editStyles` / `setRootVariables`. |
 
@@ -3003,6 +3005,61 @@ It is only rendered on formats a browser will actually render as an icon — `ic
 Clicking marks the card immediately and then reconciles against the server's answer, restoring the previous choice and reporting the reason if the command refuses. Without that the radio would appear to swallow the click while the request was in flight, since the browser has already moved it by the time the handler runs.
 
 `editFavicon` stores a **pointer** — it writes the asset's path into the project config and copies nothing. Renaming the chosen asset follows the pointer; deleting it clears the pointer. So the grid can never show a favicon that is no longer there, and choosing one does not leave duplicate or backup images cluttering the library.
+
+### 9.16 Builds (/admin/builds)
+
+Where a project becomes a site you can put on a server: build it, download the archive, delete it when you are done.
+
+**A project holds exactly one build.** Not "the newest few" — one. The page therefore shows a single build or none, never a list, and the whole design follows from that.
+
+#### What the page shows
+
+| State | What is on the page |
+|---|---|
+| No build | An explanation of what a build is, and a **Build now** button. |
+| A build | Its name, when it was made, its size, how many files and pages it carries, its languages, and the public / secure folder names and URL space it was built for. |
+| A build that did not finish | The same, marked **incomplete**, with a note saying it carries no manifest and can only be deleted. |
+| A build carrying OAuth client secrets | A warning that the archive is a credential, not just a website. |
+
+#### The second build is refused, and the page says what to do
+
+Building while a build exists does not overwrite it — the command answers 409 and nothing on disk changes. The page states that **before** you press anything: while a build is present it explains that a new one will be refused, and offers download and delete beside the explanation. If the refusal arrives anyway, the panel re-reads the build and shows the same two buttons rather than an error you cannot act on.
+
+The reason it works this way: the build on disk is the only copy. Overwriting one silently would destroy something nobody asked to lose.
+
+#### Deleting offers a download first
+
+The confirmation says two things — that this is the only copy, and that deleting is how you make room for the next build — and puts **Download it first** in the dialog beside Cancel and Delete. Deleting is the normal step in a rebuild, so the moment you are about to lose the archive is exactly the moment to be offered it.
+
+#### The space panel, and the warning
+
+Below the build, the page reports what the project occupies, how much of that is the build, and what is left of the account's storage quota. The figures come from the same measurement the dashboard uses (`getMySpaceUsage`); the page measures nothing of its own.
+
+A build is roughly the size of the project's content, so a project can grow past the point where its own build still fits. The page warns before that happens:
+
+- **What must fit**: the projected build, taken as the project's current content size.
+- **What is available**: the free quota **plus** the bytes the existing build already occupies — at one build per project the old one is deleted before the new one is made, so its space comes back.
+- **When it warns**: once the projected build would take more than **half** of that.
+
+Below the line the panel is silent. With no quota configured there is no ceiling to run into and the page says so instead of inventing a number.
+
+The quota belongs to the project's **owner**. A member who is not the owner sees the build and its size but no quota figure — and is told whose it is, rather than being shown a blank.
+
+#### Who sees what
+
+The page is open to every member of the project: viewing a build needs `getBuild`, which every role holds. Creating, downloading and deleting need the `build` category (developer and up), and those buttons are simply **not rendered** without it — a viewer gets the same information and a line explaining that their role cannot act on it. Non-members do not reach the page at all.
+
+#### Getting there
+
+Three routes, each gated on the same read the page is:
+
+- **Build → Builds** in the sidebar.
+- **Dashboard → Manage Space → Builds → Open builds page**, beside the same build the panel lists.
+- **My memberships**, per project row — this one switches the edited project first, so it works from any project you belong to without visiting the picker.
+
+#### Deploying is elsewhere
+
+This page does not deploy. `deployBuild` copies a build onto a filesystem path, is granted to project admins and owners only, and is refused outright unless the installation's operator has enabled it — see *Self-deploy* in `COMMAND_API.md`.
 
 ## 10. Data attribute reference
 

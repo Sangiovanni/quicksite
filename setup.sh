@@ -22,9 +22,11 @@
 #   4. Environment          — production (default) or development
 #   5. Self-registration    — may visitors create their own accounts?
 #   6. Setup token          — read the first-run credential off disk
+#   7. Storage quotas       — per-account size and upload-rate ceilings
+#   8. Self-deploy          — may this install write a built site onto a path?
 #
-# Items 1-3 rewrite init.php constants and the .htaccess routing. Items 4-5
-# write config files under the secure folder. Item 6 only reads.
+# Items 1-3 rewrite init.php constants and the .htaccess routing. Items 4-5,
+# 7 and 8 write config files under the secure folder. Item 6 only reads.
 #
 # WHAT THIS SCRIPT CANNOT DO: create your account. No account exists yet, so
 # there is nobody to be one. That happens in the browser at /admin/, and the
@@ -230,6 +232,32 @@ selfreg_label() {
         true)  echo -e "${YELLOW}on${NC}   ${DIM}(anyone may create an account at /admin/register)${NC}" ;;
         false) echo -e "off" ;;
         *)     echo -e "off  ${DIM}(default — auth.php not created yet)${NC}" ;;
+    esac
+}
+
+# 'true' | 'false' | '' when deploy.php has not been created yet.
+#
+# The trailing comma in the pattern is load-bearing: first_capture wraps what
+# it is given in .*<pattern>.* and returns the FIRST match in the file, so a
+# pattern that also fits a sentence in the file's own comments would report
+# the documentation instead of the setting. A '^' anchor cannot help — inside
+# that wrapper it is a literal caret.
+#
+# ⚠ ABSENT MEANS DENIED here, the opposite of the quota reader below. deploy.php
+# follows environment.php: an install nobody configured does not write a site
+# onto a filesystem path. So a missing file and 'false' behave identically, and
+# the label says so rather than distinguishing them.
+deploy_current() {
+    first_capture "$(CONFIG_DIR)/deploy.php" \
+        "'allow_deploy'[[:space:]]*=>[[:space:]]*\([a-zA-Z]*\),"
+}
+
+deploy_label() {
+    local v; v="$(deploy_current)"
+    case "$v" in
+        true)  echo -e "${YELLOW}on${NC}   ${DIM}(admins and owners may deploy a build onto this server)${NC}" ;;
+        false) echo -e "off" ;;
+        *)     echo -e "off  ${DIM}(default — deploy.php not created yet)${NC}" ;;
     esac
 }
 
@@ -951,6 +979,95 @@ item_quota() {
 }
 
 # ==========================================================
+# Item 8 — self-deploy
+# ==========================================================
+# ⚠ ABSENT MEANS DENIED, which is the OPPOSITE of item 7 above. quota.php absent
+# means "no limits"; deploy.php absent means "nobody deploys". The two configs
+# look alike and behave in opposite directions, so the reasoning is written down
+# rather than left to be inferred: deploy is the one command that writes outside
+# the project's own storage, and an install nobody configured must not do it.
+# This follows environment.php (absent ⇒ production), not quota.php.
+item_deploy() {
+    local cfg_dir; cfg_dir="$(CONFIG_DIR)"
+    local live="$cfg_dir/deploy.php"
+    local example="$cfg_dir/deploy.php.example"
+
+    echo ""
+    echo -e "${BOLD}Self-deploy${NC}"
+    echo ""
+    echo "  May this installation copy a built site onto a filesystem path?"
+    echo ""
+    echo "  off  nobody deploys. This is the default, and what a shared or"
+    echo "       hosted install wants. Users can still build a site and"
+    echo "       download the archive — they upload it themselves."
+    echo "  on   an admin or owner of a project may deploy its build into"
+    echo "       this install's own root, or into a root you list in"
+    echo "       deploy-roots.php."
+    echo ""
+    echo -e "  Currently: $(deploy_label)"
+    echo ""
+    echo -e "  ${DIM}Turning it on does NOT widen who may deploy: deployBuild is${NC}"
+    echo -e "  ${DIM}granted to admin and owner only, and deploy-roots.php still${NC}"
+    echo -e "  ${DIM}decides where. It only lifts the flat refusal in front of both.${NC}"
+    echo ""
+
+    local ANSWER
+    read -r -p "  Allow deploying from this installation? [y/N]: " ANSWER || true
+
+    local VALUE="false"
+    case "${ANSWER:-}" in
+        [yY]|[yY][eE][sS]) VALUE="true" ;;
+    esac
+
+    if [ ! -d "$cfg_dir" ]; then
+        echo -e "  ${RED}✗ Error: config folder not found:${NC} $cfg_dir"
+        return 0
+    fi
+
+    # Declining when no file exists LEAVES IT ABSENT — absent already means
+    # denied, and writing a file to say so would turn an install that never
+    # opted in into one that opted out, which reads as a decision somebody made.
+    if [ "$VALUE" = "false" ] && [ ! -f "$live" ]; then
+        echo ""
+        echo -e "  ${GREEN}✓${NC} Deploy stays off — deploy.php left absent, which is what a"
+        echo "    fresh install has."
+        return 0
+    fi
+
+    # deploy.php.example is the shipped documentation and is never edited: the
+    # live file is a COPY with the value patched, so every explanatory comment
+    # survives into the file the deployer will actually read later.
+    if [ ! -f "$live" ]; then
+        if [ -f "$example" ]; then
+            cp "$example" "$live"
+        else
+            echo -e "  ${RED}✗ Error: neither deploy.php nor deploy.php.example is present${NC}"
+            echo "    $cfg_dir"
+            return 0
+        fi
+    fi
+
+    # Anchored to start-of-line so the value quoted inside the file's own
+    # comments is left alone.
+    sed -i "s|^\( *\)'allow_deploy'[[:space:]]*=>[[:space:]]*[a-zA-Z]*|\1'allow_deploy' => $VALUE|" "$live"
+
+    if [ "$(deploy_current)" = "$VALUE" ]; then
+        if [ "$VALUE" = "true" ]; then
+            echo -e "  ${GREEN}✓${NC} Self-deploy: ${BOLD}on${NC}"
+            echo -e "  ${YELLOW}⚠ A project admin or owner can now write a built site into${NC}"
+            echo -e "  ${YELLOW}  $SCRIPT_DIR${NC}"
+            echo -e "  ${YELLOW}  and into any root listed in deploy-roots.php.${NC}"
+        else
+            echo -e "  ${GREEN}✓${NC} Self-deploy: ${BOLD}off${NC}"
+        fi
+    else
+        echo -e "  ${RED}✗ Could not set the value automatically.${NC}"
+        echo "    Edit this file by hand and set 'allow_deploy' => $VALUE:"
+        echo "    $live"
+    fi
+}
+
+# ==========================================================
 # The menu
 # ==========================================================
 show_header() {
@@ -968,6 +1085,7 @@ show_menu() {
     echo -e "  Environment:        $(env_label)"
     echo -e "  Self-registration:  $(selfreg_label)"
     echo -e "  Storage quotas:     $(quota_label)"
+    echo -e "  Self-deploy:        $(deploy_label)"
     echo ""
     echo "    1) Rename the public folder"
     echo "    2) Rename the secure folder"
@@ -976,6 +1094,7 @@ show_menu() {
     echo "    5) Turn self-registration on / off"
     echo "    6) Show my setup token"
     echo "    7) Storage quotas (per user)"
+    echo "    8) Allow / forbid deploying from this install"
     echo "    q) Finish"
     echo ""
 }
@@ -1001,6 +1120,7 @@ while true; do
         5) item_selfreg; pause_for_menu ;;
         6) item_token; pause_for_menu ;;
         7) item_quota; pause_for_menu ;;
+        8) item_deploy; pause_for_menu ;;
         q|Q|"") break ;;
         *) echo -e "  ${RED}Unknown choice: $CHOICE${NC}" ;;
     esac
@@ -1021,6 +1141,7 @@ fi
 echo -e "  Environment:        $(env_label)"
 echo -e "  Self-registration:  $(selfreg_label)"
 echo -e "  Storage quotas:     $(quota_label)"
+echo -e "  Self-deploy:        $(deploy_label)"
 echo ""
 
 if [ -n "$OWNERSHIP_WARNING" ]; then

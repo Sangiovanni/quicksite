@@ -180,6 +180,12 @@ if (isset($_GET['denied'])): ?>
                         <span class="manage-space__section-title">
                             <span class="storage-overview__legend-color storage-overview__legend-color--builds"></span>
                             <?= __admin('dashboard.storage.builds', 'Builds') ?>
+                            <!-- The full builds page: make one, download it, and see
+                                 whether the next one will still fit. Gated on the same
+                                 read the page itself is gated on, so a caller who
+                                 cannot open it is not offered the link. -->
+                            <a href="<?= $router->url('builds') ?>" class="manage-space__section-link"
+                               data-requires-command="getBuild"><?= __admin('dashboard.storage.buildsPage', 'Open builds page') ?> &rarr;</a>
                         </span>
                         <span class="manage-space__section-count" id="manage-builds-count">--</span>
                     </div>

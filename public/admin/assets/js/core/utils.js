@@ -146,6 +146,28 @@ window.QuickSiteUtils = (function() {
         return text.substring(0, maxLength - 3) + '...';
     }
 
+    /**
+     * Human-readable byte count — the client-side twin of PHP's qs_format_size.
+     *
+     * The dashboard grew one of these and the builds page needed the same thing,
+     * so it lives here instead of being copied a third time. dashboard.js
+     * delegates to it and produces byte-identical output.
+     *
+     * NOTE: assets.js still carries its OWN copy with different rules (one
+     * decimal, an em dash for zero, no GB tier). Folding it in would change what
+     * that page prints, so it is left alone deliberately rather than quietly
+     * unified.
+     *
+     * @param {number} bytes
+     * @returns {string}
+     */
+    function formatSize(bytes) {
+        if (bytes < 1024) return bytes + ' B';
+        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
+        if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+        return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+    }
+
     // ============================================
     // Toast Notifications
     // ============================================
@@ -536,6 +558,7 @@ window.QuickSiteUtils = (function() {
         escapeAttr,
         formatJson,
         truncate,
+        formatSize,
         
         // Toast Notifications
         showToast,

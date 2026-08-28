@@ -1115,6 +1115,14 @@ $manifest = [
     'default_language' => CONFIG['LANGUAGE_DEFAULT'],
     'compiled_pages' => $compiledPages,
     'pages_count' => count($compiledPages),
+    // Recorded here, not only in the build response, because it changes what the
+    // deliverable IS — a build carrying OAuth client secrets is a credential,
+    // not just a website — and the moment that matters most is the DOWNLOAD,
+    // which happens long after this response is gone. getBuild merges the
+    // manifest, so the builds page can warn before the archive leaves the
+    // server. A build made before this key existed simply has no flag and is
+    // reported as an ordinary build, which is what it was.
+    'oauth_secrets_included' => $buildCarriesOAuthSecrets,
     'source' => [
         'public_folder' => PUBLIC_FOLDER_NAME,
         'secure_folder' => SECURE_FOLDER_NAME,

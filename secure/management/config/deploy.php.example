@@ -1,0 +1,52 @@
+<?php
+/**
+ * Self-deploy switch  (beta.11)
+ *
+ * Copy this file to deploy.php and set allow_deploy to true (the line at the
+ * bottom) to let this installation deploy a build onto the server it is
+ * running on.
+ *
+ * ⚠ IF THIS FILE IS ABSENT, DEPLOY IS REFUSED. That is deliberate. An install
+ * nobody configured is an install that does not write outside its own project
+ * storage. Every other failure path leads to the same answer: unreadable,
+ * a syntax error, a file that is not PHP, a wrong shape, a missing key, or any
+ * value that is not boolean `true`. Only a well-formed file saying exactly
+ * `true` opens the gate, and a broken file is reported to the PHP error log
+ * rather than taking the request down.
+ *
+ * WHAT IT GOVERNS
+ *   The `deployBuild` command, and nothing else. Building, downloading and
+ *   deleting a build are unaffected — a user of an install with deploy off can
+ *   still produce the archive and upload it wherever they like by hand. What
+ *   this closes is QuickSite writing the site onto a filesystem path itself.
+ *
+ * WHY IT EXISTS
+ *   `deployBuild` copies a build — which contains generated PHP — into the
+ *   install's own root, or into a root listed in deploy-roots.php. It asks for
+ *   no credentials: the install writes to itself. On a shared or hosted
+ *   QuickSite that is a capability the person who set the server up may not
+ *   want to hand to the people who use it.
+ *
+ * THREE INDEPENDENT GATES, and none substitutes for another:
+ *
+ *   1. THIS FILE   — may anyone deploy at all?      Absent ⇒ no.
+ *   2. roles.php   — may THIS caller deploy?        `deployBuild` is alone in
+ *                    the `deploy` category, granted to admin and owner.
+ *   3. deploy-roots.php — WHERE may a permitted deploy write? Absent ⇒ the
+ *                    install root (SERVER_ROOT) only.
+ *
+ *   Turning this on does NOT widen the role gate, and it does NOT widen the
+ *   target allowlist. It only stops the flat refusal that comes before both.
+ *
+ * BEFORE YOU TURN IT ON
+ *   A deploy into the install's own root puts the built site's pages in the
+ *   same URL space as QuickSite's own /admin, /management and /p namespaces.
+ *   `deployBuild` checks for that collision at deploy time and refuses when a
+ *   route would be shadowed, so you are told rather than left to discover it —
+ *   but it is worth knowing that the two share a namespace before you choose
+ *   that layout.
+ */
+
+return [
+    'allow_deploy' => false,
+];

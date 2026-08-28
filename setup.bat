@@ -21,9 +21,11 @@ REM   3. URL space            - serve from a subdirectory (http://domain/web/)
 REM   4. Environment          - production (default) or development
 REM   5. Self-registration    - may visitors create their own accounts?
 REM   6. Setup token          - read the first-run credential off disk
+REM   7. Storage quotas       - per-account size and upload-rate ceilings
+REM   8. Self-deploy          - may this install write a built site onto a path?
 REM
-REM Items 1-3 rewrite init.php constants and the .htaccess routing. Items 4-5
-REM write config files under the secure folder. Item 6 only reads.
+REM Items 1-3 rewrite init.php constants and the .htaccess routing. Items 4-5,
+REM 7 and 8 write config files under the secure folder. Item 6 only reads.
 REM
 REM WHAT THIS SCRIPT CANNOT DO: create your account. No account exists yet, so
 REM there is nobody to be one. That happens in the browser at /admin/, and the
@@ -102,6 +104,7 @@ echo   URL space:          !SPACE_LABEL!
 echo   Environment:        !ENV_LABEL!
 echo   Self-registration:  !SELFREG_LABEL!
 echo   Storage quotas:     !QUOTA_LABEL!
+echo   Self-deploy:        !DEPLOY_LABEL!
 echo.
 echo     1^) Rename the public folder
 echo     2^) Rename the secure folder
@@ -110,6 +113,7 @@ echo     4^) Switch environment (development / production)
 echo     5^) Turn self-registration on / off
 echo     6^) Show my setup token
 echo     7^) Storage quotas (per user)
+echo     8^) Allow / forbid deploying from this install
 echo     q^) Finish
 echo.
 set "CHOICE="
@@ -122,6 +126,7 @@ if "!CHOICE!"=="4" goto :go_env
 if "!CHOICE!"=="5" goto :go_selfreg
 if "!CHOICE!"=="6" goto :go_token
 if "!CHOICE!"=="7" goto :go_quota
+if "!CHOICE!"=="8" goto :go_deploy
 if /i "!CHOICE!"=="q" goto :finish
 if "!CHOICE!"=="" goto :finish
 echo   Unknown choice: !CHOICE!
@@ -166,6 +171,11 @@ call :item_quota
 call :pause_menu
 goto :menu
 
+:go_deploy
+call :item_deploy
+call :pause_menu
+goto :menu
+
 REM ==========================================================
 REM Finish
 REM ==========================================================
@@ -182,6 +192,8 @@ echo   Secure folder:      !SECURE_FOLDER_NAME!
 echo   URL space:          !SPACE_LABEL!
 echo   Environment:        !ENV_LABEL!
 echo   Self-registration:  !SELFREG_LABEL!
+echo   Storage quotas:     !QUOTA_LABEL!
+echo   Self-deploy:        !DEPLOY_LABEL!
 echo.
 echo   Next steps:
 echo     1. Point your vhost DocumentRoot at the public folder
@@ -351,6 +363,17 @@ if exist "!AUTH_FILE!" (
     set "SELFREG_LABEL=off  (value unreadable - check auth.php)"
     findstr /c:"'allow_self_registration' => false" "!AUTH_FILE!" >nul 2>&1 && set "SELFREG_LABEL=off"
     findstr /c:"'allow_self_registration' => true" "!AUTH_FILE!" >nul 2>&1 && set "SELFREG_LABEL=on   (anyone may create an account at /admin/register)"
+)
+
+REM ABSENT MEANS DENIED here, the opposite of the quota reader above. deploy.php
+REM follows environment.php: an install nobody configured does not write a site
+REM onto a filesystem path. A missing file and 'false' behave identically.
+set "DEPLOY_FILE=!CONFIG_DIR!\deploy.php"
+set "DEPLOY_LABEL=off  (default - deploy.php not created yet)"
+if exist "!DEPLOY_FILE!" (
+    set "DEPLOY_LABEL=off  (value unreadable - check deploy.php)"
+    findstr /c:"    'allow_deploy' => false," "!DEPLOY_FILE!" >nul 2>&1 && set "DEPLOY_LABEL=off"
+    findstr /c:"    'allow_deploy' => true," "!DEPLOY_FILE!" >nul 2>&1 && set "DEPLOY_LABEL=on   (admins and owners may deploy a build onto this server)"
 )
 goto :eof
 
@@ -792,7 +815,7 @@ if errorlevel 1 (
     goto :eof
 )
 echo   + Environment: !ENV_VALUE!
-if /i "!ENV_VALUE!"=="development" echo   ! Do not run a publicly reachable install this way.
+if /i "!ENV_VALUE!"=="development" echo   ^^! Do not run a publicly reachable install this way.
 echo.
 echo   This is a server-side file, on purpose: there is no API that changes
 echo   it, so a leaked credential cannot switch the install into development
@@ -863,9 +886,101 @@ if errorlevel 1 (
 )
 if /i "!REG_VALUE!"=="true" (
     echo   + Self-registration: on
-    echo   ! /admin/register is now open to anyone who can reach it.
+    echo   ^^! /admin/register is now open to anyone who can reach it.
 ) else (
     echo   + Self-registration: off
+)
+goto :eof
+
+REM ==========================================================
+REM Item 8 - self-deploy
+REM ==========================================================
+REM ABSENT MEANS DENIED, which is the OPPOSITE of item 7. quota.php absent means
+REM "no limits"; deploy.php absent means "nobody deploys". The two configs look
+REM alike and behave in opposite directions, so the reasoning is written down
+REM rather than left to be inferred: deploy is the one command that writes
+REM outside the project's own storage, and an install nobody configured must not
+REM do it. This follows environment.php (absent = production), not quota.php.
+:item_deploy
+call :read_state
+echo.
+echo Self-deploy
+echo.
+echo   May this installation copy a built site onto a filesystem path?
+echo.
+echo   off  nobody deploys. This is the default, and what a shared or
+echo        hosted install wants. Users can still build a site and
+echo        download the archive - they upload it themselves.
+echo   on   an admin or owner of a project may deploy its build into
+echo        this install's own root, or into a root you list in
+echo        deploy-roots.php.
+echo.
+echo   Currently: !DEPLOY_LABEL!
+echo.
+echo   Turning it on does NOT widen who may deploy: deployBuild is granted
+echo   to admin and owner only, and deploy-roots.php still decides where.
+echo   It only lifts the flat refusal in front of both.
+echo.
+
+set "ANSWER="
+set /p "ANSWER=  Allow deploying from this installation? [y/N]: "
+
+set "DEP_VALUE=false"
+if /i "!ANSWER!"=="y" set "DEP_VALUE=true"
+if /i "!ANSWER!"=="yes" set "DEP_VALUE=true"
+
+if not exist "!CONFIG_DIR!" (
+    echo   X Error: config folder not found: !CONFIG_DIR!
+    goto :eof
+)
+
+REM Declining when no file exists LEAVES IT ABSENT - absent already means
+REM denied, and writing a file to say so would turn an install that never opted
+REM in into one that opted out, which reads as a decision somebody made.
+if /i "!DEP_VALUE!"=="false" (
+    if not exist "!DEPLOY_FILE!" (
+        echo.
+        echo   + Deploy stays off - deploy.php left absent, which is what a
+        echo     fresh install has.
+        goto :eof
+    )
+)
+
+REM deploy.php.example is the shipped documentation and is never edited: the
+REM live file is a COPY with the value patched, so every explanatory comment
+REM survives into the file the deployer will actually read later.
+if not exist "!DEPLOY_FILE!" (
+    if not exist "!CONFIG_DIR!\deploy.php.example" (
+        echo   X Error: neither deploy.php nor deploy.php.example is present
+        echo     !CONFIG_DIR!
+        goto :eof
+    )
+    copy /y "!CONFIG_DIR!\deploy.php.example" "!DEPLOY_FILE!" >nul
+)
+
+set "PS_DEP_TEMP=%TEMP%\qs_setup_deploy.ps1"
+echo $f = '!DEPLOY_FILE!' > "%PS_DEP_TEMP%"
+echo $v = '!DEP_VALUE!' >> "%PS_DEP_TEMP%"
+echo $c = Get-Content $f -Raw >> "%PS_DEP_TEMP%"
+echo $c = $c -replace "'allow_deploy'\s*=>\s*\w+", ("'allow_deploy' => " + $v) >> "%PS_DEP_TEMP%"
+echo [IO.File]::WriteAllText($f, $c, (New-Object System.Text.UTF8Encoding $false)) >> "%PS_DEP_TEMP%"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%PS_DEP_TEMP%" <nul >nul 2>&1
+del "%PS_DEP_TEMP%" 2>nul
+
+findstr /c:"    'allow_deploy' => !DEP_VALUE!," "!DEPLOY_FILE!" >nul 2>&1
+if errorlevel 1 (
+    echo   X Could not set the value automatically.
+    echo     Edit this file by hand and set 'allow_deploy' =^> !DEP_VALUE!:
+    echo     !DEPLOY_FILE!
+    goto :eof
+)
+if /i "!DEP_VALUE!"=="true" (
+    echo   + Self-deploy: on
+    echo   ^^! A project admin or owner can now write a built site into
+    echo     !SCRIPT_DIR!
+    echo     and into any root listed in deploy-roots.php.
+) else (
+    echo   + Self-deploy: off
 )
 goto :eof
 

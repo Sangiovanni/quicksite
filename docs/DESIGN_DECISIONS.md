@@ -9911,3 +9911,103 @@ quietly stops covering the case it was added for).
 
 **Source**: `secure/src/functions/contentSecurityPolicy.php`,
 `secure/src/runtime/site/index.php`.
+
+### Deploying is off until an operator turns it on — absent config means denied (locked 2026-08-28)
+
+**Decision**: `deployBuild` is refused outright unless
+`secure/management/config/deploy.php` exists and says `allow_deploy => true`.
+An absent file, an unreadable one, a syntax error, a non-PHP file, a wrong
+return type, a missing key, and any truthy-but-not-`true` value all deny.
+`setup.sh` / `setup.bat` offer it as a menu item.
+
+**Reasoning**: `deployBuild` copies generated PHP onto a filesystem path and
+needs no credentials to do it — the installation writes to itself. That is the
+one command whose reach ends outside the project's own storage, and on a shared
+or hosted QuickSite it is a capability the person who set the server up may not
+want the people using it to have. There was no way to say no.
+
+The default had to be denial, and which existing config it should imitate was
+the whole question. `quota.php` absent means *no limits*, because a fresh
+install must not start refusing uploads. `environment.php` absent means
+*production*, because the unconfigured state is the cautious one. Deploy is the
+second shape: an install nobody configured is an install that should not be
+writing a site onto a path. Following `quota.php` here would have meant every
+QuickSite deploys by default, which is the outcome the switch exists to prevent.
+
+This is a **behaviour change** — before it, `deployBuild` worked on an install
+with no configuration at all. beta.11 carries no backward-compatibility
+obligation, and the change is in the safe direction: an install that wants the
+old behaviour opts into it in one line.
+
+The switch governs *whether*, and nothing else. It does not widen who may deploy
+(`deployBuild` is alone in the `deploy` category, granted to project admins and
+owners) and it does not widen where (`deploy-roots.php`, absent ⇒ the install
+root only). Three gates, each answering its own question; the probe proves they
+are independent by turning the switch on and watching the role gate still refuse.
+
+**Alternatives considered**: adding a key to `deploy-roots.php` (rejected — that
+file returns a list of paths, so a keyed entry changes its shape for every
+existing install, and its absence already means something else); defaulting to
+allowed with an opt-out (rejected — it is the `quota.php` shape applied to the
+one command that writes outside project storage, and an operator who never
+reads the docs gets the permissive answer); a runtime API setting (rejected for
+the reason `environment.php` states about itself — a leaked or low-trust token
+must not be able to flip it); reusing `environment.php`'s development flag
+(rejected — deploying is not a development activity, and a production install is
+exactly where deploying is wanted).
+
+**Source**: `secure/src/functions/deployPolicy.php`,
+`secure/management/config/deploy.php.example`,
+`secure/management/command/deployBuild.php`, `setup.sh`, `setup.bat`.
+
+### Route collisions are checked at deploy time, not forbidden at route creation (locked 2026-08-28)
+
+**Decision**: `deployBuild` refuses with `409 conflict.route_collision` when a
+route in the build is shadowed by a directory that already exists beside where
+the site's entry point will land, naming each collision and the directory
+responsible. `acceptRouteCollisions: true` deploys anyway and reports what was
+shadowed. `addRoute` reserves no names.
+
+**Reasoning**: the default deploy target is the installation's own web root,
+where QuickSite already serves `/admin`, `/management` and `/p`. A site's entry
+point funnels requests through a fallback that only applies when the URL is not
+a real file or directory, so a directory of the same name shadows a route
+permanently and silently — the page simply never answers.
+
+The obvious fix is to forbid those names when a route is created. It was
+considered and rejected. Those names collide in exactly **one** of three
+deployment shapes: a project served at `/p/<id>/` prefixes everything and has no
+conflict, a build on its own domain has no panel present at all, and only a
+deploy into the install root shares a namespace. Blocking the names everywhere
+constrains every author for a layout most will never use, gives them a rule with
+no visible cause, and would have to be threaded through route creation, editing
+and import to actually hold.
+
+Deploy time is where the question is answerable: the target layout is known, the
+collision is real rather than hypothetical, and the person deciding is the
+deployer rather than a content author.
+
+The check reads the **target directory**, not a list of names. That is what makes
+it correct for a target QuickSite has never seen — a deployer's own folder
+shadows a route exactly as `/admin` does — and what makes it silent about a
+target that carries nothing to collide with.
+
+The override exists because the deployer is the right decider, and some of them
+genuinely will not care about one unreachable page; refusing forever would force
+a rename in the project for a constraint that belongs to one deployment. It
+follows the `overwrite` flag the same command already carries for file
+conflicts, and the success response names what was shadowed rather than going
+quiet once permission was given.
+
+**Alternatives considered**: blacklisting `admin` / `management` / `p` in
+`addRoute` (rejected, above — Sangio and the manager reached this independently);
+warning instead of refusing (rejected — a warning in a response body is read by
+nobody, and the failure it describes is silent and permanent); refusing with no
+override (rejected — it makes a project undeployable to the install root over a
+page its author may not want, and the constraint belongs to the deployment, not
+the project); comparing against a hardcoded list of QuickSite's namespaces
+(rejected — it is wrong for every other target, and would miss a deployer's own
+directories at the install root just as surely).
+
+**Source**: `secure/management/command/deployBuild.php`, ruling by Sangio
+2026-08-16.

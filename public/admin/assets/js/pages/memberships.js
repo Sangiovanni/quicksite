@@ -23,6 +23,7 @@
     var ICON_X = 'M18 6L6 18M6 6l12 12';
     var ICON_EDIT = 'M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z';
     var ICON_OUT = 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9';
+    var ICON_BUILD = 'M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z';
 
     function api(cmd, method, body) {
         var admin = window.QuickSiteAdmin;
@@ -157,6 +158,15 @@
                 onEditProject(p.name, this);
             }));
         }
+        // Per-project route to the builds page. Gated on THIS project's role
+        // against the server-derived set of roles that hold getBuild — the
+        // panel-wide permission set answers for the EDITED project only, so it
+        // would gate every row by the wrong project's role.
+        if ((CFG.buildRoles || []).indexOf(p.my_role) !== -1) {
+            actions.push(_renderActionBtn(T.buildsBtn || 'Builds', ICON_BUILD, 'ghost', function () {
+                onOpenBuilds(p.name, isEditing, this);
+            }));
+        }
         if (!isOwned) {
             actions.push(_renderActionBtn(T.leaveBtn || 'Leave', ICON_OUT, 'danger', function () {
                 onLeaveProject(p.name);
@@ -182,6 +192,32 @@
                 // Cache-busted navigation (not reload()) — same bfcache-safe
                 // pattern as the header picker and the dashboard switch.
                 window.location.href = window.location.pathname + '?t=' + Date.now();
+            } else {
+                if (btn) btn.disabled = false;
+                toast(serverMessage(res), 'error');
+            }
+        });
+    }
+
+    /**
+     * Open the builds page FOR THIS ROW'S PROJECT.
+     *
+     * The builds page acts on the edited project, so a row that is not the
+     * edited one has to switch first — same setSelectedProject the Edit button
+     * uses. Switching only to land on a page the user did not ask for would be
+     * a surprise, which is why the navigation goes straight to builds rather
+     * than reloading this page.
+     */
+    function onOpenBuilds(project, isEditing, btn) {
+        var url = CFG.buildsUrl || 'builds';
+        if (isEditing) {
+            window.location.href = url;
+            return;
+        }
+        if (btn) btn.disabled = true;
+        api('setSelectedProject', 'POST', { project: project }).then(function (res) {
+            if (res && res.ok) {
+                window.location.href = url;
             } else {
                 if (btn) btn.disabled = false;
                 toast(serverMessage(res), 'error');

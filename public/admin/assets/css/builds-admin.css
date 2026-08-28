@@ -1,0 +1,133 @@
+/**
+ * Builds page (beta.11 S3.8).
+ *
+ * Leans on admin.css primitives (admin-card, admin-btn, admin-alert,
+ * admin-modal, admin-hint); only the few pieces the page invents live here.
+ * Every colour comes from an existing custom property — no new palette.
+ */
+
+/* The project the page is acting on, beside the section title. The build is
+   per-project and the panel edits one project at a time, so naming it is not
+   decoration: it is what stops a delete landing on the wrong site. */
+.builds-project-chip {
+    display: inline-block;
+    margin-left: var(--space-sm);
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+    background: var(--admin-accent-muted);
+    color: var(--admin-accent-hover);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    vertical-align: middle;
+}
+
+.builds-head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    margin-bottom: var(--space-md);
+}
+
+.builds-name {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: var(--font-size-base);
+    color: var(--admin-text);
+    overflow-wrap: anywhere;
+}
+
+.builds-badge {
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.builds-badge--incomplete {
+    background: var(--admin-warning-bg);
+    color: var(--admin-warning);
+}
+
+/* Auto-fit rather than a fixed column count: the facts list is short on a build
+   with no space or languages and longer on a multilingual one, and a fixed grid
+   would leave a hole in the first case. */
+.builds-facts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--space-sm) var(--space-lg);
+    margin-bottom: var(--space-lg);
+}
+
+.builds-field {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.builds-field__label {
+    font-size: var(--font-size-xs);
+    color: var(--admin-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.builds-field__value {
+    font-size: var(--font-size-sm);
+    color: var(--admin-text);
+    overflow-wrap: anywhere;
+}
+
+.builds-empty__title {
+    font-size: var(--font-size-base);
+    color: var(--admin-text);
+    margin-bottom: var(--space-sm);
+}
+
+.builds-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-sm);
+    margin-top: var(--space-md);
+}
+
+/* An alert with a heading stacks; admin-alert's base rule does not lay out its
+   children, so the two parts need saying explicitly. */
+.builds-alert__title {
+    display: block;
+    margin-bottom: 4px;
+}
+
+.builds-alert__body {
+    margin: 0;
+}
+
+/* The base .admin-modal__content is 90% wide with no ceiling, which is right for
+   the editor's big panels and far too wide for a confirmation. */
+.admin-modal--builds .admin-modal__content {
+    max-width: 520px;
+}
+
+.builds-modal__name {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: var(--font-size-sm);
+    color: var(--admin-text-muted);
+    overflow-wrap: anywhere;
+    margin-top: var(--space-sm);
+}
+
+/* The dashboard's manage-space panel links here. Lives in this file rather than
+   admin.css because it exists only to reach the builds page. */
+.manage-space__section-link {
+    margin-left: var(--space-sm);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-normal);
+    color: var(--admin-accent-hover);
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.manage-space__section-link:hover {
+    text-decoration: underline;
+}
