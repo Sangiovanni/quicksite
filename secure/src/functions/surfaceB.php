@@ -300,7 +300,9 @@ function qs_surface_b_finish(): void {
         qs_regenerate_project_scripts($projectDir, $id);
     }
 
-    qs_surface_b_send_headers();
+    // The project dir, explicitly: PROJECT_PATH is not bound yet at this point
+    // in the request, and connect-src is derived from THIS project's registry.
+    qs_surface_b_send_headers($projectDir);
 
     // Rewrite REQUEST_URI so TrimParameters + the whole pipeline see a clean path
     // (the optional-space + p + id marker stripped; sub-route + query preserved).
@@ -652,18 +654,42 @@ function qs_sb_emit_range(string $file, int $start, int $length): void {
     fclose($fh);
 }
 
-/** Emit surface-B response security headers for the HTML render. */
-function qs_surface_b_send_headers(): void {
-    // Same-origin framing only (the admin preview iframe is same-origin). Cross-origin
-    // shared embedding is a later concern. init.php already sends X-Frame-Options.
-    // A baseline CSP tighter than the admin's own chrome: engine pages use inline
-    // scripts (theme toggle, state-store hydration) so 'unsafe-inline' is required for
-    // now; object/base are locked down and framing is restricted to same origin.
+/**
+ * Emit surface-B response security headers for the HTML render.
+ *
+ * Same-origin framing only (the admin preview iframe is same-origin). Cross-origin
+ * shared embedding is a later concern. init.php already sends X-Frame-Options.
+ * A baseline CSP tighter than the admin's own chrome: engine pages use inline
+ * scripts (theme toggle, state-store hydration) so 'unsafe-inline' is required for
+ * now; object/base are locked down and framing is restricted to same origin.
+ *
+ * ⚠ `connect-src` IS DERIVED, not fixed. It was `'self'` alone, which blocked
+ * every browser-side call to a registered external API — the entire client half
+ * of the API registry, unusable on the surface an author develops on, while the
+ * same page worked once built because a built site sends no CSP at all. Blocked
+ * in development and open in production is the worst way round.
+ *
+ * The registry already names every origin the author registered, so the policy
+ * is derived from it rather than configured separately: registering an API IS
+ * the act of declaring that this site talks to it. Server-only APIs are excluded
+ * — the browser never calls them — by the same filter that keeps them out of the
+ * compiled client config. See qs_api_client_origins().
+ *
+ * @param string|null $projectPath The project being served; defaults to PROJECT_PATH.
+ */
+function qs_surface_b_send_headers(?string $projectPath = null): void {
+    require_once SECURE_FOLDER_PATH . '/src/functions/apiRegistry.php';
+
+    $connect = "'self'";
+    foreach (qs_api_client_origins($projectPath) as $origin) {
+        $connect .= ' ' . $origin;
+    }
+
     if (!headers_sent()) {
         header("Content-Security-Policy: default-src 'self'; "
             . "script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
             . "img-src 'self' data:; font-src 'self' data:; "
-            . "connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'");
+            . "connect-src " . $connect . "; object-src 'none'; base-uri 'self'; frame-ancestors 'self'");
     }
 }
 

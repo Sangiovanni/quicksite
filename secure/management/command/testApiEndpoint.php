@@ -75,22 +75,22 @@ function __command_testApiEndpoint(array $params = [], array $urlParams = []): A
     }
     
     // Build URL — substitute :placeholders from pathParams first.
-    // Any :name not provided is left literal in the URL so the user
-    // sees what's missing in the response.
-    $url = $endpoint['fullUrl'];
-    if (preg_match('/:[a-zA-Z][a-zA-Z0-9_]*/', $url)) {
-        $url = preg_replace_callback(
-            '/:([a-zA-Z][a-zA-Z0-9_]*)/',
-            function ($m) use ($pathParams) {
-                $name = $m[1];
-                if (array_key_exists($name, $pathParams) && $pathParams[$name] !== '' && $pathParams[$name] !== null) {
-                    return rawurlencode((string)$pathParams[$name]);
-                }
-                return $m[0]; // leave literal so test surfaces the omission
-            },
-            $url
-        );
-    }
+    //
+    // Shared with QS.fetch and the server-side resolver through
+    // qs_api_substitute_path(): an omitted OPTIONAL placeholder is removed
+    // (with its label, for the key/value path-pair convention) so the request
+    // is valid, while a REQUIRED one is left literal here on purpose — this is
+    // a test panel, and seeing `:nameContains` in the URL it reports is how the
+    // omission surfaces. The names are reported alongside, so the response says
+    // it rather than only showing it.
+    require_once SECURE_FOLDER_PATH . '/src/functions/apiRegistry.php';
+    $substitution = qs_api_substitute_path(
+        (string) ($endpoint['path'] ?? ''),
+        is_array($pathParams) ? $pathParams : [],
+        $endpoint['parameters'] ?? []
+    );
+    $url = rtrim((string) ($endpoint['baseUrl'] ?? ''), '/') . $substitution['path'];
+    $missingRequiredPathParams = $substitution['missingRequired'];
 
     // Add query params for GET requests
     if (!empty($queryParams)) {

@@ -887,13 +887,41 @@ Validation rules (`ApiEndpointManager::validateEndpoint`):
 - Parameter names start with a letter, then letters, digits or underscores; no duplicates.
 - Unknown types or shapes are rejected with a clear message.
 
-Missing **required** parameters at runtime → `QS.fetch` rejects
-with a toast. Missing **optional** parameters leave the `:name`
-literal in the URL (so the user can see what's empty in the test
-panel and in dev tools).
+**What an omitted parameter leaves behind**
+
+A missing **required** parameter rejects at runtime, with a toast naming it.
+The test panel is the exception on purpose: it leaves `:name` in the URL it
+reports, because seeing it there is how the omission surfaces in a panel whose
+job is to show you the request.
+
+A missing **optional** parameter is *removed*, so the request stays valid:
+
+| Path | Omitted | Request |
+|---|---|---|
+| `/listFile.php/nameContains/:nameContains` | `nameContains` | `/listFile.php` |
+| `/users/:id` | `id` | `/users` |
+| `/users/:id/posts` | `id` | `/users/posts` |
+| `/files/file-:id.json` | `id` | unchanged — see below |
+
+The rule: the placeholder's segment is dropped, and the segment before it goes
+too when it is a literal equal to the parameter's name. That second half is the
+key/value path-pair convention (`/endpoint.php/key1/value1/key2/value2`) —
+dropping only the value would leave a dangling `/nameContains/`, which most APIs
+read as "this filter, empty" rather than "no filter". It fires only on a name
+match, so an unrelated literal like `users` is never removed. A placeholder that
+is only *part* of a segment is left alone, because removing half a segment has no
+defensible meaning.
+
+One rule, three implementations that must agree: `qs_api_substitute_path()` in
+`secure/src/functions/apiRegistry.php` (the test panel and the server-side
+resolver) and `substitutePath()` in `secure/src/runtime/qs.js` (the browser).
+
+Direct-URL mode is deliberately excluded: `QS.fetch('GET', 'https://…')` has no
+`parameters` list to say what is optional, and the author typed that URL by hand,
+so a colon in it is far more likely to be theirs.
 
 Non-placeholder `opts` keys (anything not in
-`{body, onSuccess, onError, silent, _auth, _endpoint}`) get appended
+`{body, onSuccess, onError, silent, _auth, _endpoint, _baseUrl}`) get appended
 as query-string parameters. Example:
 `QS.fetch('@my-api/users', 'page=2', 'sort=name')` →
 `GET <baseUrl>/users?page=2&sort=name`.
@@ -976,6 +1004,20 @@ table + data-bind coverage warning + empty-text input.
 | FieldMap table | One row per target var. Target vars = union of `{{placeholder}}` keys + `__enums__` short keys in the component template. "From" column auto-defaults to name-match against the array's `items.properties`; user can override. "Enum" column shows a checkbox for vars declared in `__enums__`, pre-checked with the fully-qualified `<componentName>.<shortKey>` name. |
 | Warning banner | Yellow banner when one or more fieldMap target vars are missing a `data-bind="<var>"` attribute on the component template. The `{{<var>}}` placeholders are server-resolved once at hidden-template render time; the runtime needs `data-bind` to know which DOM nodes to update on each cloned item. |
 | Empty-text input | Optional. Rendered as a `<p class="qs-list-empty">` in the container when the API returns an empty array. |
+
+**When the picker cannot offer a binding, it says so**
+
+Three conditions used to produce nothing at all — no rows, no radios, no
+message — which reads as a broken panel rather than a missing prerequisite:
+
+| Condition | What you see |
+|---|---|
+| The endpoint declares no `responseSchema` | The Response Mapping section still appears, carrying the reason and where to fix it (`/admin/apis` → the endpoint → Response schema). The Add Mapping button is hidden — every field the picker offers comes from the schema, so there is nothing to choose. |
+| The selected field is not declared `array` | A note under the row naming the type it *is* declared as. List / Component per item / Count need an `array`. |
+| The fetch runs in direct-URL mode | `QS.fetch('GET', 'https://…')` carries no endpoint, so bindings never run. When the URL matches a registered endpoint that has bindings, the console says which one and how to call it (`QS.fetch('@api/endpoint')`). An unrelated direct URL stays quiet. |
+
+The schema is hand-authored — there is no inference from a test call, so the
+field list is exactly what you declared.
 
 **Persisted shape**
 
@@ -1090,7 +1132,22 @@ array, the render-mode radio shows three options: `data-bind template`,
 - **Sentence pickers** (when Format is Translated sentence): three
   textKey pickers labelled Zero / One / Many. Uses the same shared
   `QSComplexWizard.createTextKeyPicker` primitive — searchable, with
-  inline "Create" form.
+  inline "Create" form. They start **empty**: the keys are the author's own,
+  and a pre-filled key that resolves in no project renders
+  `{translation missing: …}` on the visitor's page.
+- **Save-time check** — `editApi` answers with `countKeyWarnings`, one entry
+  per sentence key that does not resolve, naming the key, where it is used,
+  and which languages lack it. The picker raises it as a toast, grouped by
+  language. It is a warning and never a refusal: authoring the binding before
+  the key is a normal order to work in, and a key present in `en` but
+  forgotten in `fr` is the miss worth catching.
+
+  ⚠ Expect it on a freshly created key. The create form writes the value you
+  type into the language you are editing and an **empty string** into every
+  other, and an empty translation is treated as untranslated everywhere in the
+  engine — so a new key is genuinely unresolved in every other language, and
+  `/fr/` really would render `{translation missing: …}`. The warning names what
+  is left to type rather than reporting a fault.
 - **Fallback** — number used when the field resolves to null, missing,
   or a falsy non-array (0 / "" / false). Defaults to 0.
 
@@ -1099,9 +1156,15 @@ array, the render-mode radio shows three options: `data-bind template`,
 | Value type | Count |
 |---|---|
 | Array | `value.length` |
+| Finite number | the number itself, **`0` included** |
 | null / undefined | fallback |
-| 0 / "" / false | fallback |
-| any other truthy (object, non-zero number, non-empty string, true) | 1 |
+| `""` / `false` | fallback |
+| `NaN` / `Infinity` | fallback |
+| any other truthy (object, non-empty string, `true`) | 1 |
+
+A number is already a count, so binding an endpoint's `total: 97` writes
+**97**. `fallback` means the value is missing or is not a count at all — a
+genuine `0` reaches the zero branch and renders "No products".
 
 **Persisted shape** (in `secure/projects/<p>/data/api-endpoints.json`)
 
@@ -1131,16 +1194,15 @@ Translated-sentence form — stores **keys**, not the resolved strings:
 }
 ```
 
-**Compile-time translation**
+**Where the sentences come from**
 
-`ApiEndpointManager::transformBindingsForCompile()` is called when
-writing `qs-api-config.js`. For each count-sentence binding, it
-resolves `zeroKey` / `oneKey` / `manyKey` to translated strings via
-`Translator::translate(...)` and emits them as `zeroStr` / `oneStr` /
-`manyStr` in the compiled JS. The runtime receives **resolved
-strings**, not keys — PHP stays the only translation engine.
+The binding is split between the two artifacts along one line: whatever is
+language-**independent** travels in the compiled config, whatever is
+language-**dependent** rides the page.
 
-What the runtime sees in `qs-api-config.js`:
+`qs-api-config.js` carries the keys, verbatim — it is written once per
+project, so any string resolved into it would be served to visitors of every
+language.
 
 ```js
 {
@@ -1149,18 +1211,32 @@ What the runtime sees in `qs-api-config.js`:
   selector:   "#cmd-counter",
   fallback:   0,
   format:     "sentence",
-  zeroStr:    "No commands",
-  oneStr:     "1 command",
-  manyStr:    "{n} commands"
+  zeroKey:    "home.commandsZero",
+  oneKey:     "home.commandsOne",
+  manyKey:    "home.commandsMany"
 }
 ```
 
-**Multi-language limitation**
+The page carries the sentences, resolved for its own language and emitted by
+the runtime handoff as one more `window.QS_*` block:
 
-`qs-api-config.js` is project-scoped, not per-language. Translation
-happens once at `editApi` / `build` / regeneration time using
-whatever language is active in that request. Multi-language sites
-should re-trigger one of those after a language switch.
+```html
+<script>window.QS_COUNT_STRINGS={"home.commandsZero":"No commands",
+  "home.commandsOne":"1 command","home.commandsMany":"{n} commands"};</script>
+```
+
+`qs_api_count_strings()` (`secure/src/functions/apiRegistry.php`) gathers
+every sentence key the project's bindings name and resolves each through
+`Translator::translate(...)`, so PHP remains the only translation engine. The
+table is project-wide rather than per-page — which endpoints a page may call
+is not statically known, and the whole set is a few short strings.
+
+A key that resolves nowhere is still emitted, carrying Translator's
+`{translation missing: …}` marker, so the author sees which key is missing
+rather than a bare number.
+
+The same split applies to a built site: `/en/` and `/fr/` of one build serve
+one `qs-api-config.js` and two different `QS_COUNT_STRINGS` blocks.
 
 **Runtime flow**
 
@@ -1172,17 +1248,20 @@ applyBindings(data, responseBindings)
 renderCount(value, binding)
    ↓  n = computeCount(value, binding.fallback)
    ↓  if binding.format === 'sentence':
-   ↓      template = n === 0 ? zeroStr : n === 1 ? oneStr : manyStr
-   ↓      output = template.replace('{n}', String(n))
+   ↓      key      = n === 0 ? zeroKey : n === 1 ? oneKey : manyKey
+   ↓      template = window.QS_COUNT_STRINGS[key]
+   ↓      output   = template.replace('{n}', String(n))
    ↓  else:
    ↓      output = String(n)
    ↓
 elements.forEach(el => el.textContent = output)
 ```
 
-Sentence-mode is forgiving: if the matching string is missing (e.g.
-the translation key didn't resolve), the runtime falls back to the
-raw number and emits a `console.warn`.
+Sentence-mode is forgiving: if the matching string is missing, the runtime
+falls back to the raw number and emits a `console.warn` naming the key. A
+binding still carrying `zeroStr` / `oneStr` / `manyStr` — a build produced
+before the sentences moved out of `qs-api-config.js` — is read as a last
+resort, so an old build renders sentences rather than bare numbers.
 
 ### 9.4 Fetch picker (Action Type: API Call)
 
@@ -1386,13 +1465,41 @@ no `tokenSource` plumbing, no `saveToken` call, no `Authorization`
 header. The server's `Set-Cookie` header on login is
 self-contained.
 
-What it doesn't do: CSRF token handling. If your API expects
-a CSRF token echoed in a header (e.g. `X-CSRF-Token` from a cookie),
-that's currently manual via a separate interaction.
-
 `credentials: 'include'` also works cross-origin if the server sets
 the right CORS headers (`Access-Control-Allow-Credentials: true`
 plus a concrete `Access-Control-Allow-Origin` — not `*`).
+
+**CSRF — the double-submit token**
+
+Most session-cookie APIs will not accept a state-changing request without a
+CSRF token: the server sets a readable (non-`httponly`) cookie, and every
+request must echo its value back in a header. A cross-site page can cause the
+cookie to be *sent* but cannot *read* it, so it cannot produce the header.
+
+Declare the pair on the API's `auth` block, alongside `type: "cookie"`:
+
+```json
+"auth": {
+  "type": "cookie",
+  "csrf": { "from": "cookie:XSRF-TOKEN", "to": "header:X-XSRF-TOKEN" }
+}
+```
+
+`QS.fetch` reads the named cookie, URL-decodes it, and sets the named header.
+The `prefix:name` form matches `tokenSource` elsewhere in the auth config;
+only `cookie:` reads and only `header:` writes. The block is optional and
+accepted on `type: "cookie"` only — every other auth shape puts its credential
+in a header the caller already controls, which is not forgeable cross-site in
+the first place.
+
+Nothing is invented when the cookie is not there: no header is sent, and the
+console says which cookie was missing and that the server marking it
+`httponly` makes the pattern impossible. That message is what turns the API's
+403 into something actionable.
+
+⚠ **This is the AUTHOR'S API's CSRF, not QuickSite's.** QuickSite's own
+management surface authenticates with a session cookie *and* a per-session
+bearer token, and shares no plumbing with this.
 
 #### Tier 2 — Refresh on 401
 

@@ -127,6 +127,7 @@ class Page {
     // and silently lost the consent map and both resolver blocks.
     require_once SECURE_FOLDER_PATH . '/src/functions/runtimeHandoff.php';
     require_once SECURE_FOLDER_PATH . '/src/functions/resolverRegistry.php';
+    require_once SECURE_FOLDER_PATH . '/src/functions/apiRegistry.php';
 
     // Consent, PRECOMPUTED at build time. The live site derives this payload by
     // walking the storage registry through the authoring helpers; a build ships
@@ -153,6 +154,11 @@ class Page {
         'themeEnabled'       => $themeEnabled,
         'themeToggleEnabled' => $toggleEnabled,
         'consentPayload'     => $__consentPayload,
+        // NOT precomputed like consent above: these are per-LANGUAGE, and a
+        // built site serves every language its project declares from the one
+        // set of files. Resolved per request, from the registry + translation
+        // files the build carries.
+        'countStrings'       => qs_api_count_strings(PROJECT_PATH),
         'stateStores'        => $stateStores,
         'resolverConfigs'    => $__routePath !== '' ? qs_resolvers_for_route($__routePath) : [],
         'resolvedVars'       => qs_get_resolved_vars(),

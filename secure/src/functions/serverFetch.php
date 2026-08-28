@@ -163,17 +163,19 @@ function _serverFetchPrepare(string $endpointRef, array $inputs, array $context)
         $pathPlaceholders = $matches[1];
     }
 
-    // Substitute path placeholders. Required-but-missing placeholders
-    // get left as the literal ':name' so a 404 from the upstream surfaces
-    // the misconfig visibly (mirrors QS.fetch's "leave literal if optional"
-    // policy; we don't distinguish required vs optional here — that's a
-    // resolver-level config concern handled upstream).
-    $path = $rawPath;
-    foreach ($pathPlaceholders as $name) {
-        if (array_key_exists($name, $inputs)) {
-            $path = str_replace(':' . $name, rawurlencode((string) $inputs[$name]), $path);
-        }
-    }
+    // Substitute path placeholders through the SHARED rule
+    // (qs_api_substitute_path in apiRegistry.php), so the resolver, the test
+    // panel and QS.fetch agree on what an omitted parameter leaves behind.
+    //
+    // This used to substitute only what was supplied and leave every other
+    // `:name` literal, without distinguishing required from optional — so a
+    // resolver with an optional path parameter and no input for it fetched a
+    // URL containing the literal string `:name`. Optional-and-omitted is now
+    // removed (with its label, for the key/value path-pair convention);
+    // required-and-missing is still left literal, deliberately, so the
+    // upstream's own 404 surfaces the misconfiguration.
+    $substitution = qs_api_substitute_path($rawPath, $inputs, $endpoint['parameters'] ?? []);
+    $path = $substitution['path'];
     $url = rtrim($endpoint['baseUrl'] ?? '', '/') . $path;
 
     // Method.

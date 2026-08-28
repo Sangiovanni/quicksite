@@ -5814,25 +5814,57 @@
     }
     
     /**
+     * The notice shown in place of binding rows when the endpoint declares no
+     * response schema.
+     *
+     * ⚠ THIS USED TO BE SILENCE. The whole Response Mapping block was hidden
+     * outright, so an author who had never seen it working could not tell an
+     * endpoint that cannot be bound from a panel that had not loaded. The
+     * translated string for this was already in en.json and fr.json — nothing
+     * ever read it.
+     */
+    function _renderNoSchemaNotice() {
+        var note = document.createElement('p');
+        note.className = 'preview-contextual-js-response-bindings__notice';
+        var strong = document.createElement('strong');
+        strong.textContent = PreviewConfig.i18n?.noResponseSchema
+            || 'No response schema defined for this endpoint';
+        note.appendChild(strong);
+        note.appendChild(document.createTextNode(' '));
+        note.appendChild(document.createTextNode(
+            PreviewConfig.i18n?.noResponseSchemaHint
+            || 'Response Mapping needs one. Add it on /admin/apis — open this endpoint and paste a JSON schema describing the response.'
+        ));
+        return note;
+    }
+
+    /**
      * Show/hide the response bindings section and populate it when an endpoint is selected.
      */
     function showBindingsForEndpoint(endpointSelect, container, rowsEl) {
         if (!container || !rowsEl) return;
-        
+
         // Determine which API select to use based on context
         var apiSelect = (container.id && container.id.indexOf('page-event') !== -1)
             ? peFormApi : jsFormApi;
-        
+
         var epData = _findEndpointData(apiSelect, endpointSelect);
-        
+        var addBtn = container.querySelector('.preview-contextual-js-response-bindings__add');
+
         if (!epData || !epData.responseSchema || !epData.responseSchema.properties ||
             Object.keys(epData.responseSchema.properties).length === 0) {
-            container.style.display = 'none';
+            // Endpoint picked but unbindable: show the section carrying the
+            // reason, with no rows to add — every field the picker offers comes
+            // from the schema, so there is nothing to choose from.
+            container.style.display = epData ? '' : 'none';
             rowsEl.innerHTML = '';
+            if (epData) rowsEl.appendChild(_renderNoSchemaNotice());
+            if (addBtn) addBtn.style.display = 'none';
             return;
         }
-        
+
         container.style.display = '';
+        if (addBtn) addBtn.style.display = '';
         rowsEl.innerHTML = '';
         
         // Load existing bindings if any
@@ -6199,6 +6231,34 @@
     }
 
     /**
+     * The note explaining why List / Component per item / Count are not on
+     * offer for the field that is selected.
+     *
+     * The radios appear only for a field the response schema declares as
+     * `array`, and used to appear-or-not with nothing said either way — so an
+     * author whose schema typed a collection as `object`, or left the type off,
+     * saw the Count option simply not exist and had no way to learn why.
+     */
+    function _renderModeUnavailableNote(fieldType) {
+        var note = document.createElement('p');
+        note.className = 'preview-contextual-js-response-bindings__notice';
+        if (fieldType) {
+            note.appendChild(document.createTextNode(
+                (PreviewConfig.i18n?.modeNeedsArray
+                 || 'List / Component / Count need a field the response schema declares as an array. This one is declared') + ' '
+            ));
+            var code = document.createElement('code');
+            code.textContent = fieldType;
+            note.appendChild(code);
+            note.appendChild(document.createTextNode('.'));
+        } else {
+            note.textContent = PreviewConfig.i18n?.modeNeedsArrayUntyped
+                || 'List / Component / Count need a field the response schema declares as an array. This one declares no type.';
+        }
+        return note;
+    }
+
+    /**
      * One labelled textKey-picker mount for the count-sentence subblock
      * (zero / one / many).
      */
@@ -6278,52 +6338,49 @@
         root.appendChild(fallbackRow);
 
         // ── Wire up textKey pickers (shared primitive from contextual-complex) ──
-        // Slice 6 item 7 — V5 default keys. Pre-fill the three slots with
-        // `qs.count.zero` / `qs.count.one` / `qs.count.many` when no
-        // existing binding provides them. The author can override per
-        // binding (the picker's "Create new key" inline form lets them
-        // type a field-specific key like `home.commandsZero`); these
-        // shared defaults work for the common case where the count copy
-        // is generic ("0 items / 1 item / N items").
+        // ⚠ NOTHING IS PRE-FILLED. These three slots used to arrive holding
+        // `qs.count.zero` / `.one` / `.many`, which read as working defaults
+        // and were not: no project defines those keys and none should — they
+        // are QuickSite vocabulary, and seeding them would write the engine's
+        // namespace into the author's own translation files. An author who
+        // left them alone got `{translation missing: qs.count.one}` on the
+        // page and every reason to think the feature was broken. Empty slots
+        // with a placeholder ask the real question instead: which of YOUR keys
+        // holds this sentence?
         var pickerFactory = window.QSComplexWizard && window.QSComplexWizard.createTextKeyPicker;
         var pickers = { zero: null, one: null, many: null };
-        if (typeof pickerFactory === 'function') {
-            pickers.zero = pickerFactory({
-                container:   zeroSlot.mount,
-                placeholder: 'e.g. home.commandsZero',
-                value:       (existing && existing.zeroKey) || 'qs.count.zero',
-            });
-            pickers.one = pickerFactory({
-                container:   oneSlot.mount,
-                placeholder: 'e.g. home.commandsOne',
-                value:       (existing && existing.oneKey) || 'qs.count.one',
-            });
-            pickers.many = pickerFactory({
-                container:   manySlot.mount,
-                placeholder: 'e.g. home.commandsMany',
-                value:       (existing && existing.manyKey) || 'qs.count.many',
-            });
-        } else {
-            // Fallback: plain text inputs if the picker primitive isn't
+        var slots = [
+            ['zero', zeroSlot, 'e.g. shop.productsZero'],
+            ['one',  oneSlot,  'e.g. shop.productsOne'],
+            ['many', manySlot, 'e.g. shop.productsMany']
+        ];
+        slots.forEach(function(slot) {
+            var name = slot[0];
+            var mount = slot[1].mount;
+            var placeholder = slot[2];
+            var value = (existing && existing[name + 'Key']) || '';
+
+            if (typeof pickerFactory === 'function') {
+                pickers[name] = pickerFactory({
+                    container:   mount,
+                    placeholder: placeholder,
+                    value:       value
+                });
+                return;
+            }
+            // Fallback: a plain text input if the picker primitive isn't
             // loaded. Saves typing the key by hand instead of breaking.
-            [['zero', zeroSlot, 'home.commandsZero', 'qs.count.zero'],
-             ['one',  oneSlot,  'home.commandsOne',  'qs.count.one'],
-             ['many', manySlot, 'home.commandsMany', 'qs.count.many']].forEach(function(triple) {
-                var key = triple[0];
-                var slot = triple[1];
-                var input = document.createElement('input');
-                input.type = 'text';
-                input.placeholder = 'e.g. ' + triple[2];
-                // Slice 6 item 7 — V5 default keys, fallback parity with the picker path.
-                input.value = (existing && existing[key + 'Key']) || triple[3];
-                slot.mount.appendChild(input);
-                pickers[key] = {
-                    getValue: function() { return input.value; },
-                    setValue: function(v) { input.value = v; },
-                    destroy:  function() {}
-                };
-            });
-        }
+            var input = document.createElement('input');
+            input.type = 'text';
+            input.placeholder = placeholder;
+            input.value = value;
+            mount.appendChild(input);
+            pickers[name] = {
+                getValue: function() { return input.value; },
+                setValue: function(v) { input.value = v; },
+                destroy:  function() {}
+            };
+        });
         _countPickers.set(row, pickers);
 
         // ── Reactivity: show/hide the sentence subblock on format change ──
@@ -6813,6 +6870,12 @@
                 selectorInput.title = PreviewConfig.i18n?.targetSelector || 'CSS selector to inject data into';
                 bottomRow.appendChild(attrLabel);
                 bottomRow.appendChild(attrInput);
+                // Only once a field is actually chosen — an empty dropdown is
+                // not the author failing to pick an array, it is them not
+                // having picked anything yet.
+                if (fieldSelect.value) {
+                    bottomRow.appendChild(_renderModeUnavailableNote(fieldType));
+                }
             }
         }
 
@@ -6974,6 +7037,35 @@
             });
             var result = await response.json();
             if (!response.ok) throw new Error(result.message || 'Failed to save bindings');
+
+            // Sangio's rule — nothing happens silently. A count-sentence
+            // binding names three translation keys; a key that resolves in no
+            // language renders `{translation missing: …}` on the visitor's
+            // page. The save reports which keys miss, and in which languages
+            // (a key present in `en` and forgotten in `fr` is the common one),
+            // so the author learns it here and not from the live site.
+            var keyWarnings = (result.data && result.data.countKeyWarnings) || [];
+            if (keyWarnings.length > 0 && showToastFn) {
+                // Grouped BY LANGUAGE, not per key. Creating one sentence key
+                // produces three warnings for the same language — and the
+                // create form writes the typed value only into the language
+                // being edited, so this fires on essentially every new key. Per
+                // key that is three near-identical clauses; per language it is
+                // one line naming what is left to type, which is what it is.
+                var byLang = {};
+                keyWarnings.forEach(function(w) {
+                    (w.missingIn || []).forEach(function(lang) {
+                        (byLang[lang] = byLang[lang] || []).push(w.key);
+                    });
+                });
+                var detail = Object.keys(byLang).map(function(lang) {
+                    var keys = byLang[lang].filter(function(k, i, a) { return a.indexOf(k) === i; });
+                    return lang + ': ' + keys.join(', ');
+                }).join(' — ');
+                var heading = PreviewConfig.i18n?.countKeysUnresolved
+                    || 'Saved. Some count sentences have no text yet';
+                showToastFn(heading + ' — ' + detail, 'warning');
+            }
             
             // Update local cache
             var cached = availableApiEndpoints.find(function(ep) {

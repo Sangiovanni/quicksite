@@ -29,6 +29,9 @@ class ApiEndpointManager {
     
     /** @var string Path to api-endpoints.json config */
     private string $configPath;
+
+    /** @var string The project directory both data/ and translate/ hang off */
+    private string $basePath;
     
     /** @var array Valid HTTP methods */
     private array $validMethods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
@@ -98,6 +101,7 @@ class ApiEndpointManager {
             $basePath = SECURE_FOLDER_PATH;
         }
         
+        $this->basePath   = $basePath;
         $this->configPath = $basePath . '/data/api-endpoints.json';
         
         // Ensure data directory exists
@@ -619,6 +623,9 @@ class ApiEndpointManager {
     
     /**
      * Validate auth configuration
+     *
+     * ⚠ This is the AUTHOR'S API's auth, never QuickSite's own session.
+     *
      * @param array $auth
      * @return array ['valid' => bool, 'error' => string|null]
      */
@@ -651,6 +658,39 @@ class ApiEndpointManager {
                 return [
                     'valid' => false,
                     'error' => 'Invalid tokenSource format. Use: localStorage:key, sessionStorage:key, config:key, or header:headerName'
+                ];
+            }
+        }
+
+        // CSRF double-submit (optional, cookie auth only). The author's server
+        // sets a readable cookie; every request echoes it back in a header.
+        // Restricted to 'cookie' because that is the only auth shape where the
+        // browser sends a credential the page did not choose — the other types
+        // put the credential in a header the caller controls, which a
+        // cross-site page cannot forge in the first place.
+        if (isset($auth['csrf']) && $auth['csrf'] !== null && $auth['csrf'] !== []) {
+            if ($type !== 'cookie') {
+                return [
+                    'valid' => false,
+                    'error' => "CSRF config is only supported for auth type 'cookie'"
+                ];
+            }
+            if (!is_array($auth['csrf'])) {
+                return [
+                    'valid' => false,
+                    'error' => 'Invalid csrf config. Use: {"from": "cookie:NAME", "to": "header:NAME"}'
+                ];
+            }
+            $from = $auth['csrf']['from'] ?? '';
+            $to   = $auth['csrf']['to']   ?? '';
+            // A header name is echoed verbatim into a request header, so it is
+            // held to RFC 7230's token grammar — a name carrying CR, LF or a
+            // colon is a header-splitting payload, not a typo.
+            if (!is_string($from) || !preg_match('/^cookie:[^\s;,=]+$/', $from)
+                || !is_string($to) || !preg_match('/^header:[A-Za-z0-9!#$%&\'*+.^_`|~-]+$/', $to)) {
+                return [
+                    'valid' => false,
+                    'error' => 'Invalid csrf config. Use: {"from": "cookie:XSRF-TOKEN", "to": "header:X-XSRF-TOKEN"}'
                 ];
             }
         }
@@ -878,6 +918,125 @@ class ApiEndpointManager {
     }
     
     /**
+     * Every count-sentence translation key that does not resolve, and where.
+     *
+     * Sangio's rule, applied at the one moment it can still help: nothing
+     * happens silently. A count binding names three translation keys, and a key
+     * that resolves nowhere renders the literal `{translation missing: …}` on
+     * the visitor's page — the feature looks broken rather than misconfigured,
+     * and the author finds out from the live site.
+     *
+     * A WARNING, NOT A REFUSAL. Authoring order is legitimately
+     * binding-then-key as often as the reverse, and a save that is refused
+     * because a key does not exist yet would be worse than the silence it
+     * replaces.
+     *
+     * Checked against EVERY language the project declares, because that is
+     * where the interesting miss lives: a key added in `en` and forgotten in
+     * `fr` looks perfectly fine until someone visits `/fr/`.
+     *
+     * @return array<int,array{api:string,endpoint:string,slot:string,key:string,missingIn:string[]}>
+     */
+    public function countKeyWarnings(): array {
+        $config = $this->loadConfig();
+
+        $used = [];   // key => [ [api, endpoint, slot], ... ]
+        foreach ($config['apis'] as $apiId => $api) {
+            foreach (($api['endpoints'] ?? []) as $endpoint) {
+                foreach (($endpoint['responseBindings'] ?? []) as $binding) {
+                    if (!is_array($binding)
+                        || ($binding['renderMode'] ?? null) !== 'count'
+                        || ($binding['format'] ?? null) !== 'sentence') {
+                        continue;
+                    }
+                    foreach (['zeroKey' => 'zero', 'oneKey' => 'one', 'manyKey' => 'many'] as $field => $slot) {
+                        $key = $binding[$field] ?? null;
+                        if (is_string($key) && $key !== '') {
+                            $used[$key][] = [(string) $apiId, (string) ($endpoint['id'] ?? '?'), $slot];
+                        }
+                    }
+                }
+            }
+        }
+        if (empty($used)) {
+            return [];
+        }
+
+        $tables = $this->translationTables();
+        $out = [];
+        foreach ($used as $key => $sites) {
+            $missingIn = [];
+            foreach ($tables as $lang => $table) {
+                if (!self::keyResolves($table, (string) $key)) {
+                    $missingIn[] = $lang;
+                }
+            }
+            if (empty($missingIn)) {
+                continue;
+            }
+            foreach ($sites as $site) {
+                $out[] = [
+                    'api'       => $site[0],
+                    'endpoint'  => $site[1],
+                    'slot'      => $site[2],
+                    'key'       => (string) $key,
+                    'missingIn' => $missingIn,
+                ];
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * This project's translation tables, keyed by language code.
+     *
+     * Falls back to `default.json` under the code `default`, which is the file
+     * a mono-language project actually serves.
+     *
+     * @return array<string,array>
+     */
+    private function translationTables(): array {
+        $dir = $this->basePath . '/translate';
+        $langs = [];
+        if (defined('CONFIG') && isset(CONFIG['LANGUAGES_SUPPORTED']) && is_array(CONFIG['LANGUAGES_SUPPORTED'])
+            && defined('MULTILINGUAL_SUPPORT') && MULTILINGUAL_SUPPORT) {
+            $langs = array_values(array_filter(CONFIG['LANGUAGES_SUPPORTED'], 'is_string'));
+        }
+        if (empty($langs)) {
+            $langs = ['default'];
+        }
+
+        $tables = [];
+        foreach ($langs as $lang) {
+            $file = $dir . '/' . $lang . '.json';
+            if (!is_file($file)) {
+                $file = $dir . '/default.json';
+            }
+            $decoded = is_file($file) ? json_decode((string) @file_get_contents($file), true) : null;
+            $tables[$lang] = is_array($decoded) ? $decoded : [];
+        }
+        return $tables;
+    }
+
+    /**
+     * Whether a dot-path names a usable string in one translation table.
+     *
+     * Same three rejections Translator::translate() makes at render time —
+     * absent, non-scalar (a branch, not a leaf) and empty — so the warning
+     * agrees with what the visitor would actually see.
+     */
+    private static function keyResolves(array $table, string $key): bool {
+        $current = $table;
+        foreach (explode('.', $key) as $segment) {
+            if (!is_array($current) || !isset($current[$segment])) {
+                return false;
+            }
+            $current = $current[$segment];
+        }
+        return is_scalar($current) && (string) $current !== '';
+    }
+
+    /**
      * Get valid auth types
      * @return array
      */
@@ -942,18 +1101,19 @@ class ApiEndpointManager {
                     if (!empty($endpoint['responseSchema'])) {
                         $apiEndpoints[$endpointId]['responseSchema'] = $endpoint['responseSchema'];
                     }
-                    // Include response bindings so runtime applyBindings() can use them.
-                    // Some binding shapes need server-side translation here
-                    // (e.g. count-sentence bindings store zeroKey/oneKey/manyKey
-                    // and the runtime needs the resolved strings). The
-                    // transformer below swaps keys → translated strings using
-                    // the current request's language. Multi-language sites:
-                    // qs-api-config.js is project-scoped, not per-language —
-                    // see BACKLOG.md "Per-language count bindings" for the
-                    // proper fix (inline translation registry per page render).
+                    // Response bindings, verbatim — including a count-sentence
+                    // binding's zeroKey / oneKey / manyKey.
+                    //
+                    // ⚠ NOTHING LANGUAGE-DEPENDENT MAY BE RESOLVED HERE. This
+                    // file is written once per project, not once per language,
+                    // so a string resolved at compile time is served to every
+                    // visitor in whatever language happened to be loaded when
+                    // the write ran. The keys stay keys; the page resolves them
+                    // for its own language and hands the sentences over as
+                    // window.QS_COUNT_STRINGS (qs_api_count_strings() in
+                    // apiRegistry.php, emitted by runtimeHandoff.php).
                     if (!empty($endpoint['responseBindings'])) {
-                        $apiEndpoints[$endpointId]['responseBindings']
-                            = $this->transformBindingsForCompile($endpoint['responseBindings']);
+                        $apiEndpoints[$endpointId]['responseBindings'] = $endpoint['responseBindings'];
                     }
                     // Include parameters so QS.fetch can substitute :placeholders
                     // and route remaining params to query string (Step 2 wiring).
@@ -1000,74 +1160,10 @@ class ApiEndpointManager {
         return $js;
     }
 
-    /**
-     * Transform a responseBindings array for runtime consumption.
-     *
-     * The picker writes some bindings with translation KEYS (e.g.
-     * `count` mode + `format: 'sentence'` carries `zeroKey`, `oneKey`,
-     * `manyKey`). The runtime needs resolved STRINGS (no client-side
-     * translation engine per project convention — PHP is the only
-     * translation engine).
-     *
-     * This method walks each binding and swaps keys → translated
-     * strings using the currently-loaded language. Pure: returns a
-     * new array, doesn't mutate the input. Bindings without a
-     * translation rule pass through unchanged.
-     *
-     * Multi-language note: the active language at compile time
-     * "wins" — qs-api-config.js is project-scoped, not per-language.
-     * Filed as a backlog item to fix via a per-page inline
-     * translation registry.
-     */
-    private function transformBindingsForCompile(array $bindings): array {
-        // Lazy-load Translator only when at least one binding actually
-        // needs translation. Avoids a hard coupling on common-case
-        // bindings that ship without any keys.
-        $needsTranslator = false;
-        foreach ($bindings as $b) {
-            if (is_array($b)
-                && ($b['renderMode'] ?? null) === 'count'
-                && ($b['format']     ?? null) === 'sentence') {
-                $needsTranslator = true;
-                break;
-            }
-        }
-        if ($needsTranslator) {
-            require_once __DIR__ . '/Translator.php';
-        }
-
-        $out = [];
-        foreach ($bindings as $binding) {
-            if (!is_array($binding)) {
-                $out[] = $binding;
-                continue;
-            }
-            $copy = $binding;
-
-            // Count + sentence: keys → resolved strings.
-            if (($copy['renderMode'] ?? null) === 'count'
-                && ($copy['format']     ?? null) === 'sentence') {
-
-                foreach ([
-                    'zeroKey' => 'zeroStr',
-                    'oneKey'  => 'oneStr',
-                    'manyKey' => 'manyStr',
-                ] as $keyField => $strField) {
-                    if (isset($copy[$keyField]) && is_string($copy[$keyField]) && $copy[$keyField] !== '') {
-                        $copy[$strField] = Translator::translate($copy[$keyField]);
-                    }
-                }
-                // Drop the *Key fields from the compiled output — the
-                // runtime only reads *Str. Keys stay in api-endpoints.json
-                // so the picker can re-render them on edit and the
-                // re-compile is repeatable.
-                unset($copy['zeroKey'], $copy['oneKey'], $copy['manyKey']);
-            }
-
-            $out[] = $copy;
-        }
-        return $out;
-    }
+    // (Removed, beta.11) transformBindingsForCompile(). It resolved a
+    // count-sentence binding's translation keys into zeroStr / oneStr /
+    // manyStr and deleted the keys — at COMPILE time, into a file that has no
+    // language. See the note at the responseBindings passthrough above.
 
     /**
      * Write compiled JS to a file

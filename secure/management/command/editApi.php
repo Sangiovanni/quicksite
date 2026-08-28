@@ -35,8 +35,12 @@
  *     "requestSchema": { ... },          // Optional: Expected request body schema
  *     "responseSchema": { ... },         // Optional: Expected response schema
  *     "queryParams": [ ... ],            // Optional: For GET requests
- *     "responseBindings": { ... }        // Optional: DOM update mappings
+ *     "responseBindings": [ ... ]        // Optional: DOM update mappings
  * }
+ *
+ * Response data carries `countKeyWarnings`: every count-sentence binding whose
+ * translation key resolves in no (or not every) project language, with the
+ * languages named. Advisory — the edit is saved either way.
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
@@ -161,10 +165,18 @@ function __command_editApi(array $params = [], array $urlParams = []): ApiRespon
         ];
     }
     
+    // Count-sentence bindings name translation keys. A key that resolves in no
+    // language renders `{translation missing: …}` on the visitor's page, so the
+    // save says so now rather than letting the author find out from the live
+    // site. A warning, never a refusal — authoring the binding before the key
+    // is a normal order to work in.
+    $countKeyWarnings = $manager->countKeyWarnings();
+
     $responseData = [
         'apiId' => $result['apiId'],
         'api' => $result['api'],
         'endpointCount' => count($result['api']['endpoints'] ?? []),
+        'countKeyWarnings' => $countKeyWarnings,
         'enumSync' => [
             'written' => $enumSync['written'] ?? false,
             'count' => $enumSync['count'] ?? 0,
@@ -179,8 +191,14 @@ function __command_editApi(array $params = [], array $urlParams = []): ApiRespon
         $responseData['cascadeRename'] = $cascadeRename;
     }
     
+    $message = "API '$apiId' updated successfully";
+    if (!empty($countKeyWarnings)) {
+        $message .= ' — ' . count($countKeyWarnings)
+            . ' count-sentence translation key(s) do not resolve in every language';
+    }
+
     return ApiResponse::create(200, 'operation.success')
-        ->withMessage("API '$apiId' updated successfully")
+        ->withMessage($message)
         ->withData($responseData);
 }
 

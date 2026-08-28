@@ -22,6 +22,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php'; // qs_delete_tree
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -96,20 +97,68 @@ function __command_deleteProject(array $params = [], array $urlParams = []): Api
     $cascadeSiteName = qs_project_site_name($projectName);
     $callerId = getCurrentUser()['id'] ?? null;
 
-    // Delete the project directory recursively
-    $deleted = deleteDirectory($projectPath);
-    
-    if (!$deleted) {
+    // Delete the project directory recursively.
+    //
+    // qs_delete_tree keeps going past a failure and reports what is left, which
+    // is the whole point here: a delete that stopped at the first locked file
+    // used to answer a bare "failed" while most of the project was already
+    // gone. The caller could not tell a project that is intact from one that is
+    // half-removed, and neither could the next command to touch it.
+    //
+    // ⚠ THREE ENTRIES GO LAST, and that is load-bearing rather than tidy.
+    // Between them they are what makes this project addressable and authorized,
+    // which is to say: what a RETRY needs.
+    //
+    //   config.php, routes.php   the project context boots from these
+    //                            (projectContext.php dies without either), so a
+    //                            project missing them cannot be the target of
+    //                            any project-scoped command at all
+    //   config/                  holds members.json, the authoritative
+    //                            permission gate (users.php is only a cache)
+    //
+    // In scandir order all three came first, so any failure further down the
+    // tree destroyed them on the way past and left a project that could no
+    // longer be named or authorized: the retry answered "Insufficient
+    // permissions", then "Missing file: config.php", and the leftovers could
+    // only be cleared from the filesystem by hand. Deferred, they are removed
+    // only once everything else is already gone — and kept untouched when
+    // anything is not, which is the part ordering alone does not buy
+    // (qs_delete_tree continues past failures by design).
+    $removal = qs_delete_tree($projectPath, ['config', 'config.php', 'routes.php']);
+
+    if (!$removal['ok']) {
         // beta.10 C13 F-C13-18. This returned `path` => the absolute project
         // directory, ungated. The central scrub in ApiResponse would render it
         // "secure/projects/<id>", but the id is something the caller just named
         // and the folder convention adds nothing — so say what actually failed
         // and send the path where the person who can act on it is looking. Same
         // treatment C12 gave qs_project_context_die().
-        error_log("deleteProject: failed to remove project directory {$projectPath}");
+        //
+        // `survived` is PROJECT-RELATIVE for the same reason (qs_delete_tree
+        // builds it that way): the person reading the response asked to delete
+        // this project and needs to know which of ITS files are still there,
+        // not where the install lives on disk.
+        $partial = $removal['files'] > 0 || $removal['dirs'] > 0;
+        error_log("deleteProject: '{$projectName}' not fully removed — "
+            . count($removal['survived']) . " path(s) survived under {$projectPath}");
         return ApiResponse::create(500, 'server.delete_failed')
-            ->withMessage('Failed to delete project directory')
-            ->withData(['project' => $projectName]);
+            ->withMessage($partial
+                ? 'Project only partially deleted'
+                : 'Failed to delete project directory')
+            ->withData([
+                'project'             => $projectName,
+                'partial'             => $partial,
+                'files_deleted'       => $removal['files'],
+                'directories_deleted' => $removal['dirs'],
+                'survived'            => $removal['survived'],
+                // Kept ON PURPOSE, not blocked — the distinction matters when
+                // someone reads this list looking for what to unlock.
+                'retained'            => $removal['retained'],
+                'hint'                => 'These paths could not be removed — most often a file held open by '
+                    . 'another process, or a permission the web server does not have. Release them and run '
+                    . 'deleteProject again; it is safe to repeat, and "retained" was kept deliberately so the '
+                    . 'project still has an owner to authorize that retry.',
+            ]);
     }
 
     // C10 10.1b — destroy this project's command log with it. The log lives in
@@ -233,39 +282,14 @@ function countProjectFiles(string $dir): array {
     return $stats;
 }
 
-/**
- * Recursively delete a directory
- * 
- * @param string $dir Directory path
- * @return bool Success
- */
-function deleteDirectory(string $dir): bool {
-    if (!is_dir($dir)) {
-        return false;
-    }
-    
-    $items = scandir($dir);
-    
-    foreach ($items as $item) {
-        if ($item === '.' || $item === '..') {
-            continue;
-        }
-        
-        $path = $dir . '/' . $item;
-        
-        if (is_dir($path)) {
-            if (!deleteDirectory($path)) {
-                return false;
-            }
-        } else {
-            if (!unlink($path)) {
-                return false;
-            }
-        }
-    }
-    
-    return rmdir($dir);
-}
+// (Removed, beta.11) A local deleteDirectory(). It shadowed the shared one in
+// FileSystem.php — two global functions of one name with DIFFERENT semantics
+// (the shared one ignored failures and returned rmdir's result; this one bailed
+// on the first), so which behaviour ran depended on which file a process had
+// loaded, and loading both was a redeclare fatal. Deleting now goes through
+// qs_delete_tree(), required at the top of this file. Exactly the collision the
+// note below records for formatBytes — same class, same file, twelve lines
+// apart.
 
 // (Removed, S2.9) A local formatBytes(). Byte formatting lives in
 // qs_format_size() in utilsManagement.php, already required at the top of this

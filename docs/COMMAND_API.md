@@ -427,6 +427,37 @@ secure/logs/_global/commands_<YYYY-MM-DD>.json         commands that target no p
 - A project's history counts toward that project's disk usage in `getSizeInfo`
   (category `logs`), not toward installation core files.
 
+**A delete that does not finish says what is left.** `deleteProject` removes the
+whole tree, continuing past a file it cannot remove instead of stopping at the
+first one, and answers `500 server.delete_failed` naming the outcome:
+
+```json
+{
+  "status": 500,
+  "code":   "server.delete_failed",
+  "message": "Project only partially deleted",
+  "data": {
+    "project":             "my-site",
+    "partial":             true,
+    "files_deleted":       17,
+    "directories_deleted": 14,
+    "survived":  ["templates/model/json/pages/home/home.json", "templates/model/json/pages/home"],
+    "retained":  ["config", "config.php", "routes.php"],
+    "hint":      "…"
+  }
+}
+```
+
+`survived` is what could **not** be removed — a file held open by another
+process, or one the web server has no permission to unlink — with paths
+relative to the project, never absolute. `retained` is different in kind: those
+entries were kept **on purpose**. `config.php` and `routes.php` are what the
+project context boots from and `config/members.json` is the permission gate, so
+removing them on the way past would leave a project that could neither be named
+nor authorized, and no retry could finish it. They go last, and only once
+everything else is gone. Releasing whatever blocked the delete and running the
+command again completes it.
+
 ### What is recorded, and what is stripped
 
 Each entry holds the command, the HTTP method, the caller (user id + display name),

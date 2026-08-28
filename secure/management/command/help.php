@@ -3353,9 +3353,10 @@ $GLOBALS['__help_commands'] = [
             '400.validation.confirmation_required' => 'Must set confirm=true',
             '400.validation.active_project' => 'Cannot delete the served main project (use force=true)',
             '403.auth.forbidden' => 'Not the owner of this project (owner-only)',
-            '404.resource.not_found' => 'Project not found'
+            '404.resource.not_found' => 'Project not found',
+            '500.server.delete_failed' => 'The tree could not be fully removed. data.partial says whether anything was deleted; data.survived names what could not be (project-relative paths); data.retained names what was kept deliberately so a retry stays possible; data.files_deleted / data.directories_deleted count what did go.'
         ],
-        'notes' => 'WARNING: This is permanent and cannot be undone. Use exportProject first to backup. Only the project OWNER may delete it. Membership cascade: every OTHER member and every ENGAGED pending party (invitees, self-requesters) gets a dismissable status "deleted" notice in their own cache (listMyInvitations shows it; dismissProjectNotice clears it) so the deletion is never mistaken for a refusal or removal; the deleting owner\'s own entry is simply removed, and a sponsored not-yet-validated proposal target gets NOTHING (they were never told the project existed). The response reports the cascade under data.membership_cascade.'
+        'notes' => 'WARNING: This is permanent and cannot be undone. Use exportProject first to backup. Only the project OWNER may delete it. Membership cascade: every OTHER member and every ENGAGED pending party (invitees, self-requesters) gets a dismissable status "deleted" notice in their own cache (listMyInvitations shows it; dismissProjectNotice clears it) so the deletion is never mistaken for a refusal or removal; the deleting owner\'s own entry is simply removed, and a sponsored not-yet-validated proposal target gets NOTHING (they were never told the project existed). The response reports the cascade under data.membership_cascade. PARTIAL DELETES: the removal continues past a file it cannot remove rather than stopping at the first, and reports what is left — data.survived (blocked) and data.retained (kept on purpose). config.php, routes.php and config/ go LAST and are skipped entirely when anything else failed: the first two are what the project context boots from and config/members.json is the permission gate, so removing them on the way past would leave a project that could be neither named nor authorized, and no retry could finish it. Release whatever blocked the delete and re-run; the command is safe to repeat.'
     ],
 
     'listMembers' => [
@@ -5881,7 +5882,11 @@ $GLOBALS['__help_commands'] = [
             'data' => [
                 'apiId' => 'main-backend',
                 'api' => ['...updated API object...'],
-                'endpointCount' => 3
+                'endpointCount' => 3,
+                'countKeyWarnings' => [
+                    ['api' => 'main-backend', 'endpoint' => 'users-list', 'slot' => 'many',
+                     'key' => 'users.many', 'missingIn' => ['fr']]
+                ]
             ]
         ],
         'error_responses' => [
@@ -5889,7 +5894,7 @@ $GLOBALS['__help_commands'] = [
             '400.api.error.invalid_parameter' => 'Endpoint already exists (when adding), invalid update operation, or invalid callableFrom value (must be client/server/both or omitted for auto-derive)',
             '404.api.error.not_found' => 'API or endpoint not found'
         ],
-        'notes' => 'Use ONE endpoint operation per request: endpoints (full replace), addEndpoint, editEndpoint, or deleteEndpoint. Regenerates qs-api-config.js automatically (server-only endpoints are filtered out). **callableFrom** (beta.8 A4): per-endpoint marker — "client"/"server"/"both", or absent for auto-derive (apiKey → server, others → both).'
+        'notes' => 'Use ONE endpoint operation per request: endpoints (full replace), addEndpoint, editEndpoint, or deleteEndpoint. Regenerates qs-api-config.js automatically (server-only endpoints are filtered out). **callableFrom** (beta.8 A4): per-endpoint marker — "client"/"server"/"both", or absent for auto-derive (apiKey → server, others → both). **countKeyWarnings**: advisory list of count-sentence bindings whose translation key does not resolve in every project language (empty array when all resolve). The edit is saved regardless. **auth.csrf**: optional on auth type "cookie" only — {"from": "cookie:XSRF-TOKEN", "to": "header:X-XSRF-TOKEN"} makes QS.fetch echo the named cookie into the named request header (the double-submit pattern used by the AUTHOR\'s own API, unrelated to QuickSite\'s session).'
     ],
     
     'deleteApi' => [
@@ -5999,7 +6004,7 @@ $GLOBALS['__help_commands'] = [
             '404.api.error.not_found' => 'Endpoint not found',
             '500.api.error.request_failed' => 'HTTP request failed (timeout, connection error)'
         ],
-        'notes' => 'This makes a server-side (PHP) request to the external API. Useful for testing auth configuration and endpoint availability without client-side CORS issues. Auth tokens are masked in response for security.'
+        'notes' => 'This makes a server-side (PHP) request to the external API. Useful for testing auth configuration and endpoint availability without client-side CORS issues. Auth tokens are masked in response for security. PATH PARAMETERS: a value supplied in pathParams is substituted; an OPTIONAL one that is omitted has its path segment removed (along with the preceding segment when that segment is a literal equal to the parameter name — the key/value path-pair convention), so the request stays valid. A REQUIRED one that is omitted is deliberately left as the literal :name in the URL this command reports, because seeing it is how the omission surfaces in a test panel. Same rule as QS.fetch and the server-side resolver — qs_api_substitute_path() in src/functions/apiRegistry.php.'
     ],
     
     // ==========================================

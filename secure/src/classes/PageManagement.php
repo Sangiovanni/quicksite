@@ -167,6 +167,7 @@ class PageManagement {
         $__handoffResolverConfigs = [];
         $__handoffResolvedVars    = [];
         $__handoffConsentPayload  = null;
+        $__handoffCountStrings    = [];
         $__handoffPageEvents      = '';
 
         // Editor mode is excluded from all of these for one reason: an editor
@@ -191,6 +192,12 @@ class PageManagement {
             require_once SECURE_FOLDER_PATH . '/src/functions/consentHelpers.php';
             $__handoffConsentPayload = qs_consent_payload();
 
+            // Count-sentence strings for THIS request's language. The compiled
+            // qs-api-config.js carries the translation keys and nothing
+            // language-dependent — one file cannot serve two languages.
+            require_once SECURE_FOLDER_PATH . '/src/functions/apiRegistry.php';
+            $__handoffCountStrings = qs_api_count_strings(PROJECT_PATH);
+
             $__handoffPageEvents = $this->buildPageEventsScript($__routePath, $renderer);
         }
 
@@ -201,6 +208,7 @@ class PageManagement {
             'themeEnabled'       => $themeEnabled,
             'themeToggleEnabled' => $toggleEnabled,
             'consentPayload'     => $__handoffConsentPayload,
+            'countStrings'       => $__handoffCountStrings,
             'stateStores'        => $__handoffStores,
             'resolverConfigs'    => $__handoffResolverConfigs,
             'resolvedVars'       => $__handoffResolvedVars,

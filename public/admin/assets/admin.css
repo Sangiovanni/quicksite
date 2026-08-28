@@ -12953,6 +12953,24 @@ code.preview-node-panel__value {
     margin-top: 2px;
 }
 
+/* Why a binding cannot be made here: no response schema on the endpoint, or a
+   field the schema does not declare as an array. Both were silent before —
+   the section simply hid itself, or the mode radios simply did not appear. */
+.preview-contextual-js-response-bindings__notice {
+    font-size: 0.68rem;
+    line-height: 1.45;
+    color: var(--admin-text-muted);
+    background: var(--admin-info-bg);
+    border-left: 2px solid var(--admin-info);
+    border-radius: 3px;
+    padding: 6px 8px;
+    margin: 4px 0 0;
+}
+.preview-contextual-js-response-bindings__notice code {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.95em;
+}
+
 /* ──────────────────── componentList mode ──────────────────── */
 /* Render-mode radio (list vs componentList) shown when field is array. */
 .preview-contextual-js-response-bindings__row-mode {

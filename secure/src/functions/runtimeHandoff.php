@@ -4,9 +4,9 @@
  *
  * A rendered page ends with a run of `<script>` tags: the route schema, the
  * storage namespace, the library itself, the consent map, the theme wiring, the
- * API config, the enum tables, this route's state stores, and what the
- * server-side resolver already fetched. Together they are the contract between
- * PHP and the browser runtime.
+ * API config, the enum tables, this page's count-sentence strings, this route's
+ * state stores, and what the server-side resolver already fetched. Together they
+ * are the contract between PHP and the browser runtime.
  *
  * WHY THIS FILE EXISTS. That contract had TWO writers that did not agree.
  * PageManagement (the live `/p/<projectId>/` render) emitted seven blocks;
@@ -49,6 +49,8 @@ if (!function_exists('qs_runtime_handoff')) {
      *   themeEnabled:       bool
      *   themeToggleEnabled: bool
      *   consentPayload:     ?array  from qs_consent_payload(), null when off
+     *   countStrings:       array   from qs_api_count_strings() — this page's
+     *                               language, for count-sentence bindings
      *   stateStores:        array   this route's stores ({storeId => def})
      *   resolverConfigs:    array   this route's resolvers (for hydration matching)
      *   resolvedVars:       array   what they resolved to
@@ -100,6 +102,18 @@ if (!function_exists('qs_runtime_handoff')) {
         }
         if ($contentPath !== '' && file_exists($contentPath . '/scripts/qs-enums.js')) {
             $out .= '<script src="' . $base . 'scripts/qs-enums.js"></script>';
+        }
+
+        // 6b. Count-sentence strings, in THIS page's language.
+        //
+        // They cannot travel in qs-api-config.js above: that file is written
+        // once per project, so whichever language wrote it last would be served
+        // to everyone. The compiled config carries the translation KEYS, which
+        // are language-independent; the sentences ride the page, like every
+        // other per-request value in this run.
+        $countStrings = is_array($ctx['countStrings'] ?? null) ? $ctx['countStrings'] : [];
+        if (!empty($countStrings)) {
+            $out .= '<script>window.QS_COUNT_STRINGS=' . json_encode($countStrings, JSON_UNESCAPED_SLASHES) . ';</script>';
         }
 
         // 7. This route's state stores.

@@ -9586,3 +9586,244 @@ of you).
 
 **Source**: `public/admin/assets/js/pages/assets.js` (`_renderFaviconControl`,
 `setFavicon`), `public/admin/assets/admin.css`.
+### Count-sentence strings ride the page, not the compiled config (locked 2026-08-24)
+
+**Decision**: `qs-api-config.js` carries a count binding's translation KEYS
+(`zeroKey` / `oneKey` / `manyKey`) and nothing language-dependent. The page
+resolves them for its own language and hands the sentences to `qs.js` as
+`window.QS_COUNT_STRINGS`, emitted by the runtime handoff beside the seven
+blocks already there.
+
+**Reasoning**: the compiler used to resolve the three keys into
+`zeroStr` / `oneStr` / `manyStr` at the moment it wrote the config, in whatever
+language that request happened to be in. `qs-api-config.js` is one file per
+project, not one per language — so a bilingual site served one language's
+sentences to everybody, and which language depended on who last triggered a
+write. It was not a build defect: `addApi` / `editApi` / `deleteApi` regenerate
+the same file into the live project, so development had it too.
+
+The split follows from asking which half of the binding is language-dependent.
+The structure — field, selector, render mode, the keys themselves — is not, and
+belongs in the static file. The sentences are, and belong wherever per-request
+values already live. That is the page, and the mechanism is not new: seven
+`window.QS_*` blocks already work exactly this way, and beta.11 had just
+centralised their emission into one writer. PHP stays the only translation
+engine either way, which was the original constraint.
+
+**Alternatives considered**: one compiled config per language (rejected — an
+eighth, different mechanism for handing per-language data to the client, when
+the existing one fits; and it multiplies an artifact that is regenerated on
+every serve); passing the strings through per binding, keyed by endpoint and
+index (rejected — a key→string dictionary needs no index alignment between two
+artifacts and deduplicates for free); renaming the three fields to a positional
+list (rejected — identical information, and it would touch the runtime, the
+picker and the compiler for no behavioural gain).
+
+Emitting the project's whole key set rather than one page's: which endpoints a
+page may call is not statically known — an interaction chain, a state store and
+a resolver can each reach one — and the table is a few short strings.
+
+**Source**: `secure/src/functions/apiRegistry.php` (`qs_api_count_strings`),
+`secure/src/functions/runtimeHandoff.php`, `secure/src/classes/ApiEndpointManager.php`,
+`secure/src/runtime/qs.js` (`countTemplate`).
+
+### A number bound to a count binding IS the count, and zero means zero (locked 2026-08-24)
+
+**Decision**: `computeCount` returns a finite number unchanged, `0` included.
+`fallback` now applies only when the value is absent (`null` / `undefined`) or
+is not a count at all (`''`, `false`, `NaN`, `Infinity`).
+
+**Reasoning**: the old rule was array → length, anything else truthy → 1. So
+binding an endpoint's `total: 97` rendered "1 product" — silently, with no
+warning, on the field an author is most likely to reach for when they want a
+count. The array is not the only shape an API expresses a count in, and a
+paginated endpoint that returns ten items and a total of ninety-seven is the
+normal case, not an exotic one.
+
+Zero moved with it, and that is a behaviour change rather than a bug fix. `0`
+used to reach `fallback`, so a genuinely empty result could not render "No
+products" unless the fallback happened to be 0 as well — the zero branch of a
+zero/one/many sentence was unreachable for numeric fields. `fallback` now means
+what its name says.
+
+**Alternatives considered**: treating only integers as counts (rejected — an
+API returning `12.0` in JSON is indistinguishable from `12`, and rejecting it
+would reintroduce the silent "1"); flooring or rounding (rejected — a count
+binding should show what the API said, and a fractional total is the author's
+data problem, not something to hide); keeping `0 → fallback` for
+backward-compatibility (rejected — it is the behaviour that made the zero
+sentence unreachable, and a fallback of 0 is the default anyway, so almost no
+project can observe the difference).
+
+**Source**: `secure/src/runtime/qs.js` (`computeCount`).
+
+### `QS.fetch` speaks the double-submit CSRF pattern (locked 2026-08-24)
+
+**Decision**: an API whose `auth.type` is `cookie` may declare
+`csrf: {from: "cookie:NAME", to: "header:NAME"}`. `QS.fetch` reads the named
+cookie, URL-decodes it and sets the named header.
+
+**Reasoning**: `cookie` auth existed but only added `credentials: 'include'`,
+which is not enough for most real session-cookie APIs — Laravel, Angular's
+HttpClient and Django all expect a readable cookie echoed back in a header, and
+refuse a state-changing request without it. So an author whose own API used the
+commonest session pattern could register it, wire it, and get a 403 with nothing
+to read.
+
+The config shape follows `tokenSource`'s existing `prefix:name` convention
+rather than inventing a second one, and admits only `cookie:` as a source and
+`header:` as a destination: there is one shape of this pattern, and accepting
+others would be guessing. It is restricted to `cookie` auth because that is the
+only shape where the browser attaches a credential the page did not choose —
+every other type puts its credential in a header the caller controls, which a
+cross-site page cannot forge in the first place.
+
+Nothing is invented when the cookie is not readable: no header is sent, and the
+console names the cookie and the two reasons it can be unreadable. A silent
+omission would surface as an unexplained 403 from someone else's server.
+
+⚠ This is the **author's API's** auth. It shares no plumbing with QuickSite's
+own session, which authenticates with a cookie *and* a per-session bearer token.
+
+**Alternatives considered**: reading the token from any storage rather than a
+cookie (rejected — the security property of double-submit comes precisely from
+the value living in a cookie a cross-site page cannot read; sourcing it
+elsewhere would look identical and protect nothing); making it automatic for
+every cookie-auth API by guessing `XSRF-TOKEN` (rejected — the names vary, and a
+header sent to an API that did not ask for it is at best noise); leaving it to a
+manual interaction (rejected — the value has to be read at call time, and no
+verb can reach into `QS.fetch`'s own request).
+
+**Source**: `secure/src/runtime/qs.js` (`applyCsrf`),
+`secure/src/classes/ApiEndpointManager.php` (`validateAuth`).
+
+### A delete that fails reports what survived, and keeps what a retry needs (locked 2026-08-24)
+
+**Decision**: one recursive delete, `qs_delete_tree()`, which continues past a
+failure, collects what it could not remove as project-relative paths, and takes
+a list of top-level entries to remove **last and only if everything else went**.
+`deleteProject` defers `config.php`, `routes.php` and `config/`.
+
+**Reasoning**: two global functions named `deleteDirectory` existed — the shared
+one ignored every failure and answered on the final `rmdir`, and a copy inside
+`deleteProject.php` returned on the first. Which behaviour ran depended on which
+file a process had loaded, and loading both was a redeclare fatal (the collision
+class already fixed for `formatBytes`, twelve lines away in the same file). Both
+answered a single boolean, so a project that half-deleted was reported as
+"failed": the caller could not tell an intact project from a gutted one, and a
+locked file deep in the tree looked exactly like a permission problem at the
+root.
+
+The deferral is the part that is not merely tidy, and it was found by probing
+rather than by reasoning. `config.php` and `routes.php` are what the project
+context boots from and `config/members.json` is the authoritative permission
+gate; in `scandir` order all three went first, so any failure further down
+destroyed them on the way past. The retry then answered "Insufficient
+permissions", and after that "Missing file: config.php" — the leftovers could
+only be cleared from the filesystem by hand. Ordering alone does not fix it
+either, because this delete continues past failures by design: a merely
+reordered entry is still removed at the end of a failed run. It has to be
+skipped.
+
+Survivors are reported relative to the project. What could not be removed is a
+diagnosis the owner acts on; the absolute path of a server directory is not part
+of it. `retained` is reported separately from `survived` so nobody hunts for a
+lock on a file that was kept deliberately.
+
+**Alternatives considered**: keeping the bail-on-first-failure semantics and
+just naming the first casualty (rejected — it leaves most of the project
+undeleted for a reason that may be one stray file); rolling the deletion back
+(rejected — there is nothing to roll back to, and a project half-restored from
+nothing is worse than one honestly reported); moving the ownership record aside
+and restoring it on failure (rejected — a move that fails leaves the record
+somewhere nobody looks for it).
+
+**Source**: `secure/src/functions/FileSystem.php` (`qs_delete_tree`),
+`secure/management/command/deleteProject.php`.
+### An omitted optional path parameter is removed, not left literal (locked 2026-08-24)
+
+**Decision**: when a value for an optional `:placeholder` is not supplied, its
+path segment is removed — along with the segment before it when that segment is
+a literal equal to the parameter's name. A missing **required** placeholder is
+still left literal and reported to the caller, which decides. One rule, in
+`qs_api_substitute_path()` for PHP and `substitutePath()` for the browser.
+
+**Reasoning**: all three substitution sites — the test panel, the server-side
+resolver and `QS.fetch` — left `:name` in the URL whenever no value was
+supplied, deliberately, so a missing value would "surface the omission". That is
+defensible for a required parameter. Applied to an optional one it means
+declaring a parameter optional and then omitting it sends the API the literal
+string `:nameContains` as the filter value: against the project's own fixture
+API that returned **0 files instead of 2**, with HTTP 200 and nothing in the
+console. An optional parameter that is omitted has to produce a valid request;
+that is what optional means.
+
+Removing only the value is not enough. QuickSite's own `TrimParameters`
+convention puts parameters in the path as key/value pairs
+(`/endpoint.php/key1/value1/key2/value2`), so dropping just the value leaves a
+dangling `/nameContains/` — which most APIs read as "this filter, empty" rather
+than "no filter". The label goes with it. The pair rule fires only when the
+label and the parameter name MATCH, so `/users/:id/posts` loses `:id` and keeps
+`users`: narrow and predictable beats clever, and an author who wants the pair
+dropped names the two alike, which is how anyone writes a pair anyway.
+
+A placeholder that is only part of a segment (`/files/file-:id.json`) is left
+alone: removing half a segment has no meaning to define.
+
+Direct-URL mode keeps the old behaviour. There is no `parameters` list there to
+say what is optional, and the author typed the URL by hand, so a colon in it is
+far more likely to be theirs than a placeholder they forgot.
+
+**Alternatives considered**: substituting the empty string (rejected — it is the
+dangling-segment case, and it silently sends an empty filter); dropping the
+segment but never the label (rejected — measured against the real fixture, that
+is the case that returns the wrong answer); inferring the pair from position
+rather than from the name (rejected — it would eat `users` in `/users/:id`);
+keeping "leave literal" and documenting it (rejected — the failure is a wrong
+result with a 200, which no amount of documentation makes visible).
+
+**Source**: `secure/src/functions/apiRegistry.php` (`qs_api_substitute_path`),
+`secure/src/runtime/qs.js` (`substitutePath`),
+`secure/management/command/testApiEndpoint.php`,
+`secure/src/functions/serverFetch.php`.
+
+### Surface B derives `connect-src` from the API registry (locked 2026-08-24)
+
+**Decision**: the surface-B CSP's `connect-src` is `'self'` plus the origin of
+every registered API that has at least one client-callable endpoint. Derived
+from the registry, not configured separately.
+
+**Reasoning**: it was `'self'` alone, so every browser-side call to a registered
+external API on `/p/<projectId>/` was refused by the browser — the whole client
+half of the API registry, unusable on the surface an author develops on. The
+same page then worked once built, because a built site sends no CSP at all.
+Blocked in development and open in production is the worst way round: the author
+cannot test what they ship, and the thing they ship is the less protected of the
+two.
+
+Deriving beats configuring because the registry is already the declaration.
+Registering an API and giving it a base URL IS the act of saying this site talks
+to that origin; asking the author to say it a second time in a different screen
+adds a way for the two to disagree and nothing else. Only the ORIGIN is emitted —
+a CSP source is not a path matcher — and a `baseUrl` that does not parse to an
+http(s) origin is skipped rather than guessed at, so a malformed value cannot
+inject a token into the header.
+
+Server-only APIs are excluded, through the same `qs_api_effective_callable_from()`
+the compiled client config uses. An endpoint the browser can never call has no
+business widening the page's policy, and sharing the filter means the allowlist
+and the config cannot disagree about what the browser can reach.
+
+**Alternatives considered**: an explicit per-project allowlist (rejected — a
+second place to declare the same fact, plus a command and admin UI, and it can
+drift from the registry); dropping `connect-src` entirely to match the built site
+(rejected — a built site sending no CSP is itself a defect, and aligning the
+stricter surface down to the weaker one is the wrong direction); allowing the
+full `baseUrl` including its path (rejected — CSP source expressions match paths
+by prefix with rules of their own, and the origin is the honest granularity).
+
+⚠ A built site still ships **no** CSP. That is a separate decision and is not
+made here.
+
+**Source**: `secure/src/functions/apiRegistry.php` (`qs_api_client_origins`),
+`secure/src/functions/surfaceB.php` (`qs_surface_b_send_headers`).

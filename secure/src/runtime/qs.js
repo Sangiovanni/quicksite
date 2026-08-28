@@ -643,6 +643,7 @@
             method = resolved.method;
             opts._auth = resolved.auth;
             opts._endpoint = resolved.endpoint;
+            opts._baseUrl = resolved.baseUrl;
         }
         // Direct URL mode: METHOD is first arg, URL is second
         else {
@@ -675,7 +676,7 @@
         // `parameters`) that are missing → reject with a clear error.
         // Remaining opts go to the query string at the end (below).
         const RESERVED_OPTS = new Set([
-            'body', 'onSuccess', 'onError', 'silent', '_auth', '_endpoint',
+            'body', 'onSuccess', 'onError', 'silent', '_auth', '_endpoint', '_baseUrl',
             // Translatable toast labels — already resolved to strings by
             // PHP at compile time. They're not path placeholders and
             // shouldn't leak into the query string.
@@ -685,27 +686,37 @@
             // append/infinite would flicker: bindings replace, store appends).
             'noBindings'
         ]);
-        if (url.indexOf(':') !== -1) {
-            const placeholders = [];
-            url.replace(/:([a-zA-Z][a-zA-Z0-9_]*)/g, function (_m, n) {
-                placeholders.push(n); return _m;
-            });
-            const paramDefs = (opts._endpoint && opts._endpoint.parameters) || [];
-            for (const name of placeholders) {
-                const val = opts[name];
-                const def = paramDefs.find(p => p && p.name === name);
-                const required = !!(def && def.required);
-                if (val !== undefined && val !== null && val !== '') {
-                    url = url.replace(':' + name, encodeURIComponent(val));
-                    delete opts[name];   // consumed; don't echo into query string
-                } else if (required) {
-                    const msg = '[QS] fetch: missing required parameter: ' + name;
-                    console.warn(msg);
-                    QS.toast('Missing required parameter: ' + name, 'error');
-                    return Promise.reject(new Error(msg));
-                }
-                // Optional + missing → leave `:name` literal (consistent with test panel).
+        if (opts._endpoint) {
+            // Registry mode: the path is known separately from the base URL, so
+            // an omitted optional placeholder can have its whole segment removed
+            // without the scheme's colon getting in the way.
+            const sub = substitutePath(
+                opts._endpoint.path || '',
+                opts,
+                opts._endpoint.parameters || []
+            );
+            if (sub.missingRequired.length > 0) {
+                const msg = '[QS] fetch: missing required parameter: ' + sub.missingRequired[0];
+                console.warn(msg);
+                QS.toast('Missing required parameter: ' + sub.missingRequired[0], 'error');
+                return Promise.reject(new Error(msg));
             }
+            sub.consumed.forEach(function (n) { delete opts[n]; });  // don't echo into the query string
+            url = (opts._baseUrl || '').replace(/[/]+$/, '') + sub.path;
+        } else if (url.indexOf(':') !== -1) {
+            // Direct-URL mode. Substitute what the caller supplied and leave
+            // anything else exactly as written — there is no `parameters` list
+            // to say what is optional, and the author typed this URL by hand, so
+            // a stray colon is far more likely to be theirs than a placeholder
+            // they forgot.
+            url = url.replace(/:([a-zA-Z][a-zA-Z0-9_]*)/g, function (m, name) {
+                const val = opts[name];
+                if (val !== undefined && val !== null && val !== '') {
+                    delete opts[name];
+                    return encodeURIComponent(val);
+                }
+                return m;
+            });
         }
 
         // Build request options
@@ -795,6 +806,8 @@
                 // out via noBindings — e.g. QS.fetchState renders via the store).
                 if (opts._endpoint && opts._endpoint.responseBindings && !opts.noBindings) {
                     applyBindings(data, opts._endpoint.responseBindings);
+                } else if (!opts._endpoint && !opts.noBindings) {
+                    warnDirectUrlSkipsBindings(url);
                 }
 
                 // Toast: `toastSuccessKey` (translated server-side at
@@ -916,17 +929,110 @@
             return null;
         }
         
-        // Build full URL
+        // Build full URL. `baseUrl` travels separately too: path-placeholder
+        // substitution has to work on the PATH alone, or the colon in
+        // "https://" is one more thing every pattern has to dodge.
         let url = (api.baseUrl || '') + (endpoint.path || '');
-        
+
         return {
             url: url,
+            baseUrl: api.baseUrl || '',
             method: endpoint.method || 'GET',
             auth: api.auth,
             endpoint: endpoint
         };
     }
     
+    /**
+     * Put values into an endpoint path's `:placeholders`, and decide what an
+     * OMITTED one leaves behind.
+     *
+     * ⚠ AN OMITTED OPTIONAL PARAMETER MUST PRODUCE A VALID REQUEST. This used
+     * to leave `:name` in the URL whenever no value was supplied — deliberately,
+     * to "surface the omission". That is defensible for a REQUIRED parameter and
+     * wrong for an optional one: declaring a parameter optional and then
+     * omitting it sent the API the literal string `:nameContains` as the filter
+     * value. Silently, and with a 200 back, because most APIs read an unknown
+     * filter value as a filter.
+     *
+     * The rule for an omitted optional placeholder:
+     *
+     *   - it occupies a whole path segment        -> the segment is removed;
+     *   - the segment BEFORE it is a literal that
+     *     equals the parameter's name             -> that segment goes too;
+     *   - it is only part of a segment
+     *     (`/file-:id.json`)                      -> left literal, because
+     *                                                removing part of a segment
+     *                                                has no defensible meaning.
+     *
+     * The second rule is the key/value path-pair convention QuickSite's own
+     * TrimParameters reads — `/endpoint.php/key1/value1/key2/value2`. Dropping
+     * only the value leaves a dangling `/nameContains/`, which most APIs read as
+     * "this filter, empty" rather than "no filter". It fires only when the label
+     * and the parameter name MATCH, so `/users/:id/posts` loses `:id` and keeps
+     * `users` — narrow and predictable beats clever.
+     *
+     * Required-and-missing is reported, not decided: the caller rejects.
+     *
+     * ⚠ `qs_api_substitute_path()` in secure/src/functions/apiRegistry.php is
+     * this same rule for PHP — the test panel and the server-side resolver run
+     * it — and the two must not drift.
+     *
+     * @param {string} path       The endpoint's declared path.
+     * @param {object} values     name -> value. '' and null count as not supplied.
+     * @param {array}  parameters The endpoint's declared parameters. A
+     *                            placeholder no entry declares is OPTIONAL.
+     * @returns {{path: string, consumed: string[], missingRequired: string[]}}
+     */
+    function substitutePath(path, values, parameters) {
+        const required = {};
+        (parameters || []).forEach(function (def) {
+            if (def && def.name && def.required) required[def.name] = true;
+        });
+        const supplied = function (name) {
+            const v = values[name];
+            return v !== undefined && v !== null && v !== '';
+        };
+
+        const consumed = [];
+        const missingRequired = [];
+        const out = [];
+
+        String(path).split('/').forEach(function (segment) {
+            const whole = /^:([a-zA-Z_][a-zA-Z0-9_]*)$/.exec(segment);
+            if (whole) {
+                const name = whole[1];
+                if (supplied(name)) {
+                    out.push(encodeURIComponent(values[name]));
+                    consumed.push(name);
+                } else if (required[name]) {
+                    missingRequired.push(name);
+                    out.push(segment);
+                } else if (out.length > 0 && out[out.length - 1] === name) {
+                    out.pop();          // drop the label along with its value
+                }
+                return;
+            }
+            out.push(segment.replace(/:([a-zA-Z_][a-zA-Z0-9_]*)/g, function (m, name) {
+                if (supplied(name)) {
+                    consumed.push(name);
+                    return encodeURIComponent(values[name]);
+                }
+                if (required[name]) missingRequired.push(name);
+                return m;
+            }));
+        });
+
+        // Dropping a trailing segment can leave "/listFile.php/" — tidy it, but
+        // never reduce the path to nothing: a path of "/:only" with the value
+        // omitted is still a request to the root, not a request with no path.
+        let result = out.join('/');
+        if (result.length > 1) result = result.replace(/[/]+$/, '');
+        if (result === '') result = '/';
+
+        return { path: result, consumed: consumed, missingRequired: missingRequired };
+    }
+
     /**
      * Apply auth configuration to fetch options
      * @param {object} fetchOpts - Fetch options object
@@ -961,12 +1067,77 @@
             // self-contained, and the browser sends it automatically.
             // `credentials: 'include'` ALSO works cross-origin if the
             // server sets the right CORS headers (Access-Control-
-            // Allow-Credentials + a concrete Origin). Documented limit:
-            // no built-in CSRF token helper; if the API needs a CSRF
-            // token echoed in a header, configure it manually via a
-            // separate interaction (filed as a future concern).
+            // Allow-Credentials + a concrete Origin).
             fetchOpts.credentials = 'include';
+            applyCsrf(fetchOpts, auth.csrf);
         }
+    }
+
+    /**
+     * The double-submit CSRF token that most session-cookie APIs require.
+     *
+     * ⚠ THIS IS THE AUTHOR'S API's CSRF, NOT QUICKSITE'S. QuickSite's own
+     * management surface authenticates with a session cookie AND a per-session
+     * bearer token, and none of that plumbing is here. This reads a cookie the
+     * author's own server set on the author's own origin.
+     *
+     * The pattern it implements: the server sets a readable (non-httponly)
+     * cookie, and every state-changing request must echo its value back in a
+     * header. A cross-site page can cause the cookie to be SENT but cannot READ
+     * it, so it cannot produce the header. Laravel, Angular's HttpClient and
+     * Django all ship a variant; the cookie is usually `XSRF-TOKEN` and the
+     * header `X-XSRF-TOKEN`.
+     *
+     * Config, on the API's `auth` block, alongside `type: 'cookie'`:
+     *
+     *     "csrf": { "from": "cookie:XSRF-TOKEN", "to": "header:X-XSRF-TOKEN" }
+     *
+     * The `prefix:name` form matches `tokenSource` elsewhere in the auth
+     * config. Only `cookie:` reads and only `header:` writes — there is one
+     * shape of this pattern and inventing others would be guessing.
+     *
+     * Values are URL-decoded before they are sent. A missing cookie warns
+     * rather than sending a header with no value — the request will be refused by the API,
+     * and a console line naming the cookie is what turns that 419/403 into
+     * something an author can act on.
+     */
+    function applyCsrf(fetchOpts, csrf) {
+        // Absent, and "present but empty", both mean the author never
+        // configured this. An empty JSON object arrives here as a truthy `{}`,
+        // so it needs saying explicitly — warning about it would fire on every
+        // request of every API that merely has the field cleared.
+        if (!csrf || (!csrf.from && !csrf.to)) return;
+
+        var from = typeof csrf.from === 'string' ? csrf.from : '';
+        var to   = typeof csrf.to   === 'string' ? csrf.to   : '';
+        if (from.indexOf('cookie:') !== 0 || to.indexOf('header:') !== 0) {
+            console.warn('[QS] auth.csrf ignored: expected {from:"cookie:NAME", to:"header:NAME"}, got',
+                csrf.from, '->', csrf.to);
+            return;
+        }
+        var cookieName = from.slice(7);
+        var headerName = to.slice(7);
+        if (!cookieName || !headerName) {
+            console.warn('[QS] auth.csrf ignored: cookie name or header name is empty');
+            return;
+        }
+
+        // _readCookie returns the raw value; Set-Cookie percent-encodes, and
+        // the server compares against its decoded session copy (the step
+        // Angular and Axios also perform). A value that is not valid
+        // percent-encoding is still a value, so a decode failure sends it as-is.
+        var value = _readCookie(cookieName);
+        if (value !== null) {
+            try { value = decodeURIComponent(value); } catch (e) { /* send raw */ }
+        }
+        if (value === null) {
+            console.warn('[QS] auth.csrf: cookie "' + cookieName + '" is not readable',
+                '— the API will likely refuse this request. Either it has not been issued yet ' +
+                '(call the endpoint that sets it first), or the server marked it httponly, ' +
+                'which makes the double-submit pattern impossible.');
+            return;
+        }
+        fetchOpts.headers[headerName] = value;
     }
     
     // =========================================================================
@@ -1568,6 +1739,50 @@
     }
     
     /**
+     * Say so when a direct-URL fetch just walked past bindings the author
+     * configured.
+     *
+     * Response bindings hang off a REGISTERED endpoint, so they are reachable
+     * only through registry mode — `QS.fetch('@api/endpoint')`. Written as
+     * `QS.fetch('GET', 'https://…')` the same call fetches identically and
+     * updates nothing, with no error: the most confusing shape a failure can
+     * take, and one an author hits by copying a URL out of the endpoint form.
+     *
+     * Only fires when the URL actually matches a registered endpoint that has
+     * bindings — a deliberate direct fetch to some unrelated URL is a normal
+     * thing to do and must stay quiet.
+     */
+    function warnDirectUrlSkipsBindings(url) {
+        var registry = window.QS_API_ENDPOINTS;
+        if (!registry || typeof url !== 'string') return;
+
+        var plain = url.split('?')[0];
+        for (var apiId in registry) {
+            if (!Object.prototype.hasOwnProperty.call(registry, apiId)) continue;
+            var api = registry[apiId] || {};
+            var endpoints = api.endpoints || {};
+            for (var epId in endpoints) {
+                if (!Object.prototype.hasOwnProperty.call(endpoints, epId)) continue;
+                var ep = endpoints[epId] || {};
+                if (!ep.responseBindings || !ep.responseBindings.length) continue;
+                // Match on the part of the declared URL that is fixed. A
+                // path can carry :placeholders the caller already substituted,
+                // so compare only up to the first one — and cut at "/:" so the
+                // colon in "https://" is not mistaken for a placeholder.
+                var declared = (api.baseUrl || '') + (ep.path || '');
+                var ph = declared.indexOf('/:');
+                var stem = ph === -1 ? declared : declared.slice(0, ph);
+                if (stem.length > 1 && plain.indexOf(stem) === 0) {
+                    console.warn('[QS] fetch: this URL matches the registered endpoint @' + apiId + '/' + epId +
+                        ', which has ' + ep.responseBindings.length + ' response binding(s) — direct-URL mode does not apply them.',
+                        'Call it as QS.fetch(\'@' + apiId + '/' + epId + '\') to bind the response.');
+                    return;
+                }
+            }
+        }
+    }
+
+    /**
      * Get nested value from object using dot notation
      * @param {object} obj - Source object
      * @param {string} path - Dot notation path (e.g., "user.name")
@@ -1819,9 +2034,25 @@
 
     /**
      * Compute a numeric count from an arbitrary value.
-     *   - Array       → array.length
-     *   - null / undefined / falsy (0, '', false) → fallback
-     *   - truthy non-array (object / scalar)      → 1
+     *   - Array           → array.length
+     *   - finite number   → the number ITSELF, zero included
+     *   - null/undefined  → fallback
+     *   - '' / false      → fallback
+     *   - other truthy    → 1
+     *
+     * A NUMBER IS ALREADY A COUNT. Binding an API's `total: 97` used to
+     * render "1 product", because anything truthy that was not an array
+     * counted as one item — and a numeric total is the most likely field
+     * an author picks for a count.
+     *
+     * ZERO MEANS ZERO. `0` used to fall through to `fallback`, so a
+     * genuinely empty result could not reach the zero sentence unless the
+     * fallback happened to be 0 as well. `fallback` now means what its
+     * name says — the value is missing (null/undefined) or is not a count
+     * at all ('' / false) — and a real zero renders "No products".
+     *
+     * NaN and Infinity are not counts; they take the fallback with the
+     * other non-numbers.
      *
      * `fallback` defaults to 0. Used by both renderCount (binding mode)
      * and any future direct callers.
@@ -1830,9 +2061,37 @@
         var fb = (fallback === undefined || fallback === null) ? 0 : Number(fallback);
         if (Number.isNaN(fb)) fb = 0;
         if (Array.isArray(value)) return value.length;
+        if (typeof value === 'number') return isFinite(value) ? value : fb;
         if (value === null || value === undefined) return fb;
-        if (value === 0 || value === '' || value === false) return fb;
+        if (value === '' || value === false) return fb;
         return 1;
+    }
+
+    /**
+     * One branch's sentence for a count binding: `zero`, `one` or `many`.
+     *
+     * The page's own table wins. `window.QS_COUNT_STRINGS` is emitted per
+     * request in the page's language, so it is the only source that can be
+     * right on a multi-language site. `zeroStr`/`oneStr`/`manyStr` baked into
+     * the binding are read only as a fallback — a build produced before the
+     * strings moved out of qs-api-config.js still renders sentences rather
+     * than bare numbers.
+     *
+     * A key with no entry in the table is a real problem (the page was
+     * rendered without knowing the binding existed), so it says so instead of
+     * failing quiet.
+     */
+    function countTemplate(binding, which) {
+        var key = binding[which + 'Key'];
+        var table = window.QS_COUNT_STRINGS;
+        if (typeof key === 'string' && key !== '' && table) {
+            if (Object.prototype.hasOwnProperty.call(table, key)) {
+                return table[key];
+            }
+            console.warn('[QS] count[sentence]: key "' + key + '" is not in window.QS_COUNT_STRINGS',
+                '— this page was rendered without it (stale build, or the binding was saved after the page was compiled)');
+        }
+        return binding[which + 'Str'];
     }
 
     /**
@@ -1844,22 +2103,24 @@
      *     renderMode: "count",
      *     selector:   "#cmd-counter",
      *     fallback:   0,                         // optional
-     *     // sentence form (added by writeCompiledJs from KEYS in the
-     *     // saved binding, translated to STRINGS at compile time):
+     *     // sentence form — the binding carries translation KEYS:
      *     format:    "sentence",
-     *     zeroStr:   "No commands",
-     *     oneStr:    "1 command",
-     *     manyStr:   "{n} commands"
+     *     zeroKey:   "shop.zero",
+     *     oneKey:    "shop.one",
+     *     manyKey:   "shop.many"
      *   }
      *
      * Without `format`, the count number is written verbatim.
-     * With `format === "sentence"`, picks zeroStr/oneStr/manyStr per
-     * count, substitutes `{n}` with the actual number.
+     * With `format === "sentence"`, picks the zero/one/many string per
+     * count and substitutes `{n}` with the actual number.
      *
-     * Sentence strings are already in the user's language — server
-     * translation happens at qs-api-config.js write time. Bindings on
-     * multi-language sites currently freeze in whatever language was
-     * active when writeCompiledJs ran (filed in BACKLOG.md).
+     * ⚠ WHERE THE SENTENCES COME FROM. Not from qs-api-config.js: that
+     * file is written once per PROJECT, so a string resolved into it
+     * would be served to every visitor in whichever language wrote it
+     * last — a bilingual site froze in one language. The server resolves
+     * the keys for the page's own language and emits
+     * `window.QS_COUNT_STRINGS`, the same way it hands over QS_CONSENT,
+     * QS_ENUMS and the resolver blocks.
      */
     function renderCount(value, binding) {
         var selector = binding.selector;
@@ -1877,17 +2138,15 @@
         var output;
 
         if (binding.format === 'sentence') {
-            var template;
-            if (n === 0)      template = binding.zeroStr;
-            else if (n === 1) template = binding.oneStr;
-            else              template = binding.manyStr;
+            var which = n === 0 ? 'zero' : (n === 1 ? 'one' : 'many');
+            var template = countTemplate(binding, which);
 
             if (typeof template !== 'string' || template === '') {
                 // Sentence mode declared but the matching string is
                 // missing — fall back to the raw number so the page
                 // still shows something useful.
-                console.warn('[QS] count[sentence]: missing template for n=' + n,
-                    '(zero/one/many strings:', binding.zeroStr, binding.oneStr, binding.manyStr, ')');
+                console.warn('[QS] count[sentence]: no "' + which + '" sentence for n=' + n,
+                    '(key:', binding[which + 'Key'], ')');
                 output = String(n);
             } else {
                 output = template.replace(/\{n\}/g, String(n));
@@ -2131,7 +2390,7 @@
      *
      * Returns a Promise resolving to the API response on success, or
      * undefined on failure (console.warn surfaces the reason). The verb
-     * is registered as CHAIN_AWAITABLE in JsonToHtmlRenderer.php so
+     * is registered as CHAIN_AWAITABLE in CallTransformer.php so
      * `{{call:exchangeMagicLink:…}};{{call:saveToken:…}}` chains await
      * the exchange before saveToken reads QS._lastFetchResult.
      *
