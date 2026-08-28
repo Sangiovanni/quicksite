@@ -516,8 +516,50 @@ Other layered protections:
 | AuthN / AuthZ | Username+password login → a PHP session (HttpOnly cookie) plus a per-session token; both are required on every Management call. Role is checked per project on every call, and logged. A session generation counter on the user record ends every session of an account at once. Failed logins are throttled per username. |
 | CSRF on admin | The session cookie alone never authorizes: a call must also carry the per-session token, which is page-embedded and unreadable to another origin. A cross-site request can make the browser send the cookie but cannot supply the token. The same rule covers the panel's own state-changing forms — signing out is a POST carrying that token, not a link. The three pre-session forms (login, register, first-run) have no session to draw a token from, so they use a double-submit pair instead: an HttpOnly, `SameSite=Strict` cookie scoped to the admin path plus a hidden field, accepted only when the two match. |
 | CORS | Configurable per deployment. |
-| Per-project serving (`/p/<id>/`) | Static sub-resources are served **only** from the project's own `public/` subtree via a `realpath` canonicalisation + prefix check (a jail): any path resolving outside `…/public/` is refused, so `config/` (members.json), `data/` (api-endpoints.json), `routes.php`, `config.php`, `templates/`, `translate/` are unreachable, and encoded / backslash / absolute traversals are rejected. Hidden paths are refused as well — no segment of a served path may begin with a dot, so neither a dotfile nor anything inside a hidden directory such as `.git/` is reachable (§5.1). HTML is always live-rendered, never served as raw project files; the view runs the same render/compile sanitisation as the built site, plus a Content-Security-Policy whose `connect-src` is **derived from the project's own API registry** — `'self'` plus the origin of every registered API that has at least one client-callable endpoint, and nothing else. A fixed `'self'` blocked every browser-side call an author had registered, which is the entire client half of the API registry; deriving it means registering an API is what declares that the site talks to it, and a server-only API (whose endpoints never reach the browser anyway) never widens the policy. Private projects require membership, and that decision is taken before a single byte is read: conditional and range requests are answered inside the same passthrough, so `Range` and `If-None-Match` reach no file the caller could not have fetched whole. |
+| Per-project serving (`/p/<id>/`) | Static sub-resources are served **only** from the project's own `public/` subtree via a `realpath` canonicalisation + prefix check (a jail): any path resolving outside `…/public/` is refused, so `config/` (members.json), `data/` (api-endpoints.json), `routes.php`, `config.php`, `templates/`, `translate/` are unreachable, and encoded / backslash / absolute traversals are rejected. Hidden paths are refused as well — no segment of a served path may begin with a dot, so neither a dotfile nor anything inside a hidden directory such as `.git/` is reachable (§5.1). HTML is always live-rendered, never served as raw project files; the view runs the same render/compile sanitisation as the built site, plus the Content-Security-Policy described below — the same one a built site sends, from the same writer. Private projects require membership, and that decision is taken before a single byte is read: conditional and range requests are answered inside the same passthrough, so `Range` and `If-None-Match` reach no file the caller could not have fetched whole. |
 | Error + path disclosure | A PHP fatal happens outside every `try` a program can write, so all four entry points (`/management`, `/admin/api`, `/admin`, and the per-project view at `/p/<id>/`) register a shared shutdown handler (`secure/src/functions/errorHygiene.php`) that discards the partial output and answers `500` — as a JSON envelope on the API surfaces, as a plain page on the panel and on the public project view. The error's type, message, file and line reach the response **only** on an install that declares itself development (`environment.php`); otherwise they go to the PHP error log. The project view registers it inside `init.php`'s `/p/` block rather than in its own entry file, because that entry file cannot name `secure/` until `SECURE_FOLDER_PATH` has been resolved; registering there also puts the visibility gate itself inside the handler's reach. Separately, no response publishes where the installation lives: paths in a response body are rewritten to be relative before the envelope is assembled (`secure/src/functions/publicPaths.php`), so the disk layout is not disclosed by an ordinary success either. See the note below on `display_errors`. |
+
+### 7.1 Content-Security-Policy — one policy, every surface that serves a page
+
+`secure/src/functions/contentSecurityPolicy.php` composes it; `/p/<projectId>/`
+and a built site both call it, and a build carries the file. There was one
+writer and two surfaces before: the preview sent a full policy and **a built
+site sent none at all** — no `object-src`, no `base-uri`, no `frame-ancestors`
+and no `script-src` restriction — so the artifact a visitor actually reaches was
+the less protected of the two.
+
+The line is drawn by what a resource can **do**, not by where it comes from.
+
+| Directive | Value | Why |
+|---|---|---|
+| `default-src` | `'self'` | the floor for anything not named |
+| `script-src` | `'self' 'unsafe-inline'` | `script` is a blocked tag, so a project ships no JavaScript of its own; the inline allowance is for the engine's own output (theme toggle, state-store hydration, compiled page-event handlers) |
+| `style-src` | `'self' 'unsafe-inline'` | an external stylesheet can exfiltrate through selectors |
+| `img-src` / `font-src` / `media-src` | `'self' data: https: http:` | passive, and `UrlPolicy` permits http/https in URL attributes — an author referencing an external image is doing something the engine supports |
+| `frame-src` | `'self' https: http:` | external embeds are a shipped feature; `IframeSandbox` exists to give them per-domain sandbox rules |
+| `connect-src` | `'self'` + registered API origins | **derived** — see below |
+| `object-src` | `'none'` | free: `object`, `embed` and `applet` are blocked tags |
+| `base-uri` | `'self'` | an injected `<base>` silently re-points every relative URL |
+| `frame-ancestors` | `'self'` | agrees with the `X-Frame-Options: SAMEORIGIN` both surfaces already send |
+
+`form-action` is deliberately **not** set: a form posting to an external endpoint
+is something an author can legitimately build, and the directive does not fall
+back to `default-src`, so omitting it leaves current behaviour unchanged rather
+than tightening it silently.
+
+**`connect-src` is derived from the project's API registry** — `'self'` plus the
+origin of every registered API with at least one client-callable endpoint, and
+nothing else. A fixed `'self'` blocked every browser-side call an author had
+registered, which is the entire client half of the API registry. Deriving it
+means registering an API is what declares that the site talks to it; a
+server-only API, whose endpoints never reach the browser, never widens the
+policy, because the same `qs_api_effective_callable_from()` filters both the
+allowlist and the compiled client config. Only the origin is emitted, and a base
+URL that does not parse to an http(s) origin is skipped rather than guessed at.
+
+⚠ **A policy that blocks a shipped feature is a bug, not a hardening.** Both of
+the permissive rows above are there because the tighter value was measured, in a
+browser, to block content the engine renders.
 
 **Deployment requirement — `display_errors` must be off in production.** The fatal handler
 above can only replace a response that has not started going out. On a full admin page the

@@ -536,6 +536,11 @@ foreach ($classFiles as $file) {
 // errorHygiene.php: turns a fatal into a neutral 500 instead of a 200 with the
 // server's absolute paths in the visitor's page. Required by the front
 // controller on EVERY request, not only by the OAuth path that first needed it.
+// contentSecurityPolicy.php: the one policy both surfaces send. A built site
+// used to send none at all, so the deployed artifact was less protected than
+// its own preview; and the policy's connect-src is DERIVED from this project's
+// API registry, which is why it has to travel rather than be baked into the
+// entry point as a string.
 //
 // The rest are the REQUEST-time half of the engine. Each has an authoring
 // counterpart that deliberately does NOT travel: apiRegistry is the read half
@@ -561,6 +566,7 @@ $functionFiles = [
     'oauthStateStore.php',
     'oauthProviderHelpers.php',
     'errorHygiene.php',
+    'contentSecurityPolicy.php',
 ];
 
 foreach ($functionFiles as $file) {
@@ -1020,7 +1026,7 @@ DEPLOYMENT STEPS:
    YOUR SITE MAY ALREADY SERVE PAGES BEFORE YOU DO THIS, and that is
    normal — not a sign you can skip it, and not a sign something is
    wrong. Panel-generated vhosts usually already carry
-   `try_files $uri $uri/ /index.php...` plus `index index.php`, because
+   `try_files \$uri \$uri/ /index.php...` plus `index index.php`, because
    that is what every front-controller app needs, and a build is one.
    Measured on CloudPanel: every page, the 404 page, styling and
    language switching all worked with no include at all.

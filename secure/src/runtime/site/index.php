@@ -233,6 +233,21 @@ header('Referrer-Policy: strict-origin-when-cross-origin');
 define('PROJECT_PATH', SECURE_FOLDER_PATH);
 define('PROJECT_NAME', $qsSite['project']);
 
+// The Content-Security-Policy, from the same writer `/p/<projectId>/` uses.
+//
+// ⚠ IT IS SENT HERE RATHER THAN WITH THE THREE HEADERS ABOVE because it is the
+// only one of the four that is a fact about THIS PROJECT: `connect-src` is
+// derived from the project's own API registry, so it needs PROJECT_PATH bound.
+// Output is buffered from ob_start() above, so nothing has flushed yet.
+//
+// A built site used to send NO policy at all — no object-src, no base-uri, no
+// frame-ancestors and no script-src restriction — which made the deployed
+// artifact strictly less protected than its own preview. That survived a slice
+// about preview/build parity because the harness compared rendered DOM and
+// never compared response headers.
+require_once SECURE_FOLDER_PATH . '/src/functions/contentSecurityPolicy.php';
+qs_send_content_security_policy(PROJECT_PATH);
+
 define('CONFIG_PATH', PROJECT_PATH . DIRECTORY_SEPARATOR . 'config.php');
 define('ROUTES_PATH', PROJECT_PATH . DIRECTORY_SEPARATOR . 'routes.php');
 if (!is_file(CONFIG_PATH)) {

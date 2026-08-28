@@ -657,39 +657,32 @@ function qs_sb_emit_range(string $file, int $start, int $length): void {
 /**
  * Emit surface-B response security headers for the HTML render.
  *
- * Same-origin framing only (the admin preview iframe is same-origin). Cross-origin
- * shared embedding is a later concern. init.php already sends X-Frame-Options.
- * A baseline CSP tighter than the admin's own chrome: engine pages use inline
- * scripts (theme toggle, state-store hydration) so 'unsafe-inline' is required for
- * now; object/base are locked down and framing is restricted to same origin.
+ * The policy itself is NOT written here any more. It lives in
+ * src/functions/contentSecurityPolicy.php, which a built site also carries and
+ * calls, because this surface and that one had drifted into sending a full
+ * policy and no policy at all — the preview protected better than the artifact
+ * a visitor reaches. One writer now; read that file for why each directive is
+ * the value it is, and in particular for why `connect-src` is derived from the
+ * project's API registry rather than fixed at `'self'`.
  *
- * ⚠ `connect-src` IS DERIVED, not fixed. It was `'self'` alone, which blocked
- * every browser-side call to a registered external API — the entire client half
- * of the API registry, unusable on the surface an author develops on, while the
- * same page worked once built because a built site sends no CSP at all. Blocked
- * in development and open in production is the worst way round.
+ * init.php already sends X-Frame-Options; `frame-ancestors` agrees with it.
+ * The install's own public/.htaccess adds X-Content-Type-Options.
  *
- * The registry already names every origin the author registered, so the policy
- * is derived from it rather than configured separately: registering an API IS
- * the act of declaring that this site talks to it. Server-only APIs are excluded
- * — the browser never calls them — by the same filter that keeps them out of the
- * compiled client config. See qs_api_client_origins().
+ * ⚠ Referrer-Policy is sent HERE, from PHP, for the reason a built site sends
+ * it from PHP: a project's public/.htaccess sets it, but that file governs the
+ * project's static directory, and a `/p/<projectId>/` PAGE is live-rendered
+ * through the install's front controller instead — so the rendered page got
+ * neither the project's .htaccess nor a header of its own, and a built page
+ * carried a header its preview did not. Found by diffing the two surfaces'
+ * response headers, which is the thing nobody had done.
  *
  * @param string|null $projectPath The project being served; defaults to PROJECT_PATH.
  */
 function qs_surface_b_send_headers(?string $projectPath = null): void {
-    require_once SECURE_FOLDER_PATH . '/src/functions/apiRegistry.php';
-
-    $connect = "'self'";
-    foreach (qs_api_client_origins($projectPath) as $origin) {
-        $connect .= ' ' . $origin;
-    }
-
+    require_once SECURE_FOLDER_PATH . '/src/functions/contentSecurityPolicy.php';
+    qs_send_content_security_policy($projectPath);
     if (!headers_sent()) {
-        header("Content-Security-Policy: default-src 'self'; "
-            . "script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; "
-            . "img-src 'self' data:; font-src 'self' data:; "
-            . "connect-src " . $connect . "; object-src 'none'; base-uri 'self'; frame-ancestors 'self'");
+        header('Referrer-Policy: strict-origin-when-cross-origin');
     }
 }
 

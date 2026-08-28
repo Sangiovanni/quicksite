@@ -510,6 +510,7 @@ if (!function_exists('qs_site_verify_servable')) {
             'src/functions/resolverCache.php',
             'src/functions/environment.php',
             'src/functions/errorHygiene.php',
+            'src/functions/contentSecurityPolicy.php',
             'src/functions/jsonIo.php',
             'src/classes/DataResolver.php',
             'src/classes/OutboundUrlPolicy.php',

@@ -9827,3 +9827,87 @@ made here.
 
 **Source**: `secure/src/functions/apiRegistry.php` (`qs_api_client_origins`),
 `secure/src/functions/surfaceB.php` (`qs_surface_b_send_headers`).
+### One Content-Security-Policy, drawn by what a resource can do (locked 2026-08-28)
+
+**Decision**: one writer, `contentSecurityPolicy.php`, called by `/p/<projectId>/`
+and by a built site, which carries the file. Tight on anything that executes or
+redirects — `script-src` and `style-src` at `'self'` plus the inline the engine
+needs, `object-src 'none'`, `base-uri 'self'`, `default-src 'self'`. Permissive
+on passive and embedded resources — `img-src`, `font-src`, `media-src` and
+`frame-src` allow http(s). `connect-src` stays derived from the API registry.
+`form-action` deliberately unset.
+
+**Reasoning**: a built site sent no policy at all, so the deployed artifact was
+strictly less protected than its own preview — missing `object-src`, `base-uri`,
+`frame-ancestors` and any `script-src` restriction. Copying the preview's policy
+across looked like the whole job and was not: measured in a browser, that policy
+**blocks an external image and an external iframe**, both of which the engine
+renders. `UrlPolicy` permits http and https in URL attributes, and
+`IframeSandbox` is an entire subsystem for giving external embeds per-domain
+sandbox rules. Shipping the tight policy would have taken production sites that
+work today and silently broken them.
+
+So the line is what a resource can DO. A script or a stylesheet executes, and an
+injected `<base>` re-points every relative URL on the page; those stay at
+`'self'`. An image, a font, a video and an embed do not execute, and authors
+legitimately point them elsewhere. `object-src 'none'` is free — `object`,
+`embed` and `applet` are blocked tags, so nothing an author can write needs it.
+
+`'unsafe-inline'` on `script-src` reduces what that directive is worth, and the
+temptation was to conclude a policy is therefore not worth sending. It is: the
+inline allowance exists for the engine's own output — `script` is a blocked tag,
+so a project ships no JavaScript of its own — and it takes nothing away from
+`object-src`, `base-uri` or `frame-ancestors`, which cost nothing and were
+absent.
+
+`form-action` is unset rather than `'self'`: a form posting to an external
+endpoint is something an author can build, the directive does not fall back to
+`default-src`, and adding it would be a silent behaviour change dressed as
+hardening.
+
+**Alternatives considered**: giving the built site the preview's policy verbatim
+(rejected — measured to break external images and embeds, so it ships a
+regression); a permissive built-site policy with the preview left tight
+(rejected — it recreates the preview/production split in the other direction,
+with the author's own image blocked while authoring and fine in production);
+leaving the built site with no policy until a later security review (rejected:
+a review's job is to find what nobody knew, and this was known — deferring a
+known gap to the work meant for unknown ones is how a known gap ships).
+
+**Source**: `secure/src/functions/contentSecurityPolicy.php`,
+`secure/src/functions/surfaceB.php`, `secure/src/runtime/site/index.php`,
+`secure/management/command/build.php`.
+
+### `frame-ancestors 'self'` on a built site, to agree with the header beside it (locked 2026-08-28)
+
+**Decision**: a built site sends `frame-ancestors 'self'`, the same value the
+preview sends.
+
+**Reasoning**: the preview's value is `'self'` for a concrete reason that does
+not transfer — the admin preview iframe is same-origin. A built site has no
+admin and no preview iframe and frames nothing of its own, so `'none'` was the
+tempting answer, and on its own merits it is the tighter one.
+
+It is not the right one, because a built site **already** sends
+`X-Frame-Options: SAMEORIGIN`, and has since before this policy existed.
+`frame-ancestors 'none'` would make the CSP contradict the header sitting beside
+it in the same response; browsers that honour CSP would refuse framing while the
+older header says same-origin is fine, and a reader of the response could not
+tell which was intended. Worse, it would silently tighten a deployed site's
+embeddability as a side effect of adding a policy — and whether a site may be
+embedded is a decision for whoever deploys it, not a consequence of a security
+header being introduced.
+
+So the two agree. A deployment that wants `'none'` changes both, deliberately.
+
+**Alternatives considered**: `'none'` (rejected — contradicts the
+`X-Frame-Options` already shipping, and changes deployed behaviour as a side
+effect); making it configurable per project (rejected — no other CSP directive
+is configurable, and a knob nobody has asked for is a knob that has to be
+documented, validated and kept in step with `X-Frame-Options`); omitting
+`frame-ancestors` entirely and relying on `X-Frame-Options` (rejected — it is
+the directive that supersedes that header, and leaving it out is how a policy
+quietly stops covering the case it was added for).
+
+**Source**: `secure/src/functions/contentSecurityPolicy.php`,
+`secure/src/runtime/site/index.php`.
