@@ -3016,10 +3016,26 @@ Where a project becomes a site you can put on a server: build it, download the a
 
 | State | What is on the page |
 |---|---|
-| No build | An explanation of what a build is, and a **Build now** button. |
+| No build | An explanation of what a build is, a **Build now** button, and the folder-name / URL-space options behind a closed disclosure. |
 | A build | Its name, when it was made, its size, how many files and pages it carries, its languages, and the public / secure folder names and URL space it was built for. |
 | A build that did not finish | The same, marked **incomplete**, with a note saying it carries no manifest and can only be deleted. |
 | A build carrying OAuth client secrets | A warning that the archive is a credential, not just a website. |
+
+#### Choosing the folder names and the URL space
+
+`build` has always taken three parameters that decide the shape of what it produces. They sit behind a closed **Folder names and URL space** disclosure beside the Build button — closed because the defaults suit most projects and the common path should stay one click, present because they are not right for everyone.
+
+| Field | Default | When to change it |
+|---|---|---|
+| Public folder name | `public` | The deployed site's document root. Some hosts force the name — `htdocs`, `public_html` — and that is the server's decision, not yours. |
+| Secure folder name | `secure` | The sibling folder holding the engine and the compiled pages. It has to sit outside the document root wherever it lands; renaming it is obscurity, not protection. |
+| URL space | *(empty)* | Serve the site from a subdirectory: `shop` makes it answer at `/shop/`. Empty serves from the domain root. |
+
+The resulting layout is **previewed as you type** rather than described, because the URL space is the one that gets misread: with a space set the document root is still `<public>/`, the site's own files live one level in at `<public>/<space>/`, and a bare `/` is not the site. A deployer who follows "point your document root at the public folder" and then tests `/` reaches a root that serves nothing.
+
+A rejected name comes back **into the form** with what was typed still in it and the disclosure opened, since the reason is almost certainly one of the three fields. Names are validated before the one-build-at-a-time refusal, so a bad name is answered as a bad name rather than sending you off to delete a build first.
+
+These names are what the deploy panel compares against the installation's own, so a build made with the defaults and deployed into the install root is the case it flags in red.
 
 #### The second build is refused, and the page says what to do
 
@@ -3045,9 +3061,58 @@ Below the line the panel is silent. With no quota configured there is no ceiling
 
 The quota belongs to the project's **owner**. A member who is not the owner sees the build and its size but no quota figure — and is told whose it is, rather than being shown a blank.
 
+#### Deploying
+
+The page can copy the build onto a path on the server. The section is **absent** — not disabled, not greyed out — unless two independent things are both true:
+
+| | |
+|---|---|
+| The installation allows deploying at all | `secure/management/config/deploy.php`, an operator decision made on the server. Absent means no, and nothing in the panel can change it. |
+| This caller may deploy | `deployBuild` is alone in the `deploy` category, granted to project admins and owners. A developer who can build and download still cannot push. |
+
+Both are asked when the page is rendered, so a caller who fails either never receives the markup, and the filesystem paths below are never emitted to them.
+
+#### Before you press it: where the files go
+
+Deploying is a file copy and nothing else — it does not point a document root, edit a web server configuration, or restart anything. Since that is easy to misread as "publish", the panel names the two folders it will create before the button does anything:
+
+- `<target>/<public>/` — the document root
+- `<target>/<secure>/` — must stay **outside** it
+
+The target defaults to the installation's own root and can be changed; any other path has to be listed in `deploy-roots.php` on the server or the deploy is refused. Two cases get called out as the target is typed, because both look like success and neither is:
+
+- **The folder names match the installation's own.** The build's files are copied *into* QuickSite's own `public/` and `secure/` rather than beside them. Build with different folder names, or deploy somewhere else.
+- **The folder names differ.** They land beside QuickSite's own folders, where no web server is looking — the deploy reports success and the site is invisible until a document root points at it.
+
+#### After: does it serve?
+
+Copying does not point a document root; only the deployer can. But when the target is a site that was set up earlier, the document root is *already* pointed and a deploy is a pure file copy, so the site serves the moment the copy finishes and there is nothing to do at all. The panel therefore leads with **check first** and treats configuration as the fallback:
+
+1. Open the site. If your pages load, you are done and the rest does not apply.
+2. The check worth doing is a URL that does not exist: it should answer with **your** 404 page, not the web server's grey one.
+3. Only if it does not serve: point the site's document root at `<target>/<public>/`. That step is required, and it is the only required one.
+
+⚠ **Never point a document root at the folder above.** It contains `<secure>/` — the engine, the site's configuration and the source of every page — and a document root there serves all of it. Renaming the two folders is obscurity, not a control; the control is that `<secure>/` sits outside the document root. The panel says this where the document root is being chosen, not in a file somewhere.
+
+Per web server, and the distinction between them matters:
+
+- **Apache** — nothing to add. The build ships the `.htaccess` files that do the routing; they take effect once the document root is right, `mod_rewrite` is on, and the directory allows overrides.
+- **nginx** — `.htaccess` is not read, so the build ships a snippet at `<target>/<secure>/nginx_routes.conf`. **You may not need it**: a hosting panel's vhost usually already carries the front-controller routing a build needs. Include it only if a page answers with nginx's own error page instead of yours, and read the top of the file first — it names one line your PHP handler must already have.
+
+#### Refusals you can answer on the spot
+
+Two of them arrive with the control that resolves them rather than a parameter to go and find:
+
+| Refusal | What the panel offers |
+|---|---|
+| Files already exist at the target (a redeploy) | The count, and **Replace them and deploy** |
+| A route is shadowed by a directory at the target | The routes and the directories responsible, and **Deploy anyway, leaving them unreachable** |
+
+A deploy that proceeds over a shadowed route still says so afterwards.
+
 #### Who sees what
 
-The page is open to every member of the project: viewing a build needs `getBuild`, which every role holds. Creating, downloading and deleting need the `build` category (developer and up), and those buttons are simply **not rendered** without it — a viewer gets the same information and a line explaining that their role cannot act on it. Non-members do not reach the page at all.
+The page is open to every member of the project: viewing a build needs `getBuild`, which every role holds. Creating, downloading and deleting need the `build` category (developer and up), and deploying needs `deploy` (admin and owner) on top of the installation's own switch; those buttons are simply **not rendered** without them — a viewer gets the same information and a line explaining that their role cannot act on it. Non-members do not reach the page at all.
 
 #### Getting there
 
@@ -3056,10 +3121,6 @@ Three routes, each gated on the same read the page is:
 - **Build → Builds** in the sidebar.
 - **Dashboard → Manage Space → Builds → Open builds page**, beside the same build the panel lists.
 - **My memberships**, per project row — this one switches the edited project first, so it works from any project you belong to without visiting the picker.
-
-#### Deploying is elsewhere
-
-This page does not deploy. `deployBuild` copies a build onto a filesystem path, is granted to project admins and owners only, and is refused outright unless the installation's operator has enabled it — see *Self-deploy* in `COMMAND_API.md`.
 
 ## 10. Data attribute reference
 

@@ -131,3 +131,157 @@
 .manage-space__section-link:hover {
     text-decoration: underline;
 }
+
+/* =============================================================================
+   DEPLOY
+
+   The section exists only when the installation allows deploying AND the caller
+   may — both asked in builds.php, so there is no "disabled" state to style.
+   ============================================================================= */
+
+/* Where the files will land, shown BEFORE the button is pressed. A deploy that
+   just fires looks broken with non-default folder names and alarming with
+   default ones, and both are decided by the target plus these two names. */
+.builds-deploy__preview {
+    margin: var(--space-md) 0;
+    padding: var(--space-sm) var(--space-md);
+    border-left: 3px solid var(--admin-border);
+    background: var(--admin-bg-tertiary);
+}
+
+.builds-deploy__path {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-xs) var(--space-sm);
+    margin-top: 4px;
+}
+
+.builds-deploy__path-value {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: var(--font-size-sm);
+    color: var(--admin-text);
+    overflow-wrap: anywhere;
+}
+
+.builds-deploy__path-note {
+    font-size: var(--font-size-xs);
+    color: var(--admin-text-muted);
+}
+
+.builds-deploy__path-note--danger {
+    color: var(--admin-warning);
+}
+
+.builds-deploy__check {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-sm);
+    margin-top: var(--space-md);
+    cursor: pointer;
+}
+
+.builds-deploy__check .admin-hint {
+    display: block;
+    margin: 2px 0 0;
+}
+
+.builds-deploy__collisions {
+    margin: var(--space-sm) 0 0;
+    padding-left: var(--space-lg);
+}
+
+.builds-deploy__collisions li {
+    margin-bottom: 4px;
+}
+
+.builds-deploy__collisions code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    margin-right: var(--space-sm);
+}
+
+/* The guidance. Ordered so "check first" is read before any configuration —
+   a redeploy onto a vhost that already points at the right place needs none of
+   it, and sending that reader to edit a vhost has already cost this project
+   once. */
+.builds-deploy__guidance {
+    margin-top: var(--space-lg);
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--admin-border);
+}
+
+.builds-deploy__heading {
+    font-size: var(--font-size-base);
+    color: var(--admin-text);
+    margin-bottom: var(--space-sm);
+}
+
+.builds-deploy__subheading {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--admin-text);
+    margin: var(--space-md) 0 var(--space-sm);
+}
+
+.builds-deploy__guidance p {
+    margin: 0 0 var(--space-sm);
+}
+
+.builds-deploy__guidance code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: var(--font-size-sm);
+    overflow-wrap: anywhere;
+}
+
+.builds-deploy__server {
+    margin-top: var(--space-md);
+    padding-left: var(--space-md);
+    border-left: 2px solid var(--admin-border);
+}
+
+.builds-deploy__conf {
+    display: block;
+    margin: var(--space-xs) 0 var(--space-sm);
+    color: var(--admin-accent-hover);
+}
+
+/* =============================================================================
+   BUILD OPTIONS
+
+   Closed by default: the defaults suit most projects and the common path is one
+   click. Native <details>, so the open/closed state costs no script.
+   ============================================================================= */
+.builds-options {
+    margin-top: var(--space-md);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-md);
+}
+
+.builds-options__summary {
+    padding: var(--space-sm) var(--space-md);
+    cursor: pointer;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--admin-text);
+    user-select: none;
+}
+
+.builds-options__summary:hover {
+    color: var(--admin-accent-hover);
+}
+
+.builds-options__body {
+    padding: 0 var(--space-md) var(--space-md);
+    border-top: 1px solid var(--admin-border);
+}
+
+.builds-options__body .admin-form-group {
+    margin-top: var(--space-md);
+    margin-bottom: 0;
+}
+
+/* The layout preview reuses the deploy panel's, so the two places that answer
+   "where will the files be" look and read the same. */
+.builds-options__body .builds-deploy__preview {
+    margin-bottom: 0;
+}

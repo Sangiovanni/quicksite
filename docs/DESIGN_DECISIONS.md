@@ -10011,3 +10011,56 @@ directories at the install root just as surely).
 
 **Source**: `secure/management/command/deployBuild.php`, ruling by Sangio
 2026-08-16.
+
+### Post-deploy guidance leads with "check first", not with the configuration (locked 2026-08-28)
+
+**Decision**: after a successful deploy the builds page states, in this order:
+open the site and see whether it already works; the check that actually
+distinguishes success (a URL that does not exist must answer with the site's own
+404 page); and only then the one required step — point the document root at
+`<public>/`. Per-web-server configuration comes last, and the nginx snippet is
+introduced as *you may not need this* before it is introduced as a thing to
+include.
+
+**Reasoning**: copying files does not point a document root, and only the
+deployer can. That makes "configure your web server" look like the natural next
+instruction. It is the wrong one to lead with, because the most common deploy is
+a REDEPLOY onto a target that was set up earlier — where the document root is
+already pointed, the vhost already exists, and the deploy is a pure file copy
+that serves the moment it finishes. Leading with configuration sends that reader
+to edit a vhost they must not touch.
+
+That is not hypothetical. The build's own README once implied an nginx include
+was load-bearing when it was not, and Sangio edited a vhost he did not need to
+touch. The build's shipped `nginx_routes.conf` was rewritten then to say so
+plainly; this is the same lesson applied to the panel, which is where the
+instruction is now read first.
+
+The rule the ordering encodes: **say what is required as required, say what is
+conditional as conditional, and let the reader tell which is which.** Exactly one
+thing on the panel is unconditional — the document root — and it is the only
+thing phrased that way. Everything else is behind "if it does not serve yet", "you
+may not need it", or a named symptom ("if a page answers with nginx's own grey
+error page").
+
+The security invariant is stated in the same place rather than left to the
+README: a document root pointed at the parent serves `<secure>/` and everything
+in it. Renaming the folders is obscurity, not a control; the control is that
+`<secure>/` sits outside the document root. It sits beside the document-root step
+because that is the moment somebody can get it wrong.
+
+**Alternatives considered**: leading with the web-server configuration (rejected —
+it is the wrong instruction for the most common case, and this project has
+already paid for that once); omitting the guidance and pointing at the build's
+README (rejected — the README is not deployed, only archived, and a reader who
+deployed from the panel has no reason to go looking for it); showing the nginx
+vhost block inline (rejected — the build already ships a snippet written for that
+exact site, with its own caveats about two-server-block panels and the
+`try_files $uri =404;` line, and a second inline copy would drift from it);
+detecting whether the site serves and reporting that instead of asking the user
+to check (rejected — the panel cannot reach the target's URL, does not know what
+domain points at it, and a wrong answer here is worse than no answer).
+
+**Source**: `public/admin/assets/js/pages/builds.js`
+(`_renderServingGuidance`), `secure/admin/templates/pages/builds.php`,
+`secure/src/functions/buildSiteRuntime.php` (`qs_site_nginx_config`).
