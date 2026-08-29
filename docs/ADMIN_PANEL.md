@@ -3033,6 +3033,8 @@ Where a project becomes a site you can put on a server: build it, download the a
 
 The resulting layout is **previewed as you type** rather than described, because the URL space is the one that gets misread: with a space set the document root is still `<public>/`, the site's own files live one level in at `<public>/<space>/`, and a bare `/` is not the site. A deployer who follows "point your document root at the public folder" and then tests `/` reaches a root that serves nothing.
 
+The **public folder name is read-only until you unlock it**, behind an explicit *I want to change this*. It is the one of the three that is usually not the author's decision — the destination host picks it — but it has to stay reachable, because a host that forces `htdocs` leaves no alternative. The other two fields are editable straight away.
+
 A rejected name comes back **into the form** with what was typed still in it and the disclosure opened, since the reason is almost certainly one of the three fields. Names are validated before the one-build-at-a-time refusal, so a bad name is answered as a bad name rather than sending you off to delete a build first.
 
 These names are what the deploy panel compares against the installation's own, so a build made with the defaults and deployed into the install root is the case it flags in red.
@@ -3079,10 +3081,19 @@ Deploying is a file copy and nothing else — it does not point a document root,
 - `<target>/<public>/` — the document root
 - `<target>/<secure>/` — must stay **outside** it
 
-The target defaults to the installation's own root and can be changed; any other path has to be listed in `deploy-roots.php` on the server or the deploy is refused. Two cases get called out as the target is typed, because both look like success and neither is:
+#### Choosing where it goes
 
-- **The folder names match the installation's own.** The build's files are copied *into* QuickSite's own `public/` and `secure/` rather than beside them. Build with different folder names, or deploy somewhere else.
-- **The folder names differ.** They land beside QuickSite's own folders, where no web server is looking — the deploy reports success and the site is invisible until a document root points at it.
+The target field starts **empty**, and the installation's own path is never rendered. Two ways to fill it:
+
+- **Deploy to this installation's own root** — a button, not a path. It sends no target at all and the server fills its own in, so the path stays on the server. This is also the only mode where the panel can say anything about merging, because it is the only one where it knows what the target is.
+- **Type a path** — anywhere listed in `deploy-roots.php` on the server. The panel previews `<target>/<public>/` and `<target>/<secure>/` as you type.
+
+In install-root mode the two folders are previewed relative — `public/`, `secure/` — with a line saying they are inside this installation's own root. That is where the two warnings live:
+
+- **The folder names match the installation's own** → the build's files would be copied *into* QuickSite's own `public/` and `secure/`. Shown in red.
+- **They differ** → they land beside QuickSite's own folders, where no web server is looking; the deploy reports success and the site is invisible until a document root points at it.
+
+A deployer who types the installation's own path by hand gets no client-side warning — the panel does not know that path, deliberately. The server's own co-tenancy refusals below cover that case, and they are the ones that matter.
 
 #### After: does it serve?
 
@@ -3099,16 +3110,22 @@ Per web server, and the distinction between them matters:
 - **Apache** — nothing to add. The build ships the `.htaccess` files that do the routing; they take effect once the document root is right, `mod_rewrite` is on, and the directory allows overrides.
 - **nginx** — `.htaccess` is not read, so the build ships a snippet at `<target>/<secure>/nginx_routes.conf`. **You may not need it**: a hosting panel's vhost usually already carries the front-controller routing a build needs. Include it only if a page answers with nginx's own error page instead of yours, and read the top of the file first — it names one line your PHP handler must already have.
 
-#### Refusals you can answer on the spot
+#### Co-tenancy: deploying one site never damages another
 
-Two of them arrive with the control that resolves them rather than a parameter to go and find:
+Several built sites can share one document root, separated by URL space. Three things make that safe, and all three refuse rather than ask a general question:
 
-| Refusal | What the panel offers |
-|---|---|
-| Files already exist at the target (a redeploy) | The count, and **Replace them and deploy** |
-| A route is shadowed by a directory at the target | The routes and the directories responsible, and **Deploy anyway, leaving them unreachable** |
+| Refusal | What it means | The one control that answers it |
+|---|---|---|
+| *This target already holds this project* | A deployment of **this** project is already here. The routine update path. | **Update the existing deployment** |
+| *That secure folder name is taken* | The folder belongs to a **different** project's deployment. | **Write over it anyway** |
+| *That secure folder already exists* | The folder has contents and no QuickSite marker, so its owner cannot be established. | **Use it anyway** |
+| *Some pages would never be reachable* | A directory at the target shadows one of the site's routes. | **Deploy anyway, leaving them unreachable** |
 
-A deploy that proceeds over a shadowed route still says so afterwards.
+None of them is answered by *Replace files that already exist* — that checkbox governs only files inside the site's own folders. That separation is the point: one blunt replace-everything click is exactly how a deployer destroys a site they did not know was there.
+
+**A build owns its own subtree and nothing else.** With a URL space that is `<public>/<space>/` and `<secure>/`; the document root itself belongs to whatever else is served from it. Files outside the subtree are created if missing and never replaced, and a deploy that leaves some alone says so afterwards.
+
+**Nothing is ever deleted.** A deploy writes the files this build produces and leaves everything else where it is — including in a folder it was told to write over. Clearing out a stale deployment is a manual act on the server.
 
 #### Who sees what
 

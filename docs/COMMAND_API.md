@@ -287,6 +287,43 @@ Turning it on widens nothing else. The role gate and the target allowlist are un
 
 Building, downloading and deleting a build are unaffected on an install with deploy off. The archive can still be produced and fetched; what is closed is QuickSite writing the site onto a path itself.
 
+### Co-tenancy: one document root, several sites
+
+Deploying site B never damages site A. `deployBuild` enforces that with a subtree rule and three named refusals, none of which `overwrite` can answer.
+
+**A build owns its own subtree and nothing else.** That is `<public>/<space>/**` and `<secure>/**`. A spaced build also emits a `.htaccess` for the document root itself — `Options -Indexes` plus headers, no `FallbackResource` — and the document root is *outside* its subtree. Outside the subtree a deploy **creates but never overwrites**, and `overwrite: true` does not reach those paths. Skipped paths come back as `shared_paths_skipped`.
+
+Without that rule, a spaced build deployed over a root build replaced the root site's funnel: its home page kept working (a real `index.php`) and every route 404'd. Order-dependent — root-then-spaced broke, spaced-then-root did not — so it passed a test and broke the next deploy.
+
+#### The deployment marker
+
+On success `deployBuild` writes `<secure>/qs-deployment.json` naming the project, the build and the time. The secure folder is not web-reachable, so it can carry a project id; and it is the folder whose contents are at stake, which is what makes the check work when two sites use different *public* folder names — the multi-tenant case.
+
+A build carries no such identity of its own: `qs-site.php` names the project but lives in the public folder, and `build_manifest.json` is never deployed. A site uploaded by hand from a downloaded archive therefore has no marker, and the first deploy over it reports an unknown owner.
+
+| At the target | Answer |
+|---|---|
+| Marker naming **this** project | `409 deploy.update_confirmation_required`, with `deployed_at` and `deployed_build`. `confirmUpdate: true` proceeds. The routine path. |
+| Marker naming a **different** project | `409 deploy.secure_folder_in_use`. `replaceDeployment: true` proceeds. |
+| Contents, **no** marker | `409 deploy.secure_folder_unmarked`. `adoptSecureFolder: true` proceeds. |
+| Empty or absent | Deploys, and the marker is written. |
+
+The two refusals about somebody else's folder say only that the name is not available. They do not name the project that holds it, its build, or when it was deployed — the same reasoning that keeps the installation's own path out of the panel.
+
+**Nothing is ever deleted.** Every path above writes the files the build produces and leaves everything else untouched, including in a folder the deployer chose to write over. Clearing a stale secure folder is a manual act on the server, deliberately: a command that could delete one is a command that can destroy a site by typo.
+
+```json
+{
+  "status": 409,
+  "code": "deploy.secure_folder_in_use",
+  "message": "The secure folder name \"app\" is not available at this target",
+  "data": {
+    "secure_folder": "app",
+    "hint": "Another deployment already owns this folder. Build with a different secure folder name, deploy to a different target, or set replaceDeployment=true to overwrite what is there. Nothing is deleted either way: files the new deployment does not write are left untouched."
+  }
+}
+```
+
 ### Route collisions at the target
 
 The default deploy target is the installation's own web root, where QuickSite already serves `/admin`, `/management` and `/p`. A site's entry point funnels requests through a fallback that only applies when the URL is **not** a real file or directory — so a directory sitting beside that entry point permanently shadows a same-named route, silently.
@@ -313,7 +350,7 @@ Route names are **not** reserved when a route is created: the names only clash i
 
 ### Parameters
 
-`deployBuild` takes an optional `name`. At one build per project the command finds the build on its own; supplying the name asserts *which* build was meant, and a name that is not the current build is a `404` rather than a silent substitution. `targetPath` defaults to `SERVER_ROOT`, `overwrite` (default false) governs existing files, and `acceptRouteCollisions` (default false) governs the check above. An incomplete build is refused: it carries no manifest, and a half-written site on a server is where a broken deliverable does damage.
+`deployBuild` takes an optional `name`. At one build per project the command finds the build on its own; supplying the name asserts *which* build was meant, and a name that is not the current build is a `404` rather than a silent substitution. `targetPath` defaults to `SERVER_ROOT`, `overwrite` (default false) governs existing files, and `acceptRouteCollisions` (default false) governs the check above. `confirmUpdate`, `replaceDeployment` and `adoptSecureFolder` (all default false) each answer exactly one co-tenancy refusal and nothing else — none of them is implied by `overwrite`, and none implies another. An incomplete build is refused: it carries no manifest, and a half-written site on a server is where a broken deliverable does damage.
 
 ## Archive import limits
 

@@ -57,15 +57,21 @@ window.QS_BUILDS_CONFIG = {
     // allowed to deploy.
     deployEnabled: <?= $__deployEnabled ? 'true' : 'false' ?>,
 <?php if ($__deployShow): ?>
-    // Emitted ONLY to a caller who passes both gates. These are filesystem
-    // facts about the server, and the deployer needs them to answer "where will
-    // this land and will it serve" before pressing anything — but nobody else
-    // has a reason to read them.
-    deployDefaultTarget: <?= json_encode(SERVER_ROOT) ?>,
+    // Emitted only to a caller who passes both gates.
+    //
+    // ⚠ THE INSTALL'S OWN PATH IS DELIBERATELY NOT HERE. publicPaths.php exists
+    // because this project decided install-root paths do not belong in responses,
+    // and emitting one into a page contradicted that for no gain. Deploying to
+    // this installation's own root sends NO targetPath at all — deployBuild
+    // already defaults to SERVER_ROOT — so the capability is kept and the path
+    // never reaches the browser.
+    //
+    // These two are folder NAMES, not paths. They are what the panel compares
+    // the build against to say whether its folders would merge into QuickSite's
+    // own or land beside them, and they disclose nothing about where this
+    // installation lives.
     installPublicName: <?= json_encode(PUBLIC_FOLDER_NAME) ?>,
     installSecureName: <?= json_encode(SECURE_FOLDER_NAME) ?>,
-    // Whether two paths that differ only in case are the same path here.
-    caseInsensitivePaths: <?= DIRECTORY_SEPARATOR === '\\' ? 'true' : 'false' ?>,
 <?php endif; ?>
 };
 window.QS_BUILDS_I18N = <?= json_encode([
@@ -129,7 +135,7 @@ window.QS_BUILDS_I18N = <?= json_encode([
     'deployTitle'      => __admin('builds.deployTitle', 'Deploy'),
     'deployIntro'      => __admin('builds.deployIntro', 'Copy this build onto a path on this server. That is all deploying does — it does not point a document root, edit your web server configuration, or restart anything.'),
     'deployTargetLabel'=> __admin('builds.deployTargetLabel', 'Deploy to'),
-    'deployTargetHint' => __admin('builds.deployTargetHint', 'This installation\'s own root is the default. Any other path has to be listed in deploy-roots.php on the server, or the deploy is refused.'),
+    'deployTargetHint' => __admin('builds.deployTargetHint', 'Where the site\'s folders will be created. It has to be listed in deploy-roots.php on the server, or the deploy is refused — apart from this installation\'s own root, which is always allowed.'),
     'deployWillCreate' => __admin('builds.deployWillCreate', 'This will create'),
     'deployDocRoot'    => __admin('builds.deployDocRoot', 'the document root'),
     'deployOutside'    => __admin('builds.deployOutside', 'must stay OUTSIDE the document root'),
@@ -167,6 +173,26 @@ window.QS_BUILDS_I18N = <?= json_encode([
     'serveNginxBody'   => __admin('builds.serveNginxBody', 'nginx does not read .htaccess. The build ships a snippet describing this site; include it inside the server block that contains the PHP handler, then reload.'),
     'serveNginxOptional' => __admin('builds.serveNginxOptional', 'If a page answers with nginx\'s own grey error page instead of yours, include this file inside the server block that holds the PHP handler, then reload. Read the top of it first — it says exactly what the include adds, and names one line your PHP handler must already have.'),
     'serveMore'        => __admin('builds.serveMore', 'The full instructions — permissions, both web servers, and how to test — ship as README.txt inside the downloaded archive.'),
+
+    // --- Deploy target mode, co-tenancy refusals, field unlock --------------
+    'deployTargetPlaceholder' => __admin('builds.deployTargetPlaceholder', '/var/www/mysite'),
+    'deployUseInstall' => __admin('builds.deployUseInstall', 'Deploy to this installation\'s own root'),
+    'deployToInstall' => __admin('builds.deployToInstall', 'Deploying into this installation\'s own root.'),
+    'deployElsewhere' => __admin('builds.deployElsewhere', 'Choose a different path'),
+    'deployInsideInstall' => __admin('builds.deployInsideInstall', 'Inside this installation\'s own root. The panel does not show that path — the server fills it in.'),
+    'deployInstallRootLabel' => __admin('builds.deployInstallRootLabel', 'this installation\'s own root'),
+    'deploySharedTitle' => __admin('builds.deploySharedTitle', 'Some files were left as they were'),
+    'deploySharedBody' => __admin('builds.deploySharedBody', '{n} file(s) outside this site\'s own folder already existed, so they were left untouched: {paths}. They belong to whatever else is served from that document root — another site deployed there, most likely. Replacing files never reaches outside a site\'s own subtree.'),
+    'deployUpdateTitle' => __admin('builds.deployUpdateTitle', 'This target already holds this project'),
+    'deployUpdateBody' => __admin('builds.deployUpdateBody', 'A deployment of this project was made here on {date}. Updating it replaces the files this build produces. Nothing else at the target is touched, and nothing is deleted.'),
+    'deployConfirmUpdateBtn' => __admin('builds.deployConfirmUpdateBtn', 'Update the existing deployment'),
+    'deployInUseTitle' => __admin('builds.deployInUseTitle', 'That secure folder name is taken'),
+    'deployInUseBody' => __admin('builds.deployInUseBody', 'The folder “{folder}” at this target already belongs to a deployment. Building with a different secure folder name, or deploying somewhere else, is usually what you want. Going ahead writes this site\'s files over what is there — nothing is deleted, but that site stops working.'),
+    'deployReplaceOtherBtn' => __admin('builds.deployReplaceOtherBtn', 'Write over it anyway'),
+    'deployUnmarkedTitle' => __admin('builds.deployUnmarkedTitle', 'That secure folder already exists'),
+    'deployUnmarkedBody' => __admin('builds.deployUnmarkedBody', 'The folder “{folder}” at this target has contents and carries no QuickSite deployment marker, so who owns it cannot be established — a deployment made before markers existed, or something else entirely. Going ahead writes this site\'s files into it; nothing is deleted.'),
+    'deployAdoptBtn' => __admin('builds.deployAdoptBtn', 'Use it anyway'),
+    'optUnlock' => __admin('builds.optUnlock', 'I want to change this'),
 ]) ?>;
 </script>
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/builds.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/builds.js') ?>"></script>

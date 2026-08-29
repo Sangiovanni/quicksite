@@ -10064,3 +10064,79 @@ domain points at it, and a wrong answer here is worse than no answer).
 **Source**: `public/admin/assets/js/pages/builds.js`
 (`_renderServingGuidance`), `secure/admin/templates/pages/builds.php`,
 `secure/src/functions/buildSiteRuntime.php` (`qs_site_nginx_config`).
+
+### Deploying one site never damages another: a build owns its own subtree (locked 2026-08-29)
+
+**Decision**: a deployed build owns `<public>/<space>/**` and `<secure>/**`, and
+nothing else. Outside that subtree `deployBuild` may CREATE but never OVERWRITE,
+and `overwrite: true` does not reach those paths. Every cross-tenant conflict
+gets its own refusal code and its own opt-in — never folded into a general
+`files_exist` that one checkbox waves past. `deployBuild` writes an ownership
+marker into `<secure>/` so the next deploy can tell an update from a stranger.
+**Nothing in the deploy path ever deletes.**
+
+**Reasoning**: several built sites sharing one document root, separated by URL
+space, is one of the things QuickSite is for. Nothing enforced it. Three
+separate reports turned out to be the same problem, and `overwrite: true` was
+the common failure path in all three — one blunt checkbox that a deployer must
+tick to redeploy their own site, and which therefore gets ticked reflexively.
+
+The three symptoms, each measured:
+
+1. **The document-root `.htaccess`.** A spaced build emits a guard for the
+   document root — `Options -Indexes` plus headers, no `FallbackResource` —
+   because the root is not its own. Deployed over a root build it replaced that
+   site's funnel: the home page kept working, since `index.php` is a real file,
+   and every route 404'd. Order-dependent: root-then-spaced broke, spaced-then-
+   root did not, so it passed a test and broke the next deploy. Found by Sangio
+   on a live pair of sites.
+2. **The secure folder.** Deploying site B with site A's secure folder name
+   replaced A's compiled pages and its config — A silently became B. It
+   surfaced only as `conflict.files_exist`, a file list identical in shape to
+   the one a routine redeploy produces.
+3. **Route collisions**, already checked at deploy time since beta.11: a
+   directory at the target shadowing one of the site's routes.
+
+**Why the fix is at deploy time and expressed as a subtree rule.** The
+build-time alternative for symptom 1 — stop emitting the root guard — was
+rejected: it costs `Options -Indexes` on a fresh spaced-only deployment, which
+was a deliberate earlier decision, and it fixes a co-tenancy symptom in the
+layer that cannot see the other tenant. Deploy time is where the target's
+layout is known. Stating it as ownership of a subtree rather than as a
+special case for one filename means a nested space, or a third tenant, needs no
+second patch.
+
+**Why the marker lives in `<secure>/`.** Nothing in a build carried an identity
+that survived to the target: `qs-site.php` names the project but sits in the
+PUBLIC folder, and `build_manifest.json` is read out of the build and never
+deployed. The secure folder is not web-reachable, so it can hold a project id
+safely; it is the folder whose contents are at stake; and checking it rather
+than the public folder is what makes the check work when two sites use
+different public folder names — which is exactly the multi-tenant case.
+
+**Why the refusals are discrete.** They say the secure folder name is not
+available. They do not name the project that holds it, its build, or when it
+was deployed. Same reasoning as keeping the installation's own path out of the
+panel: a deployer with filesystem access can look, and nobody else needs to be
+told what else is on that box.
+
+**Why nothing deletes** (Sangio's rule): QuickSite may create a secure folder
+and may write into one, but clearing a stale one is the deployer's own manual
+act. A command that can delete a secure folder is a command that can destroy a
+site by typo, and the recovery is a backup nobody took.
+
+**Alternatives considered**: dropping the root guard from spaced builds
+(rejected — wrong layer, and it costs a deliberate protection); folding the new
+refusals into `files_exist` (rejected — that is the failure path being closed:
+one checkbox must not answer three different questions); refusing rather than
+skipping outside the subtree (rejected — skipping is right in every case, so a
+refusal would only teach deployers to click through another opt-in); putting the
+marker in the public folder beside `qs-site.php` (rejected — web-reachable, and
+it would identify the wrong folder when two sites share a document root under
+different spaces); making the marker part of the BUILD (rejected — a build can
+be downloaded and uploaded by hand, and QuickSite should only vouch for what it
+deployed itself; an unmarked folder is honestly reported as unknown).
+
+**Source**: `secure/management/command/deployBuild.php`,
+`secure/src/functions/buildSiteRuntime.php` (`qs_site_htaccess`,
+`qs_site_root_htaccess`), `NOTES/tests/beta11/s38c_live_probe.sh`.

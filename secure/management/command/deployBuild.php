@@ -18,6 +18,18 @@
  * - acceptRouteCollisions: (optional) If true, deploy even though one of the
  *              site's routes is shadowed by a directory that already exists at
  *              the target. Default false, which refuses with the collisions named.
+ * - confirmUpdate: (optional) The target already holds a deployment OF THIS
+ *              PROJECT. Confirms the update. This is the routine path.
+ * - replaceDeployment: (optional) The target's secure folder belongs to a
+ *              DIFFERENT project. Overwrites what that deployment wrote.
+ * - adoptSecureFolder: (optional) The target's secure folder has contents and
+ *              no QuickSite marker, so its owner is unknown. Writes into it anyway.
+ *
+ * CO-TENANCY: deploying site B never damages site A. A build owns its own
+ * subtree — <public>/<space>/** and <secure>/** — and nothing else. Outside it a
+ * deploy may CREATE but never OVERWRITE, and `overwrite` does not reach those
+ * paths. Each cross-tenant conflict above has its own refusal code and its own
+ * opt-in; none is reachable through `overwrite`. Nothing here ever DELETES.
  *
  * THREE INDEPENDENT GATES, all of which must pass:
  *   1. deploy.php    — may this installation deploy at all? ABSENT MEANS NO.
@@ -54,21 +66,25 @@ if (!qs_deploy_allowed()) {
 $params = $trimParametersManagement->params();
 $buildName = $params['name'] ?? null;
 $targetPath = $params['targetPath'] ?? null;
-// Cast overwrite to boolean (form checkboxes send "true"/"false" strings)
-$rawOverwrite = $params['overwrite'] ?? false;
-if (is_string($rawOverwrite)) {
-    $overwrite = in_array(strtolower($rawOverwrite), ['true', '1', 'yes'], true);
-} else {
-    $overwrite = (bool) $rawOverwrite;
-}
+// One spelling of "the form said yes", for every opt-in this command takes.
+// Form checkboxes send "true"/"false" as strings; JSON callers send booleans.
+$optIn = static function (string $key) use ($params): bool {
+    $raw = $params[$key] ?? false;
+    return is_string($raw)
+        ? in_array(strtolower($raw), ['true', '1', 'yes'], true)
+        : (bool) $raw;
+};
 
-// Same cast for the route-collision opt-in — one spelling of "the form said yes".
-$rawAcceptCollisions = $params['acceptRouteCollisions'] ?? false;
-if (is_string($rawAcceptCollisions)) {
-    $acceptRouteCollisions = in_array(strtolower($rawAcceptCollisions), ['true', '1', 'yes'], true);
-} else {
-    $acceptRouteCollisions = (bool) $rawAcceptCollisions;
-}
+$overwrite             = $optIn('overwrite');
+$acceptRouteCollisions = $optIn('acceptRouteCollisions');
+// The three co-tenancy opt-ins. Each answers ONE named refusal and nothing
+// else: none of them is reachable through `overwrite`, and none of them
+// implies another. That separation is the point — a single blunt
+// replace-everything checkbox is exactly how a deployer destroys a site they
+// did not know was there.
+$confirmUpdate       = $optIn('confirmUpdate');
+$replaceDeployment   = $optIn('replaceDeployment');
+$adoptSecureFolder   = $optIn('adoptSecureFolder');
 
 // Default targetPath to SERVER_ROOT (the project root where public/ and secure/ live)
 if (empty($targetPath)) {
@@ -318,6 +334,91 @@ if (!is_dir($sourceSecure)) {
 $destPublic = $targetPath . DIRECTORY_SEPARATOR . $buildPublicName;
 $destSecure = $targetPath . DIRECTORY_SEPARATOR . $buildSecureName;
 
+// === WHO OWNS THE SECURE FOLDER AT THIS TARGET? ===
+//
+// THE WORST CO-TENANCY CASE, and until now the least guarded. Deploying site B
+// with site A's secure folder name replaces A's compiled pages and its config:
+// A silently becomes B. It surfaced only as `conflict.files_exist` — a file
+// list that anyone redeploying clicks straight past, because redeploying your
+// own site produces exactly the same list.
+//
+// So the folder that holds the data answers for itself. Nothing in a build
+// carried an identity that survived to the target: `qs-site.php` names the
+// project but lives in the PUBLIC folder, and `build_manifest.json` is read out
+// of the build and never deployed. The marker is written HERE, at deploy, into
+// <secure>/ — which is not web-reachable, so it can carry the project id
+// safely, and which is the right place because it is the folder whose contents
+// are at stake. Checking the secure folder rather than the public one is also
+// what makes this work when the two sites use different public folder names,
+// which is the multi-tenant case.
+//
+// ⚠ NOTHING HERE DELETES. QuickSite may create a secure folder and may write
+// into one it owns; clearing a stale secure folder is the deployer's own manual
+// act, deliberately (Sangio's rule). A command that could delete a secure
+// folder is a command that can destroy a site by typo.
+//
+// ⚠ THE REFUSALS ARE DISCRETE. They say the name is not available. They do not
+// name the other project, its build, when it was deployed, or anything else on
+// that box — same reasoning as keeping the install root out of the panel.
+const QS_DEPLOY_MARKER = 'qs-deployment.json';
+
+$markerPath = $destSecure . DIRECTORY_SEPARATOR . QS_DEPLOY_MARKER;
+$existingMarker = null;
+if (is_file($markerPath)) {
+    $decoded = json_decode((string) @file_get_contents($markerPath), true);
+    if (is_array($decoded)) {
+        $existingMarker = $decoded;
+    }
+}
+
+/** Is there anything in the destination secure folder at all? */
+$secureFolderOccupied = false;
+if (is_dir($destSecure)) {
+    foreach ((array) @scandir($destSecure) as $entry) {
+        if ($entry !== '.' && $entry !== '..') { $secureFolderOccupied = true; break; }
+    }
+}
+
+if ($existingMarker !== null) {
+    $markerProject = (string) ($existingMarker['project'] ?? '');
+    if ($markerProject === (string) PROJECT_NAME) {
+        // THE UPDATE PATH — the common one, and the only one that is routine.
+        // It still asks, because "update the live site" deserves a deliberate
+        // yes even when it is the thing you meant.
+        if (!$confirmUpdate) {
+            ApiResponse::create(409, 'deploy.update_confirmation_required')
+                ->withMessage('This target already holds a deployment of this project. Confirm to update it.')
+                ->withData([
+                    'secure_folder'   => $buildSecureName,
+                    'deployed_at'     => $existingMarker['deployed_at'] ?? null,
+                    'deployed_build'  => $existingMarker['build'] ?? null,
+                    'hint'            => 'Set confirmUpdate=true to update the existing deployment in place.',
+                ])
+                ->send();
+        }
+    } elseif (!$replaceDeployment) {
+        // A DIFFERENT project's data. Its own code, its own opt-in, and
+        // nothing about the occupant in the answer.
+        ApiResponse::create(409, 'deploy.secure_folder_in_use')
+            ->withMessage('The secure folder name "' . $buildSecureName . '" is not available at this target')
+            ->withData([
+                'secure_folder' => $buildSecureName,
+                'hint'          => 'Another deployment already owns this folder. Build with a different secure folder name, deploy to a different target, or set replaceDeployment=true to overwrite what is there. Nothing is deleted either way: files the new deployment does not write are left untouched.',
+            ])
+            ->send();
+    }
+} elseif ($secureFolderOccupied && !$adoptSecureFolder) {
+    // Occupied, and QuickSite did not put the marker there — so it cannot say
+    // whose it is. Adopting is a decision, not a default.
+    ApiResponse::create(409, 'deploy.secure_folder_unmarked')
+        ->withMessage('The secure folder name "' . $buildSecureName . '" is not available at this target')
+        ->withData([
+            'secure_folder' => $buildSecureName,
+            'hint'          => 'This folder already has contents and carries no QuickSite deployment marker, so its owner is unknown — a deployment made before markers existed, or something else entirely. Build with a different secure folder name, deploy to a different target, or set adoptSecureFolder=true to write into it anyway. Nothing is deleted either way.',
+        ])
+        ->send();
+}
+
 // === ROUTE COLLISIONS AT THE TARGET (Sangio's ruling, 2026-08-16) ===
 //
 // The default deploy target is the installation's own web root, and `addRoute`
@@ -430,35 +531,92 @@ if (empty($buildSpace) && is_dir($destPublic)) {
     }
 }
 
+// === WHAT THIS BUILD OWNS ===
+//
+// THE PRINCIPLE: deploying site B never damages site A.
+//
+// A build owns its own subtree and nothing else. With a URL space the site
+// lives at <public>/<space>/, so <public>/ itself belongs to whatever else the
+// deployer serves from that document root — including another QuickSite site
+// deployed at the root. Everything under <secure>/ is the build's (subject to
+// the ownership check further down, which decides whether it may write there
+// at all).
+//
+// Outside its own subtree a deploy may CREATE but never OVERWRITE, and
+// `overwrite: true` does not reach those paths. That is what makes a shared
+// document root safe: the first tenant's files stay the first tenant's.
+//
+// THE DEFECT THIS CLOSES, measured: a spaced build emits two .htaccess files —
+// its own funnel at <public>/<space>/, and a guard at <public>/ carrying
+// `Options -Indexes` and headers but NO FallbackResource. Deployed over a root
+// build, that guard replaced the root site's funnel: the root site kept "/"
+// (index.php is a real file) and lost every route. Order-dependent —
+// root-then-spaced broke, spaced-then-root did not — so it passed a test and
+// broke the next deploy.
+//
+// Expressed as the general rule rather than a spaced-build special case, so a
+// nested space and a third tenant need no second patch.
+$ownedPublicPrefix = $buildSpace !== ''
+    ? trim(str_replace('/', DIRECTORY_SEPARATOR, $buildSpace), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR
+    : '';
+
+/**
+ * Does this build own the destination of `$relativePath` within the public tree?
+ *
+ * With no space it owns all of it. With a space it owns only what is under that
+ * space; anything else the build happens to emit into the document root — today
+ * exactly one file, the root guard — is a shared path.
+ */
+$ownsPublicPath = static function (string $relativePath) use ($ownedPublicPrefix): bool {
+    if ($ownedPublicPrefix === '') {
+        return true;
+    }
+    $normalised = str_replace('/', DIRECTORY_SEPARATOR, $relativePath);
+    return strncmp($normalised, $ownedPublicPrefix, strlen($ownedPublicPrefix)) === 0;
+};
+
 // === FILE CONFLICT DETECTION ===
 
 /**
  * Scan source directory and find files that already exist at destination.
- * Returns array of relative paths that would be overwritten.
+ *
+ * Returns two lists. `conflicts` are paths this build OWNS and would therefore
+ * overwrite — those are what the overwrite decision is about. `shared` are
+ * paths outside its subtree that already exist: they are not conflicts, because
+ * nothing is going to touch them, and counting them as such would ask the user
+ * to authorise an overwrite that will not happen.
  */
-function findConflicts(string $source, string $dest): array {
+function findConflicts(string $source, string $dest, ?callable $ownsPath = null): array {
     $conflicts = [];
-    if (!is_dir($dest)) return $conflicts;
-    
+    $shared = [];
+    if (!is_dir($dest)) return ['conflicts' => $conflicts, 'shared' => $shared];
+
     $iterator = new RecursiveIteratorIterator(
         new RecursiveDirectoryIterator($source, RecursiveDirectoryIterator::SKIP_DOTS),
         RecursiveIteratorIterator::LEAVES_ONLY
     );
-    
+
     foreach ($iterator as $item) {
         $relativePath = $iterator->getSubPathname();
         $destFile = $dest . DIRECTORY_SEPARATOR . $relativePath;
         if (file_exists($destFile)) {
-            $conflicts[] = $relativePath;
+            if ($ownsPath !== null && !$ownsPath($relativePath)) {
+                $shared[] = $relativePath;
+            } else {
+                $conflicts[] = $relativePath;
+            }
         }
     }
-    
-    return $conflicts;
+
+    return ['conflicts' => $conflicts, 'shared' => $shared];
 }
 
 // Check for file conflicts in public/secure directories
-$publicConflicts = findConflicts($sourcePublic, $destPublic);
-$secureConflicts = findConflicts($sourceSecure, $destSecure);
+$publicScan     = findConflicts($sourcePublic, $destPublic, $ownsPublicPath);
+$secureScan     = findConflicts($sourceSecure, $destSecure);
+$publicConflicts = $publicScan['conflicts'];
+$secureConflicts = $secureScan['conflicts'];
+$sharedPaths     = $publicScan['shared'];
 $totalConflicts = count($publicConflicts) + count($secureConflicts);
 
 if ($totalConflicts > 0 && !$overwrite) {
@@ -530,25 +688,27 @@ $createdDirs = [];
 /**
  * Recursively copy a directory, tracking all created items for rollback
  */
-function copyDirectory(string $source, string $dest, bool $overwrite, array &$createdFiles, array &$createdDirs): array {
+function copyDirectory(string $source, string $dest, bool $overwrite, array &$createdFiles, array &$createdDirs, ?callable $ownsPath = null): array {
     if (!is_dir($dest)) {
         if (!mkdir($dest, 0755, true)) {
             return ['files' => 0, 'directories' => 0, 'error' => "Failed to create directory: {$dest}"];
         }
         $createdDirs[] = $dest;
     }
-    
+
     $iterator = new RecursiveIteratorIterator(
         new RecursiveDirectoryIterator($source, RecursiveDirectoryIterator::SKIP_DOTS),
         RecursiveIteratorIterator::SELF_FIRST
     );
-    
+
     $copiedFiles = 0;
     $copiedDirs = 0;
-    
+    $skippedShared = [];
+
     foreach ($iterator as $item) {
-        $destPath = $dest . DIRECTORY_SEPARATOR . $iterator->getSubPathname();
-        
+        $relativePath = $iterator->getSubPathname();
+        $destPath = $dest . DIRECTORY_SEPARATOR . $relativePath;
+
         if ($item->isDir()) {
             if (!is_dir($destPath)) {
                 if (!mkdir($destPath, 0755, true)) {
@@ -559,6 +719,15 @@ function copyDirectory(string $source, string $dest, bool $overwrite, array &$cr
             }
         } else {
             $fileExisted = file_exists($destPath);
+            // OUTSIDE THIS BUILD'S SUBTREE: create, never overwrite — and
+            // `overwrite` deliberately does not reach here. This is the whole of
+            // "deploying site B never damages site A": the file belongs to
+            // whoever put it there first, and a blanket replace-everything
+            // checkbox must not be able to take it.
+            if ($fileExisted && $ownsPath !== null && !$ownsPath($relativePath)) {
+                $skippedShared[] = $relativePath;
+                continue;
+            }
             if ($overwrite || !$fileExisted) {
                 if (!copy($item->getPathname(), $destPath)) {
                     return ['files' => $copiedFiles, 'directories' => $copiedDirs, 'error' => "Failed to copy file: {$destPath}"];
@@ -571,8 +740,8 @@ function copyDirectory(string $source, string $dest, bool $overwrite, array &$cr
             }
         }
     }
-    
-    return ['files' => $copiedFiles, 'directories' => $copiedDirs];
+
+    return ['files' => $copiedFiles, 'directories' => $copiedDirs, 'skipped_shared' => $skippedShared];
 }
 
 /**
@@ -606,7 +775,7 @@ function rollbackDeployment(array $createdFiles, array $createdDirs): array {
 }
 
 // Copy public folder
-$publicResult = copyDirectory($sourcePublic, $destPublic, $overwrite, $createdFiles, $createdDirs);
+$publicResult = copyDirectory($sourcePublic, $destPublic, $overwrite, $createdFiles, $createdDirs, $ownsPublicPath);
 
 if (isset($publicResult['error'])) {
     $rollbackErrors = rollbackDeployment($createdFiles, $createdDirs);
@@ -655,6 +824,19 @@ if (file_exists($licenseSource)) {
     }
 }
 
+// === STAMP THE SECURE FOLDER WITH WHO OWNS IT ===
+// Written LAST, and only on the success path, so a deploy that failed and
+// rolled back does not leave a claim on a folder it did not populate. A failure
+// to write the marker is not fatal — the site is already there and serving —
+// but it IS reported, because the next deploy will then see an unmarked folder
+// and refuse until adopted, and the deployer should learn that here rather than
+// next time.
+$markerWritten = @file_put_contents($markerPath, json_encode([
+    'project'     => (string) PROJECT_NAME,
+    'build'       => $buildName,
+    'deployed_at' => date('c'),
+], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n") !== false;
+
 // Release lock
 release_deploy_lock();
 
@@ -681,8 +863,32 @@ $responseData = [
     ],
     'license_copied' => $licenseCopied,
     'overwrite_mode' => $overwrite,
-    'files_overwritten' => $overwrite ? $totalConflicts : 0
+    'files_overwritten' => $overwrite ? $totalConflicts : 0,
+    // The folder now says who owns it, so the next deploy can tell an update
+    // from a stranger without asking the deployer to remember.
+    'ownership_marker' => [
+        'written' => $markerWritten,
+        'path'    => $destSecure . DIRECTORY_SEPARATOR . QS_DEPLOY_MARKER,
+        'updated_existing' => $existingMarker !== null,
+    ],
 ];
+
+if (!$markerWritten) {
+    $responseData['ownership_marker']['warning'] =
+        'The deployment marker could not be written. The site is deployed and serving, but the next deploy to this target will see an unmarked secure folder and refuse until it is adopted.';
+}
+
+// Paths this build does NOT own that already existed and were therefore left
+// alone. Reported rather than passed over in silence: on a shared document root
+// this is the difference between "your site is fine" and "something quietly did
+// not happen".
+if ($sharedPaths !== []) {
+    $responseData['shared_paths_skipped'] = [
+        'count' => count($sharedPaths),
+        'paths' => array_slice($sharedPaths, 0, 50),
+        'reason' => 'Outside this build\'s own subtree (it is mounted under the "' . $buildSpace . '" URL space), so it belongs to whatever else is served from that document root. Existing files there are never replaced, and overwrite does not reach them.',
+    ];
+}
 
 if ($spaceWarning) {
     $responseData['warning'] = $spaceWarning;
