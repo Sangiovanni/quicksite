@@ -12,6 +12,18 @@
  * and the space picture; build / download / delete live in the `build` category
  * (developer and up) and their buttons are simply not rendered without it.
  *
+ * DEPLOY has TWO gates on top of that, and they are independent: the
+ * installation must allow deploying at all (deploy.php, an operator decision
+ * the panel cannot change) AND the caller's role must hold `deployBuild` (the
+ * `deploy` category, admin and owner). The page template asks both and emits no
+ * section unless they pass; this file asks both again before filling it.
+ *
+ * The deploy panel's real work is not the button — it is saying WHERE the files
+ * land before the button is pressed, and WHAT MAKES THEM SERVE afterwards.
+ * Copying does not point a document root; only the deployer can. But on a
+ * redeploy the document root is already pointed and nothing needs doing, so the
+ * guidance leads with "check first" and treats configuration as the fallback.
+ *
  * Built with QSDom.el + named _render* helpers (one Element each) per the
  * CLAUDE.md HTML-in-JS hygiene rule. No innerHTML string-glueing.
  * Static structure lives in templates/pages/builds.php.
@@ -29,10 +41,23 @@
     var ICON_TRASH = 'M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6';
     var ICON_BUILD = 'M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z';
     var ICON_REFRESH = 'M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15';
+    var ICON_DEPLOY = 'M12 19V5m0 0l-7 7m7-7l7 7M4 21h16';
 
     // Last successful getBuild payload — the delete modal's download-first button
     // and the space panel both read it rather than re-fetching.
     var currentBuild = null;
+
+    /**
+     * What the next build will be shaped like.
+     *
+     * `build` has always accepted these three; nothing in the panel could set
+     * them, so every build made from here came out with the defaults and a
+     * deployer who needed `htdocs` or a URL space had to go through
+     * /admin/command. Held in module state rather than read off the inputs at
+     * submit time, so a refused build can re-render the form with what was typed
+     * instead of throwing it away.
+     */
+    var buildOptions = { public: 'public', secure: 'secure', space: '' };
 
     function api(cmd, method, body) {
         return window.QuickSiteAdmin.apiRequest(cmd, method, body);
@@ -147,19 +172,28 @@
                 return;
             }
             setBody(_renderEmptyState());
+            loadDeploy(null);
             return;
         }
 
         currentBuild = data;
         setBody(_renderBuild(data));
+        loadDeploy(data);
     }
 
-    function _renderEmptyState() {
+    function _renderEmptyState(errorText) {
         var nodes = [
             el('p', { class: 'builds-empty__title', text: T.none || 'This project has no build yet.' }),
             el('p', { class: 'admin-hint', text: T.noneHint || '' }),
         ];
+        if (errorText) {
+            nodes.push(_renderAlert('error', T.error || 'Error', errorText));
+        }
         if (canRun('build')) {
+            // Opened when a build was just refused: the reason is almost always
+            // one of these three fields, and it is already filled in with what
+            // was typed.
+            nodes.push(_renderBuildOptions(!!errorText));
             nodes.push(el('div', { class: 'builds-actions' }, [
                 _renderButton(T.buildBtn || 'Build now', ICON_BUILD, 'primary', onBuild),
             ]));
@@ -167,6 +201,95 @@
             nodes.push(_renderAlert('info', null, T.noControls || ''));
         }
         return nodes;
+    }
+
+    /**
+     * The three knobs `build` has always taken, behind a closed disclosure.
+     *
+     * Closed by default because the defaults are right for most people and the
+     * common path should stay one click. Present because they are not right for
+     * everyone: a host that forces `htdocs` or `public_html` as the document
+     * root decides the public folder's name, and a site that has to answer under
+     * /shop/ needs the space. Getting either wrong is only discovered after a
+     * deploy that reported success, which is why the layout is previewed here as
+     * it is typed rather than described in a hint.
+     */
+    function _renderBuildOptions(open) {
+        var preview = el('div', { class: 'builds-deploy__preview' });
+
+        /**
+         * One field. `locked` starts it READ-ONLY behind an explicit unlock.
+         *
+         * Used for the public folder name, which is the one of the three that is
+         * usually not the author's decision at all — the destination host picks
+         * it. Read-only rather than hidden, because it is also the field that
+         * decides which deploy warning fires, and a deployer moving to a host
+         * that forces `htdocs` must be able to say so. The unlock is deliberate,
+         * the same shape as the disclosure this sits inside.
+         */
+        function field(key, labelText, hintText, placeholder, locked) {
+            var input = el('input', {
+                type: 'text',
+                class: 'admin-input',
+                id: 'builds-opt-' + key,
+                placeholder: placeholder || '',
+                spellcheck: 'false',
+            });
+            input.value = buildOptions[key];
+            input.addEventListener('input', function () {
+                buildOptions[key] = input.value.trim();
+                refresh();
+            });
+
+            var children = [
+                el('label', { class: 'admin-label', for: 'builds-opt-' + key, text: labelText }),
+                input,
+            ];
+
+            if (locked) {
+                input.setAttribute('readonly', 'readonly');
+                input.className = 'admin-input builds-options__locked';
+                var unlock = _renderButton(T.optUnlock || '', null, 'ghost', function () {
+                    input.removeAttribute('readonly');
+                    input.className = 'admin-input';
+                    unlock.remove();
+                });
+                children.push(el('div', { class: 'builds-options__unlock' }, [unlock]));
+            }
+
+            children.push(el('p', { class: 'admin-hint', text: hintText }));
+            return el('div', { class: 'admin-form-group' }, children);
+        }
+
+        function refresh() {
+            var pub = buildOptions.public || 'public';
+            var sec = buildOptions.secure || 'secure';
+            var space = buildOptions.space || '';
+            clearNode(preview);
+            preview.appendChild(el('span', { class: 'builds-field__label', text: T.optPreview || '' }));
+            preview.appendChild(_renderPathLine(pub + '/', T.deployDocRoot || ''));
+            // The one the README had to be corrected for: with a space set, the
+            // document root is still <public>/ and the site lives one level in,
+            // so "/" is NOT the site.
+            if (space !== '') {
+                preview.appendChild(_renderPathLine(pub + '/' + space + '/', (T.optSpaceServes || '').replace('{space}', space)));
+            }
+            preview.appendChild(_renderPathLine(sec + '/', T.deployOutside || '', true));
+        }
+        refresh();
+
+        var body = el('div', { class: 'builds-options__body' }, [
+            field('public', T.optPublicLabel || '', T.optPublicHint || '', 'public', true),
+            field('secure', T.optSecureLabel || '', T.optSecureHint || '', 'secure'),
+            field('space', T.optSpaceLabel || '', T.optSpaceHint || '', ''),
+            preview,
+        ]);
+
+        var details = el('details', { class: 'builds-options' });
+        if (open) details.setAttribute('open', 'open');
+        details.appendChild(el('summary', { class: 'builds-options__summary', text: T.optTitle || '' }));
+        details.appendChild(body);
+        return details;
     }
 
     function _renderBuild(b) {
@@ -242,11 +365,19 @@
 
     async function onBuild() {
         setLoading(T.building || 'Building…');
+        // Empty means "use the default", which is what the server does with an
+        // absent parameter — so an empty field is sent as absent rather than as
+        // an empty string the validator would then have to have an opinion about.
+        var body = {};
+        if (buildOptions.public) body.public = buildOptions.public;
+        if (buildOptions.secure) body.secure = buildOptions.secure;
+        if (buildOptions.space) body.space = buildOptions.space;
+
         var res;
         try {
-            res = await api('build', 'POST', {});
+            res = await api('build', 'POST', body);
         } catch (e) {
-            setBody([_renderAlert('error', T.error || 'Error', String(e && e.message ? e.message : e))]);
+            setBody(_renderEmptyState(String(e && e.message ? e.message : e)));
             return;
         }
 
@@ -266,7 +397,11 @@
             toast(serverMessage(res), 'warning');
             return;
         }
-        setBody([_renderAlert('error', T.error || 'Error', serverMessage(res))]);
+        // Anything else — a rejected folder name, most likely — comes back into
+        // the FORM with what was typed still in it and the server's own reason
+        // above it. Replacing the panel with a bare error would make the user
+        // re-enter three fields to fix one character.
+        setBody(_renderEmptyState(serverMessage(res)));
     }
 
     /**
@@ -428,6 +563,354 @@
                 loadSpace(true);
             }),
         ]));
+    }
+
+    // ============================================================
+    // Deploy — copy the build onto a path on this server
+    // ============================================================
+
+    /**
+     * TWO GATES, and the section only exists when both hold.
+     *
+     *   1. The INSTALLATION allows deploying (CFG.deployEnabled, from
+     *      deploy.php via the page). An operator decision; nothing here can
+     *      change it.
+     *   2. THIS CALLER may deploy (`deployBuild`, the `deploy` category, admin
+     *      and owner). A developer who can build and download still cannot push.
+     *
+     * The page template already asked both and emitted no shell unless they
+     * passed, so this is the second half of a deliberate doubling: whatever
+     * reaches the DOM, nothing fills it with a deploy button unless both gates
+     * agree here too.
+     */
+    function deployAllowedHere() {
+        return CFG.deployEnabled === true && canRun('deployBuild');
+    }
+
+    /** `<target>/<folder>`, in the reader's own separator style. */
+    function joinPath(target, folder) {
+        var sep = String(target || '').indexOf('\\') !== -1 ? '\\' : '/';
+        return String(target || '').replace(/[\\/]+$/, '') + sep + folder;
+    }
+
+    function setDeploy(nodes) {
+        var panel = document.getElementById('builds-deploy');
+        if (!panel) return;
+        clearNode(panel);
+        nodes.forEach(function (n) { if (n) panel.appendChild(n); });
+    }
+
+    /**
+     * Render the deploy panel for the build that is on disk.
+     *
+     * Nothing to deploy, or an incomplete build, is stated rather than left as a
+     * form that would only produce a refusal.
+     */
+    function loadDeploy(build) {
+        var panel = document.getElementById('builds-deploy');
+        if (!panel || !deployAllowedHere()) return;
+
+        if (!build) {
+            setDeploy([el('p', { class: 'admin-hint', text: T.none || '' })]);
+            return;
+        }
+        if (build.complete === false) {
+            setDeploy([_renderAlert('warning', null, T.incompleteBody || '')]);
+            return;
+        }
+        setDeploy(_renderDeployForm(build));
+    }
+
+    /**
+     * Where to deploy: this installation's own root, and nowhere else.
+     *
+     * There is no target field. On any install without a deploy-roots.php — the
+     * default — every path a user could type is refused, so the control could
+     * only ever fail; and free text in front of a destructive operation buys a
+     * typo, not a capability. Choosing a target is the INSTALLER's decision, the
+     * same way allow_deploy already is. deployBuild still accepts targetPath for
+     * API callers and still validates it against the allowlist; the panel simply
+     * does not offer it.
+     *
+     * `publicPaths.php` exists because this project decided install-root paths do
+     * not belong in responses; emitting one into a page contradicted that for no
+     * gain. The capability is kept and the path is not: choosing "this
+     * installation's own root" sends NO targetPath, and `deployBuild` already
+     * defaults to SERVER_ROOT when none is given. The server knows where it
+     * lives; the browser does not have to.
+     *
+     * A consequence worth stating: the two warnings below can only fire in
+     * install-root MODE, because that is the only case where the page knows the
+     * target is the install. A deployer who types the install's path by hand
+     * gets no client-side warning — the server's own co-tenancy refusals cover
+     * that case, and they are the ones that matter.
+     */
+    function _renderDeployForm(build) {
+        var overwrite = el('input', { type: 'checkbox', id: 'builds-deploy-overwrite' });
+
+        var preview  = el('div', { class: 'builds-deploy__preview' });
+        var warnings = el('div', { class: 'builds-deploy__warnings' });
+
+        // WHERE IT LANDS, before anything is pressed. A deploy that just fires
+        // looks broken in one case and alarming in the other, and both are
+        // decided by the target plus the build's own folder names.
+        function refresh() {
+            clearNode(preview);
+            clearNode(warnings);
+
+            preview.appendChild(el('span', { class: 'builds-field__label', text: T.deployWillCreate || '' }));
+            preview.appendChild(_renderPathLine(build.public + '/', T.deployDocRoot || ''));
+            preview.appendChild(_renderPathLine(build.secure + '/', T.deployOutside || '', true));
+            preview.appendChild(el('p', { class: 'admin-hint', text: T.deployInsideInstall || '' }));
+
+            var merges = build.public === CFG.installPublicName
+                      && build.secure === CFG.installSecureName;
+            warnings.appendChild(merges
+                ? _renderAlert('error', T.deployMergeTitle || '',
+                    (T.deployMergeBody || '')
+                        .replace('{public}', CFG.installPublicName)
+                        .replace('{secure}', CFG.installSecureName))
+                : _renderAlert('warning', T.deployBesideTitle || '',
+                    (T.deployBesideBody || '')
+                        .replace('{public}', CFG.installPublicName)
+                        .replace('{secure}', CFG.installSecureName)
+                        .replace('{docroot}', build.public + '/')));
+        }
+
+        refresh();
+
+        var btn = _renderButton(T.deployBtn || 'Deploy', ICON_DEPLOY, 'primary', function () {
+            // The target is DELIBERATELY absent: the server fills it in from
+            // SERVER_ROOT, so the install's path never round-trips to the browser.
+            onDeploy(build, null, overwrite.checked, {}, this);
+        });
+
+        return [
+            el('p', { class: 'admin-hint', text: T.deployIntro || '' }),
+            preview,
+            warnings,
+            el('label', { class: 'builds-deploy__check', for: 'builds-deploy-overwrite' }, [
+                overwrite,
+                el('span', {}, [
+                    el('span', { text: T.deployOverwrite || '' }),
+                    el('span', { class: 'admin-hint', text: T.deployOverwriteHint || '' }),
+                ]),
+            ]),
+            el('div', { class: 'builds-actions' }, [btn]),
+            el('div', { id: 'builds-deploy-result' }),
+        ];
+    }
+
+    function _renderPathLine(path, note, danger) {
+        return el('div', { class: 'builds-deploy__path' }, [
+            el('code', { class: 'builds-deploy__path-value', text: path }),
+            el('span', {
+                class: 'builds-deploy__path-note' + (danger ? ' builds-deploy__path-note--danger' : ''),
+                text: note,
+            }),
+        ]);
+    }
+
+    /**
+     * Every co-tenancy refusal arrives with the ONE control that answers it.
+     *
+     * Each row is its own named refusal with its own opt-in, and none of them is
+     * `overwrite`. That separation is the point of the slice: a single blunt
+     * replace-everything checkbox is how a deployer destroys a site they did not
+     * know was there, so the panel never lets one click stand for "yes" to a
+     * question the deployer was never asked.
+     */
+    var DEPLOY_REFUSALS = {
+        'conflict.route_collision':          { flag: 'acceptRouteCollisions', btn: 'deployAnywayBtn' },
+        'conflict.files_exist':              { flag: 'overwrite',             btn: 'deployReplaceBtn',
+                                               title: 'deployFilesExist',     body: 'deployFilesExistBody' },
+        'deploy.update_confirmation_required': { flag: 'confirmUpdate',       btn: 'deployConfirmUpdateBtn',
+                                               title: 'deployUpdateTitle',    body: 'deployUpdateBody' },
+        'deploy.secure_folder_in_use':       { flag: 'replaceDeployment',     btn: 'deployReplaceOtherBtn',
+                                               title: 'deployInUseTitle',     body: 'deployInUseBody', danger: true },
+        'deploy.secure_folder_unmarked':     { flag: 'adoptSecureFolder',     btn: 'deployAdoptBtn',
+                                               title: 'deployUnmarkedTitle',  body: 'deployUnmarkedBody', danger: true },
+    };
+
+    async function onDeploy(build, target, overwrite, optIns, btn) {
+        var out = document.getElementById('builds-deploy-result');
+        if (btn) btn.disabled = true;
+        clearNode(out);
+        out.appendChild(el('div', { class: 'admin-loading' }, [
+            el('span', { class: 'admin-spinner' }),
+            el('span', { text: T.deploying || '' }),
+        ]));
+
+        var body = {};
+        // A null target is DELIBERATE: install-root mode sends none and lets the
+        // server fill it in, so the install's path never reaches the browser.
+        if (target) body.targetPath = target;
+        if (overwrite) body.overwrite = true;
+        Object.keys(optIns || {}).forEach(function (k) { if (optIns[k]) body[k] = true; });
+
+        var res;
+        try {
+            res = await api('deployBuild', 'POST', body);
+        } catch (e) {
+            clearNode(out);
+            out.appendChild(_renderAlert('error', T.deployFailed || '', String(e && e.message ? e.message : e)));
+            if (btn) btn.disabled = false;
+            return;
+        }
+        if (btn) btn.disabled = false;
+        clearNode(out);
+
+        var data = (res && res.data && res.data.data) || {};
+
+        if (res && res.ok) {
+            toast(T.deployedMsg || 'Deployed', 'success');
+            var files = (data.public_deployment ? data.public_deployment.files_copied : 0)
+                      + (data.secure_deployment ? data.secure_deployment.files_copied : 0);
+            out.appendChild(_renderAlert('success', T.deployedMsg || '',
+                (T.deployCopied || '').replace('{files}', String(files))
+                    .replace('{target}', target || (T.deployInstallRootLabel || ''))));
+            if (Array.isArray(data.route_collisions) && data.route_collisions.length) {
+                out.appendChild(_renderCollisions(data.route_collisions, null));
+            }
+            // Files this build does not own that were left alone. Reported,
+            // because on a shared document root "nothing happened here" is
+            // information, not silence.
+            if (data.shared_paths_skipped && data.shared_paths_skipped.count) {
+                out.appendChild(_renderAlert('info', T.deploySharedTitle || '',
+                    (T.deploySharedBody || '')
+                        .replace('{n}', String(data.shared_paths_skipped.count))
+                        .replace('{paths}', (data.shared_paths_skipped.paths || []).join(', '))));
+            }
+            if (data.ownership_marker && data.ownership_marker.written === false) {
+                out.appendChild(_renderAlert('warning', null, data.ownership_marker.warning || ''));
+            }
+            out.appendChild(_renderServingGuidance(build, target, data));
+            return;
+        }
+
+        var code = (res && res.data && res.data.code) || '';
+        var spec = DEPLOY_REFUSALS[code];
+        if (spec) {
+            if (code === 'conflict.route_collision') {
+                out.appendChild(_renderCollisions(data.collisions || [], function () {
+                    onDeploy(build, target, overwrite, _withFlag(optIns, spec.flag), btn);
+                }));
+                return;
+            }
+            out.appendChild(_renderAlert(spec.danger ? 'error' : 'warning',
+                T[spec.title] || '',
+                (T[spec.body] || '')
+                    .replace('{n}', String(data.total_conflicts || 0))
+                    .replace('{folder}', data.secure_folder || '')
+                    .replace('{date}', data.deployed_at ? new Date(data.deployed_at).toLocaleString() : '')));
+            out.appendChild(el('div', { class: 'builds-actions' }, [
+                _renderButton(T[spec.btn] || '', ICON_DEPLOY, spec.danger ? 'danger' : 'primary', function () {
+                    onDeploy(build, target,
+                             spec.flag === 'overwrite' ? true : overwrite,
+                             spec.flag === 'overwrite' ? optIns : _withFlag(optIns, spec.flag),
+                             this);
+                }),
+            ]));
+            return;
+        }
+        out.appendChild(_renderAlert('error', T.deployFailed || '', serverMessage(res)));
+    }
+
+    /** optIns plus one more, without mutating the caller's object. */
+    function _withFlag(optIns, flag) {
+        var next = {};
+        Object.keys(optIns || {}).forEach(function (k) { next[k] = optIns[k]; });
+        next[flag] = true;
+        return next;
+    }
+
+    function _renderCollisions(collisions, onAnyway) {
+        var list = el('ul', { class: 'builds-deploy__collisions' });
+        collisions.forEach(function (c) {
+            list.appendChild(el('li', {}, [
+                el('code', { text: '/' + (c.segment || c.route || '') }),
+                el('span', { class: 'builds-deploy__path-note', text: c.shadowed_by || '' }),
+            ]));
+        });
+
+        var kind = onAnyway ? 'warning' : 'info';
+        var box = el('div', { class: 'admin-alert admin-alert--' + kind }, [
+            el('strong', { class: 'builds-alert__title', text: T.deployCollisionTitle || '' }),
+            el('p', { class: 'builds-alert__body', text: T.deployCollisionBody || '' }),
+            list,
+        ]);
+        if (onAnyway) {
+            box.appendChild(el('div', { class: 'builds-actions' }, [
+                _renderButton(T.deployAnywayBtn || '', ICON_DEPLOY, 'danger', onAnyway),
+            ]));
+        }
+        return box;
+    }
+
+    /**
+     * WHAT TO DO NEXT — and the order matters more than the content.
+     *
+     * Copying files does not point a document root; only the deployer can. But
+     * on a REDEPLOY the document root is already pointed, the web server config
+     * already exists, and a deploy is a pure file copy — so the site serves the
+     * moment the copy finishes and there is nothing to do at all. That case is
+     * common enough that leading with the configuration would send people to
+     * edit a vhost they must not touch, which has already happened once here.
+     *
+     * So: check first, and treat the configuration as the fallback. What is
+     * REQUIRED is stated as required (a document root at <public>/); what is
+     * CONDITIONAL is stated as conditional (the nginx include).
+     */
+    function _renderServingGuidance(build, target, data) {
+        // Paths come from the SERVER's answer where it gave one: it scrubs its
+        // own install root out of responses, so an install-root deploy reads as
+        // "public/" rather than an absolute path — which is the point of not
+        // shipping that path to the browser in the first place.
+        var paths = (data && data.deployed_paths) || {};
+        var insideInstall = !target;
+        var docRoot = paths.public || (target ? joinPath(target, build.public) : build.public + '/');
+        var securePath = paths.secure || (target ? joinPath(target, build.secure) : build.secure + '/');
+        var targetLabel = target || (T.deployInstallRootLabel || '');
+        var nodes = [];
+
+        nodes.push(el('h3', { class: 'builds-deploy__heading', text: T.serveTitle || '' }));
+        nodes.push(el('p', { text: T.serveCheckFirst || '' }));
+        nodes.push(el('p', { class: 'admin-hint', text: T.serveRedeploy || '' }));
+        nodes.push(el('p', { class: 'admin-hint', text: T.serveRealCheck || '' }));
+
+        nodes.push(el('h4', { class: 'builds-deploy__subheading', text: T.serveIfNotTitle || '' }));
+        nodes.push(el('p', {}, [
+            el('span', { text: (T.serveDocRoot || '') + ' ' }),
+            el('code', { text: docRoot }),
+        ]));
+        if (insideInstall) {
+            nodes.push(el('p', { class: 'admin-hint', text: T.deployInsideInstall || '' }));
+        }
+        if (build.space) {
+            nodes.push(el('p', { class: 'admin-hint', text: (T.serveSpaceNote || '').replace('{space}', build.space) }));
+        }
+
+        // THE ONE WAY A CORRECT DEPLOY BECOMES A BREACH. Stated where it is read,
+        // not left to the README nobody opens.
+        nodes.push(_renderAlert('error', T.serveDangerTitle || '',
+            (T.serveDangerBody || '')
+                .replace('{target}', targetLabel)
+                .replace(/\{secure\}/g, build.secure)));
+
+        nodes.push(el('div', { class: 'builds-deploy__server' }, [
+            el('strong', { text: T.serveApacheTitle || '' }),
+            el('p', { text: T.serveApacheBody || '' }),
+        ]));
+        nodes.push(el('div', { class: 'builds-deploy__server' }, [
+            el('strong', { text: T.serveNginxTitle || '' }),
+            el('p', { text: T.serveNginxBody || '' }),
+            el('code', { class: 'builds-deploy__conf', text: joinPath(securePath, 'nginx_routes.conf') }),
+            el('p', { class: 'admin-hint', text: T.serveNginxOptional || '' }),
+        ]));
+
+        nodes.push(el('p', { class: 'admin-hint', text: T.serveMore || '' }));
+
+        return el('div', { class: 'builds-deploy__guidance' }, nodes);
     }
 
     // ============================================================

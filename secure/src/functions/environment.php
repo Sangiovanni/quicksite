@@ -65,6 +65,26 @@ function qs_is_development(): bool
         return $isDev = false;
     }
 
+    // ⚠ OPCACHE WOULD OTHERWISE HOLD THE OLD ANSWER, AND HERE THE STALE
+    // DIRECTION IS THE UNSAFE ONE. `require` on a cached file returns what was
+    // compiled, not what is on disk — so an operator moving an install from
+    // development BACK to production keeps the SSRF internal-address block
+    // LIFTED until the cache lets go. With PHP's defaults that is a two-second
+    // window; on a production install running `opcache.validate_timestamps=0`
+    // (a normal tuning) it never lets go at all short of a restart.
+    //
+    // Measured on the deploy gate first, which has the identical shape:
+    // rewriting the config and re-reading in the same second still returned the
+    // previous answer, while DELETING the file worked — because absence is a
+    // filesystem question and `require` is a compiled one.
+    //
+    // force=true, so it applies whether or not timestamp validation is on.
+    // loadRolesConfig() and qs_deploy_allowed() do the same thing for the same
+    // reason.
+    if (function_exists('opcache_invalidate')) {
+        @opcache_invalidate($path, true);
+    }
+
     $cfg = null;
     // The buffer catches a non-PHP file's contents; the catch keeps a syntax
     // error from ending the request. Both paths fall through to production.

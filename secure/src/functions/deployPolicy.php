@@ -54,6 +54,23 @@ function qs_deploy_allowed(): bool
         return $allowed = false;
     }
 
+    // ⚠ OPCACHE WOULD OTHERWISE HOLD THE OLD ANSWER, AND THE STALE DIRECTION IS
+    // THE DANGEROUS ONE. This is the switch an operator uses to turn deploying
+    // OFF; `require` on a cached file returns what was compiled, not what is on
+    // disk. With PHP's defaults that is a two-second window, which is already
+    // wrong for a control somebody is deliberately closing — and a production
+    // install running `opcache.validate_timestamps=0` (a normal tuning) would
+    // never pick the change up at all, short of a restart. Measured: writing
+    // `allow_deploy => false` and immediately re-rendering the page still
+    // showed the deploy control; DELETING the file worked, because absence is a
+    // filesystem question rather than a compiled one.
+    //
+    // force=true, so it applies whether or not timestamp validation is on.
+    // loadRolesConfig() does the same thing for the same reason.
+    if (function_exists('opcache_invalidate')) {
+        @opcache_invalidate($path, true);
+    }
+
     $cfg = null;
     ob_start();
     try {
