@@ -219,6 +219,11 @@ if (!function_exists('qs_site_nginx_config')) {
         $notFnd = $prefix . '/nope';
         $date   = date('Y-m-d H:i:s');
 
+        // The location prefix THIS file declares. It is also the prefix an
+        // installation's own generated file declares for a site deployed into
+        // its document root — which is why including both is a duplicate.
+        $rootShown = $prefix . '/';
+
         // The two example URLs are shown one above the other with their arrows
         // lined up, so pad the shorter to the longer rather than letting the
         // space length decide whether the block reads as a table.
@@ -315,12 +320,49 @@ if (!function_exists('qs_site_nginx_config')) {
 # Pages behave identically either way — verified byte for byte on ten URLs. So
 # this is worth adding, and it is not an emergency if you have not.
 #
-# If this server also runs a QuickSite INSTALL, that install has its own
-# generated file, `<its secure>/nginx/dynamic_routes.conf`. It is a different
-# file for a different thing: it describes /admin/, /management/ and /p/, which
-# a build does not have. The two do not overlap and can both be included — but
-# do not point this include at that file, or the site gets routing for
-# namespaces that are not here and none for the ones that are.
+# ----------------------------------------------------------
+# ⚠ IF THIS SERVER ALSO RUNS A QUICKSITE INSTALLATION
+# ----------------------------------------------------------
+# That installation has its own generated file, `<its secure>/nginx/
+# dynamic_routes.conf`. It is a different file for a different thing, and you
+# must not point this include at it: the site would get routing for namespaces
+# that are not here and none for the ones that are.
+#
+# ⚠ AND DO NOT INCLUDE BOTH FILES IN THE SAME SERVER BLOCK. That file emits
+# FIVE location blocks, not the three its own header names:
+#
+#     /admin/api/    /management/    /admin/    /p/    and the DOCUMENT ROOT
+#
+# — plus one funnel for each build deployed under a URL space. So it declares
+# `location {$rootShown}` in exactly the case that matters here: when this site was
+# deployed into that installation's own document root. Two location blocks with
+# the same prefix are `[emerg] duplicate location "{$rootShown}"`, and nginx then
+# refuses to load AT ALL — taking down every site on that server, not just this
+# one. If your vhost already includes that file, adding this one stops nginx
+# starting.
+#
+# YOU DO NOT NEED BOTH, and on that server you do not need this one. The
+# installation regenerates its file after every deploy, from what is on its own
+# disk, so the funnel for this site is already in it. THIS file is for deploying
+# onto a server that has no QuickSite installation on it.
+#
+# ⚠ THE SYMPTOM, IF YOU EVER SEE IT: only "{$home}" serves, and every other URL
+# answers nginx's own grey 404 page rather than this site's 404 page. That is
+# some `location {$rootShown}` ending in `=404` winning over this site's funnel —
+# an installation's free-root form, or a hand-written block of your own.
+# "{$home}" still works because `index index.php` resolves the DIRECTORY; nothing
+# else does, because the `=404` is hard.
+#
+# A server-level `try_files \$uri \$uri/ /index.php?\$args;` does NOT rescue
+# it, however right it looks: server-level try_files runs only for a request that
+# matched NO location, and a prefix location claims every request beneath it.
+# Find the block that is winning with `nginx -T | grep -n "location {$rootShown}"`
+# and remove the one that is not this site's.
+#
+# QuickSite checks what it can SEE — the files on its own disk — and does. It
+# cannot see your vhost: it is not at a known path, and on a hosting panel it is
+# assembled from includes that only `nginx -T` resolves. So this is written down
+# rather than checked.
 #
 # ⚠ nginx -t parses the configuration; it does not resolve it. It will report
 # "test is successful" for a setup that answers 500 on every page — a missing

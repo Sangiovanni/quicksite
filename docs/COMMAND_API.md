@@ -297,9 +297,11 @@ Without that rule, a spaced build deployed over a root build replaced the root s
 
 #### The deployment marker
 
-On success `deployBuild` writes `<secure>/qs-deployment.json` naming the project, the build and the time. The secure folder is not web-reachable, so it can carry a project id; and it is the folder whose contents are at stake, which is what makes the check work when two sites use different *public* folder names — the multi-tenant case.
+On success `deployBuild` writes `<secure>/qs-deployment.json` naming the project, the build, the time, and **where the deployment landed** — the public folder name and the URL space. The secure folder is not web-reachable, so it can carry a project id; and it is the folder whose contents are at stake, which is what makes the check work when two sites use different *public* folder names — the multi-tenant case.
 
-A build carries no such identity of its own: `qs-site.php` names the project but lives in the public folder, and `build_manifest.json` is never deployed. A site uploaded by hand from a downloaded archive therefore has no marker, and the first deploy over it reports an unknown owner.
+The placement fields have a second reader: the nginx generator below, which has to tell a build sitting at the installation's document root from one sitting beside it. `qs-site.php` holds the same three fields and cannot be used for it — it answers 404 and exits unless the site's own entry point is booting.
+
+A build carries no such identity of its own: `qs-site.php` names the project but lives in the public folder, and `build_manifest.json` is never deployed. A site uploaded by hand from a downloaded archive therefore has no marker, and the first deploy over it reports an unknown owner. A marker written before the placement fields existed is treated as a marker with no placement: it still answers the ownership question, and the next deploy rewrites it.
 
 | At the target | Answer |
 |---|---|
@@ -347,6 +349,30 @@ A collision is refused with `409 conflict.route_collision`, naming each route, t
 ```
 
 Route names are **not** reserved when a route is created: the names only clash in one of three deployment shapes (a site served at `/p/<id>/` and a build on its own domain have no conflict), so blocking them everywhere would constrain every author for a layout most never use.
+
+#### nginx routing, and PHP's compiled files
+
+An installation generates `<secure>/nginx/dynamic_routes.conf`, whose last block describes the document root. On an installation that root is deliberately **free** — `try_files $uri $uri/ =404;` — because the installation puts no front controller there and must not squat a domain it does not own. A deploy to that same root puts one there, so `deployBuild` **regenerates the file** from what is on disk:
+
+| On disk at the document root | The generated root block |
+|---|---|
+| No deployed build | `try_files $uri $uri/ =404;` — unchanged |
+| A build at the root (no URL space) | A funnel to that build's `index.php` |
+| A build under a URL space | Still `=404`, plus a funnel block for that space |
+
+Without it a deployed site serves only its home page — `index index.php` resolves the directory — while every other URL answers nginx's own 404. A server-level `try_files $uri $uri/ /index.php?$args;` in the vhost does not rescue it: server-level `try_files` runs only for requests matching no `location`, and `location /` matches everything.
+
+The response reports the outcome under `nginx`, and never claims a reload that did not happen:
+
+| `nginx.reload` | Meaning |
+|---|---|
+| `reloaded` | `nginx -t` passed and the running nginx took the new configuration. |
+| `pending` | The file was written, the reload failed. `.pending_reload` is left for the optional cron script; a manual `nginx -t && nginx -s reload` is still needed. |
+| `not_applicable` | Not an nginx server. Nothing was attempted and no flag was written — an Apache install generates the file and never reads it. |
+
+`nginx.config_regenerated` reports whether the file itself was written; a failure there is a warning on a successful deploy, not a rollback, because the files are already copied and the deployer needs to be told rather than surprised.
+
+`php_opcache.files_invalidated` counts the deployed `.php` files this process invalidated. It is **best effort by nature**: a deployed site normally runs in a different php-fpm pool, and OPcache memory is per-pool, so the invalidation reaches the deploying process's cache rather than the site's. It is exactly right when the pool is shared and harmless when it is not. On a pool tuned with `opcache.validate_timestamps=0` — a normal production setting — a redeploy is otherwise a silent no-op until php-fpm is reloaded, which is why the response says so rather than leaving it to be discovered.
 
 ### Parameters
 

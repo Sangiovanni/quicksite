@@ -848,6 +848,47 @@
     }
 
     /**
+     * The cache-proof check, with the URL spelled out rather than described.
+     *
+     * A fresh value each render: a query string that was already asked for once
+     * can itself have been cached, which would put the reader back where they
+     * started.
+     */
+    function _renderCacheProofCheck(build) {
+        var base = (build && build.space) ? '/' + build.space + '/' : '/';
+        var example = base + '?qs=' + Date.now();
+        var text = (T.serveCacheProof || '').split('{example}');
+        var p = el('p', { class: 'admin-hint' });
+        p.appendChild(document.createTextNode(text[0] || ''));
+        p.appendChild(el('code', { text: example }));
+        p.appendChild(document.createTextNode(text.length > 1 ? text[1] : ''));
+        return p;
+    }
+
+    /**
+     * What the deploy did to this installation's own nginx routing file, and
+     * whether the running nginx actually took it.
+     *
+     * ⚠ 'pending' IS A WARNING, NOT AN ASIDE. The file on disk is correct and
+     * the server is not using it — the one state in which the site looks broken
+     * for a reason the deployer cannot see from the outside.
+     */
+    function _renderNginxReload(data) {
+        var info = data && data.nginx;
+        if (!info) return null;
+        if (!info.config_regenerated) {
+            return _renderAlert('error', T.nginxReloadTitle || '', T.nginxFailed || '');
+        }
+        if (info.reload === 'reloaded') {
+            return _renderAlert('success', T.nginxReloadTitle || '', T.nginxReloaded || '');
+        }
+        if (info.reload === 'not_applicable') {
+            return null; // Apache: saying nothing is the honest amount to say.
+        }
+        return _renderAlert('warning', T.nginxReloadTitle || '', T.nginxPending || '');
+    }
+
+    /**
      * WHAT TO DO NEXT — and the order matters more than the content.
      *
      * Copying files does not point a document root; only the deployer can. But
@@ -876,7 +917,24 @@
         nodes.push(el('h3', { class: 'builds-deploy__heading', text: T.serveTitle || '' }));
         nodes.push(el('p', { text: T.serveCheckFirst || '' }));
         nodes.push(el('p', { class: 'admin-hint', text: T.serveRedeploy || '' }));
+
+        // ⚠ THE CHECK HAS TO BE ONE A CACHE CANNOT ANSWER. A plain visit to a
+        // site behind Varnish or a CDN returns the PREVIOUS deploy and reads as
+        // success — and reloading the web server does not touch either of them.
+        // The query string is the cheapest correct form because it needs to know
+        // nothing about the stack; the backend-direct request is the better one
+        // for whoever has it, which is why both are offered in that order.
+        nodes.push(_renderCacheProofCheck(build));
         nodes.push(el('p', { class: 'admin-hint', text: T.serveRealCheck || '' }));
+        nodes.push(el('p', { class: 'admin-hint', text: T.serveBackendDirect || '' }));
+
+        // What this deploy did to THIS installation's own nginx routing, when
+        // the server said anything about it.
+        var nginxNote = _renderNginxReload(data);
+        if (nginxNote) nodes.push(nginxNote);
+
+        nodes.push(el('h4', { class: 'builds-deploy__subheading', text: T.serveOpcacheTitle || '' }));
+        nodes.push(el('p', { class: 'admin-hint', text: T.serveOpcacheBody || '' }));
 
         nodes.push(el('h4', { class: 'builds-deploy__subheading', text: T.serveIfNotTitle || '' }));
         nodes.push(el('p', {}, [

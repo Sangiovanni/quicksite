@@ -308,10 +308,11 @@ nginx ignores `.htaccess` files. QuickSite handles this automatically:
    >
    > Apache needs nothing here: `LimitRequestBody` is unlimited by default.
    >
-   > **Already have a `dynamic_routes.conf`?** It is generated once, when it is
-   > absent, so an install set up before this line existed still has the old
-   > file. Delete `secure/nginx/dynamic_routes.conf`, load any page to
-   > regenerate it, and reload nginx.
+   > **Already have a `dynamic_routes.conf`?** It is generated when absent and
+   > rewritten after every build deploy, but not in between — so an install set
+   > up before this line existed and never deployed still has the old file.
+   > Delete `secure/nginx/dynamic_routes.conf`, load any page to regenerate it,
+   > and reload nginx.
 
    **Both blocks are required.** Project pages would still render without
    `@quicksite_project`, but every stylesheet, script and image would fail — and

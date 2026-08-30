@@ -10140,3 +10140,72 @@ deployed itself; an unmarked folder is honestly reported as unknown).
 **Source**: `secure/management/command/deployBuild.php`,
 `secure/src/functions/buildSiteRuntime.php` (`qs_site_htaccess`,
 `qs_site_root_htaccess`), `NOTES/tests/beta11/s38c_live_probe.sh`.
+
+
+### The nginx root block is derived from the disk, not fixed at install (locked 2026-08-30)
+
+**Decision**: `dynamic_routes.conf` is regenerated after every successful build
+deploy, and its last block — the document root — is derived from what the deploy
+left on disk. No build deployed there: `try_files $uri $uri/ =404;`, unchanged. A
+build at the root: a front-controller funnel to its `index.php`. A build under a
+URL space: the root stays `=404` and the space gets its own funnel block. Which
+of those is true is read from the deployment marker's placement fields and then
+confirmed against the disk — a marker whose `index.php` is not there routes
+nothing.
+
+**Reasoning**: the file was written once, when absent, and never again. That was
+coherent while an installation only ever served projects at `/p/`: the web root
+stayed free for the operator's own site, and `=404` said so. Self-deploy broke
+the assumption without touching the file. A build deployed to the installation's
+own root puts a front controller at exactly the path `=404` refuses, and the
+result is a site that serves its home page — `index index.php` resolves the
+directory — and answers every other URL with nginx's own grey 404. Measured on
+nginx 1.24.0 against the config a real installation generated.
+
+A vhost that already funnels does not save it. Hosting panels generate
+`try_files $uri $uri/ /index.php?$args;` at server level, which is exactly what
+a front-controller application needs — but server-level `try_files` runs only
+for a request that matched no `location`, and `location /` matches every request
+there is. The generated block shadows it completely.
+
+**The two failure directions are not symmetric**, which is what decides the
+space row. A stale `=404` over a deployed build breaks that one site, loudly and
+recoverably. A funnel over a free root hands every URL on the domain to
+QuickSite, quietly, on an installation whose operator deliberately mounted their
+site under `/shop/` to keep `/` for something else. So the space case leaves the
+root alone, and the root case is only ever entered on the evidence of a marker
+plus a front controller actually being there.
+
+**Alternatives considered**: dropping `location /` from the generated file
+entirely (rejected — it happens to work on a CloudPanel vhost, whose server-level
+`try_files` would then be reached, but it hands the root to whatever the vhost
+does instead, and QuickSite cannot see that vhost; the block exists to state the
+root is free, and deleting it states nothing); reading `<public>/qs-site.php`
+for the placement instead of the marker (rejected — it answers 404 and calls
+`exit` unless the site's entry point is booting, so reading it from the panel
+would end the request, and defining its boot constant to get around that is
+worse); checking the deployer's own vhost for a conflicting block (rejected — it
+is not in the repo, not at a known path, and on a hosting panel it is assembled
+from includes only `nginx -T` resolves; a check that cannot see its subject
+either false-passes and gets trusted or asks the deployer to paste in the config,
+which is the same work as reading the guidance. Check what you can see, document
+what you cannot); scanning all five permitted levels for deployment markers
+(rejected — it walks the whole document root and project tree on every deploy for
+a nesting shape almost nobody uses; the scan stops at two levels, the deploy in
+progress passes its own destination in so it is never subject to the cap, and
+past it the root stays free, which is the safe direction).
+
+**On the reload**: the generator attempts `nginx -t && nginx -s reload` only when
+the serving software is nginx, and the response says which of three things
+happened — reloaded, pending (the cron flag is written, a manual reload is still
+needed), or not attempted at all. An Apache installation generates the file, as
+it always did, and spawns nothing. A reload that did not happen is never reported
+as one that did: the deployer would stop looking while the running server kept
+the previous configuration.
+
+**Source**: `secure/src/functions/NginxConfig.php` (`generate_nginx_config`,
+`try_nginx_reload`, `qs_server_is_nginx`),
+`secure/src/functions/deploymentMarker.php` (`qs_deployed_sites`),
+`secure/management/command/deployBuild.php`.
+Behaviour: [COMMAND_API.md](COMMAND_API.md) *Self-deploy*,
+[ADMIN_PANEL.md](ADMIN_PANEL.md) §9.16.

@@ -157,9 +157,17 @@ window.QS_BUILDS_I18N = <?= json_encode([
 
     // --- Serving guidance, shown after a successful deploy ------------------
     'serveTitle'       => __admin('builds.serveTitle', 'Does it serve?'),
-    'serveCheckFirst'  => __admin('builds.serveCheckFirst', 'Check before you change anything. Open the site in a browser — if your pages load, you are done and nothing below applies.'),
+    'serveCheckFirst'  => __admin('builds.serveCheckFirst', 'Check before you change anything. If the site already serves, you are done and nothing below applies.'),
     'serveRedeploy'    => __admin('builds.serveRedeploy', 'That is the normal outcome when you are updating a site you set up earlier: deploying is only a file copy, so the web server configuration you already have keeps working.'),
-    'serveRealCheck'   => __admin('builds.serveRealCheck', 'The check worth doing is a URL that does not exist. It should answer with YOUR 404 page. If you get the web server\'s own grey error page instead, the routing below is not reaching the site.'),
+    // ⚠ A PLAIN BROWSER VISIT IS NOT A CHECK. A cache in front of the site — Varnish
+    // on CloudPanel, a CDN, the browser's own — answers with the PREVIOUS deploy and
+    // reads as success. Reloading the web server clears none of them. So the check
+    // that is offered has to be one a cache cannot answer.
+    'serveCacheProof'  => __admin('builds.serveCacheProof', 'Ask for it in a way no cache can answer: add a unique query string, for example {example}. A plain visit can be served from a cache in front of the site — Varnish, a CDN, your own browser — which would show you the PREVIOUS deploy and look like success. Reloading the web server does not clear those.'),
+    'serveRealCheck'   => __admin('builds.serveRealCheck', 'Then ask for a URL that does not exist, with the same query string. It should answer with YOUR 404 page. The web server\'s own grey error page instead means the routing below is not reaching the site — and if the home page works while every other URL gives that grey page, it is the root routing specifically.'),
+    'serveBackendDirect' => __admin('builds.serveBackendDirect', 'If you can reach the web server directly behind whatever caches sit in front of it — on a hosting panel that is usually a port on localhost — a request there settles it with no query-string trick at all.'),
+    'serveOpcacheTitle' => __admin('builds.serveOpcacheTitle', 'If the previous version keeps coming back'),
+    'serveOpcacheBody' => __admin('builds.serveOpcacheBody', 'PHP caches compiled files. A deployed site normally runs in its own php-fpm pool, and a pool tuned with opcache.validate_timestamps=0 never re-reads a file from disk — so the redeploy changes nothing there until php-fpm is reloaded. Deploying invalidates what it can reach, which is not that pool. Reload php-fpm if a cache-proof request still shows the previous version.'),
     'serveIfNotTitle'  => __admin('builds.serveIfNotTitle', 'If it does not serve yet'),
     'serveDocRoot'     => __admin('builds.serveDocRoot', 'One thing is required, and only you can do it: point the site\'s document root at'),
     'serveSpaceNote'   => __admin('builds.serveSpaceNote', 'This build is mounted under a URL space, so it answers at /{space}/ and not at /. The document root is still the folder above it.'),
@@ -171,6 +179,15 @@ window.QS_BUILDS_I18N = <?= json_encode([
     'serveNginxBody'   => __admin('builds.serveNginxBody', 'nginx does not read .htaccess. The build ships a snippet describing this site; include it inside the server block that contains the PHP handler, then reload.'),
     'serveNginxOptional' => __admin('builds.serveNginxOptional', 'If a page answers with nginx\'s own grey error page instead of yours, include this file inside the server block that holds the PHP handler, then reload. Read the top of it first — it says exactly what the include adds, and names one line your PHP handler must already have.'),
     'serveMore'        => __admin('builds.serveMore', 'The full instructions — permissions, both web servers, and how to test — ship as README.txt inside the downloaded archive.'),
+
+    // --- What the deploy did to THIS installation's own nginx routing -------
+    // Reported because the deployer cannot see it happen, and because a reload
+    // that did not happen must never read as one that did.
+    'nginxReloadTitle'   => __admin('builds.nginxReloadTitle', 'nginx routing on this server'),
+    'nginxReloaded'      => __admin('builds.nginxReloaded', 'The routing file was rewritten for what is now at the document root, and nginx was reloaded. Nothing for you to do.'),
+    'nginxPending'       => __admin('builds.nginxPending', 'The routing file was rewritten for what is now at the document root, but nginx could NOT be reloaded — it is still running the previous routing. Reload it yourself, then check the site: nginx -t && nginx -s reload'),
+    'nginxNotApplicable' => __admin('builds.nginxNotApplicable', 'The routing file was rewritten for what is now at the document root. No reload was attempted, because this server is not nginx — Apache reads .htaccess and needs none of it.'),
+    'nginxFailed'        => __admin('builds.nginxFailed', 'The routing file could NOT be rewritten. On nginx the site\'s pages will not route until it describes the document root correctly, and the symptom is that only the home page serves while every other URL answers nginx\'s own grey 404. Apache is unaffected.'),
 
     // --- Deploy target mode, co-tenancy refusals, field unlock --------------
     'deployInsideInstall' => __admin('builds.deployInsideInstall', 'Inside this installation\'s own root. The panel does not show that path — the server fills it in.'),

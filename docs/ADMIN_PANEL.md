@@ -3099,16 +3099,20 @@ A deployer who types the installation's own path by hand gets no client-side war
 
 Copying does not point a document root; only the deployer can. But when the target is a site that was set up earlier, the document root is *already* pointed and a deploy is a pure file copy, so the site serves the moment the copy finishes and there is nothing to do at all. The panel therefore leads with **check first** and treats configuration as the fallback:
 
-1. Open the site. If your pages load, you are done and the rest does not apply.
-2. The check worth doing is a URL that does not exist: it should answer with **your** 404 page, not the web server's grey one.
+1. Ask for the site in a way **no cache can answer** — the panel prints a URL with a unique query string on it. A plain visit can be served from a cache in front of the site (Varnish on a hosting panel, a CDN, the browser's own), which shows the *previous* deploy and reads as success; reloading the web server clears none of those. Whoever can reach the web server directly, behind the caches, does not need the query string.
+2. Then ask for a URL that does not exist, with the same query string: it should answer with **your** 404 page, not the web server's grey one. If the home page works while every other URL gives the grey page, the root routing is the thing at fault.
 3. Only if it does not serve: point the site's document root at `<target>/<public>/`. That step is required, and it is the only required one.
+
+If a cache-proof request still returns the *previous* version, the cause is PHP rather than routing: a deployed site normally runs in its own php-fpm pool, and a pool tuned with `opcache.validate_timestamps=0` never re-reads a file from disk, so the redeploy is a no-op there until php-fpm is reloaded. Deploying invalidates the compiled files it can reach, which is not that pool.
 
 ⚠ **Never point a document root at the folder above.** It contains `<secure>/` — the engine, the site's configuration and the source of every page — and a document root there serves all of it. Renaming the two folders is obscurity, not a control; the control is that `<secure>/` sits outside the document root. The panel says this where the document root is being chosen, not in a file somewhere.
 
 Per web server, and the distinction between them matters:
 
 - **Apache** — nothing to add. The build ships the `.htaccess` files that do the routing; they take effect once the document root is right, `mod_rewrite` is on, and the directory allows overrides.
-- **nginx** — `.htaccess` is not read, so the build ships a snippet at `<target>/<secure>/nginx_routes.conf`. **You may not need it**: a hosting panel's vhost usually already carries the front-controller routing a build needs. Include it only if a page answers with nginx's own error page instead of yours, and read the top of the file first — it names one line your PHP handler must already have.
+- **nginx** — `.htaccess` is not read, so the build ships a snippet at `<target>/<secure>/nginx_routes.conf`. **You may not need it**, and on a server that carries a QuickSite installation you should not use it: the installation regenerates its own `<secure>/nginx/dynamic_routes.conf` after every deploy so that its root block describes what is actually at the document root, and that already includes the funnel for a build deployed there. Including both files in one server block declares the same `location` twice, which is `[emerg] duplicate location` — nginx then refuses to load at all. The build's snippet is for deploying onto a server that has no QuickSite installation on it.
+
+  After a deploy the panel says which of three things happened to the installation's own nginx routing: the file was rewritten and **nginx was reloaded**; it was rewritten but the **reload could not be performed**, so the running nginx is still on the previous routing and the deployer must reload it; or the file **could not be rewritten** at all. A reload that did not happen is never reported as one that did. Nothing is said on an Apache install, where the file is generated but never read.
 
 #### Co-tenancy: deploying one site never damages another
 

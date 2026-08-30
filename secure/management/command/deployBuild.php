@@ -49,6 +49,8 @@ require_once SECURE_FOLDER_PATH . '/src/functions/LockManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/deployPolicy.php';   // qs_deploy_allowed
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_build_* (the one build-location derivation)
+require_once SECURE_FOLDER_PATH . '/src/functions/deploymentMarker.php'; // QS_DEPLOY_MARKER, marker shape
+require_once SECURE_FOLDER_PATH . '/src/functions/NginxConfig.php';     // write_nginx_dynamic_routes
 
 // === GATE 1: IS DEPLOY ENABLED ON THIS INSTALLATION AT ALL? ===
 // Asked FIRST, before any parameter is read, so a disabled install answers the
@@ -360,7 +362,11 @@ $destSecure = $targetPath . DIRECTORY_SEPARATOR . $buildSecureName;
 // ⚠ THE REFUSALS ARE DISCRETE. They say the name is not available. They do not
 // name the other project, its build, when it was deployed, or anything else on
 // that box — same reasoning as keeping the install root out of the panel.
-const QS_DEPLOY_MARKER = 'qs-deployment.json';
+//
+// QS_DEPLOY_MARKER and the record's shape now live in src/functions/
+// deploymentMarker.php: the nginx generator reads the same file to find out
+// what is deployed at the document root, and a record with two readers cannot
+// have its definition inside one of them.
 
 $markerPath = $destSecure . DIRECTORY_SEPARATOR . QS_DEPLOY_MARKER;
 $existingMarker = null;
@@ -691,7 +697,7 @@ $createdDirs = [];
 function copyDirectory(string $source, string $dest, bool $overwrite, array &$createdFiles, array &$createdDirs, ?callable $ownsPath = null): array {
     if (!is_dir($dest)) {
         if (!mkdir($dest, 0755, true)) {
-            return ['files' => 0, 'directories' => 0, 'error' => "Failed to create directory: {$dest}"];
+            return ['files' => 0, 'directories' => 0, 'php_invalidated' => 0, 'error' => "Failed to create directory: {$dest}"];
         }
         $createdDirs[] = $dest;
     }
@@ -704,6 +710,7 @@ function copyDirectory(string $source, string $dest, bool $overwrite, array &$cr
     $copiedFiles = 0;
     $copiedDirs = 0;
     $skippedShared = [];
+    $phpInvalidated = 0;
 
     foreach ($iterator as $item) {
         $relativePath = $iterator->getSubPathname();
@@ -712,7 +719,7 @@ function copyDirectory(string $source, string $dest, bool $overwrite, array &$cr
         if ($item->isDir()) {
             if (!is_dir($destPath)) {
                 if (!mkdir($destPath, 0755, true)) {
-                    return ['files' => $copiedFiles, 'directories' => $copiedDirs, 'error' => "Failed to create directory: {$destPath}"];
+                    return ['files' => $copiedFiles, 'directories' => $copiedDirs, 'php_invalidated' => $phpInvalidated, 'error' => "Failed to create directory: {$destPath}"];
                 }
                 $createdDirs[] = $destPath;
                 $copiedDirs++;
@@ -730,18 +737,37 @@ function copyDirectory(string $source, string $dest, bool $overwrite, array &$cr
             }
             if ($overwrite || !$fileExisted) {
                 if (!copy($item->getPathname(), $destPath)) {
-                    return ['files' => $copiedFiles, 'directories' => $copiedDirs, 'error' => "Failed to copy file: {$destPath}"];
+                    return ['files' => $copiedFiles, 'directories' => $copiedDirs, 'php_invalidated' => $phpInvalidated, 'error' => "Failed to copy file: {$destPath}"];
                 }
                 // Only track for rollback if we created a new file (not overwrote)
                 if (!$fileExisted) {
                     $createdFiles[] = $destPath;
                 }
                 $copiedFiles++;
+
+                // ⚠ THE FILE WAS REPLACED; ITS COMPILED FORM WAS NOT. `require`
+                // on a cached file returns what was compiled, not what is on
+                // disk — a two-second window with PHP's defaults, and FOREVER on
+                // a production install running `opcache.validate_timestamps=0`,
+                // where a redeploy is a silent no-op until php-fpm restarts.
+                //
+                // force=true, so it applies whether or not timestamp validation
+                // is on. Same pattern, same reason, as qs_deploy_allowed() and
+                // qs_environment(); the difference is that those invalidate a
+                // file THIS process is about to read, and this one invalidates a
+                // file ANOTHER process will read — which is why it is
+                // best-effort: the deployed site usually runs in a different
+                // php-fpm pool, and OPcache memory is per-pool. Free when the
+                // pool is shared, harmless when it is not. The response says so.
+                if (substr($destPath, -4) === '.php' && function_exists('opcache_invalidate')) {
+                    @opcache_invalidate($destPath, true);
+                    $phpInvalidated++;
+                }
             }
         }
     }
 
-    return ['files' => $copiedFiles, 'directories' => $copiedDirs, 'skipped_shared' => $skippedShared];
+    return ['files' => $copiedFiles, 'directories' => $copiedDirs, 'skipped_shared' => $skippedShared, 'php_invalidated' => $phpInvalidated];
 }
 
 /**
@@ -831,11 +857,59 @@ if (file_exists($licenseSource)) {
 // but it IS reported, because the next deploy will then see an unmarked folder
 // and refuse until adopted, and the deployer should learn that here rather than
 // next time.
-$markerWritten = @file_put_contents($markerPath, json_encode([
-    'project'     => (string) PROJECT_NAME,
-    'build'       => $buildName,
-    'deployed_at' => date('c'),
-], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n") !== false;
+//
+// It also records WHERE the deployment landed — the public folder name and the
+// URL space — because the nginx generator below has to tell a build sitting at
+// this installation's document root from one sitting beside it, and only this
+// record knows. `<public>/qs-site.php` holds the same three fields and is not
+// usable for it: it answers 404 and calls exit unless QS_SITE_BOOT is defined.
+$markerWritten = @file_put_contents($markerPath, json_encode(
+    qs_deployment_marker_fields(
+        (string) PROJECT_NAME,
+        $buildName,
+        $buildPublicName,
+        $buildSecureName,
+        (string) $buildSpace
+    ),
+    JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES
+) . "\n") !== false;
+
+// === THE WEB SERVER'S ROUTING NOW DISAGREES WITH THE DISK ===
+//
+// nginx only. This installation generates `<secure>/nginx/dynamic_routes.conf`
+// once, at first page load, and its last block describes the document root as
+// FREE — `try_files $uri $uri/ =404;` — which is correct for an installation,
+// whose public root deliberately holds no front controller.
+//
+// The deploy that just finished put one there. Left alone, the site serves its
+// home page (`index index.php` resolves the DIRECTORY) and answers every other
+// URL with nginx's own grey 404 — measured on nginx 1.24.0. A vhost carrying a
+// server-level `try_files $uri $uri/ /index.php?$args;` does not rescue it:
+// server-level try_files runs only for requests matching NO location, and
+// `location /` matches everything.
+//
+// So the file is regenerated from what is on disk. Apache installs generate it
+// too and it stays inert there — Apache never reads it, .htaccess does the
+// routing — and try_nginx_reload() refuses to shell out on a non-nginx server,
+// so an Apache deploy attempts nothing.
+//
+// ⚠ NOT FATAL, AND NEVER OPTIMISTIC. The files are copied and the site is on
+// disk; a configuration that could not be rewritten is something the deployer
+// must be TOLD about, not a reason to roll back a successful copy. The response
+// carries which of the three outcomes happened and never claims a reload that
+// did not occur.
+//
+// $destSecure is handed in explicitly: a build's secure folder name may be
+// nested (`build` validates it to five levels and offers `backend/core` as an
+// example), and the marker scan stops at two. The deploy that just happened must
+// never depend on that cap.
+$nginxResult = write_nginx_dynamic_routes(
+    PUBLIC_FOLDER_SPACE,
+    SECURE_FOLDER_PATH,
+    null,
+    null,
+    [$destSecure]
+);
 
 // Release lock
 release_deploy_lock();
@@ -877,6 +951,51 @@ if (!$markerWritten) {
     $responseData['ownership_marker']['warning'] =
         'The deployment marker could not be written. The site is deployed and serving, but the next deploy to this target will see an unmarked secure folder and refuse until it is adopted.';
 }
+
+$nginxRootIsFunnelled = false;
+foreach ($nginxResult['deployed_sites'] as $deployedSite) {
+    if ($deployedSite['space'] === '') { $nginxRootIsFunnelled = true; break; }
+}
+
+// The routing file and what happened to the running nginx. `reload` is the
+// field that matters and it is never optimistic: 'reloaded' only when nginx
+// actually took the new configuration, 'pending' when the flag was left for the
+// cron fallback and a manual reload is still needed, 'not_applicable' when this
+// is not an nginx server and nothing was attempted.
+$responseData['nginx'] = [
+    'config_regenerated' => (bool) $nginxResult['success'],
+    'config_path'        => $nginxResult['config_path'],
+    'reload'             => $nginxResult['reload_outcome'],
+    'reload_note'        => $nginxResult['reload_note'],
+    // What the regenerated root block says: a funnel to a deployed front
+    // controller, or the free `=404` form that leaves the domain root alone.
+    'root_serves_a_build' => $nginxRootIsFunnelled,
+];
+if (!$nginxResult['success']) {
+    $responseData['nginx']['warning'] =
+        'The nginx routing file could not be rewritten (' . ($nginxResult['error'] ?? 'unknown error')
+        . '). The site is deployed. On nginx, its pages will not route until that file describes the '
+        . 'document root correctly — the symptom is that only "/" serves and every other URL answers '
+        . 'nginx\'s own 404 page. Apache installs are unaffected.';
+}
+
+// ⚠ OPCACHE ON THE DEPLOYED SITE, AND WHAT THIS CAN AND CANNOT DO.
+// `opcache.validate_timestamps=0` is a normal production tuning under which PHP
+// never re-stats a compiled file — so replacing a deployed .php file changes
+// nothing until php-fpm is reloaded, and a redeploy is a SILENT NO-OP.
+//
+// The invalidation above (inside copyDirectory) is best-effort by nature and
+// cannot be more: a deployed site normally runs in a different php-fpm pool from
+// the panel that deployed it, and OPcache shared memory is per-pool — so the
+// invalidate lands in the wrong memory. It is free when the pool IS shared
+// (the common self-deploy-to-this-install case, where it is exactly right) and
+// harmless when it is not. What closes the gap in every case is saying so.
+$responseData['php_opcache'] = [
+    'files_invalidated' => $publicResult['php_invalidated'] + $secureResult['php_invalidated'],
+    'note' => 'Deployed PHP files were invalidated in THIS process\'s OPcache. If the deployed site '
+        . 'runs in a different php-fpm pool and that pool has opcache.validate_timestamps=0, it is '
+        . 'still serving the previous code — reload php-fpm to pick this deploy up.',
+];
 
 // Paths this build does NOT own that already existed and were therefore left
 // alone. Reported rather than passed over in silence: on a shared document root
