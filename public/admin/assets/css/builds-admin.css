@@ -289,19 +289,6 @@
 /* The deploy-target mode switch. The install's own path is never rendered —
    choosing it sends no target at all and the server fills it in — so this row
    is how the capability stays reachable without the path. */
-.builds-deploy__mode {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: var(--space-sm);
-    margin-bottom: var(--space-md);
-}
-
-.builds-deploy__mode-label {
-    font-size: var(--font-size-sm);
-    color: var(--admin-text);
-}
-
 /* A field that is read-only until deliberately unlocked. Reads as a value, not
    as a disabled control: the deployed site's document-root folder name is
    usually the host's decision, not the author's. */

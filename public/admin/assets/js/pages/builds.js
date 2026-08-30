@@ -622,7 +622,15 @@
     }
 
     /**
-     * Where to deploy — WITHOUT the install's own path ever reaching the browser.
+     * Where to deploy: this installation's own root, and nowhere else.
+     *
+     * There is no target field. On any install without a deploy-roots.php — the
+     * default — every path a user could type is refused, so the control could
+     * only ever fail; and free text in front of a destructive operation buys a
+     * typo, not a capability. Choosing a target is the INSTALLER's decision, the
+     * same way allow_deploy already is. deployBuild still accepts targetPath for
+     * API callers and still validates it against the allowlist; the panel simply
+     * does not offer it.
      *
      * `publicPaths.php` exists because this project decided install-root paths do
      * not belong in responses; emitting one into a page contradicted that for no
@@ -638,25 +646,8 @@
      * that case, and they are the ones that matter.
      */
     function _renderDeployForm(build) {
-        var mode = 'path';   // 'path' | 'installRoot'
-
-        var input = el('input', {
-            type: 'text',
-            class: 'admin-input',
-            id: 'builds-deploy-target',
-            placeholder: T.deployTargetPlaceholder || '',
-            spellcheck: 'false',
-        });
-        input.value = '';
-
         var overwrite = el('input', { type: 'checkbox', id: 'builds-deploy-overwrite' });
 
-        var pathRow  = el('div', { class: 'admin-form-group' }, [
-            el('label', { class: 'admin-label', for: 'builds-deploy-target', text: T.deployTargetLabel || '' }),
-            input,
-            el('p', { class: 'admin-hint', text: T.deployTargetHint || '' }),
-        ]);
-        var modeRow  = el('div', { class: 'builds-deploy__mode' });
         var preview  = el('div', { class: 'builds-deploy__preview' });
         var warnings = el('div', { class: 'builds-deploy__warnings' });
 
@@ -666,43 +657,12 @@
         function refresh() {
             clearNode(preview);
             clearNode(warnings);
-            clearNode(modeRow);
-
-            var installRoot = mode === 'installRoot';
-            pathRow.style.display = installRoot ? 'none' : '';
-
-            if (installRoot) {
-                modeRow.appendChild(el('span', { class: 'builds-deploy__mode-label', text: T.deployToInstall || '' }));
-                modeRow.appendChild(_renderButton(T.deployElsewhere || '', null, 'ghost', function () {
-                    mode = 'path';
-                    refresh();
-                }));
-            } else {
-                modeRow.appendChild(_renderButton(T.deployUseInstall || '', null, 'ghost', function () {
-                    mode = 'installRoot';
-                    refresh();
-                }));
-            }
-
-            // With no target chosen there is nothing truthful to preview.
-            var typed = input.value.trim();
-            if (!installRoot && typed === '') {
-                return;
-            }
 
             preview.appendChild(el('span', { class: 'builds-field__label', text: T.deployWillCreate || '' }));
-            var pubLine = installRoot ? build.public + '/'  : joinPath(typed, build.public);
-            var secLine = installRoot ? build.secure + '/' : joinPath(typed, build.secure);
-            preview.appendChild(_renderPathLine(pubLine, T.deployDocRoot || ''));
-            preview.appendChild(_renderPathLine(secLine, T.deployOutside || '', true));
-            if (installRoot) {
-                preview.appendChild(el('p', { class: 'admin-hint', text: T.deployInsideInstall || '' }));
-            }
+            preview.appendChild(_renderPathLine(build.public + '/', T.deployDocRoot || ''));
+            preview.appendChild(_renderPathLine(build.secure + '/', T.deployOutside || '', true));
+            preview.appendChild(el('p', { class: 'admin-hint', text: T.deployInsideInstall || '' }));
 
-            if (!installRoot) {
-                return;
-            }
-            // Only reachable in install-root mode — see the note above.
             var merges = build.public === CFG.installPublicName
                       && build.secure === CFG.installSecureName;
             warnings.appendChild(merges
@@ -717,20 +677,16 @@
                         .replace('{docroot}', build.public + '/')));
         }
 
-        input.addEventListener('input', refresh);
         refresh();
 
         var btn = _renderButton(T.deployBtn || 'Deploy', ICON_DEPLOY, 'primary', function () {
-            // In install-root mode the target is DELIBERATELY absent: the server
-            // fills it in from SERVER_ROOT, so the path never round-trips.
-            onDeploy(build, mode === 'installRoot' ? null : input.value.trim(),
-                     overwrite.checked, {}, this);
+            // The target is DELIBERATELY absent: the server fills it in from
+            // SERVER_ROOT, so the install's path never round-trips to the browser.
+            onDeploy(build, null, overwrite.checked, {}, this);
         });
 
         return [
             el('p', { class: 'admin-hint', text: T.deployIntro || '' }),
-            pathRow,
-            modeRow,
             preview,
             warnings,
             el('label', { class: 'builds-deploy__check', for: 'builds-deploy-overwrite' }, [

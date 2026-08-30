@@ -134,8 +134,6 @@ window.QS_BUILDS_I18N = <?= json_encode([
     // --- Deploy ------------------------------------------------------------
     'deployTitle'      => __admin('builds.deployTitle', 'Deploy'),
     'deployIntro'      => __admin('builds.deployIntro', 'Copy this build onto a path on this server. That is all deploying does — it does not point a document root, edit your web server configuration, or restart anything.'),
-    'deployTargetLabel'=> __admin('builds.deployTargetLabel', 'Deploy to'),
-    'deployTargetHint' => __admin('builds.deployTargetHint', 'Where the site\'s folders will be created. It has to be listed in deploy-roots.php on the server, or the deploy is refused — apart from this installation\'s own root, which is always allowed.'),
     'deployWillCreate' => __admin('builds.deployWillCreate', 'This will create'),
     'deployDocRoot'    => __admin('builds.deployDocRoot', 'the document root'),
     'deployOutside'    => __admin('builds.deployOutside', 'must stay OUTSIDE the document root'),
@@ -175,10 +173,6 @@ window.QS_BUILDS_I18N = <?= json_encode([
     'serveMore'        => __admin('builds.serveMore', 'The full instructions — permissions, both web servers, and how to test — ship as README.txt inside the downloaded archive.'),
 
     // --- Deploy target mode, co-tenancy refusals, field unlock --------------
-    'deployTargetPlaceholder' => __admin('builds.deployTargetPlaceholder', '/var/www/mysite'),
-    'deployUseInstall' => __admin('builds.deployUseInstall', 'Deploy to this installation\'s own root'),
-    'deployToInstall' => __admin('builds.deployToInstall', 'Deploying into this installation\'s own root.'),
-    'deployElsewhere' => __admin('builds.deployElsewhere', 'Choose a different path'),
     'deployInsideInstall' => __admin('builds.deployInsideInstall', 'Inside this installation\'s own root. The panel does not show that path — the server fills it in.'),
     'deployInstallRootLabel' => __admin('builds.deployInstallRootLabel', 'this installation\'s own root'),
     'deploySharedTitle' => __admin('builds.deploySharedTitle', 'Some files were left as they were'),
