@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/RegexPatterns.php';
+
 /**
  * TagRegistry — Single source of truth for ALL HTML tag classification.
  *
@@ -262,6 +264,34 @@ class TagRegistry
         return (bool) preg_match('/^[a-z0-9-]+$/i', $tag)
             && !self::isBlocked($tag)
             && self::isAllowed($tag);
+    }
+
+    /**
+     * Single "may this attribute NAME be emitted at all?" gate.
+     *
+     * The attribute-level sibling of isRenderable(). THREE writers ask it and
+     * they must all get the same answer, or the same page says different
+     * things in preview, in a build, and at the moment it is stored:
+     *
+     *   - JsonToHtmlRenderer::renderAttribute  — /p/<id>/ preview
+     *   - JsonToPhpCompiler::compileTagNode    — the build
+     *   - firstUnsafeParam                     — addNode / editNode / editStructure
+     *
+     * ⚠ A MALFORMED NAME IS DROPPED, NEVER ESCAPED. An attribute name is an
+     * IDENTIFIER, not text: there is no encoding of `x" . phpinfo() . "y` that
+     * means anything as an attribute, so escaping it would only preserve
+     * nonsense and invite the reader to treat names as a value type. The
+     * compiler emits the name into a double-quoted PHP string literal, so a
+     * name carrying a quote used to close that literal and turn the rest into
+     * executable PHP in the compiled page — the renderer refused it, the build
+     * did not, and the build was the surface that ran.
+     *
+     * The charset lives in RegexPatterns ('html_attribute_name') so this rule
+     * exists as ONE regex in the tree rather than one copy per consumer.
+     */
+    public static function isRenderableAttributeName(string $name): bool
+    {
+        return RegexPatterns::match('html_attribute_name', $name);
     }
 
     public static function isSelfClosing(string $tag): bool

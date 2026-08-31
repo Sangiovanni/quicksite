@@ -6,6 +6,7 @@ if (!defined('SECURE_FOLDER_PATH')) {
 }
 
 require_once SECURE_FOLDER_PATH . '/src/classes/UrlPolicy.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/TagRegistry.php';
 
 /**
  * Writer-side node-param safety — the reject-on-store companion to the render
@@ -20,7 +21,28 @@ require_once SECURE_FOLDER_PATH . '/src/classes/UrlPolicy.php';
 if (!function_exists('firstUnsafeParam')) {
     function firstUnsafeParam(array $params): ?string {
         foreach ($params as $name => $value) {
-            if (!is_string($name) || !is_string($value) || $value === '') {
+            // ── THE NAME, BEFORE THE VALUE GUARD ──────────────────────────
+            //
+            // DEFENCE IN DEPTH, not the fix. The load-bearing gate is in the
+            // two renderers (TagRegistry::isRenderableAttributeName): existing
+            // projects already hold un-gated structures, and no write-side
+            // check can retroactively clean data that is already stored. What
+            // this adds is an immediate error for the author instead of an
+            // attribute that silently disappears from the page.
+            //
+            // ⚠ It runs BEFORE the value guard on purpose. That guard skips a
+            // non-string or empty value, and the compiler's boolean branch
+            // emits the bare name — so a hostile name paired with `true` would
+            // have walked straight past a check placed after it.
+            //
+            // Cast because PHP turns a numeric JSON object key into an int.
+            $name = (string) $name;
+            if (!TagRegistry::isRenderableAttributeName($name)) {
+                return "Attribute name '{$name}' is not a valid HTML attribute name "
+                     . '(letters, digits, underscore, colon and hyphen only).';
+            }
+
+            if (!is_string($value) || $value === '') {
                 continue;
             }
             // Raw event handler — must use {{call:...}} (mirrors renderAttribute).

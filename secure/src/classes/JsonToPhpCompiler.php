@@ -89,9 +89,19 @@ class JsonToPhpCompiler {
         // Add system variables for placeholders
         $output .= $this->generateSystemVariables();
         
-        // Generate title from translation using page title parameter
+        // Generate title from translation using page title parameter.
+        //
+        // SECURITY (beta.11 S3.10b): the key used to be INTERPOLATED into a
+        // single-quoted PHP literal, so a title carrying `'` closed the literal
+        // and the rest became executable PHP. Route names are gated on write
+        // (addRoute allows only lowercase alphanumerics, hyphens and `:param`
+        // segments), so nothing stored today reaches it — but the compiler was
+        // trusting a validator two files away rather than emitting a literal it
+        // controls. var_export is what every other key in this file already
+        // uses; see compileTextNode.
         $output .= "// Get page title from translation\n";
-        $output .= "\$pageTitle = \$translator->translate('page.titles.{$pageTitle}');\n\n";
+        $output .= "\$pageTitle = \$translator->translate("
+                 . var_export('page.titles.' . $pageTitle, true) . ");\n\n";
         $output .= "\$content = '';\n";
         // Normalize: if structure is a single node (associative array), wrap in array
         if (!empty($structure) && !array_is_list($structure)) {
@@ -488,6 +498,29 @@ class JsonToPhpCompiler {
             // URL-sink recognition + rewriting scope come from the shared
             // UrlPolicy (R-6, same class the renderer uses) — see per-attr below.
             foreach ($params as $attrName => $attrValue) {
+                // ── THE NAME, BEFORE ANYTHING ELSE ────────────────────────
+                //
+                // SECURITY (beta.11 S3.10b): the name is emitted VERBATIM into
+                // a double-quoted PHP string literal on every branch below, so
+                // a name carrying `"` closed that literal and made the rest of
+                // it executable PHP in the compiled page — dormant in the
+                // artifact, and running the moment the built site served the
+                // route. The renderer has always refused these names
+                // (renderAttribute), so preview and production disagreed and
+                // production was the weaker one.
+                //
+                // Same gate, same outcome, one definition: a malformed name is
+                // DROPPED, exactly as the tag gate above drops a non-renderable
+                // tag. It is not escaped — an attribute name is an identifier,
+                // not text (see TagRegistry::isRenderableAttributeName).
+                //
+                // Cast because PHP turns a numeric JSON object key into an int.
+                $attrName = (string) $attrName;
+                if (!TagRegistry::isRenderableAttributeName($attrName)) {
+                    error_log("Compiler skipped invalid attribute name: {$attrName}");
+                    continue;
+                }
+
                 // ── VALUE SHAPES ──────────────────────────────────────────
                 // The renderer decides these at render time; the compiler knows
                 // the authored value now, so it decides them here. Same rules,
@@ -653,23 +686,40 @@ class JsonToPhpCompiler {
         if (empty($componentName)) {
             return "// Missing component name\n";
         }
-        
+
+        // SECURITY (beta.11 S3.10b): the four diagnostics below used to
+        // INTERPOLATE the component name into the generated `//` comment. A
+        // name carrying a newline ended the comment and put the remainder of
+        // the name into the compiled page as executable PHP — the same class of
+        // hole as the attribute name above, through a line that looks inert.
+        // Nothing validates a component REFERENCE on write (editStructure
+        // checks tags and params, never `component`), so the name arrives
+        // unconstrained.
+        //
+        // The name goes to error_log, which is where a maintainer looks for
+        // "why is my component missing?" anyway, and where the tag gate already
+        // sends its own refusals. The generated comment says what happened
+        // without echoing author data into code.
+        //
         // Load component JSON from development location
         $componentPath = PROJECT_PATH . '/templates/model/json/components/' . $componentName . '.json';
-        
+
         if (!file_exists($componentPath)) {
-            return "// Component not found: {$componentName}\n";
+            error_log("Compiler: component not found: {$componentName}");
+            return "// Component not found (name in the error log)\n";
         }
-        
+
         $componentJson = @file_get_contents($componentPath);
         if ($componentJson === false) {
-            return "// Failed to read component: {$componentName}\n";
+            error_log("Compiler: failed to read component: {$componentName}");
+            return "// Failed to read component (name in the error log)\n";
         }
-        
+
         $componentStructure = json_decode($componentJson, true);
-        
+
         if (!$componentStructure) {
-            return "// Invalid component JSON: {$componentName}\n";
+            error_log("Compiler: invalid component JSON: {$componentName}");
+            return "// Invalid component JSON (name in the error log)\n";
         }
         
         // Process system placeholders in data FIRST

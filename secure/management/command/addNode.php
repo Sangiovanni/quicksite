@@ -119,9 +119,10 @@ function __command_addNode(array $params = [], array $urlParams = []): ApiRespon
     // SECURITY: Strip sandbox attribute on embed tags — system enforces its own at render time
     IframeSandbox::sanitizeNodeParams($tag, $nodeParams);
 
-    // SECURITY (beta.10): reject raw on* handlers + dangerous URL schemes on
-    // write — the renderer enforces the same at render; this is the reject-
-    // on-store companion so stored JSON stays clean.
+    // SECURITY (beta.10, widened beta.11 S3.10b): reject a malformed attribute
+    // NAME, a raw on* handler, and a dangerous URL scheme on write — the
+    // renderer and the compiler enforce the same at render/build time; this is
+    // the reject-on-store companion so stored JSON stays clean.
     $unsafeParam = firstUnsafeParam($nodeParams);
     if ($unsafeParam !== null) {
         return ApiResponse::create(400, 'validation.unsafe_param')

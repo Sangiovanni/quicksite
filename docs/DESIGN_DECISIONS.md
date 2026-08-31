@@ -10209,3 +10209,79 @@ the previous configuration.
 `secure/management/command/deployBuild.php`.
 Behaviour: [COMMAND_API.md](COMMAND_API.md) *Self-deploy*,
 [ADMIN_PANEL.md](ADMIN_PANEL.md) §9.16.
+
+### An identifier from project data never becomes code (locked 2026-08-31)
+
+**Decision**: an element's attribute NAME is an identifier, not text. It may
+hold letters, digits, underscore, colon and hyphen; anything else is **dropped**
+and logged. The rule lives in one place —
+`TagRegistry::isRenderableAttributeName()`, reading the `html_attribute_name`
+pattern from `RegexPatterns` — and three writers ask it: the live renderer, the
+build compiler, and the node writers on the way in.
+
+The wider principle the compiler now follows: **no identifier taken from project
+data is interpolated into generated PHP.** A component name and a page-title key
+are written as data — logged, or `var_export`ed into a literal — never spliced
+into a statement, and not into a comment either.
+
+**Reasoning**: the compiler wrote an attribute name verbatim into a
+double-quoted PHP string literal. A name carrying a quote closed the literal and
+the remainder became executable PHP inside the compiled page — dormant in the
+artifact and running the moment the built site served that route. The renderer
+had refused these names since the beginning, so the two surfaces disagreed and
+the surface facing the public was the weaker one. That is the shape that decided
+this entry: not "one gate was missing" but "one gate had one copy too few".
+
+Sweeping the rest of the compiler for the same shape found two more, and their
+existence is the argument for stating a principle rather than patching a line.
+A component name reached a generated `// Component not found: …` comment, where
+a newline ended the comment and put the rest of the name into the page as code;
+a comment is not a safe place for author data, it only looks like one. The
+page-title key was interpolated into a single-quoted literal, safe today only
+because a validator two files away happens to restrict route names — the
+compiler was trusting a rule it does not own. Every other identifier in the file
+was already emitted through `var_export` and was already safe, which is what a
+correct emission looks like.
+
+**Drop, do not escape.** There is no encoding of `x" . phpinfo() . "y` that
+means anything as an attribute, so escaping it would preserve nonsense, keep the
+two surfaces disagreeing about what the page contains, and teach the next reader
+that names are a value type. Dropping is also what the tag gate beside it
+already does.
+
+**The write-side check is the second layer, never the first.** `firstUnsafeParam`
+now refuses a malformed name so an author gets an error instead of an attribute
+that silently disappears. It cannot be the fix: projects already hold structures
+written before the rule existed, and only the render/compile gate protects a
+page built from those. The check runs before the value guard, because that guard
+skips a non-string value and the compiler emits the bare name for a boolean —
+placed after it, the check would have missed the boolean form entirely.
+
+**Measured before shipping**: every attribute name stored in every project —
+1821 occurrences, 60 distinct, across 81 files — passes the gate. Zero
+legitimate names refused. Compiling all 24 stored structures of all four
+projects before and after produces byte-identical PHP.
+
+**Alternatives considered**: escaping the name into the literal (rejected — see
+above; it preserves an attribute that cannot mean anything and leaves preview
+and build disagreeing); keeping the gate as a third copy of the regex beside the
+renderer's and the write side's (rejected — three copies of a security rule is
+three chances to fix two of them, and `RegexPatterns` already carried the
+pattern with no consumer); gating the component name for the comment instead of
+removing the interpolation (rejected — it invites a charset argument about a
+diagnostic, when the diagnostic does not need author data in generated code at
+all; the name goes to the error log, where the tag gate already sends its own
+refusals); relying on the write-side check alone (rejected — it cannot reach
+data that is already stored, which is exactly the data a build compiles).
+
+The preview's twin of the component diagnostic was escaped rather than stripped,
+because there the name is read by a person: it is what tells an author WHICH
+component is missing, and `htmlspecialchars` makes it unable to close the HTML
+comment around it.
+
+**Source**: `secure/src/classes/TagRegistry.php`
+(`isRenderableAttributeName`), `secure/src/classes/JsonToPhpCompiler.php`
+(`compileTagNode`, `compileComponent`, `compilePage`),
+`secure/src/classes/JsonToHtmlRenderer.php` (`renderAttribute`, `renderNode`),
+`secure/src/functions/nodeParamPolicy.php` (`firstUnsafeParam`).
+Behaviour: [ARCHITECTURE.md](ARCHITECTURE.md) §7 and §8.7.

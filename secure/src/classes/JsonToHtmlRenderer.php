@@ -198,7 +198,9 @@ class JsonToHtmlRenderer {
         // Load component template
         $componentTemplate = $this->loadComponent($componentName);
         if ($componentTemplate === null) {
-            return "<!-- Component not found: {$componentName} -->";
+            // Escaped for the same reason as the renderNode twin above.
+            return '<!-- Component not found: '
+                 . htmlspecialchars($componentName, ENT_QUOTES | ENT_HTML5, 'UTF-8') . ' -->';
         }
         
         // Extract __enums__ metadata and strip it from template before processing
@@ -436,7 +438,14 @@ class JsonToHtmlRenderer {
                 $this->currentComponentName = $prevComponentName;
                 $this->currentComponentNode = $prevComponentNode;
                 error_log("Component not found: {$componentName}");
-                return "<!-- Component not found: {$componentName} -->";
+                // ESCAPED, not raw: nothing validates a component REFERENCE on
+                // write, so a name carrying `-->` used to close this comment
+                // and inject the rest as live markup into the preview. The
+                // compiler's twin of this diagnostic had the same shape and the
+                // same hole (beta.11 S3.10b). The name stays visible — it is
+                // what tells the author WHICH component is missing.
+                return '<!-- Component not found: '
+                     . htmlspecialchars((string) $componentName, ENT_QUOTES | ENT_HTML5, 'UTF-8') . ' -->';
             }
             
             // Extract __enums__ metadata and strip it from template before processing
@@ -804,8 +813,10 @@ class JsonToHtmlRenderer {
     private const EMPTY_MEANINGFUL_ATTRIBUTES = ['alt', 'aria-label'];
 
     private function renderAttribute(string $name, $value): string {
-        // Sanitize attribute name
-        if (!preg_match('/^[a-z0-9_:-]+$/i', $name)) {
+        // Sanitize attribute name. The charset rule is shared with the compiler
+        // and the write-side param check so all three make the same decision
+        // about the same name (TagRegistry::isRenderableAttributeName).
+        if (!TagRegistry::isRenderableAttributeName($name)) {
             error_log("Invalid attribute name: {$name}");
             return '';
         }

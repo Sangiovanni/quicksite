@@ -103,7 +103,7 @@ Page structure is JSON rather than HTML for a handful of pragmatic reasons:
 
 - **API-first contract.** Every external client — admin panel, CLI, AI agent — produces JSON natively. An HTML-to-JSON parser would be lossy and a security pit.
 - **Deterministic AI output.** Validating that an LLM produced a tree with known keys is tractable; validating that it produced safe HTML is famously not.
-- **Security by construction.** A single chokepoint applies the tag blacklist (see §7) and escapes attribute values. There is no path for raw `<script>` to slip through.
+- **Security by construction.** A single chokepoint applies the tag blacklist (see §7), requires an attribute name to be a well-formed identifier, and escapes attribute values. There is no path for raw `<script>` to slip through.
 - **Translation separation.** `textKey` cleanly decouples content from structure. The same tree renders in any active language without template duplication.
 - **Tree addressability.** Every node has a stable path (`data-qs-node="0.1.2"` in editor mode). The visual editor maps an iframe click back to the exact JSON node and back again — trivial on a tree, painful on free-form HTML.
 - **Single source, two outputs.** The same JSON feeds the runtime renderer (`JsonToHtmlRenderer`) and the build-time compiler (`JsonToPhpCompiler`). Editing HTML twice is exactly the bit-rot we want to avoid.
@@ -510,8 +510,8 @@ Other layered protections:
 | Concern | Protection |
 |---|---|
 | Path traversal | All file paths normalised and checked against `..`; whitelisted base directories; helpers in `secure/src/functions/PathManagement.php`. |
-| XSS in JSON content | Only allowlisted tags render: a tag must be on `TagRegistry::ALLOWED_TAGS` and off the blacklist (`script`, `noscript`, `style`, `template`, `slot`, `object`, `embed`, `applet`) — anything else is dropped. The two lists answer different questions, and a tag can be on neither: the blacklist names tags that would be a *security* problem, while a tag that is merely unusable is simply absent from the allowlist and refused as unknown. URL attributes (`href`, `src`, `xlink:href`, `ping`, `srcset`, …) accept only `http` / `https` / `mailto` / `tel` schemes plus relative / anchor / protocol-relative values; everything else becomes `#`. All attribute values are HTML-escaped. The renderer and the compiler enforce this identically (`TagRegistry::isRenderable`, `UrlPolicy`), so preview and built output agree. |
-| Inline JS injection | `on*` attributes only accept the `{{call:fn:args}}` syntax (see §8), transformed to allowlisted `QS.*()` calls (`CallTransformer`); raw JS is rejected. The tag, URL-scheme and `on*` policies are also enforced by the node writers (`addNode` / `editNode` / `editStructure`), so unsafe values are refused on write, not just dropped at render. |
+| XSS in JSON content | Only allowlisted tags render: a tag must be on `TagRegistry::ALLOWED_TAGS` and off the blacklist (`script`, `noscript`, `style`, `template`, `slot`, `object`, `embed`, `applet`) — anything else is dropped. The two lists answer different questions, and a tag can be on neither: the blacklist names tags that would be a *security* problem, while a tag that is merely unusable is simply absent from the allowlist and refused as unknown. URL attributes (`href`, `src`, `xlink:href`, `ping`, `srcset`, …) accept only `http` / `https` / `mailto` / `tel` schemes plus relative / anchor / protocol-relative values; everything else becomes `#`. All attribute values are HTML-escaped, and an attribute *name* must be a well-formed identifier (letters, digits, underscore, colon, hyphen) or the attribute is dropped. The renderer and the compiler enforce all of this identically (`TagRegistry::isRenderable`, `TagRegistry::isRenderableAttributeName`, `UrlPolicy`), so preview and built output agree. |
+| Inline JS injection | `on*` attributes only accept the `{{call:fn:args}}` syntax (see §8), transformed to allowlisted `QS.*()` calls (`CallTransformer`); raw JS is rejected. The tag, attribute-name, URL-scheme and `on*` policies are also enforced by the node writers (`addNode` / `editNode` / `editStructure`), so unsafe values are refused on write, not just dropped at render. The write-side check is a second layer, never the only one: projects can already hold structures written before a rule existed, and only the render/compile gate protects a page built from those. |
 | File upload | MIME sniffed from content (not extension); per-category size cap; JS uploads disallowed. |
 | AuthN / AuthZ | Username+password login → a PHP session (HttpOnly cookie) plus a per-session token; both are required on every Management call. Role is checked per project on every call, and logged. A session generation counter on the user record ends every session of an account at once. Failed logins are throttled per username. |
 | CSRF on admin | The session cookie alone never authorizes: a call must also carry the per-session token, which is page-embedded and unreadable to another origin. A cross-site request can make the browser send the cookie but cannot supply the token. The same rule covers the panel's own state-changing forms — signing out is a POST carrying that token, not a link. The three pre-session forms (login, register, first-run) have no session to draw a token from, so they use a double-submit pair instead: an HttpOnly, `SameSite=Strict` cookie scoped to the admin path plus a hidden field, accepted only when the two match. |
@@ -1092,6 +1092,29 @@ value.
 The one exception is `{{__current_page;lang=xx}}`, the language switch: it
 resolves to a COMPLETE URL, so both surfaces recognise it *before* substituting
 and exempt the result from being composed against the base a second time.
+
+**Attribute names.** A name is an *identifier*, not text. It may hold letters,
+digits, underscore, colon and hyphen and nothing else — `class`, `data-id`,
+`aria-label`, `xml:lang`. Anything else is **dropped**, on both surfaces, and
+logged.
+
+The rule has one home, `TagRegistry::isRenderableAttributeName()`, reading the
+`html_attribute_name` pattern from `RegexPatterns`. Three writers ask it: the
+renderer, the compiler, and the node writers on the way in
+(`addNode` / `editNode` / `editStructure`), where a malformed name is refused
+with an error rather than silently dropped later.
+
+A malformed name is dropped rather than escaped, because there is no encoding of
+one that means anything as an attribute. It matters more than tidiness: the
+compiler writes the name into a PHP string literal, so a name carrying a quote
+closed that literal and turned the remainder into executable PHP inside the
+compiled page — code that ran when the built site served the route. The renderer
+had always refused such names, so the two surfaces disagreed and the build was
+the weaker one.
+
+The same principle governs every identifier the compiler emits. A component name
+and a page-title key are written as data — logged, or `var_export`ed into a
+literal — never interpolated into generated code, not even into a comment.
 
 **Attribute values.** An attribute carries a string, a boolean, or nothing.
 

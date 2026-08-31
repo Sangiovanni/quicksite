@@ -121,8 +121,9 @@ function validateStructureTags($node): ?string {
         return null;
     }
 
-    // Param safety: reject raw on* handlers + dangerous URL schemes on write
-    // (mirrors the renderer). Same shared helper the single-node writers use.
+    // Param safety: reject a malformed attribute NAME, a raw on* handler and a
+    // dangerous URL scheme on write (mirrors the renderer and the compiler).
+    // Same shared helper the single-node writers use.
     if (isset($node['params']) && is_array($node['params'])) {
         $paramError = firstUnsafeParam($node['params']);
         if ($paramError !== null) {

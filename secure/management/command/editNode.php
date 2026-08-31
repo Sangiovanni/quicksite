@@ -140,8 +140,10 @@ function __command_editNode(array $params = [], array $urlParams = []): ApiRespo
             ->withErrors([['field' => 'addParams.' . $reservedQsParam, 'reason' => 'reserved_attribute']]);
     }
 
-    // SECURITY (beta.10): reject raw on* handlers + dangerous URL schemes on
-    // write — the renderer enforces the same at render (reject-on-store companion).
+    // SECURITY (beta.10, widened beta.11 S3.10b): reject a malformed attribute
+    // NAME, a raw on* handler, and a dangerous URL scheme on write — the
+    // renderer and the compiler enforce the same at render/build time
+    // (reject-on-store companion).
     $unsafeParam = firstUnsafeParam($addParams);
     if ($unsafeParam !== null) {
         return ApiResponse::create(400, 'validation.unsafe_param')

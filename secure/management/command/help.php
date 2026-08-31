@@ -834,6 +834,7 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.validation.required' => 'Missing type, name, or structure parameter',
             '400.validation.invalid_format' => 'Invalid type, nodeId format, or structure format',
+            '400.validation.blocked_tag' => 'The structure holds something the renderer would refuse: a blocked or non-allowlisted tag, an attribute NAME outside [letters, digits, underscore, colon, hyphen], a raw on* handler (use {{call:...}} syntax), or a disallowed URL scheme (only http, https, mailto, tel). The message names the offender.',
             '400.operation.failed' => 'Node operation failed (e.g., node not found)',
             '404.route.not_found' => 'Page does not exist',
             '404.file.not_found' => 'Structure file not found',
@@ -2718,6 +2719,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.required' => 'Missing required parameter (e.g., tag for nodeKind=tag; textKey for nodeKind=text + textRaw=false)',
             '400.validation.invalid_value' => 'Invalid tag, position, or nodeKind',
             '400.validation.missing_params' => 'Missing mandatory params (e.g., href for <a>)',
+            '400.validation.unsafe_param' => 'A param the renderer would refuse: an attribute NAME outside [letters, digits, underscore, colon, hyphen]; a raw on* handler (use {{call:...}} syntax); or a disallowed URL scheme (only http, https, mailto, tel)',
             '400.operation.denied' => 'Cannot insert inside component node',
             '404.resource.not_found' => 'Target node not found'
         ],
@@ -2920,6 +2922,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.empty_value' => 'addParams contains keys with empty/null values — use removeParams to drop a key',
             '400.validation.reserved_key' => 'addParams contains a reserved admin-namespace storage key (qs_/qs-/quicksite_/quicksite-)',
             '400.validation.reserved_attribute' => 'addParams contains a reserved data-qs-* attribute (auto-managed by QuickSite)',
+            '400.validation.unsafe_param' => 'A param the renderer would refuse: an attribute NAME outside [letters, digits, underscore, colon, hyphen]; a raw on* handler (use {{call:...}} syntax); or a disallowed URL scheme (only http, https, mailto, tel)',
             '400.operation.denied' => 'Cannot edit component node (use editComponentToNode)',
             '404.resource.not_found' => 'Node not found'
         ],
