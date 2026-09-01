@@ -433,7 +433,7 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.validation.invalid_date' => 'Invalid date format (expected YYYY-MM-DD)'
         ],
-        'notes' => 'PROJECT-SCOPED: returns the history of the project named by the URL marker (/management/p/<projectId>/getCommandHistory) and nothing else - there is no installation-wide view. Logs are stored in daily files under secure/logs/p/<projectId>/. By default returns last 7 days. The getCommandHistory command itself is not logged to prevent recursion. Commands that target no project (registration, login, project creation, membership self-service) are recorded separately in secure/logs/_global/, which no command reads. Request bodies are sanitized DENY-BY-DEFAULT: any key that looks like a credential (password/secret/token/credential/key/auth/authorization/signature/salt) has its value replaced with [redacted] at every depth, for every command including ones added later; the authentication commands (login/register/logoutSession/changePassword/deleteMyAccount) log no body at all; uploadAsset logs file metadata only and editStyles truncates stylesheets over 5KB.'
+        'notes' => 'PROJECT-SCOPED: returns the history of the project named by the URL marker (/management/p/<projectId>/getCommandHistory) and nothing else - there is no installation-wide view. Logs are stored in daily files under <secure>/logs/p/<projectId>/. By default returns last 7 days. The getCommandHistory command itself is not logged to prevent recursion. Commands that target no project (registration, login, project creation, membership self-service) are recorded separately in <secure>/logs/_global/, which no command reads. Request bodies are sanitized DENY-BY-DEFAULT: any key that looks like a credential (password/secret/token/credential/key/auth/authorization/signature/salt) has its value replaced with [redacted] at every depth, for every command including ones added later; the authentication commands (login/register/logoutSession/changePassword/deleteMyAccount) log no body at all; uploadAsset logs file metadata only and editStyles truncates stylesheets over 5KB.'
     ],
 
     'clearCommandHistory' => [
@@ -486,7 +486,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.missing_parameter' => 'Missing required parameter: before',
             '400.validation.invalid_date' => 'Invalid date format or future date'
         ],
-        'notes' => 'PROJECT-SCOPED: deletes only inside secure/logs/p/<projectId>/ for the project named by the URL marker, so clearing one project\'s history can never affect another\'s. Without confirm=true, returns a preview showing what would be deleted. A future "before" date is refused. Requires admin permission ON THAT PROJECT.'
+        'notes' => 'PROJECT-SCOPED: deletes only inside <secure>/logs/p/<projectId>/ for the project named by the URL marker, so clearing one project\'s history can never affect another\'s. Without confirm=true, returns a preview showing what would be deleted. A future "before" date is refused. Requires admin permission ON THAT PROJECT.'
     ],
 
     'editFavicon' => [
@@ -681,7 +681,7 @@ $GLOBALS['__help_commands'] = [
                 'customUrls' => ['https://example.com/landing'],
                 'saved' => true,
                 'published' => true,
-                'path' => '/…/secure/projects/mysite/public/sitemap.txt',
+                'path' => '/…/<secure>/projects/mysite/public/sitemap.txt',
                 'urlCount' => 5
             ]
         ],
@@ -2210,7 +2210,7 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '403.auth.registration_disabled' => 'Self-registration is disabled on this installation (auth.php registration.allow_self_registration)',
             '403.auth.registration_closed' => 'Registration is closed - the account limit (registration.max_users) is reached',
-            '403.auth.setup_required' => 'The installation has no accounts at all. Registration cannot create the first one - open /admin/ and use the first-run page, which requires the setup token written to secure/management/config/setup-token.txt',
+            '403.auth.setup_required' => 'The installation has no accounts at all. Registration cannot create the first one - open /admin/ and use the first-run page, which requires the setup token written to <secure>/management/config/setup-token.txt',
             '429.auth.throttled' => 'Too many registration attempts - retry_after gives the wait in seconds (per-IP rate or install-wide hourly cap)',
             '400.validation.required' => 'name, username and password are required',
             '400.validation.invalid_format' => 'Invalid username (3-32 chars: lowercase letters, digits, dash, underscore); OR the public name equals the username (they must differ - the username is private); OR password shorter than the configured minimum (data.min_length)',
@@ -2327,7 +2327,7 @@ $GLOBALS['__help_commands'] = [
                     ]
                 ],
                 'count' => 3,
-                'directory' => 'secure/templates/model/json/components/'
+                'directory' => '<secure>/templates/model/json/components/'
             ]
         ],
         'error_responses' => [],
@@ -2519,7 +2519,7 @@ $GLOBALS['__help_commands'] = [
                 'count' => 4,
                 'with_routes' => 3,
                 'orphaned' => 1,
-                'directory' => 'secure/templates/model/json/pages/'
+                'directory' => '<secure>/templates/model/json/pages/'
             ]
         ],
         'error_responses' => [],
@@ -2794,7 +2794,7 @@ $GLOBALS['__help_commands'] = [
             '404.node.not_found' => 'Target node not found at the given dot path',
             '500.complex_element.build_failed' => 'Builder threw unexpectedly or returned a malformed node'
         ],
-        'notes' => 'After save, the emitted subtree is INDISTINGUISHABLE from a hand-built one — same JSON shape, same renderer, editable with the regular visual-editor tools. Wizard is build-time only; nothing at render time knows the element came from here. Builders live in secure/src/classes/complexElements/*.php as ComplexElementBuilder subclasses and are auto-discovered by the dispatcher. Drop a new builder file + a matching public/admin/.../contextual-complex/complex-<kind>.js wizard to add a kind — zero registration. Reuses addNode\'s insertion helper for non-root targets (same atomicity). For targetNodeId="root", detects page (list-shape root) vs component (object-shape root) and splices accordingly.'
+        'notes' => 'After save, the emitted subtree is INDISTINGUISHABLE from a hand-built one — same JSON shape, same renderer, editable with the regular visual-editor tools. Wizard is build-time only; nothing at render time knows the element came from here. Builders live in <secure>/src/classes/complexElements/*.php as ComplexElementBuilder subclasses and are auto-discovered by the dispatcher. Drop a new builder file + a matching public/admin/.../contextual-complex/complex-<kind>.js wizard to add a kind — zero registration. Reuses addNode\'s insertion helper for non-root targets (same atomicity). For targetNodeId="root", detects page (list-shape root) vs component (object-shape root) and splices accordingly.'
     ],
 
     'duplicateNode' => [
@@ -3090,7 +3090,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_parameter' => 'Invalid alias format or target does not exist',
             '409.conflict' => 'Alias conflicts with existing route or reserved path'
         ],
-        'notes' => 'Aliases cannot conflict with existing routes or reserved paths (management, assets, build). Delete an alias first to modify its target. Stored in secure/config/aliases.json.'
+        'notes' => 'Aliases cannot conflict with existing routes or reserved paths (management, assets, build). Delete an alias first to modify its target. Stored per project in <secure>/projects/<projectId>/data/aliases.json.'
     ],
     
     'deleteAlias' => [
@@ -3172,7 +3172,7 @@ $GLOBALS['__help_commands'] = [
                 'projects' => [
                     [
                         'name' => 'quicksite',
-                        'path' => 'secure/projects/quicksite',
+                        'path' => '<secure>/projects/quicksite',
                         'site_name' => 'QuickSite Demo',
                         'routes_count' => 5,
                         'pages_count' => 5,
@@ -3183,7 +3183,7 @@ $GLOBALS['__help_commands'] = [
                     ]
                 ],
                 'count' => 1,
-                'projects_path' => 'secure/projects/'
+                'projects_path' => '<secure>/projects/'
             ]
         ],
         'error_responses' => [],
@@ -3300,7 +3300,7 @@ $GLOBALS['__help_commands'] = [
             'message' => "Project 'mysite' created successfully",
             'data' => [
                 'project' => 'mysite',
-                'path' => 'secure/projects/mysite',
+                'path' => '<secure>/projects/mysite',
                 'site_name' => 'My Website',
                 'default_language' => 'en',
                 'created' => true,
@@ -4109,7 +4109,7 @@ $GLOBALS['__help_commands'] = [
             'save' => [
                 'required' => false,
                 'type' => 'boolean',
-                'description' => 'false (default): stream the ZIP bytes straight back as the response body - no JSON envelope, nothing stored. true: write the archive into secure/projects/<id>/exports/ and return the JSON envelope below with a download_url.',
+                'description' => 'false (default): stream the ZIP bytes straight back as the response body - no JSON envelope, nothing stored. true: write the archive into <secure>/projects/<id>/exports/ and return the JSON envelope below with a download_url.',
                 'default' => false
             ]
         ],
@@ -4122,7 +4122,7 @@ $GLOBALS['__help_commands'] = [
             'data' => [
                 'project' => 'quicksite',
                 'filename' => 'quicksite_export_20250120_143022.zip',
-                'path' => 'secure/projects/quicksite/exports/quicksite_export_20250120_143022.zip',
+                'path' => '<secure>/projects/quicksite/exports/quicksite_export_20250120_143022.zip',
                 'size' => '2.1 MB',
                 'size_bytes' => 2202009,
                 'files_count' => 148,
@@ -4144,7 +4144,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.zip_error' => 'The archive failed to finalise',
             '500.server.move_failed' => 'save=true, but the archive could not be written into the exports folder'
         ],
-        'notes' => 'Project-scoped: the exported project is the one in the URL marker; a name/project in the request is optional and must match. Export format v2.0-secure - PHP files are NOT included, they are rebuilt from JSON on import. Saved exports live in that project\'s own folder (secure/projects/<id>/exports/), are auto-cleaned (keeps the last 5), and are reachable only through their own project\'s marker via downloadExport.'
+        'notes' => 'Project-scoped: the exported project is the one in the URL marker; a name/project in the request is optional and must match. Export format v2.0-secure - PHP files are NOT included, they are rebuilt from JSON on import. Saved exports live in that project\'s own folder (<secure>/projects/<id>/exports/), are auto-cleaned (keeps the last 5), and are reachable only through their own project\'s marker via downloadExport.'
     ],
     
     'importProject' => [
@@ -4195,7 +4195,7 @@ $GLOBALS['__help_commands'] = [
             'An archive is untrusted input. Entries are accepted against an extension ALLOWLIST and each one is checked so its content matches what its name claims (magic bytes for binary formats, valid JSON for .json, no PHP open tag for text, sanitisation for SVG).',
             'A refused entry is skipped and listed in security.skipped_disallowed with the reason; the rest of the archive still imports. Entries refusing to stay inside the project are listed in security.skipped_unsafe.',
             'Archive resource limits are enforced from the ZIP headers before anything is extracted: entry count, total and per-entry uncompressed size, and per-entry compression ratio. Exceeding any of them returns 413 and writes nothing.',
-            'The permitted extensions and the limits can be changed by copying secure/management/config/import-policy.php.example to import-policy.php.',
+            'The permitted extensions and the limits can be changed by copying <secure>/management/config/import-policy.php.example to import-policy.php.',
             'PHP is never imported. config.php and routes.php are rebuilt from the archive JSON, and any members.json in the archive is discarded — the importer becomes the sole owner.',
             'A project id is unique across the installation and an import never reassigns one. If the id is taken the import refuses with 409 and writes nothing; there is no option to replace the existing project. Import under a different name, or delete the existing project first.'
         ],
@@ -4266,7 +4266,7 @@ $GLOBALS['__help_commands'] = [
                 'project' => 'quicksite',
                 'backup' => [
                     'name' => '2026-01-03_14-30-00',
-                    'path' => '/secure/projects/quicksite/backups/2026-01-03_14-30-00',
+                    'path' => '<secure>/projects/quicksite/backups/2026-01-03_14-30-00',
                     'size' => 1234567,
                     'size_formatted' => '1.18 MB',
                     'files' => 42,
@@ -4330,7 +4330,7 @@ $GLOBALS['__help_commands'] = [
     ],
     
     'restoreBackup' => [
-        'description' => 'Restores a project from a backup (auto-creates pre-restore backup first)',
+        'description' => 'Restores a project from a backup, overwriting its current state. The pre-restore snapshot is OPT-IN (create_backup) and is NOT taken by default.',
         'method' => 'POST',
         'parameters' => [
             'backup' => [
@@ -4342,34 +4342,41 @@ $GLOBALS['__help_commands'] = [
             'name' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => 'Project name (defaults to active project)',
+                'description' => 'Echo-check only. The project restored is ALWAYS the one in the URL marker (/management/p/<projectId>/restoreBackup); this parameter cannot select a different one. Supply it and it must match the marker, or the call is refused with 400 project.mismatch.',
                 'example' => 'quicksite'
             ],
-            'skip_pre_backup' => [
+            'create_backup' => [
                 'required' => false,
                 'type' => 'boolean',
-                'description' => 'Skip creating pre-restore safety backup (default: false)',
-                'example' => false
+                'description' => 'Take a pre-restore snapshot before overwriting. The snapshot captures the project\'s CURRENT state (config.php, routes.php, templates, translate, data, public) into a new backup named pre-restore_<timestamp>, so the restore can be undone by restoring that snapshot. Default: false - no snapshot is taken and the current state is lost.',
+                'example' => true
             ]
         ],
-        'example_post' => 'POST /management/restoreBackup\n{"backup": "2026-01-03_14-30-00"}',
+        'example_post' => 'POST /management/restoreBackup\n{"backup": "2026-01-03_14-30-00", "create_backup": true}',
         'success_response' => [
             'status' => 200,
-            'message' => 'Backup restored successfully',
+            'code' => 'restore.success',
+            'message' => 'Backup restored successfully: 2026-01-03_14-30-00',
             'data' => [
                 'project' => 'quicksite',
-                'backup_restored' => '2026-01-03_14-30-00',
-                'restored_items' => ['config.php', 'routes.php', 'templates', 'translate', 'data', 'public'],
+                'restored_backup' => '2026-01-03_14-30-00',
                 'pre_restore_backup' => 'pre-restore_2026-01-03_16-45-22',
-                'public_synced_to_live' => true
+                'restored_items' => ['config.php', 'routes.php', 'templates', 'translate', 'data', 'public'],
+                'pre_restore_items' => ['config.php', 'routes.php', 'templates', 'translate', 'data', 'public'],
+                'errors' => []
             ]
         ],
         'error_responses' => [
+            '400.backup.name_required' => 'Backup name required',
             '400.project.required' => 'No project targeted - use /management/p/<projectId>/restoreBackup',
-            '400.validation.missing_field' => 'Backup name required',
-            '404.resource.not_found' => 'Backup not found'
+            '400.project.mismatch' => 'The name in the body does not match the project in the URL marker',
+            '400.validation.invalid_format' => 'Backup name or project name is not a valid identifier',
+            '404.project.not_found' => 'Project not found',
+            '404.backup.not_found' => 'Backup not found',
+            '500.backup.prerestore_failed' => 'create_backup=true was requested but the pre-restore snapshot folder could not be created - nothing was overwritten',
+            '500.restore.no_files_restored' => 'No file could be restored; data.errors lists why, data.pre_restore_backup names the snapshot if one was taken'
         ],
-        'notes' => 'A pre-restore backup is automatically created before restoring, allowing rollback if something goes wrong. If restoring the active project, public/ is synced to live folder.'
+        'notes' => 'DESTRUCTIVE: config.php, routes.php, templates/, translate/, data/ and public/ are overwritten from the chosen backup. There is NO automatic safety net - pass create_backup=true to snapshot the current state first (data.pre_restore_backup then names it, and restoring that snapshot undoes this restore). Omit it and data.pre_restore_backup is null and the state being overwritten is not recoverable from within QuickSite. The admin panel asks before it restores and sends create_backup according to the answer; a direct API caller gets no such prompt.'
     ],
     
     'deleteBackup' => [
@@ -4439,7 +4446,7 @@ $GLOBALS['__help_commands'] = [
                 'secure' => ['total' => '...', 'folders' => '...', 'projects_detail' => '...']
             ]
         ],
-        'notes' => 'Project-scoped: the report covers ONLY the project in the URL marker. secure.projects_detail holds that single project (name, size, file count, its backups); it does not enumerate other projects on the installation, and folder entries carry no absolute filesystem path. summary.project names the reported project (it is NOT the globally served main). Categories combine related folders: projects, backups, admin (public/admin+secure/admin), management (API system), core (src+config+logs). Used by dashboard storage overview widget.'
+        'notes' => 'Project-scoped: the report covers ONLY the project in the URL marker. secure.projects_detail holds that single project (name, size, file count, its backups); it does not enumerate other projects on the installation, and folder entries carry no absolute filesystem path. summary.project names the reported project (it is NOT the globally served main). Categories combine related folders: projects, backups, admin (public/admin+<secure>/admin), management (API system), core (src+config+logs). Used by dashboard storage overview widget.'
     ],
     
     'clearExports' => [
@@ -4478,7 +4485,7 @@ $GLOBALS['__help_commands'] = [
             '207.operation.partial_success' => 'Some archives were deleted and some could not be removed. data.failed_files names the survivors and errors lists them; the deletions that DID happen are real.',
             '500.server.delete_failed' => 'Every archive that was found failed to delete (deleted_count is 0)'
         ],
-        'notes' => 'Project-scoped: deletes .zip files only in the targeted project\'s own exports folder (secure/projects/<id>/exports/). It cannot reach another project\'s archives. Does not affect project data or backups. A run in which any unlink fails NEVER answers 200 — check the status/code, not just data.deleted_count.'
+        'notes' => 'Project-scoped: deletes .zip files only in the targeted project\'s own exports folder (<secure>/projects/<id>/exports/). It cannot reach another project\'s archives. Does not affect project data or backups. A run in which any unlink fails NEVER answers 200 — check the status/code, not just data.deleted_count.'
     ],
 
     // ==========================================
@@ -4580,7 +4587,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.role_exists' => 'A role with this name already exists',
             '403.auth.forbidden' => 'Requires superadmin (*) permission'
         ],
-        'notes' => 'Custom roles are stored in secure/config/roles.php. Commands must be valid existing commands. Use listRoles to see all available roles. The createRole/editRole/deleteRole commands are disabled (denied to every role) in the fixed-role model.'
+        'notes' => 'Roles are defined in <secure>/management/config/roles.php. Commands must be valid existing commands. Use listRoles to see all available roles. The createRole/editRole/deleteRole commands are disabled (denied to every role) in the fixed-role model.'
     ],
     
     'editRole' => [
@@ -4706,7 +4713,7 @@ $GLOBALS['__help_commands'] = [
     ],
 
     'listDataBindings' => [
-        'description' => 'Lists the QuickSite-runtime `data-*` attribute catalog — what each attribute does, what value shape it expects, which attrs it pairs with. Consumed by the in-editor autocomplete in the Add Element wizard so users can discover which data-* attributes the runtime recognises (data-state-*, data-auth-*, data-storage-*, data-bind, data-error-for, data-qs-complex, …). Single source of truth lives in secure/src/functions/qsDataAttributeCatalog.php — mirrors the qsVerbCatalog.php pattern from beta.7.',
+        'description' => 'Lists the QuickSite-runtime `data-*` attribute catalog — what each attribute does, what value shape it expects, which attrs it pairs with. Consumed by the in-editor autocomplete in the Add Element wizard so users can discover which data-* attributes the runtime recognises (data-state-*, data-auth-*, data-storage-*, data-bind, data-error-for, data-qs-complex, …). Single source of truth lives in <secure>/src/functions/qsDataAttributeCatalog.php — mirrors the qsVerbCatalog.php pattern from beta.7.',
         'method' => 'GET',
         'parameters' => [],
         'url_segments' => [
@@ -5300,7 +5307,7 @@ $GLOBALS['__help_commands'] = [
             ]
         ],
         'error_responses' => [],
-        'notes' => 'Sources: "admin" (engine catalogue at secure/admin/config/oauth-presets.json), "project" (project-only at secure/projects/<active>/data/oauth-presets.json), "project-override" (project overrides an admin entry). Per the Slice 2.5 lookup order locked 2026-06-15, project entries replace admin entries at PROVIDER level (full-entry replace, not field-level merge). Each provider entry includes preset, credentials_status (set/missing), resolver_count (route-resolvers explicitly referencing this provider id), and setup (per-provider route existence).'
+        'notes' => 'Sources: "admin" (engine catalogue at <secure>/admin/config/oauth-presets.json), "project" (project-only at <secure>/projects/<active>/data/oauth-presets.json), "project-override" (project overrides an admin entry). Per the Slice 2.5 lookup order locked 2026-06-15, project entries replace admin entries at PROVIDER level (full-entry replace, not field-level merge). Each provider entry includes preset, credentials_status (set/missing), resolver_count (route-resolvers explicitly referencing this provider id), and setup (per-provider route existence).'
     ],
     'addOAuthProvider' => [
         'description' => 'Add a new OAuth provider preset and (optionally) its credentials at admin or per-project scope. Writes to oauth-presets.json + oauth-secrets.{php,json}. Drives the /admin/oauth-providers page\'s Add modal.',
@@ -6117,7 +6124,7 @@ $GLOBALS['__help_commands'] = [
             'scope' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => "Where the snippet is stored. 'project' (default) puts it in the marker project's own snippets folder, visible to every member of that project. 'personal' puts it in the CALLER'S OWN library (secure/snippets/custom/<userId>/), which they can reuse in any project they are a member of and which no other user can list, read, insert or delete. 'global' is accepted as a legacy alias of 'personal'.",
+                'description' => "Where the snippet is stored. 'project' (default) puts it in the marker project's own snippets folder, visible to every member of that project. 'personal' puts it in the CALLER'S OWN library (<secure>/snippets/custom/<userId>/), which they can reuse in any project they are a member of and which no other user can list, read, insert or delete. 'global' is accepted as a legacy alias of 'personal'.",
                 'example' => 'personal'
             ]
         ],
@@ -6132,7 +6139,7 @@ $GLOBALS['__help_commands'] = [
             'message' => 'Snippet created successfully',
             'data' => [
                 'id' => 'my-nav',
-                'path' => 'secure/projects/quicksite/snippets/nav/my-nav.json'
+                'path' => '<secure>/projects/quicksite/snippets/nav/my-nav.json'
             ]
         ],
         'error_responses' => [
@@ -6194,7 +6201,7 @@ $GLOBALS['__help_commands'] = [
             'data' => [
                 'sourceId' => 'navbar-basic',
                 'newId' => 'my-navbar',
-                'path' => 'secure/projects/quicksite/snippets/nav/my-navbar.json'
+                'path' => '<secure>/projects/quicksite/snippets/nav/my-navbar.json'
             ]
         ],
         'error_responses' => [
@@ -6304,7 +6311,7 @@ $GLOBALS['__help_commands'] = [
             '400.snippets.project_required' => 'No project specified and no active project found',
             '404.snippets.not_found' => 'Snippet not found'
         ],
-        'notes' => 'Writes to both the live public stylesheet and the project backup in secure/projects/. Includes :root variables referenced by injected rules. In "replace" mode, only global-scope rules are removed (media query rules are left untouched).'
+        'notes' => 'Writes to both the live public stylesheet and the project backup in <secure>/projects/. Includes :root variables referenced by injected rules. In "replace" mode, only global-scope rules are removed (media query rules are left untouched).'
     ],
 
     'checkForUpdates' => [
@@ -6413,55 +6420,6 @@ $GLOBALS['__help_commands'] = [
         ],
         'notes' => 'Removes the sandbox rule for the specified tag and domain.'
     ],
-
-    'listWorkflowBlocks' => [
-        'description' => 'List reusable prompt blocks (blocks/, pins/, warnings/, examples/) discoverable by the workflow editor. Returns each block ID, its {{> partial}} reference, byte size, and a 120-char preview line. Used by the AI-Editor to populate pin/warning multi-select dropdowns.',
-        'method' => 'GET',
-        'parameters' => [],
-        'example_get' => 'GET /management/listWorkflowBlocks',
-        'success_response' => [
-            'status' => 200,
-            'code' => 'operation.success',
-            'message' => 'Workflow blocks listed successfully',
-            'data' => [
-                'categories' => [
-                    'blocks' => [['id' => 'output-json-only', 'partial' => '{{> output-json-only}}', 'size_bytes' => 380, 'preview' => '## ⚠️ IMPORTANT: Output Rules']],
-                    'pins' => [['id' => 'lang-switch', 'partial' => '{{> pin.lang-switch}}', 'size_bytes' => 180, 'preview' => '**MANDATORY:** include the lang-switch component...']],
-                    'warnings' => [['id' => 'json-only', 'partial' => '{{> warning.json-only}}', 'size_bytes' => 220, 'preview' => '**Output JSON ONLY.** No prose...']],
-                    'examples' => [['id' => 'restyle-theme-only', 'partial' => '{{> example.restyle-theme-only}}', 'size_bytes' => 540, 'preview' => 'For a theme change (variables only):']]
-                ],
-                'count' => 4
-            ]
-        ],
-        'notes' => 'Admin-tier; will move to superadmin once that role is introduced (see beta.7 objective 8).'
-    ],
-
-    'lintWorkflows' => [
-        'description' => 'Scan every workflow template for paragraphs that occur in 3+ workflows and report them as candidates for extraction into reusable blocks. Read-only — does NOT modify any file. Skips fenced code blocks, JSON examples, and paragraphs that already use {{> partial}} references.',
-        'method' => 'GET',
-        'parameters' => [],
-        'example_get' => 'GET /management/lintWorkflows',
-        'success_response' => [
-            'status' => 200,
-            'code' => 'operation.success',
-            'message' => '2 duplicated paragraph(s) found across 8 workflow template(s)',
-            'data' => [
-                'duplications' => [
-                    [
-                        'hash' => 'a1b2c3d4e5f6',
-                        'occurrences' => 4,
-                        'line_count' => 5,
-                        'preview' => '⚠️ IMPORTANT: Output Rules — OUTPUT JSON ONLY...',
-                        'workflows' => ['create-website', 'create-landing', 'restyle', 'global-design'],
-                        'suggested_block_name' => 'output-json-rules'
-                    ]
-                ],
-                'scanned_files' => 8,
-                'threshold' => 3
-            ]
-        ],
-        'notes' => 'Pure dev tooling. Admin-tier; will move to superadmin once that role is introduced (see beta.7 objective 8).'
-    ]
 ];
 
 /**
@@ -6573,13 +6531,13 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                     'listRoles' => 'View the fixed roles',
                     'getMyPermissions' => 'See your role and accessible commands'
                 ],
-                'config_file' => 'secure/management/config/auth.php (session TTLs, self-registration gate, CORS)',
-                'users_file' => 'secure/management/config/users.php (username + password_hash per user)',
-                'roles_config' => 'secure/management/config/roles.php'
+                'config_file' => '<secure>/management/config/auth.php (session TTLs, self-registration gate, CORS)',
+                'users_file' => '<secure>/management/config/users.php (username + password_hash per user)',
+                'roles_config' => '<secure>/management/config/roles.php'
             ],
             'cors' => [
                 'development_mode' => 'Allows localhost:* origins automatically',
-                'config_file' => 'secure/management/config/auth.php',
+                'config_file' => '<secure>/management/config/auth.php',
                 'allowed_methods' => ['GET', 'POST', 'OPTIONS']
             ],
             'usage' => 'All requests require Authorization header. GET commands: help, getRoutes, getSiteMap, analyzeReachability, getStructure, getTranslation, getTranslations, getLangList, getTranslationKeys, validateTranslations, getUnusedTranslationKeys, analyzeTranslations, listAssets, getStyles, getRootVariables, listStyleRules, getStyleRule, getKeyframes, listComponents, getComponent, listPages, listAliases, listMembers, listMyInvitations. POST commands: all others.',

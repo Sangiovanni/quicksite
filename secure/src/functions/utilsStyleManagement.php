@@ -156,3 +156,103 @@ function cssWriteAllTargets(string $content, string $livePath, string $projectPa
         }
     }
 }
+
+/**
+ * Extract every CSS class, ID and tag named by a JSON structure, recursively.
+ *
+ * Walks a page / menu / footer / component / snippet subtree, resolving
+ * `component` references against the project's component folder so a component's
+ * own selectors count too, and returns the three selector sets a CssParser query
+ * needs.
+ *
+ * Shared: `injectSnippetCss` reaches it through `extractSnippetCss()` in
+ * SnippetManagement.php, which `createSnippet` and `duplicateSnippet` call.
+ *
+ * Requires `componentPolicy.php` (qs_resolve_component_path) and the
+ * TEMPLATES_JSON_PATH constant to be in scope.
+ *
+ * @param array $structure  Array of nodes.
+ * @param array $components Component cache, filled as references are resolved.
+ * @return array ['classes' => [...], 'ids' => [...], 'tags' => [...]]
+ */
+function extractCssSelectorsFromStructure(array $structure, array &$components = []): array {
+    $classes = [];
+    $ids = [];
+    $tags = [];
+
+    foreach ($structure as $node) {
+        // Handle component references
+        if (isset($node['component'])) {
+            $componentName = $node['component'];
+
+            // Load component if not already loaded
+            if (!isset($components[$componentName])) {
+                // beta.11 S3.10c: stored reference, jailed by the shared resolver.
+                $componentPath = qs_resolve_component_path($componentName, TEMPLATES_JSON_PATH . '/components');
+                if ($componentPath !== null) {
+                    $componentContent = @file_get_contents($componentPath);
+                    if ($componentContent !== false) {
+                        $componentData = json_decode($componentContent, true);
+                        if (is_array($componentData)) {
+                            $components[$componentName] = $componentData;
+                        }
+                    }
+                }
+            }
+
+            // Recursively extract from component
+            if (isset($components[$componentName])) {
+                $componentSelectors = extractCssSelectorsFromStructure(
+                    is_array($components[$componentName][0] ?? null) ? $components[$componentName] : [$components[$componentName]],
+                    $components
+                );
+                $classes = array_merge($classes, $componentSelectors['classes']);
+                $ids = array_merge($ids, $componentSelectors['ids']);
+                $tags = array_merge($tags, $componentSelectors['tags']);
+            }
+
+            // Also extract from data params (component might have class in data)
+            if (isset($node['data']) && is_array($node['data'])) {
+                if (isset($node['data']['class'])) {
+                    $nodeClasses = preg_split('/\s+/', trim($node['data']['class']));
+                    $classes = array_merge($classes, $nodeClasses);
+                }
+                if (isset($node['data']['id'])) {
+                    $ids[] = $node['data']['id'];
+                }
+            }
+
+            continue;
+        }
+
+        // Handle regular tags
+        if (isset($node['tag'])) {
+            $tags[] = $node['tag'];
+
+            // Extract params
+            if (isset($node['params']) && is_array($node['params'])) {
+                if (isset($node['params']['class'])) {
+                    $nodeClasses = preg_split('/\s+/', trim($node['params']['class']));
+                    $classes = array_merge($classes, $nodeClasses);
+                }
+                if (isset($node['params']['id'])) {
+                    $ids[] = $node['params']['id'];
+                }
+            }
+        }
+
+        // Recurse into children
+        if (isset($node['children']) && is_array($node['children'])) {
+            $childSelectors = extractCssSelectorsFromStructure($node['children'], $components);
+            $classes = array_merge($classes, $childSelectors['classes']);
+            $ids = array_merge($ids, $childSelectors['ids']);
+            $tags = array_merge($tags, $childSelectors['tags']);
+        }
+    }
+
+    return [
+        'classes' => array_unique(array_filter($classes)),
+        'ids' => array_unique(array_filter($ids)),
+        'tags' => array_unique(array_filter($tags))
+    ];
+}

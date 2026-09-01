@@ -10390,3 +10390,78 @@ that does nothing); leaving the field and documenting that it means nothing
 
 **Source**: `secure/management/command/build.php` (success envelope, and the
 config.php copy's abort message).
+
+### `help` names constants; it never prints their values (locked 2026-09-01)
+
+**Decision.** The `help` command's output is a specification of the API, not a
+report about the server answering it. Its text names constants (`SECURE_FOLDER_PATH`,
+`SERVER_ROOT`, `PUBLIC_FOLDER_SPACE`) rather than resolving them, and writes engine
+paths against a `<secure>/…` placeholder instead of a literal `secure/…`. Two
+installations running the same version answer `help` with the same bytes.
+
+**Reasoning.** The rule reads like a disclosure rule, and it is one — `help` is a
+public command, so it answers before authentication and anything it prints is
+public. But what actually made it urgent was correctness. The secure folder is
+renameable; that is a supported deployment choice and a live one. Every literal
+`secure/management/config/auth.php` in `help` was therefore **false** on such an
+install: it told an operator to edit a file at a path that does not exist there.
+A placeholder is not vaguer than the literal — it is the only form that is true
+everywhere, because the part it elides is the part that varies.
+
+Naming the constant carries more information too. `SERVER_ROOT` tells a reader
+which value governs the default and where to change it; the resolved path tells
+them one server's answer and hides the mechanism.
+
+Two literals turned out to be wrong in a second, plainer way — pointing at
+`secure/config/roles.php` and `secure/config/aliases.json`, neither of which is
+where those files live (roles are under `management/config/`, and aliases are
+per-project under `projects/<id>/data/`). Both had survived precisely because a
+concrete-looking path invites belief rather than checking.
+
+**Alternatives considered**: resolving the constants at runtime so the paths are
+correct per install (rejected — it makes `help` a report about the deployment,
+defeats caching a single published spec, and hands an unauthenticated caller the
+install's real layout); leaving the literals and documenting the default layout as
+an assumption (rejected — a doc that is wrong on a supported configuration is
+wrong, and the assumption would live where nobody reads it); dropping the paths
+entirely (rejected — knowing *which* file holds the session TTLs is the useful
+half, and the placeholder keeps it).
+
+**Scope note.** `data.base_url` remains the one field derived from the running
+deployment. It echoes the API root the caller just used, so it discloses nothing
+the caller does not have, and it is what makes the response self-locating for a
+consumer. It is a deliberate exception, not an oversight.
+
+**Source**: `secure/management/command/help.php` (29 path literals plus the two
+wrong ones); the rule for future entries is in `CLAUDE.md` under *Architecture
+Principles*.
+
+### Two command file styles, chosen by whether the command runs in-process (locked 2026-09-01)
+
+**Decision.** A command file may either be a top-level script that executes on
+include, or define `__command_<name>()` and end with an
+`if (!defined('COMMAND_INTERNAL_CALL'))` dispatch guard. Both are correct. The
+function+guard style is **required** only when the command must be callable
+in-process — that is, when it is (or may become) an entry in `CommandRunner`'s
+allowlist, or when another command file calls it directly.
+
+**Reasoning.** The contributor checklist had prescribed the guard as though it
+were universal, and 51 of the 173 command files do not follow it. That is a
+documentation defect, not 51 defects: the dispatcher includes exactly one command
+file per request, so a top-level script cannot collide with anything, and every
+one of `CommandRunner`'s 25 allowlisted commands does define its function — the
+invariant that actually matters holds.
+
+Converting the 51 was weighed and declined. The guard buys a capability none of
+them uses, and rewriting the entry point of a quarter of the command surface late
+in a beta risks regressions in exchange for uniformity alone. Correcting the
+checklist costs nothing and stops the next contributor being told that working
+code is wrong.
+
+**Alternatives considered**: convert all 51 for consistency (rejected — real
+regression risk, no functional gain); leave the checklist alone and treat the 51
+as debt (rejected — the checklist is what a new contributor reads, so a rule 29%
+of the code disproves teaches them to distrust the whole document).
+
+**Source**: `CLAUDE.md` *Adding a new command — checklist* step 1;
+`secure/src/classes/CommandRunner.php` (the allowlist the requirement derives from).

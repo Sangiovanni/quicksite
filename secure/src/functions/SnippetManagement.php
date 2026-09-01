@@ -377,8 +377,8 @@ function loadFullSnippet(string $filePath, string $snippetId, string $source = '
 /**
  * Extract CSS selectors and matching CSS rules from a snippet structure
  * 
- * Uses the same extraction logic as getCssForStructure: scans the structure
- * tree for all classes and IDs, then queries the project stylesheet.
+ * Scans the structure tree for all classes and IDs via the shared
+ * extractCssSelectorsFromStructure() helper, then queries the project stylesheet.
  * Tags are intentionally excluded — they match too broadly and pull in
  * unrelated rules (e.g. a bare `p` tag would match `.feature-card p`).
  * 
@@ -388,7 +388,8 @@ function loadFullSnippet(string $filePath, string $snippetId, string $source = '
  */
 function extractSnippetCss(array $structure, string $projectName): array {
     require_once SECURE_FOLDER_PATH . '/src/classes/CssParser.php';
-    require_once SECURE_FOLDER_PATH . '/management/command/getCssForStructure.php';
+    require_once SECURE_FOLDER_PATH . '/src/functions/utilsStyleManagement.php'; // extractCssSelectorsFromStructure
+    require_once SECURE_FOLDER_PATH . '/src/functions/componentPolicy.php';      // qs_resolve_component_path
 
     // Normalize: extractCssSelectorsFromStructure expects an array of nodes
     $nodes = isset($structure['tag']) || isset($structure['component']) || isset($structure['textKey'])

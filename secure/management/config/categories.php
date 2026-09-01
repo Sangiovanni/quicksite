@@ -284,18 +284,6 @@ return [
         'commands' => ['listRoles', 'getMyPermissions'],
     ],
 
-    // Workflow-editor tooling. These read ONLY the workflow block/lint templates
-    // shipped under secure/admin/workflows — QuickSite's own catalogue, not any
-    // project's data — so they were re-tagged GLOBAL in C8 8.5. As project-scoped
-    // admin+ they demanded a marker and an admin membership for a read that touches
-    // no project at all: the error direction was fail-SAFE, but the tag misdescribed
-    // the command and forced the editor to carry a marker it did not need.
-    'workflow' => [
-        'scope' => 'global',
-        'access' => 'any',
-        'commands' => ['listWorkflowBlocks', 'lintWorkflows'],
-    ],
-
     // "My projects" surface (OUTPUT filtered to memberships by C7/C8; the command
     // itself is any-auth).
     // getMySpaceUsage aggregates disk usage across the projects the caller OWNS —
