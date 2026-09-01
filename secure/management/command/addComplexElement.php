@@ -227,6 +227,16 @@ function __command_addComplexElement(array $params = [], array $urlParams = []):
             ->withErrors([['field' => 'config', 'reason' => 'blocked_tag', 'value' => $badTag]]);
     }
 
+    // Same arrangement for component REFERENCES (beta.11 S3.10c): the gate
+    // belongs to the splice, not to each builder, so a future builder cannot
+    // become the one writer that emits an unjailable reference unnoticed.
+    $badRef = qs_first_invalid_component_reference($newNode);
+    if ($badRef !== null) {
+        return ApiResponse::create(400, 'validation.invalid_format')
+            ->withMessage("Builder '$kind' emitted component reference '{$badRef}', which is not allowed (security restriction)")
+            ->withErrors([qs_component_reference_error('config', $badRef)]);
+    }
+
     // SECURITY: walk the builder's emitted subtree for reserved-namespace
     // storage keys (slice 5b). Builders consume user-supplied `config` and
     // could propagate hostile values into emitted nodes; this is the

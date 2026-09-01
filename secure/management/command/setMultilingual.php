@@ -1,5 +1,6 @@
 <?php
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_json_write
+require_once SECURE_FOLDER_PATH . '/src/functions/opcacheHygiene.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 
 /**
@@ -70,9 +71,7 @@ if (!flock($lockHandle, LOCK_EX)) {
 
 // Clear caches and read FRESH config (not the stale CONFIG constant)
 clearstatcache(true, $configPath);
-if (function_exists('opcache_invalidate')) {
-    opcache_invalidate($configPath, true);
-}
+qs_opcache_invalidate($configPath);
 
 $freshConfig = @include $configPath;
 if (!is_array($freshConfig)) {
@@ -247,9 +246,7 @@ if ($result === false) {
 }
 
 // Clear opcache after writing
-if (function_exists('opcache_invalidate')) {
-    opcache_invalidate($configPath, true);
-}
+qs_opcache_invalidate($configPath);
 
 $mode = $enabled ? 'multilingual' : 'mono-language';
 

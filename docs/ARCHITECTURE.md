@@ -117,7 +117,7 @@ Page structure is JSON rather than HTML for a handful of pragmatic reasons:
 | Tag | `{ tag, params?, children? }` | Standard HTML element. |
 | Text | `{ textKey: "…" }` | Resolved through the translator. |
 | Raw text | `{ textKey: "__RAW__…" }` | Literal, never translated. |
-| Component | `{ component, data? }` | Inlines a component's JSON, with `{{var}}` interpolation. |
+| Component | `{ component, data? }` | Inlines a component's JSON, with `{{var}}` interpolation. The reference is a bare component **name**, never a path — see §8.7. |
 
 Attributes also accept a `{ condition, value }` shape for conditional rendering of a single attribute (evaluated server-side at render time).
 
@@ -1054,6 +1054,14 @@ first (`QS_OAUTH_<PROVIDER>_CLIENT_ID` / `_CLIENT_SECRET`) and from the shipped
 `data/oauth-secrets.json` second, so a deployer can keep the credential out of a
 build folder that `downloadBuild` hands over whole.
 
+The post-auth record and the pre-auth sign-in state both carry the id of the
+project that wrote them, and every read verifies it. Two built sites on one
+origin open the same PHP session store — same session name, same save path,
+cookie at `/` because a built site lives at the root — so without the stamp the
+only thing separating two tenants' visitors would be each site reading its own
+project-namespaced cookie name, which is a lookup key and not a check. A record
+carrying no stamp is refused rather than trusted.
+
 ### 8.7 Render parity — one contract, two implementations
 
 `JsonToHtmlRenderer` renders a page from JSON on every request;
@@ -1115,6 +1123,30 @@ the weaker one.
 The same principle governs every identifier the compiler emits. A component name
 and a page-title key are written as data — logged, or `var_export`ed into a
 literal — never interpolated into generated code, not even into a comment.
+
+**Component references.** `{ "component": "lang-switch" }` names a file in the
+project's own `templates/model/json/components/` directory. The reference is a
+**name, not a path**: it starts with a letter, then letters, digits, hyphens and
+underscores, up to 64 characters. It holds no separators, no dots, and no
+traversal, so it can only ever name a component of the project being rendered.
+A reference that breaks the rule resolves to nothing and the reader reports the
+component as not found — refused, not repaired, for the same reason a malformed
+attribute name is dropped: there is no rewriting of a path that means anything
+as a component name.
+
+Both the containment and the rule live in one place, `qs_resolve_component_path()`
+in `src/functions/componentPolicy.php`, and every reader asks it: the `/p/<id>/`
+renderer, the compiler, and the commands that expand a component for a preview or
+read its variable list. The resolver applies the rule, then confirms that the
+file it is about to return really sits inside that project's components
+directory, so the two checks fail independently.
+
+The write side is the second layer, not the first. `editStructure`,
+`createSnippet`, `addComplexElement` and `importProject` walk a structure before
+storing it and refuse a malformed reference with an error, the same way they
+already refuse a blocked tag. The read-side jail is what actually protects a
+render or a build, because a project may already hold references written before
+the rule existed.
 
 **Attribute values.** An attribute carries a string, a boolean, or nothing.
 

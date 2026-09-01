@@ -324,6 +324,20 @@ if ($structure !== null && is_array($structure)) {
             ->send();
     }
 
+    // Then component REFERENCES. Nothing inspected them before beta.11 S3.10c:
+    // the tag walk trips on `tag`, the param walk below inspects `params`, and a
+    // `component` value passed both untouched into a path concatenation. The
+    // readers' jail is what actually protects a render or a build; this is the
+    // author-facing half, so a bad reference is an error here rather than a node
+    // that silently never appears.
+    $badRef = qs_first_invalid_component_reference($structure);
+    if ($badRef !== null) {
+        ApiResponse::create(400, 'validation.invalid_format')
+            ->withMessage("Component reference '{$badRef}' is not allowed (security restriction)")
+            ->withErrors([qs_component_reference_error('structure', $badRef)])
+            ->send();
+    }
+
     // Then params, which still walk per-shape.
     // For pages/menu/footer (arrays of nodes)
     if (isset($structure[0]) || empty($structure)) {

@@ -26,6 +26,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/SnippetManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/componentPolicy.php';
 
 /**
  * Generate a unique text key prefix based on structure type and name
@@ -194,9 +195,10 @@ function processSnippetStructure(array $node, string $prefix, int &$itemCounter,
             $processed['data'] = [];
             
             // Load component definition to detect variable types
-            $componentPath = PROJECT_PATH . '/templates/model/json/components/' . $node['component'] . '.json';
+            // beta.11 S3.10c: stored reference, jailed by the shared resolver.
+            $componentPath = qs_resolve_component_path($node['component'], PROJECT_PATH . '/templates/model/json/components');
             $componentVars = [];
-            if (file_exists($componentPath)) {
+            if ($componentPath !== null) {
                 $compContent = @file_get_contents($componentPath);
                 if ($compContent !== false) {
                     $compStructure = json_decode($compContent, true);

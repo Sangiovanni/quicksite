@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../functions/opcacheHygiene.php';
 /**
  * EnumSyncHelper
  *
@@ -124,9 +125,7 @@ class EnumSyncHelper {
         // Invalidate OPcache for the script if the extension is loaded
         // (qs-enums.js is JS, not PHP, but the broader cache may still
         // have a stale stat — no-op on JS files but harmless).
-        if (function_exists('opcache_invalidate')) {
-            @opcache_invalidate($targetPath, true);
-        }
+        qs_opcache_invalidate($targetPath);
 
         return [
             'ok' => true,

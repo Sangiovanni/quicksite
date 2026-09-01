@@ -44,6 +44,7 @@
  * - Path traversal attempts (..) are blocked
  */
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/opcacheHygiene.php'; // qs_opcache_invalidate
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/LockManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
@@ -707,14 +708,33 @@ function copyDirectory(string $source, string $dest, bool $overwrite, array &$cr
         RecursiveIteratorIterator::SELF_FIRST
     );
 
+    // The jail root, canonicalised ONCE: every entry below must resolve inside
+    // it. Without this the walk follows a reparse point out of the build and
+    // copies whatever it finds — RecursiveDirectoryIterator reports a junction
+    // as an ordinary directory (beta.11 S3.10c, audit F6). Defence in depth:
+    // the source is a build QuickSite generated with mkdir/copy and no command
+    // plants a link, so no remote vector was found. It is here so this boundary
+    // and the publish copier make the SAME decision instead of differing
+    // invisibly; both now ask qs_path_is_within().
+    $jailRoot = realpath($source);
+    if ($jailRoot === false) {
+        return ['files' => 0, 'directories' => 0, 'php_invalidated' => 0, 'error' => "Source directory is unreadable: {$source}"];
+    }
+
     $copiedFiles = 0;
     $copiedDirs = 0;
     $skippedShared = [];
+    $skippedOutside = [];
     $phpInvalidated = 0;
 
     foreach ($iterator as $item) {
         $relativePath = $iterator->getSubPathname();
         $destPath = $dest . DIRECTORY_SEPARATOR . $relativePath;
+
+        if (!qs_path_is_within($item->getPathname(), $jailRoot)) {
+            $skippedOutside[] = $relativePath;
+            continue;
+        }
 
         if ($item->isDir()) {
             if (!is_dir($destPath)) {
@@ -759,15 +779,15 @@ function copyDirectory(string $source, string $dest, bool $overwrite, array &$cr
                 // best-effort: the deployed site usually runs in a different
                 // php-fpm pool, and OPcache memory is per-pool. Free when the
                 // pool is shared, harmless when it is not. The response says so.
-                if (substr($destPath, -4) === '.php' && function_exists('opcache_invalidate')) {
-                    @opcache_invalidate($destPath, true);
+                if (substr($destPath, -4) === '.php' && qs_opcache_invalidate($destPath)) {
                     $phpInvalidated++;
                 }
             }
         }
     }
 
-    return ['files' => $copiedFiles, 'directories' => $copiedDirs, 'skipped_shared' => $skippedShared, 'php_invalidated' => $phpInvalidated];
+    return ['files' => $copiedFiles, 'directories' => $copiedDirs, 'skipped_shared' => $skippedShared,
+            'skipped_outside' => $skippedOutside, 'php_invalidated' => $phpInvalidated];
 }
 
 /**

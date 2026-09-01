@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/PathManagement.php'; // qs_path_is_within
 
 /**
  * File Policy — what may ENTER a project from an archive, what may be
@@ -634,15 +635,10 @@ function qs_copy_publishable_directory(
             continue;
         }
 
-        // The jail check, identical in shape to the passthrough's: canonicalise,
-        // then require the result to sit under the copy root. Trailing separator
-        // on the jail so a sibling whose name merely PREFIXES the root cannot
-        // satisfy it; case-folded on Windows.
-        $real = realpath($sourcePath);
-        $jail = rtrim($root, '/\\') . DIRECTORY_SEPARATOR;
-        $hay  = $real === false ? '' : $real . (is_dir($real) ? DIRECTORY_SEPARATOR : '');
-        if (DIRECTORY_SEPARATOR === '\\') { $jail = strtolower($jail); $hay = strtolower($hay); }
-        if ($real === false || strncmp($hay, $jail, strlen($jail)) !== 0) {
+        // The jail check. Canonicalise, then require the result to sit under
+        // the copy root. The predicate is shared with the deploy copier so both
+        // boundaries make the same decision (beta.11 S3.10c).
+        if (!qs_path_is_within($sourcePath, $root)) {
             $skipped[] = $relative . ' (resolves outside the project)';
             continue;
         }

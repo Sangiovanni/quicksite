@@ -10285,3 +10285,108 @@ comment around it.
 `secure/src/classes/JsonToHtmlRenderer.php` (`renderAttribute`, `renderNode`),
 `secure/src/functions/nodeParamPolicy.php` (`firstUnsafeParam`).
 Behaviour: [ARCHITECTURE.md](ARCHITECTURE.md) §7 and §8.7.
+
+### A component reference is a name, not a path (locked 2026-09-01)
+
+**Decision.** `{ "component": "lang-switch" }` names a file in the rendering
+project's own components directory and nothing else. A legal reference starts
+with a letter, then letters, digits, hyphens and underscores, up to 64
+characters. It carries no path separators, no dots and no traversal. A reference
+that breaks the rule resolves to nothing and the reader reports the component as
+not found.
+
+One function decides this — `qs_resolve_component_path()` — and every reader
+asks it: the `/p/<id>/` renderer, the JSON→PHP compiler, and the eight commands
+that expand a component for a preview, read its variable list, or find its
+usages. The resolver applies the rule and then confirms that the file it is
+about to return really sits inside that project's components directory, so the
+charset rule and the containment check fail independently.
+
+**Reasoning.** The reference is stored project data. Every reader used to
+concatenate it into a filesystem path on its own, so `../` walked out of
+`templates/model/json/components/` and reached any `.json` the process could
+read — another project's included. Where the file it reached happened to be
+component-shaped, its full content rendered into the preview HTML and compiled
+into the built site. Measured: project `quicksite` referencing
+`../../../../../test/templates/model/json/components/lang-switch` rendered that
+other project's component verbatim, and the same reference aimed at that
+project's `backups/` directory rendered the older version stored there — proving
+the read is of the traversed file and not a local fallback.
+
+Three commands did already jail the reference, but each carried its own copy of
+a near-identical rule and two of the three disagreed about whether an underscore
+was legal, while a fourth validated nothing at all. So the rule was not new; it
+was inconsistent, and absent exactly where it mattered.
+
+**Refused, not repaired.** There is no rewriting of `../menu` that means
+anything as a component name. Repairing one would preserve an author's mistake
+in a new shape and leave the two surfaces free to disagree about what it meant.
+Dropping is what the tag gate and the attribute-name gate beside it already do
+(see the entry above).
+
+**The read side is the load-bearing gate; the write side is the second layer.**
+`editStructure`, `createSnippet`, `addComplexElement` and `importProject` — the
+four writers that already walk a structure for blocked tags — now refuse a
+malformed reference too, so an author gets an immediate error. That cannot be
+the fix: projects already hold references written before any rule existed, and
+only the resolver protects a render or a build made from them. The gate is
+deliberately not extended to the writers that merely move or copy stored nodes,
+which could only quarantine existing content rather than harden anything.
+
+**Measured before shipping.** Every component file on disk, every reference
+stored in every project, and every reference the shipped workflows write already
+satisfies the rule; no project nests components in a subdirectory. Compiling and
+rendering all 30 stored structures of all four projects before and after
+produces byte-identical output, with a control showing that a one-character
+change to the compiler moves 29 of those 30 rows.
+
+**Alternatives considered**: allowing a nested reference and jailing with
+`realpath` alone (rejected — it makes the legal set depend on what happens to
+exist on disk, so the same reference is legal on one install and not on another,
+and it keeps the reference a path when nothing needs it to be one); leaving the
+read side and validating only on write (rejected — it cannot reach data that is
+already stored, which is exactly the data a build compiles); fixing the renderer
+and the compiler and leaving the commands (rejected — the preview expander and
+the snippet readers take their reference from the same stored node, so the hole
+would have survived in the surfaces an author actually clicks); adding a ninth
+private copy of the charset rule rather than one shared resolver (rejected for
+the reason the three existing copies had already drifted apart).
+
+**Source**: `secure/src/functions/componentPolicy.php`
+(`qs_is_valid_component_reference`, `qs_resolve_component_path`),
+`secure/src/classes/RegexPatterns.php` (`component_name`),
+`secure/src/classes/JsonToHtmlRenderer.php` (`loadComponent`),
+`secure/src/classes/JsonToPhpCompiler.php` (`compileComponent`),
+`secure/src/functions/utilsManagement.php`
+(`qs_first_invalid_component_reference`).
+Behaviour: [ARCHITECTURE.md](ARCHITECTURE.md) §8.7.
+
+### The build reports what it does, not what it wishes it did (locked 2026-09-01)
+
+**Decision.** `build` no longer reports `config_sanitized`. The field was always
+`true` and nothing was ever sanitised: `config.php` is copied verbatim into the
+build. The claim is removed rather than made true, and the abort message that
+said "Failed to write sanitized config.php" now says what actually failed.
+
+**Reasoning.** A command's own report is part of its contract. A field asserting
+a security property that nothing implements is worse than no field: it is the
+thing a reader checks instead of checking the code, and it would have gone on
+being true-looking on the day somebody added a credential to the config schema.
+
+Defining sanitisation instead — an allowlist of config keys permitted to travel,
+with unknown keys dropped — was the alternative, and it was declined. Today's
+schema holds only site name, language settings, theme flags, a build size cap
+and a favicon path; there is nothing to strip. An allowlist that must be updated
+for every new key fails in the silent direction: forget to add one and it stops
+reaching builds with no error, which trades a false claim for a real bug.
+
+A warn-only variant (report unrecognised keys but copy them anyway) was also
+weighed and declined for adding a field nobody would act on.
+
+**Alternatives considered**: the allowlist, enforced (rejected — see above);
+the allowlist, warn-only (rejected — reporting without acting is another claim
+that does nothing); leaving the field and documenting that it means nothing
+(rejected — documentation does not fix a lie in a response body).
+
+**Source**: `secure/management/command/build.php` (success envelope, and the
+config.php copy's abort message).

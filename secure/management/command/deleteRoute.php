@@ -20,6 +20,7 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/opcacheHygiene.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/String.php';
 // Beta.8 A1 — routeHelpers is already loaded by utilsManagement,
@@ -213,9 +214,7 @@ if (file_put_contents(ROUTES_PATH, $routesContent, LOCK_EX) === false) {
 }
 
 // Invalidate opcache
-if (function_exists('opcache_invalidate')) {
-    opcache_invalidate(ROUTES_PATH, true);
-}
+qs_opcache_invalidate(ROUTES_PATH);
 
 // Beta.8 A1 Build Slice 1 — regenerate the client-side routes schema
 // so qs.js (Slice 2) drops the deleted route immediately without a

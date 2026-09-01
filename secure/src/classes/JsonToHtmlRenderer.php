@@ -17,6 +17,7 @@ require_once __DIR__ . '/../functions/routeHelpers.php';
 // EVERY context this class renders in (surface B, and /management/ fragments).
 // Requiring this file defines no constants outside a surface-B request.
 require_once __DIR__ . '/../functions/renderBootstrap.php';
+require_once __DIR__ . '/../functions/componentPolicy.php';
 
 /**
  * JsonToHtmlRenderer
@@ -970,9 +971,18 @@ class JsonToHtmlRenderer {
             return $this->componentCache[$componentName];
         }
 
-        $componentPath = $this->componentsPath . $componentName . '.json';
-        
-        if (!file_exists($componentPath)) {
+        // SECURITY (beta.11 S3.10c): the reference used to be concatenated
+        // straight into this path, so `../` walked out of the components
+        // directory and read any .json the process could reach — another
+        // project's included. Where the out-of-jail target was component-shaped
+        // its full content rendered into the preview. The shared resolver
+        // refuses anything that is not a bare component name and confirms the
+        // file it returns really sits inside this project's components
+        // directory. The compiler asks the SAME resolver, so both surfaces
+        // agree on what a component reference is.
+        $componentPath = qs_resolve_component_path($componentName, $this->componentsPath);
+
+        if ($componentPath === null) {
             return null;
         }
 

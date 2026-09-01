@@ -6,6 +6,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/JsonToHtmlRenderer.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/reservedStorageKeys.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/componentPolicy.php';
 
 /**
  * addComponentToNode - Add a component instance to a structure
@@ -188,11 +189,12 @@ function __command_addComponentToNode(array $params = [], array $urlParams = [])
             ->withErrors([['field' => 'position', 'value' => $position, 'allowed' => $allowedPositions]]);
     }
     
-    // Validate component name format
-    if (!preg_match('/^[a-zA-Z][a-zA-Z0-9_-]*$/', $componentName)) {
+    // Validate component name format. beta.11 S3.10c: one shared rule, the
+    // same one the renderer and the compiler enforce — this was a private copy.
+    if (!qs_is_valid_component_reference($componentName)) {
         return ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage("Invalid component name format")
-            ->withErrors([['field' => 'component', 'value' => $componentName]]);
+            ->withErrors([qs_component_reference_error('component', $componentName)]);
     }
     
     // Load component definition

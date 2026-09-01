@@ -61,6 +61,12 @@ class RegexPatterns
             'examples' => ['myComponent', 'user-card', 'item_123']
         ],
         
+        'component_name' => [
+            'pattern' => '/^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/',
+            'description' => 'Component reference: starts with a letter, then letters, numbers, hyphens and underscores (no path separators, no dots)',
+            'examples' => ['lang-switch', 'feature-card', 'img-dynamic', 'my_card']
+        ],
+        
         'css_variable' => [
             'pattern' => '/^--[a-zA-Z][a-zA-Z0-9-]*$/',
             'description' => 'CSS custom property (starts with --)',

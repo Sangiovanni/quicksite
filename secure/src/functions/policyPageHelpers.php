@@ -12,6 +12,7 @@ if (!defined('SECURE_FOLDER_PATH')) {
 }
 
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/opcacheHygiene.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/routeHelpers.php';
 
 /**
@@ -86,7 +87,7 @@ function policyCreateRoute(array $segments): void {
     }
     if ($changed && defined('ROUTES_PATH')) {
         file_put_contents(ROUTES_PATH, '<?php return ' . varExportNested($newRoutes) . '; ?>', LOCK_EX);
-        if (function_exists('opcache_invalidate')) opcache_invalidate(ROUTES_PATH, true);
+        qs_opcache_invalidate(ROUTES_PATH);
         require_once SECURE_FOLDER_PATH . '/src/functions/projectPublicArtifacts.php';
         qs_emit_route_schema($newRoutes);
     }
@@ -113,7 +114,7 @@ function policyDeleteRoute(array $segments): void {
     $newRoutes = policyRemoveRoute($segments, defined('ROUTES') && is_array(ROUTES) ? ROUTES : []);
     if (defined('ROUTES_PATH')) {
         file_put_contents(ROUTES_PATH, '<?php return ' . varExportNested($newRoutes) . '; ?>', LOCK_EX);
-        if (function_exists('opcache_invalidate')) opcache_invalidate(ROUTES_PATH, true);
+        qs_opcache_invalidate(ROUTES_PATH);
     }
     require_once SECURE_FOLDER_PATH . '/src/functions/projectPublicArtifacts.php';
     qs_emit_route_schema($newRoutes);

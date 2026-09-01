@@ -37,6 +37,7 @@
  */
 
 require_once __DIR__ . '/AuthManagement.php';
+require_once __DIR__ . '/opcacheHygiene.php';
 
 /**
  * Path of the operator list. Gitignored, with a tracked `.example` sibling —
@@ -106,9 +107,7 @@ function qs_operator_ids(): array {
     if (!is_file($path)) {
         return [];
     }
-    if (function_exists('opcache_invalidate')) {
-        opcache_invalidate($path, true);
-    }
+    qs_opcache_invalidate($path);
     // ⚠ THE try/catch IS LOAD-BEARING, and `@` alone is not enough. A SYNTAX
     // error in an included file is not a warning to suppress — it is a
     // ParseError, and an uncaught one is fatal. This file is edited BY HAND on

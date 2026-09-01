@@ -12,6 +12,7 @@
  */
 
 require_once __DIR__ . '/SessionManagement.php';
+require_once __DIR__ . '/opcacheHygiene.php';
 require_once __DIR__ . '/setupToken.php';
 
 /**
@@ -34,9 +35,7 @@ function loadAuthConfig(): array {
     }
     
     // Invalidate opcode cache if available (needed for dynamic config changes)
-    if (function_exists('opcache_invalidate')) {
-        opcache_invalidate($configPath, true);
-    }
+    qs_opcache_invalidate($configPath);
     
     return require $configPath;
 }
@@ -54,9 +53,7 @@ function loadRolesConfig(): array {
     }
     
     // Invalidate opcode cache if available (needed for dynamic config changes)
-    if (function_exists('opcache_invalidate')) {
-        opcache_invalidate($configPath, true);
-    }
+    qs_opcache_invalidate($configPath);
     
     return require $configPath;
 }
@@ -95,9 +92,7 @@ function loadCategoriesConfig(): array {
     }
 
     // Invalidate opcode cache if available (config changes must be seen live)
-    if (function_exists('opcache_invalidate')) {
-        opcache_invalidate($configPath, true);
-    }
+    qs_opcache_invalidate($configPath);
 
     return require $configPath;
 }
@@ -115,9 +110,7 @@ function loadUsersConfig(): array {
     }
 
     // Invalidate opcode cache if available (config changes must be seen live)
-    if (function_exists('opcache_invalidate')) {
-        opcache_invalidate($configPath, true);
-    }
+    qs_opcache_invalidate($configPath);
 
     return require $configPath;
 }
@@ -1056,9 +1049,7 @@ function qs_users_mutate(callable $fn) {
                 return false;
             }
         }
-        if (function_exists('opcache_invalidate')) {
-            opcache_invalidate($path, true);
-        }
+        qs_opcache_invalidate($path);
         return $result;
     } finally {
         flock($lock, LOCK_UN);

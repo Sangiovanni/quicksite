@@ -93,6 +93,16 @@ function __command_createSnippet(array $params = [], array $urlParams = []): Api
             ->withMessage("Tag '{$badTag}' is not allowed (security restriction)")
             ->withErrors([['field' => 'structure', 'reason' => 'blocked_tag', 'value' => $badTag]]);
     }
+
+    // The same gate for component REFERENCES (beta.11 S3.10c). A snippet's tree
+    // is copied into a page by insertSnippet, so a reference stored here is a
+    // reference the readers will resolve later.
+    $badRef = qs_first_invalid_component_reference($structure);
+    if ($badRef !== null) {
+        return ApiResponse::create(400, 'validation.invalid_format')
+            ->withMessage("Component reference '{$badRef}' is not allowed (security restriction)")
+            ->withErrors([qs_component_reference_error('structure', $badRef)]);
+    }
     
     // (project already bound to the authorized marker above)
     

@@ -6,6 +6,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/JsonToHtmlRenderer.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/componentPolicy.php';
 
 /**
  * editComponentToNode - Edit a component instance's data bindings
@@ -190,8 +191,10 @@ function __command_editComponentToNode(array $params = [], array $urlParams = []
     $currentData = $targetNode['data'] ?? [];
     
     // Load component definition to get variable types
-    $componentPath = PROJECT_PATH . '/templates/model/json/components/' . $componentName . '.json';
-    if (!file_exists($componentPath)) {
+    // beta.11 S3.10c: this reference comes from the STORED node, not the
+    // request, so it is jailed by the shared resolver.
+    $componentPath = qs_resolve_component_path($componentName, PROJECT_PATH . '/templates/model/json/components');
+    if ($componentPath === null) {
         return ApiResponse::create(404, 'error.notFound')
             ->withMessage("Component definition not found: {$componentName}");
     }

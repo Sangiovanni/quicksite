@@ -29,6 +29,7 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/JsonToPhpCompiler.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/errorHygiene.php'; // qs_safe_copy
 require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/filePolicy.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/LockManagement.php';
@@ -65,8 +66,12 @@ if (!empty($buildCustomName)) {
     }
 }
 
-// Validate public folder name parameter
-if (!empty($params['public'])) {
+// Validate public folder name parameter.
+// `isset`, not `!empty`: an explicit `public: ''` (or `'0'`) is a value the
+// caller chose and it used to skip BOTH this format check and the containment
+// guard below, reaching the build with an empty name — the same hole as
+// `public: '.'` spelled differently (beta.11 S3.10c).
+if (isset($params['public'])) {
     // Type validation
     if (!is_string($params['public'])) {
         ApiResponse::create(400, 'validation.invalid_type')
@@ -96,8 +101,9 @@ if (!empty($params['public'])) {
     }
 }
 
-// Validate secure folder name parameter
-if (!empty($params['secure'])) {
+// Validate secure folder name parameter. `isset`, not `!empty` — see the
+// public block above.
+if (isset($params['secure'])) {
     // Type validation
     if (!is_string($params['secure'])) {
         ApiResponse::create(400, 'validation.invalid_type')
@@ -159,18 +165,31 @@ if (!empty($params['space'])) {
     }
 }
 
-// Security validation: Public and secure folders must NOT share parent directory
-if (!empty($params['public']) || !empty($params['secure'])) {
+// Security validation: the secure folder must not end up inside the public one.
+//
+// This used to compare only the FIRST PATH SEGMENT of each name, which answers a
+// different question from the one the explanation below asks. `public='.'`
+// passed it — and `.` makes the public content path the build ROOT, so the whole
+// secure folder became a child of the deployed document root, which is exactly
+// what that explanation promises cannot happen (beta.11 S3.10c, audit F2).
+// qs_build_paths_conflict() answers the real question (containment) and keeps
+// the shared-root rule the example_invalid below documents.
+// Unconditional: the names always have values (the defaults), the default pair
+// passes, and gating this on "was a parameter supplied" is what let an explicit
+// empty name through.
+{
     $publicRoot = explode('/', $buildPublicName)[0];
     $secureRoot = explode('/', $buildSecureName)[0];
-    
-    if ($publicRoot === $secureRoot) {
+    $pathConflict = qs_build_paths_conflict($buildPublicName, $buildSecureName);
+
+    if ($pathConflict !== null) {
         ApiResponse::create(400, 'validation.shared_parent_folder')
             ->withMessage('Public and secure folders cannot share the same root directory for security reasons')
             ->withData([
                 'public_root' => $publicRoot,
                 'secure_root' => $secureRoot,
-                'explanation' => 'If both folders share a parent, the secure folder could be accessible from the public web space through path traversal',
+                'conflict' => $pathConflict,
+'explanation' => 'If both folders share a parent, the secure folder could be accessible from the public web space through path traversal',
                 'example_valid' => [
                     'public' => 'www/assets',
                     'secure' => 'backend/core'
@@ -385,10 +404,11 @@ if (!is_file($entryPointSource)) {
     );
 }
 
-if (!copy($entryPointSource, $publicContentPath . '/index.php')) {
+if (($copyError = qs_safe_copy($entryPointSource, $publicContentPath . '/index.php', 'build')) !== null) {
     abort_build(
         ApiResponse::create(500, 'server.file_write_failed')
             ->withMessage('Failed to write the site entry point (index.php)')
+            ->withData(['reason' => $copyError])
     );
 }
 
@@ -455,10 +475,11 @@ if (!qs_copy_publishable_directory(PUBLIC_CONTENT_PATH . '/assets', $publicConte
 
 // Copy LICENSE file to build root (MIT License requirement)
 if (file_exists(SERVER_ROOT . '/LICENSE')) {
-    if (!copy(SERVER_ROOT . '/LICENSE', $buildFullPath . '/LICENSE')) {
+    if (($copyError = qs_safe_copy(SERVER_ROOT . '/LICENSE', $buildFullPath . '/LICENSE', 'build')) !== null) {
         abort_build(
             ApiResponse::create(500, 'server.file_write_failed')
                 ->withMessage("Failed to copy LICENSE file")
+                ->withData(['reason' => $copyError])
         );
     }
 }
@@ -466,24 +487,28 @@ if (file_exists(SERVER_ROOT . '/LICENSE')) {
 // Copy sitemap.txt from project public folder (if generated)
 $projectSitemapPath = PROJECT_PATH . '/public/sitemap.txt';
 if (file_exists($projectSitemapPath)) {
-    copy($projectSitemapPath, $publicContentPath . '/sitemap.txt');
+    // Best effort — a missing sitemap is not a build failure. Suppressed so a
+    // failed copy cannot print the absolute source path into the response.
+    @copy($projectSitemapPath, $publicContentPath . '/sitemap.txt');
 }
 
 // Step 3: Copy secure folder files (selective)
 
 // Copy routes.php
-if (!copy(PROJECT_PATH . '/routes.php', $buildFullPath . '/' . $buildSecureName . '/routes.php')) {
+if (($copyError = qs_safe_copy(PROJECT_PATH . '/routes.php', $buildFullPath . '/' . $buildSecureName . '/routes.php', 'build')) !== null) {
     abort_build(
         ApiResponse::create(500, 'server.file_write_failed')
             ->withMessage("Failed to copy routes.php")
+            ->withData(['reason' => $copyError])
     );
 }
 
 // Copy config.php
-if (!copy(PROJECT_PATH . '/config.php', $buildFullPath . '/' . $buildSecureName . '/config.php')) {
+if (($copyError = qs_safe_copy(PROJECT_PATH . '/config.php', $buildFullPath . '/' . $buildSecureName . '/config.php', 'build')) !== null) {
     abort_build(
         ApiResponse::create(500, 'server.file_write_failed')
-            ->withMessage("Failed to write sanitized config.php")
+            ->withMessage("Failed to copy config.php")
+->withData(['reason' => $copyError])
     );
 }
 
@@ -514,10 +539,11 @@ foreach ($classFiles as $file) {
     $source = SECURE_FOLDER_PATH . '/src/classes/' . $file;
     $dest = $buildFullPath . '/' . $buildSecureName . '/src/classes/' . $file;
     
-    if (!copy($source, $dest)) {
+    if (($copyError = qs_safe_copy($source, $dest, 'build')) !== null) {
         abort_build(
             ApiResponse::create(500, 'server.file_write_failed')
                 ->withMessage("Failed to copy class file: {$file}")
+                ->withData(['reason' => $copyError])
         );
     }
 }
@@ -554,7 +580,8 @@ $functionFiles = [
     'aliasRouting.php',
     'jsonIo.php',
     'environment.php',
-    'apiRegistry.php',
+    'opcacheHygiene.php',
+'apiRegistry.php',
     'resolverRegistry.php',
     'runtimePlaceholders.php',
     'runtimeHandoff.php',
@@ -573,10 +600,11 @@ foreach ($functionFiles as $file) {
     $source = SECURE_FOLDER_PATH . '/src/functions/' . $file;
     $dest   = $buildFullPath . '/' . $buildSecureName . '/src/functions/' . $file;
 
-    if (!copy($source, $dest)) {
+    if (($copyError = qs_safe_copy($source, $dest, 'build')) !== null) {
         abort_build(
             ApiResponse::create(500, 'server.file_write_failed')
                 ->withMessage("Failed to copy function file: {$file}")
+                ->withData(['reason' => $copyError])
         );
     }
 }
@@ -602,10 +630,11 @@ if (MULTILINGUAL_SUPPORT) {
     // Mono-language: copy only default.json
     $defaultJsonPath = PROJECT_PATH . '/translate/default.json';
     if (file_exists($defaultJsonPath)) {
-        if (!copy($defaultJsonPath, $translateDestPath . '/default.json')) {
+        if (($copyError = qs_safe_copy($defaultJsonPath, $translateDestPath . '/default.json', 'build')) !== null) {
             abort_build(
                 ApiResponse::create(500, 'server.file_write_failed')
                     ->withMessage("Failed to copy default.json")
+                    ->withData(['reason' => $copyError])
             );
         }
     } else {
@@ -648,10 +677,11 @@ foreach ($runtimeDataFiles as $dataFile) {
                 ->withMessage("Failed to create the build's data directory")
         );
     }
-    if (!copy($dataSource, $dataDir . '/' . $dataFile)) {
+    if (($copyError = qs_safe_copy($dataSource, $dataDir . '/' . $dataFile, 'build')) !== null) {
         abort_build(
             ApiResponse::create(500, 'server.file_write_failed')
                 ->withMessage("Failed to copy {$dataFile}")
+                ->withData(['reason' => $copyError])
         );
     }
 }
@@ -673,10 +703,11 @@ if (file_exists($oauthSecretsSource)) {
                 ->withMessage("Failed to create the build's data directory")
         );
     }
-    if (!copy($oauthSecretsSource, $dataDir . '/oauth-secrets.json')) {
+    if (($copyError = qs_safe_copy($oauthSecretsSource, $dataDir . '/oauth-secrets.json', 'build')) !== null) {
         abort_build(
             ApiResponse::create(500, 'server.file_write_failed')
                 ->withMessage('Failed to copy oauth-secrets.json')
+                ->withData(['reason' => $copyError])
         );
     }
     $buildCarriesOAuthSecrets = true;
@@ -837,10 +868,11 @@ if (!($enumsSyncResult['ok'] ?? false)) {
 // shipped a build with no qs.js. Sourcing the engine copy fixes that.
 $qsJsSource = SECURE_FOLDER_PATH . '/src/runtime/qs.js';
 if (file_exists($qsJsSource)) {
-    if (!copy($qsJsSource, $scriptsDir . '/qs.js')) {
+    if (($copyError = qs_safe_copy($qsJsSource, $scriptsDir . '/qs.js', 'build')) !== null) {
         abort_build(
             ApiResponse::create(500, 'server.file_write_failed')
                 ->withMessage("Failed to copy qs.js")
+                ->withData(['reason' => $copyError])
         );
     }
 }
@@ -1226,8 +1258,14 @@ ApiResponse::create(201, 'operation.success')
         'public_folder_name' => $buildPublicName,
         'secure_folder_name' => $buildSecureName,
         'public_folder_space' => $buildPublicSpace,
-        'config_sanitized' => true,
-        // The site's own front controller, its parameters and its request
+        // `config_sanitized` was reported here and was never true: config.php is
+        // copied verbatim and no sanitisation exists anywhere in this command
+        // (beta.11 S3.10c, audit F4). The field is gone rather than made true —
+        // an allowlist of travelling config keys was weighed and declined,
+        // because today's schema holds only benign settings and a list that must
+        // be updated for every new key fails closed in the silent direction.
+        // The command no longer claims a property it does not have.
+// The site's own front controller, its parameters and its request
         // funnel — all three verified present and consistent before this
         // response was allowed to be a success.
         'entry_point_written' => true,

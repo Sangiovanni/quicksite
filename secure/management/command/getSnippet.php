@@ -1,5 +1,6 @@
 <?php
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_param_string
+require_once SECURE_FOLDER_PATH . '/src/functions/componentPolicy.php';
 /**
  * getSnippet - Get a single snippet by ID
  * 
@@ -31,8 +32,9 @@ function expandSnippetForPreview(array $node, string $projectPath): array {
         $componentName = $node['component'];
         $componentData = $node['data'] ?? [];
         
-        $componentPath = $projectPath . '/templates/model/json/components/' . $componentName . '.json';
-        if (file_exists($componentPath)) {
+        // beta.11 S3.10c: stored reference, jailed by the shared resolver.
+        $componentPath = qs_resolve_component_path($componentName, $projectPath . '/templates/model/json/components');
+        if ($componentPath !== null) {
             $compContent = @file_get_contents($componentPath);
             if ($compContent !== false) {
                 $compStructure = json_decode($compContent, true);

@@ -302,3 +302,40 @@ function qs_safe_error_message(Throwable $e, string $context = ''): string
     );
     return 'An internal error occurred while processing the request';
 }
+
+/**
+ * Copy a file, keeping PHP's own warning out of the response.
+ *
+ * Returns null on success, or a REDACTED diagnosis on failure.
+ *
+ * `copy()` emits a `Warning` carrying the absolute source path when it fails.
+ * Callers that already test the return value still leak that warning wherever
+ * display_errors is on — which is every development install, since
+ * qs_register_fatal_handler only forces it off in production (beta.11 S3.10c,
+ * audit F5). Suppressing the warning loses nothing: the failure is still
+ * detected, and the reason now travels through the same redaction policy as
+ * every other message that reaches a response body.
+ *
+ * @param string $context Short label recorded in the log line on production.
+ * @return string|null null when the copy succeeded
+ */
+function qs_safe_copy(string $source, string $destination, string $context = 'copy'): ?string
+{
+    if (@copy($source, $destination)) {
+        return null;
+    }
+
+    $last = error_get_last();
+    $raw  = is_array($last) && isset($last['message']) ? (string) $last['message'] : '';
+
+    return qs_safe_error_message(
+        new ErrorException(
+            $raw !== '' ? $raw : 'copy() failed',
+            0,
+            E_WARNING,
+            is_array($last) && isset($last['file']) ? (string) $last['file'] : __FILE__,
+            is_array($last) && isset($last['line']) ? (int) $last['line'] : 0
+        ),
+        $context
+    );
+}

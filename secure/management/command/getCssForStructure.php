@@ -3,6 +3,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/CssParser.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/componentPolicy.php';
 
 /**
  * getCssForStructure - Extracts CSS rules relevant to a specific structure
@@ -35,8 +36,9 @@ function extractCssSelectorsFromStructure(array $structure, array &$components =
             
             // Load component if not already loaded
             if (!isset($components[$componentName])) {
-                $componentPath = TEMPLATES_JSON_PATH . '/components/' . $componentName . '.json';
-                if (file_exists($componentPath)) {
+                // beta.11 S3.10c: stored reference, jailed by the shared resolver.
+                $componentPath = qs_resolve_component_path($componentName, TEMPLATES_JSON_PATH . '/components');
+                if ($componentPath !== null) {
                     $componentContent = @file_get_contents($componentPath);
                     if ($componentContent !== false) {
                         $componentData = json_decode($componentContent, true);

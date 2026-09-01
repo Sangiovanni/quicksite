@@ -1764,6 +1764,13 @@ DESIGN_DECISIONS.md "OAuth token custody"); the IETF "OAuth 2.0 for
 Browser-Based Apps" BCP and every major provider recommend this
 pattern for confidential web-server clients.
 
+**Session records are bound to their project.** Two built sites deployed to one
+origin share PHP's session store, so a record is stamped with the project that
+wrote it and that stamp is checked on every read. A neighbouring site cannot read
+the record, consume its single-use sign-in state, or clear it. Cookie names are
+namespaced per project as well, but the namespacing is the lookup key rather than
+a check; the stamp is the check.
+
 **Setting up a provider — 3 steps**:
 
 1. **Preset** — engine catalogue at `secure/admin/config/oauth-presets.json`

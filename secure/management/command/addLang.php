@@ -1,5 +1,6 @@
 <?php
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_json_write
+require_once SECURE_FOLDER_PATH . '/src/functions/opcacheHygiene.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 
@@ -125,9 +126,7 @@ if (!flock($lockHandle, LOCK_EX)) {
 clearstatcache(true, $config_path);
 
 // Clear opcache if available
-if (function_exists('opcache_invalidate')) {
-    opcache_invalidate($config_path, true);
-}
+qs_opcache_invalidate($config_path);
 
 // Parse current config (use include to get fresh copy, not cached by require)
 $get_fresh_config = function($path) {
@@ -179,9 +178,7 @@ if (file_put_contents($config_path, $new_config_content, LOCK_EX) === false) {
 }
 
 // Clear opcode cache if available
-if (function_exists('opcache_invalidate')) {
-    opcache_invalidate($config_path, true);
-}
+qs_opcache_invalidate($config_path);
 
 // --- CREATE TRANSLATION FILE ---
 // Copy from default language

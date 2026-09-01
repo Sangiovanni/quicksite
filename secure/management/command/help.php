@@ -177,15 +177,15 @@ $GLOBALS['__help_commands'] = [
                 'type' => 'string',
                 'description' => 'Custom name/path for public folder (default: public_template)',
                 'example' => 'public or www/v1/public',
-                'validation' => 'Max 255 chars, max 5 levels deep, alphanumeric/dots/hyphens/underscores/forward-slash only'
-            ],
+                'validation' => 'Max 255 chars, max 5 levels deep, alphanumeric/dots/hyphens/underscores/forward-slash only. Must not name the build root itself ("." or an empty string) and must not contain, or sit inside, the secure folder.'
+],
             'secure' => [
                 'required' => false,
                 'type' => 'string',
                 'description' => 'Custom name for secure folder - single level only (default: secure_template)',
                 'example' => 'backend or app',
-                'validation' => 'Max 255 chars, max 1 level (single folder name), alphanumeric/dots/hyphens/underscores only'
-            ],
+                'validation' => 'Max 255 chars, max 1 level (single folder name), alphanumeric/dots/hyphens/underscores only. Must not name the build root itself and must not contain, or sit inside, the public folder.'
+],
             'space' => [
                 'required' => false,
                 'type' => 'string',
@@ -213,14 +213,14 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.validation.invalid_type' => 'Parameter must be a string',
             '400.validation.invalid_format' => 'Invalid path format (check max depth and allowed characters)',
-            '400.validation.shared_parent' => 'Public and secure folders cannot share the same root directory (security requirement)',
-            '409.conflict.already_exists' => 'This project already has a build - delete it first with deleteBuild',
+            '400.validation.shared_parent_folder' => 'The public and secure folders would overlap: one contains the other, they are the same folder, or they share a root directory. data.conflict names which (identical, secure_inside_public, public_inside_secure, shared_root).',
+'409.conflict.already_exists' => 'This project already has a build - delete it first with deleteBuild',
             '409.conflict.operation_in_progress' => 'Another build is already running',
             '413.validation.size_limit_exceeded' => 'Build exceeds MAX_BUILD_SIZE_MB',
             '500.server.file_write_failed' => 'Failed to create build directory or copy files',
             '500.server.internal_error' => 'Build compilation failed, OR the finished build cannot serve requests and was discarded (data.problems names what is missing)'
         ],
-        'notes' => 'Compiles JSON templates to PHP using JsonToPhpCompiler and emits a self-contained single-project site: a front controller, the parameters it reads, an .htaccess that funnels requests into it, and the small runtime the compiled pages need. Before answering success the command checks that the finished build can actually serve - funnel target, parameters, project data, runtime, menu/footer, every route reachable at the path routing will compute, and the 404 - and DISCARDS the build with a 500 if any of that is missing. Output goes to qs_build/<name>/ inside the project - OUTSIDE its public/, so no URL reaches a build; downloadBuild is the only way to fetch one. RETENTION IS ONE BUILD PER PROJECT: a second build is refused rather than overwriting the first, so use deleteBuild between builds. A build that FAILS removes its own partial directory; if that removal also fails the leftover carries no build_manifest.json and getBuild reports it as incomplete. No ZIP is stored - downloadBuild archives the folder on demand. The "space" parameter controls PUBLIC_FOLDER_SPACE - when set (e.g., "web"), all public files go inside {public}/{space}/ creating access URL like http://site.com/web/, and the document root gets its own non-browsable .htaccess since the site is not there. Public and secure folders MUST have different root directories for security. The built site stores visitor state under the REAL project id, so it shares a browser-storage namespace with the same project served at /p/<projectId>/. Uses file locking to prevent concurrent builds.'
+        'notes' => 'Compiles JSON templates to PHP using JsonToPhpCompiler and emits a self-contained single-project site: a front controller, the parameters it reads, an .htaccess that funnels requests into it, and the small runtime the compiled pages need. Before answering success the command checks that the finished build can actually serve - funnel target, parameters, project data, runtime, menu/footer, every route reachable at the path routing will compute, and the 404 - and DISCARDS the build with a 500 if any of that is missing. Output goes to qs_build/<name>/ inside the project - OUTSIDE its public/, so no URL reaches a build; downloadBuild is the only way to fetch one. RETENTION IS ONE BUILD PER PROJECT: a second build is refused rather than overwriting the first, so use deleteBuild between builds. A build that FAILS removes its own partial directory; if that removal also fails the leftover carries no build_manifest.json and getBuild reports it as incomplete. No ZIP is stored - downloadBuild archives the folder on demand. The "space" parameter controls PUBLIC_FOLDER_SPACE - when set (e.g., "web"), all public files go inside {public}/{space}/ creating access URL like http://site.com/web/, and the document root gets its own non-browsable .htaccess since the site is not there. Public and secure folders MUST NOT overlap: neither may contain the other, be the other, or share a root directory - otherwise a deployed build would serve its own secure folder over the web. The built site stores visitor state under the REAL project id, so it shares a browser-storage namespace with the same project served at /p/<projectId>/. Uses file locking to prevent concurrent builds.'
     ],
     
     'getBuild' => [
@@ -833,8 +833,8 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '400.validation.required' => 'Missing type, name, or structure parameter',
-            '400.validation.invalid_format' => 'Invalid type, nodeId format, or structure format',
-            '400.validation.blocked_tag' => 'The structure holds something the renderer would refuse: a blocked or non-allowlisted tag, an attribute NAME outside [letters, digits, underscore, colon, hyphen], a raw on* handler (use {{call:...}} syntax), or a disallowed URL scheme (only http, https, mailto, tel). The message names the offender.',
+            '400.validation.invalid_format' => 'Invalid type, nodeId format, or structure format. Also returned when A component reference in the structure is not a bare component name. It must start with a letter, then letters, digits, hyphens and underscores, up to 64 characters - never a path. errors[0].expected states the rule.',
+'400.validation.blocked_tag' => 'The structure holds something the renderer would refuse: a blocked or non-allowlisted tag, an attribute NAME outside [letters, digits, underscore, colon, hyphen], a raw on* handler (use {{call:...}} syntax), or a disallowed URL scheme (only http, https, mailto, tel). The message names the offender.',
             '400.operation.failed' => 'Node operation failed (e.g., node not found)',
             '404.route.not_found' => 'Page does not exist',
             '404.file.not_found' => 'Structure file not found',
@@ -2406,8 +2406,9 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '400.validation.missing_parameter' => 'Component name not provided',
+            '400.validation.invalid_format' => 'Component name is not a bare component name (letter first, then letters, digits, hyphens and underscores, max 64 - never a path)',
             '404.file.not_found' => 'Component does not exist'
-        ],
+],
         'notes' => 'can_delete is false only if other components use this component (would break them). Pages/menu/footer usage shows warning but allows delete. Use before deleteComponent to understand impact. Locations array contains node IDs where component is referenced.'
     ],
     
@@ -2785,8 +2786,8 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '400.validation.required' => 'Missing required parameter (kind, config, structType, targetNodeId)',
-            '400.validation.invalid_format' => 'Invalid kind format or invalid targetNodeId format',
-            '400.validation.invalid_value' => 'Invalid structType / position, or attempt to insert inside a component or text node',
+            '400.validation.invalid_format' => 'Invalid kind format or invalid targetNodeId format, or the builder emitted a component reference that is not a bare component name (see editStructure).',
+'400.validation.invalid_value' => 'Invalid structType / position, or attempt to insert inside a component or text node',
             '400.complex_element.build_failed' => 'Builder rejected the config (e.g. list with no items, select with duplicate option values)',
             '404.complex_element.unknown_kind' => 'No builder registered for the requested kind (response includes availableKinds list)',
             '404.route.not_found' => 'Target page does not exist',
@@ -6136,8 +6137,8 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '400.validation.missing_field' => 'Missing required field (id, name, category, structure)',
-            '400.validation.invalid_format' => 'Invalid snippet ID format',
-            '409.snippet.exists' => 'Snippet with this ID already exists'
+            '400.validation.invalid_format' => 'Invalid snippet ID format, or A component reference in the structure is not a bare component name. It must start with a letter, then letters, digits, hyphens and underscores, up to 64 characters - never a path. errors[0].expected states the rule.',
+'409.snippet.exists' => 'Snippet with this ID already exists'
         ],
         'notes' => 'User snippets do not include a css field - they use existing project classes. Category folder is created if it does not exist.'
     ],

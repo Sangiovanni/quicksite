@@ -1,5 +1,6 @@
 <?php
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/opcacheHygiene.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 
 // Note: Removed multilingual mode requirement to allow cleanup of orphaned languages
@@ -105,9 +106,7 @@ if (file_put_contents($config_path, $new_config_content, LOCK_EX) === false) {
 }
 
 // Clear opcode cache if available
-if (function_exists('opcache_invalidate')) {
-    opcache_invalidate($config_path, true);
-}
+qs_opcache_invalidate($config_path);
 
 // Success
 ApiResponse::create(200, 'operation.success')

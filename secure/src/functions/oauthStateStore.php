@@ -101,6 +101,40 @@ function _oauthIsHttps(): bool {
 }
 
 /**
+ * Which project owns the records written during THIS request.
+ *
+ * The store is one PHP session — `qs_oauth_session`, `path=/`, one save path —
+ * so every site served from the same origin opens the same session file. Two
+ * built sites deployed side by side therefore share this store. Isolation used
+ * to rest entirely on each site reading only its own project-namespaced cookie
+ * (`qsp_<id>_qs_oauth`): isolation by lookup key, never verified against the
+ * record. Stamping the owner into the record and checking it on read gives that
+ * boundary a second, explicit check (beta.11 S3.10c, audit F3).
+ *
+ * Path-scoping the cookie instead was considered and rejected in an earlier
+ * design round: a built site lives at `/`, so a path scope would only ever work
+ * on the preview surface and would reintroduce a preview/production split.
+ */
+function _oauthProjectId(): string {
+    return defined('PROJECT_NAME') ? (string) PROJECT_NAME : 'default';
+}
+
+/**
+ * Does a stored record belong to the project serving this request?
+ *
+ * A record written before this binding existed carries no `project` key. It is
+ * treated as belonging to nobody and refused, which logs those visitors out
+ * once; the alternative — accepting an unstamped record — would leave exactly
+ * the hole this closes open for the lifetime of every existing session.
+ */
+function _oauthRecordBelongsHere($entry): bool {
+    return is_array($entry)
+        && isset($entry['project'])
+        && is_string($entry['project'])
+        && $entry['project'] === _oauthProjectId();
+}
+
+/**
  * Store a pre-auth state record. Identified by `$id` (the value sent to
  * the provider as `state`); cleared on first read.
  */
@@ -109,6 +143,7 @@ function storeOAuthState(string $id, array $data, int $ttlSeconds): void {
     $_SESSION['oauth_state'][$id] = [
         'data'       => $data,
         'expires_at' => time() + max(1, $ttlSeconds),
+        'project'    => _oauthProjectId(),
     ];
 }
 
@@ -122,8 +157,13 @@ function consumeOAuthState(string $id): ?array {
         return null;
     }
     $entry = $_SESSION['oauth_state'][$id];
+    // Another project's record is not ours to read OR to consume: consuming it
+    // would let a co-tenant burn a neighbour's single-use CSRF state.
+    if (!_oauthRecordBelongsHere($entry)) {
+        return null;
+    }
     unset($_SESSION['oauth_state'][$id]);
-    if (!is_array($entry) || (int) ($entry['expires_at'] ?? 0) < time()) {
+if (!is_array($entry) || (int) ($entry['expires_at'] ?? 0) < time()) {
         return null;
     }
     return is_array($entry['data'] ?? null) ? $entry['data'] : null;
@@ -140,6 +180,7 @@ function storeOAuthSession(string $sessionId, array $userData, int $ttlSeconds):
     $_SESSION['oauth_session'][$sessionId] = [
         'user'       => $userData,
         'expires_at' => time() + max(1, $ttlSeconds),
+        'project'    => _oauthProjectId(),
     ];
 }
 
@@ -154,7 +195,13 @@ function getOAuthSession(string $sessionId): ?array {
         return null;
     }
     $entry = $_SESSION['oauth_session'][$sessionId];
-    if (!is_array($entry) || (int) ($entry['expires_at'] ?? 0) < time()) {
+    // Belongs to another project on this origin: invisible here, and NOT
+    // deleted — evicting a neighbour's record would let any co-tenant log out
+    // the other site's visitors.
+    if (!_oauthRecordBelongsHere($entry)) {
+        return null;
+    }
+    if ((int) ($entry['expires_at'] ?? 0) < time()) {
         unset($_SESSION['oauth_session'][$sessionId]);
         return null;
     }
@@ -167,6 +214,12 @@ function getOAuthSession(string $sessionId): ?array {
  */
 function clearOAuthSession(string $sessionId): void {
     _oauthEnsureSession();
+    // Only this project's own record. Logout must not be a way to evict a
+    // co-tenant's session by guessing or replaying its id.
+    if (isset($_SESSION['oauth_session'][$sessionId])
+        && !_oauthRecordBelongsHere($_SESSION['oauth_session'][$sessionId])) {
+        return;
+    }
     unset($_SESSION['oauth_session'][$sessionId]);
 }
 

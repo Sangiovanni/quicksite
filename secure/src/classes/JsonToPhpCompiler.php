@@ -6,6 +6,7 @@ require_once __DIR__ . '/../functions/qsVerbCatalog.php';
 // (the supported floor) the bare call is a fatal, so the dependency has to be
 // stated by the file that uses it.
 require_once __DIR__ . '/../functions/utilsManagement.php';
+require_once __DIR__ . '/../functions/componentPolicy.php';
 require_once __DIR__ . '/Translator.php';
 require_once __DIR__ . '/UrlPolicy.php';
 require_once __DIR__ . '/CallTransformer.php';
@@ -701,11 +702,19 @@ class JsonToPhpCompiler {
         // sends its own refusals. The generated comment says what happened
         // without echoing author data into code.
         //
-        // Load component JSON from development location
-        $componentPath = PROJECT_PATH . '/templates/model/json/components/' . $componentName . '.json';
+        // SECURITY (beta.11 S3.10c): the reference used to be concatenated
+        // straight into this path, so `../` walked out of the components
+        // directory and read any .json the process could reach. Where the
+        // out-of-jail target was component-shaped, its content COMPILED INTO
+        // THE BUILT SITE. The shared resolver - the same one
+        // JsonToHtmlRenderer::loadComponent asks - decides that a reference is
+        // a bare component name and that the file it names really sits inside
+        // this project's components directory.
+        $componentPath = qs_resolve_component_path($componentName, PROJECT_PATH . '/templates/model/json/components');
 
-        if (!file_exists($componentPath)) {
-            error_log("Compiler: component not found: {$componentName}");
+        if ($componentPath === null) {
+            error_log("Compiler: component not found or reference refused: "
+                . (is_string($componentName) ? $componentName : gettype($componentName)));
             return "// Component not found (name in the error log)\n";
         }
 

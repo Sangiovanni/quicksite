@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/opcacheHygiene.php';
 /**
  * The self-deploy gate (beta.11 S3.8).
  *
@@ -67,9 +68,7 @@ function qs_deploy_allowed(): bool
     //
     // force=true, so it applies whether or not timestamp validation is on.
     // loadRolesConfig() does the same thing for the same reason.
-    if (function_exists('opcache_invalidate')) {
-        @opcache_invalidate($path, true);
-    }
+    qs_opcache_invalidate($path);
 
     $cfg = null;
     ob_start();

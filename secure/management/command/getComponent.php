@@ -1,5 +1,6 @@
 <?php
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_param_string
+require_once SECURE_FOLDER_PATH . '/src/functions/componentPolicy.php';
 /**
  * getComponent - Get a single component by name
  * 
@@ -27,8 +28,10 @@ function expandComponentForPreview(array $node, string $componentsDir, int $dept
         $componentName = $node['component'];
         $componentData = $node['data'] ?? [];
         
-        $componentPath = $componentsDir . '/' . $componentName . '.json';
-        if (file_exists($componentPath)) {
+        // beta.11 S3.10c: a nested reference comes from STORED data, so it is
+        // jailed by the shared resolver rather than concatenated.
+        $componentPath = qs_resolve_component_path($componentName, $componentsDir);
+        if ($componentPath !== null) {
             $content = @file_get_contents($componentPath);
             if ($content !== false) {
                 $compStructure = json_decode($content, true);
@@ -156,13 +159,15 @@ function __command_getComponent(array $params = [], array $urlParams = []): ApiR
     }
     
     // Sanitize name: only allow alphanumeric, dash, underscore
-    if (!preg_match('/^[a-zA-Z][a-zA-Z0-9_-]*$/', $componentName)) {
+    // beta.11 S3.10c: one rule, shared with the renderer, the compiler and
+    // every other command — this used to be a private copy.
+    if (!qs_is_valid_component_reference($componentName)) {
         return ApiResponse::create(400, 'components.invalid_name')
             ->withMessage('Invalid component name');
     }
     
     $componentsDir = PROJECT_PATH . '/templates/model/json/components';
-    $filePath = $componentsDir . '/' . $componentName . '.json';
+    $filePath = $componentsDir . '/' . $componentName . '.json';   // reference already validated above
     
     if (!file_exists($filePath)) {
         return ApiResponse::create(404, 'components.not_found')

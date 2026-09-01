@@ -633,6 +633,15 @@ function extractProjectFromZipSecure(ZipArchive $zip, string $prefix, string $de
             continue;
         }
 
+        // The component-reference half of the same site predicate (beta.11
+        // S3.10c). An imported archive is the one path that brings a whole
+        // structure tree from outside this install.
+        $badRef = importFirstInvalidComponentReference($relativePath, $content);
+        if ($badRef !== null) {
+            $stats['skipped_disallowed'][] = $relativePath . ' (invalid component reference: ' . $badRef . ')';
+            continue;
+        }
+
         if (file_put_contents($destFilePath, $content) === false) {
             return ['success' => false, 'error' => "Failed to write file: $relativePath"];
         }
@@ -682,6 +691,34 @@ function importFirstUnrenderableTag(string $relativePath, string $content): ?str
     $structure = $isSnippet ? ($data['structure'] ?? null) : $data;
 
     return qs_first_unrenderable_tag($structure);
+}
+
+/**
+ * The component-reference gate's SITE predicate — the exact twin of
+ * importFirstUnrenderableTag() above, narrowed to the same paths for the same
+ * reason: only templates/model/json/** and snippets/** hold structure, and the
+ * author's own data files may legitimately contain a `component` key that means
+ * something else entirely.
+ *
+ * @return string|null the offending reference, or null when the entry is clean
+ */
+function importFirstInvalidComponentReference(string $relativePath, string $content): ?string {
+    $lower = strtolower($relativePath);
+    if (substr($lower, -5) !== '.json') {
+        return null;
+    }
+    $isModelJson = strpos($lower, 'templates/model/json/') === 0;
+    $isSnippet   = strpos($lower, 'snippets/') === 0;
+    if (!$isModelJson && !$isSnippet) {
+        return null;
+    }
+    $data = json_decode($content, true);
+    if (!is_array($data)) {
+        return null;
+    }
+    $structure = $isSnippet ? ($data['structure'] ?? null) : $data;
+
+    return qs_first_invalid_component_reference($structure);
 }
 
 /**

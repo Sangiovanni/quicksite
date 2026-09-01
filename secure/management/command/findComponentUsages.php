@@ -15,6 +15,7 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/componentPolicy.php';
 
 /**
  * Recursively find component references in a structure
@@ -138,6 +139,15 @@ function __command_findComponentUsages(array $params = [], array $urlParams = []
             ->withData(['missing' => 'component']);
     }
     
+    // beta.11 S3.10c: this parameter had NO format check - only the existence
+    // test below, which a traversal answered for any readable .json on the
+    // server. The shared rule now decides what a reference is.
+    if (!qs_is_valid_component_reference($componentName)) {
+        return ApiResponse::create(400, 'validation.invalid_format')
+            ->withMessage('Invalid component name format')
+            ->withData(['component' => is_string($componentName) ? $componentName : gettype($componentName)]);
+    }
+
     // Validate component exists
     $componentsDir = PROJECT_PATH . '/templates/model/json/components';
     $componentFile = $componentsDir . '/' . $componentName . '.json';

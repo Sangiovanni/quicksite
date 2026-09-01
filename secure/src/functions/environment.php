@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/opcacheHygiene.php';
 /**
  * The runtime-environment gate (beta.10 C12).
  *
@@ -81,9 +82,7 @@ function qs_is_development(): bool
     // force=true, so it applies whether or not timestamp validation is on.
     // loadRolesConfig() and qs_deploy_allowed() do the same thing for the same
     // reason.
-    if (function_exists('opcache_invalidate')) {
-        @opcache_invalidate($path, true);
-    }
+    qs_opcache_invalidate($path);
 
     $cfg = null;
     // The buffer catches a non-PHP file's contents; the catch keeps a syntax

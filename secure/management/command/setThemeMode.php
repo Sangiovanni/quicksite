@@ -1,4 +1,5 @@
 <?php
+require_once SECURE_FOLDER_PATH . '/src/functions/opcacheHygiene.php';
 /**
  * setThemeMode - Enable/disable dark mode support and configure theme defaults
  *
@@ -88,9 +89,7 @@ if (!flock($lockHandle, LOCK_EX)) {
 }
 
 clearstatcache(true, $configPath);
-if (function_exists('opcache_invalidate')) {
-    opcache_invalidate($configPath, true);
-}
+qs_opcache_invalidate($configPath);
 
 $freshConfig = @include $configPath;
 if (!is_array($freshConfig)) {
@@ -132,9 +131,7 @@ if ($result === false) {
         ->send();
 }
 
-if (function_exists('opcache_invalidate')) {
-    opcache_invalidate($configPath, true);
-}
+qs_opcache_invalidate($configPath);
 
 ApiResponse::create(200, 'operation.success')
     ->withMessage('Theme mode updated successfully')

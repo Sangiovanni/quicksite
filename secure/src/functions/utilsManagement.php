@@ -3,6 +3,7 @@
 // Beta.8 A1 — paramRoutePathToFs / paramRouteSegmentToFs live here.
 // utilsManagement uses them in resolvePageJsonPath / resolvePagePhpPath.
 require_once __DIR__ . '/routeHelpers.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/opcacheHygiene.php';
 
 // qs_json_write lives in its own file so the three runtime consumers can take it
 // without this whole utility drawer. One definition, required from both paths.
@@ -304,6 +305,9 @@ function qs_structure_depth_ok($structure, int $maxDepth = 50): bool {
 // define tag lists anywhere else). Required explicitly rather than relied on
 // transitively, so qs_first_unrenderable_tag() works from any caller.
 require_once SECURE_FOLDER_PATH . '/src/classes/TagRegistry.php';
+// componentPolicy is the same arrangement for component REFERENCES, which the
+// tag walker below never inspected (beta.11 S3.10c).
+require_once SECURE_FOLDER_PATH . '/src/functions/componentPolicy.php';
 
 /**
  * Walk a WHOLE structure and return the first tag the render/compile layers would
@@ -362,6 +366,72 @@ function qs_first_unrenderable_tag_node($node): ?string {
     if (isset($node['children']) && is_array($node['children'])) {
         foreach ($node['children'] as $child) {
             $bad = qs_first_unrenderable_tag_node($child);
+            if ($bad !== null) {
+                return $bad;
+            }
+        }
+    }
+    return null;
+}
+
+/**
+ * Walk a WHOLE structure and return the first component REFERENCE the render and
+ * compile layers would refuse, or null when every reference is legal.
+ *
+ * The write-side twin of the jail in qs_resolve_component_path(), and the exact
+ * mirror of qs_first_unrenderable_tag() above: same two stored shapes, same
+ * recursion, same belt-and-braces intent. Until beta.11 S3.10c nothing inspected
+ * `component` on write at all — the tag walker looks at `tag`, the param policy
+ * looks at `params` — so a reference reached the readers unexamined and `../`
+ * walked out of the components directory.
+ *
+ * The READ side is the load-bearing gate, because existing projects already hold
+ * references nothing ever checked and only the resolver protects a render or a
+ * build made from them. This gate exists so an author who writes a bad reference
+ * is told immediately instead of getting a node that silently never appears.
+ *
+ * Same caller distinction as the tag walker: use it on a writer that takes a
+ * structure FROM THE REQUEST (which can INTRODUCE a bad reference), not on one
+ * that only moves or copies what is already stored (which would QUARANTINE
+ * pre-existing content rather than harden anything).
+ *
+ * @param mixed $structure decoded structure (list of nodes, or one node)
+ * @return string|null the offending reference, or null when all are legal
+ */
+function qs_first_invalid_component_reference($structure): ?string {
+    if (!is_array($structure)) {
+        return null;
+    }
+    if (isset($structure[0]) || empty($structure)) {
+        foreach ($structure as $node) {
+            $bad = qs_first_invalid_component_reference_node($node);
+            if ($bad !== null) {
+                return $bad;
+            }
+        }
+        return null;
+    }
+    return qs_first_invalid_component_reference_node($structure);
+}
+
+/**
+ * Single-node recursion behind qs_first_invalid_component_reference().
+ *
+ * @param mixed $node
+ * @return string|null
+ */
+function qs_first_invalid_component_reference_node($node): ?string {
+    if (!is_array($node)) {
+        return null;
+    }
+    if (array_key_exists('component', $node) && !qs_is_valid_component_reference($node['component'])) {
+        // A non-string reference is reported by type, not by casting it: an
+        // array used to reach a path concatenation as the string "Array".
+        return is_string($node['component']) ? $node['component'] : gettype($node['component']);
+    }
+    if (isset($node['children']) && is_array($node['children'])) {
+        foreach ($node['children'] as $child) {
+            $bad = qs_first_invalid_component_reference_node($child);
             if ($bad !== null) {
                 return $bad;
             }
@@ -860,9 +930,7 @@ function qs_config_mutate(string $configPath, callable $patch): array
     // reported failure, not a fatal; opcache is invalidated first because the
     // last writer may have been this same request.
     clearstatcache(true, $configPath);
-    if (function_exists('opcache_invalidate')) {
-        opcache_invalidate($configPath, true);
-    }
+    qs_opcache_invalidate($configPath);
     $config = @include $configPath;
     if (!is_array($config)) {
         $release($lockHandle, $lockFile);
@@ -884,9 +952,7 @@ function qs_config_mutate(string $configPath, callable $patch): array
     if ($written === false) {
         return $fail('write_failed');
     }
-    if (function_exists('opcache_invalidate')) {
-        opcache_invalidate($configPath, true);
-    }
+    qs_opcache_invalidate($configPath);
     clearstatcache(true, $configPath);
 
     return ['ok' => true, 'reason' => '', 'config' => $config];

@@ -307,3 +307,115 @@ function write_htaccess_fallback(string $htaccess_path, string $fallback_resourc
     $content .= "\nFallbackResource " . $fallback_resource;
     return file_put_contents($htaccess_path, $content, LOCK_EX) !== false;
 }
+
+/**
+ * Do a build's public and secure folder names conflict?
+ *
+ * Returns a machine-readable reason, or null when the pair is safe.
+ *
+ * `build` advertises, in its own refusal message, that the secure folder can
+ * never sit under the public one. It used to check that by comparing the FIRST
+ * PATH SEGMENT of each name, which answers a different question. `public='.'`
+ * is a valid relative path, its first segment is '.', 'secure' differs, so the
+ * pair passed — and `.` makes the public content path the build ROOT, putting
+ * the entire secure folder (config.php, data/*.json, translate/*.json) under
+ * the document root of the deployed site (beta.11 S3.10c, audit F2).
+ *
+ * Two rules, both kept:
+ *   - CONTAINMENT: neither normalised path may be the other, nor an ancestor of
+ *     the other. This is the rule the message always claimed, and the one that
+ *     catches '.' without naming it.
+ *   - SHARED ROOT: the pair may not share a first segment. Stricter than
+ *     containment (app/public and app/secure contain neither) and already
+ *     documented in the command's own example_invalid, so it stays.
+ *
+ * Normalisation only drops '.' and empty segments: '..' never reaches here
+ * because is_valid_relative_path() refuses it outright.
+ *
+ * @param string $publicName the build's `public` name
+ * @param string $secureName the build's `secure` name
+ * @return string|null 'identical' | 'secure_inside_public' | 'public_inside_secure'
+ *                     | 'shared_root', or null when the pair is safe
+ */
+function qs_build_paths_conflict(string $publicName, string $secureName): ?string
+{
+    $split = static function (string $name): array {
+        $name = str_replace('\\', '/', trim($name));
+        $out = [];
+        foreach (explode('/', $name) as $seg) {
+            if ($seg === '' || $seg === '.') {
+                continue;
+            }
+            $out[] = $seg;
+        }
+        return $out;
+    };
+
+    $public = $split($publicName);
+    $secure = $split($secureName);
+
+    if ($public === $secure) {
+        return 'identical';   // covers '' vs '', '.' vs '.', 'public' vs 'public'
+    }
+
+    // Ancestor test on whole segments, so 'public' does not "contain" 'publicX'.
+    $isAncestor = static function (array $ancestor, array $descendant): bool {
+        if (count($ancestor) >= count($descendant)) {
+            return false;
+        }
+        return array_slice($descendant, 0, count($ancestor)) === $ancestor;
+    };
+
+    if ($isAncestor($public, $secure)) {
+        return 'secure_inside_public';   // includes public='.' -> [] , an ancestor of everything
+    }
+    if ($isAncestor($secure, $public)) {
+        return 'public_inside_secure';
+    }
+
+    if (isset($public[0], $secure[0]) && $public[0] === $secure[0]) {
+        return 'shared_root';
+    }
+
+    return null;
+}
+
+/**
+ * Does $path, once canonicalised, sit inside $root?
+ *
+ * The jail behind every recursive copy and every static passthrough.
+ * `scandir()`, `is_dir()` and RecursiveDirectoryIterator all report a reparse
+ * point (an NTFS junction, a symlink) as an ordinary directory, so a walk that
+ * does not canonicalise follows one straight out of the tree it thought it was
+ * confined to.
+ *
+ * Two details that are easy to get wrong and are the reason this is one
+ * function rather than three copies (beta.11 S3.10c):
+ *   - the jail carries a TRAILING SEPARATOR, so a sibling whose name merely
+ *     PREFIXES the root ("/srv/wwwroot-old" vs "/srv/www") cannot satisfy it;
+ *   - on Windows the comparison is case-folded, because NTFS resolves
+ *     "Templates" and "templates" to one directory.
+ *
+ * A path that cannot be canonicalised (it does not exist) is NOT inside.
+ *
+ * @param string $path A real filesystem path to test
+ * @param string $root The directory the path must be under
+ * @return bool
+ */
+function qs_path_is_within(string $path, string $root): bool
+{
+    $real = realpath($path);
+    $base = realpath($root);
+    if ($real === false || $base === false) {
+        return false;
+    }
+
+    $jail = rtrim($base, '/\\') . DIRECTORY_SEPARATOR;
+    $hay  = $real . (is_dir($real) ? DIRECTORY_SEPARATOR : '');
+    if (DIRECTORY_SEPARATOR === '\\') {
+        $jail = strtolower($jail);
+        $hay  = strtolower($hay);
+    }
+
+    return strncmp($hay, $jail, strlen($jail)) === 0;
+}
