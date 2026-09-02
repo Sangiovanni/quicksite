@@ -95,7 +95,7 @@ function __command_listProjects(array $params = [], array $urlParams = []): ApiR
         ->withData([
             'projects' => $projects,
             'count' => count($projects),
-            'projects_path' => 'secure/projects/'
+            'projects_path' => SECURE_FOLDER_NAME . '/projects/'
         ]);
 }
 
@@ -109,7 +109,7 @@ function __command_listProjects(array $params = [], array $urlParams = []): ApiR
 function getProjectInfo(string $projectPath, string $projectName): array {
     $info = [
         'name' => $projectName,
-        'path' => 'secure/projects/' . $projectName,
+        'path' => SECURE_FOLDER_NAME . '/projects/' . $projectName,
         'exists' => true,
         'has_config' => file_exists($projectPath . '/config.php'),
         'has_routes' => file_exists($projectPath . '/routes.php'),

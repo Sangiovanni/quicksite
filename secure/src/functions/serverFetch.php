@@ -259,7 +259,7 @@ function _serverFetchPrepare(string $endpointRef, array $inputs, array $context)
                 'ok' => false,
                 'status' => 0,
                 'data' => null,
-                'error' => "apiKey not configured for API '{$apiIdForSecret}' in secure/admin/config/api-secrets.php (see .example template).",
+                'error' => "apiKey not configured for API '{$apiIdForSecret}' in " . SECURE_FOLDER_NAME . "/admin/config/api-secrets.php (see .example template).",
             ]];
         }
         $keyValue = $apiSecrets[$apiIdForSecret];

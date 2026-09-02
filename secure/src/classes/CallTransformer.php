@@ -56,10 +56,16 @@ class CallTransformer
             $fn = $m[1];
             $argsString = isset($m[2]) ? substr($m[2], 1) : '';
             if (!in_array($fn, $allowed, true)) {
-                error_log("Unknown QS function: {$fn}");
+                // The engine-side detail goes to the SERVER log, where the
+                // operator who could act on it can read it. It must not go into
+                // the console.warn below: that string is compiled into the built
+                // site's public HTML and served to every visitor, so naming an
+                // engine source file there would publish the install's internal
+                // layout for no benefit to the person reading the console.
+                error_log("Unknown QS function: {$fn} (not in the runtime verb catalogue)");
                 // Context-neutral message (was "at render"/"at compile" in the
                 // two old copies — unified here).
-                $syncPrelude[] = "console.warn('[QS] unknown verb {{call:{$fn}:...}} dropped — verb missing from secure/src/functions/qsVerbCatalog.php')";
+                $syncPrelude[] = "console.warn('[QS] unknown verb {{call:{$fn}:...}} dropped — not in the QuickSite runtime verb catalogue')";
                 continue;
             }
             $callJs = self::buildCallJs($fn, $argsString);

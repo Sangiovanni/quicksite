@@ -57,6 +57,11 @@ if (!is_dir(SECURE_FOLDER_PATH)) {
     $detectedRoot = htmlspecialchars(PUBLIC_FOLDER_ROOT);
     $computedSecure = htmlspecialchars(SECURE_FOLDER_PATH);
     $publicName = htmlspecialchars(PUBLIC_FOLDER_NAME);
+    // The folder is renameable (setup.sh / setup.bat offer it), so the prose
+    // below names the one this installation actually looks for rather than the
+    // default. Saying "secure/" to somebody whose folder is called something
+    // else sends them looking for a directory that does not exist.
+    $secureName = htmlspecialchars(SECURE_FOLDER_NAME) . '/';
     $actualFolder = basename(PUBLIC_FOLDER_ROOT);
     die(
         '<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">' .
@@ -76,19 +81,19 @@ if (!is_dir(SECURE_FOLDER_PATH)) {
         'small{color:#888}' .
         '</style></head><body>' .
         '<h1>QuickSite &mdash; Configuration Error</h1>' .
-        '<p class="subtitle">The <code>secure/</code> folder could not be found.</p>' .
+        '<p class="subtitle">The <code>' . $secureName . '</code> folder could not be found.</p>' .
 
         '<div class="diag">' .
         '<strong>What happened:</strong>' .
         '<p style="margin-bottom:0.5em">QuickSite uses <code>PUBLIC_FOLDER_NAME</code> to find the project root. ' .
-        'It strips that name from the document root path to locate the sibling <code>secure/</code> folder.</p>' .
+        'It strips that name from the document root path to locate the sibling <code>' . $secureName . '</code> folder.</p>' .
         '<ul style="margin-bottom:0">' .
         '<li>Your document root is: <code>' . $detectedRoot . '</code></li>' .
         '<li><code>PUBLIC_FOLDER_NAME</code> is set to: <code>' . $publicName . '</code></li>' .
         '<li>Your actual folder name is: <code>' . htmlspecialchars($actualFolder) . '</code></li>' .
         '</ul>' .
         '<p style="margin-top:0.8em">Because <code>' . $publicName . '</code> does not match <code>' . htmlspecialchars($actualFolder) . '</code>, ' .
-        'QuickSite cannot find its way back to the project root and looks for <code>secure/</code> in the wrong place: ' .
+        'QuickSite cannot find its way back to the project root and looks for <code>' . $secureName . '</code> in the wrong place: ' .
         '<code>' . $computedSecure . '</code></p>' .
         '</div>' .
 

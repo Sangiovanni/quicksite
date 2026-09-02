@@ -168,14 +168,28 @@ function cssWriteAllTargets(string $content, string $livePath, string $projectPa
  * Shared: `injectSnippetCss` reaches it through `extractSnippetCss()` in
  * SnippetManagement.php, which `createSnippet` and `duplicateSnippet` call.
  *
- * Requires `componentPolicy.php` (qs_resolve_component_path) and the
- * TEMPLATES_JSON_PATH constant to be in scope.
+ * THE COMPONENTS DIRECTORY IS PASSED IN, NOT READ FROM AMBIENT STATE. It used
+ * to be `TEMPLATES_JSON_PATH . '/components'` — a constant nothing defines, so
+ * the component branch fataled on the first node carrying `component`. An
+ * ambient global is also the wrong shape for a function whose caller already
+ * knows which project it is working on: `extractSnippetCss()` is handed a
+ * project NAME, so a request-bound constant would have read components from
+ * whichever project the REQUEST bound rather than the one being extracted. The
+ * caller derives the directory from that name and hands it down.
  *
- * @param array $structure  Array of nodes.
- * @param array $components Component cache, filled as references are resolved.
+ * (Its stylesheet lookup still prefers the request-bound PUBLIC_CONTENT_PATH and
+ * only falls back to the named project's own copy, so the two halves agree only
+ * while both callers pass the marker project — which today they both do.)
+ *
+ * Requires `componentPolicy.php` (qs_resolve_component_path) to be in scope.
+ *
+ * @param array  $structure     Array of nodes.
+ * @param string $componentsDir Project's components folder. Pass '' to skip
+ *                              component resolution entirely.
+ * @param array  $components    Component cache, filled as references resolve.
  * @return array ['classes' => [...], 'ids' => [...], 'tags' => [...]]
  */
-function extractCssSelectorsFromStructure(array $structure, array &$components = []): array {
+function extractCssSelectorsFromStructure(array $structure, string $componentsDir, array &$components = []): array {
     $classes = [];
     $ids = [];
     $tags = [];
@@ -186,9 +200,9 @@ function extractCssSelectorsFromStructure(array $structure, array &$components =
             $componentName = $node['component'];
 
             // Load component if not already loaded
-            if (!isset($components[$componentName])) {
+            if (!isset($components[$componentName]) && $componentsDir !== '') {
                 // beta.11 S3.10c: stored reference, jailed by the shared resolver.
-                $componentPath = qs_resolve_component_path($componentName, TEMPLATES_JSON_PATH . '/components');
+                $componentPath = qs_resolve_component_path($componentName, $componentsDir);
                 if ($componentPath !== null) {
                     $componentContent = @file_get_contents($componentPath);
                     if ($componentContent !== false) {
@@ -202,8 +216,12 @@ function extractCssSelectorsFromStructure(array $structure, array &$components =
 
             // Recursively extract from component
             if (isset($components[$componentName])) {
+                // $componentsDir is threaded through: a component may itself
+                // reference a component, and a recursion that dropped the
+                // directory would resolve nothing one level down.
                 $componentSelectors = extractCssSelectorsFromStructure(
                     is_array($components[$componentName][0] ?? null) ? $components[$componentName] : [$components[$componentName]],
+                    $componentsDir,
                     $components
                 );
                 $classes = array_merge($classes, $componentSelectors['classes']);
@@ -243,7 +261,7 @@ function extractCssSelectorsFromStructure(array $structure, array &$components =
 
         // Recurse into children
         if (isset($node['children']) && is_array($node['children'])) {
-            $childSelectors = extractCssSelectorsFromStructure($node['children'], $components);
+            $childSelectors = extractCssSelectorsFromStructure($node['children'], $componentsDir, $components);
             $classes = array_merge($classes, $childSelectors['classes']);
             $ids = array_merge($ids, $childSelectors['ids']);
             $tags = array_merge($tags, $childSelectors['tags']);

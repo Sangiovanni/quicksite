@@ -82,7 +82,7 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
     if (!is_dir($projectPath)) {
         return ApiResponse::create(404, 'resource.not_found')
             ->withMessage("Project '$projectName' not found")
-            ->withData(['searched_path' => 'secure/projects/' . $projectName]);
+            ->withData(['searched_path' => SECURE_FOLDER_NAME . '/projects/' . $projectName]);
     }
     
     // Check ZipArchive is available
@@ -225,7 +225,7 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
             ->withData([
                 'project' => $projectName,
                 'filename' => $zipFileName,
-                'path' => 'secure/projects/' . $projectName . '/exports/' . $zipFileName,
+                'path' => SECURE_FOLDER_NAME . '/projects/' . $projectName . '/exports/' . $zipFileName,
                 'size' => formatExportBytes($zipSize),
                 'size_bytes' => $zipSize,
                 'files_count' => $stats['files'],

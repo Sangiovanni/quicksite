@@ -275,58 +275,104 @@ $GLOBALS['__help_commands'] = [
     ],
     
     'deployBuild' => [
-        'description' => 'Deploys a build to a target root directory. The build\'s public and secure folders are copied as subdirectories of the target path.',
+        'description' => 'Deploys this project\'s build to a target root directory. The build\'s public and secure folders are copied as subdirectories of the target path. Three independent gates stand in front of it and all three must pass: the installation must allow deploying at all (an operator decision, absent means no), the caller must hold the deploy permission, and the target must sit inside an allowed deploy root.',
         'method' => 'POST',
         'parameters' => [
             'name' => [
-                'required' => true,
+                'required' => false,
                 'type' => 'string',
-                'description' => 'Build folder name to deploy',
+                'description' => 'Build folder name to deploy. Retention is one build per project, so the command finds it on its own. Supplying the name asserts WHICH build you meant: a name that is not the current build is a 404 rather than a silent substitution.',
                 'example' => 'build_20251214_084504',
                 'validation' => 'Must match format build_YYYYMMDD_HHMMSS'
             ],
             'targetPath' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => 'Absolute path to the root directory. The build\'s public and secure folders will be placed inside it. Defaults to SERVER_ROOT (current project root) when omitted.',
-                'example' => '/var/www/mysite',
+                'description' => 'Absolute path to the root directory. The build\'s public and secure folders will be placed inside it. Defaults to SERVER_ROOT when omitted, which is the only target a default installation permits.',
+                'example' => 'omit it, or a path inside an allowed deploy root',
                 'default' => 'SERVER_ROOT',
-                'validation' => 'Must be absolute path, no path traversal (..)'
+                'validation' => 'Absolute, no path traversal (..), and inside SERVER_ROOT or a root listed in <secure>/management/config/deploy-roots.php. Anything else is refused 403 validation.security_violation.'
             ],
             'overwrite' => [
                 'required' => false,
                 'type' => 'boolean',
-                'description' => 'If true, overwrite existing files. When false, returns list of file conflicts instead.',
+                'description' => 'If true, overwrite existing files inside the build\'s own subtree. When false, returns the list of file conflicts instead. It does NOT reach paths outside that subtree and it answers none of the co-tenancy refusals below.',
+                'example' => false,
+                'validation' => 'Boolean true/false (default: false)'
+            ],
+            'confirmUpdate' => [
+                'required' => false,
+                'type' => 'boolean',
+                'description' => 'The target already holds a deployment OF THIS PROJECT. Confirms updating it in place. This is the routine path for every deploy after the first, and the only control that answers 409 deploy.update_confirmation_required.',
+                'example' => true,
+                'validation' => 'Boolean true/false (default: false)'
+            ],
+            'replaceDeployment' => [
+                'required' => false,
+                'type' => 'boolean',
+                'description' => 'The target\'s secure folder belongs to a DIFFERENT project. Overwrites what that deployment wrote. Answers 409 deploy.secure_folder_in_use and nothing else.',
+                'example' => false,
+                'validation' => 'Boolean true/false (default: false)'
+            ],
+            'adoptSecureFolder' => [
+                'required' => false,
+                'type' => 'boolean',
+                'description' => 'The target\'s secure folder has contents and carries no QuickSite marker, so its owner is unknown. Writes into it anyway. Answers 409 deploy.secure_folder_unmarked and nothing else.',
+                'example' => false,
+                'validation' => 'Boolean true/false (default: false)'
+            ],
+            'acceptRouteCollisions' => [
+                'required' => false,
+                'type' => 'boolean',
+                'description' => 'Deploy even though one of the site\'s routes is already a directory at the target and would never be reachable. Answers 409 conflict.route_collision and nothing else.',
                 'example' => false,
                 'validation' => 'Boolean true/false (default: false)'
             ]
         ],
-        'example_post' => 'POST /management/deployBuild with body: {"name": "build_20251214_084504", "targetPath": "C:/wamp64/www/prod"}',
+        'example_post' => 'POST /management/p/<projectId>/deployBuild with an empty body (deploys the project\'s one build to SERVER_ROOT), or with body: {"confirmUpdate": true} to update a deployment already there',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
             'message' => 'Build deployed successfully',
             'data' => [
                 'build' => 'build_20251214_084504',
-                'target' => 'C:/wamp64/www/prod',
+                'target' => '<the target root>',
                 'folders' => ['public' => 'www.mysite.com', 'secure' => 'secure', 'space' => 'web'],
-                'deployed_paths' => ['public' => 'C:/wamp64/www/prod/www.mysite.com', 'secure' => 'C:/wamp64/www/prod/secure'],
+                'deployed_paths' => ['public' => '<target>/www.mysite.com', 'secure' => '<target>/secure'],
                 'public_deployment' => ['files_copied' => 28, 'directories_created' => 7],
                 'secure_deployment' => ['files_copied' => 18, 'directories_created' => 6],
-                'license_copied' => true
+                'license_copied' => true,
+                'overwrite_mode' => false,
+                'files_overwritten' => 0,
+                'ownership_marker' => ['written' => true, 'path' => '<target>/<secureFolder>/qs-deployment.json', 'updated_existing' => false],
+                'nginx' => ['config_regenerated' => true, 'config_path' => '<secure>/nginx/dynamic_routes.conf', 'reload' => 'reloaded|pending|not_applicable', 'reload_note' => '...', 'root_serves_a_build' => false],
+                'php_opcache' => ['files_invalidated' => 46, 'note' => '...'],
+                'shared_paths_skipped' => 'Present only when the target held paths outside this build\'s subtree; they are never replaced.',
+                'route_collisions' => 'Present only when acceptRouteCollisions=true was used and collisions existed.'
             ]
         ],
         'error_responses' => [
-            '400.validation.required' => 'Missing required parameter',
-            '400.validation.invalid_format' => 'Path must be absolute',
-            '400.validation.security_violation' => 'Path traversal (..) not allowed',
-            '404.build.not_found' => 'Build not found',
-            '409.conflict.files_exist' => 'Files would be overwritten (use overwrite=true). Returns detailed conflict list.',
-            '409.conflict.operation_in_progress' => 'Another deployment in progress',
+            '400.validation.invalid_type' => 'targetPath is not a string',
+            '400.validation.invalid_format' => 'Invalid build name format, or targetPath is not absolute',
+            '400.validation.security_violation' => 'targetPath contains path traversal (..)',
+            '403.deploy.disabled' => 'Deploying is disabled on this installation. Asked before any parameter is read, so a disabled install answers the same way whatever it is asked.',
+            '403.validation.security_violation' => 'targetPath is outside SERVER_ROOT and every configured deploy root. This is what a default installation answers to any target but its own root.',
+            '404.build.not_found' => 'This project has no build, or the name given is not the build that exists',
+            '409.build.incomplete' => 'The build carries no manifest, so it did not finish, and is refused rather than deployed',
+            '409.conflict.build_in_progress' => 'A build of this name is being written right now',
+            '409.conflict.files_exist' => 'Files inside the build\'s own subtree would be overwritten (use overwrite=true). Returns a detailed conflict list.',
+            '409.conflict.operation_in_progress' => 'Another deployment holds the lock',
+            '409.conflict.route_collision' => 'A route of this site is already a directory at the target and would never be reachable (use acceptRouteCollisions=true)',
+            '409.deploy.update_confirmation_required' => 'The target already holds a deployment of THIS project (use confirmUpdate=true). The routine path for any deploy after the first.',
+            '409.deploy.secure_folder_in_use' => 'The target\'s secure folder belongs to a different project (use replaceDeployment=true)',
+            '409.deploy.secure_folder_unmarked' => 'The target\'s secure folder has contents and no QuickSite marker, so its owner is unknown (use adoptSecureFolder=true)',
+            '500.build.invalid_structure' => 'The build\'s manifest does not describe a deployable tree',
+            '500.build.missing_folder' => 'The build is missing the public or secure folder its manifest names',
             '500.server.directory_create_failed' => 'Failed to create target directory',
-            '500.server.permission_denied' => 'Target directory not writable'
+            '500.server.permission_denied' => 'Target directory not writable',
+            '500.deploy.copy_failed' => 'The copy failed part-way'
         ],
-        'notes' => 'SECURITY: Allows copying to any absolute path - protect your API token! The folder names come from the build manifest (set during build). The "space" field from the manifest is shown in the response — if it is empty, public files are placed at the public root level (not inside a subdirectory). Without overwrite=true, the command scans for file conflicts and returns a detailed list. Uses file locking to prevent concurrent deployments. NGINX USERS: The build includes a ready-to-use nginx_routes.conf inside the secure folder. After deploying, add "include /path/to/secure/nginx_routes.conf;" inside your server {} block, then run "nginx -t && nginx -s reload". Apache users (.htaccess) need no extra step.'
+        'notes' => 'THREE GATES, all of which must pass: the installation must have deploying enabled (an operator decision made in <secure>/management/config/deploy.php; absent means no), the caller must hold the deploy permission, and the target must be SERVER_ROOT or a root the operator listed in <secure>/management/config/deploy-roots.php. A default installation therefore deploys to itself and nowhere else, and any other target is refused 403 — the target is NOT an arbitrary absolute path. The folder names come from the build manifest (set during build). The "space" field from the manifest is shown in the response — if it is empty, public files are placed at the public root level (not inside a subdirectory). CO-TENANCY: a build owns its own subtree and nothing else; outside it a deploy may create but never overwrite, and overwrite does not reach those paths. Nothing is ever deleted. Without overwrite=true, the command scans its own subtree for file conflicts and returns a detailed list. Uses file locking to prevent concurrent deployments. On success it writes a deployment marker into the target\'s secure folder recording which project, build and layout landed there — that is what lets the next deploy tell an update from a stranger. NGINX: you probably need to do nothing. This installation regenerates its own routing file after a deploy and attempts a reload, and the response says which of the three outcomes happened. The nginx_routes.conf shipped inside the build is for deploying onto a server that carries NO QuickSite installation; including it alongside an installation\'s own generated routing declares the same location twice, which is a duplicate-location emergency and nginx then refuses to start. Apache users (.htaccess) need no extra step.'
     ],
     
     'downloadBuild' => [

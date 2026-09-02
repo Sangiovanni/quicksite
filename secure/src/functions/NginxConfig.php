@@ -96,9 +96,15 @@ require_once __DIR__ . '/deploymentMarker.php'; // qs_deployed_sites
  * @param list<array{space:string,project:string}> $deployedSites Builds deployed
  *        into this installation's document root, from qs_deployed_sites(). Empty
  *        (the default) means the root stays free.
+ * @param string $secureFolderName This installation's secure folder name. A
+ *        parameter, like the two on write_nginx_dynamic_routes(), so the
+ *        generator stays runnable against a scratch tree; and read from the
+ *        caller rather than hardcoded as "secure" because the folder is
+ *        renameable and the header below tells the operator which file to
+ *        include.
  * @return string Nginx configuration content
  */
-function generate_nginx_config(string $publicFolderSpace, array $deployedSites = []): string {
+function generate_nginx_config(string $publicFolderSpace, array $deployedSites = [], string $secureFolderName = 'secure'): string {
     $prefix = $publicFolderSpace !== '' ? '/' . trim($publicFolderSpace, '/') : '';
 
     // Split the deployments into "owns the root" and "owns a subdirectory". At
@@ -129,7 +135,7 @@ function generate_nginx_config(string $publicFolderSpace, array $deployedSites =
     $config .= "# setup deleting this file so the next page load rebuilds it.\n";
     $config .= "#\n";
     $config .= "# Usage — TWO steps, both required:\n";
-    $config .= "#   1. include /path/to/secure/nginx/dynamic_routes.conf;   (in server {})\n";
+    $config .= "#   1. include /path/to/{$secureFolderName}/nginx/dynamic_routes.conf;   (in server {})\n";
     $config .= "#   2. define the `@quicksite_project` named location — see the block\n";
     $config .= "#      further down. Without it every project URL answers 500.\n";
     $config .= "#\n";
@@ -137,7 +143,7 @@ function generate_nginx_config(string $publicFolderSpace, array $deployedSites =
     $config .= "# the public space configuration changes (requires sudoers setup).\n";
     $config .= "#\n";
     $config .= "# Manual reload: nginx -t && nginx -s reload\n";
-    $config .= "# Cron fallback: secure/cron/nginx_reload.sh (optional)\n";
+    $config .= "# Cron fallback: {$secureFolderName}/cron/nginx_reload.sh (optional)\n";
     $config .= "# ==========================================================\n\n";
 
     // Admin API (most specific path — must come first)
@@ -184,7 +190,7 @@ function generate_nginx_config(string $publicFolderSpace, array $deployedSites =
     // Project renderer (surface B) — see the function docblock for why this one
     // block is `^~` and why its fallback is a NAMED location.
     $config .= "# Project renderer — every project is served at /p/<projectId>/ from its own\n";
-    $config .= "# folder under secure/projects/, which is OUTSIDE the web root so the\n";
+    $config .= "# folder under {$secureFolderName}/projects/, which is OUTSIDE the web root so the\n";
     $config .= "# visibility gate runs before any byte is sent.\n";
     $config .= "#\n";
     $config .= "# `^~` is required: it stops a vhost's own `location ~* \\.(css|js|png|…)$`\n";
@@ -358,7 +364,7 @@ function write_nginx_dynamic_routes(
     }
 
     // Generate and write config
-    $content = generate_nginx_config($publicFolderSpace, $deployedSites);
+    $content = generate_nginx_config($publicFolderSpace, $deployedSites, basename(rtrim($secureFolderPath, '/\\')));
 
     if (file_put_contents($configPath, $content, LOCK_EX) === false) {
         return [

@@ -78,7 +78,7 @@ function __command_createProject(array $params = [], array $urlParams = []): Api
     if (is_dir($projectPath)) {
         return ApiResponse::create(409, 'resource.already_exists')
             ->withMessage("Project '$projectName' already exists")
-            ->withData(['existing_path' => 'secure/projects/' . $projectName]);
+            ->withData(['existing_path' => SECURE_FOLDER_NAME . '/projects/' . $projectName]);
     }
     
     // Create project structure
@@ -212,7 +212,7 @@ HTACCESS;
 
     $result = [
         'project' => $projectName,
-        'path' => 'secure/projects/' . $projectName,
+        'path' => SECURE_FOLDER_NAME . '/projects/' . $projectName,
         'site_name' => $siteName,
         'default_language' => $defaultLang,
         'owner_user_id' => $creatorId,

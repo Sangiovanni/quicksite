@@ -163,7 +163,7 @@ function __command_listPages(array $params = [], array $urlParams = []): ApiResp
             'count' => count($pages),
             'with_routes' => $withRoutes,
             'orphaned' => $orphaned,
-            'directory' => 'secure/templates/model/json/pages/'
+            'directory' => SECURE_FOLDER_NAME . '/projects/' . PROJECT_NAME . '/templates/model/json/pages/'
         ]);
 }
 

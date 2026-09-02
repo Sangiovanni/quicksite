@@ -72,7 +72,7 @@ function __command_deleteProject(array $params = [], array $urlParams = []): Api
     if (!is_dir($projectPath)) {
         return ApiResponse::create(404, 'resource.not_found')
             ->withMessage("Project '$projectName' not found")
-            ->withData(['searched_path' => 'secure/projects/' . $projectName]);
+            ->withData(['searched_path' => SECURE_FOLDER_NAME . '/projects/' . $projectName]);
     }
 
     // C15 15.3 — no project is "the active one" installation-wide any more, so there is no

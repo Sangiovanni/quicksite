@@ -340,7 +340,7 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
 
     $result = [
         'project' => $projectName,
-        'path' => 'secure/projects/' . $projectName,
+        'path' => SECURE_FOLDER_NAME . '/projects/' . $projectName,
         'imported' => true,
         'source_file' => $uploadedFile,
         'files_count' => $stats['files'],
@@ -444,7 +444,7 @@ function checkArchiveLimits(ZipArchive $zip, ?int &$totalBytes = null): ?array {
         // decompression bomb. Tiny entries are exempt: a few hundred bytes
         // expanding from a dozen is ordinary compression, not an attack.
         if ($comp > 0 && $size > 1024 && intdiv($size, $comp) > $limits['max_ratio']) {
-            return ['message' => 'Archive contains an entry compressed beyond the allowed ratio (raise max_ratio in secure/management/config/import-policy.php)', 'data' => [
+            return ['message' => 'Archive contains an entry compressed beyond the allowed ratio (raise max_ratio in ' . SECURE_FOLDER_NAME . '/management/config/import-policy.php)', 'data' => [
                 'entry' => (string)($stat['name'] ?? ''),
                 'ratio' => intdiv($size, $comp) . ':1',
                 'max_ratio' => $limits['max_ratio'] . ':1',

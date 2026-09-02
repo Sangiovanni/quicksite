@@ -530,8 +530,7 @@ class OAuthHandler
         $adminPath = SECURE_FOLDER_PATH . '/admin/config/oauth-presets.json';
         if (!file_exists($adminPath)) {
             throw new RuntimeException(
-                "OAuth presets file not found: $adminPath. Ship/restore "
-                . 'oauth-presets.json in secure/admin/config/.'
+                "OAuth presets file not found: $adminPath. Ship or restore that file."
             );
         }
         $admin = self::readJsonFile($adminPath, 'OAuth presets');

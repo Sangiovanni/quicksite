@@ -464,7 +464,7 @@ function validateResolverConfig(array $config, ?ApiEndpointManager $apiManager =
                         'field'  => 'resolver.provider',
                         'reason' => 'unknown_provider',
                         'value'  => $provider,
-                        'hint'   => 'Provider id must match a key in oauth-presets.json — either per-project at secure/projects/<active>/data/oauth-presets.json or the engine catalogue at secure/admin/config/oauth-presets.json. Add the preset there (URL/scope/userinfo paths) or use a {:routeParam} placeholder to read from the URL.',
+                        'hint'   => 'Provider id must match a key in oauth-presets.json — either per-project at ' . SECURE_FOLDER_NAME . '/projects/<projectId>/data/oauth-presets.json or the engine catalogue at ' . SECURE_FOLDER_NAME . '/admin/config/oauth-presets.json. Add the preset there (URL/scope/userinfo paths) or use a {:routeParam} placeholder to read from the URL.',
                     ];
                 }
             }

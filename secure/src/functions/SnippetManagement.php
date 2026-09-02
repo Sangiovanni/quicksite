@@ -96,8 +96,8 @@ function warnAboutLegacyFlatSnippets(): void {
     }
     $alreadyWarned = true;
     error_log('QuickSite [snippets]: ' . count($legacy) . ' snippet(s) remain in the older flat '
-        . 'secure/snippets/custom/ layout and are no longer served (no owner recorded). Move each into '
-        . 'secure/snippets/custom/<userId>/<category>/ to restore it: ' . implode(', ', $legacy));
+        . SECURE_FOLDER_NAME . '/snippets/custom/ layout and are no longer served (no owner recorded). Move each into '
+        . SECURE_FOLDER_NAME . '/snippets/custom/<userId>/<category>/ to restore it: ' . implode(', ', $legacy));
 }
 
 function getPersonalSnippetsPath(?string $userId = null): ?string {
@@ -396,8 +396,14 @@ function extractSnippetCss(array $structure, string $projectName): array {
         ? [$structure]
         : $structure;
 
+    // Components resolve from the project this snippet belongs to — the same
+    // $projectName the stylesheet lookup below uses, so both halves of the
+    // extraction describe one project. (It used to be an ambient
+    // TEMPLATES_JSON_PATH constant, which nothing defines.)
+    $componentsDir = SECURE_FOLDER_PATH . '/projects/' . $projectName . '/templates/model/json/components';
+
     $components = [];
-    $allSelectors = extractCssSelectorsFromStructure($nodes, $components);
+    $allSelectors = extractCssSelectorsFromStructure($nodes, $componentsDir, $components);
 
     // Only keep classes and IDs for snippet CSS — tags are too broad
     $selectors = [

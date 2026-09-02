@@ -81,7 +81,7 @@ function __command_cloneProject(array $params = [], array $urlParams = []): ApiR
     if (!is_dir($sourcePath)) {
         return ApiResponse::create(404, 'resource.not_found')
             ->withMessage("Source project '$sourceProject' not found")
-            ->withData(['searched_path' => 'secure/projects/' . $sourceProject]);
+            ->withData(['searched_path' => SECURE_FOLDER_NAME . '/projects/' . $sourceProject]);
     }
     
     // Check target doesn't already exist
@@ -90,7 +90,7 @@ function __command_cloneProject(array $params = [], array $urlParams = []): ApiR
     if (is_dir($targetPath)) {
         return ApiResponse::create(409, 'resource.already_exists')
             ->withMessage("Project '$newName' already exists")
-            ->withData(['existing_path' => 'secure/projects/' . $newName]);
+            ->withData(['existing_path' => SECURE_FOLDER_NAME . '/projects/' . $newName]);
     }
     
     // Recursive copy, excluding backups/
@@ -153,7 +153,7 @@ function __command_cloneProject(array $params = [], array $urlParams = []): ApiR
     $result = [
         'project' => $newName,
         'source' => $sourceProject,
-        'path' => 'secure/projects/' . $newName,
+        'path' => SECURE_FOLDER_NAME . '/projects/' . $newName,
         'site_name' => $newSiteName,
         'files_copied' => $fileCount,
         'cloned' => true,

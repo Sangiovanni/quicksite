@@ -298,7 +298,7 @@ function __command_listComponents(array $params = [], array $urlParams = []): Ap
         ->withData([
             'components' => $components,
             'count' => count($components),
-            'directory' => 'secure/templates/model/json/components/'
+            'directory' => SECURE_FOLDER_NAME . '/projects/' . PROJECT_NAME . '/templates/model/json/components/'
         ]);
 }
 

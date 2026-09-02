@@ -10,9 +10,11 @@
  *               one build or none and this command finds it on its own. Supply
  *               the name only to assert WHICH build you meant; a name that is
  *               not the current build is a 404 rather than a silent substitution.
- * - targetPath: Absolute path to the root directory where the build will be deployed
- *               The build's public and secure folders will be placed inside this path.
- *               Example: /var/www/mysite -> creates /var/www/mysite/{publicFolder}/ and /var/www/mysite/{secureFolder}/
+ * - targetPath: (optional) Absolute path to the root directory where the build
+ *               will be deployed. The build's public and secure folders are
+ *               placed inside it as <target>/{publicFolder}/ and
+ *               <target>/{secureFolder}/. Defaults to SERVER_ROOT, and must
+ *               be inside SERVER_ROOT or a configured deploy root — see gate 3.
  * - overwrite: (optional) If true, overwrite existing files (default: false)
  *              When false, the command scans for file conflicts first and returns them.
  * - acceptRouteCollisions: (optional) If true, deploy even though one of the
@@ -39,9 +41,13 @@
  *   3. deploy-roots.php — where may it write? Absent ⇒ SERVER_ROOT only.
  *
  * SECURITY NOTE:
- * - This command allows copying to arbitrary paths on the filesystem
- * - Protect your API token - anyone with access can deploy anywhere the PHP process can write
- * - Path traversal attempts (..) are blocked
+ * - The target is NOT an arbitrary absolute path. It must be SERVER_ROOT or a
+ *   root the operator listed in deploy-roots.php; anything else is refused 403.
+ *   A default installation, which has no such file, deploys to itself and
+ *   nowhere else. (beta.10 C4/F8 — before that it did write anywhere.)
+ * - Path traversal attempts (..) are blocked before the allowlist is consulted.
+ * - The gates above are what a leaked deploy token runs into: it can redeploy
+ *   this install's own site, and it cannot write generated PHP to another vhost.
  */
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/opcacheHygiene.php'; // qs_opcache_invalidate
@@ -61,7 +67,7 @@ if (!qs_deploy_allowed()) {
     ApiResponse::create(403, 'deploy.disabled')
         ->withMessage('Deploying is disabled on this installation')
         ->withData([
-            'hint' => 'The operator enables it on the server: copy secure/management/config/deploy.php.example to deploy.php and set allow_deploy => true (setup.sh / setup.bat offers this). Building, downloading and deleting a build are unaffected.',
+            'hint' => 'The operator enables it on the server: copy ' . SECURE_FOLDER_NAME . '/management/config/deploy.php.example to deploy.php and set allow_deploy => true (setup.sh / setup.bat offers this). Building, downloading and deleting a build are unaffected.',
         ])
         ->send();
 }
@@ -208,7 +214,7 @@ foreach ($allowedRoots as $allowedRoot) {
 }
 if (!$targetAllowed) {
     ApiResponse::create(403, 'validation.security_violation')
-        ->withMessage('Deploy target is outside the allowed deploy root(s). Add it to secure/management/config/deploy-roots.php to permit this location.')
+        ->withMessage('Deploy target is outside the allowed deploy root(s). Add it to ' . SECURE_FOLDER_NAME . '/management/config/deploy-roots.php to permit this location.')
         ->withErrors([
             ['field' => 'targetPath', 'value' => $targetPath],
             ['reason' => 'Only SERVER_ROOT and configured deploy-roots.php entries are permitted']

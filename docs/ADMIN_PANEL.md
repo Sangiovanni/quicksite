@@ -3088,19 +3088,18 @@ Deploying is a file copy and nothing else — it does not point a document root,
 - `<target>/<public>/` — the document root
 - `<target>/<secure>/` — must stay **outside** it
 
-#### Choosing where it goes
+#### Where it goes
 
-The target field starts **empty**, and the installation's own path is never rendered. Two ways to fill it:
+**This installation's own root, and nowhere else.** There is no target field, and the installation's own path is never rendered into the page: the panel sends no target and the server fills in its own, so the path stays on the server.
 
-- **Deploy to this installation's own root** — a button, not a path. It sends no target at all and the server fills its own in, so the path stays on the server. This is also the only mode where the panel can say anything about merging, because it is the only one where it knows what the target is.
-- **Type a path** — anywhere listed in `deploy-roots.php` on the server. The panel previews `<target>/<public>/` and `<target>/<secure>/` as you type.
+That is a deliberate narrowing rather than a missing control. On an installation with no deploy-roots configuration — the default — every path a deployer could type would be refused anyway, so the field could only ever fail; and free text in front of a destructive operation buys a typo, not a capability. Choosing a target is the **installer's** decision, made on the server, the same way enabling deploying at all is. `deployBuild` still accepts `targetPath` from API callers and still validates it against the allowlist — the panel simply does not offer it.
 
-In install-root mode the two folders are previewed relative — `public/`, `secure/` — with a line saying they are inside this installation's own root. That is where the two warnings live:
+The two folders are previewed relative — `public/`, `secure/` — with a line saying they are inside this installation's own root. That is where the two warnings live:
 
 - **The folder names match the installation's own** → the build's files would be copied *into* QuickSite's own `public/` and `secure/`. Shown in red.
 - **They differ** → they land beside QuickSite's own folders, where no web server is looking; the deploy reports success and the site is invisible until a document root points at it.
 
-A deployer who types the installation's own path by hand gets no client-side warning — the panel does not know that path, deliberately. The server's own co-tenancy refusals below cover that case, and they are the ones that matter.
+Both warnings depend on the page knowing the target is the install, which is the only case it does know. An API caller deploying to a configured deploy root gets neither — the server's own co-tenancy refusals below cover that case, and they are the ones that matter.
 
 #### After: does it serve?
 
