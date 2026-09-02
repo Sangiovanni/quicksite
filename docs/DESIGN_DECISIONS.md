@@ -10553,3 +10553,79 @@ withdraw a spelling the renderer accepts and the documentation promises).
 `secure/management/command/getSnippet.php`,
 `secure/management/command/getComponent.php`. Behaviour:
 [ARCHITECTURE.md](ARCHITECTURE.md) §2, §4.
+
+---
+
+### An import takes its archive from the request body, and nothing else (locked 2026-09-03)
+
+**Decision.** `importProject` accepts an archive only as an uploaded file. The
+`file_path` parameter — which named an absolute path on the server and opened
+whatever was there — is removed, and so is the command's own re-merge of the
+query string and request body into its parameter array. The rule the removal
+states is general: **a parameter a command reads is a parameter the web can set,
+whatever the comment beside it says, and a parameter with no caller is only an
+attack surface.**
+
+**Reasoning.** The branch was commented "for internal calls" and behaved as
+though that were enforced: it validated nothing about the path it was given —
+not a project name, not a marker, not a containing directory. Two facts made the
+comment false. The command opened by merging the request superglobals into its
+own parameters, so the query string reached the branch; and its category is
+global with access open to any authenticated account, so every signed-in user
+could call it while being a member of no project at all.
+
+What that combination yielded was not theoretical. Two distinguishable refusals
+— one for a path that exists but is not an archive, another for a path that does
+not exist — made the command a filesystem existence oracle over the whole server,
+and because a project's export archives are named after the project and a
+timestamp, that oracle made the names guessable. Opening one then walked past the
+containment that had deliberately moved exports *underneath* the project they
+belong to, so that an archive is reachable only through that project's own
+membership check. Reproduced end to end: an account that was a member of nothing
+imported another account's private export and became the owner of a copy of its
+contents — in the same session in which the sanctioned route for that same
+archive answered it `403 auth.forbidden`. Membership was not broken; the
+parameter simply did not consult it.
+
+Removal, rather than repair, because the parameter had no consumer to protect.
+Nothing passed it: the command is absent from the in-process runner's allowlist,
+no shipped workflow names it, no admin script sends it, and no PHP file loads the
+command file to call its function directly. It appeared in no documentation —
+neither in the runtime `help` payload nor in the command reference. A branch with
+one demonstrated use, and that use an attack, is not a feature with a security
+problem; it is the problem.
+
+The superglobal merge went with it, for the reason it was never needed. The
+dispatcher already builds a command's parameters from the query string merged
+with the request body, in that same precedence, before the command file is
+loaded — so over HTTP the command's own second merge changed nothing, which is
+why removing it leaves every way of passing `name` and `switch_to` working
+exactly as before, on the query string and in the multipart body alike. What it
+did change was reach: it re-imported the ambient request on *every* call, so any
+parameter the command read was settable from a URL no matter what the caller
+intended. That is the mechanism that turned an internal-only branch into a public
+one, and leaving it in place would leave the next parameter one line away from
+the same fate.
+
+**Alternatives considered**: jail `file_path` to the exports the caller can
+already reach through their own membership (rejected — that writes a containment
+rule, and the tests needed to keep it honest, around a parameter nothing calls;
+the cheapest correct jail for an unused parameter is not having one); keep the
+parameter and narrow the merge to the parameters the command names (rejected —
+the branch stays publicly reachable through the request body, so this renames the
+hole rather than closing it); narrow the merge instead of deleting it (rejected —
+the dispatcher already performs exactly that merge, so narrowing preserves a line
+whose only remaining effect is to re-import request state into calls that did not
+ask for it); make the two refusals identical so the oracle closes while the
+parameter stays (rejected — that hides the read without preventing it, and an
+attacker who already knows an archive's name never needed the oracle).
+
+**Source**: `secure/management/command/importProject.php`;
+`secure/src/classes/TrimParametersManagement.php` (the merge the dispatcher
+already performs); `secure/management/config/categories.php` (the global,
+open-access category the command belongs to);
+`secure/src/classes/CommandRunner.php` (the in-process allowlist the command is
+absent from); `secure/src/functions/projectContainment.php` (the export
+containment the parameter bypassed). Behaviour:
+[COMMAND_API.md](COMMAND_API.md) (*Export / Import*), which already described the
+command as taking an uploaded ZIP and needed no correction.

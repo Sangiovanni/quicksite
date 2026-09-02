@@ -54,8 +54,22 @@ const IMPORT_ALLOWED_CONFIG_KEYS = [
  * @return ApiResponse
  */
 function __command_importProject(array $params = [], array $urlParams = []): ApiResponse {
-    // Merge query parameters for POST with multipart (query params in URL)
-    $params = array_merge($_GET, $_POST, $params);
+    // ⚠ There is deliberately NO `array_merge($_GET, $_POST, $params)` here.
+    //
+    // The line that used to open this function was commented "merge query
+    // parameters for POST with multipart". The need behind it is real — a
+    // caller uploading an archive may put `name` and `switch_to` on the query
+    // string rather than in the multipart body — but it was already met: the
+    // dispatcher's TrimParametersManagement builds $params as $_GET merged
+    // with $_POST, in that same precedence, before this file is included. Over
+    // HTTP the merge was a no-op, and the probe that proves those options
+    // still arrive is NOTES/tests/beta11/s56a_import_query_options_probe.sh.
+    //
+    // What it DID add was reach: it re-imported the ambient superglobals on
+    // EVERY call, an in-process one included, so every parameter this function
+    // reads was settable from the query string whatever the caller intended.
+    // That is how a branch commented "for internal calls" became a public one
+    // (S5.6a). A parameter this command reads is a parameter the web can set.
 
     // Per-user resource limits (quota.php — absent file = no limits). The RATE
     // axis first, before the archive is opened or a byte is read: an import is
@@ -106,14 +120,19 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
         $zipPath = $file['tmp_name'];
         $uploadedFile = $file['name'];
     }
-    // Method 2: Check for file path in params (for internal calls).
-    // qs_param_string first: `?file_path[]=x` is non-empty but is an array, and
-    // file_exists() is typed for a string — TypeError (beta.10 C13 F-C13-11).
-    elseif (($filePathParam = qs_param_string($params, 'file_path', '')) !== ''
-            && file_exists($filePathParam)) {
-        $zipPath = $filePathParam;
-        $uploadedFile = basename($filePathParam);
-    }
+    // An uploaded file is the ONLY way an archive gets in.
+    //
+    // ⚠ There used to be a second method here: a `file_path` parameter,
+    // commented "for internal calls", that opened whatever absolute path it
+    // named — no project-name validation, no marker comparison, no base
+    // directory. It had no internal caller (importProject is not in
+    // CommandRunner's allowlist and no PHP file requires this one), it was
+    // documented nowhere, and because `projects.create` is a global
+    // access:'any' category it was reachable by every signed-in account,
+    // member of nothing. It handed them a filesystem existence oracle over the
+    // whole server and read past the containment that put each project's
+    // exports under its own marker. Removed in S5.6a — an import supplies its
+    // archive in the request body or not at all.
     else {
         // Same distinction uploadAsset draws: an archive PHP discarded for
         // exceeding post_max_size arrives here looking exactly like no archive
@@ -135,7 +154,7 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
                 'max_file_size'       => $limits['transport_max'],
                 'max_file_size_human' => qs_format_size($limits['transport_max']),
             ])
-            ->withErrors(['file' => 'Required. Upload a ZIP file or provide file_path for internal calls']);
+            ->withErrors(['file' => 'Required. Upload a ZIP file as multipart/form-data.']);
     }
     
     // Options.
