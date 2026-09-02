@@ -57,30 +57,30 @@ function expandComponentForPreview(array $node, string $componentsDir, int $dept
 }
 
 /**
- * Replace {{varName}} placeholders in a component structure with data values
+ * Replace {{varName}} placeholders in a component structure with data values.
+ *
+ * The substitution itself is `qs_resolve_component_placeholders()` in
+ * componentPolicy.php — shared with the renderer, the compiler and the snippet
+ * CSS extractor, so every reader agrees on what a slot is. This function is
+ * just the walk. (The shared rule additionally accepts a hyphenated slot name,
+ * which this copy refused and the renderer always allowed.)
  */
 function resolveComponentPlaceholdersForPreview(array $node, array $data): array {
     $result = [];
-    
+
     if (isset($node['textKey']) && is_string($node['textKey'])) {
-        $result['textKey'] = preg_replace_callback('/\{\{(\$?\w+)\}\}/', function($m) use ($data) {
-            return $data[$m[1]] ?? $m[0];
-        }, $node['textKey']);
+        $result['textKey'] = qs_resolve_component_placeholders($node['textKey'], $data);
         if (!isset($node['tag'])) return $result;
     }
-    
+
     if (isset($node['tag'])) $result['tag'] = $node['tag'];
-    
+
     if (isset($node['params'])) {
         $result['params'] = [];
         foreach ($node['params'] as $key => $value) {
-            if (is_string($value)) {
-                $result['params'][$key] = preg_replace_callback('/\{\{(\$?\w+)\}\}/', function($m) use ($data) {
-                    return $data[$m[1]] ?? $m[0];
-                }, $value);
-            } else {
-                $result['params'][$key] = $value;
-            }
+            $result['params'][$key] = is_string($value)
+                ? qs_resolve_component_placeholders($value, $data)
+                : $value;
         }
     }
     

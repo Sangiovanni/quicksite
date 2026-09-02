@@ -10465,3 +10465,91 @@ of the code disproves teaches them to distrust the whole document).
 
 **Source**: `CLAUDE.md` *Adding a new command — checklist* step 1;
 `secure/src/classes/CommandRunner.php` (the allowlist the requirement derives from).
+
+---
+
+### A snippet's CSS is the CSS the visitor will see (locked 2026-09-02)
+
+**Decision.** When a snippet is created or duplicated, the stylesheet rules it
+carries are chosen by walking the structure with the component `data` bound —
+the same substitution the renderer performs — so a component reference
+contributes the classes the page will really have. A slot nothing supplied
+contributes nothing at all, rather than a literal `{{slot}}` entry.
+
+**Reasoning.** The walk used to read only two keys off a component reference,
+`data.class` and `data.id`, and to take every other value verbatim. That is
+correct only for a component whose class slot happens to be named `class`. A
+component naming it anything else — `imgClass`, say — had its real class never
+read, so the rules for that class were left out of the stored snippet and the
+snippet lost its styling when inserted somewhere the stylesheet differs. The
+gap was measured on the starter project: a `menu-link` reference carried 1099
+bytes of CSS once bound and 893 before, so 206 bytes of genuinely-used rules
+were missing, and the 893 it did carry was byte-identical to what the same
+reference produces when the slot is left unsupplied entirely — the stored CSS
+could not distinguish a bound component from an unbound one.
+
+Binding rather than guessing is what makes the two halves agree: the extractor
+now answers the same question the renderer answers, using the same code, so a
+snippet's CSS cannot drift from the page's markup by construction.
+
+Dropping the unbound `{{slot}}` entries is a consequence, not a second
+decision. A class name containing braces matches no rule — measured at zero
+bytes on its own — so storing one adds nothing but a claim that the snippet
+uses a selector which will never exist.
+
+**Alternatives considered**: drop the `{{…}}` entries and leave the missing
+rules missing (rejected — measured byte-identical CSS across three shapes, so
+it is purely cosmetic and fixes nothing that costs anything); leave both
+(rejected — the missing rules are a real loss of styling, silently); read a
+wider fixed set of slot names such as `class`, `imgClass`, `wrapperClass`
+(rejected — a convention masquerading as a rule, wrong for the next component
+someone writes).
+
+**Source**: `secure/src/functions/utilsStyleManagement.php`
+(`extractCssSelectorsFromStructure`), `secure/src/functions/componentPolicy.php`
+(`qs_resolve_component_placeholders`). Behaviour:
+[ARCHITECTURE.md](ARCHITECTURE.md) §2 (the `{{var}}` marker).
+
+---
+
+### One placeholder rule, applied by every reader of a component (locked 2026-09-02)
+
+**Decision.** What `{{slot}}` means — which spellings are slots, what a missing
+key does, what a non-string value does — is defined once, in
+`componentPolicy.php`, beside the rule that decides what a component *reference*
+is. The renderer, the compiler, the two preview commands and the snippet CSS
+extractor all call it.
+
+**Reasoning.** Four near-identical substitutions existed and they did not agree.
+The compiler alone did not accept the `{{$slot}}` spelling, so a component
+written that way bound in the editor preview and shipped **unbound into the
+built site** — a preview that lies about production. The two preview commands
+alone did not accept a hyphenated slot name, which the renderer had always
+allowed and which the architecture document already described as legal. Each
+copy was individually defensible and the set was not: the same component bound
+differently depending on which surface read it.
+
+The extractor needed the same substitution, which would have made five. A fifth
+spelling of a rule that already disagreed with itself is the failure this file
+was created to prevent, so the rule moved instead.
+
+One behaviour was deliberately not preserved. A slot given a non-scalar value
+used to substitute PHP's literal string `Array` into the attribute, with a
+conversion warning; it now keeps its placeholder. Scalars still bind and still
+stringify, so nothing an author can reasonably write changed — every rendered
+and compiled byte of every component in every project on the reference install
+is identical across the change except the `Array` case and the `{{$slot}}` fix.
+
+**Alternatives considered**: give the extractor its own copy (rejected — the
+duplication is the defect); unify only the two identical command copies and
+leave the renderer and compiler apart (rejected — those two are the pair whose
+disagreement reached a built site, so leaving them is leaving the part that
+matters); make the compiler's narrower rule the shared one (rejected — it would
+withdraw a spelling the renderer accepts and the documentation promises).
+
+**Source**: `secure/src/functions/componentPolicy.php`
+(`qs_resolve_component_placeholders`), `secure/src/classes/JsonToHtmlRenderer.php`,
+`secure/src/classes/JsonToPhpCompiler.php`,
+`secure/management/command/getSnippet.php`,
+`secure/management/command/getComponent.php`. Behaviour:
+[ARCHITECTURE.md](ARCHITECTURE.md) §2, §4.

@@ -181,15 +181,37 @@ function cssWriteAllTargets(string $content, string $livePath, string $projectPa
  * only falls back to the named project's own copy, so the two halves agree only
  * while both callers pass the marker project — which today they both do.)
  *
- * Requires `componentPolicy.php` (qs_resolve_component_path) to be in scope.
+ * A COMPONENT'S SLOTS ARE BOUND, NOT READ RAW. A reference supplies values for
+ * the slots its component leaves open — `{"component": "menu-link", "data":
+ * {"imgClass": "menu-icon"}}` — and this walk binds them through the shared
+ * `qs_resolve_component_placeholders()`, the same substitution the renderer
+ * performs, so the selectors collected here are the ones the visitor's page
+ * will really carry. It used to read `data['class']` and `data['id']` and
+ * nothing else, which meant a component naming its class slot anything other
+ * than `class` had its real class silently missed and the matching rules left
+ * out of the stored snippet CSS (measured: 206 bytes for one `menu-link`).
+ *
+ * An UNBOUND slot is dropped rather than stored. A class named `{{imgClass}}`
+ * matches no rule — it contributes no CSS either way — so keeping it only
+ * misreports which selectors a snippet uses.
+ *
+ * Requires `componentPolicy.php` (qs_resolve_component_path,
+ * qs_resolve_component_placeholders) to be in scope.
  *
  * @param array  $structure     Array of nodes.
  * @param string $componentsDir Project's components folder. Pass '' to skip
  *                              component resolution entirely.
  * @param array  $components    Component cache, filled as references resolve.
+ *                              Holds the RAW component structure: slots bind
+ *                              during the walk, so one cached copy serves
+ *                              every reference to it whatever its data.
+ * @param array  $data          Slot values in scope for this subtree — the
+ *                              `data` map of the component reference that led
+ *                              here. Empty at the top level, where a node's
+ *                              classes are already literal.
  * @return array ['classes' => [...], 'ids' => [...], 'tags' => [...]]
  */
-function extractCssSelectorsFromStructure(array $structure, string $componentsDir, array &$components = []): array {
+function extractCssSelectorsFromStructure(array $structure, string $componentsDir, array &$components = [], array $data = []): array {
     $classes = [];
     $ids = [];
     $tags = [];
@@ -198,6 +220,22 @@ function extractCssSelectorsFromStructure(array $structure, string $componentsDi
         // Handle component references
         if (isset($node['component'])) {
             $componentName = $node['component'];
+
+            // Bind this reference's own data map against the slots in scope
+            // HERE, before it becomes the scope one level down. That ordering
+            // is what makes a nested reference resolve: menu-link's inner
+            // {"component": "img-dynamic", "data": {"class": "{{imgClass}}"}}
+            // has to become {"class": "menu-icon"} from menu-link's data
+            // before img-dynamic's own {{class}} slot has anything to bind to.
+            // The renderer expands a component in exactly this order.
+            $nodeData = [];
+            if (isset($node['data']) && is_array($node['data'])) {
+                foreach ($node['data'] as $slot => $value) {
+                    $nodeData[$slot] = is_string($value)
+                        ? qs_resolve_component_placeholders($value, $data)
+                        : $value;
+                }
+            }
 
             // Load component if not already loaded
             if (!isset($components[$componentName]) && $componentsDir !== '') {
@@ -216,28 +254,30 @@ function extractCssSelectorsFromStructure(array $structure, string $componentsDi
 
             // Recursively extract from component
             if (isset($components[$componentName])) {
-                // $componentsDir is threaded through: a component may itself
-                // reference a component, and a recursion that dropped the
-                // directory would resolve nothing one level down.
+                // $componentsDir and $nodeData are both threaded through: a
+                // component may itself reference a component, and a recursion
+                // that dropped either would resolve nothing one level down —
+                // no file for the directory, no slot values for the data.
                 $componentSelectors = extractCssSelectorsFromStructure(
                     is_array($components[$componentName][0] ?? null) ? $components[$componentName] : [$components[$componentName]],
                     $componentsDir,
-                    $components
+                    $components,
+                    $nodeData
                 );
                 $classes = array_merge($classes, $componentSelectors['classes']);
                 $ids = array_merge($ids, $componentSelectors['ids']);
                 $tags = array_merge($tags, $componentSelectors['tags']);
             }
 
-            // Also extract from data params (component might have class in data)
-            if (isset($node['data']) && is_array($node['data'])) {
-                if (isset($node['data']['class'])) {
-                    $nodeClasses = preg_split('/\s+/', trim($node['data']['class']));
-                    $classes = array_merge($classes, $nodeClasses);
-                }
-                if (isset($node['data']['id'])) {
-                    $ids[] = $node['data']['id'];
-                }
+            // Also extract from the reference's own data (a component may take
+            // its class straight from the referencing node, the way the
+            // starter project's 404 page hands img-dynamic a literal class).
+            if (isset($nodeData['class']) && is_string($nodeData['class'])) {
+                $nodeClasses = preg_split('/\s+/', trim($nodeData['class']));
+                $classes = array_merge($classes, $nodeClasses);
+            }
+            if (isset($nodeData['id']) && is_string($nodeData['id'])) {
+                $ids[] = $nodeData['id'];
             }
 
             continue;
@@ -247,30 +287,52 @@ function extractCssSelectorsFromStructure(array $structure, string $componentsDi
         if (isset($node['tag'])) {
             $tags[] = $node['tag'];
 
-            // Extract params
+            // Extract params. Inside a component these carry that component's
+            // slots, so they bind against the data in scope; at the top level
+            // $data is empty and the substitution is a no-op. The is_string
+            // guards are the type contract of the shared resolver — a stored
+            // `"class": ["a"]` used to reach trim() and fatal on PHP 8.
             if (isset($node['params']) && is_array($node['params'])) {
-                if (isset($node['params']['class'])) {
-                    $nodeClasses = preg_split('/\s+/', trim($node['params']['class']));
+                if (isset($node['params']['class']) && is_string($node['params']['class'])) {
+                    $boundClass = qs_resolve_component_placeholders($node['params']['class'], $data);
+                    $nodeClasses = preg_split('/\s+/', trim($boundClass));
                     $classes = array_merge($classes, $nodeClasses);
                 }
-                if (isset($node['params']['id'])) {
-                    $ids[] = $node['params']['id'];
+                if (isset($node['params']['id']) && is_string($node['params']['id'])) {
+                    $ids[] = qs_resolve_component_placeholders($node['params']['id'], $data);
                 }
             }
         }
 
         // Recurse into children
         if (isset($node['children']) && is_array($node['children'])) {
-            $childSelectors = extractCssSelectorsFromStructure($node['children'], $componentsDir, $components);
+            $childSelectors = extractCssSelectorsFromStructure($node['children'], $componentsDir, $components, $data);
             $classes = array_merge($classes, $childSelectors['classes']);
             $ids = array_merge($ids, $childSelectors['ids']);
             $tags = array_merge($tags, $childSelectors['tags']);
         }
     }
 
+    // An entry still holding `{{…}}` here is a slot nothing supplied, and no
+    // outer level can supply it — slot values flow inward only, so what is
+    // unbound at this depth stays unbound. Drop it: it names no rule the
+    // parser could match, and storing it would claim a snippet uses a
+    // selector that will never exist on the page.
+    $bound = static function ($selector): bool {
+        // `$selector &&` keeps the truthiness test the default array_filter
+        // callback applied here before; the placeholder rule is what is new.
+        return $selector && (!is_string($selector) || strpos($selector, '{{') === false);
+    };
+
+    // array_values because both array_filter and array_unique preserve keys,
+    // and these three lists are stored: `createSnippet` writes them to the
+    // snippet's `selectors`, where a gap in the keys makes json_encode emit an
+    // OBJECT instead of an array. Dropping unbound placeholders above opens
+    // exactly such a gap — {"0":"img-fluid"} where the shape everything else
+    // documents, and every reader iterates, is a list.
     return [
-        'classes' => array_unique(array_filter($classes)),
-        'ids' => array_unique(array_filter($ids)),
-        'tags' => array_unique(array_filter($tags))
+        'classes' => array_values(array_unique(array_filter($classes, $bound))),
+        'ids' => array_values(array_unique(array_filter($ids, $bound))),
+        'tags' => array_values(array_unique(array_filter($tags, $bound)))
     ];
 }

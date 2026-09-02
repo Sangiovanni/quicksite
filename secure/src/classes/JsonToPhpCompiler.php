@@ -755,12 +755,11 @@ class JsonToPhpCompiler {
      */
     private function processComponentTemplate($template, array $data) {
         if (is_string($template)) {
-            // Replace {{placeholder}} with actual value
-            // [\w-]+ allows hyphens in variable names (e.g. alt-logo)
-            return preg_replace_callback('/\{\{([\w-]+)\}\}/', function($matches) use ($data) {
-                $key = $matches[1];
-                return $data[$key] ?? $matches[0]; // Keep placeholder if no data
-            }, $template);
+            // The slot rule lives in componentPolicy.php beside the rule for
+            // the reference itself. This method used to be the one spelling
+            // that omitted the optional `$` prefix, so a component written
+            // `{{$label}}` bound in a preview and shipped unbound in a build.
+            return qs_resolve_component_placeholders($template, $data);
         }
         
         if (is_array($template)) {

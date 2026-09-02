@@ -1013,12 +1013,10 @@ class JsonToHtmlRenderer {
      */
     private function processComponentTemplate($template, array $data) {
         if (is_string($template)) {
-            // Replace {{placeholder}} or {{$placeholder}} with actual value
-            // [\w-]+ allows hyphens in variable names (e.g. alt-logo)
-            return preg_replace_callback('/\{\{(\$?[\w-]+)\}\}/', function($matches) use ($data) {
-                $key = $matches[1];
-                return $data[$key] ?? $matches[0]; // Keep placeholder if no data
-            }, $template);
+            // The slot rule lives in componentPolicy.php beside the rule for
+            // the reference itself, so the compiler, the two preview commands
+            // and the snippet CSS extractor all bind a slot the same way.
+            return qs_resolve_component_placeholders($template, $data);
         }
 
         if (is_array($template)) {

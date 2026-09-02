@@ -6,6 +6,12 @@
  * stored PROJECT DATA: an author writes it, nothing outside this file decides
  * what it is allowed to be, and several readers turn it into a filesystem path.
  *
+ * A reference has two halves and this file owns both: WHICH FILE the name
+ * points at (`qs_resolve_component_path`, and the charset rule under it) and
+ * HOW THE `data` MAP BINDS to the slots that file leaves open
+ * (`qs_resolve_component_placeholders`). Every reader needs both, and each
+ * half had been copied per reader until it was collected here.
+ *
  * WHY A SHARED FUNCTION FILE. Ten call sites resolve a component reference —
  * the `/p/<id>/` renderer, the JSON→PHP compiler, and eight commands. Before
  * this file each one concatenated the name into a path on its own, so `../`
@@ -126,5 +132,63 @@ if (!function_exists('qs_component_reference_error')) {
             'reason'   => 'invalid_component_reference',
             'expected' => RegexPatterns::getDescription('component_name'),
         ];
+    }
+}
+
+if (!function_exists('qs_resolve_component_placeholders')) {
+    /**
+     * Bind one `{{slot}}` string against a component reference's `data` map.
+     *
+     * The second half of what a component reference means. `{"component":
+     * "menu-link", "data": {"imgClass": "menu-icon"}}` names a file (resolved
+     * above) AND supplies values for the slots that file leaves open. This is
+     * the substitution every reader of a component performs, in one spelling.
+     *
+     * WHY IT IS HERE AND NOT COPIED AGAIN. Four near-identical
+     * `preg_replace_callback` calls existed before this function:
+     * JsonToHtmlRenderer::processComponentTemplate, the compiler's method of
+     * the same name, and the structure walkers in getSnippet and getComponent.
+     * They did not agree — the compiler alone refused a `{{$var}}` slot, and
+     * the two commands alone refused a hyphenated one — so the same component
+     * could bind in a preview and not in a build. The CSS extractor needed the
+     * same substitution and would have made it five, which is what this file
+     * exists to prevent.
+     *
+     * THE RULE: `{{name}}` or `{{$name}}`, where name is letters, digits,
+     * underscores and hyphens. Hyphens are deliberate — a slot may be called
+     * `alt-logo`. Nothing else is a slot: `{{call:…}}` (event syntax),
+     * `{{param:…}}` / `{{resolved:…}}` (request-time values) and
+     * `{{__current_page;lang=en}}` (system placeholders) all carry characters
+     * outside the rule and are left untouched for the reader that owns them.
+     *
+     * A MISSING SLOT KEEPS ITS PLACEHOLDER, verbatim — the behaviour every
+     * copy already had. The caller decides what an unbound slot means; a
+     * renderer prints it, and the CSS extractor drops it, because a class name
+     * containing braces cannot match a rule.
+     *
+     * A NON-SCALAR VALUE ALSO KEEPS ITS PLACEHOLDER. This is the one place the
+     * shared function does not copy the old behaviour: `data: {"class": []}`
+     * used to substitute PHP's literal string "Array" (plus an array-to-string
+     * warning) into the attribute. Scalars still bind and still stringify —
+     * `3` binds as "3", `false` as "" — so nothing an author can reasonably
+     * write behaves differently.
+     *
+     * @param string $template a single string from a component structure
+     * @param array  $data     the referencing node's `data` map
+     * @return string the same string with every bound slot substituted
+     */
+    function qs_resolve_component_placeholders(string $template, array $data): string {
+        if ($data === [] || strpos($template, '{{') === false) {
+            return $template;
+        }
+
+        return preg_replace_callback(
+            '/\{\{(\$?[\w-]+)\}\}/',
+            static function (array $matches) use ($data): string {
+                $value = $data[$matches[1]] ?? null;
+                return is_scalar($value) ? (string) $value : $matches[0];
+            },
+            $template
+        );
     }
 }

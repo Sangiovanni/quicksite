@@ -1101,6 +1101,22 @@ The one exception is `{{__current_page;lang=xx}}`, the language switch: it
 resolves to a COMPLETE URL, so both surfaces recognise it *before* substituting
 and exempt the result from being composed against the base a second time.
 
+**Component slots.** `{{var}}` and `{{$var}}` are a separate mechanism from the
+four above and are bound earlier — when a component is inlined, from the
+referencing node's `data` (§2, §4) — so the request-time substitutions see a
+node that already reads like any other. A slot name may hold letters, digits,
+underscores and hyphens. A slot with no matching key in `data` keeps its
+placeholder verbatim; a slot given a value that is not a scalar keeps it too.
+
+The rule has one home, `qs_resolve_component_placeholders()` in
+`componentPolicy.php`, beside the rule for what a component *reference* is
+(below). Five readers ask it: the renderer, the compiler, the two preview
+commands (`getSnippet`, `getComponent`), and the snippet CSS extractor, which
+binds slots so the rules it captures are the ones the rendered page will use.
+The compiler was the surface that had this wrong — it alone did not accept the
+`{{$var}}` spelling, so a component written that way bound in the editor
+preview and shipped unbound in the build.
+
 **Attribute names.** A name is an *identifier*, not text. It may hold letters,
 digits, underscore, colon and hyphen and nothing else — `class`, `data-id`,
 `aria-label`, `xml:lang`. Anything else is **dropped**, on both surfaces, and

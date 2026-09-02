@@ -25,14 +25,27 @@ if (!function_exists('updates_normalizeVersion')) {
 }
 
 /**
- * Read the local VERSION file.
+ * Read the local VERSION file, normalised for version_compare.
  * Returns null if the file does not exist or is empty.
+ *
+ * NOT `qs_local_version()` in utilsManagement.php, which reads the same file
+ * from the same candidates. Sharing would mean requiring utilsManagement here,
+ * and this command currently loads one class and makes one HTTPS call: that
+ * file is 1000 lines and pulls in JsonToHtmlRenderer, PageManagement,
+ * TagRegistry, Translator and TrimParameters behind it. Paying that to share a
+ * file read is the trade componentPolicy.php already refused for the same
+ * reason. The two differ only in the `ltrim('vV')` below, which this command
+ * needs for version_compare and the build stamp must not have.
  */
 if (!function_exists('updates_getLocalVersion')) {
     function updates_getLocalVersion(): ?string {
-        // VERSION file lives at the project root (two levels above secure/management/command/)
+        // VERSION file lives at the installation root. SERVER_ROOT is what
+        // init.php defines; the relative walks cover a layout that reaches this
+        // code without it. (A `dirname(PUBLIC_FOLDER_PATH)` candidate sat first
+        // here and could never fire — nothing in the tree defines that
+        // constant, as uploadAsset.php:552 already noted in passing.)
         $candidates = [
-            defined('PUBLIC_FOLDER_PATH') ? dirname(PUBLIC_FOLDER_PATH) . '/VERSION' : null,
+            defined('SERVER_ROOT') ? SERVER_ROOT . '/VERSION' : null,
             SECURE_FOLDER_PATH . '/../VERSION',          // secure is sibling of public
             SECURE_FOLDER_PATH . '/../../VERSION',       // fallback
         ];
