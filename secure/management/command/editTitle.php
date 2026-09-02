@@ -86,8 +86,11 @@ if (!RegexPatterns::match('identifier_alphanum', $route)) {
 // Special pages that exist but are not in ROUTES (error pages, etc.)
 $specialPages = ['404', '500', '403', '401'];
 
-// Validate route exists in ROUTES or is a special page
-if (!in_array($route, ROUTES) && !in_array($route, $specialPages, true)) {
+// Validate route exists in ROUTES or is a special page.
+// routeExists(), NOT in_array(): ROUTES holds route names as KEYS ('home' => [...]),
+// so in_array searched the VALUES and was false for every real route — the command
+// refused every ordinary page it documents and only ever succeeded on the special pages.
+if (!routeExists($route, ROUTES) && !in_array($route, $specialPages, true)) {
     ApiResponse::create(404, 'validation.invalid_route')
         ->withMessage('Route does not exist')
         ->withData([

@@ -1160,7 +1160,7 @@ $manifest = [
         'secure_folder' => SECURE_FOLDER_NAME,
         'public_space' => PUBLIC_FOLDER_SPACE
     ],
-    'quicksite_version' => '1.4.0'
+    'quicksite_version' => qs_local_version()
 ];
 qs_json_write($buildFullPath . '/build_manifest.json', $manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
 

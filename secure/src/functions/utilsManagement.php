@@ -1009,3 +1009,33 @@ function qs_favicon_repoint(string $projectPath, string $oldName, ?string $newNa
 
     return $changed;
 }
+
+/**
+ * The QuickSite version this installation is running, read from the VERSION
+ * file at the installation root.
+ *
+ * Shared because more than one command reports it: build.php stamps it into
+ * build_manifest.json (which getBuild merges, so every builds-page row shows
+ * it) and checkForUpdates compares it against the latest GitHub release.
+ * A hardcoded literal here reported a version that was never released.
+ *
+ * @return string|null Trimmed VERSION contents, or null when it cannot be read
+ */
+function qs_local_version(): ?string {
+    $candidates = [
+        defined('SERVER_ROOT') ? SERVER_ROOT . '/VERSION' : null,
+        SECURE_FOLDER_PATH . '/../VERSION',      // secure/ is a sibling of public/
+        SECURE_FOLDER_PATH . '/../../VERSION',   // fallback for a nested layout
+    ];
+
+    foreach ($candidates as $path) {
+        if ($path === null) { continue; }
+        $real = realpath($path);
+        if ($real !== false && is_file($real)) {
+            $content = trim((string)@file_get_contents($real));
+            if ($content !== '') { return $content; }
+        }
+    }
+
+    return null;
+}

@@ -255,7 +255,7 @@ function exportConfigAsJson(ZipArchive $zip, string $projectPath, string $projec
         $configJson = [
             'SITE_NAME' => $projectName,
             'LANGUAGES_SUPPORTED' => ['en'],
-            'DEFAULT_LANGUAGE' => 'en',
+            'LANGUAGE_DEFAULT' => 'en',
             'MULTILINGUAL_SUPPORT' => false
         ];
     } else {

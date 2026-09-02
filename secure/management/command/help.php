@@ -196,7 +196,7 @@ $GLOBALS['__help_commands'] = [
         ],
         'example_post' => 'POST /management/build with body: {"public": "www/public", "secure": "app", "space": "web"}',
         'success_response' => [
-            'status' => 200,
+            'status' => 201,
             'code' => 'operation.success',
             'message' => 'Build completed successfully',
             'data' => [
@@ -599,13 +599,13 @@ $GLOBALS['__help_commands'] = [
         'example_patch' => 'PATCH /management/editTitle with body: {"route": "home", "lang": "en", "title": "Home - My Site"}',
         'success_response' => [
             'status' => 200,
-            'code' => 'operation.success',
+            'code' => 'success.title_updated',
             'message' => 'Page title updated successfully',
             'data' => [
                 'route' => 'home',
-                'lang' => 'en',
+                'language' => 'en',
                 'title' => 'Home - My Site',
-                'file_updated' => '/translate/en.json'
+                'translation_key' => 'page.titles.home'
             ]
         ],
         'error_responses' => [
@@ -3376,12 +3376,6 @@ $GLOBALS['__help_commands'] = [
                 'type' => 'boolean',
                 'description' => 'Safety confirmation (must be true)',
                 'validation' => 'Must be true to proceed'
-            ],
-            'force' => [
-                'required' => false,
-                'type' => 'boolean',
-                'description' => 'Force delete even if project is active',
-                'default' => false
             ]
         ],
         'example_delete' => 'DELETE /management/deleteProject with body: {"name": "oldsite", "confirm": true}',
@@ -3401,7 +3395,6 @@ $GLOBALS['__help_commands'] = [
             '400.project.mismatch' => 'The body name does not match the targeted (URL marker) project',
             '400.project.required' => 'No project targeted - use /management/p/<projectId>/deleteProject',
             '400.validation.confirmation_required' => 'Must set confirm=true',
-            '400.validation.active_project' => 'Cannot delete the served main project (use force=true)',
             '403.auth.forbidden' => 'Not the owner of this project (owner-only)',
             '404.resource.not_found' => 'Project not found',
             '500.server.delete_failed' => 'The tree could not be fully removed. data.partial says whether anything was deleted; data.survived names what could not be (project-relative paths); data.retained names what was kept deliberately so a retry stays possible; data.files_deleted / data.directories_deleted count what did go.'
@@ -4293,7 +4286,7 @@ $GLOBALS['__help_commands'] = [
             'name' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => 'Project name to backup (defaults to active project)',
+                'description' => 'Echo-check only. The project backed up is ALWAYS the one in the URL marker (/management/p/<projectId>/backupProject); this parameter cannot select a different one. Supply it and it must match the marker, or the call is refused with 400 project.mismatch.',
                 'example' => 'quicksite'
             ],
             'max_backups' => [
@@ -4339,7 +4332,7 @@ $GLOBALS['__help_commands'] = [
             'name' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => 'Project name (defaults to active project)',
+                'description' => 'Echo-check only. The project listed is ALWAYS the one in the URL marker (/management/p/<projectId>/listBackups); this parameter cannot select a different one. Supply it and it must match the marker, or the call is refused with 400 project.mismatch.',
                 'example' => 'quicksite'
             ]
         ],
@@ -4438,7 +4431,7 @@ $GLOBALS['__help_commands'] = [
             'name' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => 'Project name (defaults to active project)',
+                'description' => 'Echo-check only. The project deleted from is ALWAYS the one in the URL marker (/management/p/<projectId>/deleteBackup); this parameter cannot select a different one. Supply it and it must match the marker, or the call is refused with 400 project.mismatch.',
                 'example' => 'quicksite'
             ]
         ],
@@ -4732,7 +4725,7 @@ $GLOBALS['__help_commands'] = [
         'example_get' => 'GET /management/listJsFunctions',
         'success_response' => [
             'status' => 200,
-            'code' => 'js_functions.list',
+            'code' => 'operation.success',
             'message' => 'JavaScript functions retrieved successfully',
             'data' => [
                 'functions' => [
@@ -4828,7 +4821,7 @@ $GLOBALS['__help_commands'] = [
         'example_get' => 'GET /management/listInteractions/page/home/hero%2Fcta-button',
         'success_response' => [
             'status' => 200,
-            'code' => 'interactions.list',
+            'code' => 'operation.success',
             'message' => 'Interactions retrieved successfully',
             'data' => [
                 'interactions' => [
@@ -5036,7 +5029,7 @@ $GLOBALS['__help_commands'] = [
         'example_delete' => 'DELETE /management/deleteInteraction with body: {"structType": "page", "pageName": "home", "nodeId": "hero/cta-button", "event": "onclick", "index": 0}',
         'success_response' => [
             'status' => 200,
-            'code' => 'interaction.deleted',
+            'code' => 'operation.success',
             'message' => 'Interaction deleted successfully',
             'data' => [
                 'event' => 'onclick',
@@ -5571,7 +5564,7 @@ $GLOBALS['__help_commands'] = [
     ],
 
     'getConsentStatus' => [
-        'description' => 'Current consent-layer state for the active project: whether it is enabled, whether the banner/popup structures are generated, the recorded cookie-policy route, and whether that route still exists. Read-only; drives the /admin/storage generate modal (pre-fill + Generate/Update/Delete).',
+        'description' => 'Current consent-layer state for the project in the URL marker: whether it is enabled, whether the banner/popup structures are generated, the recorded cookie-policy route, and whether that route still exists. Read-only; drives the /admin/storage generate modal (pre-fill + Generate/Update/Delete).',
         'method' => 'POST',
         'parameters' => [],
         'example_post' => 'POST \management\getConsentStatus',
@@ -6075,7 +6068,7 @@ $GLOBALS['__help_commands'] = [
         'example_get' => 'GET /management/listSnippets',
         'success_response' => [
             'status' => 200,
-            'code' => 'operation.success',
+            'code' => 'snippets.list_success',
             'message' => 'Snippets retrieved',
             'data' => [
                 'snippets' => [
@@ -6107,7 +6100,7 @@ $GLOBALS['__help_commands'] = [
         'example_get' => 'GET /management/getSnippet?id=navbar-basic',
         'success_response' => [
             'status' => 200,
-            'code' => 'operation.success',
+            'code' => 'snippets.get_success',
             'message' => 'Snippet retrieved',
             'data' => [
                 'id' => 'navbar-basic',
@@ -6180,8 +6173,8 @@ $GLOBALS['__help_commands'] = [
         ],
         'example_post' => 'POST /management/createSnippet with body: {"id": "my-nav", "name": "My Nav", "category": "nav", "structure": {"tag": "nav"}, "scope": "personal"}',
         'success_response' => [
-            'status' => 200,
-            'code' => 'operation.success',
+            'status' => 201,
+            'code' => 'snippets.create_success',
             'message' => 'Snippet created successfully',
             'data' => [
                 'id' => 'my-nav',
@@ -6210,7 +6203,7 @@ $GLOBALS['__help_commands'] = [
         'example_post' => 'DELETE /management/deleteSnippet?id=my-custom-nav',
         'success_response' => [
             'status' => 200,
-            'code' => 'operation.success',
+            'code' => 'snippets.delete_success',
             'message' => 'Snippet deleted successfully',
             'data' => ['id' => 'my-custom-nav', 'deleted' => true]
         ],
@@ -6226,7 +6219,7 @@ $GLOBALS['__help_commands'] = [
         'description' => 'Duplicates a core snippet to the project snippets folder, making it editable. Creates a copy with a new ID.',
         'method' => 'POST',
         'parameters' => [
-            'sourceId' => [
+            'id' => [
                 'required' => true,
                 'type' => 'string',
                 'description' => 'ID of the snippet to duplicate',
@@ -6235,14 +6228,20 @@ $GLOBALS['__help_commands'] = [
             'newId' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => 'New ID for the duplicate (defaults to sourceId-copy)',
+                'description' => 'New ID for the duplicate (defaults to <id>-copy, then <id>-copy-2 and so on)',
                 'example' => 'my-navbar'
+            ],
+            'newName' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Display name for the duplicate (defaults to "Copy of <source name>")',
+                'example' => 'My Navbar'
             ]
         ],
-        'example_post' => 'POST /management/duplicateSnippet with body: {"sourceId": "navbar-basic", "newId": "my-navbar"}',
+        'example_post' => 'POST /management/duplicateSnippet with body: {"id": "navbar-basic", "newId": "my-navbar"}',
         'success_response' => [
-            'status' => 200,
-            'code' => 'operation.success',
+            'status' => 201,
+            'code' => 'snippets.duplicate_success',
             'message' => 'Snippet duplicated successfully',
             'data' => [
                 'sourceId' => 'navbar-basic',
@@ -6251,7 +6250,7 @@ $GLOBALS['__help_commands'] = [
             ]
         ],
         'error_responses' => [
-            '400.validation.missing_field' => 'Missing sourceId parameter',
+            '400.snippets.id_required' => 'Missing id parameter',
             '404.snippet.not_found' => 'Source snippet not found',
             '409.snippet.exists' => 'Target snippet ID already exists'
         ],
@@ -6268,16 +6267,16 @@ $GLOBALS['__help_commands'] = [
                 'description' => 'ID of the snippet to insert',
                 'example' => 'navbar-basic'
             ],
-            'targetType' => [
+            'type' => [
                 'required' => true,
                 'type' => 'string',
                 'description' => 'Target structure type: page, component, menu, footer',
                 'example' => 'page'
             ],
-            'targetName' => [
+            'name' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Target name (page name or component name)',
+                'description' => 'Target name (page name or component name). Required for type page and component; ignored for menu and footer.',
                 'example' => 'home'
             ],
             'targetNodeId' => [
@@ -6287,22 +6286,25 @@ $GLOBALS['__help_commands'] = [
                 'example' => '0.2'
             ],
             'position' => [
-                'required' => true,
+                'required' => false,
                 'type' => 'string',
-                'description' => 'Insertion position: inside, before, after',
+                'description' => 'Insertion position: inside, before, after. Default: after. Forced to inside when targetNodeId is the literal "root".',
                 'example' => 'inside'
             ]
         ],
-        'example_post' => 'POST /management/insertSnippet with body: {"snippetId": "navbar-basic", "targetType": "page", "targetName": "home", "targetNodeId": "0", "position": "inside"}',
+        'example_post' => 'POST /management/insertSnippet with body: {"snippetId": "navbar-basic", "type": "page", "name": "home", "targetNodeId": "0", "position": "inside"}',
         'success_response' => [
             'status' => 200,
-            'code' => 'operation.success',
+            'code' => 'snippets.inserted',
             'message' => 'Snippet inserted successfully',
             'data' => [
-                'structureFile' => 'home.json',
-                'insertedAt' => '0.0',
-                'nodesInserted' => 5,
-                'translationsAdded' => ['en' => 3, 'fr' => 3],
+                'snippetId' => 'navbar-basic',
+                'snippetName' => 'Basic Navbar',
+                'newNodeId' => '0.1',
+                'position' => 'after',
+                'targetNodeId' => '0.0',
+                'translationsAdded' => 3,
+                'keyMapping' => ['snippet.navbar.home' => 'text_abc12345'],
                 'html' => '<nav class="qs-snippet-navbar">...</nav>'
             ]
         ],
@@ -6316,7 +6318,7 @@ $GLOBALS['__help_commands'] = [
     ],
 
     'injectSnippetCss' => [
-        'description' => 'Injects a snippet\'s saved CSS into the active project stylesheet. Two modes: "missing" adds only rules for selectors not found in the current stylesheet; "replace" removes existing matching rules and re-adds the snippet\'s full CSS block.',
+        'description' => 'Injects a snippet\'s saved CSS into the stylesheet of the project in the URL marker. Two modes: "missing" adds only rules for selectors not found in the current stylesheet; "replace" removes existing matching rules and re-adds the snippet\'s full CSS block.',
         'method' => 'POST',
         'parameters' => [
             'id' => [
@@ -6334,7 +6336,7 @@ $GLOBALS['__help_commands'] = [
             'project' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => 'Target project name. Defaults to the active project.',
+                'description' => 'Echo-check only. The project written to is ALWAYS the one in the URL marker (/management/p/<projectId>/injectSnippetCss); this parameter cannot select a different one. Supply it and it must match the marker, or the call is refused with 400 project.mismatch.',
                 'example' => 'my-project'
             ]
         ],
@@ -6354,7 +6356,7 @@ $GLOBALS['__help_commands'] = [
             '400.snippets.id_required' => 'Snippet ID is required',
             '400.snippets.invalid_mode' => 'Mode must be "missing" or "replace"',
             '400.snippets.no_css' => 'This snippet has no saved CSS to inject',
-            '400.snippets.project_required' => 'No project specified and no active project found',
+            '400.project.required' => 'No project targeted - use /management/p/<projectId>/injectSnippetCss',
             '404.snippets.not_found' => 'Snippet not found'
         ],
         'notes' => 'Writes to both the live public stylesheet and the project backup in <secure>/projects/. Includes :root variables referenced by injected rules. In "replace" mode, only global-scope rules are removed (media query rules are left untouched).'
@@ -6387,7 +6389,7 @@ $GLOBALS['__help_commands'] = [
     ],
 
     'getIframeSandbox' => [
-        'description' => 'Returns the embed sandbox configuration for the active project. Shows tag-based rules (tag → domain → sandbox permissions) and the default sandbox policy.',
+        'description' => 'Returns the embed sandbox configuration for the project in the URL marker. Shows tag-based rules (tag → domain → sandbox permissions) and the default sandbox policy.',
         'method' => 'GET',
         'parameters' => [],
         'example_get' => 'GET /management/getIframeSandbox',
