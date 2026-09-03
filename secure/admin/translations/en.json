@@ -484,6 +484,10 @@
             "commands": "Commands",
             "history": "History"
         },
+        "disabled": {
+            "title": "The command console is turned off",
+            "text": "The operator of this installation chose not to offer it. This removes a page, not a permission: every command still answers on the Management API to any caller whose role allows it, and the panel's other pages are unaffected."
+        },
         "searchPlaceholder": "Search commands...",
         "allCategories": "All Categories",
         "method": "Method",

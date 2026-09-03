@@ -9,10 +9,26 @@
  */
 
 $selectedCommand = $router->getCommand();
-$categories = getCommandCategories();
+
+// S6.5 — the console is an install-time choice (console.php; ABSENT MEANS ON,
+// see consolePolicy.php). When the operator has said no, the runner is not
+// built: neither the index nor the per-command form.
+//
+// ⚠ THE HISTORY TAB IS DELIBERATELY NOT GATED. It is a record of what ran, not
+// a way to run anything, and commands run constantly from the panel's own
+// pages whether or not this console exists — so removing the runner must not
+// take the audit trail with it. The dashboard's "view all history" link points
+// straight at it and keeps working. `getCommandHistory` carries its own role
+// gate, unchanged here.
+//
+// ⚠ AND THIS IS NOT A PERMISSION. The commands stay reachable at /management/
+// for every caller whose role allows them; what goes away is a page that lists
+// and drives them.
+$consoleEnabled = $router->isConsoleEnabled();
+$categories = $consoleEnabled ? getCommandCategories() : [];
 
 // If a specific command is selected, show its page
-if ($selectedCommand) {
+if ($consoleEnabled && $selectedCommand) {
     require_once __DIR__ . '/command-form.php';
     return;
 }
@@ -54,7 +70,23 @@ $baseUrl = rtrim(BASE_URL, '/');
     </a>
 </div>
 
-<?php if ($currentTab === 'commands'): ?>
+<?php if ($currentTab === 'commands' && !$consoleEnabled): ?>
+<!-- ==================== CONSOLE TURNED OFF (S6.5) ==================== -->
+<!-- Said plainly rather than answered with a 404. The page exists, it is in the
+     router's page list, and its template is on disk — a 404 here would send the
+     next person to debug routing. It is also not a secret: the gate removes
+     reach, not access, so hiding the feature's existence would buy nothing and
+     would imply a boundary that is not there. -->
+<div class="admin-empty">
+    <svg class="admin-empty__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+    </svg>
+    <h2 class="admin-empty__title"><?= __admin('commands.disabled.title', 'The command console is turned off') ?></h2>
+    <p class="admin-empty__text"><?= __admin('commands.disabled.text', 'The operator of this installation chose not to offer it. This removes a page, not a permission: every command still answers on the Management API to any caller whose role allows it, and the panel\'s other pages are unaffected.') ?></p>
+</div>
+
+<?php elseif ($currentTab === 'commands'): ?>
 <!-- ==================== COMMANDS TAB ==================== -->
 
 <!-- Search -->

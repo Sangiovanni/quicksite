@@ -210,6 +210,14 @@ $langNames = [
                         </svg>
                         <span><?= __admin('nav.visualEditor') ?></span>
                     </a>
+                    <?php /* S6.5 — an installation can decline to offer the command console
+                             (console.php; absent means it is offered). Gated here on the
+                             SERVER so the entry is never emitted: the panel's own
+                             data-requires-command filter only ever hides elements it finds,
+                             so a client-side rule could not have removed this one on an
+                             install where the operator said no. The page itself refuses
+                             independently — this only stops us advertising it. */ ?>
+                    <?php if ($router->isConsoleEnabled()): ?>
                     <a href="<?= $router->url('command') ?>"
                        class="admin-nav__link<?= $currentPage === 'command' ? ' admin-nav__link--active' : '' ?>">
                         <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -218,6 +226,7 @@ $langNames = [
                         </svg>
                         <span><?= __admin('nav.commands') ?></span>
                     </a>
+                    <?php endif; ?>
                     <a href="<?= $router->url('apis') ?>"
                        class="admin-nav__link<?= $currentPage === 'apis' ? ' admin-nav__link--active' : '' ?>"
                        data-requires-command="listApiEndpoints">

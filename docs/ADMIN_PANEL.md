@@ -835,8 +835,8 @@ The AI call is browser-direct via `QSAiCall.call(...)` (see `public/admin/assets
 | Page | What it does |
 |---|---|
 | **Dashboard** (`dashboard.js`) | Stats cards (route count, language count, recent build), command activity feed, recent history. Calls `help`, `getRoutes`, `getCommandHistory`. |
-| **Command** (`command.js`) | Permission-filtered command index. |
-| **Command form** (`command-form.js`) | Renders a dynamic form for any command from `help` metadata, then executes it. The escape hatch into raw API. |
+| **Command** (`command.js`) | Permission-filtered command index. An installation can decline to offer the console at all — see §9.17. |
+| **Command form** (`command-form.js`) | Renders a dynamic form for any command from `help` metadata, then executes it. The escape hatch into raw API. Withheld with the rest of the console when the installation turns it off (§9.17). |
 | **History** (`history.js`) | Browses `getCommandHistory` for the **currently edited project** — the command history is per-project, so switching projects switches the trail. Modal with full request/response. Actions that belong to no project (signing in, creating a project, membership self-service) are recorded server-side but are not shown here; see *Command history storage* in `COMMAND_API.md`. |
 | **Settings** (`settings.js`) | User profile, language, theme, AI provider config status. |
 | **My account** (`account.js`) | The caller's own account — change password, sign out everywhere, delete the account. See §9.13. Commands: `logoutSession`. The password change and the deletion are not commands — they go to `/admin/self/change-password` and `/admin/self/delete`. |
@@ -3152,6 +3152,37 @@ Three routes, each gated on the same read the page is:
 - **Build → Builds** in the sidebar.
 - **Dashboard → Manage Space → Builds → Open builds page**, beside the same build the panel lists.
 - **My memberships**, per project row — this one switches the edited project first, so it works from any project you belong to without visiting the picker.
+
+### 9.17 Command console (/admin/command)
+
+A form for every command in the Management API, generated from the same `help` metadata the API serves, plus a searchable index of them by category and a **History** tab over `getCommandHistory`. It is the escape hatch into the raw API from inside the panel: everything the purpose-built pages do, and everything they do not.
+
+#### An installation can decline to offer it
+
+`secure/management/config/console.php` decides whether this page exists on a given installation:
+
+| `console.php` | The console |
+|---|---|
+| absent | **offered** — the default, and what a fresh install has |
+| `'allow_console' => true` | offered |
+| `'allow_console' => false` | withheld |
+| present but unreadable, broken, or holding any other value | withheld |
+
+`setup.sh` / `setup.bat` offer it as menu item 9, and `console.php.example` documents it. Turning it on needs no file at all: the switch exists to say no.
+
+⚠ **It is not a security control, and it is worth being blunt about that.** Every command the console runs goes through exactly the same permission check as a direct `POST` to `/management/`. The console grants nothing — a signed-in user can already call every command it lists, by hand, on an installation where this is off. **`/management/` is deliberately not gated by it**, because the commands are the product's interface and gating them would break every headless caller and the panel's own operation.
+
+What turning it off removes is **discoverability and reach**: your users stop holding a generic runner pointed at the whole command surface, which narrows what a future authorization bug could be driven through. That is worth having on a shared or hosted installation, where people author sites through the visual editor, sitemap and media pages and have no need for the raw API. It is not a boundary, and it is not a substitute for getting roles right.
+
+#### What is withheld, and what is not
+
+Withheld: the command index, the per-command form, and the panel's **Commands** navigation entry. `/admin/command` still answers `200` and says the operator turned the console off — deliberately not a `404`, because the page does exist, the gate is not a secret, and a `404` on a routed page sends the next person to debug routing.
+
+Not withheld: the **History** tab on that same page, and the dashboard's link to it. History is a record of what ran, not a way to run anything, and commands run constantly from the panel's own pages whether or not this console exists — removing the runner must not take the audit trail with it. `getCommandHistory` keeps its own role gate either way.
+
+#### Changing it takes effect immediately
+
+The setting is read fresh on every request, and the read drops the file from the opcode cache first. An operator turning the console **off** sees it gone on their next page load, with no restart — including on an installation tuned with `opcache.validate_timestamps=0`, where a compiled config would otherwise never be re-read at all.
 
 ## 10. Data attribute reference
 

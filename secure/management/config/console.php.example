@@ -1,0 +1,61 @@
+<?php
+/**
+ * Command console switch  (beta.11)
+ *
+ * Copy this file to console.php and set allow_console to false (the line at
+ * the bottom) to remove the admin panel's generic command console from this
+ * installation. `setup.sh` / `setup.bat` offer it as menu item 9.
+ *
+ * ⚠ IF THIS FILE IS ABSENT, THE CONSOLE IS OFFERED. That is the opposite of
+ * deploy.php, and it is deliberate — see WHY IT IS ON BY DEFAULT below. You
+ * only need this file to turn the console OFF.
+ *
+ * ⚠⚠ THIS IS NOT A SECURITY CONTROL.
+ *   Every command run from the console goes through exactly the same
+ *   permission check as a direct POST to /management/. The console grants
+ *   nothing: a signed-in user can already call every command it lists, by
+ *   hand, with curl, on an install where this is off. What you remove by
+ *   turning it off is DISCOVERABILITY AND REACH — your users no longer hold a
+ *   generic runner for the whole command surface, which narrows what a future
+ *   authorization bug could be driven through. That is worth having, and it is
+ *   not a boundary. Do not treat it as one, and do not skip a permission
+ *   review because it is off.
+ *
+ * WHAT IT GOVERNS
+ *   The /admin/command page — the command index and the per-command form — and
+ *   its entry in the panel's navigation. Nothing else. The Management API at
+ *   /management/ is untouched: every command stays reachable to every caller
+ *   whose role allows it, which is what keeps headless callers, scripts and
+ *   the panel's own operation working. The command HISTORY tab on that same
+ *   page also stays: it is a record of what ran, not a way to run anything.
+ *
+ * WHY IT IS ON BY DEFAULT
+ *   deploy.php defaults to denied because deploying writes generated PHP
+ *   outside the project's own storage — an install nobody configured must not
+ *   do that. The console writes nothing and grants nothing, so the same
+ *   reasoning does not apply to it: a fresh install that has never been
+ *   configured should still have its developer tooling. Fail-closed is right
+ *   for a capability that grants something and wrong for a view onto
+ *   capabilities the caller already has.
+ *
+ * WHEN TO TURN IT OFF
+ *   A shared or hosted QuickSite whose users author sites and have no business
+ *   holding a generic command runner. The panel's purpose-built pages — the
+ *   visual editor, the sitemap, the media library, builds, members — cover the
+ *   work; the console is the escape hatch into the raw API, and it is a
+ *   reasonable thing to withhold.
+ *
+ * WHAT A BROKEN FILE MEANS
+ *   OFF. An unreadable file, a syntax error, a file that is not PHP, a wrong
+ *   return type, a missing key, and any value that is not boolean `true` all
+ *   leave the console disabled, and the reason is written to the PHP error log
+ *   rather than taking the request down. That is not inconsistent with the
+ *   default above: an ABSENT file means nobody ever configured this, while a
+ *   file that is present but broken means somebody did — and the only reason
+ *   to create it is to turn the console off. A typo resolving the permissive
+ *   way would silently re-open what you closed.
+ */
+
+return [
+    'allow_console' => true,
+];

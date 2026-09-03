@@ -10784,3 +10784,81 @@ unreachable); `public/admin/assets/js/core/api.js` (`accountRequest`). Behaviour
 [ARCHITECTURE.md](ARCHITECTURE.md) §3, [ADMIN_PANEL.md](ADMIN_PANEL.md) §9.13.
 Supersedes nothing: it implements *The command surface is a project CLI; the
 panel is a tool that uses it* above.
+
+### The command console is an install-time choice, default ON — and it is not a security control (locked 2026-09-04)
+
+**Decision**: `secure/management/config/console.php` decides whether an
+installation offers the admin panel's generic command console at
+`/admin/command`. **An absent file means the console IS offered** — the console
+index, the per-command form, and the panel's Commands navigation entry. A
+well-formed file saying `'allow_console' => false` withholds all three; so does
+a file that is present but unreadable, broken, or holding any other value.
+`setup.sh` / `setup.bat` offer it as menu item 9, and `console.php.example`
+documents it. `/management/` is deliberately **not** gated by it, and the
+command history tab on the same page is not gated either.
+
+**Reasoning**: on a shared or hosted QuickSite, the people using the panel
+author sites through the visual editor, the sitemap and the media library. A
+form that will run any of the 153 commands is a developer tool, and an operator
+should be able to decline to hand it to their tenants.
+
+⚠ **It confers no privilege, and the code says so in as many words.** Every
+command the console runs goes through the same `hasPermission` check as a direct
+POST to `/management/`; a signed-in user can already call every command it lists,
+by hand, on an installation where this is off. What turning it off removes is
+**discoverability and reach** — nobody is holding a generic runner pointed at the
+whole surface, which narrows what a future authorization bug could be driven
+through. That is worth having and it is not a fix, and the distinction is written
+into the config reader, the `.example` file, the setup prompt and the notice the
+page itself renders. A gate documented as a boundary is one somebody later relies
+on as if it were.
+
+**The default is INVERTED from the deploy gate, and that is the substance of the
+decision.** `deploy.php` absent means denied, because deploying writes generated
+PHP outside the project's own storage and an install nobody configured must not
+do that. `console.php` absent means allowed, because the console writes nothing
+and grants nothing, and a fresh install that has never been configured should
+still have its developer tooling. The rule the two express together:
+**fail-closed is right for a capability that grants something, and wrong for a
+view onto capabilities the caller already has.**
+
+The default and the failure mode answer different questions, so they differ.
+Absent is "never configured" and gets the console; present-but-broken is
+"configured, and the answer is unreadable" and does not. That is not an
+inconsistency — this file only ever gets created by an operator turning the
+console off (on needs no file, and setup declines to write one for it), so its
+existence is evidence somebody said no, and resolving a typo in it the
+permissive way would silently re-open what they closed. The other direction
+fails loudly and harmlessly: the console is missing, the error log says why.
+
+**Turning it off does not wait for a restart.** The read drops the file from the
+opcode cache first, because the dangerous stale direction here is the same one
+the deploy gate documents — an operator editing an existing `console.php` from
+`true` to `false` gets whatever was compiled until the cache lets go, which under
+`opcache.validate_timestamps=0` is never. Creating the file where none existed
+was never at risk; absence is a filesystem question rather than a compiled one.
+
+**Alternatives considered**: defaulting to OFF for symmetry with `deploy.php`
+(rejected — a fresh install would come up without its developer tooling, and the
+symmetry is false: deploy gates a capability, this gates a view onto capabilities
+the caller already holds). Answering `404` on `/admin/command` when it is off
+(rejected — the page is in the router's page list and its template is on disk, so
+a `404` sends the next person to debug routing; and the gate is not a secrecy
+measure, so pretending the feature does not exist would imply a boundary that is
+not there). Gating `/management/` as well (rejected — the commands are the
+product's interface; it would break every headless caller and the panel's own
+operation, and it would turn a reach reduction into an access change). Taking the
+command **history** tab down with the runner (rejected — history is a record of
+what ran, not a way to run anything, commands run constantly from the panel's own
+pages either way, and an operator locking an installation down wants *more* audit,
+not less). A per-user or per-role setting rather than per-installation (rejected —
+roles already decide who may run what; this is the deployer's question about what
+their installation offers, and it belongs on the server beside the other install
+switches).
+
+**Source**: `secure/src/functions/consolePolicy.php`,
+`secure/management/config/console.php.example`,
+`secure/admin/AdminRouter.php` (`isConsoleEnabled`),
+`secure/admin/templates/pages/command.php`,
+`secure/admin/templates/layout.php`, `setup.sh`, `setup.bat`. Behaviour:
+[ADMIN_PANEL.md](ADMIN_PANEL.md) §9.17.

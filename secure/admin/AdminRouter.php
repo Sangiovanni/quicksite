@@ -238,6 +238,23 @@ class AdminRouter {
     }
 
     /**
+     * Does this installation offer the command console (console.php
+     * allow_console)? Drives the /admin/command page's runner and the panel's
+     * nav entry for it (S6.5). Absent config means YES — see consolePolicy.php
+     * for why that is inverted from the deploy gate.
+     *
+     * ⚠ It is NOT a permission. The console runs commands through the same
+     * `hasPermission` check as a direct POST to /management/, and /management/
+     * is deliberately not gated by this, so turning it off removes reach and
+     * discoverability rather than access. Never treat a `false` here as
+     * evidence that a caller cannot run a command.
+     */
+    public function isConsoleEnabled(): bool {
+        require_once SECURE_FOLDER_PATH . '/src/functions/consolePolicy.php';
+        return qs_console_allowed();
+    }
+
+    /**
      * Has this install been bootstrapped — i.e. does ANY account exist? (C14)
      *
      * The test is the REGISTRY BEING EMPTY, not users.php existing: a file that

@@ -23,9 +23,10 @@ REM   5. Self-registration    - may visitors create their own accounts?
 REM   6. Setup token          - read the first-run credential off disk
 REM   7. Storage quotas       - per-account size and upload-rate ceilings
 REM   8. Self-deploy          - may this install write a built site onto a path?
+REM   9. Command console      - offer the raw command runner at /admin/command?
 REM
-REM Items 1-3 rewrite init.php constants and the .htaccess routing. Items 4-5,
-REM 7 and 8 write config files under the secure folder. Item 6 only reads.
+REM Items 1-3 rewrite init.php constants and the .htaccess routing. Items 4-5
+REM and 7-9 write config files under the secure folder. Item 6 only reads.
 REM
 REM WHAT THIS SCRIPT CANNOT DO: create your account. No account exists yet, so
 REM there is nobody to be one. That happens in the browser at /admin/, and the
@@ -105,6 +106,7 @@ echo   Environment:        !ENV_LABEL!
 echo   Self-registration:  !SELFREG_LABEL!
 echo   Storage quotas:     !QUOTA_LABEL!
 echo   Self-deploy:        !DEPLOY_LABEL!
+echo   Command console:    !CONSOLE_LABEL!
 echo.
 echo     1^) Rename the public folder
 echo     2^) Rename the secure folder
@@ -114,6 +116,7 @@ echo     5^) Turn self-registration on / off
 echo     6^) Show my setup token
 echo     7^) Storage quotas (per user)
 echo     8^) Allow / forbid deploying from this install
+echo     9^) Offer / withhold the command console ^(/admin/command^)
 echo     q^) Finish
 echo.
 set "CHOICE="
@@ -127,6 +130,7 @@ if "!CHOICE!"=="5" goto :go_selfreg
 if "!CHOICE!"=="6" goto :go_token
 if "!CHOICE!"=="7" goto :go_quota
 if "!CHOICE!"=="8" goto :go_deploy
+if "!CHOICE!"=="9" goto :go_console
 if /i "!CHOICE!"=="q" goto :finish
 if "!CHOICE!"=="" goto :finish
 echo   Unknown choice: !CHOICE!
@@ -176,6 +180,11 @@ call :item_deploy
 call :pause_menu
 goto :menu
 
+:go_console
+call :item_console
+call :pause_menu
+goto :menu
+
 REM ==========================================================
 REM Finish
 REM ==========================================================
@@ -194,6 +203,7 @@ echo   Environment:        !ENV_LABEL!
 echo   Self-registration:  !SELFREG_LABEL!
 echo   Storage quotas:     !QUOTA_LABEL!
 echo   Self-deploy:        !DEPLOY_LABEL!
+echo   Command console:    !CONSOLE_LABEL!
 echo.
 echo   Next steps:
 echo     1. Point your vhost DocumentRoot at the public folder
@@ -313,7 +323,7 @@ echo $f = '!QUOTA_FILE!' > "%PS_Q_TEMP%"
 echo $b = '!Q_BYTES!' >> "%PS_Q_TEMP%"
 echo $u = '!Q_MAXUP!' >> "%PS_Q_TEMP%"
 echo $p = '!Q_PERIOD!' >> "%PS_Q_TEMP%"
-echo $c = Get-Content $f -Raw >> "%PS_Q_TEMP%"
+echo $c = Get-Content $f -Raw -Encoding UTF8 >> "%PS_Q_TEMP%"
 REM Anchored per-line so the COMMENTED example value above each setting (those
 REM lines begin with //) is left alone. The '>' characters sit inside double
 REM quotes, which is what stops cmd reading them as redirects - no caret.
@@ -374,6 +384,26 @@ if exist "!DEPLOY_FILE!" (
     set "DEPLOY_LABEL=off  (value unreadable - check deploy.php)"
     findstr /c:"    'allow_deploy' => false," "!DEPLOY_FILE!" >nul 2>&1 && set "DEPLOY_LABEL=off"
     findstr /c:"    'allow_deploy' => true," "!DEPLOY_FILE!" >nul 2>&1 && set "DEPLOY_LABEL=on   (admins and owners may deploy a build onto this server)"
+)
+
+REM ABSENT MEANS ALLOWED here - the OPPOSITE of the deploy reader immediately
+REM above, and the only place in this file where two readers of the same shape
+REM default in opposite directions. The console writes nothing and grants
+REM nothing: every command it lists is already reachable at /management/ by any
+REM caller whose role allows it. So a fresh install nobody configured keeps its
+REM developer tooling, while a fresh install nobody configured does not deploy.
+REM
+REM Note the "value unreadable" branch says OFF, not the default. For deploy,
+REM absent and broken mean the same thing and one label covers both; here they
+REM are opposite answers, and a broken console.php leaves the console off - the
+REM only reason to create the file is to turn it off, so a typo must not
+REM silently re-open it. The engine reads it the same way.
+set "CONSOLE_FILE=!CONFIG_DIR!\console.php"
+set "CONSOLE_LABEL=on   (default - console.php not created yet)"
+if exist "!CONSOLE_FILE!" (
+    set "CONSOLE_LABEL=off  (value unreadable - check console.php)"
+    findstr /c:"    'allow_console' => false," "!CONSOLE_FILE!" >nul 2>&1 && set "CONSOLE_LABEL=off  (/admin/command is not offered)"
+    findstr /c:"    'allow_console' => true," "!CONSOLE_FILE!" >nul 2>&1 && set "CONSOLE_LABEL=on"
 )
 goto :eof
 
@@ -682,7 +712,7 @@ echo } >> "%PS_SPACE_TEMP%"
 echo $initDir = if ($newSpace) { Join-Path $publicDir ($newSpace -replace '/','\') } else { $publicDir } >> "%PS_SPACE_TEMP%"
 echo $initFile = Join-Path $initDir 'init.php' >> "%PS_SPACE_TEMP%"
 echo if (Test-Path $initFile) { >> "%PS_SPACE_TEMP%"
-echo   $c = Get-Content $initFile -Raw >> "%PS_SPACE_TEMP%"
+echo   $c = Get-Content $initFile -Raw -Encoding UTF8 >> "%PS_SPACE_TEMP%"
 echo   $c = $c -replace "define\('PUBLIC_FOLDER_SPACE',\s*'.*?'\)", "define('PUBLIC_FOLDER_SPACE', '$newSpace')" >> "%PS_SPACE_TEMP%"
 echo   [IO.File]::WriteAllText($initFile, $c, (New-Object System.Text.UTF8Encoding $false)) >> "%PS_SPACE_TEMP%"
 echo } >> "%PS_SPACE_TEMP%"
@@ -700,7 +730,7 @@ echo   @{ File=(Join-Path $initDir 'management\.htaccess'); Fallback="$prefix/ma
 echo   @{ File=(Join-Path $initDir 'admin\.htaccess'); Fallback="$prefix/admin/index.php" } >> "%PS_SPACE_TEMP%"
 echo )) { >> "%PS_SPACE_TEMP%"
 echo   if (Test-Path $pair.File) { >> "%PS_SPACE_TEMP%"
-echo     $c = Get-Content $pair.File -Raw >> "%PS_SPACE_TEMP%"
+echo     $c = Get-Content $pair.File -Raw -Encoding UTF8 >> "%PS_SPACE_TEMP%"
 echo     $c = $c -replace 'FallbackResource .*', ('FallbackResource ' + $pair.Fallback) >> "%PS_SPACE_TEMP%"
 echo     [IO.File]::WriteAllText($pair.File, $c, (New-Object System.Text.UTF8Encoding $false)) >> "%PS_SPACE_TEMP%"
 echo   } >> "%PS_SPACE_TEMP%"
@@ -796,7 +826,7 @@ if not exist "!ENV_FILE!" (
 set "PS_CFG_TEMP=%TEMP%\qs_setup_env.ps1"
 echo $f = '!ENV_FILE!' > "%PS_CFG_TEMP%"
 echo $v = '!ENV_VALUE!' >> "%PS_CFG_TEMP%"
-echo $c = Get-Content $f -Raw >> "%PS_CFG_TEMP%"
+echo $c = Get-Content $f -Raw -Encoding UTF8 >> "%PS_CFG_TEMP%"
 REM The '>' inside the double-quoted regex needs NO caret — the quotes stop cmd
 REM reading it as a redirect, and a caret it does not need lands in the .ps1 as
 REM a literal '^', which turns the pattern into one that matches nothing. Only
@@ -871,7 +901,7 @@ if not exist "!AUTH_FILE!" (
 set "PS_CFG_TEMP=%TEMP%\qs_setup_reg.ps1"
 echo $f = '!AUTH_FILE!' > "%PS_CFG_TEMP%"
 echo $v = '!REG_VALUE!' >> "%PS_CFG_TEMP%"
-echo $c = Get-Content $f -Raw >> "%PS_CFG_TEMP%"
+echo $c = Get-Content $f -Raw -Encoding UTF8 >> "%PS_CFG_TEMP%"
 echo $c = $c -replace "'allow_self_registration'\s*=>\s*\w+", ("'allow_self_registration' => " + $v) >> "%PS_CFG_TEMP%"
 echo [IO.File]::WriteAllText($f, $c, (New-Object System.Text.UTF8Encoding $false)) >> "%PS_CFG_TEMP%"
 powershell -NoProfile -ExecutionPolicy Bypass -File "%PS_CFG_TEMP%" <nul >nul 2>&1
@@ -961,7 +991,7 @@ if not exist "!DEPLOY_FILE!" (
 set "PS_DEP_TEMP=%TEMP%\qs_setup_deploy.ps1"
 echo $f = '!DEPLOY_FILE!' > "%PS_DEP_TEMP%"
 echo $v = '!DEP_VALUE!' >> "%PS_DEP_TEMP%"
-echo $c = Get-Content $f -Raw >> "%PS_DEP_TEMP%"
+echo $c = Get-Content $f -Raw -Encoding UTF8 >> "%PS_DEP_TEMP%"
 echo $c = $c -replace "'allow_deploy'\s*=>\s*\w+", ("'allow_deploy' => " + $v) >> "%PS_DEP_TEMP%"
 echo [IO.File]::WriteAllText($f, $c, (New-Object System.Text.UTF8Encoding $false)) >> "%PS_DEP_TEMP%"
 powershell -NoProfile -ExecutionPolicy Bypass -File "%PS_DEP_TEMP%" <nul >nul 2>&1
@@ -981,6 +1011,110 @@ if /i "!DEP_VALUE!"=="true" (
     echo     and into any root listed in deploy-roots.php.
 ) else (
     echo   + Self-deploy: off
+)
+goto :eof
+
+REM ==========================================================
+REM Item 9 - the command console
+REM ==========================================================
+REM ABSENT MEANS ALLOWED, the OPPOSITE of item 8 immediately above, so the
+REM "leave the file absent" shortcut inverts with it: item 8 declines to write
+REM a file when the answer is OFF, this one declines when the answer is ON.
+REM
+REM AND IT IS NOT A SECURITY CONTROL. Every command the console lists is
+REM already reachable at /management/ by any caller whose role allows it - the
+REM console runs them through the same permission check. Turning it off removes
+REM reach and discoverability, not access. The prompt says so, because an
+REM operator who reads this as "my users can no longer run commands" has been
+REM misled.
+:item_console
+call :read_state
+echo.
+echo Command console
+echo.
+echo   Should the admin panel offer the raw command runner at
+echo   /admin/command - a form for every command, and a page listing them?
+echo.
+echo   on   the default. Anyone signed in sees the Commands entry in the
+echo        panel and can run any command their role allows.
+echo   off  the page and its nav entry are gone. This is what a shared or
+echo        hosted install wants: your users author sites through the
+echo        visual editor, sitemap and media pages, and have no business
+echo        holding a generic runner for the whole command surface.
+echo.
+echo   Currently: !CONSOLE_LABEL!
+echo.
+echo   ^^! This is NOT a security control. Every command stays reachable
+echo     at /management/ to any caller whose role allows it, and the
+echo     console checks the same permissions. Turning it off removes
+echo     reach and discoverability, not access - do not skip a role
+echo     review because of it. The command history tab stays either way.
+echo.
+
+set "ANSWER="
+set /p "ANSWER=  Offer the command console on this installation? [Y/n]: "
+
+REM Enter accepts the SHIPPED DEFAULT, which here is on. Item 8's [y/N] does
+REM the same thing for a default of off - same rule, opposite letter.
+set "CON_VALUE=true"
+if /i "!ANSWER!"=="n" set "CON_VALUE=false"
+if /i "!ANSWER!"=="no" set "CON_VALUE=false"
+
+if not exist "!CONFIG_DIR!" (
+    echo   X Error: config folder not found: !CONFIG_DIR!
+    goto :eof
+)
+
+REM Accepting when no file exists LEAVES IT ABSENT - absent already means the
+REM console is offered, and writing a file to say so would turn an install that
+REM never opted out into one that opted in, which reads as a decision somebody
+REM made. Item 8 does this for its own default, which is the other answer.
+if /i "!CON_VALUE!"=="true" (
+    if not exist "!CONSOLE_FILE!" (
+        echo.
+        echo   + Console stays on - console.php left absent, which is what a
+        echo     fresh install has.
+        goto :eof
+    )
+)
+
+REM console.php.example is the shipped documentation and is never edited: the
+REM live file is a COPY with the value patched, so every explanatory comment
+REM survives into the file the deployer will actually read later.
+if not exist "!CONSOLE_FILE!" (
+    if not exist "!CONFIG_DIR!\console.php.example" (
+        echo   X Error: neither console.php nor console.php.example is present
+        echo     !CONFIG_DIR!
+        goto :eof
+    )
+    copy /y "!CONFIG_DIR!\console.php.example" "!CONSOLE_FILE!" >nul
+)
+
+set "PS_CON_TEMP=%TEMP%\qs_setup_console.ps1"
+echo $f = '!CONSOLE_FILE!' > "%PS_CON_TEMP%"
+echo $v = '!CON_VALUE!' >> "%PS_CON_TEMP%"
+REM -Encoding UTF8 is load-bearing: without it Get-Content reads a UTF-8 file
+REM through the system ANSI codepage and WriteAllText re-encodes the result,
+REM which mangles every non-ASCII character in the file's own comments.
+echo $c = Get-Content $f -Raw -Encoding UTF8 >> "%PS_CON_TEMP%"
+echo $c = $c -replace "'allow_console'\s*=>\s*\w+", ("'allow_console' => " + $v) >> "%PS_CON_TEMP%"
+echo [IO.File]::WriteAllText($f, $c, (New-Object System.Text.UTF8Encoding $false)) >> "%PS_CON_TEMP%"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%PS_CON_TEMP%" <nul >nul 2>&1
+del "%PS_CON_TEMP%" 2>nul
+
+findstr /c:"    'allow_console' => !CON_VALUE!," "!CONSOLE_FILE!" >nul 2>&1
+if errorlevel 1 (
+    echo   X Could not set the value automatically.
+    echo     Edit this file by hand and set 'allow_console' =^> !CON_VALUE!:
+    echo     !CONSOLE_FILE!
+    goto :eof
+)
+if /i "!CON_VALUE!"=="false" (
+    echo   + Command console: off
+    echo     /admin/command no longer renders the runner and the nav entry
+    echo     is gone. The commands themselves are unchanged.
+) else (
+    echo   + Command console: on
 )
 goto :eof
 
@@ -1071,7 +1205,7 @@ set "PS_TEMP=%TEMP%\qs_setup_const.ps1"
 echo $f = '%UIC_FILE%' > "%PS_TEMP%"
 echo $n = '%UIC_NAME%' >> "%PS_TEMP%"
 echo $v = '%UIC_VALUE%' >> "%PS_TEMP%"
-echo $c = Get-Content $f -Raw >> "%PS_TEMP%"
+echo $c = Get-Content $f -Raw -Encoding UTF8 >> "%PS_TEMP%"
 echo $c = $c -replace "define\('$n',\s*'.*?'\)", "define('$n', '$v')" >> "%PS_TEMP%"
 echo [IO.File]::WriteAllText($f, $c, (New-Object System.Text.UTF8Encoding $false)) >> "%PS_TEMP%"
 

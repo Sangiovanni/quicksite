@@ -499,6 +499,10 @@
             "commands": "Commandes",
             "history": "Historique"
         },
+        "disabled": {
+            "title": "La console de commandes est désactivée",
+            "text": "L'opérateur de cette installation a choisi de ne pas la proposer. Cela retire une page, pas une permission : chaque commande répond toujours sur l'API de gestion à tout appelant dont le rôle l'autorise, et les autres pages du panneau ne sont pas affectées."
+        },
         "searchPlaceholder": "Rechercher des commandes...",
         "allCategories": "Toutes les catégories",
         "method": "Méthode",

@@ -24,9 +24,10 @@
 #   6. Setup token          — read the first-run credential off disk
 #   7. Storage quotas       — per-account size and upload-rate ceilings
 #   8. Self-deploy          — may this install write a built site onto a path?
+#   9. Command console      — offer the raw command runner at /admin/command?
 #
-# Items 1-3 rewrite init.php constants and the .htaccess routing. Items 4-5,
-# 7 and 8 write config files under the secure folder. Item 6 only reads.
+# Items 1-3 rewrite init.php constants and the .htaccess routing. Items 4-5 and
+# 7-9 write config files under the secure folder. Item 6 only reads.
 #
 # WHAT THIS SCRIPT CANNOT DO: create your account. No account exists yet, so
 # there is nobody to be one. That happens in the browser at /admin/, and the
@@ -258,6 +259,42 @@ deploy_label() {
         true)  echo -e "${YELLOW}on${NC}   ${DIM}(admins and owners may deploy a build onto this server)${NC}" ;;
         false) echo -e "off" ;;
         *)     echo -e "off  ${DIM}(default — deploy.php not created yet)${NC}" ;;
+    esac
+}
+
+# 'true' | 'false' | '' when console.php has not been created yet.
+#
+# ⚠ ABSENT MEANS ALLOWED — the OPPOSITE of deploy.php directly above, and this
+# is the one place in the file where two neighbouring readers of the same shape
+# default in opposite directions. The console writes nothing and grants nothing:
+# every command it lists is already reachable at /management/ by any caller
+# whose role allows it, so a fresh install that nobody configured should keep
+# its developer tooling. Fail-closed is for a capability that GRANTS something.
+#
+# The trailing comma in the pattern is load-bearing for the same reason it is
+# in deploy_current above — first_capture returns the first match in the file,
+# and the file's own comments talk about the setting.
+console_current() {
+    first_capture "$(CONFIG_DIR)/console.php" \
+        "'allow_console'[[:space:]]*=>[[:space:]]*\([a-zA-Z]*\),"
+}
+
+# ⚠ Unlike deploy_label, this MUST distinguish "no file" from "file present,
+# value unreadable" — for deploy the two mean the same thing (denied) and one
+# label covers both, but here they are opposite answers. A broken console.php
+# leaves the console OFF (the only reason to create the file is to turn it off,
+# so a typo must not silently re-open it), and a label that reported the
+# fresh-install default for it would contradict the engine.
+console_label() {
+    if [ ! -f "$(CONFIG_DIR)/console.php" ]; then
+        echo -e "on   ${DIM}(default — console.php not created yet)${NC}"
+        return
+    fi
+    local v; v="$(console_current)"
+    case "$v" in
+        true)  echo -e "on" ;;
+        false) echo -e "${YELLOW}off${NC}  ${DIM}(/admin/command is not offered)${NC}" ;;
+        *)     echo -e "${YELLOW}off${NC}  ${DIM}(value unreadable — check console.php)${NC}" ;;
     esac
 }
 
@@ -1068,6 +1105,104 @@ item_deploy() {
 }
 
 # ==========================================================
+# Item 9 — the command console
+# ==========================================================
+# ⚠ ABSENT MEANS ALLOWED, the OPPOSITE of item 8 immediately above, so the
+# "leave the file absent" shortcut inverts with it: item 8 declines to write a
+# file when the answer is OFF, this one declines when the answer is ON.
+#
+# ⚠ AND IT IS NOT A SECURITY CONTROL. Every command the console lists is
+# already reachable at /management/ by any caller whose role allows it — the
+# console runs them through the same permission check. Turning it off removes
+# reach and discoverability, not access. The prompt says so, because an operator
+# who reads this as "my users can no longer run commands" has been misled.
+item_console() {
+    local cfg_dir; cfg_dir="$(CONFIG_DIR)"
+    local live="$cfg_dir/console.php"
+    local example="$cfg_dir/console.php.example"
+
+    echo ""
+    echo -e "${BOLD}Command console${NC}"
+    echo ""
+    echo "  Should the admin panel offer the raw command runner at"
+    echo "  /admin/command — a form for every command, and a page listing them?"
+    echo ""
+    echo "  on   the default. Anyone signed in sees the Commands entry in the"
+    echo "       panel and can run any command their role allows."
+    echo "  off  the page and its nav entry are gone. This is what a shared or"
+    echo "       hosted install wants: your users author sites through the"
+    echo "       visual editor, sitemap and media pages, and have no business"
+    echo "       holding a generic runner for the whole command surface."
+    echo ""
+    echo -e "  Currently: $(console_label)"
+    echo ""
+    echo -e "  ${DIM}⚠ This is NOT a security control. Every command stays reachable${NC}"
+    echo -e "  ${DIM}at /management/ to any caller whose role allows it, and the${NC}"
+    echo -e "  ${DIM}console checks the same permissions. Turning it off removes${NC}"
+    echo -e "  ${DIM}reach and discoverability, not access — do not skip a role${NC}"
+    echo -e "  ${DIM}review because of it. The command history tab stays either way.${NC}"
+    echo ""
+
+    local ANSWER
+    read -r -p "  Offer the command console on this installation? [Y/n]: " ANSWER || true
+
+    # Enter accepts the SHIPPED DEFAULT, which here is on. (Item 8's [y/N] does
+    # the same thing for a default of off — same rule, opposite letter.)
+    local VALUE="true"
+    case "${ANSWER:-}" in
+        [nN]|[nN][oO]) VALUE="false" ;;
+    esac
+
+    if [ ! -d "$cfg_dir" ]; then
+        echo -e "  ${RED}✗ Error: config folder not found:${NC} $cfg_dir"
+        return 0
+    fi
+
+    # Accepting when no file exists LEAVES IT ABSENT — absent already means the
+    # console is offered, and writing a file to say so would turn an install
+    # that never opted out into one that opted in, which reads as a decision
+    # somebody made. (Item 8 does this for its own default, which is the other
+    # answer.)
+    if [ "$VALUE" = "true" ] && [ ! -f "$live" ]; then
+        echo ""
+        echo -e "  ${GREEN}✓${NC} Console stays on — console.php left absent, which is what a"
+        echo "    fresh install has."
+        return 0
+    fi
+
+    # console.php.example is the shipped documentation and is never edited: the
+    # live file is a COPY with the value patched, so every explanatory comment
+    # survives into the file the deployer will actually read later.
+    if [ ! -f "$live" ]; then
+        if [ -f "$example" ]; then
+            cp "$example" "$live"
+        else
+            echo -e "  ${RED}✗ Error: neither console.php nor console.php.example is present${NC}"
+            echo "    $cfg_dir"
+            return 0
+        fi
+    fi
+
+    # Anchored to start-of-line so the value quoted inside the file's own
+    # comments is left alone.
+    sed -i "s|^\( *\)'allow_console'[[:space:]]*=>[[:space:]]*[a-zA-Z]*|\1'allow_console' => $VALUE|" "$live"
+
+    if [ "$(console_current)" = "$VALUE" ]; then
+        if [ "$VALUE" = "false" ]; then
+            echo -e "  ${GREEN}✓${NC} Command console: ${BOLD}off${NC}"
+            echo -e "  ${DIM}  /admin/command no longer renders the runner and the nav entry${NC}"
+            echo -e "  ${DIM}  is gone. The commands themselves are unchanged.${NC}"
+        else
+            echo -e "  ${GREEN}✓${NC} Command console: ${BOLD}on${NC}"
+        fi
+    else
+        echo -e "  ${RED}✗ Could not set the value automatically.${NC}"
+        echo "    Edit this file by hand and set 'allow_console' => $VALUE:"
+        echo "    $live"
+    fi
+}
+
+# ==========================================================
 # The menu
 # ==========================================================
 show_header() {
@@ -1086,6 +1221,7 @@ show_menu() {
     echo -e "  Self-registration:  $(selfreg_label)"
     echo -e "  Storage quotas:     $(quota_label)"
     echo -e "  Self-deploy:        $(deploy_label)"
+    echo -e "  Command console:    $(console_label)"
     echo ""
     echo "    1) Rename the public folder"
     echo "    2) Rename the secure folder"
@@ -1095,6 +1231,7 @@ show_menu() {
     echo "    6) Show my setup token"
     echo "    7) Storage quotas (per user)"
     echo "    8) Allow / forbid deploying from this install"
+    echo "    9) Offer / withhold the command console (/admin/command)"
     echo "    q) Finish"
     echo ""
 }
@@ -1121,6 +1258,7 @@ while true; do
         6) item_token; pause_for_menu ;;
         7) item_quota; pause_for_menu ;;
         8) item_deploy; pause_for_menu ;;
+        9) item_console; pause_for_menu ;;
         q|Q|"") break ;;
         *) echo -e "  ${RED}Unknown choice: $CHOICE${NC}" ;;
     esac
@@ -1142,6 +1280,7 @@ echo -e "  Environment:        $(env_label)"
 echo -e "  Self-registration:  $(selfreg_label)"
 echo -e "  Storage quotas:     $(quota_label)"
 echo -e "  Self-deploy:        $(deploy_label)"
+echo -e "  Command console:    $(console_label)"
 echo ""
 
 if [ -n "$OWNERSHIP_WARNING" ]; then
