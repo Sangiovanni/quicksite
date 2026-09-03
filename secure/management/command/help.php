@@ -36,7 +36,7 @@ $GLOBALS['__help_commands'] = [
                 'validation' => 'Must be an existing route if provided'
             ]
         ],
-        'example_post' => 'POST /management/addRoute with body: {"route": "documentation/commands"} or {"route": "commands", "parent": "documentation"} or {"route": "products/:slug"}',
+        'example_post' => 'POST /management/p/<projectId>/addRoute with body: {"route": "documentation/commands"} or {"route": "commands", "parent": "documentation"} or {"route": "products/:slug"}',
         'success_response' => [
             'status' => 201,
             'code' => 'route.created',
@@ -54,7 +54,12 @@ $GLOBALS['__help_commands'] = [
             '400.route.invalid_segment' => 'Invalid segment. Literal: lowercase / numbers / hyphens. Param: ":name" with identifier.',
             '400.route.already_exists' => 'Route already exists',
             '500.server.file_write_failed' => 'Failed to create files',
-            '500.server.directory_create_failed' => 'Failed to create directory'
+            '500.server.directory_create_failed' => 'Failed to create directory',
+            '200.route.special_page' => 'The first segment names a special-page template (404, 500, 403 or 401), which already exists — nothing was created and no route entry is needed. A 200, not an error.',
+            '400.route.too_deep' => 'Route path exceeds maximum depth of 5 levels.',
+            '400.validation.invalid_length' => 'Route path must be between 1 and 200 characters. Segment exceeds maximum length of 50.',
+            '400.validation.invalid_type' => 'The route parameter is neither a string nor a number - an array, object, boolean or null. An integer or float is accepted and used as its string form.',
+            '500.server.operation_failed' => 'An unexpected failure while creating the route files; any directories already created are removed first. The exception message is returned.'
         ],
         'notes' => 'Creates PHP template + empty JSON structure. **Filesystem mapping**: ":slug" segments become "__slug" on disk (NTFS reserves ":") via routeHelpers.php. **Conflict warnings** (beta.8 A1, non-blocking): the response data.warnings[] array surfaces situations the user should confirm. Each warning carries a machine-readable `type` (i18n key) + EN `message` fallback + structured details. Two shapes today: `route.warning.param_shadows_exact_siblings` (param route alongside existing literals — runtime-safe via specificity but worth verifying intent) and `route.warning.duplicate_param_at_depth` (two ":name" siblings — declaration order resolves, but ambiguous).'
     ],
@@ -79,7 +84,7 @@ $GLOBALS['__help_commands'] = [
                 'default' => false
             ]
         ],
-        'example_delete' => 'DELETE /management/deleteRoute with body: {"route": "about-us"} or {"route": "guides", "force": true}',
+        'example_delete' => 'DELETE /management/p/<projectId>/deleteRoute with body: {"route": "about-us"} or {"route": "guides", "force": true}',
         'success_response' => [
             'status' => 200,
             'code' => 'route.deleted',
@@ -104,7 +109,10 @@ $GLOBALS['__help_commands'] = [
             '400.route.has_children' => 'Route has child routes. Use force=true to cascade delete.',
             '404.route.not_found' => 'Route does not exist',
             '404.file.not_found' => 'Page template file not found',
-            '500.server.file_write_failed' => 'Failed to delete files or update routes'
+            '500.server.file_write_failed' => 'Failed to delete files or update routes',
+            '400.route.invalid_segment' => 'A segment of the route path is neither a valid literal (lowercase letters, numbers, hyphens, no leading or trailing hyphen) nor a valid ":name" parameter segment.',
+            '400.validation.invalid_length' => 'Route path must be between 1 and 200 characters.',
+            '400.validation.invalid_type' => 'The route parameter is neither a string nor a number - an array, object, boolean or null. An integer or float is accepted and used as its string form.'
         ],
         'notes' => 'Deletes both PHP template and JSON page structure. Updates routes.php automatically. Also removes URL aliases, page events, and route layout config. When force=true, deletes all descendant routes recursively.'
     ],
@@ -142,7 +150,7 @@ $GLOBALS['__help_commands'] = [
                 'default' => false
             ]
         ],
-        'example_post' => 'POST /management/setRouteLayout with body: {"route": "landing", "menu": false, "footer": false}',
+        'example_post' => 'POST /management/p/<projectId>/setRouteLayout with body: {"route": "landing", "menu": false, "footer": false}',
         'success_response' => [
             'status' => 200,
             'code' => 'route.layout_updated',
@@ -156,7 +164,8 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.validation.required' => 'Missing route or both menu/footer parameters',
             '400.validation.invalid_type' => 'Invalid parameter type',
-            '404.route.not_found' => 'Route does not exist'
+            '404.route.not_found' => 'Route does not exist',
+            '400.validation.invalid_length' => 'Route path must be between 1 and 200 characters.'
         ],
         'notes' => 'Layout settings use inheritance: child routes inherit from nearest ancestor with explicit settings. Default is menu=true, footer=true. Use propagate=true to apply settings to all descendants at once.'
     ],
@@ -194,7 +203,7 @@ $GLOBALS['__help_commands'] = [
                 'validation' => 'Max 255 chars, max 5 levels deep, alphanumeric/dots/hyphens/underscores/forward-slash only, empty allowed'
             ]
         ],
-        'example_post' => 'POST /management/build with body: {"public": "www/public", "secure": "app", "space": "web"}',
+        'example_post' => 'POST /management/p/<projectId>/build with body: {"public": "www/public", "secure": "app", "space": "web"}',
         'success_response' => [
             'status' => 201,
             'code' => 'operation.success',
@@ -218,7 +227,9 @@ $GLOBALS['__help_commands'] = [
             '409.conflict.operation_in_progress' => 'Another build is already running',
             '413.validation.size_limit_exceeded' => 'Build exceeds MAX_BUILD_SIZE_MB',
             '500.server.file_write_failed' => 'Failed to create build directory or copy files',
-            '500.server.internal_error' => 'Build compilation failed, OR the finished build cannot serve requests and was discarded (data.problems names what is missing)'
+            '500.server.internal_error' => 'Build compilation failed, OR the finished build cannot serve requests and was discarded (data.problems names what is missing)',
+            '404.file.not_found' => 'The project is mono-language and its default.json translation file is missing, so the build cannot resolve any text. The build is aborted and rolled back.',
+            '500.server.directory_create_failed' => 'Failed to create build directory. Failed to create timestamped build folder. Failed to create directory. Failed to create the build\'s data directory.'
         ],
         'notes' => 'Compiles JSON templates to PHP using JsonToPhpCompiler and emits a self-contained single-project site: a front controller, the parameters it reads, an .htaccess that funnels requests into it, and the small runtime the compiled pages need. Before answering success the command checks that the finished build can actually serve - funnel target, parameters, project data, runtime, menu/footer, every route reachable at the path routing will compute, and the 404 - and DISCARDS the build with a 500 if any of that is missing. Output goes to qs_build/<name>/ inside the project - OUTSIDE its public/, so no URL reaches a build; downloadBuild is the only way to fetch one. RETENTION IS ONE BUILD PER PROJECT: a second build is refused rather than overwriting the first, so use deleteBuild between builds. A build that FAILS removes its own partial directory; if that removal also fails the leftover carries no build_manifest.json and getBuild reports it as incomplete. No ZIP is stored - downloadBuild archives the folder on demand. The "space" parameter controls PUBLIC_FOLDER_SPACE - when set (e.g., "web"), all public files go inside {public}/{space}/ creating access URL like http://site.com/web/, and the document root gets its own non-browsable .htaccess since the site is not there. Public and secure folders MUST NOT overlap: neither may contain the other, be the other, or share a root directory - otherwise a deployed build would serve its own secure folder over the web. The built site stores visitor state under the REAL project id, so it shares a browser-storage namespace with the same project served at /p/<projectId>/. Uses file locking to prevent concurrent builds.'
     ],
@@ -227,7 +238,7 @@ $GLOBALS['__help_commands'] = [
         'description' => 'Returns the build of this project - manifest data, size, file count and completeness. Takes no parameters: there is one build or none.',
         'method' => 'GET',
         'parameters' => [],
-        'example_get' => 'GET /management/getBuild',
+        'example_get' => 'GET /management/p/<projectId>/getBuild',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -255,7 +266,7 @@ $GLOBALS['__help_commands'] = [
         'description' => 'Deletes the build of this project. Takes no parameters: there is one build or none.',
         'method' => 'POST',
         'parameters' => [],
-        'example_post' => 'POST /management/deleteBuild with an empty body',
+        'example_post' => 'POST /management/p/<projectId>/deleteBuild with an empty body',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -379,7 +390,7 @@ $GLOBALS['__help_commands'] = [
         'description' => 'Streams the build of this project as a ZIP archive. Takes no parameters: there is one build or none.',
         'method' => 'GET',
         'parameters' => [],
-        'example_get' => 'GET /management/downloadBuild',
+        'example_get' => 'GET /management/p/<projectId>/downloadBuild',
         'success_response' => [
             'status' => 200,
             'code' => 'binary',
@@ -456,7 +467,7 @@ $GLOBALS['__help_commands'] = [
                 'example' => 'true'
             ]
         ],
-        'example_get' => 'GET /management/getCommandHistory?command=editStructure&status=success&limit=50',
+        'example_get' => 'GET /management/p/<projectId>/getCommandHistory?command=editStructure&status=success&limit=50',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -477,7 +488,8 @@ $GLOBALS['__help_commands'] = [
             ]
         ],
         'error_responses' => [
-            '400.validation.invalid_date' => 'Invalid date format (expected YYYY-MM-DD)'
+            '400.validation.invalid_date' => 'Invalid date format (expected YYYY-MM-DD)',
+            '400.project.required' => 'No project marker on the request. This command is project-scoped: target a project with /management/p/<projectId>/.'
         ],
         'notes' => 'PROJECT-SCOPED: returns the history of the project named by the URL marker (/management/p/<projectId>/getCommandHistory) and nothing else - there is no installation-wide view. Logs are stored in daily files under <secure>/logs/p/<projectId>/. By default returns last 7 days. The getCommandHistory command itself is not logged to prevent recursion. Commands that target no project (registration, login, project creation, membership self-service) are recorded separately in <secure>/logs/_global/, which no command reads. Request bodies are sanitized DENY-BY-DEFAULT: any key that looks like a credential (password/secret/token/credential/key/auth/authorization/signature/salt) has its value replaced with [redacted] at every depth, for every command including ones added later; the authentication commands (login/register/logoutSession/changePassword/deleteMyAccount) log no body at all; uploadAsset logs file metadata only and editStyles truncates stylesheets over 5KB.'
     ],
@@ -501,7 +513,7 @@ $GLOBALS['__help_commands'] = [
                 'example' => true
             ]
         ],
-        'example_delete' => 'DELETE /management/clearCommandHistory with body: {"before": "2025-12-01", "confirm": true}',
+        'example_delete' => 'DELETE /management/p/<projectId>/clearCommandHistory with body: {"before": "2025-12-01", "confirm": true}',
         'example_body' => [
             'before' => '2025-12-01',
             'confirm' => true
@@ -530,7 +542,9 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '400.validation.missing_parameter' => 'Missing required parameter: before',
-            '400.validation.invalid_date' => 'Invalid date format or future date'
+            '400.validation.invalid_date' => 'Invalid date format or future date',
+            '200.operation.preview' => 'Preview: Add "confirm": true to execute deletion.',
+            '400.project.required' => 'No project marker on the request. This command is project-scoped: target a project with /management/p/<projectId>/.'
         ],
         'notes' => 'PROJECT-SCOPED: deletes only inside <secure>/logs/p/<projectId>/ for the project named by the URL marker, so clearing one project\'s history can never affect another\'s. Without confirm=true, returns a preview showing what would be deleted. A future "before" date is refused. Requires admin permission ON THAT PROJECT.'
     ],
@@ -596,7 +610,7 @@ $GLOBALS['__help_commands'] = [
                 'validation' => 'Max 200 chars, no null bytes'
             ]
         ],
-        'example_patch' => 'PATCH /management/editTitle with body: {"route": "home", "lang": "en", "title": "Home - My Site"}',
+        'example_patch' => 'PATCH /management/p/<projectId>/editTitle with body: {"route": "home", "lang": "en", "title": "Home - My Site"}',
         'success_response' => [
             'status' => 200,
             'code' => 'success.title_updated',
@@ -618,7 +632,10 @@ $GLOBALS['__help_commands'] = [
             '404.file.not_found' => 'Translation file not found for language',
             '500.server.file_read_failed' => 'Failed to read translation file',
             '500.server.file_write_failed' => 'Failed to write updated translation file',
-            '500.server.internal_error' => 'Invalid JSON in translation file'
+            '500.server.internal_error' => 'Invalid JSON in translation file',
+            '400.validation.unsupported_language' => 'Language is not supported.',
+            '500.server.invalid_json' => 'Translation file contains invalid JSON.',
+            '500.server.json_encode_failed' => 'Failed to encode translation data.'
         ],
         'notes' => 'Updates ONE language at a time for single route. Updates page.titles.{route} key in the specified language translation file. Creates nested page.titles object if it doesn\'t exist. Used by Page.php: $translator->translate("page.titles.{$route}"). Route must exist in ROUTES constant, and language must be in supported languages list.'
     ],
@@ -627,7 +644,7 @@ $GLOBALS['__help_commands'] = [
         'description' => 'Returns all routes as both a nested structure and a flat list',
         'method' => 'GET',
         'parameters' => [],
-        'example_get' => 'GET /management/getRoutes',
+        'example_get' => 'GET /management/p/<projectId>/getRoutes',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -654,9 +671,16 @@ $GLOBALS['__help_commands'] = [
                 'example' => 'json',
                 'validation' => 'json|text',
                 'default' => 'json'
+            ],
+            'baseUrl' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Absolute base URL to build the sitemap entries against. First in the base-URL chain: when set and valid it wins over the resolved public base. A value that does not parse as a URL is ignored rather than refused.',
+                'example' => 'https://example.com',
+                'validation' => 'Must parse as an absolute URL'
             ]
         ],
-        'example_get' => 'GET /management/getSiteMap or GET /management/getSiteMap/text',
+        'example_get' => 'GET /management/p/<projectId>/getSiteMap or GET /management/p/<projectId>/getSiteMap/text',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -747,7 +771,7 @@ $GLOBALS['__help_commands'] = [
         'method' => 'GET',
         'url_structure' => '/management/analyzeReachability',
         'parameters' => [],
-        'example_get' => 'GET /management/analyzeReachability',
+        'example_get' => 'GET /management/p/<projectId>/analyzeReachability',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -799,7 +823,7 @@ $GLOBALS['__help_commands'] = [
                 'validation' => 'Either "showIds", "summary", or dot-notation number (0, 0.1, 0.1.2, etc.)'
             ]
         ],
-        'example_get' => 'GET /management/getStructure/page/home, GET /management/getStructure/page/home/showIds, GET /management/getStructure/page/home/summary, GET /management/getStructure/page/home/0.0.2',
+        'example_get' => 'GET /management/p/<projectId>/getStructure/page/home, GET /management/p/<projectId>/getStructure/page/home/showIds, GET /management/p/<projectId>/getStructure/page/home/summary, GET /management/p/<projectId>/getStructure/page/home/0.0.2',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -818,7 +842,11 @@ $GLOBALS['__help_commands'] = [
             '404.route.not_found' => 'Page does not exist',
             '404.file.not_found' => 'Structure file not found',
             '404.node.not_found' => 'Node not found at specified identifier',
-            '500.server.file_write_failed' => 'Failed to read structure file'
+            '500.server.file_write_failed' => 'Failed to read structure file',
+            '400.validation.invalid_length' => 'The type parameter is longer than the longest allowed type name, or the name parameter exceeds 200 characters.',
+            '400.validation.invalid_type' => 'The type parameter is not a string, or the name parameter is neither a string nor a number. An integer or float name is accepted and used as its string form.',
+            '400.validation.invalid_value' => 'The type parameter is not one of menu, footer, page, component.',
+            '500.server.internal_error' => 'Invalid JSON in structure file.'
         ],
         'notes' => 'Node identifiers use 0-indexed dot notation: "0.2.1" = root\'s 1st child → 3rd child → 2nd child. Use /summary to see structure overview with nodeIds. Use specific nodeId to retrieve just that node. **Component vs Page structure**: Pages/menu/footer have an ARRAY root where "0", "1", "2" are root elements. Components have a single OBJECT root where the root itself is accessed via empty string "" and its children are "0", "1", "2". This affects all node operations (addNode, editNode, deleteNode, moveNode).'
     ],
@@ -864,7 +892,7 @@ $GLOBALS['__help_commands'] = [
                 'validation' => 'Must be: update (replace node), delete (remove node), insertBefore, insertAfter'
             ]
         ],
-        'example_patch' => 'Full: {"type": "page", "name": "home", "structure": [...]}. Targeted: {"type": "page", "name": "home", "nodeId": "0.2", "structure": {...}}. Delete: {"type": "page", "name": "home", "nodeId": "0.2", "action": "delete"}',
+        'example_patch' => 'PATCH /management/p/<projectId>/editStructure — full: {"type": "page", "name": "home", "structure": [...]}. Targeted: {"type": "page", "name": "home", "nodeId": "0.2", "structure": {...}}. Delete: {"type": "page", "name": "home", "nodeId": "0.2", "action": "delete"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -885,7 +913,16 @@ $GLOBALS['__help_commands'] = [
             '404.route.not_found' => 'Page does not exist',
             '404.file.not_found' => 'Structure file not found',
             '500.server.file_write_failed' => 'Failed to write structure file',
-            '500.server.internal_error' => 'Failed to encode structure to JSON'
+            '500.server.internal_error' => 'Failed to encode structure to JSON',
+            '400.operation.denied' => 'Cannot delete component: used by other components.',
+            '400.validation.invalid_length' => 'The type parameter is longer than the longest allowed type name, or the name parameter exceeds 200 characters.',
+            '400.validation.invalid_type' => 'The structure parameter is not an object or array of objects, the type parameter is not a string, or the name parameter is neither a string nor a number. An integer or float name is accepted and used as its string form.',
+            '400.validation.invalid_value' => 'The type parameter is not one of menu, footer, page, component; or, in targeted mode, action is not one of update, delete, insertBefore, insertAfter. The allowed set is echoed in errors[].allowed.',
+            '400.validation.reserved_attribute' => 'A node carries an attribute starting with "data-qs-", which is reserved for QuickSite. Use a different prefix such as "data-custom-" or "data-app-". The offending attribute and its node are named in errors[].',
+            '400.validation.reserved_key' => 'Reserved admin-namespace prefix (quicksite_ / quicksite- / qs_ / qs-). These are used by the admin panel and would collide with admin state. Pick a project-specific prefix.',
+            '500.server.directory_create_failed' => 'Failed to create components directory.',
+            '500.server.file_delete_failed' => 'Failed to delete component file.',
+            '500.server.file_read_failed' => 'Failed to read structure file.'
         ],
         'notes' => 'Two modes: (1) Full replacement - sends complete structure. (2) Targeted edit - use nodeId to modify single node. Use getStructure/page/name/showIds to see node identifiers first. Actions: update (replace), delete (remove), insertBefore/insertAfter (add sibling). Security: max 10,000 nodes, max 50 levels deep. **Component node paths**: For type=component, the root object is "" (empty) and children are "0", "1", etc. This differs from pages where root elements are "0", "1".'
     ],
@@ -903,7 +940,7 @@ $GLOBALS['__help_commands'] = [
                 'validation' => '2-3 lowercase letters, or literal "default"'
             ]
         ],
-        'example_get' => 'GET /management/getTranslation/en',
+        'example_get' => 'GET /management/p/<projectId>/getTranslation/en',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -918,7 +955,10 @@ $GLOBALS['__help_commands'] = [
             '400.validation.required' => 'Missing language code in URL',
             '400.validation.invalid_format' => 'Invalid language code format',
             '404.file.not_found' => 'Translation file not found',
-            '500.server.file_write_failed' => 'Failed to read translation file'
+            '500.server.file_write_failed' => 'Failed to read translation file',
+            '400.validation.invalid_length' => 'Language code must not exceed 10 characters.',
+            '400.validation.invalid_type' => 'The language parameter must be a string.',
+            '500.server.internal_error' => 'Invalid JSON in translation file.'
         ],
         'notes' => 'Returns translations for a single language. Use language="default" in mono-language mode to access default.json.'
     ],
@@ -927,7 +967,7 @@ $GLOBALS['__help_commands'] = [
         'description' => 'Retrieves translations for all languages (mode-aware)',
         'method' => 'GET',
         'parameters' => [],
-        'example_get' => 'GET /management/getTranslations',
+        'example_get' => 'GET /management/p/<projectId>/getTranslations',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -942,7 +982,8 @@ $GLOBALS['__help_commands'] = [
             ]
         ],
         'error_responses' => [
-            '404.file.not_found' => 'No translation files found'
+            '404.file.not_found' => 'No translation files found',
+            '500.server.internal_error' => 'Failed to load any translation files.'
         ],
         'notes' => 'In multilingual mode: returns all language files (en.json, fr.json, etc.). In mono-language mode: returns only default.json. Response includes multilingual_enabled flag.'
     ],
@@ -974,8 +1015,8 @@ $GLOBALS['__help_commands'] = [
                 'validation' => 'Boolean value'
             ]
         ],
-        'example_patch' => 'PATCH /management/setTranslationKeys with body: {"language": "en", "translations": {"home": {"title": "New Title"}}}',
-        'example_replace' => 'PATCH /management/setTranslationKeys with body: {"language": "en", "replace": true, "translations": {"site": {"name": "My Site"}}}',
+        'example_patch' => 'PATCH /management/p/<projectId>/setTranslationKeys with body: {"language": "en", "translations": {"home": {"title": "New Title"}}}',
+        'example_replace' => 'PATCH /management/p/<projectId>/setTranslationKeys with body: {"language": "en", "replace": true, "translations": {"site": {"name": "My Site"}}}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -991,7 +1032,10 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.validation.required' => 'Missing language or translations parameter',
             '400.validation.invalid_format' => 'Invalid translation format',
-            '500.server.file_write_failed' => 'Failed to write translation file'
+            '500.server.file_write_failed' => 'Failed to write translation file',
+            '400.validation.invalid_length' => 'Language code must not exceed 10 characters. Translation data too large (max 5MB).',
+            '400.validation.invalid_type' => 'The language parameter must be a string. The translations parameter must be an object/array.',
+            '500.server.internal_error' => 'The translation file could not be written for a reason other than a failed write or invalid JSON; the underlying reason is returned in the message.'
         ],
         'notes' => 'SAFE by default: Merges with existing translations. Use language="default" in mono-language mode to edit default.json. New keys are added, existing keys are updated, other keys are preserved. Set replace=true to completely replace the file (used by fresh-start workflow).'
     ],
@@ -1015,7 +1059,7 @@ $GLOBALS['__help_commands'] = [
                 'validation' => 'Each key must be a non-empty string'
             ]
         ],
-        'example_delete' => 'DELETE /management/deleteTranslationKeys with body: {"language": "en", "keys": ["home.old_key", "deprecated_section"]}',
+        'example_delete' => 'DELETE /management/p/<projectId>/deleteTranslationKeys with body: {"language": "en", "keys": ["home.old_key", "deprecated_section"]}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -1032,7 +1076,12 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.validation.required' => 'Missing language or keys parameter',
             '404.resource.not_found' => 'Translation file not found or no keys deleted',
-            '500.server.file_write_failed' => 'Failed to write translation file'
+            '500.server.file_write_failed' => 'Failed to write translation file',
+            '400.validation.invalid_format' => 'Language code contains invalid characters. Invalid language code format.',
+            '400.validation.invalid_length' => 'Language code must not exceed 10 characters.',
+            '400.validation.invalid_type' => 'The language parameter is not a string, the keys parameter is not an array, or one of its entries is not a string. The offending index is named in errors[].',
+            '500.server.file_read_failed' => 'Failed to read translation file.',
+            '500.server.internal_error' => 'Failed to parse translation file. Failed to encode translations to JSON.'
         ],
         'notes' => 'Supports dot notation for nested keys. Use language="default" in mono-language mode. Empty parent objects are automatically cleaned up after deletion.'
     ],
@@ -1041,7 +1090,7 @@ $GLOBALS['__help_commands'] = [
         'description' => 'Returns list of configured languages and multilingual settings',
         'method' => 'GET',
         'parameters' => [],
-        'example_get' => 'GET /management/getLangList',
+        'example_get' => 'GET /management/p/<projectId>/getLangList',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -1056,7 +1105,9 @@ $GLOBALS['__help_commands'] = [
                 ]
             ]
         ],
-        'error_responses' => [],
+        'error_responses' => [
+            '500.server.internal_error' => 'Configuration not loaded.'
+        ],
         'notes' => 'Returns configuration from config.php. Useful for UI language selectors and checking current mode.'
     ],
     
@@ -1072,7 +1123,7 @@ $GLOBALS['__help_commands'] = [
                 'validation' => 'Must be boolean true/false'
             ]
         ],
-        'example_patch' => 'PATCH /management/setMultilingual with body: {"enabled": true}',
+        'example_patch' => 'PATCH /management/p/<projectId>/setMultilingual with body: {"enabled": true}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -1092,7 +1143,8 @@ $GLOBALS['__help_commands'] = [
             '400.validation.required' => 'Missing enabled parameter',
             '400.validation.invalid_type' => 'enabled must be boolean',
             '400.validation.invalid_format' => 'Multilingual mode requires at least 2 languages (use addLang first)',
-            '500.server.file_write_failed' => 'Failed to update config.php or translation files'
+            '500.server.file_write_failed' => 'Failed to update config.php or translation files',
+            '500.server.internal_error' => 'Failed to create config lock file. Failed to acquire config lock. Failed to read configuration file.'
         ],
         'notes' => 'To enable multilingual: 1) Use addLang to add languages first, 2) Then use setMultilingual(enabled=true). When switching modes, translations are synced: mono→multi copies default.json keys to default language file, multi→mono copies default language to default.json.'
     ],
@@ -1101,6 +1153,7 @@ $GLOBALS['__help_commands'] = [
         'description' => 'Scans all structures (pages, menu, footer, components) for lang-specific content. Use before switching to mono-language mode.',
         'method' => 'GET',
         'parameters' => [],
+        'example_get' => 'GET /management/p/<projectId>/checkStructureMulti',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -1136,7 +1189,7 @@ $GLOBALS['__help_commands'] = [
             'code' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => 'Language code (ISO 639-1). Can use "lang" as shorthand alias.',
+                'description' => 'Language code (ISO 639-1). Can use "lang" as shorthand, or "language" — all three spellings are accepted, first non-empty wins in the order code, lang, language.',
                 'example' => 'es',
                 'validation' => '2-3 lowercase letters',
                 'alias' => 'lang'
@@ -1150,7 +1203,7 @@ $GLOBALS['__help_commands'] = [
                 'default' => 'Auto-generated from language code'
             ]
         ],
-        'example_post' => 'POST /management/addLang with body: {"lang": "fr"} or {"code": "es", "name": "Español"}',
+        'example_post' => 'POST /management/p/<projectId>/addLang with body: {"lang": "fr"} or {"code": "es", "name": "Español"}',
         'success_response' => [
             'status' => 201,
             'code' => 'operation.success',
@@ -1167,7 +1220,9 @@ $GLOBALS['__help_commands'] = [
             '400.validation.required' => 'Missing code/lang parameter',
             '400.validation.invalid_format' => 'Invalid language code format',
             '409.conflict.duplicate' => 'Language already exists',
-            '500.server.file_write_failed' => 'Failed to update config or create translation file'
+            '500.server.file_write_failed' => 'Failed to update config or create translation file',
+            '500.file.not_found' => 'Configuration file not found.',
+            '500.server.internal_error' => 'Failed to create config lock file. Failed to acquire config lock. Failed to parse configuration file.'
         ],
         'notes' => 'Can be used before enabling multilingual mode (to add languages first). Use setMultilingual to enable multilingual mode after adding 2+ languages. Updates config.php and creates translation file by copying from default language.'
     ],
@@ -1185,7 +1240,7 @@ $GLOBALS['__help_commands'] = [
                 'validation' => 'Must be an existing language (not default, not last)'
             ]
         ],
-        'example_delete' => 'DELETE /management/deleteLang with body: {"code": "es"}',
+        'example_delete' => 'DELETE /management/p/<projectId>/deleteLang with body: {"code": "es"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -1202,7 +1257,8 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_format' => 'Cannot delete default or last language',
             '403.mode.requires_multilingual' => 'This command requires multilingual mode',
             '404.route.not_found' => 'Language not found',
-            '500.server.file_write_failed' => 'Failed to update config'
+            '500.server.file_write_failed' => 'Failed to update config',
+            '500.server.internal_error' => 'Failed to parse configuration file.'
         ],
         'notes' => 'Only available when MULTILINGUAL_SUPPORT = true. Cannot delete default language or last remaining language.'
     ],
@@ -1219,8 +1275,8 @@ $GLOBALS['__help_commands'] = [
                 'default' => false
             ]
         ],
-        'example_delete' => 'DELETE /management/cleanOrphanTranslations with body: {}',
-        'example_dry_run' => 'DELETE /management/cleanOrphanTranslations with body: {"dry_run": true}',
+        'example_delete' => 'DELETE /management/p/<projectId>/cleanOrphanTranslations with body: {}',
+        'example_dry_run' => 'DELETE /management/p/<projectId>/cleanOrphanTranslations with body: {"dry_run": true}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -1253,7 +1309,7 @@ $GLOBALS['__help_commands'] = [
                 'validation' => '2-3 lowercase letters, must exist in LANGUAGES_SUPPORTED'
             ]
         ],
-        'example_patch' => 'PATCH /management/setDefaultLang with body: {"lang": "fr"}',
+        'example_patch' => 'PATCH /management/p/<projectId>/setDefaultLang with body: {"lang": "fr"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -1270,7 +1326,9 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_format' => 'Invalid language code format',
             '403.mode.requires_multilingual' => 'This command requires multilingual mode',
             '404.not_found.language' => 'Language not found in LANGUAGES_SUPPORTED',
-            '500.server.file_write_failed' => 'Failed to update config file'
+            '500.server.file_write_failed' => 'Failed to update config file',
+            '500.file.not_found' => 'Configuration file not found.',
+            '500.server.internal_error' => 'Failed to parse configuration file.'
         ],
         'notes' => 'Only available when MULTILINGUAL_SUPPORT = true. The language must first be added using addLang. This affects the LANGUAGE_DEFAULT config value.'
     ],
@@ -1288,7 +1346,7 @@ $GLOBALS['__help_commands'] = [
                 'validation' => '2-10 characters (ISO 639 or BCP 47 locale code)'
             ]
         ],
-        'example_get' => 'GET /management/getTranslationKeys (keys only) or GET /management/getTranslationKeys/fr (with translation status)',
+        'example_get' => 'GET /management/p/<projectId>/getTranslationKeys (keys only) or GET /management/p/<projectId>/getTranslationKeys/fr (with translation status)',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -1318,7 +1376,10 @@ $GLOBALS['__help_commands'] = [
                 'status' => 400,
                 'code' => 'validation.invalid_format',
                 'message' => 'Invalid language code format'
-            ]
+            ],
+            '400.validation.invalid_format' => 'Invalid language code format.',
+            '400.validation.invalid_length' => 'Language code must not exceed 10 characters.',
+            '400.validation.invalid_type' => 'The language parameter must be a string.'
         ],
         'notes' => 'Recursively scans all page JSONs, menu.json, and footer.json to extract textKey values. Ignores __RAW__ prefixed keys. When language is provided, also checks if each key has a non-empty translation (empty string = untranslated).'
     ],
@@ -1336,7 +1397,7 @@ $GLOBALS['__help_commands'] = [
                 'validation' => '2-3 lowercase letters'
             ]
         ],
-        'example_get' => 'GET /management/validateTranslations (all languages) or GET /management/validateTranslations/fr (specific)',
+        'example_get' => 'GET /management/p/<projectId>/validateTranslations (all languages) or GET /management/p/<projectId>/validateTranslations/fr (specific)',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -1365,7 +1426,9 @@ $GLOBALS['__help_commands'] = [
             ]
         ],
         'error_responses' => [
-            '400.validation.invalid_format' => 'Invalid language code format'
+            '400.validation.invalid_format' => 'Invalid language code format',
+            '400.validation.invalid_length' => 'Language code must not exceed 10 characters.',
+            '400.validation.invalid_type' => 'The language parameter must be a string.'
         ],
         'notes' => 'Compares keys from getTranslationKeys with actual translation files. Shows missing keys per language and coverage percentage. Use this to identify incomplete translations before deployment.'
     ],
@@ -1383,7 +1446,7 @@ $GLOBALS['__help_commands'] = [
                 'validation' => '2-3 lowercase letters'
             ]
         ],
-        'example_get' => 'GET /management/getUnusedTranslationKeys or GET /management/getUnusedTranslationKeys/en',
+        'example_get' => 'GET /management/p/<projectId>/getUnusedTranslationKeys or GET /management/p/<projectId>/getUnusedTranslationKeys/en',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -1403,7 +1466,9 @@ $GLOBALS['__help_commands'] = [
             ]
         ],
         'error_responses' => [
-            '400.validation.invalid_format' => 'Invalid language code format'
+            '400.validation.invalid_format' => 'Invalid language code format',
+            '400.validation.invalid_length' => 'Language code must not exceed 10 characters.',
+            '400.validation.invalid_type' => 'The language parameter must be a string.'
         ],
         'notes' => 'Identifies orphaned translations not referenced by any page, menu, footer, or component. Useful for cleaning up after refactoring. Use deleteTranslationKeys to remove identified unused keys.'
     ],
@@ -1421,7 +1486,7 @@ $GLOBALS['__help_commands'] = [
                 'validation' => '2-3 lowercase letters'
             ]
         ],
-        'example_get' => 'GET /management/analyzeTranslations or GET /management/analyzeTranslations/fr',
+        'example_get' => 'GET /management/p/<projectId>/analyzeTranslations or GET /management/p/<projectId>/analyzeTranslations/fr',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -1446,7 +1511,9 @@ $GLOBALS['__help_commands'] = [
             ]
         ],
         'error_responses' => [
-            '400.validation.invalid_format' => 'Invalid language code format'
+            '400.validation.invalid_format' => 'Invalid language code format',
+            '400.validation.invalid_length' => 'Language code must not exceed 10 characters.',
+            '400.validation.invalid_type' => 'The language parameter must be a string.'
         ],
         'notes' => 'Combines validateTranslations + getUnusedTranslationKeys in one call. Returns health status: healthy, has_unused, incomplete, needs_attention, or critical. Ideal for CI/CD pipelines and dashboard views.'
     ],
@@ -1498,8 +1565,8 @@ $GLOBALS['__help_commands'] = [
             'audio' => 'MP3, WAV, OGG',
             'videos' => 'MP4, WebM, OGV'
         ],
-        'example_curl' => 'curl -F "file=@logo.png" "http://yoursite.com/management?command=uploadAsset"',
-        'example_curl_url' => 'curl -X POST -H "Content-Type: application/json" -d \'{"url":"https://example.com/photo.jpg"}\' "http://yoursite.com/management?command=uploadAsset"',
+        'example_curl' => 'curl -F "file=@logo.png" "https://example.com/management/p/<projectId>/uploadAsset"',
+        'example_curl_url' => 'curl -X POST -H "Content-Type: application/json" -d \'{"url":"https://example.com/photo.jpg"}\' "https://example.com/management/p/<projectId>/uploadAsset"',
         'success_response' => [
             'status' => 201,
             'code' => 'operation.success',
@@ -1518,7 +1585,25 @@ $GLOBALS['__help_commands'] = [
             '400.asset.file_too_large' => 'File exceeds size limit',
             '400.asset.invalid_file_type' => 'MIME type not allowed',
             '400.asset.invalid_extension' => 'Unrecognized file extension',
-            '500.asset.move_failed' => 'Failed to save file'
+            '500.asset.move_failed' => 'Failed to save file',
+            '400.asset.invalid_upload' => 'File was not uploaded via HTTP POST.',
+            '400.validation.forbidden_extension' => 'Executable file types are not allowed.',
+            '400.validation.invalid_extension' => 'The file extension — on the uploaded file or on the url — is not one this install recognises, so the asset category cannot be determined.',
+            '400.validation.invalid_file' => 'Invalid or missing filename. Could not determine filename from URL. URL must point to a file with a recognized extension. Invalid filename provided. File must have a valid extension. Could not determine file type. Filename cannot be empty. SVG file could not be sanitized — it may contain malformed XML.',
+            '400.validation.invalid_format' => 'Filename contains only invalid characters.',
+            '400.validation.invalid_length' => 'The description parameter must not exceed 500 characters. The alt parameter must not exceed 250 characters. URL must not exceed 2048 characters. Filename must not exceed 100 characters. Filename with uniqueness counter exceeds 100 characters. Please use a shorter filename.',
+            '400.validation.invalid_mime_type' => 'File type not allowed for category.',
+            '400.validation.invalid_type' => 'The description parameter must be a string. The alt parameter must be a string. The url parameter must be a string.',
+            '400.validation.missing_field' => 'No file source provided. Upload a file or provide a url parameter.',
+            '413.request.body_too_large' => 'The request body exceeded what this server accepts, so PHP discarded it before the command could read it.',
+            '429.quota.rate_limited' => 'Too many uploads in the current period. The response carries retry_after (seconds) and the message states the limit in force.',
+            '500.server.directory_not_found' => 'The asset directory for the resolved category does not exist under the project. The category is named in the message.',
+            '500.server.file_corrupted' => 'File upload failed: size mismatch (possible corruption).',
+            '500.server.file_move_failed' => 'Failed to move file to destination.',
+            '500.server.file_verification_failed' => 'File upload failed: file not found after move.',
+            '500.server.permission_denied' => 'Target directory is not writable.',
+            '500.server.too_many_duplicates' => 'Unable to generate unique filename after 1000 attempts.',
+            '507.quota.storage_exceeded' => 'Storing this file would take the owner over their configured storage quota. Charged to the project owner, so the refusal is generic when the caller is not that owner.'
         ],
         'notes' => 'Category is auto-detected from file extension (no category parameter needed). Validates MIME type (actual content, not just extension). Sanitizes filename. Auto-renames if file exists (adds _1, _2, etc.). SVG files are sanitized to remove scripts. URL downloads require HTTPS and block private IPs. Either file or url must be provided.'
     ],
@@ -1542,8 +1627,8 @@ $GLOBALS['__help_commands'] = [
                 'validation' => 'Each filename validated individually'
             ]
         ],
-        'example_delete' => 'DELETE /management/deleteAsset {"filename": "logo.png"}',
-        'example_batch' => 'DELETE /management/deleteAsset {"filenames": ["logo.png", "banner.jpg"]}',
+        'example_delete' => 'DELETE /management/p/<projectId>/deleteAsset {"filename": "logo.png"}',
+        'example_batch' => 'DELETE /management/p/<projectId>/deleteAsset {"filenames": ["logo.png", "banner.jpg"]}',
         'success_response' => [
             'status' => 204,
             'code' => 'operation.success',
@@ -1560,7 +1645,12 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_params' => 'Both filename and filenames provided',
             '400.asset.invalid_filename' => 'Invalid filename (path traversal blocked)',
             '404.asset.not_found' => 'File not found',
-            '500.asset.delete_failed' => 'Failed to delete file'
+            '500.asset.delete_failed' => 'Failed to delete file',
+            '400.operation.failed' => 'No files were deleted (failed).',
+            '400.validation.invalid_length' => 'Maximum 50 files per batch delete request.',
+            '400.validation.invalid_type' => 'The filenames parameter must be an array of strings. The filename parameter must be a string.',
+            '400.validation.invalid_value' => 'The filenames array must not be empty.',
+            '400.validation.missing_field' => 'Neither filename nor filenames was supplied (single delete needs filename; bulk delete needs filenames).'
         ],
         'notes' => 'Category is auto-detected from file extension. Supports batch deletion with filenames array (max 50). In batch mode, partial success is possible — check deleted and failed arrays in the response.'
     ],
@@ -1578,7 +1668,7 @@ $GLOBALS['__help_commands'] = [
                 'validation' => 'If provided, must be one of: images, font, audio, videos'
             ]
         ],
-        'example_get' => 'GET /management/listAssets (all) or GET /management/listAssets/images (filtered)',
+        'example_get' => 'GET /management/p/<projectId>/listAssets (all) or GET /management/p/<projectId>/listAssets/images (filtered)',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -1607,7 +1697,10 @@ $GLOBALS['__help_commands'] = [
             ]
         ],
         'error_responses' => [
-            '400.asset.invalid_category' => 'Invalid category'
+            '400.asset.invalid_category' => 'Invalid category',
+            '400.validation.invalid_length' => 'The category parameter is longer than the longest configured category name.',
+            '400.validation.invalid_type' => 'The category parameter must be a string.',
+            '400.validation.invalid_value' => 'The category is not one of the configured asset categories. The allowed set is echoed in errors[].allowed.'
         ],
         'notes' => 'Returns files sorted alphabetically. Excludes index.php files. Shows size in bytes and last modified timestamp. Includes metadata (description, alt, dimensions) when available. Also reports the site favicon: `favicon` is the bare filename when the pointer names an asset in this project (so a caller can match it against a listed file), and null otherwise; `favicon_path` is the raw stored value, which may be an absolute URL.'
     ],
@@ -1653,7 +1746,7 @@ $GLOBALS['__help_commands'] = [
                 'example' => true
             ]
         ],
-        'example_request' => 'POST /management/editAsset {"filename": "old-logo.png", "newFilename": "company-logo", "description": "Main company logo", "alt": "Company logo"}',
+        'example_request' => 'POST /management/p/<projectId>/editAsset {"filename": "old-logo.png", "newFilename": "company-logo", "description": "Main company logo", "alt": "Company logo"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -1687,7 +1780,7 @@ $GLOBALS['__help_commands'] = [
         'description' => 'Retrieves the content of the main SCSS/CSS file',
         'method' => 'GET',
         'parameters' => [],
-        'example_get' => 'GET /management?command=getStyles',
+        'example_get' => 'GET /management/p/<projectId>/getStyles',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -1719,7 +1812,7 @@ $GLOBALS['__help_commands'] = [
                 'alias' => 'css'
             ]
         ],
-        'example_put' => 'PUT /management/editStyles with body: {"content": "body { margin: 0; }"} or {"css": "body { margin: 0; }"}',
+        'example_put' => 'PUT /management/p/<projectId>/editStyles with body: {"content": "body { margin: 0; }"} or {"css": "body { margin: 0; }"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -1736,7 +1829,9 @@ $GLOBALS['__help_commands'] = [
             '400.validation.required' => 'Missing content parameter',
             '400.validation.invalid_format' => 'Content must be string or exceeds 2MB limit',
             '404.file.not_found' => 'Style file not found',
-            '500.server.file_write_failed' => 'Failed to read or write style file'
+            '500.server.file_write_failed' => 'Failed to read or write style file',
+            '400.validation.invalid_length' => 'The content parameter is empty, or larger than 512 KB.',
+            '400.validation.invalid_type' => 'The content parameter must be a string.'
         ],
         'notes' => 'Completely replaces style.css content. Response includes backup_content for manual rollback if needed. Max size: 2MB. File locking prevents concurrent writes.'
     ],
@@ -1748,8 +1843,17 @@ $GLOBALS['__help_commands'] = [
     'getRootVariables' => [
         'description' => 'Retrieves all CSS custom properties (variables) defined in the :root selector',
         'method' => 'GET',
-        'parameters' => [],
-        'example_get' => 'GET /management/getRootVariables',
+        'parameters' => [
+            'themeTarget' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Which theme scope to read. "light" reads :root; "dark" reads the [data-theme="dark"] block.',
+                'example' => 'dark',
+                'validation' => 'light|dark',
+                'default' => 'light'
+            ]
+        ],
+        'example_get' => 'GET /management/p/<projectId>/getRootVariables',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -1766,7 +1870,8 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '404.file.not_found' => 'Style file not found',
             '404.root.not_found' => 'No :root block found in CSS',
-            '500.server.file_read_failed' => 'Failed to read style file'
+            '500.server.file_read_failed' => 'Failed to read style file',
+            '400.validation.invalid_format' => 'themeTarget must be "light" or "dark".'
         ],
         'notes' => 'Returns all CSS variables from the :root selector. Variable names include the -- prefix. Use setRootVariables to modify.'
     ],
@@ -1781,9 +1886,17 @@ $GLOBALS['__help_commands'] = [
                 'description' => 'Object of variable names and values to set/update',
                 'example' => '{"--color-primary": "#ff6600", "--new-var": "10px"}',
                 'validation' => 'Variable names must start with -- or will be auto-prefixed'
+            ],
+            'themeTarget' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Which theme scope to write. "light" writes :root; "dark" writes the [data-theme="dark"] block.',
+                'example' => 'dark',
+                'validation' => 'light|dark',
+                'default' => 'light'
             ]
         ],
-        'example_patch' => 'PATCH /management/setRootVariables with body: {"variables": {"--color-primary": "#ff6600"}}',
+        'example_patch' => 'PATCH /management/p/<projectId>/setRootVariables with body: {"variables": {"--color-primary": "#ff6600"}}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -1800,7 +1913,10 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_format' => 'Variables must be a non-empty object',
             '400.validation.security' => 'Dangerous CSS pattern detected',
             '404.file.not_found' => 'Style file not found',
-            '500.server.file_write_failed' => 'Failed to write style file'
+            '500.server.file_write_failed' => 'Failed to write style file',
+            '400.validation.invalid_css' => 'Invalid CSS value detected. Variable names and values may not contain "{" or "}".',
+            '500.server.lock_failed' => 'Could not acquire file lock.',
+            '500.server.operation_failed' => 'An unexpected failure while writing the variables; the stylesheet lock is released first. The exception message is returned.'
         ],
         'notes' => 'Adds new variables or updates existing ones. Security validated against CSS injection. File locking prevents concurrent writes. Creates :root block if not exists.'
     ],
@@ -1809,7 +1925,7 @@ $GLOBALS['__help_commands'] = [
         'description' => 'Lists all CSS selectors in the stylesheet, organized by global and media query scopes',
         'method' => 'GET',
         'parameters' => [],
-        'example_get' => 'GET /management/listStyleRules',
+        'example_get' => 'GET /management/p/<projectId>/listStyleRules',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -1848,7 +1964,7 @@ $GLOBALS['__help_commands'] = [
                 'example' => '(max-width: 768px)'
             ]
         ],
-        'example_get' => 'GET /management/getStyleRule/.btn-primary or GET /management/getStyleRule/.hero/(max-width%3A%20768px)',
+        'example_get' => 'GET /management/p/<projectId>/getStyleRule/.btn-primary or GET /management/p/<projectId>/getStyleRule/.hero/(max-width%3A%20768px)',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -1862,7 +1978,8 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.validation.required' => 'Missing selector parameter',
             '404.file.not_found' => 'Style file not found',
-            '404.selector.not_found' => 'Selector not found (in specified scope)'
+            '404.selector.not_found' => 'Selector not found (in specified scope)',
+            '500.server.file_read_failed' => 'Failed to read style file.'
         ],
         'notes' => 'URL-encode selectors with special characters. Returns styles as raw CSS string. Use listStyleRules to discover available selectors.'
     ],
@@ -1896,8 +2013,8 @@ $GLOBALS['__help_commands'] = [
                 'example' => '(max-width: 768px)'
             ]
         ],
-        'example_post' => 'POST /management/setStyleRule with body: {"selector": ".btn-custom", "styles": {"background": "#007bff", "color": "white"}}',
-        'example_remove' => 'PATCH /management/setStyleRule with body: {"selector": ".btn-custom", "removeProperties": ["margin", "padding"]}',
+        'example_post' => 'POST /management/p/<projectId>/setStyleRule with body: {"selector": ".btn-custom", "styles": {"background": "#007bff", "color": "white"}}',
+        'example_remove' => 'PATCH /management/p/<projectId>/setStyleRule with body: {"selector": ".btn-custom", "removeProperties": ["margin", "padding"]}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -1916,7 +2033,9 @@ $GLOBALS['__help_commands'] = [
             '400.validation.security' => 'Dangerous CSS pattern detected (javascript:, expression(), etc.)',
             '400.validation.invalid_media_query' => 'Invalid media query format',
             '404.file.not_found' => 'Style file not found',
-            '500.server.file_write_failed' => 'Failed to write style file'
+            '500.server.file_write_failed' => 'Failed to write style file',
+            '500.server.lock_failed' => 'Could not acquire file lock.',
+            '500.server.operation_failed' => 'An unexpected failure while writing the rule; the stylesheet lock is released first. The exception message is returned.'
         ],
         'notes' => 'Styles can be string or object format. Use removeProperties to selectively delete properties. If removing properties leaves the rule empty, it is automatically deleted (action: deleted). Security validated.'
     ],
@@ -1938,7 +2057,7 @@ $GLOBALS['__help_commands'] = [
                 'example' => '(max-width: 768px)'
             ]
         ],
-        'example_delete' => 'DELETE /management/deleteStyleRule with body: {"selector": ".unused-class"}',
+        'example_delete' => 'DELETE /management/p/<projectId>/deleteStyleRule with body: {"selector": ".unused-class"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -1952,7 +2071,10 @@ $GLOBALS['__help_commands'] = [
             '400.validation.required' => 'Missing selector parameter',
             '404.file.not_found' => 'Style file not found',
             '404.selector.not_found' => 'Selector not found (in specified scope)',
-            '500.server.file_write_failed' => 'Failed to write style file'
+            '500.server.file_write_failed' => 'Failed to write style file',
+            '400.validation.invalid_format' => 'Selector cannot be empty.',
+            '500.server.lock_failed' => 'Could not acquire file lock.',
+            '500.server.operation_failed' => 'An unexpected failure while removing the rule; the stylesheet lock is released first. The exception message is returned.'
         ],
         'notes' => 'Permanently removes the CSS rule. Use getStyleRule first to confirm selector exists. Cannot be undone.'
     ],
@@ -1962,7 +2084,7 @@ $GLOBALS['__help_commands'] = [
         'method' => 'GET',
         'url_structure' => '/management/listKeyframes',
         'parameters' => [],
-        'example_get' => 'GET /management/listKeyframes',
+        'example_get' => 'GET /management/p/<projectId>/listKeyframes',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -1973,7 +2095,8 @@ $GLOBALS['__help_commands'] = [
             ]
         ],
         'error_responses' => [
-            '404.file.not_found' => 'Style file not found'
+            '404.file.not_found' => 'Style file not found',
+            '500.server.file_read_failed' => 'Failed to read style file.'
         ],
         'notes' => 'Lightweight alternative to getKeyframes when you only need animation names. Use getKeyframes for full frame content.'
     ],
@@ -1983,7 +2106,7 @@ $GLOBALS['__help_commands'] = [
         'method' => 'GET',
         'url_structure' => '/management/getAnimatedSelectors',
         'parameters' => [],
-        'example_get' => 'GET /management/getAnimatedSelectors',
+        'example_get' => 'GET /management/p/<projectId>/getAnimatedSelectors',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -2004,7 +2127,8 @@ $GLOBALS['__help_commands'] = [
             ]
         ],
         'error_responses' => [
-            '404.file.not_found' => 'Style file not found'
+            '404.file.not_found' => 'Style file not found',
+            '500.server.file_read_failed' => 'Failed to read style file.'
         ],
         'notes' => 'Useful for finding which elements use animations and detecting orphan animations (referenced but not defined). Checks both animation and animation-name properties.'
     ],
@@ -2021,7 +2145,7 @@ $GLOBALS['__help_commands'] = [
                 'example' => 'fadeIn'
             ]
         ],
-        'example_get' => 'GET /management/getKeyframes (all) or GET /management/getKeyframes/fadeIn (specific)',
+        'example_get' => 'GET /management/p/<projectId>/getKeyframes (all) or GET /management/p/<projectId>/getKeyframes/fadeIn (specific)',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -2038,7 +2162,8 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '404.file.not_found' => 'Style file not found',
-            '500.server.file_read_failed' => 'Failed to read style file'
+            '500.server.file_read_failed' => 'Failed to read style file',
+            '404.keyframe.not_found' => 'Keyframe animation not found.'
         ],
         'notes' => 'Returns all @keyframes animations with their frame definitions. Use setKeyframes to add/update animations.'
     ],
@@ -2066,8 +2191,8 @@ $GLOBALS['__help_commands'] = [
                 'example' => 'false'
             ]
         ],
-        'example_patch' => 'PATCH /management/setKeyframes with body: {"name": "bounce", "frames": {"0%, 100%": "transform: translateY(0);", "50%": "transform: translateY(-20px);"}}',
-        'example_no_overwrite' => 'PATCH /management/setKeyframes with body: {"name": "newAnim", "frames": {...}, "allowOverwrite": false}',
+        'example_patch' => 'PATCH /management/p/<projectId>/setKeyframes with body: {"name": "bounce", "frames": {"0%, 100%": "transform: translateY(0);", "50%": "transform: translateY(-20px);"}}',
+        'example_no_overwrite' => 'PATCH /management/p/<projectId>/setKeyframes with body: {"name": "newAnim", "frames": {...}, "allowOverwrite": false}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -2085,7 +2210,10 @@ $GLOBALS['__help_commands'] = [
             '400.validation.security' => 'Dangerous CSS pattern detected',
             '409.keyframes.exists' => 'Animation already exists (when allowOverwrite is false)',
             '404.file.not_found' => 'Style file not found',
-            '500.server.file_write_failed' => 'Failed to write style file'
+            '500.server.file_write_failed' => 'Failed to write style file',
+            '409.keyframe.already_exists' => 'Keyframe already exists. Set allowOverwrite: true to replace it.',
+            '500.server.lock_failed' => 'Could not acquire file lock.',
+            '500.server.operation_failed' => 'An unexpected failure while writing the keyframes; the stylesheet lock is released first. The exception message is returned.'
         ],
         'notes' => 'Frame keys: percentages (0%, 50%, 100%), combined (0%, 100%), or keywords (from, to). Use allowOverwrite:false to prevent accidental overwrites. Security validated against CSS injection.'
     ],
@@ -2101,7 +2229,7 @@ $GLOBALS['__help_commands'] = [
                 'example' => 'fadeIn'
             ]
         ],
-        'example_delete' => 'DELETE /management/deleteKeyframes with body: {"name": "fadeIn"}',
+        'example_delete' => 'DELETE /management/p/<projectId>/deleteKeyframes with body: {"name": "fadeIn"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -2115,7 +2243,10 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_format' => 'Animation name cannot be empty',
             '404.file.not_found' => 'Style file not found',
             '404.keyframes.not_found' => 'Animation not found',
-            '500.server.file_write_failed' => 'Failed to write style file'
+            '500.server.file_write_failed' => 'Failed to write style file',
+            '404.keyframe.not_found' => 'Keyframe animation not found.',
+            '500.server.lock_failed' => 'Could not acquire file lock.',
+            '500.server.operation_failed' => 'An unexpected failure while removing the keyframes; the stylesheet lock is released first. The exception message is returned.'
         ],
         'notes' => 'Permanently removes the @keyframes animation. Use getKeyframes first to confirm animation exists. Cannot be undone.'
     ],
@@ -2141,6 +2272,9 @@ $GLOBALS['__help_commands'] = [
                 'commands' => '...',
                 'total' => 19
             ]
+        ],
+        'error_responses' => [
+            '404.route.not_found' => 'Command documentation not found.'
         ]
     ],
     
@@ -2299,7 +2433,8 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_format' => 'New password shorter than the configured minimum (data.min_length)',
             '401.auth.invalid_credentials' => 'Current password is incorrect (counts toward the login throttle)',
             '429.auth.throttled' => 'Too many failed attempts - retry_after gives the wait in seconds',
-            '500.server.file_write_failed' => 'Could not persist the new password'
+            '500.server.file_write_failed' => 'Could not persist the new password',
+            '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.'
         ],
         'notes' => 'Global-scoped (no project marker) - acts only on the caller\'s own account. Wrong current-password attempts share the login throttle for the same account (keyed on its username), so a stolen access token cannot brute-force the password. After a successful change, other devices/sessions must log in again with the new password.'
     ],
@@ -2342,7 +2477,8 @@ $GLOBALS['__help_commands'] = [
             '409.account.sole_owner' => 'You still solely own one or more projects - data.owned_projects lists them; transfer or delete each first',
             '429.auth.throttled' => 'Too many failed attempts - retry_after gives the wait in seconds',
             '500.members.integrity' => 'A project membership file could not be updated - the account was NOT deleted and nothing changed',
-            '500.server.file_write_failed' => 'Memberships were removed but the account record could not be deleted - retry'
+            '500.server.file_write_failed' => 'Memberships were removed but the account record could not be deleted - retry',
+            '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.'
         ],
         'notes' => 'Global-scoped (no project marker). Sole ownership is refused rather than cascaded: deleting a project\'s only owner leaves it unownable AND undeletable (transferOwnership requires the caller to be the owner, and project.delete is owner-only), and cascading would hide N site deletions behind one call. What is removed: the users.php record (with its status-mirror cache), every members.json entry keyed by the caller\'s user id (membership, invitation received, own join request, proposal filed about them), and every session family. What is KEPT: `by`/`sponsor` references to the caller inside entries about OTHER people (removing those would destroy a third party\'s pending invitation) - they render as {user_id, name:null}, and the shipped accept/approve-time re-validation voids anything that depended on the caller\'s standing. Command history keeps its publisher record (immutable audit; the display name was already snapshotted at write time).'
     ],
@@ -2351,7 +2487,7 @@ $GLOBALS['__help_commands'] = [
         'description' => 'Lists all reusable JSON components with metadata. Shows available slots (placeholders), typed variables, and component dependencies.',
         'method' => 'GET',
         'parameters' => [],
-        'example_get' => 'GET /management/listComponents',
+        'example_get' => 'GET /management/p/<projectId>/listComponents',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -2390,7 +2526,7 @@ $GLOBALS['__help_commands'] = [
                 'description' => 'Component name (filename without .json extension)'
             ]
         ],
-        'example_get' => 'GET /management/getComponent?name=footer-link',
+        'example_get' => 'GET /management/p/<projectId>/getComponent?name=footer-link',
         'success_response' => [
             'status' => 200,
             'code' => 'components.get_success',
@@ -2411,7 +2547,12 @@ $GLOBALS['__help_commands'] = [
             ['status' => 400, 'code' => 'components.name_required', 'when' => 'No name parameter provided'],
             ['status' => 400, 'code' => 'components.invalid_name', 'when' => 'Name contains invalid characters'],
             ['status' => 404, 'code' => 'components.not_found', 'when' => 'Component file does not exist'],
-            ['status' => 422, 'code' => 'components.invalid_json', 'when' => 'Component file contains invalid JSON']
+            ['status' => 422, 'code' => 'components.invalid_json', 'when' => 'Component file contains invalid JSON'],
+            '400.components.invalid_name' => 'Invalid component name.',
+            '400.components.name_required' => 'Component name is required.',
+            '404.components.not_found' => 'Component not found.',
+            '422.components.invalid_json' => 'The component file on disk is not valid JSON; the decoder message is returned.',
+            '500.components.read_error' => 'Failed to read component file.'
         ],
         'notes' => 'Returns previewStructure only when nested component references exist. Translations are loaded from project translation files for all textKeys in the expanded structure.'
     ],
@@ -2425,9 +2566,15 @@ $GLOBALS['__help_commands'] = [
                 'type' => 'string',
                 'description' => 'Component name to search for (URL segment)',
                 'example' => 'menu-card'
+            ],
+            'component' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Component name to search for, as a parameter instead of a URL segment. The URL segment wins when both are present.',
+                'example' => 'menu-card'
             ]
         ],
-        'example_get' => 'GET /management/findComponentUsages/menu-card',
+        'example_get' => 'GET /management/p/<projectId>/findComponentUsages/menu-card',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -2465,17 +2612,19 @@ $GLOBALS['__help_commands'] = [
             'oldName' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Current component name',
-                'example' => 'menu-card'
+                'description' => 'Current component name. Can use "from" as an alias.',
+                'example' => 'menu-card',
+                'alias' => 'from'
             ],
             'newName' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'New component name (letters, numbers, hyphens)',
-                'example' => 'nav-card'
+                'description' => 'New component name (letters, numbers, hyphens). Can use "to" as an alias.',
+                'example' => 'nav-card',
+                'alias' => 'to'
             ]
         ],
-        'example_post' => 'POST /management/renameComponent with body: {"oldName": "menu-card", "newName": "nav-card"}',
+        'example_post' => 'POST /management/p/<projectId>/renameComponent with body: {"oldName": "menu-card", "newName": "nav-card"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -2495,7 +2644,8 @@ $GLOBALS['__help_commands'] = [
             '400.validation.missing_parameter' => 'oldName or newName not provided',
             '400.validation.invalid_format' => 'Invalid component name format',
             '404.file.not_found' => 'Source component does not exist',
-            '409.file.already_exists' => 'Target component name already exists'
+            '409.file.already_exists' => 'Target component name already exists',
+            '500.server.file_rename_failed' => 'Failed to rename component file.'
         ],
         'notes' => 'Renames file and updates all references atomically. Name must start with letter and contain only letters, numbers, hyphens. Use findComponentUsages first to preview impact.'
     ],
@@ -2507,17 +2657,19 @@ $GLOBALS['__help_commands'] = [
             'source' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Source component name to copy',
-                'example' => 'menu-card'
+                'description' => 'Source component name to copy. Can use "from" as an alias.',
+                'example' => 'menu-card',
+                'alias' => 'from'
             ],
             'name' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Name for the new component',
-                'example' => 'menu-card-v2'
+                'description' => 'Name for the new component. Can use "to" as an alias.',
+                'example' => 'menu-card-v2',
+                'alias' => 'to'
             ]
         ],
-        'example_post' => 'POST /management/duplicateComponent with body: {"source": "menu-card", "name": "menu-card-v2"}',
+        'example_post' => 'POST /management/p/<projectId>/duplicateComponent with body: {"source": "menu-card", "name": "menu-card-v2"}',
         'success_response' => [
             'status' => 201,
             'code' => 'operation.created',
@@ -2533,7 +2685,11 @@ $GLOBALS['__help_commands'] = [
             '400.validation.missing_parameter' => 'source or name not provided',
             '400.validation.invalid_format' => 'Invalid component name format',
             '404.file.not_found' => 'Source component does not exist',
-            '409.file.already_exists' => 'Target component name already exists'
+            '409.file.already_exists' => 'Target component name already exists',
+            '500.server.directory_create_failed' => 'Failed to create components directory.',
+            '500.server.file_read_failed' => 'Failed to read source component.',
+            '500.server.file_write_failed' => 'Failed to create new component file.',
+            '500.validation.invalid_json' => 'Source component contains invalid JSON.'
         ],
         'notes' => 'Creates independent copy. Existing pages using original component are NOT modified. Use to create variations of components.'
     ],
@@ -2542,7 +2698,7 @@ $GLOBALS['__help_commands'] = [
         'description' => 'Lists all JSON page structures with metadata. Shows route status, components used, and translation keys.',
         'method' => 'GET',
         'parameters' => [],
-        'example_get' => 'GET /management/listPages',
+        'example_get' => 'GET /management/p/<projectId>/listPages',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -2611,7 +2767,7 @@ $GLOBALS['__help_commands'] = [
                 'example' => 'before'
             ]
         ],
-        'example_patch' => 'PATCH /management/moveNode with body: {"type": "page", "name": "home", "sourceNodeId": "0.2.1", "targetNodeId": "0.3", "position": "after"}',
+        'example_patch' => 'PATCH /management/p/<projectId>/moveNode with body: {"type": "page", "name": "home", "sourceNodeId": "0.2.1", "targetNodeId": "0.3", "position": "after"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -2629,7 +2785,15 @@ $GLOBALS['__help_commands'] = [
             '400.validation.required' => 'Missing required parameter',
             '400.validation.invalid_value' => 'Invalid type or position value',
             '400.operation.denied' => 'Cannot move to same position or inside self',
-            '404.resource.not_found' => 'Source or target node not found'
+            '404.resource.not_found' => 'Source or target node not found',
+            '400.operation.failed' => 'The move could not be applied: the source node could not be removed, the target could no longer be found once the source was removed, or the insert failed. The structure file is left unchanged.',
+            '400.validation.invalid_format' => 'Invalid sourceNodeId format. Use dot notation like \'0.2.1\'. Invalid targetNodeId format. Use dot notation like \'0.2.1\'. Structure too deeply nested (max 50 levels).',
+            '404.file.not_found' => 'Structure file not found.',
+            '404.node.not_found' => 'The sourceNodeId or the targetNodeId does not resolve to a node in the structure.',
+            '404.route.not_found' => 'Page does not exist.',
+            '500.server.file_read_failed' => 'Failed to read structure file.',
+            '500.server.file_write_failed' => 'Failed to write structure file.',
+            '500.server.internal_error' => 'Invalid JSON in structure file. Failed to encode structure to JSON.'
         ],
         'notes' => 'Atomic move operation with proper index adjustment. Use in Visual Editor drag & drop. Components are moved as single units. **Component node paths**: For type=component, children are "0", "1", etc. (root is "", not movable).'
     ],
@@ -2655,9 +2819,16 @@ $GLOBALS['__help_commands'] = [
                 'type' => 'string',
                 'description' => 'Node ID to delete (dot-notation path)',
                 'example' => '0.2.1'
+            ],
+            'keepTranslationKeys' => [
+                'required' => false,
+                'type' => 'boolean',
+                'description' => 'Keep the translation keys the deleted node referenced. By default they are removed from every language along with the node.',
+                'example' => 'true',
+                'default' => false
             ]
         ],
-        'example_delete' => 'DELETE /management/deleteNode with body: {"type": "page", "name": "home", "nodeId": "0.2.1"}',
+        'example_delete' => 'DELETE /management/p/<projectId>/deleteNode with body: {"type": "page", "name": "home", "nodeId": "0.2.1"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -2675,7 +2846,15 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.validation.required' => 'Missing required parameter',
             '400.validation.invalid_value' => 'Invalid type value',
-            '404.resource.not_found' => 'Node not found'
+            '404.resource.not_found' => 'Node not found',
+            '400.operation.failed' => 'Failed to delete node.',
+            '400.validation.invalid_format' => 'Invalid nodeId format. Use dot notation like \'0.2.1\'.',
+            '404.file.not_found' => 'Structure file not found.',
+            '404.node.not_found' => 'The nodeId does not resolve to a node in the structure.',
+            '404.route.not_found' => 'Page does not exist.',
+            '500.server.file_read_failed' => 'Failed to read structure file.',
+            '500.server.file_write_failed' => 'Failed to write structure file.',
+            '500.server.internal_error' => 'Invalid JSON in structure file. Failed to encode structure to JSON.'
         ],
         'notes' => 'Recursively deletes all children AND removes associated translation keys from all language files. Collects textKey and translatable attributes (alt, placeholder, title, aria-*) from deleted node and children. Use in Visual Editor with Del key. **Component node paths**: For type=component, children are "0", "1", etc. (root itself is "", but cannot be deleted).'
     ],
@@ -2749,7 +2928,7 @@ $GLOBALS['__help_commands'] = [
                 'default' => false
             ]
         ],
-        'example_post' => 'TAG mode: {"type":"page","name":"home","targetNodeId":"0.2","position":"after","tag":"a","params":{"href":"/contact","class":"btn"}}. TEXT RAW: {"type":"page","name":"home","targetNodeId":"0.2","position":"inside","nodeKind":"text","textRaw":true,"textValue":" — "}. TEXT key: {"type":"page","name":"home","targetNodeId":"0.2","position":"inside","nodeKind":"text","textKey":"home.greeting"}.',
+        'example_post' => 'POST /management/p/<projectId>/addNode — TAG mode: {"type":"page","name":"home","targetNodeId":"0.2","position":"after","tag":"a","params":{"href":"/contact","class":"btn"}}. TEXT RAW: {"type":"page","name":"home","targetNodeId":"0.2","position":"inside","nodeKind":"text","textRaw":true,"textValue":" — "}. TEXT key: {"type":"page","name":"home","targetNodeId":"0.2","position":"inside","nodeKind":"text","textKey":"home.greeting"}.',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -2768,7 +2947,18 @@ $GLOBALS['__help_commands'] = [
             '400.validation.missing_params' => 'Missing mandatory params (e.g., href for <a>)',
             '400.validation.unsafe_param' => 'A param the renderer would refuse: an attribute NAME outside [letters, digits, underscore, colon, hyphen]; a raw on* handler (use {{call:...}} syntax); or a disallowed URL scheme (only http, https, mailto, tel)',
             '400.operation.denied' => 'Cannot insert inside component node',
-            '404.resource.not_found' => 'Target node not found'
+            '404.resource.not_found' => 'Target node not found',
+            '400.operation.failed' => 'Failed to insert node.',
+            '400.validation.blocked_tag' => 'Tag is blocked for security reasons.',
+            '400.validation.invalid_format' => 'Invalid targetNodeId format. Use dot notation like \'0.2.1\' or \'root\'. Structure too deeply nested (max 50 levels).',
+            '400.validation.reserved_attribute' => 'Cannot use reserved attribute. Attributes starting with \'data-qs-\' are reserved for QuickSite. Use a different prefix like \'data-custom-\' or \'data-app-\'.',
+            '400.validation.reserved_key' => 'Reserved admin-namespace prefix (quicksite_ / quicksite- / qs_ / qs-). These are used by the admin panel and would collide with admin state. Pick a project-specific prefix.',
+            '404.file.not_found' => 'Structure file not found.',
+            '404.node.not_found' => 'The targetNodeId does not resolve to a node in the structure.',
+            '404.route.not_found' => 'Page does not exist.',
+            '500.server.file_read_failed' => 'Failed to read structure file.',
+            '500.server.file_write_failed' => 'Failed to write structure file.',
+            '500.server.internal_error' => 'The structure file on disk is not valid JSON; the decoder message is returned.'
         ],
         'notes' => 'TAG mode adds a tag element that comes in EMPTY by default; the legacy auto-generated placeholder textKey was removed (it was the cause of span-in-span nesting when authoring bound elements). Pass an explicit `textKey` to attach a translation-key text child at add-time, or leave empty and use the dedicated TEXT mode + the Text-mode inline editor (Text tool) afterwards. TEXT mode adds a bare `{textKey:...}` text node — set `textRaw=true` + `textValue` for a literal, or pass an explicit `textKey` (the visual editor\'s text-key picker handles key creation + translation write via setTranslationKeys before calling addNode). Position "inside" moves existing text children of the target into the new tag node; this move logic is skipped for TEXT inserts. For components, use addComponentToNode. **Component node paths**: For type=component, root is "" (empty) and children are "0", "1", etc. (differs from pages where root elements start at "0").'
     ],
@@ -2815,7 +3005,7 @@ $GLOBALS['__help_commands'] = [
                 'example' => 'inside'
             ]
         ],
-        'example_post' => 'POST /management/addComplexElement with body: {"kind": "list", "config": {"tag": "ul", "items": [{"labelKey": "menu.home"}, {"labelKey": "menu.about"}]}, "structType": "page", "pageName": "home", "targetNodeId": "0", "position": "inside"}',
+        'example_post' => 'POST /management/p/<projectId>/addComplexElement with body: {"kind": "list", "config": {"tag": "ul", "items": [{"labelKey": "menu.home"}, {"labelKey": "menu.about"}]}, "structType": "page", "pageName": "home", "targetNodeId": "0", "position": "inside"}',
         'success_response' => [
             'status' => 201,
             'code' => 'operation.success',
@@ -2838,7 +3028,14 @@ $GLOBALS['__help_commands'] = [
             '404.complex_element.unknown_kind' => 'No builder registered for the requested kind (response includes availableKinds list)',
             '404.route.not_found' => 'Target page does not exist',
             '404.node.not_found' => 'Target node not found at the given dot path',
-            '500.complex_element.build_failed' => 'Builder threw unexpectedly or returned a malformed node'
+            '500.complex_element.build_failed' => 'Builder threw unexpectedly or returned a malformed node',
+            '400.operation.failed' => 'Failed to insert subtree.',
+            '400.validation.blocked_tag' => 'Builder emitted tag, which is not allowed (security restriction).',
+            '400.validation.reserved_key' => 'Reserved admin-namespace prefix (quicksite_ / quicksite- / qs_ / qs-). These are used by the admin panel and would collide with admin state. Pick a project-specific prefix.',
+            '404.file.not_found' => 'Structure file not found.',
+            '500.server.file_read_failed' => 'Failed to read structure file.',
+            '500.server.file_write_failed' => 'Failed to write structure file.',
+            '500.server.internal_error' => 'Builder failed unexpectedly. See server log. Invalid JSON.'
         ],
         'notes' => 'After save, the emitted subtree is INDISTINGUISHABLE from a hand-built one — same JSON shape, same renderer, editable with the regular visual-editor tools. Wizard is build-time only; nothing at render time knows the element came from here. Builders live in <secure>/src/classes/complexElements/*.php as ComplexElementBuilder subclasses and are auto-discovered by the dispatcher. Drop a new builder file + a matching public/admin/.../contextual-complex/complex-<kind>.js wizard to add a kind — zero registration. Reuses addNode\'s insertion helper for non-root targets (same atomicity). For targetNodeId="root", detects page (list-shape root) vs component (object-shape root) and splices accordingly.'
     ],
@@ -2873,7 +3070,7 @@ $GLOBALS['__help_commands'] = [
                 'example' => 'true'
             ]
         ],
-        'example_post' => 'POST /management/duplicateNode with body: {"type": "page", "name": "home", "nodeId": "0.2.1"}',
+        'example_post' => 'POST /management/p/<projectId>/duplicateNode with body: {"type": "page", "name": "home", "nodeId": "0.2.1"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -2893,7 +3090,15 @@ $GLOBALS['__help_commands'] = [
             '400.validation.required' => 'Missing required parameter',
             '400.validation.invalid_value' => 'Invalid type value',
             '400.operation.denied' => 'Cannot duplicate component nodes (use at component definition level)',
-            '404.resource.not_found' => 'Node not found'
+            '404.resource.not_found' => 'Node not found',
+            '400.operation.failed' => 'Component root has no children to duplicate. Failed to insert duplicated node.',
+            '400.validation.invalid_format' => 'Invalid nodeId format. Use dot notation like \'0.2.1\'. Structure too deeply nested (max 50 levels).',
+            '404.file.not_found' => 'Structure file not found.',
+            '404.node.not_found' => 'The nodeId does not resolve to a node in the structure.',
+            '404.route.not_found' => 'Page does not exist.',
+            '500.server.file_read_failed' => 'Failed to read structure file.',
+            '500.server.file_write_failed' => 'Failed to write structure file.',
+            '500.server.internal_error' => 'Invalid JSON in structure file. Failed to encode structure to JSON.'
         ],
         'notes' => 'Creates a deep copy of the node and all children. Generates new unique translation keys for textKey and translatable attributes (alt, placeholder, title, aria-*). New keys follow pattern {prefix}.item{N+1}. Optionally copies translation values from source keys. Returns rendered HTML for live DOM update. Use in Visual Editor with D key shortcut. **Component node paths**: For type=component, children are "0", "1", etc. (root itself is "", but cannot be duplicated).'
     ],
@@ -2945,7 +3150,7 @@ $GLOBALS['__help_commands'] = [
                 'example' => 'home.newKey'
             ]
         ],
-        'example_post' => 'POST /management/editNode with body: {"type": "page", "name": "home", "nodeId": "0.2", "addParams": {"class": "highlight"}, "removeParams": ["data-temp"]}',
+        'example_post' => 'POST /management/p/<projectId>/editNode with body: {"type": "page", "name": "home", "nodeId": "0.2", "addParams": {"class": "highlight"}, "removeParams": ["data-temp"]}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -2971,7 +3176,16 @@ $GLOBALS['__help_commands'] = [
             '400.validation.reserved_attribute' => 'addParams contains a reserved data-qs-* attribute (auto-managed by QuickSite)',
             '400.validation.unsafe_param' => 'A param the renderer would refuse: an attribute NAME outside [letters, digits, underscore, colon, hyphen]; a raw on* handler (use {{call:...}} syntax); or a disallowed URL scheme (only http, https, mailto, tel)',
             '400.operation.denied' => 'Cannot edit component node (use editComponentToNode)',
-            '404.resource.not_found' => 'Node not found'
+            '404.resource.not_found' => 'Node not found',
+            '400.operation.failed' => 'Failed to edit node.',
+            '400.validation.blocked_tag' => 'Tag is blocked for security reasons.',
+            '400.validation.invalid_format' => 'Invalid nodeId format. Use dot notation like \'0.2.1\'. Structure too deeply nested (max 50 levels).',
+            '404.file.not_found' => 'Structure file not found.',
+            '404.node.not_found' => 'The nodeId does not resolve to a node in the structure.',
+            '404.route.not_found' => 'Page does not exist.',
+            '500.server.file_read_failed' => 'Failed to read structure file.',
+            '500.server.file_write_failed' => 'Failed to write structure file.',
+            '500.server.internal_error' => 'The structure file on disk is not valid JSON; the decoder message is returned.'
         ],
         'notes' => 'Does NOT edit translation values (use setTranslationKeys). Cannot edit component nodes or pure text nodes. After tag change, validates mandatory params are present. Returns rendered HTML for live DOM updates. **Component node paths**: For type=component, root is "" and children are "0", "1", etc. **addParams**: empty/null values are rejected — use removeParams to drop a key.'
     ],
@@ -3015,9 +3229,15 @@ $GLOBALS['__help_commands'] = [
                 'type' => 'object',
                 'description' => 'Variable bindings (param-type only, textKey auto-generated)',
                 'example' => '{"href": "/contact"}'
+            ],
+            'params' => [
+                'required' => false,
+                'type' => 'object',
+                'description' => 'Per-instance attributes stamped on the inserted call site - a class, an id, aria-* and the like, or the binding attributes componentList mode reads. Keys must be non-empty strings; values may be string, boolean or numeric.',
+                'example' => '{"class": "featured", "aria-label": "Primary navigation"}'
             ]
         ],
-        'example_post' => 'POST /management/addComponentToNode with body: {"type": "page", "name": "home", "targetNodeId": "0.2", "position": "after", "component": "menu-card", "data": {"href": "/about"}}',
+        'example_post' => 'POST /management/p/<projectId>/addComponentToNode with body: {"type": "page", "name": "home", "targetNodeId": "0.2", "position": "after", "component": "menu-card", "data": {"href": "/about"}}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -3038,7 +3258,14 @@ $GLOBALS['__help_commands'] = [
             '400.validation.required' => 'Missing required parameter',
             '400.validation.invalid_value' => 'Component not found',
             '400.operation.denied' => 'Cannot insert inside component node',
-            '404.resource.not_found' => 'Target node not found'
+            '404.resource.not_found' => 'Target node not found',
+            '400.operation.failed' => 'Failed to insert component node.',
+            '400.validation.invalid_format' => 'Invalid targetNodeId format. Use dot notation like \'0.2.1\' or \'root\'. Invalid component name format. Structure too deeply nested (max 50 levels).',
+            '400.validation.reserved_key' => 'Reserved admin-namespace prefix (quicksite_ / quicksite- / qs_ / qs-). These are used by the admin panel and would collide with admin state. Pick a project-specific prefix.',
+            '404.error.notFound' => 'One of the four things the call needs does not exist: the component, the page, the structure file for the given type (and name), or the target node.',
+            '500.error.fileRead' => 'Failed to read component file.',
+            '500.error.fileWrite' => 'Failed to save structure file.',
+            '500.error.invalidJson' => 'Component has invalid JSON. Structure file has invalid JSON.'
         ],
         'notes' => 'Auto-generates textKeys as {struct}.{component}{N}.{var}. Creates empty translations. Returns rendered HTML for live DOM insertion. System placeholders (__ prefix) are filtered out.'
     ],
@@ -3072,7 +3299,7 @@ $GLOBALS['__help_commands'] = [
                 'example' => '{"href": "/new-target", "style": "primary"}'
             ]
         ],
-        'example_post' => 'POST /management/editComponentToNode with body: {"type": "page", "name": "home", "nodeId": "0.2", "data": {"href": "/contact"}}',
+        'example_post' => 'POST /management/p/<projectId>/editComponentToNode with body: {"type": "page", "name": "home", "nodeId": "0.2", "data": {"href": "/contact"}}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -3090,7 +3317,14 @@ $GLOBALS['__help_commands'] = [
             '400.validation.required' => 'Missing required parameter',
             '400.validation.invalid_variable' => 'Variable does not exist in component',
             '400.operation.denied' => 'Cannot edit textKey-type variables (use setTranslationKeys)',
-            '404.resource.not_found' => 'Node not found or not a component'
+            '404.resource.not_found' => 'Node not found or not a component',
+            '400.validation.failed' => 'Some variables could not be updated.',
+            '400.validation.invalid_format' => 'Invalid nodeId format. Use dot notation like \'0.2.1\'. Structure too deeply nested (max 50 levels).',
+            '400.validation.invalid_value' => 'The type parameter is not one of menu, footer, page, component; or the node at nodeId is a tag node rather than a component node (use editNode for those).',
+            '404.error.notFound' => 'One of the four things the call needs does not exist: the page, the structure file for the given type (and name), the node, or the component definition it points at.',
+            '500.error.fileWrite' => 'Failed to save structure file.',
+            '500.error.internal' => 'Failed to update node.',
+            '500.error.invalidJson' => 'Structure file has invalid JSON. Component has invalid JSON.'
         ],
         'notes' => 'Only param-type variables can be edited (href, src, etc.). TextKey variables are read-only - use setTranslationKeys to change translation values. Returns rendered HTML for live DOM update.'
     ],
@@ -3119,7 +3353,7 @@ $GLOBALS['__help_commands'] = [
                 'validation' => 'Must be "redirect" or "internal"'
             ]
         ],
-        'example_post' => 'POST /management/createAlias with body: {"alias": "/old-home", "target": "/home", "type": "redirect"}',
+        'example_post' => 'POST /management/p/<projectId>/createAlias with body: {"alias": "/old-home", "target": "/home", "type": "redirect"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -3134,7 +3368,12 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.validation.required' => 'Missing alias or target parameter',
             '400.validation.invalid_parameter' => 'Invalid alias format or target does not exist',
-            '409.conflict' => 'Alias conflicts with existing route or reserved path'
+            '409.conflict' => 'Alias conflicts with existing route or reserved path',
+            '400.api.error.invalid_parameter' => 'One of: type is neither "redirect" nor "internal"; the alias is not alphanumerics, dashes, underscores and slashes; the alias points at itself; or the target is neither an existing route nor a page.',
+            '400.api.error.invalid_request' => 'The request body is not valid JSON.',
+            '400.api.error.missing_parameter' => 'Missing or invalid "alias" parameter. Missing or invalid "target" parameter.',
+            '409.api.error.conflict' => 'Alias conflicts with existing route. Alias uses a reserved path. Alias already exists. Use deleteAlias first to modify it.',
+            '500.api.error.write_failed' => 'Failed to save aliases.'
         ],
         'notes' => 'Aliases cannot conflict with existing routes or reserved paths (management, assets, build). Delete an alias first to modify its target. Stored per project in <secure>/projects/<projectId>/data/aliases.json.'
     ],
@@ -3150,7 +3389,7 @@ $GLOBALS['__help_commands'] = [
                 'example' => '/old-page'
             ]
         ],
-        'example_delete' => 'DELETE /management/deleteAlias with body: {"alias": "/old-home"}',
+        'example_delete' => 'DELETE /management/p/<projectId>/deleteAlias with body: {"alias": "/old-home"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -3166,7 +3405,11 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '400.validation.required' => 'Missing alias parameter',
-            '404.not_found' => 'Alias not found'
+            '404.not_found' => 'Alias not found',
+            '400.api.error.invalid_request' => 'The request body is not valid JSON.',
+            '400.api.error.missing_parameter' => 'Missing or invalid "alias" parameter.',
+            '404.api.error.not_found' => 'Alias not found (no aliases exist). Alias not found.',
+            '500.api.error.write_failed' => 'Failed to save aliases.'
         ],
         'notes' => 'Returns list of available aliases if the requested alias is not found.'
     ],
@@ -3175,7 +3418,7 @@ $GLOBALS['__help_commands'] = [
         'description' => 'Lists all URL redirect aliases with their targets and types.',
         'method' => 'GET',
         'parameters' => [],
-        'example_get' => 'GET /management/listAliases',
+        'example_get' => 'GET /management/p/<projectId>/listAliases',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -3197,7 +3440,9 @@ $GLOBALS['__help_commands'] = [
                 ]
             ]
         ],
-        'error_responses' => [],
+        'error_responses' => [
+            '500.api.error.read_failed' => 'Failed to parse aliases file.'
+        ],
         'notes' => 'Returns empty array if no aliases defined. Use createAlias to add new aliases.'
     ],
     
@@ -3303,6 +3548,7 @@ $GLOBALS['__help_commands'] = [
             '401.auth.required' => 'not authenticated',
             '403.authz.not_a_member' => 'caller is not a member of the target project',
             '500.server.file_write_failed' => 'failed to persist selected_project',
+            '404.resource.not_found' => 'User record not found.'
         ],
         'notes' => 'selected_project is a UX default, never an authz input — the dispatcher re-authorizes every request against the URL project + members.json. Refuses non-member projects so the panel never opens a project it cannot edit.'
     ],
@@ -3357,7 +3603,9 @@ $GLOBALS['__help_commands'] = [
             '400.validation.missing_field' => 'Missing name parameter',
             '400.validation.invalid_format' => 'Invalid project name format',
             '400.validation.reserved_name' => 'Project name is reserved for system use',
-            '409.resource.already_exists' => 'Project already exists'
+            '409.resource.already_exists' => 'Project already exists',
+            '500.server.directory_create_failed' => 'Failed to create project structure.',
+            '500.server.file_write_failed' => 'Failed to create config.php. Failed to create routes.php. Failed to initialise project membership.'
         ],
         'notes' => 'Creates complete project structure: config.php, routes.php, templates/, translate/, etc. with basic home page template.'
     ],
@@ -3378,7 +3626,7 @@ $GLOBALS['__help_commands'] = [
                 'validation' => 'Must be true to proceed'
             ]
         ],
-        'example_delete' => 'DELETE /management/deleteProject with body: {"name": "oldsite", "confirm": true}',
+        'example_delete' => 'DELETE /management/p/<projectId>/deleteProject with body: {"name": "oldsite", "confirm": true}',
         'success_response' => [
             'status' => 200,
             'code' => 'resource.deleted',
@@ -3397,7 +3645,8 @@ $GLOBALS['__help_commands'] = [
             '400.validation.confirmation_required' => 'Must set confirm=true',
             '403.auth.forbidden' => 'Not the owner of this project (owner-only)',
             '404.resource.not_found' => 'Project not found',
-            '500.server.delete_failed' => 'The tree could not be fully removed. data.partial says whether anything was deleted; data.survived names what could not be (project-relative paths); data.retained names what was kept deliberately so a retry stays possible; data.files_deleted / data.directories_deleted count what did go.'
+            '500.server.delete_failed' => 'The tree could not be fully removed. data.partial says whether anything was deleted; data.survived names what could not be (project-relative paths); data.retained names what was kept deliberately so a retry stays possible; data.files_deleted / data.directories_deleted count what did go.',
+            '400.validation.invalid_format' => 'Invalid project name.'
         ],
         'notes' => 'WARNING: This is permanent and cannot be undone. Use exportProject first to backup. Only the project OWNER may delete it. Membership cascade: every OTHER member and every ENGAGED pending party (invitees, self-requesters) gets a dismissable status "deleted" notice in their own cache (listMyInvitations shows it; dismissProjectNotice clears it) so the deletion is never mistaken for a refusal or removal; the deleting owner\'s own entry is simply removed, and a sponsored not-yet-validated proposal target gets NOTHING (they were never told the project existed). The response reports the cascade under data.membership_cascade. PARTIAL DELETES: the removal continues past a file it cannot remove rather than stopping at the first, and reports what is left — data.survived (blocked) and data.retained (kept on purpose). config.php, routes.php and config/ go LAST and are skipped entirely when anything else failed: the first two are what the project context boots from and config/members.json is the permission gate, so removing them on the way past would leave a project that could be neither named nor authorized, and no retry could finish it. Release whatever blocked the delete and re-run; the command is safe to repeat.'
     ],
@@ -3479,7 +3728,9 @@ $GLOBALS['__help_commands'] = [
             '409.member.already_exists' => 'Target is already a member',
             '409.invitation.already_pending' => 'Target already has a pending invitation (cancel it first to change the offer) or a pending join request/proposal (approve or deny it instead)',
             '500.members.integrity' => 'members.json missing/unsound - refused',
-            '500.server.file_write_failed' => 'Could not persist the invitation'
+            '500.server.file_write_failed' => 'Could not persist the invitation',
+            '400.validation.unencodable' => 'The note is not valid UTF-8 text.',
+            '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.'
         ],
         'notes' => 'The invitee sees the invitation via listMyInvitations and answers with acceptInvitation / declineInvitation. The rank check runs inside the members.json write lock, so a concurrent demotion of the actor cannot be outrun. The invitee\'s cache gains a pending_invite mirror entry (display only - never an access input).'
     ],
@@ -3507,7 +3758,8 @@ $GLOBALS['__help_commands'] = [
             '403.authz.insufficient_rank' => 'The offered role is not strictly below the actor\'s rank (cancelling an offer = managing that role; no inviter carve-out)',
             '404.invitation.not_found' => 'No pending INVITATION for this user (a direction "request" entry answers here too - use approve/denyJoinRequest for those)',
             '500.members.integrity' => 'members.json missing/unsound - refused',
-            '500.server.file_write_failed' => 'Could not persist the cancellation'
+            '500.server.file_write_failed' => 'Could not persist the cancellation',
+            '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.'
         ],
         'notes' => 'Any admin/owner outranking the offered role may cancel - not just the original inviter (an owner can always clean up an admin\'s invitations; an admin cannot touch an owner-sent admin offer). Invites only: requests and proposals go through the adjudication lane.'
     ],
@@ -3551,7 +3803,8 @@ $GLOBALS['__help_commands'] = [
             '403.authz.insufficient_rank' => 'Current or new role is not strictly below the actor\'s rank',
             '404.member.not_found' => 'This user is not a member',
             '500.members.integrity' => 'members.json missing/unsound - refused',
-            '500.server.file_write_failed' => 'Could not persist the change'
+            '500.server.file_write_failed' => 'Could not persist the change',
+            '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.'
         ],
         'notes' => 'Same-role no-op returns 200 with role_changed=false and writes nothing. No cache touch: the users.php mirror is roleless (the role is authoritative in members.json only).'
     ],
@@ -3586,7 +3839,9 @@ $GLOBALS['__help_commands'] = [
             '403.authz.insufficient_rank' => 'Target\'s role is not strictly below the actor\'s rank',
             '404.member.not_found' => 'This user is not a member',
             '500.members.integrity' => 'members.json missing/unsound - refused',
-            '500.server.file_write_failed' => 'Could not persist the removal'
+            '500.server.file_write_failed' => 'Could not persist the removal',
+            '400.validation.unencodable' => 'The note is not valid UTF-8 text.',
+            '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.'
         ],
         'notes' => 'Removal is effective immediately (the next request re-reads members.json). The removed user\'s sessions stay valid for their OTHER projects - membership, not authentication, is what was revoked.'
     ],
@@ -3637,7 +3892,9 @@ $GLOBALS['__help_commands'] = [
             '403.auth.forbidden' => 'Caller is not the owner (project.ownership category)',
             '404.user.not_found' => 'The target no longer resolves in the user registry',
             '500.members.integrity' => 'The owner field and the owner role disagree - surfaced, never silently repaired',
-            '500.server.file_write_failed' => 'Could not persist the rotation'
+            '500.server.file_write_failed' => 'Could not persist the rotation',
+            '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.',
+            '403.authz.insufficient_rank' => 'Only the current owner can transfer ownership.'
         ],
         'notes' => 'The rotation happens inside one write lock with a fresh read and an invariant backstop (exactly one owner; owner field matches the owner role) - there is no read-back-reverse pass; the atomic temp+rename swap IS the integrity guarantee. No cache touch (both parties remain members).'
     ],
@@ -3698,7 +3955,8 @@ $GLOBALS['__help_commands'] = [
             ]
         ],
         'error_responses' => [
-            '401.auth.unauthorized' => 'Missing/invalid bearer token'
+            '401.auth.unauthorized' => 'Missing/invalid bearer token',
+            '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.'
         ],
         'notes' => 'Global-scoped self-service (an invitee is not yet a member, so a project-marker route would refuse them). Answer invitations with acceptInvitation / declineInvitation; withdraw your own requests with withdrawJoinRequest; clear notices with dismissProjectNotice. An invitation born from an approved proposal also carries sponsored_by. requests[] lists only asks YOU authored - a sponsor\'s proposal about you is invisible until validated, and a request on a private project shows the project id as its name (the site name is not yours to see yet). Identities are public {user_id, name} references - never the private username.'
     ],
@@ -3726,7 +3984,8 @@ $GLOBALS['__help_commands'] = [
             '404.invitation.not_found' => 'No pending invitation for you on this project (identical for a nonexistent project - no existence oracle)',
             '409.invitation.void' => 'The inviter no longer holds the authority that offered this role; the invitation was removed',
             '500.members.integrity' => 'members.json unsound - refused',
-            '500.server.file_write_failed' => 'Could not persist the join'
+            '500.server.file_write_failed' => 'Could not persist the join',
+            '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.'
         ],
         'notes' => 'Acts only on the caller\'s own invitation. On success the caller is a full member (role from the offer) and their cache entry flips to status member. A voided invitation disappears from listMyInvitations - ask the project\'s admins to re-invite.'
     ],
@@ -3753,7 +4012,8 @@ $GLOBALS['__help_commands'] = [
             '400.project.invalid' => 'Malformed project identifier',
             '404.invitation.not_found' => 'No pending invitation for you on this project (identical for a nonexistent project)',
             '500.members.integrity' => 'members.json unsound - refused',
-            '500.server.file_write_failed' => 'Could not persist the decline'
+            '500.server.file_write_failed' => 'Could not persist the decline',
+            '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.'
         ],
         'notes' => 'Global-scoped self-service; acts only on the caller\'s own invitation.'
     ],
@@ -3781,7 +4041,8 @@ $GLOBALS['__help_commands'] = [
             '400.member.owner_immutable' => 'The owner cannot leave - transferOwnership first (or deleteProject)',
             '404.member.not_found' => 'You are not a member of this project (identical for a nonexistent project)',
             '500.members.integrity' => 'members.json unsound - refused',
-            '500.server.file_write_failed' => 'Could not persist the exit'
+            '500.server.file_write_failed' => 'Could not persist the exit',
+            '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.'
         ],
         'notes' => 'Effective immediately - the panel falls back to another project you are a member of (or the no-project state). Rejoining takes a fresh invitation.'
     ],
@@ -3808,7 +4069,8 @@ $GLOBALS['__help_commands'] = [
             '400.project.invalid' => 'Malformed project identifier',
             '400.notice.not_dismissable' => 'The entry is a live membership/invitation, not a terminal notice (data.status says which)',
             '404.notice.not_found' => 'No cache entry for this project',
-            '500.server.file_write_failed' => 'Could not persist the dismissal'
+            '500.server.file_write_failed' => 'Could not persist the dismissal',
+            '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.'
         ],
         'notes' => 'Pure cache operation on the caller\'s own users.php entry - no members.json involved. The project id is shape-checked only, never existence-checked (a deleted project\'s notice must stay dismissable).'
     ],
@@ -3845,7 +4107,9 @@ $GLOBALS['__help_commands'] = [
             '409.request.already_pending' => 'You already asked - withdraw first to re-ask',
             '409.request.notice_pending' => 'A refused/removed notice for this project is still in your inbox - dismiss it first',
             '500.members.integrity' => 'members.json unsound - refused',
-            '500.server.file_write_failed' => 'Could not persist the request'
+            '500.server.file_write_failed' => 'Could not persist the request',
+            '400.validation.unencodable' => 'The note is not valid UTF-8 text.',
+            '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.'
         ],
         'notes' => 'Only projects whose join_policy is "open" (setJoinPolicy) accept requests. On a PRIVATE open project, a successful request confirms the project exists - an explicit owner choice; your own cache/inbox shows the project ID as its name, never the site name, until you are a member. Withdraw anytime with withdrawJoinRequest (no notice); a denial leaves a dismissable refused notice with the reason.'
     ],
@@ -3877,7 +4141,8 @@ $GLOBALS['__help_commands'] = [
             '400.project.invalid' => 'Malformed project identifier',
             '404.request.not_found' => 'No join request of yours on this project (identical for a nonexistent project, an entry you did not author, or nothing pending)',
             '500.members.integrity' => 'members.json unsound - refused',
-            '500.server.file_write_failed' => 'Could not persist the withdrawal'
+            '500.server.file_write_failed' => 'Could not persist the withdrawal',
+            '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.'
         ],
         'notes' => 'Only the AUTHOR may withdraw (by == caller): a requester cannot remove a sponsor\'s proposal about them this way, and probing for one gets the same uniform 404. Admin-side removal is denyJoinRequest (which requires a reason).'
     ],
@@ -3921,7 +4186,9 @@ $GLOBALS['__help_commands'] = [
             '409.member.already_exists' => 'Already a member',
             '409.invitation.already_pending' => 'Something already pends for this user on this project',
             '500.members.integrity' => 'members.json unsound - refused',
-            '500.server.file_write_failed' => 'Could not persist the proposal'
+            '500.server.file_write_failed' => 'Could not persist the proposal',
+            '400.validation.unencodable' => 'The note is not valid UTF-8 text.',
+            '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.'
         ],
         'notes' => 'The suggested role is capped at your OWN rank (a viewer proposes viewers, an editor up to editors - checked against your fresh in-lock rank); the validator re-checks canManageRole at approve. join_policy does NOT gate proposals (it gates only the self-service requestToJoin door). On approval the proposal converts into a real invitation carried by the approver\'s rank, with you kept as sponsored_by; the person then accepts or declines like any invitee. Withdraw your own proposal with withdrawJoinRequest {project, user_id}.'
     ],
@@ -3958,7 +4225,8 @@ $GLOBALS['__help_commands'] = [
             '404.request.not_found' => 'No pending join request/proposal for this user (invites are answered by the invitee, not here)',
             '409.request.void' => 'The requester\'s account or the proposal\'s sponsor is gone - the entry was pruned, nothing granted',
             '500.members.integrity' => 'members.json unsound - refused',
-            '500.server.file_write_failed' => 'Could not persist the approval'
+            '500.server.file_write_failed' => 'Could not persist the approval',
+            '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.'
         ],
         'notes' => 'Approve-time re-validation mirrors acceptInvitation: approver rank in-lock (against the GRANTED role); target account must still exist; a sponsored entry\'s sponsor must still be a MEMBER (any rank - a demoted sponsor stays valid, a removed one voids the proposal). The optional role is the authority changeMemberRole already carries, folded into the approval as one atomic step (supersedes the earlier "no role override at approve" rule). For a converted proposal the response carries converted_to_invitation=true and joined=false.'
     ],
@@ -3991,7 +4259,9 @@ $GLOBALS['__help_commands'] = [
             '403.authz.insufficient_rank' => 'The stored role is not strictly below the denier\'s rank - nobody may veto what they could not grant (an admin cannot kill a proposal-for-admin before the owner sees it)',
             '404.request.not_found' => 'No pending join request/proposal for this user',
             '500.members.integrity' => 'members.json unsound - refused',
-            '500.server.file_write_failed' => 'Could not persist the denial'
+            '500.server.file_write_failed' => 'Could not persist the denial',
+            '400.validation.unencodable' => 'The note is not valid UTF-8 text.',
+            '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.'
         ],
         'notes' => 'The refused notice inherits the privacy-correct display name (a private project\'s notice shows the project id, not the site name). The sponsor of a denied proposal gets no automatic notice (structural: their cache slot holds their membership) - the reason lives in this response and the command history.'
     ],
@@ -4021,7 +4291,8 @@ $GLOBALS['__help_commands'] = [
             '403.auth.forbidden' => 'Caller is not an admin/owner of this project (project.settings category)',
             '403.authz.insufficient_rank' => 'Caller lost the authority between dispatch and the write (re-checked in-lock)',
             '500.members.integrity' => 'members.json unsound - refused',
-            '500.server.file_write_failed' => 'Could not persist the policy'
+            '500.server.file_write_failed' => 'Could not persist the policy',
+            '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.'
         ],
         'notes' => 'Same-value calls are a no-op (200, changed=false). PRIVACY TRADE, stated plainly: a PRIVATE project with an open policy is knockable-by-id - any authenticated account that guesses/knows the id can send a request and thereby confirm the project exists (the response carries an advisory note when this combination becomes active). Closed private projects stay indistinguishable from nonexistent ones on the request lane.'
     ],
@@ -4051,7 +4322,8 @@ $GLOBALS['__help_commands'] = [
             '403.auth.forbidden' => 'Caller is not the owner of this project (project.visibility category)',
             '403.authz.insufficient_rank' => 'Caller is no longer the owner between dispatch and the write (re-checked in-lock)',
             '500.members.integrity' => 'members.json unsound - refused',
-            '500.server.file_write_failed' => 'Could not persist the visibility'
+            '500.server.file_write_failed' => 'Could not persist the visibility',
+            '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.'
         ],
         'notes' => 'Same-value calls are a no-op (200, changed=false). Owner-only. Making a project PRIVATE while its join_policy is open re-creates the knockable-by-id state (the response carries the same advisory note setJoinPolicy uses). Flipping to public dissolves that concern (existence is public by design). A visibility change never purges the pending request queue.'
     ],
@@ -4077,7 +4349,8 @@ $GLOBALS['__help_commands'] = [
             '400.project.required' => 'No project targeted',
             '403.auth.forbidden' => 'Caller is not an admin/owner of this project (project.members category)',
             '500.members.unreadable' => 'members.json missing/corrupt - reconcile aborted (never prunes off a failed read)',
-            '500.server.file_write_failed' => 'Could not persist the reconciled cache'
+            '500.server.file_write_failed' => 'Could not persist the reconciled cache',
+            '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.'
         ],
         'notes' => 'MERGE-PRESERVE rule (the point of the command): member/pending_invite/pending_request are DERIVABLE from members.json and rebuilt from it; but refused/removed/deleted are TOMBSTONES that live ONLY in the user cache (members.json keeps no record of a refusal, kick, or dead project). Reconcile PRESERVES any tombstone for a user the authority no longer lists, and prunes only STALE POSITIVES (a cache claiming member/pending the authority contradicts). Aborts on an unreadable authority rather than wipe real memberships.'
     ],
@@ -4125,7 +4398,8 @@ $GLOBALS['__help_commands'] = [
             ]
         ],
         'error_responses' => [
-            '401.auth.unauthorized' => 'Missing/invalid bearer token'
+            '401.auth.unauthorized' => 'Missing/invalid bearer token',
+            '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.'
         ],
         'notes' => 'Global-scoped self-service; read-only. Scans only projects where the caller\'s membership is REAL (authority-checked), and returns only entries the caller authored (pending direction "request" with by = caller) or sponsors (converted invitations with sponsor = caller). status: "pending_validation" (awaiting approve/denyJoinRequest) or "awaiting_answer" (approved - the person still answers via accept/declineInvitation). A proposal absent from both lists was adjudicated: denied, or answered by the person (check the roster). Refusal reasons are not delivered to sponsors - the deny note lives in the denier\'s response and the command history. Withdraw a pending proposal with withdrawJoinRequest {project, user_id}.'
     ],
@@ -4195,7 +4469,7 @@ $GLOBALS['__help_commands'] = [
                 'required' => true,
                 'type' => 'file',
                 'description' => 'ZIP file containing project',
-                'validation' => 'Must be valid ZIP with config.php or routes.php'
+                'validation' => 'Must be a valid ZIP containing a project folder identified by config.json, routes.json, or templates/model/json/'
             ],
             'name' => [
                 'required' => false,
@@ -4236,7 +4510,8 @@ $GLOBALS['__help_commands'] = [
             'Archive resource limits are enforced from the ZIP headers before anything is extracted: entry count, total and per-entry uncompressed size, and per-entry compression ratio. Exceeding any of them returns 413 and writes nothing.',
             'The permitted extensions and the limits can be changed by copying <secure>/management/config/import-policy.php.example to import-policy.php.',
             'PHP is never imported. config.php and routes.php are rebuilt from the archive JSON, and any members.json in the archive is discarded — the importer becomes the sole owner.',
-            'A project id is unique across the installation and an import never reassigns one. If the id is taken the import refuses with 409 and writes nothing; there is no option to replace the existing project. Import under a different name, or delete the existing project first.'
+            'A project id is unique across the installation and an import never reassigns one. If the id is taken the import refuses with 409 and writes nothing; there is no option to replace the existing project. Import under a different name, or delete the existing project first.',
+            'Compatible with exports from exportProject.'
         ],
         'error_responses' => [
             '413.request.body_too_large' => 'The archive exceeded the server\'s post_max_size, so PHP discarded the request before the command ran. The response carries the real limit.',
@@ -4244,9 +4519,20 @@ $GLOBALS['__help_commands'] = [
             '400.upload.failed' => 'File upload failed',
             '400.validation.invalid_zip' => 'Invalid or corrupted ZIP',
             '400.validation.invalid_structure' => 'ZIP missing required project files',
-            '409.resource.already_exists' => 'A project with that id already exists'
-        ],
-        'notes' => 'Compatible with exports from exportProject. ZIP must contain project folder with config.php or routes.php.'
+            '409.resource.already_exists' => 'A project with that id already exists',
+            '400.validation.incomplete_project' => 'Imported project is incomplete.',
+            '400.validation.invalid_format' => 'Invalid project name format.',
+            '400.validation.invalid_type' => 'File must be a ZIP archive.',
+            '400.validation.missing_field' => 'No archive was uploaded. Send the ZIP as multipart/form-data.',
+            '400.validation.reserved_name' => 'Project name is reserved.',
+            '429.quota.rate_limited' => 'Too many uploads in the current period. The response carries retry_after (seconds) and the message states the limit in force.',
+            '500.server.directory_create_failed' => 'Failed to create project directory.',
+            '500.server.extract_failed' => 'Failed to extract project files.',
+            '500.server.file_write_failed' => 'Failed to initialise imported project membership.',
+            '500.server.missing_extension' => 'ZIP extension not available.',
+            '500.server.rebuild_failed' => 'Failed to rebuild PHP files from JSON.',
+            '507.quota.storage_exceeded' => 'Importing this archive would take the owner over their configured storage quota. Charged to the project owner, so the refusal is generic when the caller is not that owner.'
+        ]
     ],
     
     'downloadExport' => [
@@ -4270,7 +4556,10 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.validation.missing_field' => 'Missing file parameter',
             '400.validation.invalid_filename' => 'Invalid filename (path traversal blocked)',
-            '404.resource.not_found' => 'Export file not found or expired'
+            '404.resource.not_found' => 'Export file not found or expired',
+            '400.project.mismatch' => 'The project named in the body does not match the project in the URL marker. The marker decides; a disagreeing echo is refused rather than ignored.',
+            '400.project.required' => 'No project marker on the request. This command is project-scoped: target a project with /management/p/<projectId>/.',
+            '400.validation.invalid_type' => 'Only ZIP files can be downloaded.'
         ],
         'notes' => 'Export files expire after 24 hours. This command only serves archives that exportProject was asked to SAVE (save=true); for an immediate download call exportProject with no options - streaming is its default and stores nothing. A browser cannot fetch this with a plain link: the surface requires an Authorization header as well as the session cookie, so the archive has to be fetched with the header and handed to the user as a blob (the admin panel does this through QuickSiteAdmin.downloadFile).'
     ],
@@ -4296,8 +4585,8 @@ $GLOBALS['__help_commands'] = [
                 'example' => 5
             ]
         ],
-        'example_get' => 'GET /management/backupProject',
-        'example_get_with_params' => 'GET /management/backupProject?name=quicksite&max_backups=3',
+        'example_get' => 'GET /management/p/<projectId>/backupProject',
+        'example_get_with_params' => 'GET /management/p/<projectId>/backupProject?name=quicksite&max_backups=3',
         'success_response' => [
             'status' => 200,
             'message' => 'Backup created successfully: 2026-01-03_14-30-00',
@@ -4320,7 +4609,12 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.project.required' => 'No project targeted - use /management/p/<projectId>/backupProject',
             '400.project.mismatch' => 'A name in the request disagreed with the project in the URL',
-            '404.project.not_found' => 'Project not found'
+            '404.project.not_found' => 'Project not found',
+            '200.backup.created' => 'Backup created successfully.',
+            '400.validation.invalid_format' => 'Invalid project name.',
+            '500.backup.create_failed' => 'Failed to create backup directory.',
+            '500.backup.folder_create_failed' => 'Failed to create backups directory.',
+            '500.backup.no_files_copied' => 'Failed to create backup - no files copied.'
         ],
         'notes' => 'Backups are stored in project/backups/ folder. Old backups are auto-deleted when max_backups is exceeded. For sharing projects externally, use exportProject instead (JSON-only, secure).'
     ],
@@ -4336,7 +4630,7 @@ $GLOBALS['__help_commands'] = [
                 'example' => 'quicksite'
             ]
         ],
-        'example_get' => 'GET /management/listBackups',
+        'example_get' => 'GET /management/p/<projectId>/listBackups',
         'success_response' => [
             'status' => 200,
             'message' => 'Found 3 backup(s)',
@@ -4363,7 +4657,10 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.project.required' => 'No project targeted - use /management/p/<projectId>/listBackups',
             '400.project.mismatch' => 'A name in the request disagreed with the project in the URL',
-            '404.project.not_found' => 'Project not found'
+            '404.project.not_found' => 'Project not found',
+            '200.backup.list_empty' => 'No backups folder exists yet.',
+            '200.backup.list_success' => 'The backup list, newest first. An empty list is still a 200 — no backups is not an error.',
+            '400.validation.invalid_format' => 'Invalid project name.'
         ],
         'notes' => 'Backup types: "manual" (created via backupProject), "pre-restore" (auto-created before restore), "auto" (scheduled backups).'
     ],
@@ -4391,7 +4688,7 @@ $GLOBALS['__help_commands'] = [
                 'example' => true
             ]
         ],
-        'example_post' => 'POST /management/restoreBackup\n{"backup": "2026-01-03_14-30-00", "create_backup": true}',
+        'example_post' => 'POST /management/p/<projectId>/restoreBackup with body: {"backup": "2026-01-03_14-30-00", "create_backup": true}',
         'success_response' => [
             'status' => 200,
             'code' => 'restore.success',
@@ -4435,7 +4732,7 @@ $GLOBALS['__help_commands'] = [
                 'example' => 'quicksite'
             ]
         ],
-        'example_delete' => 'DELETE /management/deleteBackup?backup=2026-01-03_14-30-00',
+        'example_delete' => 'DELETE /management/p/<projectId>/deleteBackup?backup=2026-01-03_14-30-00',
         'success_response' => [
             'status' => 200,
             'message' => 'Backup deleted successfully',
@@ -4451,7 +4748,14 @@ $GLOBALS['__help_commands'] = [
             '400.project.required' => 'No project targeted - use /management/p/<projectId>/deleteBackup',
             '400.validation.missing_field' => 'Backup name required',
             '400.validation.invalid_filename' => 'Invalid backup name (path traversal blocked)',
-            '404.resource.not_found' => 'Backup not found'
+            '404.resource.not_found' => 'Backup not found',
+            '200.backup.deleted' => 'Backup deleted successfully.',
+            '400.backup.name_required' => 'Backup name is required.',
+            '400.project.mismatch' => 'The project named in the body does not match the project in the URL marker. The marker decides; a disagreeing echo is refused rather than ignored.',
+            '400.validation.invalid_format' => 'Invalid backup name. Invalid project name.',
+            '404.backup.not_found' => 'No backup with that id exists for this project.',
+            '404.project.not_found' => 'The project in the URL marker has no backup directory.',
+            '500.backup.delete_failed' => 'Failed to delete backup directory.'
         ]
     ],
     
@@ -4459,7 +4763,7 @@ $GLOBALS['__help_commands'] = [
         'description' => 'Returns detailed storage size information for all folders in the project structure. Useful for monitoring disk usage and identifying what takes up space.',
         'method' => 'GET',
         'parameters' => [],
-        'example_get' => 'GET /management/getSizeInfo',
+        'example_get' => 'GET /management/p/<projectId>/getSizeInfo',
         'success_response' => [
             'status' => 200,
             'code' => 'size_info.success',
@@ -4485,7 +4789,11 @@ $GLOBALS['__help_commands'] = [
                 'secure' => ['total' => '...', 'folders' => '...', 'projects_detail' => '...']
             ]
         ],
-        'notes' => 'Project-scoped: the report covers ONLY the project in the URL marker. secure.projects_detail holds that single project (name, size, file count, its backups); it does not enumerate other projects on the installation, and folder entries carry no absolute filesystem path. summary.project names the reported project (it is NOT the globally served main). Categories combine related folders: projects, backups, admin (public/admin+<secure>/admin), management (API system), core (src+config+logs). Used by dashboard storage overview widget.'
+        'notes' => 'Project-scoped: the report covers ONLY the project in the URL marker. secure.projects_detail holds that single project (name, size, file count, its backups); it does not enumerate other projects on the installation, and folder entries carry no absolute filesystem path. summary.project names the reported project (it is NOT the globally served main). Categories combine related folders: projects, backups, admin (public/admin+<secure>/admin), management (API system), core (src+config+logs). Used by dashboard storage overview widget.',
+        'error_responses' => [
+            '400.project.mismatch' => 'The project named in the body does not match the project in the URL marker. The marker decides; a disagreeing echo is refused rather than ignored.',
+            '400.project.required' => 'No project marker on the request. This command is project-scoped: target a project with /management/p/<projectId>/.'
+        ]
     ],
     
     'clearExports' => [
@@ -4522,7 +4830,9 @@ $GLOBALS['__help_commands'] = [
             '400.validation.confirmation_required' => 'confirm was not true; nothing was deleted',
             '400.validation.invalid_format' => 'The project filter is not a valid project name',
             '207.operation.partial_success' => 'Some archives were deleted and some could not be removed. data.failed_files names the survivors and errors lists them; the deletions that DID happen are real.',
-            '500.server.delete_failed' => 'Every archive that was found failed to delete (deleted_count is 0)'
+            '500.server.delete_failed' => 'Every archive that was found failed to delete (deleted_count is 0)',
+            '400.project.mismatch' => 'The project named in the body does not match the project in the URL marker. The marker decides; a disagreeing echo is refused rather than ignored.',
+            '400.project.required' => 'No project marker on the request. This command is project-scoped: target a project with /management/p/<projectId>/.'
         ],
         'notes' => 'Project-scoped: deletes .zip files only in the targeted project\'s own exports folder (<secure>/projects/<id>/exports/). It cannot reach another project\'s archives. Does not affect project data or backups. A run in which any unlink fails NEVER answers 200 — check the status/code, not just data.deleted_count.'
     ],
@@ -4580,7 +4890,11 @@ $GLOBALS['__help_commands'] = [
                 'command_count' => 45
             ]
         ],
-        'notes' => 'Use this to determine what commands the current token can execute. Useful for building permission-aware UIs. The role is the caller\'s effective per-project role; owner (top of the project) sees every command. There is no superadmin.'
+        'notes' => 'Use this to determine what commands the current token can execute. Useful for building permission-aware UIs. The role is the caller\'s effective per-project role; owner (top of the project) sees every command. There is no superadmin.',
+        'error_responses' => [
+            '401.auth.invalid_token' => 'The session cookie and Authorization header did not resolve to a valid session. Note this command answers with its own code rather than the envelope-level auth.unauthorized.',
+            '401.auth.missing_header' => 'Authorization header required.'
+        ]
     ],
     
     'createRole' => [
@@ -4624,7 +4938,13 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_format' => 'Role name must be lowercase alphanumeric with underscores',
             '400.validation.invalid_command' => 'One or more commands do not exist',
             '400.validation.role_exists' => 'A role with this name already exists',
-            '403.auth.forbidden' => 'Requires superadmin (*) permission'
+            '403.auth.forbidden' => 'Requires superadmin (*) permission',
+            '400.validation.invalid_commands' => 'Some commands do not exist.',
+            '400.validation.invalid_length' => 'Description must be between 3 and 255 characters.',
+            '400.validation.invalid_type' => 'Each command must be a string.',
+            '400.validation.reserved_name' => 'Cannot use "*" as role name - it is reserved for superadmin.',
+            '409.role.already_exists' => 'Role already exists.',
+            '500.server.file_write_failed' => 'Failed to save role configuration.'
         ],
         'notes' => 'Roles are defined in <secure>/management/config/roles.php. Commands must be valid existing commands. Use listRoles to see all available roles. The createRole/editRole/deleteRole commands are disabled (denied to every role) in the fixed-role model.'
     ],
@@ -4672,7 +4992,13 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_command' => 'One or more commands do not exist',
             '400.validation.builtin_commands' => 'Cannot modify commands for builtin roles',
             '404.role.not_found' => 'Role does not exist',
-            '403.auth.forbidden' => 'Requires superadmin (*) permission'
+            '403.auth.forbidden' => 'Requires superadmin (*) permission',
+            '400.validation.invalid_commands' => 'Some commands do not exist.',
+            '400.validation.invalid_length' => 'Description must be between 3 and 255 characters.',
+            '400.validation.invalid_role' => 'Cannot edit "*" - it is not a role.',
+            '400.validation.invalid_type' => 'The commands parameter is not an array, or one of its entries is not a string.',
+            '403.role.builtin_commands_protected' => 'Cannot modify commands for builtin role.',
+            '500.server.file_write_failed' => 'Failed to save role configuration.'
         ],
         'notes' => 'Builtin roles (viewer, editor, designer, developer, admin) can only have their description changed. Use createRole to add a custom role if you need different commands.'
     ],
@@ -4710,7 +5036,11 @@ $GLOBALS['__help_commands'] = [
             '400.validation.builtin_role' => 'Cannot delete builtin roles',
             '400.validation.role_in_use' => 'Role is assigned to tokens. Use force=true to reassign to viewer',
             '404.role.not_found' => 'Role does not exist',
-            '403.auth.forbidden' => 'Requires superadmin (*) permission'
+            '403.auth.forbidden' => 'Requires superadmin (*) permission',
+            '400.validation.invalid_role' => 'Cannot delete "*" - it is not a role.',
+            '403.role.builtin_protected' => 'Cannot delete builtin role.',
+            '409.role.in_use' => 'Role is in use by token(s).',
+            '500.server.file_write_failed' => 'Failed to update token configuration. Failed to save role configuration.'
         ],
         'notes' => 'Builtin roles (viewer, editor, designer, developer, admin) cannot be deleted. If tokens are using this role, deletion will fail unless force=true, which reassigns those tokens to the viewer role.'
     ],
@@ -4722,7 +5052,7 @@ $GLOBALS['__help_commands'] = [
         'description' => 'Lists all available QS.* JavaScript functions that can be used in {{call:...}} syntax for page interactions. Returns core built-in functions from qs.js.',
         'method' => 'GET',
         'parameters' => [],
-        'example_get' => 'GET /management/listJsFunctions',
+        'example_get' => 'GET /management/p/<projectId>/listJsFunctions',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -4758,8 +5088,8 @@ $GLOBALS['__help_commands'] = [
         'url_segments' => [
             'all' => '(optional) Pass /all as the first URL segment to include editor-chrome entries (`internal: true`) like data-qs-textkey, data-qs-node, data-qs-struct — normally hidden from the user-facing picker.'
         ],
-        'example_get' => 'GET /management/listDataBindings',
-        'example_get_all' => 'GET /management/listDataBindings/all',
+        'example_get' => 'GET /management/p/<projectId>/listDataBindings',
+        'example_get_all' => 'GET /management/p/<projectId>/listDataBindings/all',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -4818,7 +5148,7 @@ $GLOBALS['__help_commands'] = [
                 'example' => 'hero/cta-button'
             ]
         ],
-        'example_get' => 'GET /management/listInteractions/page/home/hero%2Fcta-button',
+        'example_get' => 'GET /management/p/<projectId>/listInteractions/page/home/hero%2Fcta-button',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -4848,7 +5178,12 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.validation.required' => 'structType and nodeId are required',
             '400.validation.invalid_struct_type' => 'Invalid structure type',
-            '404.node.not_found' => 'Node not found in structure'
+            '404.node.not_found' => 'Node not found in structure',
+            '400.validation.invalid_value' => 'The structType parameter is not one of menu, footer, page, component.',
+            '404.file.not_found' => 'The structure file for the requested page (or for the menu, footer or component) does not exist.',
+            '404.route.not_found' => 'Page does not exist.',
+            '500.server.file_read_failed' => 'Failed to read structure file.',
+            '500.server.internal_error' => 'Invalid JSON in structure file.'
         ],
         'notes' => 'Available events are filtered by element tag type. Forms get onsubmit/onreset, inputs get oninput/onchange, media elements get onplay/onpause/onended. Interactions are parsed from {{call:...}} syntax in event params.'
     ],
@@ -4894,7 +5229,7 @@ $GLOBALS['__help_commands'] = [
                 'example' => '["#contact-modal"]'
             ]
         ],
-        'example_post' => 'POST /management/addInteraction with body: {"structType": "page", "pageName": "home", "nodeId": "hero/cta-button", "event": "onclick", "function": "show", "params": ["#contact-modal"]}',
+        'example_post' => 'POST /management/p/<projectId>/addInteraction with body: {"structType": "page", "pageName": "home", "nodeId": "hero/cta-button", "event": "onclick", "function": "show", "params": ["#contact-modal"]}',
         'success_response' => [
             'status' => 201,
             'code' => 'interaction.added',
@@ -4911,7 +5246,16 @@ $GLOBALS['__help_commands'] = [
             '400.validation.required' => 'structType, nodeId, event, and function are required',
             '400.validation.invalid_event' => 'Invalid event name',
             '400.validation.invalid_function' => 'Function not found in available functions',
-            '404.node.not_found' => 'Node not found in structure'
+            '404.node.not_found' => 'Node not found in structure',
+            '201.operation.success' => 'Interaction added successfully.',
+            '400.validation.invalid_format' => 'Invalid function name format.',
+            '400.validation.invalid_value' => 'The structType parameter is not one of menu, footer, page, component; or event is not a valid HTML event attribute (UNIVERSAL_EVENTS plus the entry for the node tag in TAG_SPECIFIC_EVENTS).',
+            '404.file.not_found' => 'The structure file for the requested page (or for the menu, footer or component) does not exist.',
+            '404.route.not_found' => 'Page does not exist.',
+            '422.node.invalid_target' => 'Interactions must be attached to a tag node, not a text node. Select the parent element (e.g. the button or link) and try again.',
+            '500.server.file_read_failed' => 'Failed to read structure file.',
+            '500.server.file_write_failed' => 'Failed to save structure file.',
+            '500.server.internal_error' => 'Invalid JSON in structure file. Failed to update node.'
         ],
         'notes' => 'If the event already has interactions, the new one is appended (space-separated). Use listJsFunctions to get available function names. Params array order must match function argument order.'
     ],
@@ -4969,7 +5313,7 @@ $GLOBALS['__help_commands'] = [
                 'example' => 'oninput'
             ]
         ],
-        'example_put' => 'PUT /management/editInteraction with body: {"structType": "page", "pageName": "home", "nodeId": "hero/cta-button", "event": "onclick", "index": 0, "function": "toggleHide", "params": ["#modal"]}',
+        'example_put' => 'PUT /management/p/<projectId>/editInteraction with body: {"structType": "page", "pageName": "home", "nodeId": "hero/cta-button", "event": "onclick", "index": 0, "function": "toggleHide", "params": ["#modal"]}',
         'success_response' => [
             'status' => 200,
             'code' => 'interaction.updated',
@@ -4986,7 +5330,16 @@ $GLOBALS['__help_commands'] = [
             '400.validation.required' => 'structType, nodeId, event, index, and function are required',
             '400.validation.invalid_index' => 'Index out of bounds for this event',
             '404.node.not_found' => 'Node not found in structure',
-            '404.interaction.not_found' => 'No interaction found at specified index'
+            '404.interaction.not_found' => 'No interaction found at specified index',
+            '200.operation.success' => 'Interaction updated successfully.',
+            '400.validation.invalid_format' => 'Invalid function name format.',
+            '400.validation.invalid_value' => 'The structType parameter is not one of menu, footer, page, component; index is not a non-negative integer; or event / newEvent is not a valid HTML event attribute.',
+            '404.file.not_found' => 'The structure file for the requested page (or for the menu, footer or component) does not exist.',
+            '404.route.not_found' => 'Page does not exist.',
+            '422.node.invalid_target' => 'Interactions must be attached to a tag node, not a text node. Select the parent element and try again.',
+            '500.server.file_read_failed' => 'Failed to read structure file.',
+            '500.server.file_write_failed' => 'Failed to save structure file.',
+            '500.server.internal_error' => 'Invalid JSON in structure file. Failed to update node.'
         ],
         'notes' => 'Index is 0-based within the specific event. Use listInteractions to find the correct index. Only replaces the interaction at that index, other interactions on the same event are preserved.'
     ],
@@ -5026,7 +5379,7 @@ $GLOBALS['__help_commands'] = [
                 'example' => 0
             ]
         ],
-        'example_delete' => 'DELETE /management/deleteInteraction with body: {"structType": "page", "pageName": "home", "nodeId": "hero/cta-button", "event": "onclick", "index": 0}',
+        'example_delete' => 'DELETE /management/p/<projectId>/deleteInteraction with body: {"structType": "page", "pageName": "home", "nodeId": "hero/cta-button", "event": "onclick", "index": 0}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -5041,7 +5394,13 @@ $GLOBALS['__help_commands'] = [
             '400.validation.required' => 'structType, nodeId, and event are required',
             '400.validation.invalid_index' => 'Index out of bounds for this event',
             '404.node.not_found' => 'Node not found in structure',
-            '404.interaction.not_found' => 'No interaction found on this event'
+            '404.interaction.not_found' => 'No interaction found on this event',
+            '400.validation.invalid_value' => 'The structType parameter is not one of menu, footer, page, component; or event is not a valid HTML event attribute.',
+            '404.file.not_found' => 'The structure file for the requested page (or for the menu, footer or component) does not exist.',
+            '404.route.not_found' => 'Page does not exist.',
+            '500.server.file_read_failed' => 'Failed to read structure file.',
+            '500.server.file_write_failed' => 'Failed to save structure file.',
+            '500.server.internal_error' => 'Invalid JSON in structure file. Failed to update node.'
         ],
         'notes' => 'If index is omitted, ALL interactions on that event are removed (the event param is deleted entirely). If index is provided, only that specific interaction is removed and others are preserved.'
     ],
@@ -5087,7 +5446,7 @@ $GLOBALS['__help_commands'] = [
                 'example' => 'onscroll'
             ]
         ],
-        'example_put' => 'PUT /management/editPageEvent with body: {"pageName": "test/scrolling", "event": "onload", "index": 0, "function": "onScrollFetchState", "params": ["scrollingStore", "200", "100"]}',
+        'example_put' => 'PUT /management/p/<projectId>/editPageEvent with body: {"pageName": "test/scrolling", "event": "onload", "index": 0, "function": "onScrollFetchState", "params": ["scrollingStore", "200", "100"]}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -5110,7 +5469,10 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_format' => 'function name does not match identifier pattern',
             '404.route.not_found' => 'pageName does not exist in routes',
             '404.data.not_found' => 'page-events.json file is missing',
-            '404.interaction.not_found' => 'No interaction at the given (event, index) for this page'
+            '404.interaction.not_found' => 'No interaction at the given (event, index) for this page',
+            '500.server.file_read_failed' => 'Failed to read page events file.',
+            '500.server.file_write_failed' => 'Failed to save page events file.',
+            '500.server.internal_error' => 'Invalid JSON in page events file. Failed to encode page events JSON.'
         ],
         'notes' => 'When newEvent differs from event, the interaction is spliced out of the source event and pushed onto the new event (empty event/page entries are cleaned up). When newEvent is omitted or equal, the call is replaced in-place at the same index. Counterpart to editInteraction (which edits element-level events on a node).'
     ],
@@ -5156,7 +5518,7 @@ $GLOBALS['__help_commands'] = [
                 'example' => '[["Q1", "100", "..."], ["Q2", "150", "..."]]'
             ]
         ],
-        'example_post' => 'POST /management/importStructureTranslations with body: {"route": "test/complex-element", "kind": "table", "structureId": "q1Sales", "language": "fr", "header": ["Trimestre","Ventes","Notes"], "rows": [["Q1","100","..."]]}',
+        'example_post' => 'POST /management/p/<projectId>/importStructureTranslations with body: {"route": "test/complex-element", "kind": "table", "structureId": "q1Sales", "language": "fr", "header": ["Trimestre","Ventes","Notes"], "rows": [["Q1","100","..."]]}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -5178,7 +5540,8 @@ $GLOBALS['__help_commands'] = [
             '404.structure.not_found' => 'no <table data-qs-complex-id=X> found on the page (table may pre-date the marker — see BETA7_TABLE_TRANSLATION_CSV.md)',
             '422.validation.dimension_mismatch' => 'pasted grid dimensions do not match the existing table — response data carries the expected vs got diff',
             '500.server.file_read_failed' => 'page JSON file unreadable',
-            '500.server.file_write_failed' => 'translation file write failed'
+            '500.server.file_write_failed' => 'translation file write failed',
+            '500.server.internal_error' => 'The page JSON is malformed, a complex table node\'s dimensions could not be measured, or the merged translations could not be encoded. The offending element is named in the message.'
         ],
         'notes' => 'Counterpart to the Table wizard\'s Translatable paste mode (which CREATES + writes the FIRST language\'s values). This command is for adding additional languages to an existing structure. Empty cells in the pasted grid become empty translation values (NOT skipped — the key must exist after this write or the renderer falls back to the raw key text).'
     ],
@@ -5199,7 +5562,7 @@ $GLOBALS['__help_commands'] = [
                 'alias' => 'pageName'
             ]
         ],
-        'example_post' => 'POST /management/getStateStores with body: {"route": "home"} (single route) or {} (all routes)',
+        'example_post' => 'POST /management/p/<projectId>/getStateStores with body: {"route": "home"} (single route) or {} (all routes)',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -5240,7 +5603,7 @@ $GLOBALS['__help_commands'] = [
                 'example' => '{"commandsList": {"endpoint": "@help-api/list", "fetchOnLoad": true, "fields": {"page": {"dir": "request", "init": "query:page", "default": 1}, "items": {"dir": "response", "from": "data", "append": false}}}}'
             ]
         ],
-        'example_post' => 'POST /management/setStateStores with body: {"route": "home", "stores": {"results": {"endpoint": "@search-api/query", "fields": {"q": {"dir": "request", "init": "query:q", "default": ""}, "items": {"dir": "response", "from": "data.results"}}}}}',
+        'example_post' => 'POST /management/p/<projectId>/setStateStores with body: {"route": "home", "stores": {"results": {"endpoint": "@search-api/query", "fields": {"q": {"dir": "request", "init": "query:q", "default": ""}, "items": {"dir": "response", "from": "data.results"}}}}}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -5281,7 +5644,7 @@ $GLOBALS['__help_commands'] = [
                 'example' => 'main-backend'
             ]
         ],
-        'example_get' => 'GET /management/listApiEndpoints or GET /management/listApiEndpoints/main-backend',
+        'example_get' => 'GET /management/p/<projectId>/listApiEndpoints or GET /management/p/<projectId>/listApiEndpoints/main-backend',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -5319,7 +5682,7 @@ $GLOBALS['__help_commands'] = [
         'description' => 'Lists available OAuth provider presets (the union of admin catalogue + per-project overrides) along with whether the per-provider routes are already set up. Drives the oauth-button wizard\'s provider picker.',
         'method' => 'GET',
         'parameters' => [],
-        'example_get' => 'GET /management/listOAuthProviders',
+        'example_get' => 'GET /management/p/<projectId>/listOAuthProviders',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -5357,7 +5720,7 @@ $GLOBALS['__help_commands'] = [
             'preset' => ['required' => true, 'type' => 'object', 'description' => 'Full preset shape: authorize_url, token_url, userinfo_url, revoke_url (optional), scope, userinfo_sub_path, userinfo_email_path, userinfo_name_path (optional), extra_authorize_params (optional), refresh_token_supported.'],
             'credentials' => ['required' => false, 'type' => 'object', 'description' => 'Optional {client_id, client_secret}. client_secret optional for public clients (PKCE-only).']
         ],
-        'example_post' => 'POST /management/addOAuthProvider with {"scope":"project","id":"mycorp-sso","preset":{...},"credentials":{"client_id":"abc","client_secret":"xyz"}}',
+        'example_post' => 'POST /management/p/<projectId>/addOAuthProvider with {"scope":"project","id":"mycorp-sso","preset":{...},"credentials":{"client_id":"abc","client_secret":"xyz"}}',
         'success_response' => [
             'status' => 201,
             'code' => 'oauth.provider.created',
@@ -5365,7 +5728,8 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '400.validation.failed' => 'Invalid body — see errors[] for per-field details',
-            '409.oauth.provider.duplicate' => 'An entry with this id already exists at the target scope; use editOAuthProvider'
+            '409.oauth.provider.duplicate' => 'An entry with this id already exists at the target scope; use editOAuthProvider',
+            '500.server.operation_failed' => 'The provider presets file could not be written at the requested scope ("admin" or "project"), or the preset was written but its secrets file could not be. The scope is named in the message.'
         ],
         'notes' => 'Admin-tier only — handles client_secret. Cross-scope duplicates (e.g., same id in both admin and project) are allowed and are the per-project override pattern locked in Slice 2.5.'
     ],
@@ -5380,7 +5744,7 @@ $GLOBALS['__help_commands'] = [
             'newId' => ['required' => false, 'type' => 'string', 'description' => 'New provider id (rename). Must not collide at target scope.'],
             'newScope' => ['required' => false, 'type' => 'string', 'enum' => ['admin', 'project'], 'description' => 'Move between scopes; copy-then-delete.']
         ],
-        'example_post' => 'POST /management/editOAuthProvider with {"scope":"admin","id":"google","preset":{...},"newScope":"project"}',
+        'example_post' => 'POST /management/p/<projectId>/editOAuthProvider with {"scope":"admin","id":"google","preset":{...},"newScope":"project"}',
         'success_response' => [
             'status' => 200,
             'code' => 'oauth.provider.updated',
@@ -5389,7 +5753,8 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.validation.failed' => 'Invalid body',
             '404.oauth.provider.not_found' => 'Source entry not found at declared scope',
-            '409.oauth.provider.duplicate' => 'newId / newScope target already has an entry'
+            '409.oauth.provider.duplicate' => 'newId / newScope target already has an entry',
+            '500.server.operation_failed' => 'A write failed at one of the scopes involved ("admin" or "project"): the presets file at the current scope, the presets file at a new scope on a move, the removal from the source scope after a successful move (the message then names the deleteOAuthProvider call that cleans it up), or the secrets file.'
         ],
         'notes' => 'Admin-tier only. Cross-scope move is copy-then-delete; on partial failure the entry exists in BOTH scopes (recoverable via deleteOAuthProvider).'
     ],
@@ -5400,7 +5765,7 @@ $GLOBALS['__help_commands'] = [
             'scope' => ['required' => true, 'type' => 'string', 'enum' => ['admin', 'project']],
             'id' => ['required' => true, 'type' => 'string']
         ],
-        'example_post' => 'POST /management/deleteOAuthProvider with {"scope":"project","id":"mycorp-sso"}',
+        'example_post' => 'POST /management/p/<projectId>/deleteOAuthProvider with {"scope":"project","id":"mycorp-sso"}',
         'success_response' => [
             'status' => 200,
             'code' => 'oauth.provider.deleted',
@@ -5409,7 +5774,8 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.validation.failed' => 'Invalid body',
             '404.oauth.provider.not_found' => 'No entry at the declared scope',
-            '409.oauth.provider.in_use' => 'Provider is referenced by route-resolvers or oauth-button elements; data.usage carries the per-site list'
+            '409.oauth.provider.in_use' => 'Provider is referenced by route-resolvers or oauth-button elements; data.usage carries the per-site list',
+            '500.server.operation_failed' => 'The provider presets file could not be written at the requested scope ("admin" or "project"). The scope is named in the message.'
         ],
         'notes' => 'Removing a PROJECT-scope OVERRIDE (when an admin entry with the same id exists) skips the in-use check — the admin entry survives, so consumers still resolve. data.was_override = true in that case.'
     ],
@@ -5418,7 +5784,7 @@ $GLOBALS['__help_commands'] = [
         'description' => 'List the project storage registry — every declared browser-storage key (localStorage / sessionStorage / cookie) with category, retention, translatable description, and derived consentRequired. Drives /admin/storage + the storageKey picker. The GDPR / cookie-consent data layer.',
         'method' => 'POST',
         'parameters' => [],
-        'example_post' => 'POST \management\listStorageItems',
+        'example_post' => 'POST /management/p/<projectId>/listStorageItems',
         'success_response' => [
             'status' => 200,
             'code' => 'success',
@@ -5441,7 +5807,7 @@ $GLOBALS['__help_commands'] = [
             'secure' => ['required' => false, 'type' => 'boolean', 'description' => 'Cookie scope only.'],
             'sameSite' => ['required' => false, 'type' => 'string', 'enum' => ['Strict', 'Lax', 'None'], 'description' => 'Cookie scope only.']
         ],
-        'example_post' => 'POST \management\addStorageItem with {"id":"cartSession","scope":"localStorage","category":"functional","description":{"en":"Saved cart"},"retention":"30d"}',
+        'example_post' => 'POST /management/p/<projectId>/addStorageItem with {"id":"cartSession","scope":"localStorage","category":"functional","description":{"en":"Saved cart"},"retention":"30d"}',
         'success_response' => [
             'status' => 201,
             'code' => 'storage.created',
@@ -5450,7 +5816,8 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.validation.required' => 'id missing',
             '400.validation.invalid' => 'Invalid scope/category/etc. — see errors[]',
-            '409.storage.duplicate' => 'An item with this id already exists; use editStorageItem'
+            '409.storage.duplicate' => 'An item with this id already exists; use editStorageItem',
+            '500.server.operation_failed' => 'Failed to write the storage registry.'
         ],
         'notes' => 'Writes data/storage.json. consentRequired is derived from category.'
     ],
@@ -5465,7 +5832,7 @@ $GLOBALS['__help_commands'] = [
             'description' => ['required' => false, 'type' => 'object'],
             'retention' => ['required' => false, 'type' => 'string']
         ],
-        'example_post' => 'POST \management\editStorageItem with {"id":"cartSession","scope":"localStorage","category":"functional","retention":"90d"}',
+        'example_post' => 'POST /management/p/<projectId>/editStorageItem with {"id":"cartSession","scope":"localStorage","category":"functional","retention":"90d"}',
         'success_response' => [
             'status' => 200,
             'code' => 'storage.updated',
@@ -5474,7 +5841,9 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '404.storage.not_found' => 'No item with this id',
             '409.storage.duplicate' => 'newId already taken',
-            '400.validation.invalid' => 'Invalid fields — see errors[]'
+            '400.validation.invalid' => 'Invalid fields — see errors[]',
+            '400.validation.required' => 'Storage item id is required.',
+            '500.server.operation_failed' => 'Failed to write the storage registry.'
         ],
         'notes' => 'Cookie-only fields (domain/path/secure/sameSite) accepted when scope is cookie.'
     ],
@@ -5484,14 +5853,16 @@ $GLOBALS['__help_commands'] = [
         'parameters' => [
             'id' => ['required' => true, 'type' => 'string']
         ],
-        'example_post' => 'POST \management\deleteStorageItem with {"id":"cartSession"}',
+        'example_post' => 'POST /management/p/<projectId>/deleteStorageItem with {"id":"cartSession"}',
         'success_response' => [
             'status' => 200,
             'code' => 'storage.deleted',
             'data' => ['id' => 'cartSession']
         ],
         'error_responses' => [
-            '404.storage.not_found' => 'No item with this id'
+            '404.storage.not_found' => 'No item with this id',
+            '400.validation.required' => 'Storage item id is required.',
+            '500.server.operation_failed' => 'Failed to write the storage registry.'
         ],
         'notes' => 'Does not check in-use references yet — the scan/reconcile slice surfaces dangling reads. Also clears the item description key from translate/.'
     ],
@@ -5502,7 +5873,7 @@ $GLOBALS['__help_commands'] = [
             'lang' => ['required' => true, 'type' => 'string', 'description' => 'Target language, must be in LANGUAGES_SUPPORTED.'],
             'confirm' => ['required' => false, 'type' => 'boolean', 'description' => 'Execute the move (defaults false → preview only).']
         ],
-        'example_post' => 'POST \management\setStorageDescLang with {"lang":"fr","confirm":true}',
+        'example_post' => 'POST /management/p/<projectId>/setStorageDescLang with {"lang":"fr","confirm":true}',
         'success_response' => [
             'status' => 200,
             'code' => 'success',
@@ -5510,7 +5881,9 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '409.storage.desclang_confirm' => 'Confirmation required — data: {from, to, moved, overwrites, needsConfirm}',
-            '400.validation.invalid' => 'Language not in LANGUAGES_SUPPORTED'
+            '400.validation.invalid' => 'Language not in LANGUAGES_SUPPORTED',
+            '400.validation.required' => 'A target language is required.',
+            '500.server.operation_failed' => 'Failed to write the storage registry.'
         ],
         'notes' => 'No-op (200) when lang already active. Drives the /admin/storage description-language selector.'
     ],
@@ -5518,7 +5891,7 @@ $GLOBALS['__help_commands'] = [
         'description' => 'Scan the build for storage-key references and reconcile against the declared registry. Triggered, warn-style check (not blocking). Walks structures (data-storage-* attrs + saveToken/store/clearToken chains), api-endpoints auth sources, page-events handler chains, and state-store init. Buckets keys into ok / incomplete (used but undeclared) / dangling_read (read but never written) / orphan (declared but unreferenced).',
         'method' => 'POST',
         'parameters' => [],
-        'example_post' => 'POST \management\scanStorageUsage',
+        'example_post' => 'POST /management/p/<projectId>/scanStorageUsage',
         'success_response' => [
             'status' => 200,
             'code' => 'success',
@@ -5532,13 +5905,15 @@ $GLOBALS['__help_commands'] = [
         'description' => 'Generate (or re-generate) the consent banner + popup structures from the registry and enable the consent layer (data/consent.json enabled=true). Writes templates/model/json/consent-banner.json + consent-popup.json — one popup toggle row per DECLARED non-essential category — and seeds default-language copy for the textKeys (NEW keys only, never clobbering edited copy; other languages are translated via the Translation Manager). The banner links to the cookie-policy route recorded in consent.json (owned by generateCookiePolicy). The structures render globally like menu/footer and are styleable/editable in the visual editor.',
         'method' => 'POST',
         'parameters' => [],
-        'example_post' => 'POST \management\generateConsentLayer',
+        'example_post' => 'POST /management/p/<projectId>/generateConsentLayer',
         'success_response' => [
             'status' => 200,
             'code' => 'success',
             'data' => ['categories' => '[declared non-essential categories]', 'languagesSeeded' => '{lang: keysAdded}', 'policyRoute' => 'string|null', 'enabled' => true]
         ],
-        'error_responses' => [],
+        'error_responses' => [
+            '500.server.operation_failed' => 'Failed to write the consent layer structure files.'
+        ],
         'notes' => 'Idempotent. Runtime write-gating only activates once this enables the layer. Drives the /admin/storage "Generate consent layer" button.'
     ],
 
@@ -5552,14 +5927,25 @@ $GLOBALS['__help_commands'] = [
                 'description' => 'Route to host the policy page (1-5 lowercase literal segments). If it already exists, its structure is overwritten.',
                 'example' => 'cookies'
             ],
+            'overwrite' => [
+                'required' => false,
+                'type' => 'boolean',
+                'description' => 'Confirm replacing a policy page that already exists. Without it the command refuses rather than overwriting, so the caller can re-send with overwrite:true once it knows.',
+                'example' => 'true',
+                'default' => false
+            ],
         ],
-        'example_post' => 'POST \management\generateCookiePolicy {"route":"cookies"}',
+        'example_post' => 'POST /management/p/<projectId>/generateCookiePolicy {"route":"cookies"}',
         'success_response' => [
             'status' => 200,
             'code' => 'success',
             'data' => ['route' => '/cookies', 'overwritten' => false, 'rows' => 'int', 'languagesSeeded' => '{lang: keysAdded}']
         ],
-        'error_responses' => [],
+        'error_responses' => [
+            '400.validation.required' => 'A route is required for the cookie-policy page.',
+            '409.route.exists' => 'The requested route already exists, and generating the cookie-policy page there would overwrite its content.',
+            '500.server.operation_failed' => 'Failed to write the cookie-policy page structure.'
+        ],
         'notes' => 'Creates the route (cascading parents) when missing; overwrites the structure when it exists (warned). Pairs with generateConsentLayer (which links the banner to this route).'
     ],
 
@@ -5567,7 +5953,7 @@ $GLOBALS['__help_commands'] = [
         'description' => 'Current consent-layer state for the project in the URL marker: whether it is enabled, whether the banner/popup structures are generated, the recorded cookie-policy route, and whether that route still exists. Read-only; drives the /admin/storage generate modal (pre-fill + Generate/Update/Delete).',
         'method' => 'POST',
         'parameters' => [],
-        'example_post' => 'POST \management\getConsentStatus',
+        'example_post' => 'POST /management/p/<projectId>/getConsentStatus',
         'success_response' => [
             'status' => 200,
             'code' => 'success',
@@ -5581,7 +5967,7 @@ $GLOBALS['__help_commands'] = [
         'description' => 'Delete the generated cookie-policy page (the route recorded in consent.json), clear the recorded route, and regenerate the banner without its policy link. No body — the route is read from consent.json so an unrelated route can not be deleted by accident.',
         'method' => 'POST',
         'parameters' => [],
-        'example_post' => 'POST \management\deleteCookiePolicy',
+        'example_post' => 'POST /management/p/<projectId>/deleteCookiePolicy',
         'success_response' => [
             'status' => 200,
             'code' => 'success',
@@ -5589,6 +5975,7 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '400 consent.no_policy_route' => 'No cookie-policy route is configured',
+            '400.consent.no_policy_route' => 'No cookie-policy route is configured for this project.'
         ],
         'notes' => 'Deletes the leaf route + its page files; parent routes stay. routeDeleted=false means the route was already gone (stale reference cleared).'
     ],
@@ -5597,7 +5984,7 @@ $GLOBALS['__help_commands'] = [
         'description' => 'Full privacy-helper state for /admin/privacy: the privacy registry (collected data, per-baseUrl host classifications, cookieSection, privacyRoute) joined with a live scan of the API registry (data/api-endpoints.json) for outbound data atoms — (endpoint, field) pairs from declared parameters + requestSchema.properties (response schemas ignored) — plus coverage (unmapped atoms, body-bearing endpoints with no request schema, unclassified hosts) and the cookie-page cross-link signal. Read-only; the scan never guesses undeclared fields.',
         'method' => 'POST',
         'parameters' => [],
-        'example_post' => 'POST \management\getPrivacyStatus',
+        'example_post' => 'POST /management/p/<projectId>/getPrivacyStatus',
         'success_response' => [
             'status' => 200,
             'code' => 'success',
@@ -5627,7 +6014,7 @@ $GLOBALS['__help_commands'] = [
             'label' => ['required' => true, 'type' => 'string', 'description' => 'Display name, e.g. "Email address".'],
             'purpose' => ['required' => false, 'type' => 'string', 'description' => 'What you do with it (empty clears).']
         ],
-        'example_post' => 'POST \management\setCollectedDatum with {"id":"email","label":"Email address","purpose":"To send login links"}',
+        'example_post' => 'POST /management/p/<projectId>/setCollectedDatum with {"id":"email","label":"Email address","purpose":"To send login links"}',
         'success_response' => [
             'status' => 200,
             'code' => 'success',
@@ -5635,7 +6022,8 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '400.validation.invalid' => 'Invalid id slug',
-            '400.validation.required' => 'Missing id or label'
+            '400.validation.required' => 'Missing id or label',
+            '500.server.operation_failed' => 'Failed to write the privacy registry.'
         ],
         'notes' => '201 when new, 200 on update. Drives the /admin/privacy collected-data editor.'
     ],
@@ -5645,14 +6033,16 @@ $GLOBALS['__help_commands'] = [
         'parameters' => [
             'id' => ['required' => true, 'type' => 'string']
         ],
-        'example_post' => 'POST \management\deleteCollectedDatum with {"id":"email"}',
+        'example_post' => 'POST /management/p/<projectId>/deleteCollectedDatum with {"id":"email"}',
         'success_response' => [
             'status' => 200,
             'code' => 'success',
             'data' => ['id' => 'email']
         ],
         'error_responses' => [
-            '404.privacy.not_found' => 'No collected datum with this id'
+            '404.privacy.not_found' => 'No collected datum with this id',
+            '400.validation.required' => 'A collected-data id is required.',
+            '500.server.operation_failed' => 'Failed to write the privacy registry.'
         ],
         'notes' => 'Mappings that referenced it become unset (null), not deleted.'
     ],
@@ -5663,7 +6053,7 @@ $GLOBALS['__help_commands'] = [
             'lang' => ['required' => true, 'type' => 'string', 'description' => 'Target language, must be in LANGUAGES_SUPPORTED.'],
             'confirm' => ['required' => false, 'type' => 'boolean', 'description' => 'Execute the move (defaults false → preview only).']
         ],
-        'example_post' => 'POST \management\setPrivacyDescLang with {"lang":"fr","confirm":true}',
+        'example_post' => 'POST /management/p/<projectId>/setPrivacyDescLang with {"lang":"fr","confirm":true}',
         'success_response' => [
             'status' => 200,
             'code' => 'success',
@@ -5671,7 +6061,9 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '409.privacy.desclang_confirm' => 'Confirmation required — data: {from, to, moved, overwrites, needsConfirm}',
-            '400.validation.invalid' => 'Language not in LANGUAGES_SUPPORTED'
+            '400.validation.invalid' => 'Language not in LANGUAGES_SUPPORTED',
+            '400.validation.required' => 'A target language is required.',
+            '500.server.operation_failed' => 'Failed to write the privacy registry.'
         ],
         'notes' => 'No-op (200) when lang already active. Drives the /admin/privacy description-language selector.'
     ],
@@ -5683,7 +6075,7 @@ $GLOBALS['__help_commands'] = [
             'field' => ['required' => true, 'type' => 'string', 'description' => 'Field name sent by that endpoint.'],
             'datum' => ['required' => false, 'type' => 'string', 'description' => 'Collected-data id; empty / "__unset__" clears the mapping.']
         ],
-        'example_post' => 'POST \management\setPrivacyMapping with {"endpoint":"test-api-auth/login","field":"login","datum":"email"}',
+        'example_post' => 'POST /management/p/<projectId>/setPrivacyMapping with {"endpoint":"test-api-auth/login","field":"login","datum":"email"}',
         'success_response' => [
             'status' => 200,
             'code' => 'success',
@@ -5691,7 +6083,8 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '400.privacy.unknown_datum' => 'datum is not a declared collected-data id',
-            '400.validation.required' => 'Missing endpoint or field'
+            '400.validation.required' => 'Missing endpoint or field',
+            '500.server.operation_failed' => 'Failed to write the privacy registry.'
         ],
         'notes' => 'Drives the /admin/privacy atom-mapping UI. Mapping an atom reduces the unmapped-coverage count.'
     ],
@@ -5704,7 +6097,7 @@ $GLOBALS['__help_commands'] = [
             'name' => ['required' => false, 'type' => 'string', 'description' => 'Third-party display name.'],
             'privacyUrl' => ['required' => false, 'type' => 'string', 'description' => 'Third-party privacy-policy URL.']
         ],
-        'example_post' => 'POST \management\setPrivacyHost with {"baseUrl":"https://hooks.x.com","kind":"third-party","name":"X","privacyUrl":"https://x.com/privacy"}',
+        'example_post' => 'POST /management/p/<projectId>/setPrivacyHost with {"baseUrl":"https://hooks.x.com","kind":"third-party","name":"X","privacyUrl":"https://x.com/privacy"}',
         'success_response' => [
             'status' => 200,
             'code' => 'success',
@@ -5712,7 +6105,8 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '400.validation.invalid' => 'kind must be self or third-party',
-            '400.validation.required' => 'Missing baseUrl'
+            '400.validation.required' => 'Missing baseUrl',
+            '500.server.operation_failed' => 'Failed to write the privacy registry.'
         ],
         'notes' => 'Drives the /admin/privacy host-classification UI. name/privacyUrl are ignored for kind=self.'
     ],
@@ -5723,7 +6117,7 @@ $GLOBALS['__help_commands'] = [
             'route' => ['required' => true, 'type' => 'string', 'description' => 'Route to host the page (1-5 lowercase literal segments). Existing route is overwritten with overwrite:true.', 'example' => 'privacy'],
             'overwrite' => ['required' => false, 'type' => 'boolean', 'description' => 'Confirm overwriting an existing route.']
         ],
-        'example_post' => 'POST \management\generatePrivacyPolicy {"route":"privacy"}',
+        'example_post' => 'POST /management/p/<projectId>/generatePrivacyPolicy {"route":"privacy"}',
         'success_response' => [
             'status' => 200,
             'code' => 'success',
@@ -5732,7 +6126,9 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '409.route.exists' => 'Route exists — re-call with overwrite:true (data.needsConfirm)',
             '400.route.invalid' => 'Route must have 1-5 segments',
-            '400.route.invalid_segment' => 'Invalid route segment'
+            '400.route.invalid_segment' => 'Invalid route segment',
+            '400.validation.required' => 'A route is required for the privacy-policy page.',
+            '500.server.operation_failed' => 'Failed to write the privacy-policy page structure.'
         ],
         'notes' => 'Descriptions resolve live (textKeys); regenerate only for data changes (new mappings, host re-classification). Drives the /admin/privacy Generate/Update flow.'
     ],
@@ -5740,9 +6136,10 @@ $GLOBALS['__help_commands'] = [
         'description' => 'Delete the generated privacy-policy page (the route recorded in data/privacy.json) and clear the recorded route. No body — the route is read from privacy.json so an unrelated route cannot be deleted by accident. Deletes the leaf route + its page files; parent routes stay.',
         'method' => 'POST',
         'parameters' => [],
-        'example_post' => 'POST \management\deletePrivacyPolicy',
+        'example_post' => 'POST /management/p/<projectId>/deletePrivacyPolicy',
         'success_response' => ['status' => 200, 'code' => 'success', 'data' => ['route' => '/privacy', 'routeDeleted' => true]],
-        'error_responses' => ['400 privacy.no_policy_route' => 'No privacy-policy route is configured'],
+        'error_responses' => ['400 privacy.no_policy_route' => 'No privacy-policy route is configured',
+            '400.privacy.no_policy_route' => 'No privacy-policy route is configured for this project.'],
         'notes' => 'routeDeleted=false means the route was already gone (stale reference cleared).'
     ],
     'setPrivacyCookieSection' => [
@@ -5751,9 +6148,10 @@ $GLOBALS['__help_commands'] = [
         'parameters' => [
             'cookieSection' => ['required' => true, 'type' => 'string', 'enum' => ['auto', 'omit']]
         ],
-        'example_post' => 'POST \management\setPrivacyCookieSection with {"cookieSection":"omit"}',
+        'example_post' => 'POST /management/p/<projectId>/setPrivacyCookieSection with {"cookieSection":"omit"}',
         'success_response' => ['status' => 200, 'code' => 'success', 'data' => ['cookieSection' => 'omit']],
-        'error_responses' => ['400.validation.invalid' => 'cookieSection must be auto or omit'],
+        'error_responses' => ['400.validation.invalid' => 'cookieSection must be auto or omit',
+            '500.server.operation_failed' => 'Failed to write the privacy registry.'],
         'notes' => 'Applies on the next generate/update. Drives the /admin/privacy cookie-section toggle.'
     ],
 
@@ -5774,7 +6172,7 @@ $GLOBALS['__help_commands'] = [
                 'example' => 'main-backend'
             ]
         ],
-        'example_get' => 'GET /management/getApiEndpoint/contact-submit or GET /management/getApiEndpoint/main-backend/contact-submit',
+        'example_get' => 'GET /management/p/<projectId>/getApiEndpoint/contact-submit or GET /management/p/<projectId>/getApiEndpoint/main-backend/contact-submit',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -5843,7 +6241,7 @@ $GLOBALS['__help_commands'] = [
                 'example' => '{"type": "bearer", "tokenSource": "localStorage:apiToken"}'
             ]
         ],
-        'example_post' => 'POST /management/addApi with body: {"apiId": "main-backend", "name": "Main Backend", "baseUrl": "https://api.example.com", "auth": {"type": "bearer", "tokenSource": "localStorage:apiToken"}}',
+        'example_post' => 'POST /management/p/<projectId>/addApi with body: {"apiId": "main-backend", "name": "Main Backend", "baseUrl": "https://api.example.com", "auth": {"type": "bearer", "tokenSource": "localStorage:apiToken"}}',
         'success_response' => [
             'status' => 201,
             'code' => 'operation.success',
@@ -5922,9 +6320,15 @@ $GLOBALS['__help_commands'] = [
                 'type' => 'string',
                 'description' => 'Delete endpoint by ID',
                 'example' => 'old-endpoint'
+            ],
+            'renameEndpoint' => [
+                'required' => false,
+                'type' => 'object',
+                'description' => 'Rename an endpoint id and re-point every reference to it: {from, to, updates?}. Use this rather than deleteEndpoint plus addEndpoint, which would leave references pointing at an id that no longer exists.',
+                'example' => '{"from": "contact", "to": "contact-submit"}'
             ]
         ],
-        'example_post' => 'POST /management/editApi with body: {"apiId": "main-backend", "addEndpoint": {"id": "users-list", "name": "List Users", "path": "/users", "method": "GET"}}',
+        'example_post' => 'POST /management/p/<projectId>/editApi with body: {"apiId": "main-backend", "addEndpoint": {"id": "users-list", "name": "List Users", "path": "/users", "method": "GET"}}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -5958,7 +6362,7 @@ $GLOBALS['__help_commands'] = [
                 'example' => 'old-api'
             ]
         ],
-        'example_delete' => 'DELETE /management/deleteApi/old-api',
+        'example_delete' => 'DELETE /management/p/<projectId>/deleteApi/old-api',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -6020,9 +6424,15 @@ $GLOBALS['__help_commands'] = [
                 'type' => 'integer',
                 'description' => 'Request timeout in seconds (default: 30)',
                 'example' => 10
+            ],
+            'pathParams' => [
+                'required' => false,
+                'type' => 'object',
+                'description' => 'Values for the ":placeholder" segments in the endpoint path. Substituted into the URL before any query parameters are appended.',
+                'example' => '{"id": "42"}'
             ]
         ],
-        'example_post' => 'POST /management/testApiEndpoint with body: {"endpointId": "contact-submit", "testData": {"name": "Test", "email": "test@test.com"}}',
+        'example_post' => 'POST /management/p/<projectId>/testApiEndpoint with body: {"endpointId": "contact-submit", "testData": {"name": "Test", "email": "test@test.com"}}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -6052,7 +6462,10 @@ $GLOBALS['__help_commands'] = [
             '400.api.error.missing_parameter' => 'Missing endpointId',
             '400.api.error.invalid_parameter' => 'Duplicate endpoint IDs - specify apiId',
             '404.api.error.not_found' => 'Endpoint not found',
-            '500.api.error.request_failed' => 'HTTP request failed (timeout, connection error)'
+            '500.api.error.request_failed' => 'HTTP request failed (timeout, connection error)',
+            '400.api.error.blocked_url' => 'Endpoint URL blocked by SSRF policy.',
+            '500.api.error.internal_error' => 'Error testing endpoint.',
+            '502.api.error.external_request_failed' => 'The outbound request to the endpoint under test did not complete (DNS, TLS, connection or timeout). The transport error is returned in the message.'
         ],
         'notes' => 'This makes a server-side (PHP) request to the external API. Useful for testing auth configuration and endpoint availability without client-side CORS issues. Auth tokens are masked in response for security. PATH PARAMETERS: a value supplied in pathParams is substituted; an OPTIONAL one that is omitted has its path segment removed (along with the preceding segment when that segment is a literal equal to the parameter name — the key/value path-pair convention), so the request stays valid. A REQUIRED one that is omitted is deliberately left as the literal :name in the URL this command reports, because seeing it is how the omission surfaces in a test panel. Same rule as QS.fetch and the server-side resolver — qs_api_substitute_path() in src/functions/apiRegistry.php.'
     ],
@@ -6065,7 +6478,7 @@ $GLOBALS['__help_commands'] = [
         'description' => 'Lists all available snippets (core + project). Returns snippets organized by category with metadata for display in the Visual Editor.',
         'method' => 'GET',
         'parameters' => [],
-        'example_get' => 'GET /management/listSnippets',
+        'example_get' => 'GET /management/p/<projectId>/listSnippets',
         'success_response' => [
             'status' => 200,
             'code' => 'snippets.list_success',
@@ -6082,7 +6495,10 @@ $GLOBALS['__help_commands'] = [
                 'categories' => ['nav', 'forms', 'cards', 'layouts']
             ]
         ],
-        'error_responses' => [],
+        'error_responses' => [
+            '400.project.mismatch' => 'The project named in the body does not match the project in the URL marker. The marker decides; a disagreeing echo is refused rather than ignored.',
+            '400.project.required' => 'No project marker on the request. This command is project-scoped: target a project with /management/p/<projectId>/.'
+        ],
         'notes' => 'Core snippets are read-only and can be duplicated to project snippets. Project snippets can be edited and deleted.'
     ],
     
@@ -6097,7 +6513,7 @@ $GLOBALS['__help_commands'] = [
                 'example' => 'navbar-basic'
             ]
         ],
-        'example_get' => 'GET /management/getSnippet?id=navbar-basic',
+        'example_get' => 'GET /management/p/<projectId>/getSnippet?id=navbar-basic',
         'success_response' => [
             'status' => 200,
             'code' => 'snippets.get_success',
@@ -6115,7 +6531,11 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '400.validation.missing_field' => 'Missing snippet id parameter',
-            '404.snippet.not_found' => 'Snippet not found'
+            '404.snippet.not_found' => 'Snippet not found',
+            '400.project.mismatch' => 'The project named in the body does not match the project in the URL marker. The marker decides; a disagreeing echo is refused rather than ignored.',
+            '400.project.required' => 'No project marker on the request. This command is project-scoped: target a project with /management/p/<projectId>/.',
+            '400.snippets.id_required' => 'Snippet ID is required.',
+            '404.snippets.not_found' => 'No snippet with that id exists in this project.'
         ],
         'notes' => 'The css field is only present for core snippets. User snippets use existing project classes.'
     ],
@@ -6169,9 +6589,10 @@ $GLOBALS['__help_commands'] = [
         ],
         'notes' => [
             "A structure carrying a tag the renderer would refuse (a blocked tag, or one that is not on the allowlist) is rejected with 400 validation.blocked_tag — the same TagRegistry policy the renderer and the compiler enforce.",
-            "The project written to is bound to the URL marker; a body 'project' that disagrees is refused with 400 project.mismatch."
+            "The project written to is bound to the URL marker; a body 'project' that disagrees is refused with 400 project.mismatch.",
+            'User snippets do not include a css field - they use existing project classes. Category folder is created if it does not exist.'
         ],
-        'example_post' => 'POST /management/createSnippet with body: {"id": "my-nav", "name": "My Nav", "category": "nav", "structure": {"tag": "nav"}, "scope": "personal"}',
+        'example_post' => 'POST /management/p/<projectId>/createSnippet with body: {"id": "my-nav", "name": "My Nav", "category": "nav", "structure": {"tag": "nav"}, "scope": "personal"}',
         'success_response' => [
             'status' => 201,
             'code' => 'snippets.create_success',
@@ -6184,9 +6605,16 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.validation.missing_field' => 'Missing required field (id, name, category, structure)',
             '400.validation.invalid_format' => 'Invalid snippet ID format, or A component reference in the structure is not a bare component name. It must start with a letter, then letters, digits, hyphens and underscores, up to 64 characters - never a path. errors[0].expected states the rule.',
-'409.snippet.exists' => 'Snippet with this ID already exists'
-        ],
-        'notes' => 'User snippets do not include a css field - they use existing project classes. Category folder is created if it does not exist.'
+            '400.project.mismatch' => 'The project named in the body does not match the project in the URL marker. The marker decides; a disagreeing echo is refused rather than ignored.',
+            '400.project.required' => 'No project marker on the request. This command is project-scoped: target a project with /management/p/<projectId>/.',
+            '400.snippets.id_required' => 'Snippet ID is required.',
+            '400.snippets.invalid_id' => 'Snippet ID must start with a letter and contain only letters, numbers, dashes, and underscores.',
+            '400.snippets.name_required' => 'Snippet name is required.',
+            '400.snippets.structure_required' => 'Snippet structure is required.',
+            '400.validation.blocked_tag' => 'Tag is not allowed (security restriction).',
+            '409.snippets.already_exists' => 'A snippet with this ID already exists.',
+            '500.snippets.save_failed' => 'The snippet passed validation but could not be written to the project. The underlying reason is returned in the message.'
+        ]
     ],
     
     'deleteSnippet' => [
@@ -6200,7 +6628,7 @@ $GLOBALS['__help_commands'] = [
                 'example' => 'my-custom-nav'
             ]
         ],
-        'example_post' => 'DELETE /management/deleteSnippet?id=my-custom-nav',
+        'example_post' => 'DELETE /management/p/<projectId>/deleteSnippet?id=my-custom-nav',
         'success_response' => [
             'status' => 200,
             'code' => 'snippets.delete_success',
@@ -6210,7 +6638,12 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.validation.missing_field' => 'Missing snippet id parameter',
             '403.snippet.core_protected' => 'Cannot delete core snippets (use duplicateSnippet first)',
-            '404.snippet.not_found' => 'Snippet not found'
+            '404.snippet.not_found' => 'Snippet not found',
+            '400.project.mismatch' => 'The project named in the body does not match the project in the URL marker. The marker decides; a disagreeing echo is refused rather than ignored.',
+            '400.project.required' => 'No project marker on the request. This command is project-scoped: target a project with /management/p/<projectId>/.',
+            '400.snippets.id_required' => 'Snippet ID is required.',
+            '403.snippets.cannot_delete_core' => 'Cannot delete core snippets. Use duplicateSnippet to create an editable copy.',
+            '404.snippets.not_found' => 'No snippet with that id exists in this project.'
         ],
         'notes' => 'Only user snippets in the project folder can be deleted. Core snippets are protected.'
     ],
@@ -6238,7 +6671,7 @@ $GLOBALS['__help_commands'] = [
                 'example' => 'My Navbar'
             ]
         ],
-        'example_post' => 'POST /management/duplicateSnippet with body: {"id": "navbar-basic", "newId": "my-navbar"}',
+        'example_post' => 'POST /management/p/<projectId>/duplicateSnippet with body: {"id": "navbar-basic", "newId": "my-navbar"}',
         'success_response' => [
             'status' => 201,
             'code' => 'snippets.duplicate_success',
@@ -6252,7 +6685,13 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.snippets.id_required' => 'Missing id parameter',
             '404.snippet.not_found' => 'Source snippet not found',
-            '409.snippet.exists' => 'Target snippet ID already exists'
+            '409.snippet.exists' => 'Target snippet ID already exists',
+            '400.project.mismatch' => 'The project named in the body does not match the project in the URL marker. The marker decides; a disagreeing echo is refused rather than ignored.',
+            '400.project.required' => 'No project marker on the request. This command is project-scoped: target a project with /management/p/<projectId>/.',
+            '400.snippets.invalid_id' => 'New ID must start with a letter and contain only letters, numbers, dashes, and underscores.',
+            '404.snippets.source_not_found' => 'Source snippet not found.',
+            '409.snippets.already_exists' => 'A snippet with the requested new id already exists in this project.',
+            '500.snippets.save_failed' => 'The copy could not be written to the project. The underlying reason is returned in the message.'
         ],
         'notes' => 'The duplicate is created without the css field (user snippets use project classes). Edit the structure JSON directly or use Visual Editor.'
     ],
@@ -6292,7 +6731,7 @@ $GLOBALS['__help_commands'] = [
                 'example' => 'inside'
             ]
         ],
-        'example_post' => 'POST /management/insertSnippet with body: {"snippetId": "navbar-basic", "type": "page", "name": "home", "targetNodeId": "0", "position": "inside"}',
+        'example_post' => 'POST /management/p/<projectId>/insertSnippet with body: {"snippetId": "navbar-basic", "type": "page", "name": "home", "targetNodeId": "0", "position": "inside"}',
         'success_response' => [
             'status' => 200,
             'code' => 'snippets.inserted',
@@ -6312,7 +6751,20 @@ $GLOBALS['__help_commands'] = [
             '400.validation.missing_field' => 'Missing required parameter',
             '400.operation.failed' => 'Failed to insert snippet at the specified position',
             '404.snippet.not_found' => 'Snippet not found',
-            '404.file.not_found' => 'Target structure file not found'
+            '404.file.not_found' => 'Target structure file not found',
+            '400.project.mismatch' => 'The project named in the body does not match the project in the URL marker. The marker decides; a disagreeing echo is refused rather than ignored.',
+            '400.project.required' => 'No project marker on the request. This command is project-scoped: target a project with /management/p/<projectId>/.',
+            '400.snippets.no_structure' => 'Snippet has no structure defined.',
+            '400.validation.invalid_format' => 'Structure too deeply nested (max 50 levels).',
+            '400.validation.invalid_position' => 'Position must be: before, after, or inside.',
+            '400.validation.invalid_type' => 'Invalid structure type. Must be: page, menu, footer, or component.',
+            '400.validation.name_required' => 'Name is required for page/component structures.',
+            '400.validation.snippet_required' => 'Snippet ID is required.',
+            '400.validation.target_required' => 'Target node ID is required.',
+            '404.snippets.not_found' => 'No snippet with that id exists in this project.',
+            '404.structure.not_found' => 'Page structure not found. Structure file not found.',
+            '500.server.file_write_failed' => 'Failed to write structure file.',
+            '500.structure.invalid' => 'Invalid structure JSON.'
         ],
         'notes' => 'Each inserted node gets a unique textKey (e.g., text_abc12345) to prevent conflicts. Translations from the snippet are mapped to new keys and added to all project language files.'
     ],
@@ -6340,7 +6792,7 @@ $GLOBALS['__help_commands'] = [
                 'example' => 'my-project'
             ]
         ],
-        'example_post' => 'POST /management/injectSnippetCss with body: {"id": "hero-centered", "mode": "missing"}',
+        'example_post' => 'POST /management/p/<projectId>/injectSnippetCss with body: {"id": "hero-centered", "mode": "missing"}',
         'success_response' => [
             'status' => 200,
             'code' => 'snippets.css_injected',
@@ -6357,7 +6809,12 @@ $GLOBALS['__help_commands'] = [
             '400.snippets.invalid_mode' => 'Mode must be "missing" or "replace"',
             '400.snippets.no_css' => 'This snippet has no saved CSS to inject',
             '400.project.required' => 'No project targeted - use /management/p/<projectId>/injectSnippetCss',
-            '404.snippets.not_found' => 'Snippet not found'
+            '404.snippets.not_found' => 'Snippet not found',
+            '200.snippets.css_already_present' => 'All CSS selectors already exist in the project stylesheet.',
+            '200.snippets.css_nothing_to_inject' => 'No CSS rules to inject.',
+            '400.project.mismatch' => 'The project named in the body does not match the project in the URL marker. The marker decides; a disagreeing echo is refused rather than ignored.',
+            '413.validation.size_limit_exceeded' => 'Injecting this snippet would take the project stylesheet past 512 KB, the ceiling every CSS writer enforces.',
+            '500.server.file_write_failed' => 'Failed to write stylesheet.'
         ],
         'notes' => 'Writes to both the live public stylesheet and the project backup in <secure>/projects/. Includes :root variables referenced by injected rules. In "replace" mode, only global-scope rules are removed (media query rules are left untouched).'
     ],
@@ -6366,6 +6823,7 @@ $GLOBALS['__help_commands'] = [
         'description' => 'Checks if a newer version of QuickSite is available on GitHub. Compares the local VERSION file against the latest release/tag.',
         'method' => 'GET',
         'parameters' => [],
+        'example_get' => 'GET /management/checkForUpdates',
         'success_response' => [
             'status' => 200,
             'code' => 'update_check.success',
@@ -6383,7 +6841,8 @@ $GLOBALS['__help_commands'] = [
             ]
         ],
         'error_responses' => [
-            '500.update_check.no_local_version' => 'VERSION file missing or empty at project root'
+            '500.update_check.no_local_version' => 'VERSION file missing or empty at project root',
+            '200.update_check.unable_to_reach' => 'Could not reach GitHub to check for updates. You may be offline or rate-limited.'
         ],
         'notes' => 'Read-only check — does not modify anything. Uses GitHub REST API (no auth required for public repos). Auto-detects install method (git clone vs ZIP download). When GitHub is unreachable, returns checked=false with current version info.'
     ],
@@ -6392,7 +6851,7 @@ $GLOBALS['__help_commands'] = [
         'description' => 'Returns the embed sandbox configuration for the project in the URL marker. Shows tag-based rules (tag → domain → sandbox permissions) and the default sandbox policy.',
         'method' => 'GET',
         'parameters' => [],
-        'example_get' => 'GET /management/getIframeSandbox',
+        'example_get' => 'GET /management/p/<projectId>/getIframeSandbox',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -6424,6 +6883,7 @@ $GLOBALS['__help_commands'] = [
             'sandbox' => '(string) Space-separated sandbox permissions, e.g. "allow-scripts allow-same-origin". Empty string = block all.',
             'default' => '(string, alternative) If provided without tag/domain, updates the default sandbox policy instead.'
         ],
+        'example_post' => 'POST /management/p/<projectId>/setIframeSandbox with body: {"tag": "iframe", "domain": "youtube.com", "sandbox": "allow-scripts allow-same-origin"} - or, to change the default policy instead of a rule: {"default": "allow-scripts"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -6438,7 +6898,8 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '400.validation.required' => 'Missing tag or domain',
-            '400.validation.invalid_value' => 'Invalid tag, domain, or unknown permission'
+            '400.validation.invalid_value' => 'Invalid tag, domain, or unknown permission',
+            '500.api.error.write_failed' => 'Failed to save iframe sandbox config.'
         ],
         'notes' => 'Valid embed tags: iframe, video, audio. Never-allowed permissions are always stripped silently. Subdomains are automatically covered: "youtube.com" matches www.youtube.com, m.youtube.com, etc.'
     ],
@@ -6450,6 +6911,7 @@ $GLOBALS['__help_commands'] = [
             'tag' => '(string) The embed tag: "iframe", "video", or "audio".',
             'domain' => '(string) The domain to remove from the tag\'s rules.'
         ],
+        'example_post' => 'POST /management/p/<projectId>/removeIframeSandbox with body: {"tag": "iframe", "domain": "youtube.com"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -6464,7 +6926,8 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.validation.required' => 'Must provide tag and domain',
             '400.validation.invalid_value' => 'Invalid embed tag',
-            '404.operation.not_found' => 'No rule found for tag+domain'
+            '404.operation.not_found' => 'No rule found for tag+domain',
+            '500.api.error.write_failed' => 'Failed to save iframe sandbox config.'
         ],
         'notes' => 'Removes the sandbox rule for the specified tag and domain.'
     ],

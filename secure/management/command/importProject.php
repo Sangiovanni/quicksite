@@ -13,7 +13,8 @@
  * 
  * @method POST
  * @route /management/importProject
- * @auth required (admin permission)
+ * @auth required (any authenticated account — category projects.create is
+ *       scope: global, access: 'any'; there is no role gate in front of this)
  * 
  * @param file $file Uploaded ZIP file (required via multipart/form-data)
  * @param string $name New project name (optional, uses ZIP folder name if not provided)
