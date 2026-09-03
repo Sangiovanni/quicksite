@@ -173,8 +173,7 @@ window.QuickSiteAPI = (function() {
     // failed to emit QUICKSITE_CONFIG.globalCommands, so the panel can still
     // authenticate + list/create projects. The emitted set is authoritative.
     const FALLBACK_GLOBAL_COMMANDS = [
-        'help', 'getMyPermissions', 'listRoles', 'listProjects',
-        'createProject'
+        'help', 'listProjects', 'createProject'
     ];
 
     function globalCommandSet() {
@@ -416,7 +415,7 @@ window.QuickSiteAPI = (function() {
             }
 
             // A 401 with auth.invalid_credentials is a COMMAND-level credential
-            // check (e.g. changePassword's current password) — the session
+            // check (e.g. the account password change's current password) — the session
             // itself is alive, so surface it to the caller (C8). Any other 401
             // means the session is over (signed out, idle, or ended elsewhere)
             // → login. An embedding platform that plugged its own token source
@@ -749,6 +748,82 @@ window.QuickSiteAPI = (function() {
         }
     }
 
+    /**
+     * Call the panel's ACCOUNT endpoint (/admin/self).
+     *
+     * NOT commands. The command surface is a CLI for developing a project;
+     * managing the login you sign in with, getting into or out of a project, and
+     * looking a person up in order to invite them are operations on an ACCOUNT,
+     * so they are served here instead (beta.11 S6).
+     *
+     * Resolves with the same {ok, status, data} shape request() uses, so a
+     * caller branches on `res.ok` and reads `res.data.data` / `res.data.message`
+     * exactly as it did when these were management commands.
+     *
+     * Reads are GET and writes are POST — the server enforces the method per
+     * route and answers 405 on a mismatch, so the verb passed here is not a
+     * suggestion. `route` may carry a literal query string ('space-usage?refresh=1').
+     *
+     * @param {string} route - e.g. 'permissions', 'accept-invitation'
+     * @param {string} method - 'GET' or 'POST'
+     * @param {Object} [body] - JSON body, POST routes only
+     * @returns {Promise<{ok: boolean, status: number, data: Object|null}>}
+     */
+    async function accountRequest(route, method, body) {
+        const token = getToken();
+        if (!token) {
+            return clientError('client.no_token', 'No authentication token', 401);
+        }
+
+        const options = {
+            method: method,
+            credentials: 'same-origin',   // the session cookie is the credential
+            headers: { 'Authorization': `Bearer ${token}` }
+        };
+        if (method === 'POST') {
+            options.headers['Content-Type'] = 'application/json';
+            options.body = JSON.stringify(body || {});
+        }
+
+        try {
+            // '/self', NOT '/account': /admin/account is the My Account PAGE, and a
+            // directory of that name under public/admin/ shadows it (Apache resolves
+            // a real directory before the panel's FallbackResource).
+            const response = await fetch(`${config.adminBase}/self/${route}`, options);
+            const body = await readResponseBody(response);
+
+            // A 2xx is NOT enough to call this a success. Every route here answers
+            // an ApiResponse envelope ({status, code, …}); anything else on a 2xx
+            // did not come from this endpoint, and the most likely sender is the
+            // panel's own FallbackResource handing back a PAGE. That is not
+            // hypothetical — it is what happened when this function briefly pointed
+            // at the wrong directory: /admin/<page>/<route> renders the page with
+            // HTTP 200 and an HTML body, readResponseBody passes a 200 through
+            // untouched, and the caller read "deleted" from a request that deleted
+            // nothing. On a destructive route a false success is the worst possible
+            // failure mode, so the shape is checked rather than assumed.
+            const fromEndpoint = body && typeof body === 'object'
+                && typeof body.status === 'number' && typeof body.code === 'string';
+            if (response.ok && !fromEndpoint) {
+                return clientError(
+                    'client.unexpected_response',
+                    'The server answered this request with something other than an account '
+                        + 'response. Nothing was changed. Reload the page and try again.',
+                    response.status
+                );
+            }
+
+            return {
+                ok: response.ok,
+                status: response.status,
+                data: body
+            };
+        } catch (error) {
+            console.error('Account request error:', error);
+            return clientError('client.network_error', error.message || 'Network error', 0);
+        }
+    }
+
     // ============================================
     // Public API
     // ============================================
@@ -783,6 +858,10 @@ window.QuickSiteAPI = (function() {
 
         // Panel state (/admin/state) — not commands. See setSelectedProject.
         setSelectedProject,
+
+        // Account + membership self-service and directory lookups
+        // (/admin/self) — not commands either. See accountRequest.
+        accountRequest,
 
         // For the few places that must hand-roll a fetch (importProject is
         // GLOBAL, so upload()'s marker path does not fit it). Exported so they

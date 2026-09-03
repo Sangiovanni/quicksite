@@ -767,7 +767,7 @@ function qs_user_generation(?array $user): int {
 /**
  * Bump a user's session generation: every session of theirs stops being
  * accepted on its next request. This is what "log out everywhere" does, and
- * what changePassword uses for containment (it then re-stamps the session that
+ * what the account password change uses for containment (it then re-stamps the session that
  * performed the change, so only the OTHERS die).
  *
  * @return int|null the new generation, or null when the write failed
@@ -1010,7 +1010,7 @@ function qs_auth_attempt_login(string $username, string $password): array {
 
 /**
  * Serialized read-modify-write on users.php — THE single users-registry writer
- * (C8): createProject, register, changePassword and the panel's own
+ * (C8): createProject, register, the account password change, and the panel's own
  * selected-project write (secure/admin/functions/panelState.php) all come
  * through here. flock sidecar (the pre-C8 inline writers were temp+rename
  * only, so two simultaneous writers could lose an update) + temp + rename
@@ -1407,7 +1407,7 @@ function hasPermission(array $user, string $command, ?string $requestedProject =
 
 /**
  * Get a USER's effective role + full command list for their current project (C6).
- * Feeds getMyPermissions (admin JS reads {role, commands} to gate the UI). Category
+ * Feeds GET /admin/self/permissions (admin JS reads {role, commands} to gate the UI). Category
  * RBAC: any-auth globals ∪ the role's project commands. There is NO owner-only
  * global set to add — global access:'owner' was retired in C8 8.5. Project source
  * = selected_project (transitional; C7 swaps to the per-request URL project).

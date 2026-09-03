@@ -1,11 +1,14 @@
 /**
  * My Memberships page (C8 8.3c) — the caller's own membership surface.
  *
- * Calls listProjects / listMyInvitations / listMyProposals plus the
- * self-service verbs (accept/decline/leave/withdraw/dismiss/requestToJoin) via
- * QuickSiteAdmin.apiRequest — all GLOBAL commands, so a 0-membership account
- * gets a clean page, never 403 noise. Switching which project you EDIT is not a
- * command at all (panel state — QuickSiteAdmin.setSelectedProject).
+ * Calls the listProjects command, plus the account endpoint for the inbox, the
+ * proposals list and the self-service verbs (accept/decline/leave/withdraw/
+ * dismiss/request-to-join). Only the first is a command: since beta.11 S6 the
+ * command surface is a CLI for DEVELOPING a project, and getting into or out of
+ * one is an operation on your account's access, served by /admin/self. Both
+ * doors answer any authenticated caller, so a 0-membership account gets a clean
+ * page, never 403 noise. Switching which project you EDIT is a third thing
+ * again (panel state — QuickSiteAdmin.setSelectedProject).
  *
  * Built with QSDom.el + named _render* helpers (one Element each) per the
  * CLAUDE.md HTML-in-JS hygiene rule. No innerHTML string-glueing.
@@ -32,6 +35,18 @@
             return Promise.reject(new Error('QuickSiteAdmin not available'));
         }
         return admin.apiRequest(cmd, method, body);
+    }
+
+    // Membership self-service is NOT a command surface (beta.11 S6): joining a
+    // project, leaving one, and answering an invitation are operations on your
+    // ACCOUNT's access, so they go to /admin/self. Same {ok, status, data}
+    // shape as api(), so every caller below is unchanged apart from the door.
+    function account(route, method, body) {
+        var admin = window.QuickSiteAdmin;
+        if (!admin || typeof admin.accountRequest !== 'function') {
+            return Promise.reject(new Error('QuickSiteAdmin not available'));
+        }
+        return admin.accountRequest(route, method, body);
     }
 
     // Panel state, not a command — same {ok, status, data} shape as api().
@@ -241,7 +256,7 @@
             [el('p', { text: (T.leaveConfirm || 'Leave {project}?').replace('{project}', project) })],
             T.leaveBtn || 'Leave', true,
             function (close, btn) {
-                api('leaveProject', 'POST', { project: project }).then(function (res) {
+                account('leave-project', 'POST', { project: project }).then(function (res) {
                     close();
                     if (res && res.ok) {
                         toast(T.leftMsg || 'You left the project', 'success');
@@ -298,7 +313,7 @@
     }
 
     function onAccept(inv) {
-        api('acceptInvitation', 'POST', { project: inv.project }).then(function (res) {
+        account('accept-invitation', 'POST', { project: inv.project }).then(function (res) {
             if (res && res.ok) {
                 toast(T.acceptedMsg || 'Invitation accepted', 'success');
             } else {
@@ -316,7 +331,7 @@
             [el('p', { text: (inv.project_name || inv.project) + ' — ' + String(inv.role || '') })],
             T.decline || 'Decline', false,
             function (close) {
-                api('declineInvitation', 'POST', { project: inv.project }).then(function (res) {
+                account('decline-invitation', 'POST', { project: inv.project }).then(function (res) {
                     close();
                     if (res && res.ok) {
                         toast(T.declinedMsg || 'Invitation declined', 'success');
@@ -359,7 +374,7 @@
     function onWithdraw(project, userId, doneMsg) {
         var body = { project: project };
         if (userId) body.user_id = userId;
-        api('withdrawJoinRequest', 'POST', body).then(function (res) {
+        account('withdraw-request', 'POST', body).then(function (res) {
             if (res && res.ok) {
                 toast(doneMsg || T.withdrawnMsg || 'Withdrawn', 'success');
             } else {
@@ -446,7 +461,7 @@
     }
 
     function onDismiss(project) {
-        api('dismissProjectNotice', 'POST', { project: project }).then(function (res) {
+        account('dismiss-notice', 'POST', { project: project }).then(function (res) {
             if (res && res.ok) {
                 toast(T.dismissedMsg || 'Notice dismissed', 'success');
             } else {
@@ -480,7 +495,7 @@
         if (!note) { toast(T.noteRequired || 'The note is required.', 'warning'); noteInput.focus(); return; }
 
         btn.disabled = true;
-        api('requestToJoin', 'POST', { project: project, note: note }).then(function (res) {
+        account('request-to-join', 'POST', { project: project, note: note }).then(function (res) {
             btn.disabled = false;
             if (res && res.ok) {
                 toast(T.requestSentMsg || 'Join request sent', 'success');
@@ -504,13 +519,13 @@
         api('listProjects', 'GET').then(function (res) {
             renderProjects((res && res.ok && res.data && res.data.data && res.data.data.projects) || []);
         });
-        api('listMyInvitations', 'GET').then(function (res) {
+        account('invitations', 'GET').then(function (res) {
             var d = (res && res.ok && res.data && res.data.data) || {};
             renderInbox(d.invitations || []);
             renderRequests(d.requests || []);
             renderNotices(d.notices || []);
         });
-        api('listMyProposals', 'GET').then(function (res) {
+        account('proposals', 'GET').then(function (res) {
             renderProposals((res && res.ok && res.data && res.data.data && res.data.data.proposals) || []);
         });
     }

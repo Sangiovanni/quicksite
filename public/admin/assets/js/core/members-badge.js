@@ -5,7 +5,7 @@
  * dashboard memberships card show — derived ENTIRELY from existing reads
  * (no new storage, no polling):
  *   - awaiting me: my pending invitations + undismissed notices
- *     (one listMyInvitations call);
+ *     (one /admin/self/invitations call);
  *   - awaiting my adjudication: direction:'request' rows in the queue of each
  *     project where I am admin/owner (listProjects → listMembers per project).
  *
@@ -40,7 +40,8 @@
             total: 0,
         };
 
-        var inboxP = API.request('listMyInvitations', 'GET').then(function (res) {
+        // The membership inbox is an ACCOUNT surface, not a command (S6).
+        var inboxP = API.accountRequest('invitations', 'GET').then(function (res) {
             var d = (res && res.ok && res.data && res.data.data) || {};
             counts.invitations = d.invitation_count || 0;
             counts.myRequests = d.request_count || 0;

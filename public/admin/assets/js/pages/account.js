@@ -1,10 +1,11 @@
 /**
  * My Account page (beta.11 S1.3) — the signed-in account's own self-service.
  *
- * Writes: changePassword / logoutSession {everywhere} / deleteMyAccount via
- * QuickSiteAdmin.apiRequest. All three are global-scope, act only on the
- * caller, and re-verify the current password server-side — the client-side
- * checks here exist to give a fast, honest answer, never as the gate.
+ * Writes: the password change and the account deletion go to /admin/self
+ * (they are account self-service, not commands — beta.11 S6); logoutSession
+ * {everywhere} is still a command. All three act only on the caller and
+ * re-verify the current password server-side — the client-side checks here
+ * exist to give a fast, honest answer, never as the gate.
  *
  * Built with QSDom.el + named _render* helpers (one Element each) per the
  * CLAUDE.md HTML-in-JS hygiene rule. No innerHTML string-glueing.
@@ -24,6 +25,17 @@
             return Promise.reject(new Error('QuickSiteAdmin not available'));
         }
         return admin.apiRequest(cmd, 'POST', body);
+    }
+
+    // The password change and the account deletion are NOT commands (S6) — they
+    // go to /admin/self. Same {ok, status, data} shape as api(), so the
+    // callers below are unchanged apart from which door they knock on.
+    function account(route, body) {
+        var admin = window.QuickSiteAdmin;
+        if (!admin || typeof admin.accountRequest !== 'function') {
+            return Promise.reject(new Error('QuickSiteAdmin not available'));
+        }
+        return admin.accountRequest(route, 'POST', body);
     }
 
     function toast(message, type) {
@@ -150,7 +162,7 @@
             }
 
             btn.disabled = true;
-            api('changePassword', { current_password: current, new_password: next }).then(function (res) {
+            account('change-password', { current_password: current, new_password: next }).then(function (res) {
                 btn.disabled = false;
                 if (res && res.ok) {
                     if (currentEl) currentEl.value = '';
@@ -233,7 +245,7 @@
                 [el('p', { text: T.deleteBody || '' })],
                 T.deleteBtn || 'Delete my account', true,
                 function (close) {
-                    api('deleteMyAccount', { current_password: password, confirm: true }).then(function (res) {
+                    account('delete', { current_password: password, confirm: true }).then(function (res) {
                         close();
                         if (res && res.ok) {
                             toast(T.deleteDone || 'Your account has been deleted.', 'success');

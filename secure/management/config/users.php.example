@@ -53,7 +53,7 @@
  *                    member, pre-8.3a entries), 'pending_invite' /
  *                    'pending_request' (awaiting consent — never grants
  *                    access), or a terminal notice 'refused' / 'removed' /
- *                    'deleted' (dismissable via dismissProjectNotice).
+ *                    'deleted' (dismissable from the memberships page).
  *                    'member' entries are rebuildable from members.json;
  *                    pending/terminal statuses are NOT — a cache repair
  *                    (reconcileMemberships) must merge-preserve them.

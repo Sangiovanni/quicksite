@@ -480,7 +480,7 @@
     // ============================================================
 
     /**
-     * getMySpaceUsage already returns a per-project breakdown with `builds` as
+     * The account space report already returns a per-project breakdown with `builds` as
      * its own line, so this panel measures nothing: it reads that report and
      * asks one question of it.
      *
@@ -507,7 +507,10 @@
 
         var res;
         try {
-            res = await api('getMySpaceUsage', 'POST', refresh ? { refresh: true } : {});
+            // Not a command since S6 — your own quota is an account fact.
+            res = await window.QuickSiteAdmin.accountRequest(
+                refresh ? 'space-usage?refresh=1' : 'space-usage', 'GET'
+            );
         } catch (e) {
             clearNode(panel);
             panel.appendChild(_renderAlert('error', T.error || 'Error', String(e && e.message ? e.message : e)));

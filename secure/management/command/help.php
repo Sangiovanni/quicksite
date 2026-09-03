@@ -608,7 +608,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_date' => 'Invalid date format (expected YYYY-MM-DD)',
             '400.project.required' => 'No project marker on the request. This command is project-scoped: target a project with /management/p/<projectId>/.'
         ],
-        'notes' => 'PROJECT-SCOPED: returns the history of the project named by the URL marker (/management/p/<projectId>/getCommandHistory) and nothing else - there is no installation-wide view. Logs are stored in daily files under <secure>/logs/p/<projectId>/. By default returns last 7 days. The getCommandHistory command itself is not logged to prevent recursion. Commands that target no project (registration, login, project creation, membership self-service) are recorded separately in <secure>/logs/_global/, which no command reads. Request bodies are sanitized DENY-BY-DEFAULT: any key that looks like a credential (password/secret/token/credential/key/auth/authorization/signature/salt) has its value replaced with [redacted] at every depth, for every command including ones added later; the authentication commands (login/register/logoutSession/changePassword/deleteMyAccount) log no body at all; uploadAsset logs file metadata only and editStyles truncates stylesheets over 5KB.'
+        'notes' => 'PROJECT-SCOPED: returns the history of the project named by the URL marker (/management/p/<projectId>/getCommandHistory) and nothing else - there is no installation-wide view. Logs are stored in daily files under <secure>/logs/p/<projectId>/. By default returns last 7 days. The getCommandHistory command itself is not logged to prevent recursion. Commands that target no project (registration, login, project creation) are recorded separately in <secure>/logs/_global/, which no command reads. Request bodies are sanitized DENY-BY-DEFAULT: any key that looks like a credential (password/secret/token/credential/key/auth/authorization/signature/salt) has its value replaced with [redacted] at every depth, for every command including ones added later; the session commands (login/register/logoutSession) log no body at all; uploadAsset logs file metadata only and editStyles truncates stylesheets over 5KB.'
     ],
 
     'clearCommandHistory' => [
@@ -2594,89 +2594,7 @@ $GLOBALS['__help_commands'] = [
         'notes' => 'No session and no user id are returned - the new account signs in through the login command. The success response is identical whether the account was created or the username already existed; if the username belonged to someone else, the subsequent login simply fails - pick another username and register again. Flood-control knobs live in auth.php authentication.registration (throttle.per_ip_per_minute, throttle.global_per_hour, max_users; 0 disables a limit). This command can never create the FIRST account on an install: while the user registry is empty the shared mint path requires the first-run setup token, which registration does not carry, so the answer is 403 auth.setup_required regardless of the allow_self_registration flag.'
     ],
 
-    'changePassword' => [
-        'description' => 'Self-service password change for the AUTHENTICATED caller. Requires the current password (a stolen access token alone cannot take over the account) and is throttled with the login backoff. On success every OTHER session of the user is revoked (containment) - the session performing the change survives.',
-        'method' => 'POST',
-        'parameters' => [
-            'current_password' => [
-                'required' => true,
-                'type' => 'string',
-                'ui_type' => 'password',
-                'description' => 'The account\'s current password',
-                'example' => '************'
-            ],
-            'new_password' => [
-                'required' => true,
-                'type' => 'string',
-                'ui_type' => 'password',
-                'description' => 'Replacement password (minimum length from auth.php registration.min_password_length, default 12)',
-                'example' => '************'
-            ]
-        ],
-        'example_post' => 'POST /management/changePassword with body: {"current_password": "************", "new_password": "************"}',
-        'success_response' => [
-            'status' => 200,
-            'code' => 'operation.success',
-            'message' => 'Password changed',
-            'data' => [
-                'other_sessions_revoked' => 1
-            ]
-        ],
-        'error_responses' => [
-            '400.validation.required' => 'current_password and new_password are required',
-            '400.auth.externally_managed' => 'This account has no local password (password_hash is null - managed by an embedding platform)',
-            '400.validation.invalid_format' => 'New password shorter than the configured minimum (data.min_length)',
-            '401.auth.invalid_credentials' => 'Current password is incorrect (counts toward the login throttle)',
-            '429.auth.throttled' => 'Too many failed attempts - retry_after gives the wait in seconds',
-            '500.server.file_write_failed' => 'Could not persist the new password',
-            '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.'
-        ],
-        'notes' => 'Global-scoped (no project marker) - acts only on the caller\'s own account. Wrong current-password attempts share the login throttle for the same account (keyed on its username), so a stolen access token cannot brute-force the password. After a successful change, other devices/sessions must log in again with the new password.'
-    ],
 
-    'deleteMyAccount' => [
-        'description' => 'Permanently deletes the AUTHENTICATED caller\'s own account. There is no admin lane: QuickSite has no global tier (every authority is per-project), so no principal can delete someone else\'s account - per-project eviction is removeMember, and operator-level removal is a users.php edit. Requires the current password plus an explicit confirm. REFUSED while the caller solely owns any project.',
-        'method' => 'POST',
-        'parameters' => [
-            'current_password' => [
-                'required' => true,
-                'type' => 'string',
-                'ui_type' => 'password',
-                'description' => 'The account\'s current password (a stolen access token alone must not be able to erase an account)',
-                'example' => '************'
-            ],
-            'confirm' => [
-                'required' => true,
-                'type' => 'boolean',
-                'description' => 'Must be true - this is irreversible',
-                'example' => true
-            ]
-        ],
-        'example_post' => 'POST /management/deleteMyAccount with body: {"current_password": "************", "confirm": true}',
-        'success_response' => [
-            'status' => 200,
-            'code' => 'resource.deleted',
-            'message' => 'Your account has been permanently deleted',
-            'data' => [
-                'deleted' => true,
-                'memberships_removed' => 2,
-                'invitations_removed' => 1,
-                'sessions_revoked' => 3
-            ]
-        ],
-        'error_responses' => [
-            '400.validation.required' => 'current_password is required',
-            '400.validation.confirmation_required' => 'Set confirm=true to proceed (data.warning describes the consequences)',
-            '400.auth.externally_managed' => 'This account has no local password (password_hash is null - its embedding platform owns its lifecycle)',
-            '401.auth.invalid_credentials' => 'Current password is incorrect (counts toward the login throttle)',
-            '409.account.sole_owner' => 'You still solely own one or more projects - data.owned_projects lists them; transfer or delete each first',
-            '429.auth.throttled' => 'Too many failed attempts - retry_after gives the wait in seconds',
-            '500.members.integrity' => 'A project membership file could not be updated - the account was NOT deleted and nothing changed',
-            '500.server.file_write_failed' => 'Memberships were removed but the account record could not be deleted - retry',
-            '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.'
-        ],
-        'notes' => 'Global-scoped (no project marker). Sole ownership is refused rather than cascaded: deleting a project\'s only owner leaves it unownable AND undeletable (transferOwnership requires the caller to be the owner, and project.delete is owner-only), and cascading would hide N site deletions behind one call. What is removed: the users.php record (with its status-mirror cache), every members.json entry keyed by the caller\'s user id (membership, invitation received, own join request, proposal filed about them), and every session family. What is KEPT: `by`/`sponsor` references to the caller inside entries about OTHER people (removing those would destroy a third party\'s pending invitation) - they render as {user_id, name:null}, and the shipped accept/approve-time re-validation voids anything that depended on the caller\'s standing. Command history keeps its publisher record (immutable audit; the display name was already snapshotted at write time).'
-    ],
 
     'listComponents' => [
         'description' => 'Lists all reusable JSON components with metadata. Shows available slots (placeholders), typed variables, and component dependencies.',
@@ -3676,50 +3594,6 @@ $GLOBALS['__help_commands'] = [
         'notes' => 'Projects you are not a member of are simply absent from the list. my_role is your role on that project (members.json). A user with no memberships gets an empty list. No project is privileged, so the list is plain alphabetical.'
     ],
     
-    'getMySpaceUsage' => [
-        'description' => 'Disk footprint of the projects the CALLER OWNS — an owner-wide total plus a per-project breakdown. Global-scoped (no /management/p/<id>/ marker) and takes no project parameter: ownership is resolved per project from members.json, so the response describes only projects you own. Owning nothing returns an empty, zeroed report. quota reports the per-account storage ceiling this install enforces and what is left of it; configured is false when no quota.php exists, in which case nothing is limited and limit/ree are 0.',
-        'method' => 'POST',
-        'parameters' => [
-            'refresh' => [
-                'type' => 'boolean',
-                'required' => false,
-                'description' => 'Bypass the measurement cache and re-walk the disk',
-                'example' => true
-            ]
-        ],
-        'example_post' => 'POST /management/getMySpaceUsage {"refresh": true}',
-        'success_response' => [
-            'status' => 200,
-            'code' => 'operation.success',
-            'message' => 'Owner space usage retrieved successfully',
-            'data' => [
-                'total' => ['size' => 20971520, 'size_formatted' => '20.00 MB'],
-                'by_category' => [
-                    'content' => ['size' => 12582912, 'size_formatted' => '12.00 MB'],
-                    'backups' => ['size' => 6291456, 'size_formatted' => '6.00 MB'],
-                    'builds' => ['size' => 1048576, 'size_formatted' => '1.00 MB'],
-                    'exports' => ['size' => 1048576, 'size_formatted' => '1.00 MB']
-                ],
-                'projects' => [
-                    [
-                        'name' => 'quicksite',
-                        'total' => 14680064,
-                        'total_formatted' => '14.00 MB',
-                        'content' => 10485760,
-                        'backups' => ['size' => 4194304, 'size_formatted' => '4.00 MB', 'count' => 2],
-                        'exports' => ['size' => 0, 'size_formatted' => '0 B', 'count' => 0],
-                        'builds' => ['size' => 0, 'size_formatted' => '0 B'],
-                        'measured_at' => 1768800000
-                    ]
-                ],
-                'project_count' => 1,
-                'quota' => ['configured' => true, 'limit' => 52428800, 'limit_formatted' => '50.00 MB', 'free' => 31457280, 'free_formatted' => '30.00 MB', 'over' => false],
-                'cache' => ['ttl' => 300, 'from_cache' => true, 'refreshed' => false]
-            ]
-        ],
-        'error_responses' => [],
-        'notes' => 'Projects are ordered largest-first. Sizes come from a short-lived shared cache (default TTL 300s); the project SET is never cached, so gaining, losing, creating or deleting a project is reflected immediately and only byte counts can age — use refresh=true to force a re-walk. Names of backups or exports are never returned, only sizes and counts. For the currently-edited project alone (including its backup list), use getSizeInfo, which is project-scoped.'
-    ],
 
     'createProject' => [
         'description' => 'Creates a new empty project with basic structure and templates',
@@ -3873,7 +3747,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.delete_failed' => 'The tree could not be fully removed. data.partial says whether anything was deleted; data.survived names what could not be (project-relative paths); data.retained names what was kept deliberately so a retry stays possible; data.files_deleted / data.directories_deleted count what did go.',
             '400.validation.invalid_format' => 'Invalid project name.'
         ],
-        'notes' => 'WARNING: This is permanent and cannot be undone. Use exportProject first to backup. Only the project OWNER may delete it. Membership cascade: every OTHER member and every ENGAGED pending party (invitees, self-requesters) gets a dismissable status "deleted" notice in their own cache (listMyInvitations shows it; dismissProjectNotice clears it) so the deletion is never mistaken for a refusal or removal; the deleting owner\'s own entry is simply removed, and a sponsored not-yet-validated proposal target gets NOTHING (they were never told the project existed). The response reports the cascade under data.membership_cascade. PARTIAL DELETES: the removal continues past a file it cannot remove rather than stopping at the first, and reports what is left — data.survived (blocked) and data.retained (kept on purpose). config.php, routes.php and config/ go LAST and are skipped entirely when anything else failed: the first two are what the project context boots from and config/members.json is the permission gate, so removing them on the way past would leave a project that could be neither named nor authorized, and no retry could finish it. Release whatever blocked the delete and re-run; the command is safe to repeat.'
+        'notes' => 'WARNING: This is permanent and cannot be undone. Use exportProject first to backup. Only the project OWNER may delete it. Membership cascade: every OTHER member and every ENGAGED pending party (invitees, self-requesters) gets a dismissable status "deleted" notice in their own cache (it appears in their membership inbox in the admin panel, where they clear it) so the deletion is never mistaken for a refusal or removal; the deleting owner\'s own entry is simply removed, and a sponsored not-yet-validated proposal target gets NOTHING (they were never told the project existed). The response reports the cascade under data.membership_cascade. PARTIAL DELETES: the removal continues past a file it cannot remove rather than stopping at the first, and reports what is left — data.survived (blocked) and data.retained (kept on purpose). config.php, routes.php and config/ go LAST and are skipped entirely when anything else failed: the first two are what the project context boots from and config/members.json is the permission gate, so removing them on the way past would leave a project that could be neither named nor authorized, and no retry could finish it. Release whatever blocked the delete and re-run; the command is safe to repeat.'
     ],
 
     'listMembers' => [
@@ -3909,13 +3783,13 @@ $GLOBALS['__help_commands'] = [
     ],
 
     'inviteMember' => [
-        'description' => 'Offers project membership to an existing account (consent model): writes a pending invitation that only materializes when the invitee runs acceptInvitation - where the inviter\'s authority is re-validated. Targeting is by user_id ONLY (the unique public identifier, discovered via findUser); the private username is never a membership target.',
+        'description' => 'Offers project membership to an existing account (consent model): writes a pending invitation that only materializes when the invitee accepts it - where the inviter\'s authority is re-validated. Accepting is an account operation, not a command: the invitee answers from their membership inbox in the admin panel. Targeting is by user_id ONLY (the unique public identifier, looked up by public display name in the panel); the private username is never a membership target.',
         'method' => 'POST',
         'parameters' => [
             'user_id' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Target account\'s user id (from findUser or a shared id)',
+                'description' => 'Target account\'s user id (from the panel\'s user lookup, or a shared id)',
                 'example' => 'usr_a1b2c3d4e5f6...'
             ],
             'role' => [
@@ -3957,7 +3831,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.unencodable' => 'The note is not valid UTF-8 text.',
             '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.'
         ],
-        'notes' => 'The invitee sees the invitation via listMyInvitations and answers with acceptInvitation / declineInvitation. The rank check runs inside the members.json write lock, so a concurrent demotion of the actor cannot be outrun. The invitee\'s cache gains a pending_invite mirror entry (display only - never an access input).'
+        'notes' => 'The invitee sees the invitation in their membership inbox in the admin panel and accepts or declines it there - neither answer is a command. The rank check runs inside the members.json write lock, so a concurrent demotion of the actor cannot be outrun. The invitee\'s cache gains a pending_invite mirror entry (display only - never an access input).'
     ],
 
     'cancelInvitation' => [
@@ -4060,7 +3934,7 @@ $GLOBALS['__help_commands'] = [
             '400.project.required' => 'No project targeted',
             '400.validation.missing_field' => 'user_id is required',
             '400.member.owner_immutable' => 'The owner cannot be removed - transfer ownership first',
-            '400.member.cannot_target_self' => 'Use leaveProject to remove yourself',
+            '400.member.cannot_target_self' => 'Leaving a project is an account operation, not a command - do it from your memberships page in the admin panel',
             '403.authz.insufficient_rank' => 'Target\'s role is not strictly below the actor\'s rank',
             '404.member.not_found' => 'This user is not a member',
             '500.members.integrity' => 'members.json missing/unsound - refused',
@@ -4124,253 +3998,13 @@ $GLOBALS['__help_commands'] = [
         'notes' => 'The rotation happens inside one write lock with a fresh read and an invariant backstop (exactly one owner; owner field matches the owner role) - there is no read-back-reverse pass; the atomic temp+rename swap IS the integrity guarantee. No cache touch (both parties remain members).'
     ],
 
-    'findUser' => [
-        'description' => 'EXACT public-name lookup - the "invite someone" primitive: look a person up by the display name they gave you, confirm the {user_id, name} pair, then invite by id. Names are NOT unique, so several matches may return; the opaque user id is the unique public identifier that disambiguates. The PRIVATE username is never searchable and never returned.',
-        'method' => 'POST',
-        'parameters' => [
-            'name' => [
-                'required' => true,
-                'type' => 'string',
-                'description' => 'Public display name to match (exact, case-insensitive; no substring search)',
-                'example' => 'Alice'
-            ]
-        ],
-        'example_post' => 'POST /management/findUser with body: {"name": "Alice"}',
-        'success_response' => [
-            'status' => 200,
-            'code' => 'operation.success',
-            'message' => '1 user found',
-            'data' => [
-                'query' => 'Alice',
-                'matches' => [
-                    ['user_id' => 'usr_...', 'name' => 'Alice']
-                ],
-                'count' => 1
-            ]
-        ],
-        'error_responses' => [
-            '400.validation.missing_field' => 'name is required'
-        ],
-        'notes' => 'Global-scoped (no project marker), any authenticated user. Zero matches is a 200 with an empty list - display names are public data and a search with no results is a success, not an error. Exact match only in beta.10 (no roster harvesting by prefix).'
-    ],
 
-    'listMyInvitations' => [
-        'description' => 'The caller\'s membership inbox: pending invitations (project, offered role, inviter, note), the caller\'s own pending join requests, and terminal project notices (refused / removed / deleted) awaiting dismissal. Reads the caller\'s own cache, then verifies each pending entry against that project\'s authoritative members.json - drift heals toward authority (a withdrawn offer is pruned; a lost approve/accept mirror upgrades to member; a pending kind that disagrees with the authority\'s direction is corrected).',
-        'method' => 'GET',
-        'parameters' => [],
-        'example_get' => 'GET /management/listMyInvitations',
-        'success_response' => [
-            'status' => 200,
-            'code' => 'operation.success',
-            'message' => 'Invitations listed successfully',
-            'data' => [
-                'invitations' => [
-                    ['project' => 'prj_a1b2c3', 'project_name' => 'Portfolio', 'role' => 'editor',
-                     'invited_by' => ['user_id' => 'usr_...', 'name' => 'Sangio'], 'at' => '2026-07-16', 'note' => 'welcome']
-                ],
-                'requests' => [
-                    ['project' => 'prj_g7h8i9', 'project_name' => 'prj_g7h8i9', 'role' => 'viewer', 'at' => '2026-07-17', 'note' => 'I run the docs team']
-                ],
-                'notices' => [
-                    ['project' => 'prj_d4e5f6', 'project_name' => 'Old Shop', 'status' => 'deleted', 'at' => '2026-07-15']
-                ],
-                'invitation_count' => 1,
-                'request_count' => 1,
-                'notice_count' => 1
-            ]
-        ],
-        'error_responses' => [
-            '401.auth.unauthorized' => 'Missing/invalid bearer token',
-            '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.'
-        ],
-        'notes' => 'Global-scoped self-service (an invitee is not yet a member, so a project-marker route would refuse them). Answer invitations with acceptInvitation / declineInvitation; withdraw your own requests with withdrawJoinRequest; clear notices with dismissProjectNotice. An invitation born from an approved proposal also carries sponsored_by. requests[] lists only asks YOU authored - a sponsor\'s proposal about you is invisible until validated, and a request on a private project shows the project id as its name (the site name is not yours to see yet). Identities are public {user_id, name} references - never the private username.'
-    ],
 
-    'acceptInvitation' => [
-        'description' => 'Accepts the caller\'s OWN pending invitation - the consent step where membership actually materializes. The inviter\'s authority is RE-VALIDATED at accept time: they must still be a member whose rank outranks the offered role, otherwise the invitation is void (removed) and refused - a grant never materializes on dead authority.',
-        'method' => 'POST',
-        'parameters' => [
-            'project' => [
-                'required' => true,
-                'type' => 'string',
-                'description' => 'Project id the invitation belongs to (from listMyInvitations)'
-            ]
-        ],
-        'example_post' => 'POST /management/acceptInvitation with body: {"project": "prj_a1b2c3"}',
-        'success_response' => [
-            'status' => 200,
-            'code' => 'operation.success',
-            'message' => 'Invitation accepted - welcome aboard',
-            'data' => ['project' => 'prj_a1b2c3', 'role' => 'editor', 'joined' => true]
-        ],
-        'error_responses' => [
-            '400.validation.missing_field' => 'project is required',
-            '400.project.invalid' => 'Malformed project identifier',
-            '404.invitation.not_found' => 'No pending invitation for you on this project (identical for a nonexistent project - no existence oracle)',
-            '409.invitation.void' => 'The inviter no longer holds the authority that offered this role; the invitation was removed',
-            '500.members.integrity' => 'members.json unsound - refused',
-            '500.server.file_write_failed' => 'Could not persist the join',
-            '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.'
-        ],
-        'notes' => 'Acts only on the caller\'s own invitation. On success the caller is a full member (role from the offer) and their cache entry flips to status member. A voided invitation disappears from listMyInvitations - ask the project\'s admins to re-invite.'
-    ],
 
-    'declineInvitation' => [
-        'description' => 'Declines the caller\'s OWN pending invitation. Self-initiated - the invitation is removed everywhere with no notice kept (the inviter simply sees it gone from listMembers).',
-        'method' => 'POST',
-        'parameters' => [
-            'project' => [
-                'required' => true,
-                'type' => 'string',
-                'description' => 'Project id the invitation belongs to'
-            ]
-        ],
-        'example_post' => 'POST /management/declineInvitation with body: {"project": "prj_a1b2c3"}',
-        'success_response' => [
-            'status' => 200,
-            'code' => 'operation.success',
-            'message' => 'Invitation declined',
-            'data' => ['project' => 'prj_a1b2c3', 'declined' => true]
-        ],
-        'error_responses' => [
-            '400.validation.missing_field' => 'project is required',
-            '400.project.invalid' => 'Malformed project identifier',
-            '404.invitation.not_found' => 'No pending invitation for you on this project (identical for a nonexistent project)',
-            '500.members.integrity' => 'members.json unsound - refused',
-            '500.server.file_write_failed' => 'Could not persist the decline',
-            '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.'
-        ],
-        'notes' => 'Global-scoped self-service; acts only on the caller\'s own invitation.'
-    ],
 
-    'leaveProject' => [
-        'description' => 'Removes the CALLER\'s own membership (self-service exit). Self-initiated - no notice is kept. The owner cannot leave (a project must never go ownerless): transfer ownership first, or delete the project.',
-        'method' => 'POST',
-        'parameters' => [
-            'project' => [
-                'required' => true,
-                'type' => 'string',
-                'description' => 'Project id to leave'
-            ]
-        ],
-        'example_post' => 'POST /management/leaveProject with body: {"project": "prj_a1b2c3"}',
-        'success_response' => [
-            'status' => 200,
-            'code' => 'operation.success',
-            'message' => 'You left the project',
-            'data' => ['project' => 'prj_a1b2c3', 'left' => true]
-        ],
-        'error_responses' => [
-            '400.validation.missing_field' => 'project is required',
-            '400.project.invalid' => 'Malformed project identifier',
-            '400.member.owner_immutable' => 'The owner cannot leave - transferOwnership first (or deleteProject)',
-            '404.member.not_found' => 'You are not a member of this project (identical for a nonexistent project)',
-            '500.members.integrity' => 'members.json unsound - refused',
-            '500.server.file_write_failed' => 'Could not persist the exit',
-            '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.'
-        ],
-        'notes' => 'Effective immediately - the panel falls back to another project you are a member of (or the no-project state). Rejoining takes a fresh invitation.'
-    ],
 
-    'dismissProjectNotice' => [
-        'description' => 'Clears ONE terminal notice (refused / removed / deleted) from the caller\'s own cache - the "OK, seen it" for the notices listMyInvitations shows. Live states are never dismissable: end a membership with leaveProject, answer an invitation with accept/declineInvitation.',
-        'method' => 'POST',
-        'parameters' => [
-            'project' => [
-                'required' => true,
-                'type' => 'string',
-                'description' => 'Project id the notice refers to (the project may no longer exist - that is the point)'
-            ]
-        ],
-        'example_post' => 'POST /management/dismissProjectNotice with body: {"project": "prj_d4e5f6"}',
-        'success_response' => [
-            'status' => 200,
-            'code' => 'operation.success',
-            'message' => 'Notice dismissed',
-            'data' => ['project' => 'prj_d4e5f6', 'dismissed' => true]
-        ],
-        'error_responses' => [
-            '400.validation.missing_field' => 'project is required',
-            '400.project.invalid' => 'Malformed project identifier',
-            '400.notice.not_dismissable' => 'The entry is a live membership/invitation, not a terminal notice (data.status says which)',
-            '404.notice.not_found' => 'No cache entry for this project',
-            '500.server.file_write_failed' => 'Could not persist the dismissal',
-            '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.'
-        ],
-        'notes' => 'Pure cache operation on the caller\'s own users.php entry - no members.json involved. The project id is shape-checked only, never existence-checked (a deleted project\'s notice must stay dismissable).'
-    ],
 
-    'requestToJoin' => [
-        'description' => 'Self-service "knock": an authenticated non-member asks to join a project. The ask lands as a pending direction:"request" entry (grants nothing until approved via approveJoinRequest). The note is MANDATORY - a request always carries its reason. The requested role is fixed at viewer: the note says what you want, approval materializes viewer, changeMemberRole handles upgrades.',
-        'method' => 'POST',
-        'parameters' => [
-            'project' => [
-                'required' => true,
-                'type' => 'string',
-                'description' => 'Project id to knock on'
-            ],
-            'note' => [
-                'required' => true,
-                'type' => 'string',
-                'description' => 'Why you want to join (control characters stripped, 500 chars max)'
-            ]
-        ],
-        'example_post' => 'POST /management/requestToJoin with body: {"project": "prj_a1b2c3", "note": "I run the docs team"}',
-        'success_response' => [
-            'status' => 201,
-            'code' => 'resource.created',
-            'message' => 'Join request sent - a project admin or the owner will answer it',
-            'data' => ['project' => 'prj_a1b2c3', 'role' => 'viewer', 'requested' => true, 'at' => '2026-07-17']
-        ],
-        'error_responses' => [
-            '400.validation.missing_field' => 'project and note are required',
-            '400.project.invalid' => 'Malformed project identifier',
-            '403.join.requests_closed' => 'The project is public but its join policy is closed',
-            '404.join.unavailable' => 'The project does not accept join requests - identical for a nonexistent project and a private project with a closed policy (no existence oracle)',
-            '409.member.already_exists' => 'You are already a member',
-            '409.invitation.already_pending' => 'You already have a pending invitation here - accept or decline it instead',
-            '409.request.already_pending' => 'You already asked - withdraw first to re-ask',
-            '409.request.notice_pending' => 'A refused/removed notice for this project is still in your inbox - dismiss it first',
-            '500.members.integrity' => 'members.json unsound - refused',
-            '500.server.file_write_failed' => 'Could not persist the request',
-            '400.validation.unencodable' => 'The note is not valid UTF-8 text.',
-            '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.'
-        ],
-        'notes' => 'Only projects whose join_policy is "open" (setJoinPolicy) accept requests. On a PRIVATE open project, a successful request confirms the project exists - an explicit owner choice; your own cache/inbox shows the project ID as its name, never the site name, until you are a member. Withdraw anytime with withdrawJoinRequest (no notice); a denial leaves a dismissable refused notice with the reason.'
-    ],
 
-    'withdrawJoinRequest' => [
-        'description' => 'Withdraws a pending join ask the CALLER AUTHORED: their own join request (no user_id), or a proposal they sponsored via proposeMember (user_id = the proposed person). Self-initiated - plain removal everywhere, no notice kept.',
-        'method' => 'POST',
-        'parameters' => [
-            'project' => [
-                'required' => true,
-                'type' => 'string',
-                'description' => 'Project id the request/proposal sits on'
-            ],
-            'user_id' => [
-                'required' => false,
-                'type' => 'string',
-                'description' => 'Proposal target\'s user id - omit to withdraw your own join request'
-            ]
-        ],
-        'example_post' => 'POST /management/withdrawJoinRequest with body: {"project": "prj_a1b2c3"}',
-        'success_response' => [
-            'status' => 200,
-            'code' => 'operation.success',
-            'message' => 'Join request withdrawn',
-            'data' => ['project' => 'prj_a1b2c3', 'user_id' => 'usr_...', 'withdrawn' => true]
-        ],
-        'error_responses' => [
-            '400.validation.missing_field' => 'project is required',
-            '400.project.invalid' => 'Malformed project identifier',
-            '404.request.not_found' => 'No join request of yours on this project (identical for a nonexistent project, an entry you did not author, or nothing pending)',
-            '500.members.integrity' => 'members.json unsound - refused',
-            '500.server.file_write_failed' => 'Could not persist the withdrawal',
-            '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.'
-        ],
-        'notes' => 'Only the AUTHOR may withdraw (by == caller): a requester cannot remove a sponsor\'s proposal about them this way, and probing for one gets the same uniform 404. Admin-side removal is denyJoinRequest (which requires a reason).'
-    ],
 
     'proposeMember' => [
         'description' => 'The sponsor lane: ANY member (viewer included) vouches an outsider for membership. The proposal is a pending direction:"request" entry with a MANDATORY note (the vouch) and needs admin/owner validation (approveJoinRequest) - the proposed person is NOT told anything until then (no inbox row, no cache entry), and nothing is granted.',
@@ -4379,7 +4013,7 @@ $GLOBALS['__help_commands'] = [
             'user_id' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Proposed account\'s user id (from findUser)'
+                'description' => 'Proposed account\'s user id (from the panel\'s user lookup)'
             ],
             'role' => [
                 'required' => true,
@@ -4415,11 +4049,11 @@ $GLOBALS['__help_commands'] = [
             '400.validation.unencodable' => 'The note is not valid UTF-8 text.',
             '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.'
         ],
-        'notes' => 'The suggested role is capped at your OWN rank (a viewer proposes viewers, an editor up to editors - checked against your fresh in-lock rank); the validator re-checks canManageRole at approve. join_policy does NOT gate proposals (it gates only the self-service requestToJoin door). On approval the proposal converts into a real invitation carried by the approver\'s rank, with you kept as sponsored_by; the person then accepts or declines like any invitee. Withdraw your own proposal with withdrawJoinRequest {project, user_id}.'
+        'notes' => 'The suggested role is capped at your OWN rank (a viewer proposes viewers, an editor up to editors - checked against your fresh in-lock rank); the validator re-checks canManageRole at approve. join_policy does NOT gate proposals (it gates only the self-service join-request door). On approval the proposal converts into a real invitation carried by the approver\'s rank, with you kept as sponsored_by; the person then accepts or declines like any invitee. Withdrawing your own proposal is an account operation, not a command - do it from your memberships page in the admin panel.'
     ],
 
     'approveJoinRequest' => [
-        'description' => 'Authority\'s "yes" on a pending join request or proposal. Consent rule: membership materializes exactly when BOTH consents exist. A SELF-REQUEST (the person asked) joins immediately at the granted role. A SPONSORED PROPOSAL converts into a normal invitation (by = the approver, sponsor kept, note kept) - the person is engaged for the first time and still answers via acceptInvitation. The approver may name the role to grant (optional; defaults to the stored role).',
+        'description' => 'Authority\'s "yes" on a pending join request or proposal. Consent rule: membership materializes exactly when BOTH consents exist. A SELF-REQUEST (the person asked) joins immediately at the granted role. A SPONSORED PROPOSAL converts into a normal invitation (by = the approver, sponsor kept, note kept) - the person is engaged for the first time and still answers it themselves from their membership inbox. The approver may name the role to grant (optional; defaults to the stored role).',
         'method' => 'POST',
         'parameters' => [
             'user_id' => [
@@ -4453,7 +4087,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.file_write_failed' => 'Could not persist the approval',
             '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.'
         ],
-        'notes' => 'Approve-time re-validation mirrors acceptInvitation: approver rank in-lock (against the GRANTED role); target account must still exist; a sponsored entry\'s sponsor must still be a MEMBER (any rank - a demoted sponsor stays valid, a removed one voids the proposal). The optional role is the authority changeMemberRole already carries, folded into the approval as one atomic step (supersedes the earlier "no role override at approve" rule). For a converted proposal the response carries converted_to_invitation=true and joined=false.'
+        'notes' => 'Approve-time re-validation mirrors the invitee\'s own accept step: approver rank in-lock (against the GRANTED role); target account must still exist; a sponsored entry\'s sponsor must still be a MEMBER (any rank - a demoted sponsor stays valid, a removed one voids the proposal). The optional role is the authority changeMemberRole already carries, folded into the approval as one atomic step (supersedes the earlier "no role override at approve" rule). For a converted proposal the response carries converted_to_invitation=true and joined=false.'
     ],
 
     'denyJoinRequest' => [
@@ -4492,7 +4126,7 @@ $GLOBALS['__help_commands'] = [
     ],
 
     'setJoinPolicy' => [
-        'description' => 'Opens or closes the SELF-SERVICE join-request lane (requestToJoin) for the target project by setting join_policy in members.json. Default is closed. Gates ONLY the front door: member proposals (proposeMember) always reach the admin queue, and closing never purges requests already pending - they stay adjudicable.',
+        'description' => 'Opens or closes the SELF-SERVICE join-request lane for the target project by setting join_policy in members.json. Asking to join is an account operation rather than a command - an outsider knocks from the admin panel - and this is the switch that decides whether the knock is answered. Default is closed. Gates ONLY the front door: member proposals (proposeMember) always reach the admin queue, and closing never purges requests already pending - they stay adjudicable.',
         'method' => 'POST',
         'parameters' => [
             'policy' => [
@@ -4605,29 +4239,6 @@ $GLOBALS['__help_commands'] = [
         'notes' => 'Project-scoped on the URL marker. Same member-row shape as listMembers, minus the queue: no invitations, no visibility/owner metadata. Admin/owner surfaces use listMembers instead. Users are {user_id, name} public references - the PRIVATE username never appears.'
     ],
 
-    'listMyProposals' => [
-        'description' => 'The sponsor\'s view of their OWN outgoing proposals (proposeMember): pending entries awaiting admin/owner validation, plus proposals already approved into a real invitation that the person has not answered yet (sponsor kept for attribution). Closes the blind-withdraw gap - withdrawJoinRequest {project, user_id} has a surface to act from.',
-        'method' => 'GET',
-        'parameters' => [],
-        'example_get' => 'GET /management/listMyProposals',
-        'success_response' => [
-            'status' => 200,
-            'code' => 'operation.success',
-            'message' => 'Proposals listed successfully',
-            'data' => [
-                'proposals' => [
-                    ['project' => 'prj_a1b2c3', 'project_name' => 'Portfolio', 'user' => ['user_id' => 'usr_...', 'name' => 'Carol'],
-                     'role' => 'editor', 'status' => 'pending_validation', 'at' => '2026-07-17', 'note' => 'My colleague, she runs our content']
-                ],
-                'proposal_count' => 1
-            ]
-        ],
-        'error_responses' => [
-            '401.auth.unauthorized' => 'Missing/invalid bearer token',
-            '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.'
-        ],
-        'notes' => 'Global-scoped self-service; read-only. Scans only projects where the caller\'s membership is REAL (authority-checked), and returns only entries the caller authored (pending direction "request" with by = caller) or sponsors (converted invitations with sponsor = caller). status: "pending_validation" (awaiting approve/denyJoinRequest) or "awaiting_answer" (approved - the person still answers via accept/declineInvitation). A proposal absent from both lists was adjudicated: denied, or answered by the person (check the roster). Refusal reasons are not delivered to sponsors - the deny note lives in the denier\'s response and the command history. Withdraw a pending proposal with withdrawJoinRequest {project, user_id}.'
-    ],
 
     'exportProject' => [
         'description' => 'Exports the targeted project as a ZIP. Streams the archive by default; set save=true to store it in the project\'s exports folder and get a download URL instead.',
@@ -5066,61 +4677,7 @@ $GLOBALS['__help_commands'] = [
     // ROLE MANAGEMENT COMMANDS
     // ==========================================
     
-    'listRoles' => [
-        'description' => 'Lists all available roles in the system. Superadmin (*) users see full command lists; other users see names and descriptions only.',
-        'method' => 'GET',
-        'parameters' => [],
-        'example_get' => 'GET /management/listRoles',
-        'success_response' => [
-            'status' => 200,
-            'code' => 'operation.success',
-            'message' => 'Roles retrieved successfully',
-            'data' => [
-                'roles' => [
-                    'viewer' => [
-                        'description' => 'Read-only access for viewing content and structure',
-                        'builtin' => true,
-                        'command_count' => 26,
-                        'commands' => ['getRoutes', 'getStructure', '...'] // Only for * users
-                    ],
-                    'editor' => [
-                        'description' => 'Content editing including structure, translations, and assets',
-                        'builtin' => true,
-                        'command_count' => 45
-                    ],
-                    // ... other roles
-                ],
-                'total_roles' => 5
-            ]
-        ],
-        'notes' => 'For non-superadmin users, the commands array is omitted from each role. This prevents information disclosure about system capabilities. Custom roles created via createRole also appear here.'
-    ],
     
-    'getMyPermissions' => [
-        'description' => 'Returns the current token\'s role and the full list of commands accessible with that role.',
-        'method' => 'GET',
-        'parameters' => [],
-        'example_get' => 'GET /management/getMyPermissions',
-        'success_response' => [
-            'status' => 200,
-            'code' => 'operation.success',
-            'message' => 'Permissions retrieved successfully',
-            'data' => [
-                'role' => 'editor',
-                'role_description' => 'Content editing including structure, translations, and assets',
-                'commands' => [
-                    'getRoutes', 'getStructure', 'listProjects', 'listBackups',
-                    'editStructure', 'addRoute', 'deleteRoute', '...'
-                ],
-                'command_count' => 45
-            ]
-        ],
-        'notes' => 'Use this to determine what commands the current token can execute. Useful for building permission-aware UIs. The role is the caller\'s effective per-project role; owner (top of the project) sees every command. There is no superadmin.',
-        'error_responses' => [
-            '401.auth.invalid_token' => 'The session cookie and Authorization header did not resolve to a valid session. Note this command answers with its own code rather than the envelope-level auth.unauthorized.',
-            '401.auth.missing_header' => 'Authorization header required.'
-        ]
-    ],
     
     'createRole' => [
         'description' => 'Creates a new custom role with specified commands. Requires superadmin (*) permission.',
@@ -5171,7 +4728,7 @@ $GLOBALS['__help_commands'] = [
             '409.role.already_exists' => 'Role already exists.',
             '500.server.file_write_failed' => 'Failed to save role configuration.'
         ],
-        'notes' => 'Roles are defined in <secure>/management/config/roles.php. Commands must be valid existing commands. Use listRoles to see all available roles. The createRole/editRole/deleteRole commands are disabled (denied to every role) in the fixed-role model.'
+        'notes' => 'Roles are defined in <secure>/management/config/roles.php. Commands must be valid existing commands. The role set is fixed and is read from the admin panel, not from a command. The createRole/editRole/deleteRole commands are disabled (denied to every role) in the fixed-role model.'
     ],
     
     'editRole' => [
@@ -7422,10 +6979,7 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                     'admin' => 'Project administration - backups, export/import, policies',
                     'owner' => 'Everything on the project, including membership (top of the project)'
                 ],
-                'endpoints' => [
-                    'listRoles' => 'View the fixed roles',
-                    'getMyPermissions' => 'See your role and accessible commands'
-                ],
+                'introspection' => 'The role catalogue and your own effective role are read from the admin panel, not from a command: authorization introspection is a fact about your account rather than a step in developing a project. The commands this response documents are the ones you may run; a command you are not granted answers 403.',
                 'config_file' => '<secure>/management/config/auth.php (session TTLs, self-registration gate, CORS)',
                 'users_file' => '<secure>/management/config/users.php (username + password_hash per user)',
                 'roles_config' => '<secure>/management/config/roles.php'
@@ -7435,7 +6989,7 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'config_file' => '<secure>/management/config/auth.php',
                 'allowed_methods' => ['GET', 'POST', 'OPTIONS']
             ],
-            'usage' => 'All requests require Authorization header. GET commands: help, getRoutes, getSiteMap, analyzeReachability, getStructure, getTranslation, getTranslations, getLangList, getTranslationKeys, validateTranslations, getUnusedTranslationKeys, analyzeTranslations, listAssets, getStyles, getRootVariables, listStyleRules, getStyleRule, getKeyframes, listComponents, getComponent, listPages, listAliases, listMembers, listMyInvitations. POST commands: all others.',
+            'usage' => 'All requests require Authorization header. GET commands: help, getRoutes, getSiteMap, analyzeReachability, getStructure, getTranslation, getTranslations, getLangList, getTranslationKeys, validateTranslations, getUnusedTranslationKeys, analyzeTranslations, listAssets, getStyles, getRootVariables, listStyleRules, getStyleRule, getKeyframes, listComponents, getComponent, listPages, listAliases, listMembers. POST commands: all others.',
             'note' => 'For GET commands with URL parameters, use URL segments (e.g., /getStructure/menu, /validateTranslations/en, /getStyleRule/.btn-primary, /getSiteMap/text). For POST commands, send parameters as JSON in request body. For file uploads, use multipart/form-data encoding.',
             'workflows' => [
                 'translation_workflow' => '1) analyzeTranslations for full health check, OR 2) validateTranslations to find missing, 3) getUnusedTranslationKeys to find orphans, 4) setTranslationKeys to add/update, 5) deleteTranslationKeys to clean up.',
@@ -7444,13 +6998,13 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'css_granular_workflow' => '1) getRootVariables to see all CSS variables, 2) setRootVariables to update colors/spacing/etc, 3) listStyleRules to see all selectors, 4) getStyleRule to inspect specific rules, 5) setStyleRule to add/update rules, 6) deleteStyleRule to remove rules.',
                 'animation_workflow' => '1) getKeyframes to list all animations, 2) setKeyframes to add/update animations, 3) deleteKeyframes to remove animations.',
                 'session_workflow' => '1) login with username+password - the response sets the session cookie and returns the session token, 2) send BOTH on every later call: the cookie, and the token as Authorization: Bearer, 3) logoutSession to end the session, or logoutSession {everywhere: true} to end every session of the account.',
-                'role_workflow' => '1) listRoles to see available roles and commands, 2) getMyPermissions to check current access, 3) createRole to add custom roles, 4) editRole to modify roles, 5) deleteRole to remove custom roles.',
+                'role_workflow' => 'There is no role-management workflow: the role set is FIXED (viewer, editor, designer, developer, admin, owner) and there are no custom roles, so createRole / editRole / deleteRole are denied to every role. Roles are per project - assign one when you invite somebody, change it with changeMemberRole, and read the catalogue or your own effective role from the admin panel rather than from a command.',
                 'alias_workflow' => '1) listAliases to see existing redirects, 2) createAlias to add URL redirects, 3) deleteAlias to remove redirects.',
                 'component_workflow' => '1) listComponents to see available reusable components, 2) getComponent?name=... to view full details with preview, 3) editStructure with type="component" to create/update/delete.',
                 'sitemap_workflow' => '1) getSiteMap for JSON data with route details and coverage, 2) getSiteMap/text to generate plain text sitemap.txt for SEO crawlers.',
                 'project_workflow' => '1) listProjects to see the projects you are a member of, 2) createProject to start a new one, 3) deleteProject to remove (requires confirm=true). There is no current project to set: every other project command names its target in the URL marker (/management/p/<projectId>/<command>), and every project is edited, previewed and served at /p/<projectId>/. No project is privileged - which project a production domain serves is a web-server mapping, not a command.',
-                'membership_workflow' => '1) findUser to confirm the {user_id, name} pair by public display name, 2) inviteMember (admin/owner, by user_id) to offer a role, 3) the invitee sees it in listMyInvitations and answers with acceptInvitation or declineInvitation, 4) manage the roster with listMembers / changeMemberRole / removeMember (cancelInvitation to withdraw an offer), 5) transferOwnership (owner-only, member target, confirm=true) to rotate the top role, 6) leaveProject to exit yourself, dismissProjectNotice to clear a refused/removed/deleted notice.',
-                'join_request_workflow' => 'Front door (setJoinPolicy open): an outsider runs requestToJoin {project, note} (mandatory note, fixed viewer ask) and tracks it in listMyInvitations requests[]; admins/owner see it in listMembers (direction "request") and answer with approveJoinRequest (member immediately) or denyJoinRequest {note} (dismissable refused notice; re-request blocked until dismissed); withdrawJoinRequest retracts your own ask silently. Sponsor lane (any member, policy-independent): proposeMember {user_id, role, note} - the person learns NOTHING until approveJoinRequest converts it into a real invitation (by = approver, sponsored_by = you), which they accept/decline as usual; denyJoinRequest removes it silently on their side.',
+                'membership_workflow' => '1) confirm the {user_id, name} pair by public display name (a panel lookup, not a command - user_id is what inviteMember takes), 2) inviteMember (admin/owner, by user_id) to offer a role, 3) the invitee answers from their membership inbox in the admin panel; nothing is granted until they accept, 4) manage the roster with listMembers / changeMemberRole / removeMember (cancelInvitation to withdraw an offer), 5) transferOwnership (owner-only, member target, confirm=true) to rotate the top role. Leaving a project yourself and clearing a refused/removed/deleted notice are account operations rather than commands - both live on your memberships page.',
+                'join_request_workflow' => 'Front door (setJoinPolicy open): an outsider knocks from the admin panel with a mandatory note and a fixed viewer ask, and tracks it on their own memberships page - knocking, tracking and retracting are account operations, not commands. Admins/owner see the ask in listMembers (direction "request") and answer with approveJoinRequest (member immediately) or denyJoinRequest {note} (dismissable refused notice; re-request blocked until dismissed). Sponsor lane (any member, policy-independent): proposeMember {user_id, role, note} - the person learns NOTHING until approveJoinRequest converts it into a real invitation (by = approver, sponsored_by = you), which they answer themselves; denyJoinRequest removes it silently on their side.',
                 'backup_workflow' => '1) backupProject to create instant backup, 2) listBackups to see available backups with size/age info, 3) restoreBackup to restore from backup (optional pre-restore backup), 4) deleteBackup to free disk space.',
                 'export_workflow' => '1) exportProject to create shareable ZIP (JSON-only, secure), 2) downloadExport to download the ZIP, 3) importProject to import from ZIP (rebuilds PHP from JSON), 4) clearExports to clean up old exports.'
             ]

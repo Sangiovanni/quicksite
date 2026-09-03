@@ -11,7 +11,7 @@
  *     (`direction:'invite'`, `by` = the APPROVER whose rank now backs it,
  *     `sponsor` kept for attribution, note kept as context) and the target is
  *     engaged for the first time (pending_invite mirror). They answer through
- *     the shipped acceptInvitation lane, whose accept-time re-validation
+ *     the shipped invitation-accept lane, whose accept-time re-validation
  *     re-checks the APPROVER's rank — the authority chain stays sound with
  *     zero new accept logic.
  *

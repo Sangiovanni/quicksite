@@ -138,7 +138,7 @@ function getCommandCategories(): array {
         'project_management' => [
             'label' => 'Project Management',
             'icon' => 'folder-tree',
-            'commands' => ['listProjects', 'getMySpaceUsage', 'createProject', 'cloneProject', 'deleteProject', 'exportProject', 'importProject', 'downloadExport', 'clearExports', 'backupProject', 'listBackups', 'restoreBackup', 'deleteBackup']
+            'commands' => ['listProjects', 'createProject', 'cloneProject', 'deleteProject', 'exportProject', 'importProject', 'downloadExport', 'clearExports', 'backupProject', 'listBackups', 'restoreBackup', 'deleteBackup']
         ],
         // C8 8.3a/8.3b — membership consent model. Marker-scoped roster
         // management, request adjudication + the join-policy knob + the
@@ -148,12 +148,14 @@ function getCommandCategories(): array {
             'icon' => 'users',
             'commands' => ['listMembers', 'getProjectRoster', 'inviteMember', 'cancelInvitation', 'changeMemberRole', 'removeMember', 'transferOwnership', 'approveJoinRequest', 'denyJoinRequest', 'proposeMember', 'setJoinPolicy', 'setProjectVisibility', 'reconcileMemberships']
         ],
-        // …and the caller's own membership surface (global self-service).
-        'my_memberships' => [
-            'label' => 'My Memberships',
-            'icon' => 'user',
-            'commands' => ['findUser', 'listMyInvitations', 'listMyProposals', 'acceptInvitation', 'declineInvitation', 'leaveProject', 'dismissProjectNotice', 'requestToJoin', 'withdrawJoinRequest']
-        ],
+        // The caller's OWN membership surface used to sit here as a
+        // 'my_memberships' section. It is gone — not emptied — because all nine
+        // of its entries stopped being commands in beta.11 S6: joining a project,
+        // leaving one, and looking somebody up in order to invite them are
+        // operations on an ACCOUNT, not steps in developing a project. They are
+        // served by /admin/self and reached from the My Memberships page. An
+        // emptied section renders as a category with nothing in it, which is why
+        // this one was removed with its last command.
         'storage_monitoring' => [
             'label' => 'Storage',
             'icon' => 'database',
@@ -167,7 +169,11 @@ function getCommandCategories(): array {
         'role_management' => [
             'label' => 'Roles & Permissions',
             'icon' => 'shield',
-            'commands' => ['listRoles', 'getMyPermissions', 'createRole', 'editRole', 'deleteRole']
+            // listRoles / getMyPermissions left the command surface in beta.11 S6:
+            // reading the role catalogue and your own effective role is
+            // authorization introspection about an ACCOUNT, not project
+            // development. Both are served by /admin/self.
+            'commands' => ['createRole', 'editRole', 'deleteRole']
         ],
         // C5b session lifecycle. (This slot previously held the removed
         // generateToken/listTokens/revokeToken trio under a duplicate
@@ -176,7 +182,12 @@ function getCommandCategories(): array {
         'auth_session' => [
             'label' => 'Authentication / Session',
             'icon' => 'key',
-            'commands' => ['login', 'logoutSession', 'register', 'changePassword', 'deleteMyAccount']
+            // changePassword / deleteMyAccount left the command surface in
+            // beta.11 S6 — managing the login you sign in with is not project
+            // development. Both are served by /admin/self and reached from
+            // the Account page. login/logoutSession/register stay: a CLI that
+            // cannot authenticate is not headlessly usable.
+            'commands' => ['login', 'logoutSession', 'register']
         ],
         'js_functions' => [
             'label' => 'JavaScript Functions / Interactions',

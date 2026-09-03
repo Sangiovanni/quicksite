@@ -31,7 +31,7 @@ $baseUrl = rtrim(BASE_URL, '/');
 //      still cannot push.
 //
 // builds.js re-checks both before filling the shell, from the same two facts
-// (the flag emitted below, and getMyPermissions). The doubling is deliberate:
+// (the flag emitted below, and /admin/self/permissions). The doubling is deliberate:
 // this decides whether the section EXISTS, and that decides whether it gets
 // controls, so a shell that somehow survived cannot acquire a deploy button.
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';

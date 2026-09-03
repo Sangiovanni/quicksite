@@ -3282,7 +3282,7 @@ function renderFormField(rawName, param, required) {
                 ${required ? 'required' : ''} ${urlParamAttr}>
         `;
     } else if (uiType === 'password') {
-        // Masked input + visibility toggle (C8: login/register/changePassword
+        // Masked input + visibility toggle (C8: login/register
         // params declare ui_type 'password' in help.php).
         inputHtml = `
             <div style="position: relative;">

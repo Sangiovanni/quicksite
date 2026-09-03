@@ -185,7 +185,7 @@
     color: var(--admin-text-light);
 }
 
-/* ---- findUser picker ---- */
+/* ---- user-lookup picker ---- */
 .members-find-row {
     display: flex;
     align-items: flex-end;

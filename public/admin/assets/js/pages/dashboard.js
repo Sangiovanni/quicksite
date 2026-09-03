@@ -579,8 +579,10 @@
         if (!section) return;
 
         try {
-            const result = await QuickSiteAdmin.apiRequest(
-                'getMySpaceUsage', 'POST', refresh ? { refresh: true } : {}
+            // Your own quota is a fact about your ACCOUNT, not about a project
+            // being developed, so it comes from /admin/self (S6).
+            const result = await QuickSiteAdmin.accountRequest(
+                refresh ? 'space-usage?refresh=1' : 'space-usage', 'GET'
             );
             const data = result.ok ? result.data?.data : null;
 
@@ -1769,7 +1771,10 @@
             hp('getSizeInfo')        ? loadStorageOverview() : Promise.resolve(),
             // Owner-wide usage walks every owned project, so it loads alongside
             // rather than gating anything; it hides itself when you own nothing.
-            hp('getMySpaceUsage')    ? loadOwnerSpaceUsage(false) : Promise.resolve()
+            // No canRun() gate: it stopped being a command in S6, so there is no
+            // permission to test — every authenticated account may ask for its
+            // own quota, and the answer is empty when you own nothing.
+            loadOwnerSpaceUsage(false)
         ]);
 
         // Refresh control — the escape hatch for the measurement cache TTL.

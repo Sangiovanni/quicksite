@@ -10712,3 +10712,75 @@ commands, 33 categories, the two emptied categories deleted);
 [COMMAND_API.md](COMMAND_API.md) (*Endpoint*, *Update detection is not part of
 this API*), [ADMIN_PANEL.md](ADMIN_PANEL.md) §8.0 and §9.14,
 [ARCHITECTURE.md](ARCHITECTURE.md) §1 and §3.
+
+---
+
+### Account and membership self-service get ONE door, and no audit trail (locked 2026-09-03)
+
+**Decision**: the fourteen account, membership and directory capabilities that
+left the command surface are served by a **single new endpoint**,
+`/admin/self`, rather than by two topic-named endpoints or by splitting their
+reads into `/admin/api`. Reads are `GET`, writes are `POST`, and the route table
+in that file **is** the method gate — a route is unreachable by any verb it does
+not declare. The handlers live in three files under `secure/admin/functions/`
+split by topic (`accountSelf.php`, `membershipSelf.php`, `directory.php`), so the
+URL surface is one door while the code stays readable. Separately: these
+capabilities are **no longer written to the command log**.
+
+**Reasoning**: the two doors that already existed each carry a contract that
+these would have broken. `/admin/api` is read-only — twenty-seven arms, every one
+a lookup whose job is to give a form its options — and `/admin/state` holds the
+panel's own per-user state, which is what project somebody has open. Account
+identity and project *access* are a third concern, so they get a third door
+rather than being folded into a surface whose contract they would quietly widen.
+One door rather than two because the fourteen share exactly one property — they
+are all operations on the caller, by the caller — and two dispatch files with one
+shared gate is the shape that drifts.
+
+Making the route table the method gate is the part that carries weight: a
+password change reachable by `GET` is a password change a link, an image tag or a
+prefetch can make. Declaring the verb per route means a new route cannot be added
+without deciding which it is.
+
+Dropping the audit trail is the one place this change made something smaller.
+While these were commands the dispatcher logged them to the write-only `_global`
+bucket — a file no command reads — with the two credential operations' bodies
+suppressed entirely. Neither `/admin/api` nor `/admin/state` logs anything, and
+reproducing the logger here would have written entries naming things that are no
+longer commands into a command log. The trail is worth less than it looks: it was
+never readable through the product, and every state change these make is already
+visible in the data itself — a membership in `members.json`, a notice in
+`users.php`. **No authorization weakened**: every check each one performed as a
+command it performs now, in the same order, and the current-password re-check and
+the login backoff on the two credential routes were always in the function body
+rather than in the dispatcher, so they travelled with the code.
+
+**Alternatives considered**: two doors, `/admin/self` and `/admin/membership`,
+split by topic (rejected — two nearly identical dispatch files behind one gate,
+and the split would put the person's answer to an invitation on a different
+surface from the account that answers it). Sending the six reads to `/admin/api`
+as arms and giving only the eight writes a new door (rejected — it breaks the
+read-only helper's "form options" contract anyway, and it would put reading your
+invitation inbox and accepting an invitation on two different surfaces). Keeping
+the command log by calling `logCommand()` from the new endpoint (rejected by
+Sangio — the entries would claim these were commands; the panel's other endpoints
+log nothing, and this matches them). Keeping it under a distinct name such as
+`account:changePassword` (rejected — it invents a second naming convention inside
+one log to preserve a file nothing reads). Passing the resolved caller into every
+handler rather than letting most re-resolve it via `getCurrentUser()` (rejected as
+a wholesale change — the two handlers the shared gate can serve directly take it
+as a parameter, which is *stricter* since the gate has already refused an
+unauthenticated caller, and the rest keep the resolution they were written with).
+
+**Source**: `public/admin/self/index.php` (the route table and its method
+gate), `secure/admin/functions/accountSelf.php`,
+`secure/admin/functions/membershipSelf.php`,
+`secure/admin/functions/directory.php`;
+`secure/management/routes.php` and `secure/management/config/categories.php` (156
+commands, 29 categories, the four emptied categories deleted);
+`secure/src/functions/LoggingManagement.php` (the skip-body list, kept though now
+unreachable); `public/admin/assets/js/core/api.js` (`accountRequest`). Behaviour:
+[COMMAND_API.md](COMMAND_API.md) (*What is deliberately not a command*),
+[ARCHITECTURE.md](ARCHITECTURE.md) §3, [ADMIN_PANEL.md](ADMIN_PANEL.md) §9.13.
+Supersedes nothing: it implements *The command surface is a project CLI; the
+panel is a tool that uses it* above.

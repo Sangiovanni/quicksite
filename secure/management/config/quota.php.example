@@ -23,7 +23,7 @@
  * ── WHAT "PER USER" MEANS ────────────────────────────────────────────────────
  *
  * Storage is measured across the projects an account OWNS — the same figure the
- * dashboard shows under "space usage" and the `getMySpaceUsage` command
+ * dashboard shows under "space usage" and the account space report
  * returns, including each project's content, backups, exports and builds.
  *
  * Two things follow, and neither is a bug:

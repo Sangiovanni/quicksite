@@ -34,7 +34,7 @@ require_once __DIR__ . '/spaceUsage.php';      // qs_owned_projects, qs_project_
  * ── WHAT "PER USER" MEANS, PRECISELY ─────────────────────────────────────────
  *
  * Usage is the total disk of the projects the CALLER OWNS, measured by
- * `spaceUsage.php` — the same measurement `getMySpaceUsage` reports, so the
+ * `spaceUsage.php` — the same measurement the account space report shows, so the
  * number the panel shows an author IS the number this code enforces against.
  * There is no second measurer.
  *
@@ -66,7 +66,7 @@ require_once __DIR__ . '/spaceUsage.php';      // qs_owned_projects, qs_project_
  * project elsewhere. That leaves the total stale-HIGH, i.e. the quota is
  * briefly stricter than reality, never looser. The existing escape hatch
  * already covers it: the dashboard's refresh control calls
- * `getMySpaceUsage` with `refresh=true`, which re-measures AND rewrites the
+ * GET /admin/self/space-usage?refresh=1, which re-measures AND rewrites the
  * cache entries, so a user who frees space and is refused can make the number
  * move immediately. The refusal message says so.
  */
@@ -146,7 +146,7 @@ function qs_quota_config(): array
 /**
  * Total bytes the given user's owned projects occupy right now.
  *
- * Consumes `spaceUsage.php` directly rather than running `getMySpaceUsage` in
+ * Consumes `spaceUsage.php` directly rather than running the account report in
  * process: that command's job is to SHAPE the answer for the dashboard (sorted
  * rows, formatted sizes, per-category splits) and all this needs is the sum.
  * The measurement underneath is the same one, so the two can never disagree.

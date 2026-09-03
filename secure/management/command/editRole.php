@@ -93,8 +93,10 @@ function __command_editRole(array $params = [], array $urlParams = []): ApiRespo
         $commands = $params['commands'];
         $allCommands = getAllCommands();
         
-        // Add the role commands
-        $allCommands = array_merge($allCommands, ['listRoles', 'getMyPermissions', 'createRole', 'editRole', 'deleteRole']);
+        // routes.php already carries createRole/editRole/deleteRole, so no merge
+        // is needed. It used to add listRoles + getMyPermissions on top; both
+        // stopped being commands in beta.11 S6, and merging them back would have
+        // let a role be defined against a name the dispatcher cannot route.
         $allCommands = array_unique($allCommands);
         
         // Validate each command exists

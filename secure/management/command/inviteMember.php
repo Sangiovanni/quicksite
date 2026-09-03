@@ -6,10 +6,11 @@
  * invitation goes into the project's members.json `invitations` block (a
  * pending entry is STRUCTURALLY unable to grant access — every access check
  * reads `members` only) and materializes only when the invitee accepts
- * (acceptInvitation), where the inviter's authority is re-validated.
+ * (from their membership inbox in the panel), where the inviter's authority is
+ * re-validated.
  *
  * Targeting is by user_id ONLY (the unique PUBLIC identifier). The public
- * display name is looked up with findUser; the PRIVATE username is never a
+ * display name is looked up in the panel's user lookup; the PRIVATE username is never a
  * membership target (a username-targeted invite would be an existence oracle
  * on the login identifier).
  *
@@ -56,7 +57,8 @@ function __command_inviteMember(array $params = [], array $urlParams = []): ApiR
 
     $targetId = trim((string)($params['user_id'] ?? ''));
     $role     = trim((string)($params['role'] ?? ''));
-    // C11 11.3 — see requestToJoin. The note is OPTIONAL here, which is exactly
+    // C11 11.3 — the note-encoding guard, shared with every roster writer.
+    // The note is OPTIONAL here, which is exactly
     // why this cannot be folded into qs_clean_note: a null return would silently
     // drop the note instead of telling the caller it was unstorable.
     if (qs_note_encoding_invalid($params['note'] ?? null)) {
@@ -149,7 +151,7 @@ function __command_inviteMember(array $params = [], array $urlParams = []): ApiR
     }
 
     // Status mirror (secondary write): the invitee's own cache gains the
-    // pending entry their listMyInvitations inbox reads. Failure is silent by
+    // pending entry their membership inbox reads. Failure is silent by
     // ruling — access is already correct (members.json committed), the mirror
     // heals via 8.4 reconcile.
     $mirror = ['name' => qs_project_site_name($project), 'status' => 'pending_invite', 'at' => $today];

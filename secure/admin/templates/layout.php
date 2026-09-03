@@ -354,8 +354,14 @@ $langNames = [
             </a>
             
             <!-- Settings Group - Click goes to Project Settings -->
-            <div class="admin-nav__group<?= $isSettingsActive ? ' admin-nav__group--has-active' : '' ?>" data-nav-group="settings" data-requires-command="getMyPermissions">
-                <a href="<?= $router->url('settings') ?>" class="admin-nav__group-toggle" data-requires-command="getMyPermissions">
+            <!-- No data-requires-command on this group. It used to name getMyPermissions,
+                 which was a global any-auth command every signed-in account held, so the
+                 gate never hid anything; that command left the surface in beta.11 S6
+                 (reading your own role is an ACCOUNT fact, served by /admin/self), and
+                 keeping the attribute would have hidden Settings from everyone. The
+                 entries inside carry their own gates where they need one. -->
+            <div class="admin-nav__group<?= $isSettingsActive ? ' admin-nav__group--has-active' : '' ?>" data-nav-group="settings">
+                <a href="<?= $router->url('settings') ?>" class="admin-nav__group-toggle">
                     <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <circle cx="12" cy="12" r="3"/>
                         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>

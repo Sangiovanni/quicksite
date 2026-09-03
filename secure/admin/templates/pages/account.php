@@ -9,11 +9,15 @@
  * no role gate and it must not acquire one.
  *
  * Three things you can do to your own account, in ascending order of finality:
- *   changePassword                 — also ends your OTHER sessions (the
- *                                    generation counter; this one survives)
- *   logoutSession {everywhere}     — ends every session including this one
- *   deleteMyAccount                — irreversible, behind the current password
- *                                    AND a typed confirmation
+ *   change the password        — also ends your OTHER sessions (the
+ *                              generation counter; this one survives)
+ *   logoutSession {everywhere} — ends every session including this one
+ *   delete the account         — irreversible, behind the current password
+ *                              AND a typed confirmation
+ *
+ * Only the middle one is a command. The password change and the deletion are
+ * account self-service, served by /admin/self since beta.11 S6 — the command
+ * surface is a CLI for DEVELOPING a project, and neither of those is that.
  *
  * Lean PHP shell: identity, section shells and form skeletons live here; every
  * dynamic row, result and confirm modal is built by account.js with
@@ -39,7 +43,7 @@ $__project  = (string)($router->getCurrentProject() ?? '');
 $__hasLocalPassword = is_string($__user['password_hash'] ?? null) && ($__user['password_hash'] !== '');
 
 // The single source of the minimum — auth.php registration.min_password_length,
-// the same value changePassword enforces server-side.
+// the same value the password change enforces server-side.
 $__minPasswordLength = qs_registration_config()['min_password_length'];
 ?>
 
@@ -171,7 +175,7 @@ window.QS_ACCOUNT_I18N = <?= json_encode([
 </section>
 
 <?php if ($__hasLocalPassword): ?>
-<!-- Delete account — irreversible. deleteMyAccount refuses while you are the
+<!-- Delete account — irreversible. The deletion refuses while you are the
      sole owner of any project (that would leave it unownable AND undeletable
      forever); the refusal names them and account.js lists them here. -->
 <section class="admin-section" id="account-delete-section">

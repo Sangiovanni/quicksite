@@ -58,7 +58,7 @@ function __command_denyJoinRequest(array $params = [], array $urlParams = []): A
     }
 
     $targetId = trim((string)($params['user_id'] ?? ''));
-    // C11 11.3 — see requestToJoin.
+    // C11 11.3 — the note-encoding guard, shared with every roster writer.
     if (qs_note_encoding_invalid($params['note'] ?? null)) {
         return ApiResponse::create(400, 'validation.unencodable')
             ->withMessage('The note is not valid UTF-8 text')

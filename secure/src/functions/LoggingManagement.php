@@ -103,6 +103,14 @@ function generateLogId(): string {
  * are listed anyway so the guarantee does not depend on that dispatch detail
  * staying true.
  */
+/*
+ * changePassword / deleteMyAccount stopped being commands in beta.11 S6 —
+ * managing the login you sign in with is not project development, so both are
+ * served by /admin/self, which does not run this logger at all. Their entries
+ * are KEPT rather than pruned: a deny-list that names something unreachable
+ * costs nothing and fails safe, while removing a name is how a body starts being
+ * logged the day a command by that name comes back.
+ */
 const QS_LOG_SKIP_BODY_COMMANDS = [
     'login', 'register', 'logoutSession',
     'changePassword', 'deleteMyAccount',

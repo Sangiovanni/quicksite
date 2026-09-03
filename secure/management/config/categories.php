@@ -246,56 +246,27 @@ return [
         'commands' => ['login', 'logoutSession', 'register'],
     ],
 
-    // Authenticated self-service on the caller's OWN account (C8). Unlike
-    // auth.session these DO require a bearer; any authenticated user. Both
-    // commands re-verify the current password before acting — 'any' authorizes
-    // WHOSE account may be touched (only your own), not how cheaply (C8 8.2).
-    'account.self' => [
-        'scope' => 'global',
-        'access' => 'any',
-        'commands' => ['changePassword', 'deleteMyAccount'],
-    ],
-
-    // Exact PUBLIC-name lookup (C8 8.3a) — the "invite someone" primitive:
-    // response is {user_id, name} pairs ONLY. The PRIVATE username is never
-    // searchable and never returned (C8 8.0b privacy rule).
-    'users.lookup' => [
-        'scope' => 'global',
-        'access' => 'any',
-        'commands' => ['findUser'],
-    ],
-
-    // Membership self-service (C8 8.3a/8.3b): the caller's OWN invitations,
-    // join requests, memberships and notices. GLOBAL on purpose — an invitee/
-    // requester is not a member, so the '/p/<id>/' marker gate would 403 them
-    // before the command runs; `project` is an F1-validated DATA parameter and
-    // every command acts only on entries the caller owns or authored
-    // (withdrawJoinRequest's `by == caller` rule covers sponsored proposals).
-    'membership.self' => [
-        'scope' => 'global',
-        'access' => 'any',
-        'commands' => ['listMyInvitations', 'acceptInvitation', 'declineInvitation', 'leaveProject', 'dismissProjectNotice', 'requestToJoin', 'withdrawJoinRequest', 'listMyProposals'],
-    ],
-
-    // Self / role catalog reads.
-    'roles.read' => [
-        'scope' => 'global',
-        'access' => 'any',
-        'commands' => ['listRoles', 'getMyPermissions'],
-    ],
+    // NOTE — account self-service, membership self-service and the two directory
+    // lookups are NOT commands (beta.11 S6). The command surface is a CLI for
+    // DEVELOPING A PROJECT; managing your login, getting into or out of a
+    // project, and looking a person up in order to invite them are none of those
+    // things. Four categories held them and were deleted with their last command
+    // rather than left empty: 'account.self' (changePassword, deleteMyAccount),
+    // 'users.lookup' (findUser), 'roles.read' (listRoles, getMyPermissions) and
+    // 'membership.self' (the eight invitation/request/notice verbs). They are
+    // served by /admin/self now; the logic lives in
+    // <secure>/admin/functions/{accountSelf,membershipSelf,directory}.php.
+    // All four were global + access 'any', so hasPermission contributed
+    // authentication and nothing else — which the shared admin gate establishes.
 
     // "My projects" surface (OUTPUT filtered to memberships by C7/C8; the command
-    // itself is any-auth).
-    // getMySpaceUsage aggregates disk usage across the projects the caller OWNS —
-    // global because an owner-wide total is not a fact about any one project and so
-    // cannot carry a marker. It takes no project parameter (nothing to retarget)
-    // and resolves ownership per project from members.json, so it reports only what
-    // the caller owns; it is NOT a return of the installation-wide enumeration
-    // removed from getSizeInfo in C8 8.5.
+    // itself is any-auth). getMySpaceUsage sat here until beta.11 S6 — a quota is
+    // a fact about an account, not about a project being developed — and is now
+    // GET /admin/self/space-usage.
     'projects.list' => [
         'scope' => 'global',
         'access' => 'any',
-        'commands' => ['listProjects', 'getMySpaceUsage'],
+        'commands' => ['listProjects'],
     ],
 
     // Any authenticated user may create a project (and becomes its sole owner).

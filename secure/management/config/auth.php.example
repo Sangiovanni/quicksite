@@ -37,11 +37,11 @@ return [
         // default) = no register page, no public register command; accounts
         // exist from setup (users.php) only. When true, /admin/register and
         // POST /management/register create accounts, subject to the flood
-        // controls below. min_password_length also applies to changePassword.
+        // controls below. min_password_length also applies to the account password change.
         // For every limit: 0 = no limit.
         'registration' => [
             'allow_self_registration' => false,
-            'min_password_length'     => 12,   // register + changePassword
+            'min_password_length'     => 12,   // register + account password change
             'max_users'               => 0,    // absolute account cap (users.php entries)
             'throttle' => [
                 'per_ip_per_minute' => 3,      // register attempts per IP per minute

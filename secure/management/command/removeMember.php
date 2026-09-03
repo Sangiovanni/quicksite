@@ -9,7 +9,8 @@
  *
  * Rank rule (in-lock): canManageRole(actor, target's current role). The owner
  * is un-removable (transferOwnership first); self-removal is refused —
- * leaveProject is the self-service door.
+ * Leaving voluntarily is the self-service door, and it is an account
+ * operation rather than a command since beta.11 S6.
  *
  * @method POST
  * @route /management/p/<projectId>/removeMember
@@ -47,7 +48,8 @@ function __command_removeMember(array $params = [], array $urlParams = []): ApiR
     }
 
     $targetId = trim((string)($params['user_id'] ?? ''));
-    // C11 11.3 — see requestToJoin. Optional note: this reason lands in the
+    // C11 11.3 — the note-encoding guard, shared with every roster writer.
+    // Optional note here: this reason lands in the
     // users.php cache notice (var_export, which cannot fail), but the check is
     // kept uniform so every note-carrying command answers identically.
     if (qs_note_encoding_invalid($params['note'] ?? null)) {
@@ -64,7 +66,7 @@ function __command_removeMember(array $params = [], array $urlParams = []): ApiR
     }
     if ($targetId === $actorId) {
         return ApiResponse::create(400, 'member.cannot_target_self')
-            ->withMessage('You cannot remove yourself — use leaveProject');
+            ->withMessage('You cannot remove yourself — leaving a project is an account operation, done from your memberships page');
     }
 
     $error = null;

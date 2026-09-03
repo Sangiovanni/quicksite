@@ -25,7 +25,7 @@ $__myUserId = !empty($__myAuth['valid']) ? (string)($__myAuth['userId'] ?? '') :
 // categories.php rather than named here.
 //
 // This page lists projects, and the caller's role differs per project — so the
-// panel-wide permission set (getMyPermissions, which answers for the EDITED
+// panel-wide permission set (/admin/self/permissions, which answers for the EDITED
 // project only) cannot gate a per-project link. The row already carries
 // `my_role`; this is the other half of the comparison. `getBuild` is the read
 // the page itself is gated on, so a role that holds it is a role that can open

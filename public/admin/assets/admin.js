@@ -68,7 +68,9 @@ const QuickSiteAdmin = {
         }
 
         try {
-            const response = await this.apiRequest('getMyPermissions', 'POST');
+            // Your role and the commands it grants: a fact about your ACCOUNT,
+            // so it comes from /admin/self rather than from a command.
+            const response = await this.accountRequest('permissions', 'GET');
             if (response.ok && response.data?.data) {
                 this.permissions = {
                     loaded: true,
@@ -479,6 +481,23 @@ const QuickSiteAdmin = {
             return window.QuickSiteAPI.setSelectedProject(projectId);
         }
         return { ok: false, status: 0, data: { message: 'Project switching unavailable: QuickSiteAPI not loaded' } };
+    },
+
+    /**
+     * Call the account endpoint - delegates to QuickSiteAPI.
+     *
+     * NOT commands: account self-service, membership self-service and the two
+     * directory lookups go to /admin/self, and resolve with the same
+     * {ok, status, data} shape apiRequest uses, so every caller branches on
+     * res.ok exactly as before.
+     *
+     * @returns {Promise<{ok: boolean, status: number, data: Object|null}>}
+     */
+    async accountRequest(route, method, body) {
+        if (window.QuickSiteAPI) {
+            return window.QuickSiteAPI.accountRequest(route, method, body);
+        }
+        return { ok: false, status: 0, data: { message: 'Account request unavailable: QuickSiteAPI not loaded' } };
     },
 
     /**

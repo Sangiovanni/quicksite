@@ -438,7 +438,7 @@
     }
 
     // ============================================================
-    // findUser picker (shared by invite + propose forms)
+    // User-lookup picker (shared by invite + propose forms)
     // ============================================================
 
     function _renderMatchRow(match, onPick) {
@@ -460,7 +460,7 @@
     }
 
     /**
-     * Wire one findUser flow. Returns { getPicked, reset }.
+     * Wire one user-lookup flow. Returns { getPicked, reset }.
      * prefix: 'invite' | 'propose' (matches the template element ids).
      */
     function setupFindUser(prefix, sendBtn) {
@@ -488,7 +488,9 @@
                 return;
             }
             findBtn.disabled = true;
-            api('findUser', 'POST', { name: name }).then(function (res) {
+            // The directory lookup is NOT a command (S6) — it identifies a
+            // person, it does not develop a project. Same response shape.
+            window.QuickSiteAdmin.accountRequest('find-user', 'POST', { name: name }).then(function (res) {
                 findBtn.disabled = false;
                 clearNode(results);
                 var matches = (res && res.ok && res.data && res.data.data && res.data.data.matches) || [];

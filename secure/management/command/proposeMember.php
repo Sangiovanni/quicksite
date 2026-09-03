@@ -16,7 +16,8 @@
  * still gates the role again at approve (canManageRole).
  *
  * join_policy does NOT gate proposals: the knob closes the self-service
- * front door (requestToJoin); member-vouched proposals always reach the
+ * front door (the self-service knock, an account operation since beta.11 S6);
+ * member-vouched proposals always reach the
  * admin queue.
  *
  * @method POST
@@ -59,7 +60,7 @@ function __command_proposeMember(array $params = [], array $urlParams = []): Api
 
     $targetId = trim((string)($params['user_id'] ?? ''));
     $role     = trim((string)($params['role'] ?? ''));
-    // C11 11.3 — see requestToJoin.
+    // C11 11.3 — the note-encoding guard, shared with every roster writer.
     if (qs_note_encoding_invalid($params['note'] ?? null)) {
         return ApiResponse::create(400, 'validation.unencodable')
             ->withMessage('The note is not valid UTF-8 text')

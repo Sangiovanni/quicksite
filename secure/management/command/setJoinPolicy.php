@@ -3,7 +3,8 @@
  * setJoinPolicy Command (C8 8.3b)
  *
  * Flips the project's `join_policy` in members.json — the knob that opens or
- * closes the SELF-SERVICE request lane (requestToJoin). Default (and absent
+ * closes the SELF-SERVICE request lane — the knock an outsider makes from the
+ * admin panel, an account operation rather than a command. Default (and absent
  * value) is 'closed'. It gates ONLY the front door: member-vouched proposals
  * (proposeMember) always reach the admin queue, and flipping to 'closed'
  * never purges requests already pending — they stay adjudicable.

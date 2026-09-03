@@ -114,7 +114,7 @@ File lists are grouped by role. Where useful, the entry point or main exported f
 | `pages/dashboard.js` | Stats cards, command activity, recent history. |
 | `pages/dashboard-memberships.js` | Fills the dashboard memberships card from the `quicksite:membership-counts-updated` event (computed by `core/members-badge.js`). |
 | `pages/memberships.js` | My Memberships page: my projects / invitation inbox / my join requests / my proposals / notices / request-to-join. Global self-service commands only. |
-| `pages/members.js` | Project Members page: roster, pending queue, invite + propose (findUser flows), visibility control, join-policy toggle, ownership transfer for the edited project. |
+| `pages/members.js` | Project Members page: roster, pending queue, invite + propose (user-lookup flows), visibility control, join-policy toggle, ownership transfer for the edited project. |
 | `pages/account.js` | My Account page: change password, sign out everywhere, delete account (§9.13). |
 | `pages/command.js` | Command index list, permission-aware filter. |
 | `pages/command-form.js` | Dynamic per-command form, helper widgets, execution. |
@@ -254,7 +254,7 @@ Two other cookies exist, both HttpOnly and neither readable by page scripts. `QS
 | `templates/pages/optimize.php` | inline readiness flag | `window.__cssRefinerLibReady` |
 | `templates/pages/memberships.php` | `window.QS_MEMBERSHIPS_CONFIG` + `window.QS_MEMBERSHIPS_I18N` | `myUserId` (the caller's own public id — no API response carries it), `editedProject`; JS-facing strings for dynamic rows |
 | `templates/pages/members.php` | `window.QS_MEMBERS_CONFIG` + `window.QS_MEMBERS_I18N` | `project`, `myUserId`, `myRole`, `myRank`, `roleRanks` (from `roles.php` — drives the strictly-below-my-rank pickers), `joinPolicy` + `visibility` (admin/owner only, read server-side from `members.json`), `isOwner` + `siteUrl` (the address a public visibility exposes); JS-facing strings |
-| `templates/pages/account.php` | `window.QS_ACCOUNT_CONFIG` + `window.QS_ACCOUNT_I18N` | `username` (the typed-confirmation target for deletion), `minPasswordLength` (from `auth.php`, the same value `changePassword` enforces), `hasLocalPassword`, `loginUrl`; JS-facing strings |
+| `templates/pages/account.php` | `window.QS_ACCOUNT_CONFIG` + `window.QS_ACCOUNT_I18N` | `username` (the typed-confirmation target for deletion), `minPasswordLength` (from `auth.php`, the same value the password change enforces), `hasLocalPassword`, `loginUrl`; JS-facing strings |
 
 `currentProject` is the user's **edited** project (their `selected_project`, §8.0) — the client prepends a `p/<currentProject>/` marker to project-scoped Management calls so the server acts on it; `globalCommands` is the set of commands called without that marker. There is no schema or runtime validation on injected objects, and page-level extensions of `QUICKSITE_CONFIG` can silently overwrite global fields. Treat the injected globals as read-only by convention.
 
@@ -839,11 +839,11 @@ The AI call is browser-direct via `QSAiCall.call(...)` (see `public/admin/assets
 | **Command form** (`command-form.js`) | Renders a dynamic form for any command from `help` metadata, then executes it. The escape hatch into raw API. |
 | **History** (`history.js`) | Browses `getCommandHistory` for the **currently edited project** — the command history is per-project, so switching projects switches the trail. Modal with full request/response. Actions that belong to no project (signing in, creating a project, membership self-service) are recorded server-side but are not shown here; see *Command history storage* in `COMMAND_API.md`. |
 | **Settings** (`settings.js`) | User profile, language, theme, AI provider config status. |
-| **My account** (`account.js`) | The caller's own account — change password, sign out everywhere, delete the account. See §9.13. Commands: `changePassword`, `logoutSession`, `deleteMyAccount`. |
+| **My account** (`account.js`) | The caller's own account — change password, sign out everywhere, delete the account. See §9.13. Commands: `logoutSession`. The password change and the deletion are not commands — they go to `/admin/self/change-password` and `/admin/self/delete`. |
 | **APIs** (`apis.js`) | External API registry — see §9.1. Commands: `listApiEndpoints`, `addApi`, `editApi`, `deleteApi`, `getApiEndpoint`, `testApiEndpoint`. |
 | **Assets** (`assets.js`) | Asset browser + uploader — see §9.15. Commands: `listAssets`, `uploadAsset`, `editAsset`, `deleteAsset`, `editFavicon`. |
 | **Sitemap** (`sitemap.js`) | Route tree, reachability, ordering. |
-| **Builds** (`builds.js`) | The project's single build — create, download, delete, and how much room is left for the next one. See §9.16. Commands: `getBuild`, `build`, `downloadBuild`, `deleteBuild`, `getMySpaceUsage`. |
+| **Builds** (`builds.js`) | The project's single build — create, download, delete, and how much room is left for the next one. See §9.16. Commands: `getBuild`, `build`, `downloadBuild`, `deleteBuild`. The storage figure comes from `/admin/self/space-usage`, not from a command. |
 | **Embed security** (`embed-security.js`) | Iframe sandbox config: `getIframeSandbox` / `setIframeSandbox` / `removeIframeSandbox`. |
 | **Optimize** (`optimize.js`) | UI for the CSS Refiner library; runs analyzers, presents diffs, applies edits via `editStyles` / `setRootVariables`. |
 
@@ -2862,7 +2862,7 @@ OWNED badge, *editing* chip on the current edit target, per-row *Edit this
 project* = the selected-project write + reload, *Leave* with confirm — hidden on
 owned rows), **Invitation inbox** (accept / decline, inviter + note + `sponsored_by`
 shown; a voided invitation surfaces the server's 409 message), **My join
-requests** (withdraw), **My proposals** (`listMyProposals` — pending validation
+requests** (withdraw), **My proposals** (`GET /admin/self/proposals` — pending validation
 vs. awaiting the person's answer; withdraw while pending), **Notices**
 (refused / removed / deleted with the recorded reason → dismiss, which also
 unblocks re-requesting), and a **Request to join** form (project id + mandatory
@@ -2874,7 +2874,7 @@ picker. Access requires membership of the edited project (`PAGE_PERMISSIONS`);
 sections render by role server-side: every rank sees the **Roster**
 (`getProjectRoster` — rank-ordered, "you" marker, `user_id` shown; change-role /
 remove actions only on rows the caller strictly outranks) and the **Propose**
-form (findUser by exact public name → pick the `{user_id, name}` match → suggested
+form (look the person up by exact public name → pick the `{user_id, name}` match → suggested
 role + mandatory vouch). Admin/owner additionally get the **Pending queue**
 (`listMembers` — invitation / join request / proposal chips with notes and
 attribution; cancel for invites, approve / deny with mandatory reason for
@@ -2928,7 +2928,7 @@ name, username, account id, and the caller's role on the project they are
 editing. The username appears here and nowhere else in the panel — it is the
 private login identifier, and no API response returns it.
 
-**Change password** (`changePassword`) asks for the current password and the new
+**Change password** (`POST /admin/self/change-password`) asks for the current password and the new
 one twice, and enforces `auth.php`'s `min_password_length` client-side before the
 server does. Succeeding ends every **other** session of the account and keeps the
 one that asked — that is the containment story for "someone has my old password".
@@ -2941,7 +2941,7 @@ then redirects to the login page. There is no list of active sessions to show:
 the kill switch is a single generation counter on the user record, not an index
 (ARCHITECTURE.md §3).
 
-**Delete my account** (`deleteMyAccount`) is irreversible and gated twice — the
+**Delete my account** (`POST /admin/self/delete`) is irreversible and gated twice — the
 current password, plus typing your username exactly (a string only the account's
 owner has in mind, and one that cannot be clicked through). The command refuses
 while the caller is the sole owner of any project, since that would leave the
@@ -3062,7 +3062,7 @@ The confirmation says two things — that this is the only copy, and that deleti
 
 #### The space panel, and the warning
 
-Below the build, the page reports what the project occupies, how much of that is the build, and what is left of the account's storage quota. The figures come from the same measurement the dashboard uses (`getMySpaceUsage`); the page measures nothing of its own.
+Below the build, the page reports what the project occupies, how much of that is the build, and what is left of the account's storage quota. The figures come from the same measurement the dashboard uses (`GET /admin/self/space-usage`); the page measures nothing of its own.
 
 A build is roughly the size of the project's content, so a project can grow past the point where its own build still fits. The page warns before that happens:
 

@@ -417,7 +417,7 @@ class AdminRouter {
      * Resolves the session -> user -> role on the project the
      * panel actually acts as: `resolveEffectiveRole` = the selected project when
      * that membership is real, ELSE the first project the user is genuinely a
-     * member of. This is the SAME resolution `getMyPermissions` /
+     * member of. This is the SAME resolution /admin/self/permissions /
      * `getTokenPermissions` (the client-side permission filter) and
      * `getCurrentProject` (resolveDefaultProject) use — so the server-side page
      * gate agrees with the nav links the client shows and with the project the

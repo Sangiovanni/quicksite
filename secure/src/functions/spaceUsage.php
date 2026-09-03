@@ -3,7 +3,7 @@ require_once __DIR__ . '/utilsManagement.php'; // qs_json_write
 /**
  * Owner space usage — per-project disk measurement + a TTL cache (beta.10 C8).
  *
- * Backs `getMySpaceUsage`: "how much disk do the projects I OWN consume", so an
+ * Backs GET /admin/self/space-usage: "how much disk do the projects I OWN consume", so an
  * owner sees their whole footprint without the command ever reporting a project
  * they have no relationship with.
  *
@@ -24,7 +24,7 @@ require_once __DIR__ . '/utilsManagement.php'; // qs_json_write
  *    request reads entries solely for projects the caller owns — the same
  *    read-what-you-own discipline members.json itself uses.
  *
- * Staleness escape hatch: `getMySpaceUsage` accepts `refresh=true`, which bypasses
+ * Staleness escape hatch: the account space report accepts `refresh=true`, which bypasses
  * and rewrites the entries — that is what the dashboard's refresh control calls
  * after you delete a backup and want the number to move now.
  */
@@ -179,7 +179,7 @@ function qs_project_space(string $project, bool $refresh = false): array {
  * This is a growth concern only. A shrink elsewhere (a deleted backup, export
  * or project) still ages out on the TTL, which leaves a total stale-HIGH: a
  * quota briefly stricter than reality, never looser. `refresh=true` on
- * getMySpaceUsage is the user-facing escape hatch for that.
+ * The account space report's refresh flag is the user-facing escape hatch for that.
  */
 function qs_invalidate_space_cache(string $project): void {
     if ($project === '') {

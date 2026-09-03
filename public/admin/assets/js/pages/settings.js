@@ -108,7 +108,7 @@
         if (!container) return;
         
         try {
-            const result = await QuickSiteAdmin.apiRequest('getMyPermissions', 'GET');
+            const result = await QuickSiteAdmin.accountRequest('permissions', 'GET');
             
             if (result.ok && result.data?.data) {
                 const data = result.data.data;
