@@ -83,12 +83,12 @@ function getCommandCategories(): array {
         'structure_management' => [
             'label' => 'Structure Management',
             'icon' => 'structure',
-            'commands' => ['getStructure', 'editStructure', 'listComponents', 'listPages', 'findComponentUsages', 'renameComponent', 'duplicateComponent']
+            'commands' => ['getStructure', 'editStructure', 'getComponent', 'listComponents', 'listPages', 'findComponentUsages', 'renameComponent', 'duplicateComponent']
         ],
         'node_management' => [
             'label' => 'Node Management',
             'icon' => 'nodes',
-            'commands' => ['moveNode', 'deleteNode', 'addNode', 'duplicateNode', 'editNode', 'addComponentToNode', 'editComponentToNode']
+            'commands' => ['moveNode', 'deleteNode', 'addNode', 'addComplexElement', 'duplicateNode', 'editNode', 'addComponentToNode', 'editComponentToNode']
         ],
         'alias_management' => [
             'label' => 'URL Aliases',
@@ -98,12 +98,12 @@ function getCommandCategories(): array {
         'translation_management' => [
             'label' => 'Translations',
             'icon' => 'translate',
-            'commands' => ['getTranslation', 'getTranslations', 'setTranslationKeys', 'deleteTranslationKeys', 'getTranslationKeys', 'validateTranslations', 'getUnusedTranslationKeys', 'analyzeTranslations']
+            'commands' => ['getTranslation', 'getTranslations', 'setTranslationKeys', 'deleteTranslationKeys', 'getTranslationKeys', 'validateTranslations', 'getUnusedTranslationKeys', 'analyzeTranslations', 'cleanOrphanTranslations', 'importStructureTranslations']
         ],
         'language_management' => [
             'label' => 'Languages',
             'icon' => 'language',
-            'commands' => ['getLangList', 'setMultilingual', 'checkStructureMulti', 'addLang', 'deleteLang', 'setDefaultLang']
+            'commands' => ['getLangList', 'getLanguageList', 'setMultilingual', 'checkStructureMulti', 'addLang', 'deleteLang', 'setDefaultLang']
         ],
         'asset_management' => [
             'label' => 'Assets',
@@ -118,7 +118,7 @@ function getCommandCategories(): array {
         'css_variables_rules' => [
             'label' => 'CSS Variables & Rules',
             'icon' => 'css',
-            'commands' => ['getRootVariables', 'setRootVariables', 'listStyleRules', 'getStyleRule', 'setStyleRule', 'deleteStyleRule']
+            'commands' => ['getRootVariables', 'setRootVariables', 'setThemeMode', 'listStyleRules', 'getStyleRule', 'setStyleRule', 'deleteStyleRule']
         ],
         'css_animations' => [
             'label' => 'CSS Animations',
@@ -138,7 +138,7 @@ function getCommandCategories(): array {
         'project_management' => [
             'label' => 'Project Management',
             'icon' => 'folder-tree',
-            'commands' => ['listProjects', 'getMySpaceUsage', 'setSelectedProject', 'createProject', 'deleteProject', 'exportProject', 'importProject', 'downloadExport', 'clearExports', 'backupProject', 'listBackups', 'restoreBackup', 'deleteBackup']
+            'commands' => ['listProjects', 'getMySpaceUsage', 'setSelectedProject', 'createProject', 'cloneProject', 'deleteProject', 'exportProject', 'importProject', 'downloadExport', 'clearExports', 'backupProject', 'listBackups', 'restoreBackup', 'deleteBackup']
         ],
         // C8 8.3a/8.3b — membership consent model. Marker-scoped roster
         // management, request adjudication + the join-policy knob + the
@@ -181,7 +181,7 @@ function getCommandCategories(): array {
         'js_functions' => [
             'label' => 'JavaScript Functions / Interactions',
             'icon' => 'zap',
-            'commands' => ['listJsFunctions', 'listDataBindings', 'listInteractions', 'addInteraction', 'editInteraction', 'deleteInteraction']
+            'commands' => ['listJsFunctions', 'listDataBindings', 'listInteractions', 'addInteraction', 'editInteraction', 'deleteInteraction', 'getPageEvents', 'addPageEvent', 'editPageEvent', 'deletePageEvent', 'getStateStores', 'setStateStores']
         ],
         'api_registry' => [
             'label' => 'API Registry',

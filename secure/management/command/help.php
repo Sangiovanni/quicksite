@@ -169,6 +169,123 @@ $GLOBALS['__help_commands'] = [
         ],
         'notes' => 'Layout settings use inheritance: child routes inherit from nearest ancestor with explicit settings. Default is menu=true, footer=true. Use propagate=true to apply settings to all descendants at once.'
     ],
+
+    'setRouteResolver' => [
+        'description' => 'Attaches, patches or clears the server-side data resolver(s) on a route. One idempotent command covers six body shapes: replace the whole entry with a single resolver or with an array of them, patch or append one slot by index, remove one slot by index, or clear the route entirely. Resolvers run before the page renders and expose their results to the template.',
+        'method' => 'POST',
+        'url_structure' => '/management/p/<projectId>/setRouteResolver',
+        'parameters' => [
+            'route' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Route the resolvers attach to. It must already exist — create it with addRoute first. setRouteResolver never touches the route\'s .php / .json template files, only the resolver sidecar.',
+                'example' => 'book/:id',
+                'validation' => 'Leading and trailing slashes are stripped and backslashes are converted to slashes before the lookup, so "/book/:id/" and "book/:id" name the same route. An integer or float is accepted and used as its string form.'
+            ],
+            'resolver' => [
+                'required' => false,
+                'type' => 'object|array',
+                'description' => 'One resolver config object, or an array of them. Omit it — or send null, {} or [] — to clear the route, or to remove one slot when combined with index. Config fields: "kind" ("data", the default, or the side-effect kinds "oauth-start", "oauth-callback", "oauth-logout"); for kind=data, "endpoint" (required, an "@apiId/endpointId" reference that must resolve in the project\'s API registry and must not be callableFrom="client"), "inputs" (object of input name to "param:<segment>" / "query:<key>" / "session:<field>" / a bare literal), "expose" (object of template variable name to a response dot-path; "" means the whole response), "cacheTTL" (non-negative integer seconds) and "onMiss" ("render-empty"); for the oauth kinds, "provider" (a preset id or a "{:routeParam}" placeholder) and, on oauth-start only, "callback_url" — the data fields are refused on an oauth kind and vice versa.',
+                'example' => '{"endpoint": "@books-api/get-book", "inputs": {"id": "param:id"}, "expose": {"book": "data"}, "cacheTTL": 3600}'
+            ],
+            'index' => [
+                'required' => false,
+                'type' => 'integer',
+                'description' => 'Targets one slot of the array shape. With a resolver object it patches slot N, or appends when N equals the current length. Without a resolver it removes slot N. It cannot be combined with an array resolver: an array replaces the whole entry while an index targets one slot, so the pair is ambiguous and is refused.',
+                'example' => 0,
+                'validation' => 'Must be a JSON integer. A string, a float or a negative number is refused — 1.5 and "0" are both rejected, not coerced. Patch or append accepts 0 through the current length; remove accepts 0 through length-1.'
+            ]
+        ],
+        'example_post' => 'POST /management/p/<projectId>/setRouteResolver with body: {"route": "book/:id", "resolver": {"endpoint": "@books-api/get-book", "inputs": {"id": "param:id"}, "expose": {"book": "data"}, "cacheTTL": 3600}}',
+        'example_array' => 'Replace the whole entry with several resolvers (they run in parallel): {"route": "book/:id", "resolver": [{"endpoint": "@books-api/get-book", "inputs": {"id": "param:id"}, "expose": {"book": "data"}, "cacheTTL": 3600}, {"endpoint": "@books-api/get-chapters", "inputs": {"id": "param:id"}, "expose": {"chapters": "data.chapters"}, "cacheTTL": 60}]}',
+        'example_patch_slot' => 'Patch just the first resolver, leaving the others alone: {"route": "book/:id", "resolver": {"endpoint": "@books-api/get-book", "expose": {"book": "data"}}, "index": 0}',
+        'example_append' => 'Append a resolver — index must equal the current length: {"route": "book/:id", "resolver": {"endpoint": "@books-api/get-chapters", "expose": {"chapters": "data"}}, "index": 2}',
+        'example_remove' => 'Remove one resolver, shrinking the array: {"route": "book/:id", "index": 1}',
+        'example_clear' => 'Clear every resolver on the route: {"route": "book/:id"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'resolver.saved',
+            'message' => "Resolver saved for route 'book/:id' (replace_all_scalar, 1 resolver)",
+            'data' => [
+                'route' => 'book/:id',
+                'resolvers' => [
+                    [
+                        'endpoint' => '@books-api/get-book',
+                        'inputs' => ['id' => 'param:id'],
+                        'expose' => ['book' => 'data'],
+                        'cacheTTL' => 3600
+                    ]
+                ],
+                'mode' => 'replace_all_scalar | replace_all_array | patch | append',
+                'index' => 'the index that was targeted, or null when the whole entry was replaced'
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'The route parameter is missing, empty, or neither a string nor a number.',
+            '404.route.not_found' => 'The route does not exist. Create it with addRoute first — setRouteResolver only writes the sidecar.',
+            '400.validation.invalid_type' => 'index is not a non-negative JSON integer, or resolver is neither an object, an array of objects, nor null.',
+            '400.validation.conflict' => 'An array resolver was combined with index. Pass a single resolver object with index to patch one slot, or an array with no index to replace the whole entry.',
+            '400.resolver.index_out_of_range' => 'index targets a slot that does not exist: past the end when patching or appending (append must equal the current length), or at/past the end when removing. data.currentLength reports the length the caller should have used.',
+            '400.validation.invalid' => 'One or more resolver configs failed validation. errors[] carries a field path re-pathed to resolver[N].x.y plus a resolverIndex, so each error maps back to one slot. Reasons include a missing or unregistered endpoint, an endpoint marked callableFrom="client", a kind outside the allowed set, a field that does not apply to the kind, a malformed inputs or expose name, a negative cacheTTL, an onMiss outside the allowed set, two resolvers exposing the same flat template variable (reason "collision"), and an array that mixes data with side-effect kinds (reason "mixed_kinds").',
+            '200.resolver.cleared' => 'Every resolver was removed from the route. A 200, not an error.',
+            '200.resolver.unchanged' => 'A clear was requested but the route had no resolver attached — the idempotent no-op. A 200, not an error.',
+            '200.resolver.removed' => 'The resolver at index was removed and the array shrank. data.removedIndex echoes the slot. A 200, not an error.',
+            '500.server.operation_failed' => 'The resolver sidecar could not be written.'
+        ],
+        'notes' => 'The six body shapes are: {route, resolver} replace with one; {route, resolver: [...]} replace with several; {route, resolver, index} patch that slot; {route, resolver, index: <length>} append; {route, index} remove that slot; {route} clear all. The on-disk shape follows the length — a single resolver is stored as a scalar, several as an array — but data.resolvers in the response is ALWAYS the resulting array, empty when cleared. Every resolver on one route must be the same kind: side-effect kinds short-circuit the render with a redirect while data resolvers feed it, so a mixed array is refused. Across data resolvers, expose names share one flat template namespace and a duplicate is refused at save time; the always-available $r0 / $r1 namespaced form is the alternative. Use cleanResolverCache to drop cached resolver responses after changing an endpoint.'
+    ],
+
+    'cleanResolverCache' => [
+        'description' => 'Deletes entries from the server-side data-resolver response cache. With no parameters it is a housekeeping pass that removes only expired entries; the other parameters target a single endpoint, a single API, everything stored before a timestamp, or the whole cache.',
+        'method' => 'POST',
+        'url_structure' => '/management/p/<projectId>/cleanResolverCache',
+        'parameters' => [
+            'endpoint' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Exact endpoint reference ("@apiId/endpointId"). Deletes every cached response for that one endpoint. The most surgical option, and the highest priority — when present, the other parameters are ignored.',
+                'example' => '@books-api/get-book'
+            ],
+            'apiId' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Deletes every cached response belonging to that API, across all of its endpoints. Ignored when endpoint is present.',
+                'example' => 'books-api'
+            ],
+            'all' => [
+                'required' => false,
+                'type' => 'boolean',
+                'description' => 'Deletes every cached entry regardless of expiry. Ignored when endpoint or apiId is present.',
+                'example' => true,
+                'default' => false,
+                'validation' => 'Read with a boolean filter, so true/false, 1/0 and the strings "true"/"false"/"on"/"yes" are all accepted; anything else reads as false.'
+            ],
+            'before' => [
+                'required' => false,
+                'type' => 'integer',
+                'description' => 'Unix timestamp. Deletes every entry stored before it, regardless of expiry — the "drop everything older than X" sweep. Ignored when endpoint, apiId or all is present.',
+                'example' => 1717900000,
+                'validation' => 'Cast to an integer, which must be positive. A numeric string is accepted; 0, a negative number and a non-numeric string are refused.'
+            ]
+        ],
+        'example_post' => 'POST /management/p/<projectId>/cleanResolverCache with body: {} (housekeeping — expired entries only), or {"endpoint": "@books-api/get-book"}, {"apiId": "books-api"}, {"before": 1717900000}, {"all": true}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'cache.cleared',
+            'message' => 'Resolver cache housekeeping: 12 expired entries deleted',
+            'data' => [
+                'deleted' => 12,
+                'mode' => 'expired | endpoint | api | all | before',
+                'endpoint' => '(mode=endpoint only) the endpoint reference that was cleared',
+                'apiId' => '(mode=api only) the API whose entries were cleared',
+                'before' => '(mode=before only) the timestamp entries were cleared before'
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.invalid_value' => 'before did not cast to a positive unix timestamp. errors[] reports the value received and what was expected.'
+        ],
+        'notes' => 'The parameters are mutually exclusive by priority, not by refusal: endpoint wins over apiId, which wins over all, which wins over before, and no parameter at all means the expired-only housekeeping pass. Sending two therefore succeeds and applies the higher-priority one — data.mode always reports which pass actually ran. Cached responses are produced by data resolvers with a cacheTTL; see setRouteResolver.'
+    ],
     
     'build' => [
         'description' => 'Creates a production-ready build with compiled PHP files and optional folder renaming. One build per project: refuses while a build already exists.',
@@ -662,7 +779,7 @@ $GLOBALS['__help_commands'] = [
     'getSiteMap' => [
         'description' => 'Generates a complete sitemap of all routes × all languages. Useful for SEO sitemap.txt generation and Dashboard insights.',
         'method' => 'GET',
-        'url_structure' => '/management/getSiteMap/{format?}',
+        'url_structure' => '/management/p/<projectId>/getSiteMap/{format?}',
         'parameters' => [
             '{format}' => [
                 'required' => false,
@@ -769,7 +886,7 @@ $GLOBALS['__help_commands'] = [
     'analyzeReachability' => [
         'description' => 'Analyzes route reachability via BFS from the home page. Follows internal links in page structures, menu, and footer to find orphan routes that are not reachable through any navigation path.',
         'method' => 'GET',
-        'url_structure' => '/management/analyzeReachability',
+        'url_structure' => '/management/p/<projectId>/analyzeReachability',
         'parameters' => [],
         'example_get' => 'GET /management/p/<projectId>/analyzeReachability',
         'success_response' => [
@@ -799,7 +916,7 @@ $GLOBALS['__help_commands'] = [
     'getStructure' => [
         'description' => 'Retrieves the JSON structure for a page, menu, footer, or component. Supports node identifiers for targeted retrieval.',
         'method' => 'GET',
-        'url_structure' => '/management/getStructure/{type}/{name?}/{option?}',
+        'url_structure' => '/management/p/<projectId>/getStructure/{type}/{name?}/{option?}',
         'parameters' => [
             '{type}' => [
                 'required' => true,
@@ -930,7 +1047,7 @@ $GLOBALS['__help_commands'] = [
     'getTranslation' => [
         'description' => 'Retrieves translations for a single language',
         'method' => 'GET',
-        'url_structure' => '/management/getTranslation/{lang}',
+        'url_structure' => '/management/p/<projectId>/getTranslation/{lang}',
         'parameters' => [
             '{lang}' => [
                 'required' => true,
@@ -1109,6 +1226,29 @@ $GLOBALS['__help_commands'] = [
             '500.server.internal_error' => 'Configuration not loaded.'
         ],
         'notes' => 'Returns configuration from config.php. Useful for UI language selectors and checking current mode.'
+    ],
+
+    'getLanguageList' => [
+        'description' => 'Returns the master list of languages a project can add. This is the fixed engine catalogue, not the project\'s configuration — for the languages a project has actually enabled, use getLangList.',
+        'method' => 'GET',
+        'url_structure' => '/management/p/<projectId>/getLanguageList',
+        'parameters' => [],
+        'example_get' => 'GET /management/p/<projectId>/getLanguageList',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Language list retrieved successfully',
+            'data' => [
+                'languages' => [
+                    ['code' => 'en', 'name' => 'English'],
+                    ['code' => 'fr', 'name' => 'Français'],
+                    ['code' => 'es', 'name' => 'Español'],
+                    '... 39 entries in total'
+                ]
+            ]
+        ],
+        'error_responses' => [],
+        'notes' => 'The catalogue holds 39 languages and is the same on every installation — it is compiled into the engine, not read from project data, so nothing a project does changes it. Each entry is an object with a "code" (the ISO 639 code passed to addLang) and a "name" (the language\'s own endonym, e.g. "Français", "日本語"). Intended for populating an "add a language" picker; pair it with getLangList to show which of the 39 a project already has.'
     ],
     
     'setMultilingual' => [
@@ -1336,7 +1476,7 @@ $GLOBALS['__help_commands'] = [
     'getTranslationKeys' => [
         'description' => 'Scans all JSON structures and extracts required translation keys. Optionally includes translation status per key.',
         'method' => 'GET',
-        'url_structure' => '/management/getTranslationKeys/{lang?}',
+        'url_structure' => '/management/p/<projectId>/getTranslationKeys/{lang?}',
         'parameters' => [
             '{lang}' => [
                 'required' => false,
@@ -1387,7 +1527,7 @@ $GLOBALS['__help_commands'] = [
     'validateTranslations' => [
         'description' => 'Validates translation completeness by comparing required keys with existing translations',
         'method' => 'GET',
-        'url_structure' => '/management/validateTranslations/{lang?}',
+        'url_structure' => '/management/p/<projectId>/validateTranslations/{lang?}',
         'parameters' => [
             '{lang}' => [
                 'required' => false,
@@ -1436,7 +1576,7 @@ $GLOBALS['__help_commands'] = [
     'getUnusedTranslationKeys' => [
         'description' => 'Finds translation keys that exist in translation files but are not used in any structure',
         'method' => 'GET',
-        'url_structure' => '/management/getUnusedTranslationKeys/{lang?}',
+        'url_structure' => '/management/p/<projectId>/getUnusedTranslationKeys/{lang?}',
         'parameters' => [
             '{lang}' => [
                 'required' => false,
@@ -1476,7 +1616,7 @@ $GLOBALS['__help_commands'] = [
     'analyzeTranslations' => [
         'description' => 'Complete translation health check - finds both missing AND unused keys',
         'method' => 'GET',
-        'url_structure' => '/management/analyzeTranslations/{lang?}',
+        'url_structure' => '/management/p/<projectId>/analyzeTranslations/{lang?}',
         'parameters' => [
             '{lang}' => [
                 'required' => false,
@@ -1658,7 +1798,7 @@ $GLOBALS['__help_commands'] = [
     'listAssets' => [
         'description' => 'Lists all files in assets folder, optionally filtered by category',
         'method' => 'GET',
-        'url_structure' => '/management/listAssets/{category?}',
+        'url_structure' => '/management/p/<projectId>/listAssets/{category?}',
         'parameters' => [
             '{category}' => [
                 'required' => false,
@@ -1920,6 +2060,61 @@ $GLOBALS['__help_commands'] = [
         ],
         'notes' => 'Adds new variables or updates existing ones. Security validated against CSS injection. File locking prevents concurrent writes. Creates :root block if not exists.'
     ],
+
+    'setThemeMode' => [
+        'description' => 'Configures the project\'s dark-mode support: whether theme switching is available at all, which theme a visitor gets by default, and whether the site offers a visitor-facing toggle. All three parameters are optional and only the ones supplied are written.',
+        'method' => 'POST',
+        'url_structure' => '/management/p/<projectId>/setThemeMode',
+        'parameters' => [
+            'enabled' => [
+                'required' => false,
+                'type' => 'boolean',
+                'description' => 'Whether theme mode is available at all. Writes THEME_MODE_ENABLED.',
+                'example' => true,
+                'validation' => 'A JSON boolean, or the strings "true" / "false". Any other value — including 1 and 0 — is refused.'
+            ],
+            'default' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'The theme a visitor gets before choosing one. Writes THEME_DEFAULT.',
+                'example' => 'dark',
+                'validation' => 'Trimmed, then must be exactly "light", "dark" or "system".'
+            ],
+            'userToggle' => [
+                'required' => false,
+                'type' => 'boolean',
+                'description' => 'Whether the site renders a visitor-facing theme switch. Writes THEME_USER_TOGGLE_ENABLED.',
+                'example' => true,
+                'validation' => 'A JSON boolean, or the strings "true" / "false". Any other value — including 1 and 0 — is refused.'
+            ]
+        ],
+        'example_post' => 'POST /management/p/<projectId>/setThemeMode with body: {"enabled": true, "default": "dark", "userToggle": true} or {"default": "system"} to change one setting only',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Theme mode updated successfully',
+            'data' => [
+                'changes' => [
+                    'THEME_MODE_ENABLED' => true,
+                    'THEME_DEFAULT' => 'dark',
+                    'THEME_USER_TOGGLE_ENABLED' => true
+                ],
+                'current' => [
+                    'THEME_MODE_ENABLED' => true,
+                    'THEME_DEFAULT' => 'dark',
+                    'THEME_USER_TOGGLE_ENABLED' => true
+                ]
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'None of enabled, default or userToggle was supplied — at least one is needed.',
+            '400.validation.invalid_type' => 'enabled or userToggle was neither a boolean nor the string "true"/"false".',
+            '400.validation.invalid_format' => 'default was not "light", "dark" or "system".',
+            '500.server.internal_error' => 'The project config lock could not be created or acquired, or the configuration file could not be read back.',
+            '500.server.file_write_failed' => 'The updated configuration could not be written.'
+        ],
+        'notes' => 'data.changes lists only the settings this call wrote; data.current reports all three afterwards, so a partial update still shows the resulting state. The write takes an exclusive lock on the project configuration and re-reads it inside the lock, so concurrent calls that each set a different setting do not overwrite one another.'
+    ],
     
     'listStyleRules' => [
         'description' => 'Lists all CSS selectors in the stylesheet, organized by global and media query scopes',
@@ -1949,7 +2144,7 @@ $GLOBALS['__help_commands'] = [
     'getStyleRule' => [
         'description' => 'Get CSS styles for a specific selector, optionally within a media query context',
         'method' => 'GET',
-        'url_structure' => '/management/getStyleRule/{selector} or /management/getStyleRule/{selector}/{mediaQuery}',
+        'url_structure' => '/management/p/<projectId>/getStyleRule/{selector} or /management/p/<projectId>/getStyleRule/{selector}/{mediaQuery}',
         'parameters' => [
             '{selector}' => [
                 'required' => true,
@@ -2082,7 +2277,7 @@ $GLOBALS['__help_commands'] = [
     'listKeyframes' => [
         'description' => 'Returns a lightweight list of all @keyframes animation names (without frame details)',
         'method' => 'GET',
-        'url_structure' => '/management/listKeyframes',
+        'url_structure' => '/management/p/<projectId>/listKeyframes',
         'parameters' => [],
         'example_get' => 'GET /management/p/<projectId>/listKeyframes',
         'success_response' => [
@@ -2104,7 +2299,7 @@ $GLOBALS['__help_commands'] = [
     'getAnimatedSelectors' => [
         'description' => 'Returns all CSS selectors using animations, grouped by animation name with orphan detection',
         'method' => 'GET',
-        'url_structure' => '/management/getAnimatedSelectors',
+        'url_structure' => '/management/p/<projectId>/getAnimatedSelectors',
         'parameters' => [],
         'example_get' => 'GET /management/p/<projectId>/getAnimatedSelectors',
         'success_response' => [
@@ -2136,7 +2331,7 @@ $GLOBALS['__help_commands'] = [
     'getKeyframes' => [
         'description' => 'Retrieves all @keyframes animations defined in the stylesheet, or a specific one by name',
         'method' => 'GET',
-        'url_structure' => '/management/getKeyframes/{name?}',
+        'url_structure' => '/management/p/<projectId>/getKeyframes/{name?}',
         'parameters' => [
             '{name}' => [
                 'required' => false,
@@ -3608,6 +3803,63 @@ $GLOBALS['__help_commands'] = [
             '500.server.file_write_failed' => 'Failed to create config.php. Failed to create routes.php. Failed to initialise project membership.'
         ],
         'notes' => 'Creates complete project structure: config.php, routes.php, templates/, translate/, etc. with basic home page template.'
+    ],
+
+    'cloneProject' => [
+        'description' => 'Duplicates a project under a new name. Every file is copied except the backups folder; the clone gets its own site name and a fresh membership file with the caller as its sole owner.',
+        'method' => 'POST',
+        'url_structure' => '/management/p/<projectId>/cloneProject',
+        'parameters' => [
+            'name' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Name of the new project. Becomes the clone\'s project id and, title-cased with dashes and underscores turned into spaces, its site name.',
+                'example' => 'my-site-copy',
+                'validation' => 'Must start with a letter and contain only letters, digits, dashes and underscores; maximum 50 characters. The names admin, management, src, logs, config and projects are reserved.'
+            ],
+            'source' => [
+                'required' => false,
+                'type' => 'string',
+                'description' => 'Echo-check only. The project cloned is ALWAYS the one in the URL marker (/management/p/<projectId>/cloneProject); this parameter cannot select a different one. Supply it and it must match the marker, or the call is refused with 400 project.mismatch.',
+                'example' => 'my-site'
+            ],
+            'switch_to' => [
+                'required' => false,
+                'type' => 'boolean',
+                'description' => 'Point the caller\'s own editing target at the clone once it exists. This moves nothing but the caller\'s per-user selection — no installation-wide pointer changes, and every project is still edited, previewed and served at /p/<projectId>/.',
+                'example' => true,
+                'default' => false,
+                'validation' => 'Read with a boolean filter, so true/false, 1/0 and the strings "true"/"false"/"on"/"yes" are all accepted; anything else reads as false.'
+            ]
+        ],
+        'example_post' => 'POST /management/p/<projectId>/cloneProject with body: {"name": "my-site-copy"} or {"name": "my-site-copy", "switch_to": true}',
+        'success_response' => [
+            'status' => 201,
+            'code' => 'resource.created',
+            'message' => "Project 'my-site' cloned to 'my-site-copy' successfully",
+            'data' => [
+                'project' => 'my-site-copy',
+                'source' => 'my-site',
+                'path' => '<secure>/projects/my-site-copy',
+                'site_name' => 'My site copy',
+                'files_copied' => 25,
+                'cloned' => true,
+                'owner_user_id' => 'usr_0123456789abcdef0123456789abcdef',
+                'switched_to' => false
+            ]
+        ],
+        'error_responses' => [
+            '400.project.required' => 'No project targeted — use /management/p/<projectId>/cloneProject.',
+            '400.project.mismatch' => 'A source in the request disagreed with the project in the URL.',
+            '400.validation.missing_field' => 'name is missing or empty.',
+            '400.validation.invalid_format' => 'name does not match the allowed pattern, or the marker names a project id that is not a valid project name.',
+            '400.validation.reserved_name' => 'name is one of the reserved names: admin, management, src, logs, config, projects.',
+            '404.resource.not_found' => 'The source project folder does not exist.',
+            '409.resource.already_exists' => 'A project with that name already exists. data.existing_path reports where.',
+            '500.server.operation_failed' => 'The recursive copy failed; anything already copied is removed first.',
+            '500.server.file_write_failed' => 'The clone\'s membership file could not be created. The whole clone is deleted rather than left ownerless.'
+        ],
+        'notes' => 'The clone does NOT inherit the source\'s roster: its membership file is written fresh with the caller as sole owner, no members, no pending invitations, visibility private and joining closed. A clone is an independent project — re-invite collaborators explicitly. The backups folder is skipped, so a clone starts with no backup history; everything else, including config, templates, translations, data and public assets, is copied. The clone\'s site name is derived from the new project name, and any site.name entry in its translation files is rewritten to match. data.files_copied counts the files present in the clone after the copy.'
     ],
     
     'deleteProject' => [
@@ -5405,6 +5657,105 @@ $GLOBALS['__help_commands'] = [
         'notes' => 'If index is omitted, ALL interactions on that event are removed (the event param is deleted entirely). If index is provided, only that specific interaction is removed and others are preserved.'
     ],
 
+    'getPageEvents' => [
+        'description' => 'Returns the page-level event interactions attached to one page — the document-level onload / onresize / onscroll handlers, as opposed to the element-level events listInteractions reports.',
+        'method' => 'GET',
+        'url_structure' => '/management/p/<projectId>/getPageEvents/{pageName}',
+        'parameters' => [
+            '{pageName}' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Page/route name, as URL segments. A nested route is written with slashes, exactly as the route reads — the segments after the command name are joined back together.',
+                'example' => 'docs/commands',
+                'validation' => 'Must be an existing route, or one of the special pages 404, 500, 403, 401.'
+            ]
+        ],
+        'example_get' => 'GET /management/p/<projectId>/getPageEvents/home or GET /management/p/<projectId>/getPageEvents/docs/commands',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Page events retrieved',
+            'data' => [
+                'pageName' => 'home',
+                'events' => [
+                    'onload' => ['{{call:fetchState:commandsList}}', '{{call:toast:Hi,info}}']
+                ],
+                'interactions' => [
+                    [
+                        'event' => 'onload',
+                        'index' => 0,
+                        'function' => 'fetchState',
+                        'params' => ['commandsList'],
+                        'raw' => '{{call:fetchState:commandsList}}'
+                    ]
+                ],
+                'availableEvents' => ['onload', 'onresize', 'onscroll'],
+                'count' => 1
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'No page name was given — the URL carried no segment after the command.',
+            '404.route.not_found' => 'The page is neither an existing route nor one of the special pages 404, 500, 403, 401.'
+        ],
+        'notes' => 'data.events is the raw stored map of event name to call strings; data.interactions is the same content parsed into function + params, with the index each call sits at — that index is what addPageEvent returns and what editPageEvent and deletePageEvent take. A page with nothing attached answers 200 with an empty events map and count 0, so absence is not an error. data.availableEvents is the fixed set of page-level events; element-level events live on nodes and are reached through listInteractions.'
+    ],
+
+    'addPageEvent' => [
+        'description' => 'Appends a page-level event interaction — a QS.* call fired on the document\'s onload, onresize or onscroll for one page. The element-level counterpart is addInteraction.',
+        'method' => 'POST',
+        'url_structure' => '/management/p/<projectId>/addPageEvent',
+        'parameters' => [
+            'pageName' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Page/route the event belongs to. Nested routes are written with slashes.',
+                'example' => 'home',
+                'validation' => 'Must be an existing route, or one of the special pages 404, 500, 403, 401.'
+            ],
+            'event' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Page-level event to attach to.',
+                'example' => 'onload',
+                'validation' => 'Exactly one of onload, onresize, onscroll.'
+            ],
+            'function' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'QS.* verb to call. Must be a name in the QS verb catalogue.',
+                'example' => 'onScrollFetchState',
+                'validation' => 'Must match an identifier — a letter or underscore followed by letters, digits or underscores — and name a catalogued verb.'
+            ],
+            'params' => [
+                'required' => false,
+                'type' => 'array',
+                'description' => 'Positional arguments for the verb. A single non-array value is wrapped into a one-element array. Each argument is checked against the verb\'s catalogue signature: a required argument may not be empty, and an argument the catalogue types as a route parameter must name a :param of the page\'s own route.',
+                'example' => '["scrollingStore", "200", "100"]'
+            ]
+        ],
+        'example_post' => 'POST /management/p/<projectId>/addPageEvent with body: {"pageName": "home", "event": "onload", "function": "onScrollFetchState", "params": ["scrollingStore", "200", "100"]}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Page event added successfully',
+            'data' => [
+                'pageName' => 'home',
+                'event' => 'onload',
+                'callSyntax' => '{{call:onScrollFetchState:scrollingStore,200,100}}',
+                'index' => 0
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'pageName, event or function is missing or empty; or one of the verb\'s arguments failed validation, in which case errors[] carries a field, an index and a reason per argument.',
+            '404.route.not_found' => 'pageName is neither an existing route nor one of the special pages 404, 500, 403, 401.',
+            '400.validation.invalid_value' => 'event is not one of onload, onresize, onscroll.',
+            '400.validation.invalid_format' => 'function is not a valid identifier.',
+            '422.validation.unknown_verb' => 'function is a well-formed name but is not in the QS verb catalogue.',
+            '500.server.file_write_failed' => 'The page-events file could not be written.'
+        ],
+        'notes' => 'The call is appended to the event\'s list, and data.index is the position it landed at — pass that index to editPageEvent or deletePageEvent. The verb\'s arguments are validated against the catalogue, but the catalogue\'s own events list is NOT enforced here: a verb documented only for click events is accepted on onload. Prefer onScrollFetchState over a raw onscroll fetchState for infinite scroll — it carries the debounce and exhausted guards. Adding the first event for a page creates the project\'s page-events file and its data folder if they do not exist yet.'
+    ],
+
     'editPageEvent' => [
         'description' => 'Edits an existing page-level event interaction (onload/onresize/onscroll). Replaces the call at the given index, optionally moving it to a different page-level event.',
         'method' => 'PUT',
@@ -5475,6 +5826,52 @@ $GLOBALS['__help_commands'] = [
             '500.server.internal_error' => 'Invalid JSON in page events file. Failed to encode page events JSON.'
         ],
         'notes' => 'When newEvent differs from event, the interaction is spliced out of the source event and pushed onto the new event (empty event/page entries are cleaned up). When newEvent is omitted or equal, the call is replaced in-place at the same index. Counterpart to editInteraction (which edits element-level events on a node).'
+    ],
+
+    'deletePageEvent' => [
+        'description' => 'Removes one page-level event interaction, identified by its page, its event and its index within that event\'s list.',
+        'method' => 'DELETE',
+        'url_structure' => '/management/p/<projectId>/deletePageEvent',
+        'parameters' => [
+            'pageName' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Page/route holding the interaction, as stored in the project\'s page-events file. Nested routes are written with slashes.',
+                'example' => 'home'
+            ],
+            'event' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'Page-level event the interaction sits on: onload, onresize or onscroll.',
+                'example' => 'onload'
+            ],
+            'index' => [
+                'required' => true,
+                'type' => 'integer',
+                'description' => '0-based position of the interaction within that event\'s list, as reported by getPageEvents.',
+                'example' => 0,
+                'validation' => 'Cast to an integer, so a numeric string is accepted. Must be at least 0 and less than the number of interactions on that event.'
+            ]
+        ],
+        'example_delete' => 'DELETE /management/p/<projectId>/deletePageEvent with body: {"pageName": "home", "event": "onload", "index": 0}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => 'Page event deleted successfully',
+            'data' => [
+                'pageName' => 'home',
+                'event' => 'onload',
+                'index' => 0,
+                'removed' => '{{call:fetchState:commandsList}}'
+            ]
+        ],
+        'error_responses' => [
+            '400.validation.required' => 'pageName, event or index is missing.',
+            '404.data.not_found' => 'The project has no page-events file yet, or that page and event hold no interactions. An unknown page name reports this rather than a route error — this command reads the stored events, it does not check the route table.',
+            '400.validation.invalid_value' => 'index is negative or beyond the last interaction on that event.',
+            '500.server.file_write_failed' => 'The page-events file could not be written.'
+        ],
+        'notes' => 'data.removed returns the call string that was deleted, so the caller can undo by passing it back through addPageEvent. Removing the last interaction on an event drops the event, and removing the last event on a page drops the page, so an emptied page does not linger in the file. Indexes shift after a delete: re-read getPageEvents before deleting a second interaction from the same event.'
     ],
 
     'importStructureTranslations' => [
@@ -6934,8 +7331,55 @@ $GLOBALS['__help_commands'] = [
 ];
 
 /**
+ * The routed command surface, read from its source rather than restated here.
+ *
+ * The two indexes this feeds — the command total and the category map — were
+ * hand-maintained lists, and both fell behind the surface they described. A
+ * derived index cannot disagree with what it counts: a command added to
+ * routes.php and categories.php appears here with no edit to this file, and one
+ * that has no documentation entry is REPORTED as undocumented rather than
+ * quietly left out of the count.
+ *
+ * Both sources are shipped engine config, identical on every installation, so
+ * nothing deployment-specific reaches the response.
+ *
+ * @return array{routed:string[], categories:array<string,array>}
+ */
+function __help_command_surface(): array {
+    // The dispatcher has already loaded the routable allowlist for this
+    // request; fall back to the file for an in-process caller that has not.
+    if (defined('ROUTES_MANAGEMENT')) {
+        $routed = ROUTES_MANAGEMENT;
+    } else {
+        $routesPath = SECURE_FOLDER_PATH . '/management/routes.php';
+        $routed = file_exists($routesPath) ? require $routesPath : [];
+    }
+    $routed = is_array($routed) ? array_values(array_unique($routed)) : [];
+
+    // loadCategoriesConfig() is the shared reader (AuthManagement.php); it is
+    // what the permission check itself resolves a command through, so this
+    // index and the authorization it describes cannot drift apart.
+    if (!function_exists('loadCategoriesConfig')) {
+        require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+    }
+    $categories = loadCategoriesConfig();
+
+    $index = [];
+    foreach ($categories as $name => $def) {
+        $entry = ['scope' => $def['scope'] ?? 'project'];
+        if (isset($def['access'])) {
+            $entry['access'] = $def['access'];
+        }
+        $entry['commands'] = array_values($def['commands'] ?? []);
+        $index[$name] = $entry;
+    }
+
+    return ['routed' => $routed, 'categories' => $index];
+}
+
+/**
  * Command function for internal execution via CommandRunner
- * 
+ *
  * @param array $params Body parameters (unused for this command)
  * @param array $urlParams URL segments - [0] = command name (optional)
  * @return ApiResponse
@@ -6986,6 +7430,14 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
         ];
     }
 
+    // The routable surface and its category map, derived from the same files the
+    // dispatcher and the permission check read. `total` counts the entries this
+    // response actually carries; `command_surface` says how that compares to the
+    // routable set, so a command with no entry is named rather than silently
+    // absent from both numbers.
+    $surface = __help_command_surface();
+    $documented = array_values(array_intersect($surface['routed'], array_keys($commands)));
+
     // Return all commands if no specific command requested
     return ApiResponse::create(200, 'operation.success')
         ->withMessage('All command documentation retrieved')
@@ -6994,33 +7446,13 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
             'commandsList' => $commandsList,
             'total' => count($commands),
             'base_url' => rtrim(BASE_URL, '/') . '/management',
-            'command_categories' => [
-                'route_management' => ['addRoute', 'deleteRoute', 'setRouteLayout', 'getRoutes', 'getSiteMap', 'analyzeReachability'],
-                'structure_management' => ['getStructure', 'editStructure', 'listComponents', 'getComponent', 'findComponentUsages', 'renameComponent', 'duplicateComponent', 'listPages'],
-                'node_management' => ['moveNode', 'deleteNode', 'addNode', 'editNode', 'addComponentToNode', 'editComponentToNode', 'addComplexElement'],
-                'alias_management' => ['createAlias', 'deleteAlias', 'listAliases'],
-                'translation_management' => ['getTranslation', 'getTranslations', 'setTranslationKeys', 'deleteTranslationKeys', 'getTranslationKeys', 'validateTranslations', 'getUnusedTranslationKeys', 'analyzeTranslations'],
-                'language_management' => ['getLangList', 'setMultilingual', 'checkStructureMulti', 'addLang', 'deleteLang', 'setDefaultLang'],
-                'asset_management' => ['uploadAsset', 'deleteAsset', 'listAssets', 'editAsset'],
-                'style_management' => ['getStyles', 'editStyles'],
-                'css_variables_rules' => ['getRootVariables', 'setRootVariables', 'listStyleRules', 'getStyleRule', 'setStyleRule', 'deleteStyleRule'],
-                'css_animations' => ['getKeyframes', 'setKeyframes', 'deleteKeyframes'],
-                'site_customization' => ['editFavicon', 'editTitle'],
-                'build_deployment' => ['build', 'getBuild', 'deleteBuild', 'deployBuild', 'downloadBuild'],
-                'project_management' => ['listProjects', 'setSelectedProject', 'createProject', 'deleteProject'],
-                'member_management' => ['listMembers', 'getProjectRoster', 'inviteMember', 'cancelInvitation', 'changeMemberRole', 'removeMember', 'transferOwnership', 'approveJoinRequest', 'denyJoinRequest', 'proposeMember', 'setJoinPolicy', 'setProjectVisibility', 'reconcileMemberships'],
-                'my_memberships' => ['findUser', 'listMyInvitations', 'listMyProposals', 'acceptInvitation', 'declineInvitation', 'leaveProject', 'dismissProjectNotice', 'requestToJoin', 'withdrawJoinRequest'],
-                'backup_restore' => ['backupProject', 'listBackups', 'restoreBackup', 'deleteBackup'],
-                'export_import' => ['exportProject', 'importProject', 'downloadExport', 'clearExports'],
-                'storage_monitoring' => ['getSizeInfo'],
-                'command_history' => ['getCommandHistory', 'clearCommandHistory'],
-                'authentication' => ['login', 'logoutSession', 'register', 'changePassword'],
-                'role_management' => ['listRoles', 'getMyPermissions', 'createRole', 'editRole', 'deleteRole'],
-                'snippet_management' => ['listSnippets', 'getSnippet', 'createSnippet', 'deleteSnippet', 'duplicateSnippet', 'insertSnippet'],
-                'system_updates' => ['checkForUpdates'],
-                'embed_security' => ['getIframeSandbox', 'setIframeSandbox', 'removeIframeSandbox'],
-                'documentation' => ['help']
+            'command_surface' => [
+                'routed' => count($surface['routed']),
+                'documented' => count($documented),
+                'undocumented' => array_values(array_diff($surface['routed'], array_keys($commands))),
+                'note' => 'routed is every command the dispatcher will accept; documented is how many of those this response carries an entry for. undocumented names the difference and is empty when the two agree.'
             ],
+            'command_categories' => $surface['categories'],
             'authentication' => [
                 'required' => true,
                 'login' => 'POST /management/login with {username, password} (users.php credentials) sets the session cookie and returns that session token',
