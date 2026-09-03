@@ -14,10 +14,14 @@
  * WHO SEES IT is decided SERVER-SIDE, in layout.php, from
  * secure/management/config/operator.php. This file is not even loaded into a
  * page whose account is not listed, so "hide it in CSS" is not what is
- * happening. The list grants nothing: `checkForUpdates` stays callable by any
- * authenticated account exactly as before, and this module calls no other
- * command. It is a display preference, and treating it as anything more would
+ * happening. The list grants nothing: the update-check endpoint stays callable
+ * by any authenticated account exactly as before, and this module calls nothing
+ * else. It is a display preference, and treating it as anything more would
  * reintroduce the installation-wide principal beta.10 removed.
+ *
+ * IT IS NOT A COMMAND. The update check reports on the INSTALLATION, not on any
+ * project, so it is an arm of the panel's own helper API (/admin/api) rather
+ * than a member of the project CLI under /management.
  *
  * THE THROTTLE IS NOT COSMETIC. Unauthenticated GitHub API calls are limited to
  * 60 per hour per address, and the check is a live network round trip on the
@@ -39,7 +43,7 @@
     }
 
     var host = document.getElementById('admin-update-notice');
-    if (!host || !window.QSDom || !window.QuickSiteAdmin) {
+    if (!host || !window.QSDom || !window.QuickSiteAPI) {
         return;
     }
 
@@ -65,7 +69,7 @@
 
     /**
      * The banner. ONE Element, built from parts — the panel's `_render*` idiom.
-     * @param {string} latest   version string from checkForUpdates
+     * @param {string} latest   version string from the update check
      * @param {string} current  the running version, or '' when not known
      * @param {string} url      release page on GitHub ('' when absent)
      * @returns {HTMLElement}
@@ -144,21 +148,22 @@
     }
 
     function check() {
-        // `checkForUpdates` is a global-scope command, so this needs no project
-        // and works for an operator with zero memberships.
-        window.QuickSiteAdmin.apiRequest('checkForUpdates', 'POST')
-            .then(function (res) {
+        // The arm carries no project and works for an operator with zero
+        // memberships. fetchHelper RESOLVES with the arm's data and REJECTS on a
+        // non-success answer, so the catch below is the offline/error path.
+        window.QuickSiteAPI.fetchHelper('update-check')
+            .then(function (d) {
                 writeStore(KEY_AT, String(Date.now()));
-                if (!res || !res.ok || !res.data || !res.data.data) {
-                    return;   // offline, rate-limited, or an error envelope — stay silent
+                if (!d) {
+                    return;   // nothing to say
                 }
-                var d = res.data.data;
                 if (d.update_available === true) {
                     show(d);
                     writeStore(KEY_SEEN, String(d.latest_version || ''));
                 } else {
-                    // Up to date — forget the previous finding so a banner does
-                    // not survive the update that answered it.
+                    // Up to date, or the check could not reach GitHub. Forget the
+                    // previous finding so a banner does not survive the update
+                    // that answered it.
                     writeStore(KEY_SEEN, '');
                 }
             })

@@ -421,7 +421,7 @@ class AdminRouter {
      * `getTokenPermissions` (the client-side permission filter) and
      * `getCurrentProject` (resolveDefaultProject) use — so the server-side page
      * gate agrees with the nav links the client shows and with the project the
-     * page operates on. A freshly-joined user who never called setSelectedProject
+     * page operates on. A freshly-joined user who never picked an editing target
      * (empty selected_project) still resolves their role instead of being locked
      * out of every role-gated page. Returns a role slug ('viewer' … 'owner') or
      * null when not authenticated, unresolved, disabled, or a member of nothing.
@@ -441,7 +441,8 @@ class AdminRouter {
      * first real membership).
      *
      * "Switching project" (header picker AND the dashboard) means switching which project
-     * you EDIT — this value — via `setSelectedProject`. The editor marker, badge and
+     * you EDIT — this value — written through `/admin/state/selected-project` (panel
+     * state, not a command: beta.11 S6). The editor marker, badge and
      * preview follow it; every project is authored and previewed at its own /p/<id>/.
      * A UX pointer only — the dispatcher re-authorizes every request against members.json
      * (C7).

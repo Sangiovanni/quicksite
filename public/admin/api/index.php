@@ -44,23 +44,17 @@ $__qsApiProject = null;
 require_once __DIR__ . '/../../init.php';
 require_once SECURE_FOLDER_PATH . '/admin/functions/AdminHelper.php';
 
-// C12 (F9): this dispatcher had no fatal handling of any kind — no
-// set_exception_handler, no shutdown function, no catch(Throwable). A fatal
+// Fatal handling, the JSON headers, and the auth gate — shared with the panel's
+// other JSON endpoint (/admin/state) so the two cannot drift apart. C12 (F9):
+// this dispatcher used to have no fatal handling of any kind, and a fatal
 // anywhere below (a malformed project config.php is enough) left the status at
-// 200 and let PHP print its own error, absolute filesystem path included, as
-// the body. Registered as early as the constants allow, sharing one
-// implementation with /management so the two surfaces cannot drift apart.
-require_once SECURE_FOLDER_PATH . '/src/functions/errorHygiene.php';
-qs_register_fatal_handler(QS_FATAL_SHAPE_ERROR);
+// 200 with PHP's own error, absolute filesystem path included, as the body.
+// Authentication is the session cookie AND the per-session token, exactly as
+// /management: this helper runs management commands in-process, so it must not
+// be reachable on a weaker credential than the commands themselves.
+require_once SECURE_FOLDER_PATH . '/admin/functions/adminJsonEndpoint.php';
+$tokenInfo = qs_admin_json_boot();
 
-header('Content-Type: application/json');
-header('Cache-Control: no-store');
-
-// Authenticate exactly like /management does: the session cookie AND the
-// per-session token in the Authorization header. This helper runs management
-// commands in-process, so it must not be reachable on a weaker credential than
-// the commands themselves.
-require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
 // is_valid_project_name — the F1 shape gate for the URL marker (the management
 // dispatcher requires this the same way).
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
@@ -68,20 +62,6 @@ require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 // than relied on arriving through a command file, because the asset-list
 // endpoint formats sizes before any command is loaded.
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
-
-$authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
-if ($authHeader === '' && function_exists('apache_request_headers')) {
-    $headers = apache_request_headers();
-    $authHeader = $headers['Authorization'] ?? $headers['authorization'] ?? '';
-}
-$tokenValidation = validateBearerToken($authHeader !== '' ? $authHeader : null);
-$tokenInfo = $tokenValidation['valid'] ? $tokenValidation['user'] : null;
-
-if ($tokenInfo === null) {
-    http_response_code(401);
-    echo json_encode(['error' => 'Unauthorized']);
-    exit;
-}
 
 // Get the action from URL
 $requestUri = trim(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), '/');
@@ -149,10 +129,12 @@ const QS_API_ARM_COMMANDS = [
 // ('upload-limits' reports the SERVER's own ini ceilings plus QuickSite's
 // per-category caps — installation-wide configuration, identical for every
 // project and every caller, so it belongs here rather than with the
-// project-bound arms.)
+// project-bound arms. 'update-check' is the same kind of fact about the
+// installation — it was the `checkForUpdates` command until beta.11 S6 ruled
+// that the command surface is a CLI for developing a PROJECT.)
 const QS_API_STATIC_ARMS = [
     'structure-types', 'asset-categories', 'asset-extensions', 'favicon-extensions',
-    'alias-types', 'edit-actions', 'upload-limits',
+    'alias-types', 'edit-actions', 'upload-limits', 'update-check',
 ];
 
 if (isset(QS_API_ARM_COMMANDS[$action])) {
@@ -392,7 +374,31 @@ switch ($action) {
             'upload_max_filesize' => $__qsLimits['upload_max_filesize'],
         ]]);
         break;
-        
+
+    case 'update-check':
+        // Is a newer QuickSite released than the one installed? A fact about the
+        // INSTALLATION, not about any project — which is why it is not a command
+        // (beta.11 S6). Reports only; applying an update is `git pull` on the
+        // server and has no HTTP surface anywhere.
+        //
+        // Answers any authenticated caller, exactly as `checkForUpdates` did.
+        // WHO SEES the resulting banner is decided in layout.php from
+        // operator.php, and that list is a display preference that grants
+        // nothing — gating this on it would make it an authorization tier.
+        //
+        // The live GitHub round trip is why update-notice.js throttles to one
+        // call per six hours: unauthenticated GitHub API calls are capped at 60
+        // per hour per address.
+        require_once SECURE_FOLDER_PATH . '/admin/functions/updateCheck.php';
+        $__qsUpdate = qs_update_check();
+        if (!$__qsUpdate['success']) {
+            http_response_code($__qsUpdate['status']);
+            echo json_encode(['success' => false, 'error' => $__qsUpdate['error']]);
+            break;
+        }
+        echo json_encode(['success' => true, 'data' => $__qsUpdate['data']]);
+        break;
+
     case 'builds':
         // The project's build, as a 0-or-1 option list.
         //

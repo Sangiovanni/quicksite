@@ -1010,8 +1010,9 @@ function qs_auth_attempt_login(string $username, string $password): array {
 
 /**
  * Serialized read-modify-write on users.php — THE single users-registry writer
- * (C8): createProject, setSelectedProject, register and changePassword all
- * come through here. flock sidecar (the pre-C8 inline writers were temp+rename
+ * (C8): createProject, register, changePassword and the panel's own
+ * selected-project write (secure/admin/functions/panelState.php) all come
+ * through here. flock sidecar (the pre-C8 inline writers were temp+rename
  * only, so two simultaneous writers could lose an update) + temp + rename
  * (atomic swap for lock-free readers) + opcache_invalidate (readers must see
  * the new file immediately).

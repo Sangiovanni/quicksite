@@ -138,7 +138,7 @@ function getCommandCategories(): array {
         'project_management' => [
             'label' => 'Project Management',
             'icon' => 'folder-tree',
-            'commands' => ['listProjects', 'getMySpaceUsage', 'setSelectedProject', 'createProject', 'cloneProject', 'deleteProject', 'exportProject', 'importProject', 'downloadExport', 'clearExports', 'backupProject', 'listBackups', 'restoreBackup', 'deleteBackup']
+            'commands' => ['listProjects', 'getMySpaceUsage', 'createProject', 'cloneProject', 'deleteProject', 'exportProject', 'importProject', 'downloadExport', 'clearExports', 'backupProject', 'listBackups', 'restoreBackup', 'deleteBackup']
         ],
         // C8 8.3a/8.3b — membership consent model. Marker-scoped roster
         // management, request adjudication + the join-policy knob + the
@@ -207,6 +207,15 @@ function getCommandCategories(): array {
             'label' => 'Snippets',
             'icon' => 'puzzle',
             'commands' => ['listSnippets', 'getSnippet', 'createSnippet', 'deleteSnippet', 'duplicateSnippet', 'insertSnippet', 'injectSnippetCss']
+        ],
+        // Per-project embed policy (data/iframe_sandbox.json). The label is the
+        // one the panel already uses for this feature — nav.embedSecurity, the
+        // /admin/embed-security page — so the console section and the nav entry
+        // read as the same thing rather than as two names for one concept.
+        'embed_security' => [
+            'label' => 'Embed Security',
+            'icon' => 'shield',
+            'commands' => ['getIframeSandbox', 'setIframeSandbox', 'removeIframeSandbox']
         ],
         'documentation' => [
             'label' => 'Documentation',

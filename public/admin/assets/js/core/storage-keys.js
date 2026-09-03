@@ -37,7 +37,7 @@ window.QuickSiteStorageKeys = Object.freeze({
 
     // Operator update notice. Written only in a browser signed in as an account
     // named in operator.php — nobody else runs update-notice.js at all.
-    //   updateCheckAt      epoch ms of the last checkForUpdates call, so a panel
+    //   updateCheckAt      epoch ms of the last update check, so a panel
     //                      navigation does not spend a GitHub API call each time
     //                      (unauthenticated GitHub allows 60/hour per address).
     //   updateNoticeHidden the version string the operator dismissed. Stored as

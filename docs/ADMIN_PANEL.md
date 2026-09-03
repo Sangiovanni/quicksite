@@ -97,7 +97,7 @@ File lists are grouped by role. Where useful, the entry point or main exported f
 | `js/core/dom.js` | `window.QSDom`: shared `el()` element factory + `svgIcon()` + `clear()` — the createElement/textContent idiom for dynamic DOM. Loaded in `<head>` so page scripts can use it at parse time. |
 | `js/core/members-badge.js` | Membership counts (inbox awaiting me + queue awaiting my adjudication) → the Members nav badge; publishes `window.QSMembershipCounts` + the `quicksite:membership-counts-updated` event; recomputes on `quicksite:memberships-changed`. |
 | `js/core/searchable-select.js` | Type-ahead select widget for long option lists; loaded by `layout.php` and used by the visual editor's pickers. |
-| `js/core/update-notice.js` | The operator update banner (§9.14). Loaded **only** for an account named in `operator.php`; calls `checkForUpdates`, throttles to one call per six hours, and renders a dismissible notice. |
+| `js/core/update-notice.js` | The operator update banner (§9.14). Loaded **only** for an account named in `operator.php`; calls the `update-check` helper arm, throttles to one call per six hours, and renders a dismissible notice. |
 | `admin.js` | Singleton `QuickSiteAdmin`: permissions, user badge, nav, delegation. |
 
 ### 5.2 Shared components
@@ -266,7 +266,9 @@ The visual editor is the panel's flagship feature. It runs as a sidebar UI in th
 
 ### 8.0 Which project the editor edits
 
-The panel edits one project at a time — the user's **selected project** (a per-user preference; ARCHITECTURE §6). The header carries a **project picker** listing the projects the user is a member of; changing it calls `setSelectedProject` and does a cache-busted reload, so the header badge, the editor's command target, and the preview iframe all follow together. The dashboard's project switch calls the same command.
+The panel edits one project at a time — the user's **selected project** (a per-user preference; ARCHITECTURE §6). The header carries a **project picker** listing the projects the user is a member of; changing it posts to `/admin/state/selected-project` and does a cache-busted reload, so the header badge, the editor's command target, and the preview iframe all follow together. The dashboard's project switch and the *Edit this project* button on My Memberships go through the same endpoint.
+
+This pointer is **not** a command. Which project a person has open is a fact about the panel, not about any project, so it is panel state — the command API names its project in the URL marker instead and has no notion of a current one. The endpoint is POST-only, takes `{"project": "<id>"}`, and refuses a project the caller is not a member of (`403 authz.not_a_member`), so the panel can never open a project it cannot edit. The value is a UX default and never an authorization input: every request is re-authorized against the target project's `members.json`.
 
 An account that is a member of no project has nothing to edit. `/admin/preview` sends it to the dashboard with a note saying the editor needs a project and pointing at creating or joining one — the editor is never opened bound to nothing, and the header's "Back to site" button is hidden, since there is no site to go back to. This applies only when there is no membership at all; asking for a project you are simply not a member of is refused by the usual gates.
 
@@ -2857,8 +2859,8 @@ every authenticated account — a freshly-registered, 0-membership user lands he
 accept their first invitation, and the page fires only global self-service
 commands (zero 403 noise). Sections: **My projects** (`listProjects` — role chip,
 OWNED badge, *editing* chip on the current edit target, per-row *Edit this
-project* = `setSelectedProject` + reload, *Leave* with confirm — hidden on owned
-rows), **Invitation inbox** (accept / decline, inviter + note + `sponsored_by`
+project* = the selected-project write + reload, *Leave* with confirm — hidden on
+owned rows), **Invitation inbox** (accept / decline, inviter + note + `sponsored_by`
 shown; a voided invitation surfaces the server's 409 message), **My join
 requests** (withdraw), **My proposals** (`listMyProposals` — pending validation
 vs. awaiting the person's answer; withdraw while pending), **Notices**
@@ -2968,8 +2970,8 @@ container nor `js/core/update-notice.js` — the notice is absent from the page
 rather than hidden in it.
 
 **The list grants nothing.** It decides whether a notice renders and nothing
-else. `checkForUpdates` keeps the permissions it always had and stays callable
-by any authenticated account; no code path uses the list to authorise anything.
+else. The update check answers any authenticated account, exactly as it always
+did; no code path uses the list to authorise anything.
 That is what keeps it a display preference rather than an installation-wide
 role, which the authority model does not have (`ARCHITECTURE.md` §3).
 
@@ -2977,8 +2979,10 @@ A missing, unreadable or malformed `operator.php` reads as **nobody** — never 
 everybody — so a notice addressed to whoever maintains the server is never shown
 by accident.
 
-**How it renders.** `layout.php` emits an empty container and the
-`isOperator` flag; `update-notice.js` calls `checkForUpdates` and fills it in.
+**How it renders.** `layout.php` emits an empty container and the `isOperator`
+flag; `update-notice.js` calls `GET /admin/api/update-check` and fills it in.
+That is a helper arm of the panel's own API, not a command — checking whether
+the installation has a newer release is not a fact about any project.
 The check is a live network round trip to GitHub, so doing it inline would make
 every panel page wait on a third party. It is throttled to one call per six
 hours per browser (unauthenticated GitHub allows 60 per hour per address) and

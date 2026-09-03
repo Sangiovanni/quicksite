@@ -310,33 +310,25 @@ return [
         'commands' => ['createProject', 'importProject'],
     ],
 
-    // Per-user EDITING target (selected_project) — a benign self-write: sets which
-    // project THIS user's panel edits (C9). UX only, never an authz input; the command
-    // still refuses selecting a project you are not a member of. any-auth.
-    'projects.select' => [
-        'scope' => 'global',
-        'access' => 'any',
-        'commands' => ['setSelectedProject'],
-    ],
-
-    // Read-only update check (hardcoded GitHub URL, no request input — C2 PASS).
-    'system.read' => [
-        'scope' => 'global',
-        'access' => 'any',
-        'commands' => ['checkForUpdates'],
-    ],
-
     // NOTE — there is deliberately NO owner-gated global category. The former
     // 'system.admin' (access 'owner') was retired in C8 8.5 along with the rule
     // itself: hasPermission resolved it as "owns ANY project anywhere",
     // target-independent, while projects.create is access 'any' — so any account
     // minted that ownership in one call (the F-C8-8.1-1 mechanism). Its last member
     // applied updates; that is now `git pull` on the server, which has no HTTP
-    // surface at all, so no token can reach the code that updates the
-    // installation. checkForUpdates stays routed under
-    // system.read, so the panel still reports available updates.
+    // surface at all, so no token can reach the code that updates the installation.
     // (The generateToken/listTokens/revokeToken trio was REMOVED in C5b; switchProject
     // was deleted in C15 along with the served-project concept it existed to repoint.)
+    //
+    // ALSO GONE, beta.11 S6: 'system.read' (checkForUpdates) and 'projects.select'
+    // (setSelectedProject). The command surface is a CLI for DEVELOPING a project;
+    // an update check is about the installation and an editing pointer is panel
+    // state, so neither is a command. Both still work — the panel reaches them at
+    // /admin/api's update-check arm and /admin/state/selected-project — and both
+    // keep the permissions they had (any authenticated caller, membership still
+    // enforced for the project pointer). Their categories were deleted rather than
+    // left empty: the routes.php <-> categories.php 1:1 invariant cannot see an
+    // empty category and the /admin/command UI cannot use one.
     // Global categories may only declare an access in QS_GLOBAL_ACCESS_GRANTING
     // ('any') or the explicit deny 'none' — see AuthManagement.php.
 

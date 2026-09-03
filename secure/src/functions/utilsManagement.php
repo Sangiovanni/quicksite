@@ -1014,9 +1014,10 @@ function qs_favicon_repoint(string $projectPath, string $oldName, ?string $newNa
  * The QuickSite version this installation is running, read from the VERSION
  * file at the installation root.
  *
- * Shared because more than one command reports it: build.php stamps it into
+ * Shared because more than one reader reports it: build.php stamps it into
  * build_manifest.json (which getBuild merges, so every builds-page row shows
- * it) and checkForUpdates compares it against the latest GitHub release.
+ * it) and the panel's update check (secure/admin/functions/updateCheck.php)
+ * compares it against the latest GitHub release.
  * A hardcoded literal here reported a version that was never released.
  *
  * @return string|null Trimmed VERSION contents, or null when it cannot be read

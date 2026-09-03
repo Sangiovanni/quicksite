@@ -10629,3 +10629,86 @@ absent from); `secure/src/functions/projectContainment.php` (the export
 containment the parameter bypassed). Behaviour:
 [COMMAND_API.md](COMMAND_API.md) (*Export / Import*), which already described the
 command as taking an uploaded ZIP and needed no correction.
+
+
+---
+
+### The command surface is a project CLI; the panel is a tool that uses it (locked 2026-09-03)
+
+**Decision**: `secure/management/command/` holds commands for **developing a
+project**, and nothing else. Anything about the installation, the account, or the
+admin panel's own state is not a command; it belongs in `secure/src/` or
+`secure/admin/` and is served from the panel's own endpoints. The panel calls the
+CLI; the CLI does not exist to serve the panel, and the two concepts are not
+merged. Every command that survives appears on `/admin/command`.
+
+The first two relocations set the pattern. `checkForUpdates` compared the local
+`VERSION` against the latest GitHub release — a fact about the installation, in a
+category literally named `system.read` — and is now the `update-check` arm of
+`public/admin/api/index.php`, alongside `upload-limits`, which reports the
+server's own ini ceilings for the same reason. `setSelectedProject` wrote the
+per-user pointer to the project the panel is editing — panel state — and is now
+`POST /admin/state/selected-project`. Both keep the permissions they had: the
+update check answers any authenticated caller, and the project pointer still
+refuses a project the caller is not a member of.
+
+**Reasoning**: an API whose commands are all about one kind of thing can be
+described in one sentence, scripted without surprises, and reasoned about as a
+unit. Mixing "edit this website" with "how is this server doing" gives a caller a
+surface where the marker convention holds for most commands and silently does not
+for others, and where the permission model has to invent a global tier for the
+odd one out — which is exactly what produced the `system.admin` escalation the
+previous release removed. `system.read` and `projects.select` were each a whole
+category holding a single command that had no project to be scoped to.
+
+The panel loses nothing, because the panel was always allowed to have its own
+endpoints — `/admin/api` has served form options and server limits for as long as
+it has existed. What changes is that the panel now owns the things that are about
+the panel, instead of borrowing the command surface to hold them.
+
+Two consequences worth stating, because both were decided rather than inherited.
+**A write gets its own door**: `/admin/api` is a read-only helper — every one of
+its arms is a lookup — so the state write went to `/admin/state` rather than
+becoming the first mutation hiding among the lookups, where the next person
+adding an arm would have had no way to tell which kind they were adding. And
+**one auth gate, not two**: both endpoints boot through
+`secure/admin/functions/adminJsonEndpoint.php`, which registers the shared fatal
+handler and requires the session cookie *and* the per-session bearer token, so a
+second hand-rolled copy of that check cannot drift away from the first.
+
+The relocation also retired a duplicate. The command file kept its own
+`updates_getLocalVersion()` rather than sharing `qs_local_version()`, because
+sharing would have pulled `utilsManagement.php` and its dependency tail into a
+command that otherwise loaded one class. That trade does not exist on the admin
+endpoint, which already requires that file on every request — so the copy went and
+the shared reader is what answers.
+
+**Alternatives considered**: moving the authentication and project-lifecycle
+commands too, on the grounds that they are equally "not about developing a
+project" (rejected — a CLI that cannot sign in is not headlessly usable, and
+`login` / `logoutSession` / `register` are the three commands that answer before
+authentication; a CLI that cannot create the project it develops is not a CLI
+either, and `listProjects` / `createProject` / `importProject` are global only
+because no marker can exist for a project that does not exist yet). Leaving both
+commands where they were and documenting the inconsistency (rejected — this is
+the last release that may remove a command, so an inconsistency left now is
+permanent). Keeping the emptied categories as empty blocks (rejected, and it is a
+trap this codebase has already fallen into: the routes-to-categories invariant
+cannot see an empty category and the console cannot render one, so an emptied
+category is deleted with its last command). Gating the update check on
+`operator.php` now that it is panel-only (rejected — that file decides who *sees*
+a notice and grants nothing, and reading it as a permission would rebuild the
+installation-wide principal its own design exists to avoid; see *operator.php
+decides who SEES a notice, and grants nothing* above).
+
+**Source**: `secure/admin/functions/updateCheck.php`,
+`secure/admin/functions/panelState.php`,
+`secure/admin/functions/adminJsonEndpoint.php`, `public/admin/state/index.php`,
+the `update-check` arm in `public/admin/api/index.php`;
+`secure/management/routes.php` and `secure/management/config/categories.php` (170
+commands, 33 categories, the two emptied categories deleted);
+`public/admin/assets/js/core/api.js` (`setSelectedProject`, and
+`FALLBACK_GLOBAL_COMMANDS` losing its update-check entry). Behaviour:
+[COMMAND_API.md](COMMAND_API.md) (*Endpoint*, *Update detection is not part of
+this API*), [ADMIN_PANEL.md](ADMIN_PANEL.md) §8.0 and §9.14,
+[ARCHITECTURE.md](ARCHITECTURE.md) §1 and §3.

@@ -1018,10 +1018,10 @@
             this.disabled = true;
             this.innerHTML = QuickSiteUtils.htmlSpinner() + ' ' + (common.loading || 'Switching...');
             try {
-                // C9 — the dashboard's project switch changes which project you EDIT
-                // (setSelectedProject), the SAME as the header picker; it does NOT change the
-                // served main (quicksite stays at the site root).
-                const result = await QuickSiteAdmin.apiRequest('setSelectedProject', 'POST', { project: newProject });
+                // C9 — the dashboard's project switch changes which project you EDIT,
+                // the SAME as the header picker; it does NOT change the served main
+                // (quicksite stays at the site root). Panel state, not a command.
+                const result = await QuickSiteAdmin.setSelectedProject(newProject);
                 if (result.ok) {
                     QuickSiteAdmin.showToast((proj.switched || 'Switched to project') + ': ' + newProject, 'success');
                     window.location.href = window.location.pathname + '?t=' + Date.now();

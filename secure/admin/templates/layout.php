@@ -57,9 +57,11 @@ $myProjectIds = [];
 // Does THIS account see operator notices? (secure/management/config/operator.php,
 // written at first run — §2.6.) A DISPLAY PREFERENCE AND NOTHING ELSE: it gates
 // whether the update banner renders, and no other decision anywhere reads it.
-// checkForUpdates keeps the permissions it always had, so this neither grants nor
-// withholds any capability — which is what stops it becoming the installation-wide
-// principal beta.10 deliberately removed.
+// The update check keeps the permissions it always had (any authenticated caller),
+// so this neither grants nor withholds any capability — which is what stops it
+// becoming the installation-wide principal beta.10 deliberately removed. beta.11 S6
+// moved it off the command surface to /admin/api's update-check arm; that changed
+// where it lives, not who may call it.
 // DEFAULT-ON-ABSENT: qs_operator_ids() reads a missing or malformed file as
 // "nobody", never "everybody".
 $isOperator = false;
@@ -395,8 +397,8 @@ $langNames = [
         <div class="admin-header__actions">
             <?php
             // EDITED-project picker: which project this user is authoring right now
-            // (= getCurrentProject = their per-user selected_project). Changing it calls
-            // setSelectedProject — see the handler at the bottom of this file.
+            // (= getCurrentProject = their per-user selected_project). Changing it writes
+            // that pointer through /admin/state — see the handler at the bottom of this file.
             // Single-project users see a plain badge; multi-project users get the dropdown.
             $editingProject = $currentProject;
             ?>
@@ -603,8 +605,8 @@ $langNames = [
             currentProject: <?= json_encode($currentProject) ?>,
             globalCommands: <?= json_encode($globalCommands) ?>,
             // Operator notices — a DISPLAY flag, never an authorization input.
-            // No version is emitted here: the notice gets both versions from
-            // checkForUpdates' own response, and putting the engine version into
+            // No version is emitted here: the notice gets both versions from the
+            // update-check arm's own response, and putting the engine version into
             // every account's page is the fingerprinting §2.6 objects to.
             isOperator: <?= $isOperator ? 'true' : 'false' ?>,
             defaultLang: '<?= CONFIG['LANGUAGE_DEFAULT'] ?? 'en' ?>',
@@ -725,7 +727,7 @@ $langNames = [
     <?php if ($isOperator): ?>
     <!-- Operator update notice (§2.6) — emitted ONLY for an account named in
          operator.php, so a non-operator never downloads it at all. After
-         admin.js, which is where QuickSiteAdmin.apiRequest comes from. -->
+         js/core/api.js, which is where QuickSiteAPI.fetchHelper comes from. -->
     <script src="<?= $versionedAsset('/js/core/update-notice.js') ?>"></script>
     <?php endif; ?>
     
@@ -736,18 +738,19 @@ $langNames = [
 
     <script>
     (function () {
-        // C9 — the header project picker switches which project you EDIT (setSelectedProject).
-        // It does NOT change the main/served project (quicksite stays at the site root). The
-        // dashboard's project switch calls the same command. Editing the main → the site root;
-        // editing any other project → surface B (/p/<id>/). apiRequest RESOLVES with a
-        // {status, code, message} object (it does NOT reject on non-2xx) — branch on status.
+        // C9 — the header project picker switches which project you EDIT. It does NOT
+        // change the main/served project (quicksite stays at the site root). The
+        // dashboard's project switch calls the same thing. Editing the main → the site
+        // root; editing any other project → surface B (/p/<id>/). setSelectedProject
+        // RESOLVES with a {ok, status, data} object (it does NOT reject on non-2xx) —
+        // branch on ok. It is panel state, not a command, so it goes to /admin/state.
         var picker = document.getElementById('admin-project-picker');
         if (picker) {
             picker.addEventListener('change', function () {
                 var project = picker.value;
                 if (!project) { return; }
                 picker.disabled = true;
-                QuickSiteAdmin.apiRequest('setSelectedProject', 'POST', { project: project })
+                QuickSiteAdmin.setSelectedProject(project)
                     .then(function (res) {
                         if (res && res.ok) {
                             // Cache-busted navigation (NOT reload()) — Firefox can restore the

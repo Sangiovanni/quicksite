@@ -174,7 +174,7 @@ window.QuickSiteAPI = (function() {
     // authenticate + list/create projects. The emitted set is authoritative.
     const FALLBACK_GLOBAL_COMMANDS = [
         'help', 'getMyPermissions', 'listRoles', 'listProjects',
-        'createProject', 'checkForUpdates'
+        'createProject'
     ];
 
     function globalCommandSet() {
@@ -705,6 +705,50 @@ window.QuickSiteAPI = (function() {
         throw new Error((result && (result.error || result.message)) || 'Failed to fetch data');
     }
 
+    /**
+     * Change which project THIS user's panel edits (their `selected_project`).
+     *
+     * NOT a command. The command surface is a CLI for developing a project;
+     * which project a person has open is a fact about the panel, so it is
+     * served by /admin/state — its own endpoint, because /admin/api is
+     * read-only. Membership is still enforced server-side: selecting a project
+     * you are not a member of is refused, and the value is never an
+     * authorization input (every request re-authorizes against the URL project).
+     *
+     * Resolves with the same {ok, status, data} shape request() uses, so a
+     * caller branches on `res.ok` and reads `res.data.message` exactly as it
+     * did when this was a management command.
+     *
+     * @param {string} projectId
+     * @returns {Promise<{ok: boolean, status: number, data: Object|null}>}
+     */
+    async function setSelectedProject(projectId) {
+        const token = getToken();
+        if (!token) {
+            return clientError('client.no_token', 'No authentication token', 401);
+        }
+
+        try {
+            const response = await fetch(`${config.adminBase}/state/selected-project`, {
+                method: 'POST',
+                credentials: 'same-origin',   // the session cookie is the credential
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ project: projectId })
+            });
+            return {
+                ok: response.ok,
+                status: response.status,
+                data: await readResponseBody(response)
+            };
+        } catch (error) {
+            console.error('Panel state request error:', error);
+            return clientError('client.network_error', error.message || 'Network error', 0);
+        }
+    }
+
     // ============================================
     // Public API
     // ============================================
@@ -736,6 +780,9 @@ window.QuickSiteAPI = (function() {
         downloadFile,
         fetchHelper,
         helperPath,
+
+        // Panel state (/admin/state) — not commands. See setSelectedProject.
+        setSelectedProject,
 
         // For the few places that must hand-roll a fetch (importProject is
         // GLOBAL, so upload()'s marker path does not fit it). Exported so they

@@ -465,6 +465,23 @@ const QuickSiteAdmin = {
     },
 
     /**
+     * Change which project this user's panel edits - delegates to QuickSiteAPI.
+     *
+     * NOT a command: the command surface is a CLI for developing a project, and
+     * which project somebody has open is panel state. It goes to /admin/state,
+     * and resolves with the same {ok, status, data} shape apiRequest uses, so
+     * every caller branches on res.ok exactly as before.
+     *
+     * @returns {Promise<{ok: boolean, status: number, data: Object|null}>}
+     */
+    async setSelectedProject(projectId) {
+        if (window.QuickSiteAPI) {
+            return window.QuickSiteAPI.setSelectedProject(projectId);
+        }
+        return { ok: false, status: 0, data: { message: 'Project switching unavailable: QuickSiteAPI not loaded' } };
+    },
+
+    /**
      * Make an API request with file upload - delegates to QuickSiteAPI
      */
     async apiUpload(command, formData, urlParams = []) {

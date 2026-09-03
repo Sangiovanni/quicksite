@@ -327,7 +327,7 @@ $GLOBALS['__help_commands'] = [
             'message' => 'Build completed successfully',
             'data' => [
                 'build_name' => 'build_20251206_143022',
-                'build_path' => '<project>/qs_build/build_20251206_143022',
+                'build_path' => 'qs_build/build_20251206_143022',
                 'build_size_mb' => 2.24,
                 'total_pages' => 7,
                 'entry_point_written' => true,
@@ -3719,33 +3719,6 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [],
         'notes' => 'Projects are ordered largest-first. Sizes come from a short-lived shared cache (default TTL 300s); the project SET is never cached, so gaining, losing, creating or deleting a project is reflected immediately and only byte counts can age — use refresh=true to force a re-walk. Names of backups or exports are never returned, only sizes and counts. For the currently-edited project alone (including its backup list), use getSizeInfo, which is project-scoped.'
-    ],
-
-    'setSelectedProject' => [
-        'description' => 'Sets the CALLER\'s per-user editing target (selected_project) — the project their admin panel edits (header picker/badge, visual editor, preview). Global-scoped (no /management/p/<id>/ marker). Which project a DEPLOYMENT serves at a domain is a web-server mapping, not a QuickSite command.',
-        'method' => 'POST',
-        'parameters' => [
-            'project' => 'string (required) — project id to edit; the caller MUST be a member of it',
-        ],
-        'example_post' => 'POST /management/setSelectedProject  {"project":"my-site"}',
-        'success_response' => [
-            'status' => 200,
-            'code' => 'operation.success',
-            'message' => "Now editing project 'my-site'",
-            'data' => [
-                'selected_project' => 'my-site',
-                'role' => 'owner',
-            ],
-        ],
-        'error_responses' => [
-            '400.validation.missing_field' => 'project is required',
-            '400.project.invalid' => 'project id fails the path-safety format',
-            '401.auth.required' => 'not authenticated',
-            '403.authz.not_a_member' => 'caller is not a member of the target project',
-            '500.server.file_write_failed' => 'failed to persist selected_project',
-            '404.resource.not_found' => 'User record not found.'
-        ],
-        'notes' => 'selected_project is a UX default, never an authz input — the dispatcher re-authorizes every request against the URL project + members.json. Refuses non-member projects so the panel never opens a project it cannot edit.'
     ],
 
     'createProject' => [
@@ -7216,34 +7189,6 @@ $GLOBALS['__help_commands'] = [
         'notes' => 'Writes to both the live public stylesheet and the project backup in <secure>/projects/. Includes :root variables referenced by injected rules. In "replace" mode, only global-scope rules are removed (media query rules are left untouched).'
     ],
 
-    'checkForUpdates' => [
-        'description' => 'Checks if a newer version of QuickSite is available on GitHub. Compares the local VERSION file against the latest release/tag.',
-        'method' => 'GET',
-        'parameters' => [],
-        'example_get' => 'GET /management/checkForUpdates',
-        'success_response' => [
-            'status' => 200,
-            'code' => 'update_check.success',
-            'message' => 'Update available: 1.1.0-beta.1 (you have 1.0.0-beta.1)',
-            'data' => [
-                'current_version' => '1.0.0-beta.1',
-                'latest_version' => '1.1.0-beta.1',
-                'latest_tag' => 'v1.1.0-beta.1',
-                'update_available' => true,
-                'checked' => true,
-                'install_method' => 'git',
-                'release_url' => 'https://github.com/Sangiovanni/quicksite/releases/tag/v1.1.0-beta.1',
-                'release_notes' => 'Bug fixes and improvements...',
-                'published_at' => '2026-01-15T10:00:00Z'
-            ]
-        ],
-        'error_responses' => [
-            '500.update_check.no_local_version' => 'VERSION file missing or empty at project root',
-            '200.update_check.unable_to_reach' => 'Could not reach GitHub to check for updates. You may be offline or rate-limited.'
-        ],
-        'notes' => 'Read-only check — does not modify anything. Uses GitHub REST API (no auth required for public repos). Auto-detects install method (git clone vs ZIP download). When GitHub is unreachable, returns checked=false with current version info.'
-    ],
-
     'getIframeSandbox' => [
         'description' => 'Returns the embed sandbox configuration for the project in the URL marker. Shows tag-based rules (tag → domain → sandbox permissions) and the default sandbox policy.',
         'method' => 'GET',
@@ -7445,7 +7390,14 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
             'commands' => $commands,
             'commandsList' => $commandsList,
             'total' => count($commands),
-            'base_url' => rtrim(BASE_URL, '/') . '/management',
+            // NAMES the constant, never its value. `help` answers before
+            // authentication and must read identically on every installation, so
+            // it states no deployment-specific fact: not the request origin, not
+            // the folder space, not a resolved path. Also removes the last piece
+            // of request-derived text in this payload — every byte below is a
+            // compile-time literal, so nothing a caller sends can be reflected.
+            'base_url' => '<PUBLIC_FOLDER_SPACE>/management',
+            'base_url_note' => 'A placeholder, not a literal path: PUBLIC_FOLDER_SPACE is the subdirectory this installation serves its public files from, and it is empty by default. Compose requests against the origin and folder space you already used to reach this endpoint.',
             'command_surface' => [
                 'routed' => count($surface['routed']),
                 'documented' => count($documented),
@@ -7496,7 +7448,7 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'alias_workflow' => '1) listAliases to see existing redirects, 2) createAlias to add URL redirects, 3) deleteAlias to remove redirects.',
                 'component_workflow' => '1) listComponents to see available reusable components, 2) getComponent?name=... to view full details with preview, 3) editStructure with type="component" to create/update/delete.',
                 'sitemap_workflow' => '1) getSiteMap for JSON data with route details and coverage, 2) getSiteMap/text to generate plain text sitemap.txt for SEO crawlers.',
-                'project_workflow' => '1) listProjects to see the projects you are a member of, 2) setSelectedProject to change which one you EDIT (your per-user target; every project is edited, previewed and served at /p/<projectId>/), 3) createProject to start a new one, 4) deleteProject to remove (requires confirm=true). No project is privileged: which project a production domain serves is a web-server mapping, not a command.',
+                'project_workflow' => '1) listProjects to see the projects you are a member of, 2) createProject to start a new one, 3) deleteProject to remove (requires confirm=true). There is no current project to set: every other project command names its target in the URL marker (/management/p/<projectId>/<command>), and every project is edited, previewed and served at /p/<projectId>/. No project is privileged - which project a production domain serves is a web-server mapping, not a command.',
                 'membership_workflow' => '1) findUser to confirm the {user_id, name} pair by public display name, 2) inviteMember (admin/owner, by user_id) to offer a role, 3) the invitee sees it in listMyInvitations and answers with acceptInvitation or declineInvitation, 4) manage the roster with listMembers / changeMemberRole / removeMember (cancelInvitation to withdraw an offer), 5) transferOwnership (owner-only, member target, confirm=true) to rotate the top role, 6) leaveProject to exit yourself, dismissProjectNotice to clear a refused/removed/deleted notice.',
                 'join_request_workflow' => 'Front door (setJoinPolicy open): an outsider runs requestToJoin {project, note} (mandatory note, fixed viewer ask) and tracks it in listMyInvitations requests[]; admins/owner see it in listMembers (direction "request") and answer with approveJoinRequest (member immediately) or denyJoinRequest {note} (dismissable refused notice; re-request blocked until dismissed); withdrawJoinRequest retracts your own ask silently. Sponsor lane (any member, policy-independent): proposeMember {user_id, role, note} - the person learns NOTHING until approveJoinRequest converts it into a real invitation (by = approver, sponsored_by = you), which they accept/decline as usual; denyJoinRequest removes it silently on their side.',
                 'backup_workflow' => '1) backupProject to create instant backup, 2) listBackups to see available backups with size/age info, 3) restoreBackup to restore from backup (optional pre-restore backup), 4) deleteBackup to free disk space.',

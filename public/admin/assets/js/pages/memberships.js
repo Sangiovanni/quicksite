@@ -2,9 +2,10 @@
  * My Memberships page (C8 8.3c) — the caller's own membership surface.
  *
  * Calls listProjects / listMyInvitations / listMyProposals plus the
- * self-service verbs (accept/decline/leave/withdraw/dismiss/requestToJoin,
- * setSelectedProject) via QuickSiteAdmin.apiRequest — all GLOBAL commands,
- * so a 0-membership account gets a clean page, never 403 noise.
+ * self-service verbs (accept/decline/leave/withdraw/dismiss/requestToJoin) via
+ * QuickSiteAdmin.apiRequest — all GLOBAL commands, so a 0-membership account
+ * gets a clean page, never 403 noise. Switching which project you EDIT is not a
+ * command at all (panel state — QuickSiteAdmin.setSelectedProject).
  *
  * Built with QSDom.el + named _render* helpers (one Element each) per the
  * CLAUDE.md HTML-in-JS hygiene rule. No innerHTML string-glueing.
@@ -31,6 +32,15 @@
             return Promise.reject(new Error('QuickSiteAdmin not available'));
         }
         return admin.apiRequest(cmd, method, body);
+    }
+
+    // Panel state, not a command — same {ok, status, data} shape as api().
+    function selectProject(project) {
+        var admin = window.QuickSiteAdmin;
+        if (!admin || typeof admin.setSelectedProject !== 'function') {
+            return Promise.reject(new Error('QuickSiteAdmin not available'));
+        }
+        return admin.setSelectedProject(project);
     }
 
     function toast(message, type) {
@@ -187,7 +197,7 @@
 
     function onEditProject(project, btn) {
         if (btn) btn.disabled = true;
-        api('setSelectedProject', 'POST', { project: project }).then(function (res) {
+        selectProject(project).then(function (res) {
             if (res && res.ok) {
                 // Cache-busted navigation (not reload()) — same bfcache-safe
                 // pattern as the header picker and the dashboard switch.
@@ -203,8 +213,8 @@
      * Open the builds page FOR THIS ROW'S PROJECT.
      *
      * The builds page acts on the edited project, so a row that is not the
-     * edited one has to switch first — same setSelectedProject the Edit button
-     * uses. Switching only to land on a page the user did not ask for would be
+     * edited one has to switch first — the same panel-state write the Edit
+     * button uses. Switching only to land on a page the user did not ask for would be
      * a surprise, which is why the navigation goes straight to builds rather
      * than reloading this page.
      */
@@ -215,7 +225,7 @@
             return;
         }
         if (btn) btn.disabled = true;
-        api('setSelectedProject', 'POST', { project: project }).then(function (res) {
+        selectProject(project).then(function (res) {
             if (res && res.ok) {
                 window.location.href = url;
             } else {
