@@ -166,15 +166,6 @@ function getCommandCategories(): array {
             'icon' => 'history',
             'commands' => ['getCommandHistory', 'clearCommandHistory']
         ],
-        'role_management' => [
-            'label' => 'Roles & Permissions',
-            'icon' => 'shield',
-            // listRoles / getMyPermissions left the command surface in beta.11 S6:
-            // reading the role catalogue and your own effective role is
-            // authorization introspection about an ACCOUNT, not project
-            // development. Both are served by /admin/self.
-            'commands' => ['createRole', 'editRole', 'deleteRole']
-        ],
         // C5b session lifecycle. (This slot previously held the removed
         // generateToken/listTokens/revokeToken trio under a duplicate
         // 'authentication' key that the OAuth block below silently clobbered —

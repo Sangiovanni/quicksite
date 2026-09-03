@@ -61,8 +61,11 @@ function loadRolesConfig(): array {
 /**
  * The ONLY global `access` values that GRANT. A global category declaring anything
  * else is denied by hasPermission — deliberately, so no future category can opt
- * into a target-independent global grant. ('none' is the explicit deny used by the
- * `disabled` category; it is a legal declaration but never grants.)
+ * into a target-independent global grant. ('none' is the explicit spelling of that
+ * deny — a legal declaration that never grants. No category declares it today: the
+ * `disabled` category that did was deleted in beta.11 S6 with the three role
+ * commands it held. The deny is not a branch, it is this allowlist's fail-closed
+ * default, so it still covers any category that declares a value by mistake.)
  *
  * RETIRED — 'owner' (C8 8.5). It resolved as resolveEffectiveRole($user) === 'owner',
  * which returns the role on the user's selected project or else the first cached

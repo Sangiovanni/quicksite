@@ -300,17 +300,18 @@ return [
     // enforced for the project pointer). Their categories were deleted rather than
     // left empty: the routes.php <-> categories.php 1:1 invariant cannot see an
     // empty category and the /admin/command UI cannot use one.
+    //
+    // AND WITH THEM, beta.11 S6: the 'disabled' category and the three commands it held
+    // (createRole / editRole / deleteRole). The role set is FIXED — roles.php.example
+    // says so in its own header — so custom-role management implemented a feature that
+    // had been withdrawn. The category declared access 'none' and no role granted it,
+    // so nothing could reach the three; they were vestigial pending a command-surface
+    // decision, and this is that decision. Deleted rather than left denied: an
+    // unreachable command is still a name the dispatcher resolves and a spec `help`
+    // must carry.
+    //
     // Global categories may only declare an access in QS_GLOBAL_ACCESS_GRANTING
-    // ('any') or the explicit deny 'none' — see AuthManagement.php.
-
-    // DISABLED — denied to everyone ('none' is not a granting rule → hasPermission
-    // returns false). Custom-role management has no place in the fixed-role model
-    // (L8); editRole additionally fatals on the category-based roles.php shape. These
-    // are vestigial pending C8's command-surface decision (remove or reconceive).
-    // Mapped here (not left unmapped) so the deny is explicit + documented.
-    'disabled' => [
-        'scope' => 'global',
-        'access' => 'none',
-        'commands' => ['createRole', 'editRole', 'deleteRole'],
-    ],
+    // ('any') or the explicit deny 'none' — see AuthManagement.php. No category
+    // declares 'none' today; the deny is not a branch but the fail-closed default of
+    // the allowlist, so it protects every future mis-declared global category.
 ];
