@@ -33,7 +33,7 @@ QuickSite separates concerns into three top-level layers. Each one has a clear b
                ┌──────────────────────┐
                │      public/         │  Apache DocumentRoot only
                │init.php · p/index.php│
-               │  admin/ · style/ · …│
+               │ admin/ · management/ │
                └──────────┬───────────┘
                           │ require_once
                           ▼
@@ -61,11 +61,12 @@ secure/projects/{name}/
 ├── config/              # members.json — owner, visibility, join policy, roster
 ├── routes.php           # ['home' => …, 'about' => …, 'docs/install' => …]
 ├── templates/
-│   ├── model/json/      # Source of truth: JSON structure per page
-│   ├── pages/           # (build only) compiled PHP templates
-│   ├── menu.json
-│   ├── footer.json
-│   └── components/      # Reusable JSON components
+│   ├── model/json/      # Source of truth: the JSON
+│   │   ├── pages/       # One folder per route
+│   │   ├── components/  # Reusable JSON components
+│   │   ├── menu.json
+│   │   └── footer.json
+│   └── pages/           # One thin PHP loader per route, included per request
 ├── translate/           # en.json, fr.json, … (or default.json mono-lang)
 ├── data/                # Aliases, metadata, API endpoints, state stores, resolvers
 ├── public/              # What /p/<name>/ serves
@@ -119,7 +120,7 @@ Page structure is JSON rather than HTML for a handful of pragmatic reasons:
 | Raw text | `{ textKey: "__RAW__…" }` | Literal, never translated. |
 | Component | `{ component, data? }` | Inlines a component's JSON, with `{{var}}` interpolation. The reference is a bare component **name**, never a path — see §8.7. |
 
-Attributes also accept a `{ condition, value }` shape for conditional rendering of a single attribute (evaluated server-side at render time).
+An attribute value is a scalar. An array is not a value an attribute can carry: the renderer and the compiler both drop it.
 
 #### Special prefixes & placeholders
 
@@ -212,7 +213,7 @@ Authorization is **per project**. Each project's `config/members.json` assigns i
 | `designer` | 3 | styles, CSS variables, animations, theme |
 | `developer` | 4 | builds + server-side route resolvers |
 | `admin` | 5 | deploy, API / OAuth config, iframe sandbox, backup / export, command history; manage members (invite, adjudicate join requests, join policy) |
-| `owner` | 6 | delete the project + transfer ownership; the single top of the project, cannot be removed by others |
+| `owner` | 6 | set the project's visibility; delete the project + transfer ownership; the single top of the project, cannot be removed by others |
 
 > AI is not a permissioned column: AI calls happen in the browser via `QSAiCall` against per-user credentials in `aiConnectionsV3` (localStorage). Any authenticated admin can use the AI workspace; gating happens at the connection level, not the role level.
 
@@ -226,7 +227,7 @@ Membership can also start from the **other side**. With the project's `join_poli
 
 Most commands do one thing. `addComplexElement` is the exception: it's a single command that dispatches to a registry of **builders** auto-discovered from `secure/src/classes/complexElements/*.php`. Each builder is a `ComplexElementBuilder` subclass that turns a wizard-supplied config into a node spec (pure: config in → node out, no I/O), which the command then splices into the structure under one file lock by reusing `addNode`'s insertion helper.
 
-The pattern means new wizard kinds (field-row, form-scaffold, select, list — and future radio, checkbox, table, …) ship as a single PHP file drop. No `routes.php` / `roles.php` / `help.php` edits, no new commands. The dispatcher globs the directory at request time and registers every subclass by its declared `kind()`.
+The pattern means a new wizard kind ships as a single PHP file drop. No `routes.php` / `roles.php` / `help.php` edits, no new commands. The dispatcher globs the directory at request time and registers every subclass by its declared `kind()`.
 
 After save, the emitted subtree is indistinguishable from a hand-built one — same JSON shape, same renderer, editable with the regular visual-editor tools. The wizard is build-time only; nothing at render time knows the element came from there.
 
@@ -274,17 +275,17 @@ authoring install.
 GET /p/mysite/fr/about
   │
   ▼  Apache public/p/.htaccess → public/p/index.php
-fatal handler  (registered as soon as SECURE_FOLDER_PATH resolves, so the
-                gate below is already covered — §7, "Error + path disclosure")
-  │
-surfaceB  (runs first, before the rest of init.php)
-  ├── binds the project from the /p/<projectId>/ URL marker
-  ├── gates it by visibility + membership
-  └── sets BASE_URL from the validated request origin
-  │
 init.php  (install-wide constants — shared by every entry point)
   ├── defines PUBLIC_FOLDER_ROOT, SECURE_FOLDER_PATH, ADMIN_ASSET_ROOT
   └── project context is deferred; the request binds its own project
+  │
+fatal handler  (registered as soon as SECURE_FOLDER_PATH resolves, so the
+                gate below is already covered — §7, "Error + path disclosure")
+  │
+surfaceB  (runs before the rest of init.php)
+  ├── binds the project from the /p/<projectId>/ URL marker
+  ├── gates it by visibility + membership
+  └── sets BASE_URL from the validated request origin
   │
 qs_load_project_context(<projectId>)
   ├── loads project config.php → CONFIG
@@ -347,7 +348,7 @@ root, where the web server serves it directly.
 Because PHP is the one sending those bytes, it is also PHP that answers the questions a browser
 asks about them: the response carries a validator (`ETag`, `Last-Modified`) so a stale copy can be
 revalidated into a `304` rather than refetched, and `Accept-Ranges: bytes` with `206` responses to
-`Range`, so media can be seeked (§5.1). None of it is deployment-specific — it behaves the same on
+`Range`, so media can be seeked (§6). None of it is deployment-specific — it behaves the same on
 Apache and on nginx, and needs no server module or configuration.
 
 ### 5.2 Management API request
@@ -376,7 +377,7 @@ The same pattern — parse → validate → mutate files → `ApiResponse` — i
 
 ### 5.3 Routing — exact and parameterised routes
 
-A route declared in a project's `secure/management/routes.php` is one of:
+A route declared in a project's own `routes.php` is one of:
 
 - **Exact** — a literal path like `'about'` or `'blog/2026/announcement'`. Matches the URL bit-for-bit. The historical default; still the right choice for one-off pages.
 - **Parameterised** — a path with one or more `:name` segments, like `'products/:slug'` or `'users/:id/posts/:postId'`. One template serves many URLs; the captured values are exposed to PHP (`$slug`, `$id`) and to qs.js (`QS.routeParams.slug`).
@@ -393,20 +394,22 @@ NTFS reserves `:` in filenames, so the on-disk page folder stores the segment as
 
 #### Matching algorithm
 
-`secure/src/classes/TrimParameters.php` walks `ROUTES` for each incoming request and picks the **most specific** match:
+`ROUTES` is a tree: each segment is a key, and its children are the segments that may follow it. `secure/src/classes/TrimParameters.php` descends that tree one segment at a time, preferring the **more specific** branch at every level:
 
 1. Split the URL path into segments. Drop the language prefix if present.
-2. For each route in `ROUTES`, compare segments. A literal segment must equal the URL segment exactly; a `:name` segment captures whatever's there.
-3. **Score** each matching route by the count of literal (non-`:`) segments. The highest score wins.
-4. On a tie, the route declared first in `routes.php` wins.
+2. At each level, try the literal first: a key equal to the URL segment wins, and the walk descends into it.
+3. Failing that, take the first `:name` key declared at that level and capture the segment as that param.
+4. A level offering neither ends the walk, and so does a URL with segments still unconsumed — both are a 404. Routes are at most five segments deep, which `addRoute` enforces when the route is created.
 
-Worked example — three registered routes:
+The walk does not backtrack. Once it descends into a literal, a dead end further down is a 404 rather than a second attempt along that level's `:name` branch. So declaration order decides only between two `:name` siblings at the same level; a literal beats a param wherever the two compete, whichever was declared first.
 
-| Route | Score | `/shop/sale/clearance` | `/shop/sale/red-vase` | `/shop/winter/jacket` |
-|---|---|---|---|---|
-| `shop/sale/clearance` | 3 | matches → wins | doesn't match | doesn't match |
-| `shop/sale/:item` | 2 | matches | matches → wins | doesn't match |
-| `shop/:cat/:item` | 1 | matches | matches | matches → wins |
+Worked example — three registered routes: `shop/sale/clearance`, `shop/sale/:item` and `shop/:cat/:item`.
+
+| URL | How the walk goes | Serves |
+|---|---|---|
+| `/shop/sale/clearance` | `shop`, `sale`, `clearance` — literal at every level | `shop/sale/clearance` |
+| `/shop/sale/red-vase` | `shop`, `sale` literal; no literal child for `red-vase`, so `:item` captures it | `shop/sale/:item` |
+| `/shop/winter/jacket` | `shop` literal; no `winter` child, so `:cat` captures it, then `:item` | `shop/:cat/:item` |
 
 Captured values are URL-decoded before exposure, matching PHP's `$_GET` convention: `/products/red%20vase` exposes `slug = 'red vase'`.
 
@@ -417,9 +420,9 @@ Captured values are URL-decoded before exposure, matching PHP's `$_GET` conventi
 
 #### Conflict detection
 
-`addRoute` runs the same matcher against the existing route set when creating or editing a route. It **blocks** exact duplicates, and **warns** in two cases:
+`addRoute` inspects the existing route set as it creates a route. It **blocks** exact duplicates, and **warns** in two cases:
 
-- Param route added at a level that has exact siblings — e.g. registering `/products/:slug` when `/products/featured` already exists. The legitimate "curated landing + param catch-all" pattern every CMS supports. Runtime is safe via specificity scoring; the warn surfaces intent.
+- Param route added at a level that has exact siblings — e.g. registering `/products/:slug` when `/products/featured` already exists. The legitimate "curated landing + param catch-all" pattern every CMS supports. Runtime is safe because the literal wins at that level; the warn surfaces intent.
 - Two param routes at the same depth — e.g. `/products/:slug` and `/products/:id`. Ambiguous which name captures a given URL segment; declaration order decides at runtime.
 
 The response carries a `warnings` array of `{ type, message }` entries. The sitemap UI renders each warning as a toast after the success toast.
@@ -522,11 +525,8 @@ Other layered protections:
 ### 7.1 Content-Security-Policy — one policy, every surface that serves a page
 
 `secure/src/functions/contentSecurityPolicy.php` composes it; `/p/<projectId>/`
-and a built site both call it, and a build carries the file. There was one
-writer and two surfaces before: the preview sent a full policy and **a built
-site sent none at all** — no `object-src`, no `base-uri`, no `frame-ancestors`
-and no `script-src` restriction — so the artifact a visitor actually reaches was
-the less protected of the two.
+and a built site both call it, and a build carries the file. One writer, so the
+artifact a visitor actually reaches is protected exactly as the preview is.
 
 The line is drawn by what a resource can **do**, not by where it comes from.
 
@@ -549,9 +549,7 @@ than tightening it silently.
 
 **`connect-src` is derived from the project's API registry** — `'self'` plus the
 origin of every registered API with at least one client-callable endpoint, and
-nothing else. A fixed `'self'` blocked every browser-side call an author had
-registered, which is the entire client half of the API registry. Deriving it
-means registering an API is what declares that the site talks to it; a
+nothing else. Registering an API is what declares that the site talks to it; a
 server-only API, whose endpoints never reach the browser, never widens the
 policy, because the same `qs_api_effective_callable_from()` filters both the
 allowlist and the compiled client config. Only the origin is emitted, and a base
