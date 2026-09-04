@@ -646,7 +646,7 @@ The renderer resolves translation keys at compile time so the rendered HTML carr
 
 Two parallel resolution paths in `CallTransformer` (`buildCallJs`):
 
-1. **Keyword-arg path** (the original) — a `TRANSLATABLE_KEYWORD_ARGS` const lists per-verb kwarg names. The first consumer was `fetch`'s `toastSuccessKey` / `toastErrorKey`. Pattern: `{{call:fetch:@api/ep,toastSuccessKey=form.contact.success}}` → resolved kwarg value substituted in the rendered call.
+1. **Keyword-arg path** — a `TRANSLATABLE_KEYWORD_ARGS` const lists per-verb kwarg names; its only consumer is `fetch`'s `toastSuccessKey` / `toastErrorKey`. Pattern: `{{call:fetch:@api/ep,toastSuccessKey=form.contact.success}}` → resolved kwarg value substituted in the rendered call.
 
 2. **Positional-arg path** (catalog-driven) — reads `qsVerbCatalog()` and collects positional indices flagged `inputType: 'translationKey'` per verb (cached per verb on first lookup). For each such arg in the chain, `Translator::translate(value)` is called; if the result is the missing marker (`{translation missing: <key>}`), the value passes through unchanged (the `allowFreeText` fallback path for raw Custom Text inputs).
 
@@ -744,8 +744,9 @@ the calling command can surface warnings in the API response.
 | serving `/p/<id>/` | when an artifact is missing or stale | Rebuilds that project's registry from its own components + bindings before the page renders. |
 | `build` | after `writeCompiledJs` to the build folder | Writes `qs-enums.js` into the build's `scripts/` so deployed sites have the registry. |
 
-No component CRUD commands exist, so changes to a component's
-`__enums__` refresh on the next binding edit or on the next serve.
+Nothing resyncs when a component's `__enums__` block itself
+changes, so a change there takes effect on the next binding edit
+or the next serve.
 
 **Naming convention**
 
@@ -779,7 +780,7 @@ infinite scroll, and is the client half of the server-side data resolver
 |---|---|
 | Storage (per project, keyed by route then store id) | `secure/projects/<project>/data/state-stores.json` |
 | Server class | `secure/src/classes/StateStoreManager.php` |
-| Read / write commands | `getStateStores` (read) / `setStateStores` (editStructure) |
+| Read / write commands | `getStateStores` (read) / `setStateStores` (write) |
 | Runtime | `secure/src/runtime/qs.js` → `QS._stores`, `QS.setState`, `QS.getState`, `QS.fetchState` |
 | Page emit — live | `secure/src/classes/PageManagement.php` → `window.QS_STATE_STORES` |
 | Page emit — built | `secure/src/classes/JsonToPhpCompiler.php` → `Page.php` (baked inline at build) |
@@ -806,7 +807,7 @@ Definition shape:
 Each **field** declares a **direction** vs the endpoint — `request` (sent only),
 `response` (set from the response only), or `both` (sent from its current value,
 then updated from the response). Sent fields (`request` / `both`) carry an **init**
-(a literal, or a `query:`, `localStorage:` or `sessionStorage:` source) and a
+(a literal, or a `query:`, `param:`, `localStorage:` or `sessionStorage:` source) and a
 **default** fallback for when that source is missing. Received fields (`response` /
 `both`) carry a **from** response dot-path plus an optional **append** flag so a
 list field grows (infinite scroll) instead of replacing. The field name *is* the
@@ -847,6 +848,11 @@ DOM bindings (store → DOM, re-applied on init / `setState` / `fetchState`):
   `false` / `[]`). Use it to hide a "Next" button when the response's
   `nextPage` / `nextId` cursor is null at the last page, hide a "Load more"
   trigger when `hasMore` is false, gate a counter on `total > 0`, etc.
+- `data-state-show-empty="storeId.field"` — the inverse: visible when the field
+  is falsy. Pair it with `data-state-show` on the same field to carry a "no
+  data" fallback beside the happy path. It is also what a route using the
+  resolver's `onMiss: 'render-empty'` (§8.4) renders when the fetch fails and
+  the resolved variables come through empty.
 - `data-state-pagenav="storeId"` — a `<nav>` whose numbered-page buttons are
   rendered + re-rendered on every store update. Reads the configured
   `totalPages` field to size itself; writes the `page` field on click then
@@ -919,7 +925,7 @@ Multi-resolver semantics:
 The headline architectural payoff: state-store JSON and resolver JSON are
 **runtime-agnostic** — one shape, two executors. The same declaration that drives
 a client-side store can drive a server-side resolver with minor extensions (the
-`param:` source kind and the optional `cacheTTL` / `onMiss` keys).
+`session:` source kind and the optional `cacheTTL` / `onMiss` keys).
 
 **Auth gate vs auth data** — two distinct concepts that share a token/cookie
 but operate at different lifecycle positions:
@@ -998,25 +1004,25 @@ order and the content of every block are decided in one place.
 `window.QS_COUNT_STRINGS` is the block that exists because the artifact beside
 it cannot carry the value. A count binding in sentence format names three
 translation keys; `qs-api-config.js` is written once per **project**, so a
-sentence resolved into it is served to visitors of every language, and a
-bilingual site froze in whichever language last wrote the file — on the live
-surface and in a build alike. The keys are language-independent and stay in
+sentence resolved into it would be served to visitors of every language, and a
+bilingual site would answer in whichever language last wrote the file — on the
+live surface and in a build alike. The keys are language-independent and stay in
 the compiled config; the sentences are not, and ride the page instead. PHP
 remains the only translation engine either way.
 
 `window.QS_CONSENT` is the block where absence is meaningful rather than
 neutral: `qs.js` reads a missing value as "this project has no consent layer"
 and lets every storage write through. That is correct for a project that never
-configured one, and it is why a surface that simply forgot to emit the payload
-did not look broken — the gate failed open silently. A build now precomputes the
-payload (the live derivation walks the storage registry through authoring
+configured one, and it is why a surface that fails to emit the payload does not
+look broken: the gate simply fails open, silently. A build therefore precomputes
+the payload (the live derivation walks the storage registry through authoring
 helpers that do not belong in a deployed site) and ships it as data.
 
 ### 8.6 What a build carries, and what it does not
 
 A production build runs the same request-time engine the live surface runs; what
 it leaves behind is the code that EDITS a site rather than serves one. Several
-files were split along that line so both halves could not drift:
+files are split along that line so both halves cannot drift:
 
 | Authoring (install only) | Runtime (travels into a build) |
 |---|---|
@@ -1068,10 +1074,8 @@ two implementations of a single contract: **the same node must produce the same
 HTML on both surfaces**, minus editor-only emissions, which a build has no use
 for.
 
-Nothing enforced that until a differential harness was pointed at them, and the
-answer was that they disagreed about most of what an attribute can hold. The
-rules below are now shared or mirrored, and each names the surface that had it
-right.
+A differential harness holds them to it. Each rule below is shared outright or
+mirrored on both sides, and each says where its single definition lives.
 
 **Placeholders.** Four kinds, and they are substituted in a fixed order.
 
@@ -1089,11 +1093,11 @@ introduces is re-scanned as a placeholder.
 
 ⚠ **And substitution precedes the URL policy.** `UrlPolicy` has to inspect the
 value the browser will actually receive. Sanitising the literal placeholder and
-substituting afterwards let a route param carry a scheme past the check:
-`xlink:href="{{param:slug}}"` served from `/products/javascript:alert(1)` emitted
-the raw value, while the same literal authored directly is refused. Path-rewritten
-attributes survived only because the base was prefixed in front of the injected
-value.
+substituting afterwards would let a route param carry a scheme past the check:
+`xlink:href="{{param:slug}}"` served from `/products/javascript:alert(1)` would
+emit the raw value, while the same literal authored directly is refused. Only the
+base sitting in front of an injected value protects a path-rewritten attribute,
+which is protection by accident rather than by policy.
 
 The one exception is `{{__current_page;lang=xx}}`, the language switch: it
 resolves to a COMPLETE URL, so both surfaces recognise it *before* substituting
@@ -1111,9 +1115,9 @@ The rule has one home, `qs_resolve_component_placeholders()` in
 (below). Five readers ask it: the renderer, the compiler, the two preview
 commands (`getSnippet`, `getComponent`), and the snippet CSS extractor, which
 binds slots so the rules it captures are the ones the rendered page will use.
-The compiler was the surface that had this wrong — it alone did not accept the
-`{{$var}}` spelling, so a component written that way bound in the editor
-preview and shipped unbound in the build.
+Both spellings bind on both surfaces. A surface accepting only `{{var}}` would
+bind a component written with `{{$var}}` in the editor preview and ship it
+unbound in the build.
 
 **Attribute names.** A name is an *identifier*, not text. It may hold letters,
 digits, underscore, colon and hyphen and nothing else — `class`, `data-id`,
@@ -1129,10 +1133,9 @@ with an error rather than silently dropped later.
 A malformed name is dropped rather than escaped, because there is no encoding of
 one that means anything as an attribute. It matters more than tidiness: the
 compiler writes the name into a PHP string literal, so a name carrying a quote
-closed that literal and turned the remainder into executable PHP inside the
-compiled page — code that ran when the built site served the route. The renderer
-had always refused such names, so the two surfaces disagreed and the build was
-the weaker one.
+would close that literal and turn the remainder into executable PHP inside the
+compiled page — code that runs when the built site serves the route. The gate is
+the same on both surfaces precisely so the build cannot be the weaker one.
 
 The same principle governs every identifier the compiler emits. A component name
 and a page-title key are written as data — logged, or `var_export`ed into a
@@ -1175,17 +1178,19 @@ the rule existed.
 | a translation key in a translatable attribute | the translation |
 | `__RAW__` / `__LIT__` prefix | the prefix stripped, no translation |
 
-Arrays are dropped rather than interpreted. The conditional form
-(`{"condition": …, "value": …}`) was the only array shape either surface
-understood; no command writes one, no project authors one, and the editor has no
-control for it. The compiler emitted `htmlspecialchars(array(…))` for it — a
-TypeError at REQUEST time, so a built page answered `200` with a fatal in the
-body and everything after the offending tag missing.
+Arrays are dropped rather than interpreted. The whole class goes, not one shape
+of it: no command writes an array attribute, no project authors one, and the
+editor has no control for it, so interpreting any single shape would leave the
+two surfaces free to disagree about every other. Interpreting none is also what
+keeps a compiled page safe, since the compiler would otherwise emit
+`htmlspecialchars(array(…))` — a TypeError at REQUEST time, answering `200` with
+a fatal in the body and everything after the offending tag missing.
 
-**The system placeholders have one source**, `runtimePlaceholders.php`. The
-renderer derived them; the compiler GENERATED PHP that re-derived them into every
-page, with its own regexes for stripping the URL space and the language prefix
-and a hardcoded `(en|fr)` fallback. The language question already has one answer
+**The system placeholders have one source**, `runtimePlaceholders.php`, which
+both surfaces call rather than deriving the values for themselves. A compiled
+page that re-derived them would carry its own rules for stripping the URL space
+and the language prefix, and its own idea of what counts as a language code —
+three chances to drift from the live surface. The language question has one answer
 in `projectLanguage.php`, which travels into a build, so both surfaces ask it —
 which is also what makes a mono-language project safe: it answers "no language
 here", so a route legitimately named `en/` is not mistaken for a language prefix
@@ -1194,7 +1199,7 @@ and stripped.
 `{{__current_route}}` is always the leaf of `{{__current_page}}`, never a
 caller-supplied value: the renderer's context is populated differently by
 different callers (a page loader passes the whole route path, `PageManagement`
-passes the leaf), so honouring it made the same nested route report two
+passes the leaf), so honouring it would make the same nested route report two
 different things.
 
 ## 9. Style management
@@ -1209,6 +1214,8 @@ CSS is modelled as four addressable layers, all manipulated through commands rat
 | `@media` queries | `getStyleRule` / `setStyleRule` with a `mediaQuery` parameter (selectors and keyframes can be scoped) |
 
 `secure/src/classes/CssParser.php` parses the targeted project's CSS into an AST so any of those layers can be queried or mutated atomically.
+
+The stylesheet is also addressable as a whole: `getStyles` returns its text and `editStyles` replaces it. Use the layer commands to change one thing; use these two to read the sheet or to install one wholesale.
 
 ---
 
@@ -1254,9 +1261,9 @@ your-server/
 ```
 
 **The front controller is a real file, shipped verbatim.** It lives in the
-engine at `src/runtime/site/index.php` — the same directory as `qs.js`, which
-is the browser half of the same idea: code that runs on a *site* rather than in
-the engine. The build copies it and writes `qs-site.php` beside it; no PHP
+engine at `src/runtime/site/index.php`, in the same runtime tree as `qs.js`,
+which is the browser half of the same idea: code that runs on a *site* rather
+than in the engine. The build copies it and writes `qs-site.php` beside it; no PHP
 source is rewritten by pattern matching, so the entry point can be linted,
 grepped and opened on its own instead of existing only inside a build.
 
