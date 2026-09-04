@@ -117,6 +117,33 @@ const QS_LOG_SKIP_BODY_COMMANDS = [
 ];
 
 /**
+ * Global-scope commands whose records are DROPPED instead of written to the
+ * `_global` bucket (beta.11 S6.6).
+ *
+ * ⚠ THIS IS ABOUT SIGNAL, NOT SECRECY. Nothing here is sensitive; these are
+ * reads. The `_global` bucket has no reader — `getCommandHistory` requires an
+ * authorized project marker and there is deliberately no installation-wide view
+ * (see its own comment) — so a record written here is only ever seen by whoever
+ * holds the server's filesystem. That makes it worth writing for something an
+ * operator would go looking for, and worth not writing for a poll.
+ *
+ * WHAT STAYS, AND WHY THE LIST IS READS ONLY. `_global` also collects the
+ * project LIFECYCLE — createProject, importProject, and deleteProject rerouted
+ * here by writeLogEntry when the project's own directory is already gone. Those
+ * have nowhere else to live: the project does not exist yet, or no longer does.
+ * "Who deleted this project, and when" is exactly the question the bucket should
+ * still be able to answer, so lifecycle events are never dropped.
+ *
+ * `login` / `register` are absent because the dispatcher installs its logging
+ * callback after they have already answered — they are not logged today at all,
+ * and naming them here would imply this is what stops them.
+ */
+const QS_LOG_SKIP_GLOBAL_COMMANDS = [
+    'listProjects',
+    'help',
+];
+
+/**
  * Key names whose VALUE is a credential. Matched case-insensitively against every
  * key at every depth of a request body.
  *
@@ -204,6 +231,55 @@ function sanitizeLogBody(string $command, array $body): ?array {
 }
 
 /**
+ * Sanitize a command's REQUEST PARAMETERS for logging (beta.11 S6.6).
+ *
+ * ⚠ WHY THIS EXISTS. Until now the log recorded only the JSON body, and a large
+ * part of the command surface does not use one. `getStructure/pages/home` takes
+ * its arguments as URL path segments; `getCommandHistory?start_date=…` takes
+ * them as a query string. Both were recorded as an empty body, so the trail said
+ * *that* a command ran and never *what it was asked for* — which is most of what
+ * an auditor wants from a read.
+ *
+ * ONE FIELD, NOT ONE PER PARAMETER, and the two sources stay distinguishable
+ * inside it because they are shaped differently and collide if flattened:
+ *
+ *   url    positional path segments, in order  → a LIST
+ *   query  the query string                    → a MAP
+ *
+ * An empty source is omitted, so a command with no parameters logs `null` rather
+ * than a pair of empty containers.
+ *
+ * ⚠ REDACTION IS ASYMMETRIC HERE, AND THAT IS A CONSTRAINT ON FUTURE COMMANDS.
+ * `qs_log_redact_secrets` matches KEY NAMES. Query parameters have keys, so they
+ * go through it exactly like a body. **URL path segments are positional and have
+ * no keys, so nothing can match them** — a secret in a path segment would be
+ * logged verbatim. Today nothing is at risk: every `@url` parameter on the
+ * surface is an identifier (`{language}`, `{apiId}`, `{nodeId}`, `{selector}`,
+ * `{type}`, `{name}`, …) and no command takes a credential in its path. A command
+ * that ever does must be added to QS_LOG_SKIP_BODY_COMMANDS, which suppresses
+ * parameters as well as the body — that list is the one lever that covers both.
+ */
+function sanitizeLogParams(string $command, array $urlParams, array $query): ?array
+{
+    // A command whose body is too sensitive to record has parameters that are
+    // too sensitive to record. One list, both directions.
+    if (in_array($command, QS_LOG_SKIP_BODY_COMMANDS, true)) {
+        return null;
+    }
+
+    $out = [];
+    if ($urlParams !== []) {
+        // Positional and unkeyed: re-indexed so the JSON is an array, never an
+        // object with numeric-looking keys.
+        $out['url'] = array_values($urlParams);
+    }
+    if ($query !== []) {
+        $out['query'] = qs_log_redact_secrets($query);
+    }
+    return $out === [] ? null : $out;
+}
+
+/**
  * Create a log entry structure
  */
 function createLogEntry(
@@ -213,10 +289,12 @@ function createLogEntry(
     array $tokenInfo,
     int $httpStatus,
     string $responseCode,
-    float $startTime
+    float $startTime,
+    array $urlParams = [],
+    array $query = []
 ): array {
     $duration = round((microtime(true) - $startTime) * 1000, 2);
-    
+
     // Publisher identity (C5): the resolved user — the token no longer carries a
     // name, so we record the stable userId + display name.
     return [
@@ -224,6 +302,7 @@ function createLogEntry(
         'timestamp' => date('c'), // ISO 8601 format
         'command' => $command,
         'method' => $method,
+        'params' => sanitizeLogParams($command, $urlParams, $query),
         'body' => sanitizeLogBody($command, $body),
         'publisher' => [
             'user_id' => $tokenInfo['id'] ?? null,
@@ -318,7 +397,9 @@ function logCommand(
     int $httpStatus,
     string $responseCode,
     float $startTime,
-    ?string $project = null
+    ?string $project = null,
+    array $urlParams = [],
+    array $query = []
 ): bool {
     // Skip logging for read-only GET commands that don't modify anything
     // We still log them if they're successful for audit trail
@@ -327,7 +408,16 @@ function logCommand(
     if ($command === 'getCommandHistory') {
         return true;
     }
-    
+
+    // A global-scope READ headed for the reader-less `_global` bucket (S6.6).
+    // ⚠ Gated on the bucket, not on the name alone: if one of these ever became
+    // project-scoped, its records would belong in a project's history — which a
+    // person actually reads — and dropping them there would be a silent loss.
+    if (($project === null || $project === '')
+        && in_array($command, QS_LOG_SKIP_GLOBAL_COMMANDS, true)) {
+        return true;
+    }
+
     // Determine if this is a success response (2xx status codes)
     $isSuccess = $httpStatus >= 200 && $httpStatus < 300;
     
@@ -339,7 +429,10 @@ function logCommand(
         return true; // Not an error, just nothing to log
     }
     
-    $entry = createLogEntry($command, $method, $body, $tokenInfo, $httpStatus, $responseCode, $startTime);
+    $entry = createLogEntry(
+        $command, $method, $body, $tokenInfo, $httpStatus, $responseCode, $startTime,
+        $urlParams, $query
+    );
     return writeLogEntry($entry, $project);
 }
 

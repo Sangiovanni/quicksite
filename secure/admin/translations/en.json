@@ -537,6 +537,7 @@
             "timestamp": "Timestamp",
             "command": "Command",
             "method": "Method",
+            "user": "User",
             "status": "Status",
             "duration": "Duration",
             "details": "Details"
@@ -548,6 +549,8 @@
             "method": "Method",
             "duration": "Duration",
             "publisher": "Publisher",
+            "userId": "User ID",
+            "params": "Parameters",
             "requestBody": "Request Body",
             "response": "Response"
         },
@@ -557,6 +560,20 @@
         "clearHistory": "Clear History",
         "clearConfirm": "Are you sure you want to clear command history?",
         "export": "Export",
+        "exportCsv": "Export CSV",
+        "exportEmpty": "Nothing to export",
+        "clear": {
+            "intro": "Deletes stored command history for this project. This cannot be undone.",
+            "beforeLabel": "Delete whole days before",
+            "beforeHint": "History is stored one file per day and is deleted a whole day at a time. Days from this date onwards are kept, so today is never deleted.",
+            "confirmButton": "Delete permanently",
+            "pickDate": "Choose a date to see what would be deleted.",
+            "nothing": "Nothing to delete before that date.",
+            "noDays": "This project has no stored history at all.",
+            "storedDays": "Days currently stored:",
+            "dayGranularHint": "History is stored one file per day and is deleted a whole day at a time, so a day only disappears once the date you pick is after it. Today cannot be cleared.",
+            "done": "Command history cleared"
+        },
         "errors": {
             "loadFailed": "Failed to load history:"
         }

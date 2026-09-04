@@ -10862,3 +10862,93 @@ switches).
 `secure/admin/templates/pages/command.php`,
 `secure/admin/templates/layout.php`, `setup.sh`, `setup.bat`. Behaviour:
 [ADMIN_PANEL.md](ADMIN_PANEL.md) §9.17.
+
+### The `_global` log bucket keeps the project lifecycle and stops recording global reads (locked 2026-09-04)
+
+**Decision**: global-scope commands that only READ — `listProjects` and `help` —
+are no longer written to `secure/logs/_global/`. Everything else that lands there
+still does: `createProject`, `importProject`, `deleteProject` rerouted when the
+project's own directory is already gone, and `logoutSession`. The rule is a named
+list in `LoggingManagement.php`, applied only when the record is headed for the
+global bucket.
+
+**Reasoning**: `_global` had accumulated 6,805 records since July and **no command
+reads it**. `getCommandHistory` requires an authorized project marker, and an
+installation-wide view was considered and rejected — it would reintroduce the
+installation-wide principal beta.10 deliberately removed. So a record written
+there is only ever seen by whoever holds the server's filesystem. That makes it
+worth writing for something an operator would go looking for, and not worth
+writing for a poll the panel fires on every page load.
+
+The split fell cleanly along read versus mutate. The project lifecycle is the
+part with genuine value and no alternative home: the project does not exist yet
+when it is created, and no longer exists when it is deleted, so "who deleted this
+project, and when" can be answered nowhere else. `listProjects` answers a question
+and changes nothing.
+
+⚠ **This is a signal decision, not a privacy one.** Nothing in the dropped records
+is sensitive — credential-shaped values were already redacted before writing, and
+these are reads. What is gained is that what remains in the bucket is worth
+reading.
+
+⚠ **The measured volume overstated the live benefit, and the decision was taken on
+the rule rather than the number.** Of the 6,805 records, 2,886 came from fourteen
+commands that no longer exist — account and membership self-service left the
+command surface earlier in beta.11 — so that share had already stopped
+accumulating on its own. Among commands still routable, `listProjects` was the
+only read still writing. The change is small today and stays correct as the
+global surface grows.
+
+**Alternatives considered**: retention — rotate or expire after N days (rejected
+as the primary answer: QuickSite has no scheduler, so it would mean pruning on
+write, a cost on every global command, and it would delete lifecycle history that
+has no other home; it remains available to an operator as an ordinary server-log
+policy, which is what the docs already recommend). Stopping `_global` writes
+entirely (rejected — `deleteProject` would become unrecorded anywhere, which is
+the one event most worth keeping). Leaving it untouched (rejected — unbounded
+collection with no consumer is not a neutral default, and the noise was the part
+nobody would ever read). An installation-wide log reader (rejected by Sangio
+before the slice began, for the reason `operator.php.example` gives about itself:
+it refuses to become an authorization list, and a global reader would be one).
+
+**Source**: `secure/src/functions/LoggingManagement.php`
+(`QS_LOG_SKIP_GLOBAL_COMMANDS` and the bucket-gated check in `logCommand`).
+Behaviour: [COMMAND_API.md](COMMAND_API.md) (*The `_global` bucket*).
+
+### The command history is its own page, not a tab on the console (locked 2026-09-04)
+
+**Decision**: command history moved from a tab on `/admin/command` to its own
+route, `/admin/history`, with its own nav entry and its own server-side role gate
+(`AdminRouter::PAGE_PERMISSIONS` on `getCommandHistory`, which the `history`
+category grants to admin and owner). The old `?tab=history` URL redirects there.
+The page gained a CSV export and a clear control; the console page lost its
+two-tab strip.
+
+**Reasoning**: an audit trail should not be a sub-view of the thing it audits, and
+the console had just become optional — an installation can switch it off. That
+left the trail reachable only through a special case in the console's template
+and a single dashboard link, and left `clearCommandHistory` reachable *only*
+through the console's generic runner: an operator who turned the console off
+could read their history and never clear it. Both problems dissolve once history
+is a page in its own right rather than a guest on one.
+
+Its own route also buys a real gate. As a tab it inherited the console page's
+permissions, which are none — every authenticated caller reaches `/admin/command`.
+As a page it has `PAGE_PERMISSIONS` of its own, so a rank below admin is refused
+the page rather than shown a surface it cannot use.
+
+**Alternatives considered**: a nav entry pointing at the existing tab (rejected —
+it makes the trail easier to find without making it independent, and the entry
+would be chrome-hiding only, since the underlying page has no role gate). A
+promoted dashboard card (rejected as the primary answer — it competes with the
+activity card already there, and still leaves clearing unreachable with the
+console off; the dashboard link stays and now points at the route). Keeping the
+tab strip with History pointing at the new route (rejected — a one-item tab strip
+is noise, and a "tab" that navigates to a different page misdescribes the
+structure).
+
+**Source**: `secure/admin/templates/pages/history.php`,
+`public/admin/assets/js/pages/history.js`, `secure/admin/AdminRouter.php`
+(`$validPages`, `PAGE_PERMISSIONS`, the `?tab=history` redirect),
+`secure/admin/templates/layout.php`, `secure/admin/templates/pages/command.php`.
+Behaviour: [ADMIN_PANEL.md](ADMIN_PANEL.md) §9.18.

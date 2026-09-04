@@ -260,8 +260,18 @@ $requestBody = is_array($decodedBody) ? $decodedBody : [];
 // which logCommand routes to the write-only `_global` bucket.
 $logProject = ($commandScope === 'project') ? $requestedProject : null;
 
+// The command's REQUEST PARAMETERS, which are not in the body (beta.11 S6.6).
+// Much of the surface takes arguments as URL path segments
+// (`getStructure/pages/home`) or as a query string
+// (`getCommandHistory?start_date=…`), and until now neither reached the log —
+// so the trail recorded that a command ran without recording what it was asked
+// for. Captured here, beside the body, from the same parser the command itself
+// reads. Sanitised in sanitizeLogParams().
+$logUrlParams = $trimParametersManagement->additionalParams();
+$logQuery     = $_GET;
+
 // Set up logging callback
-ApiResponse::setBeforeSendCallback(function($status, $responseCode) use ($command, $currentUser, $commandStartTime, $requestBody, $logProject) {
+ApiResponse::setBeforeSendCallback(function($status, $responseCode) use ($command, $currentUser, $commandStartTime, $requestBody, $logProject, $logUrlParams, $logQuery) {
     logCommand(
         $command,
         $_SERVER['REQUEST_METHOD'],
@@ -270,7 +280,9 @@ ApiResponse::setBeforeSendCallback(function($status, $responseCode) use ($comman
         $status,
         $responseCode,
         $commandStartTime,
-        $logProject
+        $logProject,
+        $logUrlParams,
+        $logQuery
     );
 });
 

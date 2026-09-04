@@ -118,7 +118,7 @@ File lists are grouped by role. Where useful, the entry point or main exported f
 | `pages/account.js` | My Account page: change password, sign out everywhere, delete account (§9.13). |
 | `pages/command.js` | Command index list, permission-aware filter. |
 | `pages/command-form.js` | Dynamic per-command form, helper widgets, execution. |
-| `pages/history.js` | Command history listing + detail modal. |
+| `pages/history.js` | Command history listing, detail modal, CSV export, clear dialog (§9.18). |
 | `pages/settings.js` | User settings + AI config status. |
 | `pages/apis.js` | External API registry CRUD + endpoint test UI. |
 | `pages/assets.js` | Asset browser, upload, edit, delete. |
@@ -837,7 +837,7 @@ The AI call is browser-direct via `QSAiCall.call(...)` (see `public/admin/assets
 | **Dashboard** (`dashboard.js`) | Stats cards (route count, language count, recent build), command activity feed, recent history. Calls `help`, `getRoutes`, `getCommandHistory`. |
 | **Command** (`command.js`) | Permission-filtered command index. An installation can decline to offer the console at all — see §9.17. |
 | **Command form** (`command-form.js`) | Renders a dynamic form for any command from `help` metadata, then executes it. The escape hatch into raw API. Withheld with the rest of the console when the installation turns it off (§9.17). |
-| **History** (`history.js`) | Browses `getCommandHistory` for the **currently edited project** — the command history is per-project, so switching projects switches the trail. Modal with full request/response. Actions that belong to no project (signing in, creating a project, membership self-service) are recorded server-side but are not shown here; see *Command history storage* in `COMMAND_API.md`. |
+| **History** (`history.js`) | Its own page at `/admin/history` — see §9.18. Browses `getCommandHistory` for the **currently edited project**, exports what is on screen as CSV, and clears the stored trail. The command history is per-project, so switching projects switches the trail. Actions that belong to no project (creating a project, signing out) are recorded server-side but are not shown here; see *Command history storage* in `COMMAND_API.md`. Admin and owner only. |
 | **Settings** (`settings.js`) | User profile, language, theme, AI provider config status. |
 | **My account** (`account.js`) | The caller's own account — change password, sign out everywhere, delete the account. See §9.13. Commands: `logoutSession`. The password change and the deletion are not commands — they go to `/admin/self/change-password` and `/admin/self/delete`. |
 | **APIs** (`apis.js`) | External API registry — see §9.1. Commands: `listApiEndpoints`, `addApi`, `editApi`, `deleteApi`, `getApiEndpoint`, `testApiEndpoint`. |
@@ -3155,7 +3155,7 @@ Three routes, each gated on the same read the page is:
 
 ### 9.17 Command console (/admin/command)
 
-A form for every command in the Management API, generated from the same `help` metadata the API serves, plus a searchable index of them by category and a **History** tab over `getCommandHistory`. It is the escape hatch into the raw API from inside the panel: everything the purpose-built pages do, and everything they do not.
+A form for every command in the Management API, generated from the same `help` metadata the API serves, plus a searchable index of them by category. It is the escape hatch into the raw API from inside the panel: everything the purpose-built pages do, and everything they do not. Command history used to be a second tab here; it is now its own page (§9.18), and `/admin/command?tab=history` redirects there.
 
 #### An installation can decline to offer it
 
@@ -3178,11 +3178,47 @@ What turning it off removes is **discoverability and reach**: your users stop ho
 
 Withheld: the command index, the per-command form, and the panel's **Commands** navigation entry. `/admin/command` still answers `200` and says the operator turned the console off — deliberately not a `404`, because the page does exist, the gate is not a secret, and a `404` on a routed page sends the next person to debug routing.
 
-Not withheld: the **History** tab on that same page, and the dashboard's link to it. History is a record of what ran, not a way to run anything, and commands run constantly from the panel's own pages whether or not this console exists — removing the runner must not take the audit trail with it. `getCommandHistory` keeps its own role gate either way.
+Not withheld: **command history**, which is a separate page at `/admin/history` with its own role gate (§9.18). History is a record of what ran, not a way to run anything, and commands run constantly from the panel's own pages whether or not this console exists — switching off the runner must not take the audit trail with it.
 
 #### Changing it takes effect immediately
 
 The setting is read fresh on every request, and the read drops the file from the opcode cache first. An operator turning the console **off** sees it gone on their next page load, with no restart — including on an installation tuned with `opcache.validate_timestamps=0`, where a compiled config would otherwise never be re-read at all.
+
+### 9.18 Command history (/admin/history)
+
+What ran on this project, who ran it, and what came back. Reached from **Build → History** in the nav, and from the dashboard's activity card.
+
+**Admin and owner only.** The `history` category holds both commands, and the page is gated on `getCommandHistory` server-side — a lower rank is redirected to the dashboard rather than shown an empty page. The nav entry is filtered client-side on the same command, which hides the link; the page gate is what makes it unreachable.
+
+**It is per project.** `getCommandHistory` reads the project named by the URL marker, so switching the edited project switches the trail. There is no installation-wide view, deliberately — see *Command history storage* in `COMMAND_API.md`.
+
+#### The table
+
+Each row is one executed command: when, which command, the HTTP method, **who ran it**, whether it succeeded, and how long it took. The command name links into the console — unless the installation has the console switched off (§9.17), in which case it is plain text rather than a link to a page that would only say it is unavailable.
+
+"Who" is the account's display name, with the stable user id on hover; the detail view shows both separately, since a display name can change and a user id cannot.
+
+Opening a row shows **Parameters**, then the request body, then the response — credential-shaped values already redacted server-side before they were ever written. Parameters come first because for much of the command surface they *are* the request: `getStructure/page/home` and `getRoutes?verbose=1` carry no body at all, and a record for one of those would otherwise show an empty body and nothing else. The section is omitted entirely for a command that took no parameters.
+
+Filters narrow by date, by command name (substring), and by success or failure. The date defaults to today; clearing it widens to the last seven days.
+
+#### Export
+
+**Export CSV** downloads exactly what is on screen — the current filters and page, not a fresh unfiltered fetch — so the file matches the question you were asking. Columns: timestamp, command, method, user, user id, HTTP status, response code, duration, parameters, request body and response, the last three as JSON.
+
+The file is written to RFC 4180: every cell is quoted, internal quotes are doubled, and records end CRLF, so a request body containing commas, quotes or newlines still parses as one row. It carries a UTF-8 byte-order mark so spreadsheets open non-ASCII content correctly.
+
+A cell whose value would otherwise begin with `=`, `+`, `-`, `@`, tab or carriage return is prefixed with an apostrophe. Spreadsheets execute such a cell as a formula, and quoting does not prevent it — the CSV parser removes the quotes and the spreadsheet sees the bare value. A display name is chosen by the person who registered it, so this is a real path into a file an admin opens, not a theoretical one.
+
+#### Clearing
+
+**Clear history** deletes stored history for the current project. It is irreversible, so the dialog does not ask over an unknown quantity: choosing a date asks the command what it *would* delete and shows the answer — how many entries, in how many days, and how many kilobytes — and the confirm button stays disabled until that preview has come back.
+
+⚠ **A whole day at a time.** History is stored one file per day, and clearing removes whole days from **before** the chosen date. A day's date is the one in its **file name**, not the `timestamp` inside any record — so editing a record's timestamp does not move it into another day, and it cannot be cleared separately from the day it was written in.
+
+Today is always kept: the command refuses a future date and deletes strictly before the one given, so there is no way to clear the day in progress. On a project whose only stored day is today, clearing therefore has nothing to remove — which is why, when nothing matches, the dialog **lists the days that are actually stored** and says how the date is applied, instead of only reporting that there was nothing to delete.
+
+Clearing is available here whether or not the command console is switched on. That is the point of it being on this page: the same command is reachable through the console's generic runner, and an installation that has turned the console off would otherwise be able to read its history and never clear it.
 
 ## 10. Data attribute reference
 

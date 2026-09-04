@@ -72,6 +72,13 @@ if (empty($body['confirm']) || $body['confirm'] !== true) {
     $totalEntries = array_sum(array_column($toDelete, 'entries'));
     $totalSize = array_sum(array_column($toDelete, 'size_bytes'));
     
+    // ⚠ `stored_days` is every day the project HAS, not only the ones this call
+    // would remove (beta.11 S6.6). Without it a caller who is told "0 files"
+    // cannot tell whether they picked the wrong date or simply have nothing
+    // older — and the answer matters, because deletion is DAY-GRANULAR: the day
+    // comes from the FILE NAME, never from a record's own timestamp, so an
+    // install whose only file is today's has nothing any valid date can reach.
+    // Strictly less information than the history the caller can already read.
     ApiResponse::create(200, 'operation.preview')
         ->withMessage('Preview: Add "confirm": true to execute deletion')
         ->withData([
@@ -82,6 +89,7 @@ if (empty($body['confirm']) || $body['confirm'] !== true) {
                 'size_kb' => round($totalSize / 1024, 2)
             ],
             'dates_affected' => array_column($toDelete, 'date'),
+            'stored_days' => array_values($dates),
             'before_date' => $body['before']
         ])
         ->send();

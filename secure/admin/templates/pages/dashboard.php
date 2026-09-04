@@ -618,7 +618,7 @@ if (isset($_GET['denied'])): ?>
 <section class="admin-section" data-requires-command="getCommandHistory">
     <div class="admin-section__header">
         <h2 class="admin-section__title"><?= __admin('dashboard.recentCommands') ?></h2>
-        <a href="<?= $router->url('command') ?>?tab=history" class="admin-btn admin-btn--ghost">
+        <a href="<?= $router->url('history') ?>" class="admin-btn admin-btn--ghost">
             <?= __admin('dashboard.viewAllHistory') ?>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                 <polyline points="9 18 15 12 9 6"/>

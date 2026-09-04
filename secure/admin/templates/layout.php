@@ -167,7 +167,7 @@ $langNames = [
             // API Endpoints moved Settings → Build (N1): it's an authoring
             // surface used constantly during build (fetch picker, interactions,
             // component-list bindings), not a config setting.
-            $buildPages = ['workflows', 'command', 'preview', 'apis', 'builds'];
+            $buildPages = ['workflows', 'command', 'history', 'preview', 'apis', 'builds'];
             $settingsPages = ['settings', 'ai-settings', 'ai-connections', 'embed-security'];
             $compliancePages = ['storage', 'privacy'];
             $membersPages = ['memberships', 'members'];
@@ -227,6 +227,21 @@ $langNames = [
                         <span><?= __admin('nav.commands') ?></span>
                     </a>
                     <?php endif; ?>
+                    <?php /* S6.6 — command history, its own page since it stopped being a
+                             tab on the console. Not gated on the console: the trail is
+                             independent of the runner, and stays reachable when the
+                             operator turns the console off. data-requires-command hides
+                             it for ranks below admin, which is chrome-hiding only — the
+                             page itself is gated server-side in PAGE_PERMISSIONS. */ ?>
+                    <a href="<?= $router->url('history') ?>"
+                       class="admin-nav__link<?= $currentPage === 'history' ? ' admin-nav__link--active' : '' ?>"
+                       data-requires-command="getCommandHistory">
+                        <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <polyline points="12 6 12 12 16 14"/>
+                        </svg>
+                        <span><?= __admin('nav.history', 'History') ?></span>
+                    </a>
                     <a href="<?= $router->url('apis') ?>"
                        class="admin-nav__link<?= $currentPage === 'apis' ? ' admin-nav__link--active' : '' ?>"
                        data-requires-command="listApiEndpoints">

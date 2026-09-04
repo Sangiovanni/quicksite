@@ -654,7 +654,14 @@ $GLOBALS['__help_commands'] = [
             'message' => 'Preview: Add "confirm": true to execute deletion',
             'data' => [
                 'would_delete' => ['files' => 5, 'entries' => 324, 'size_kb' => 156.4],
-                'dates_affected' => ['2025-11-25', '2025-11-26', '2025-11-27']
+                'dates_affected' => ['2025-11-25', '2025-11-26', '2025-11-27'],
+                // Every day the project stores, not only the ones this call
+                // would remove — so a caller told "0 files" can tell whether
+                // they picked the wrong date or simply have nothing older.
+                'stored_days' => [
+                    ['date' => '2025-11-25', 'entries' => 108, 'size_bytes' => 53248],
+                    ['date' => '2025-12-02', 'entries' => 61, 'size_bytes' => 29696]
+                ]
             ]
         ],
         'error_responses' => [
@@ -663,7 +670,7 @@ $GLOBALS['__help_commands'] = [
             '200.operation.preview' => 'Preview: Add "confirm": true to execute deletion.',
             '400.project.required' => 'No project marker on the request. This command is project-scoped: target a project with /management/p/<projectId>/.'
         ],
-        'notes' => 'PROJECT-SCOPED: deletes only inside <secure>/logs/p/<projectId>/ for the project named by the URL marker, so clearing one project\'s history can never affect another\'s. Without confirm=true, returns a preview showing what would be deleted. A future "before" date is refused. Requires admin permission ON THAT PROJECT.'
+        'notes' => 'PROJECT-SCOPED: deletes only inside <secure>/logs/p/<projectId>/ for the project named by the URL marker, so clearing one project\'s history can never affect another\'s. Without confirm=true, returns a preview showing what would be deleted, plus stored_days listing every day the project holds. DELETION IS DAY-GRANULAR: history is stored one file per day and a whole day is removed at a time, and the day comes from the FILE NAME rather than from any record\'s own timestamp — editing a timestamp inside a file does not move that record to another day. A future "before" date is refused, and days are deleted strictly BEFORE the date given, so the day in progress cannot be cleared. Requires admin permission ON THAT PROJECT.'
     ],
 
     'editFavicon' => [

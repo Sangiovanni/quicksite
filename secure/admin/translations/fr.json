@@ -552,6 +552,7 @@
             "timestamp": "Horodatage",
             "command": "Commande",
             "method": "Méthode",
+            "user": "Utilisateur",
             "status": "Statut",
             "duration": "Durée",
             "details": "Détails"
@@ -563,6 +564,8 @@
             "method": "Méthode",
             "duration": "Durée",
             "publisher": "Éditeur",
+            "userId": "ID utilisateur",
+            "params": "Paramètres",
             "requestBody": "Corps de la requête",
             "response": "Réponse"
         },
@@ -572,6 +575,20 @@
         "clearHistory": "Effacer l'historique",
         "clearConfirm": "Êtes-vous sûr de vouloir effacer l'historique des commandes ?",
         "export": "Exporter",
+        "exportCsv": "Exporter en CSV",
+        "exportEmpty": "Rien à exporter",
+        "clear": {
+            "intro": "Supprime l'historique des commandes de ce projet. Cette action est irréversible.",
+            "beforeLabel": "Supprimer les journées entières antérieures au",
+            "beforeHint": "L'historique est stocké un fichier par jour et supprimé par journée entière. Les journées à partir de cette date sont conservées : le jour même n'est jamais supprimé.",
+            "confirmButton": "Supprimer définitivement",
+            "pickDate": "Choisissez une date pour voir ce qui serait supprimé.",
+            "nothing": "Rien à supprimer avant cette date.",
+            "noDays": "Ce projet n'a aucun historique stocké.",
+            "storedDays": "Journées actuellement stockées :",
+            "dayGranularHint": "L'historique est stocké un fichier par jour et supprimé par journée entière : une journée ne disparaît que si la date choisie lui est postérieure. Le jour même ne peut pas être effacé.",
+            "done": "Historique des commandes effacé"
+        },
         "errors": {
             "loadFailed": "Échec du chargement de l'historique :"
         }

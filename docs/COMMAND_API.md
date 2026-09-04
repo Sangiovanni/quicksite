@@ -525,8 +525,22 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/jso
 ## Command history storage
 
 Every successful command (plus authentication failures) is appended to a daily
-JSON file. The store is **partitioned by project**, so a project's audit trail is
-readable only by someone who holds the `history` category **on that project**:
+JSON file. A record carries the command, the caller, the result, the timing, and
+**what the command was asked for** — `params` beside `body`:
+
+| Field | Holds |
+|---|---|
+| `body` | The decoded JSON request body, credential-shaped keys redacted. `null` when the command's body is never recorded (see the deny-list above). |
+| `params` | The request's **non-body** arguments, or `null` when there are none. `params.url` is the ordered URL path segments (`getStructure/page/home` → `["page","home"]`); `params.query` is the query string, redacted the same way a body is. Commands like `getStructure` and `getRoutes` carry no body at all, so this is the only record of what they operated on. |
+
+⚠ Redaction matches **key names**, so it covers `params.query` exactly as it covers
+a body. **URL path segments are positional and have no keys, so nothing can match
+them.** No command currently takes a credential in its path — every `@url`
+parameter on the surface is an identifier — and a command that ever does must be
+added to the body deny-list, which suppresses parameters as well.
+
+The store is **partitioned by project**, so a project's audit trail is readable
+only by someone who holds the `history` category **on that project**:
 
 ```
 secure/logs/p/<projectId>/commands_<YYYY-MM-DD>.json   one directory per project
@@ -536,6 +550,13 @@ secure/logs/_global/commands_<YYYY-MM-DD>.json         commands that target no p
 - `getCommandHistory` and `clearCommandHistory` read and delete **only** inside the
   directory of the project named by the URL marker. Clearing one project's history
   can never touch another's, and there is no query that spans projects.
+- **Clearing is day-granular.** A day is a whole file, and its date comes from the
+  **file name** — not from any record's own `timestamp`. Days are removed strictly
+  *before* the `before` date, and a future date is refused, so the day in progress
+  can never be cleared. Editing a record's timestamp does not move it to another
+  day. The preview returns `stored_days`, every day the project holds, so a caller
+  told "0 files" can tell whether the date was wrong or there is simply nothing
+  older.
 - **Deleting a project deletes its history with it.** A project id is a folder name
   and can be re-used, so the directory is purged on `deleteProject` — a new project
   reusing an old name starts with an empty trail. The deletion event itself is
@@ -599,19 +620,32 @@ deliberate.
 
 ### The `_global` bucket — operators should manage this directly
 
-Commands that belong to no project — account registration and deletion, password
-changes, project creation, invitation and membership self-service — are recorded in
-`secure/logs/_global/`. **No API command reads this directory.** It exists so that
-account-level and membership-level actions leave a forensic trail rather than going
-unrecorded; there is no installation-wide administrator role to expose it to.
+Some actions belong to no project, and their records go to `secure/logs/_global/`.
+**No API command reads this directory.** It exists so those actions leave a
+forensic trail rather than going unrecorded; there is no installation-wide
+administrator role to expose it to.
 
-Because nothing serves or rotates it, `_global` grows without bound and is the
-operator's to manage. Treat it like any other server-side log: archive or delete
-files on whatever schedule your retention policy requires (a scheduled task, a
-logrotate rule, or manual deletion are all fine — the files are plain JSON and
-nothing references them). Credentials are stripped before writing (see above), but
-the entries still describe who did what and when, so treat them like any other
-server log containing operational detail.
+**What is written there is the project lifecycle, and only that:**
+
+| Recorded | Why it has nowhere else to go |
+|---|---|
+| `createProject`, `importProject` | The project does not exist yet when the command runs. |
+| `deleteProject` | Rerouted here by the logger when the project's own directory is already gone, so the audit of a project's death outlives the project. |
+| `logoutSession` | Belongs to an account, not a project. |
+
+**Global-scope READS are deliberately not written.** `listProjects` and `help`
+answer without changing anything, and a bucket nothing reads is not the place for
+a poll: the panel calls them constantly, and their records were the bulk of what
+accumulated. Dropping them is a signal decision, not a privacy one — nothing in
+those entries is sensitive. `login` and `register` are not recorded either, for a
+different reason: they answer before the dispatcher installs its logging callback.
+
+Because nothing serves or rotates it, `_global` still grows and is the operator's
+to manage. Treat it like any other server-side log: archive or delete files on
+whatever schedule your retention policy requires (a scheduled task, a logrotate
+rule, or manual deletion are all fine — the files are plain JSON and nothing
+references them). Credentials are stripped before writing (see above), but the
+entries still describe who did what and when.
 
 ## What is deliberately not a command
 

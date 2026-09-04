@@ -1370,34 +1370,14 @@ const QuickSiteAdmin = {
         document.addEventListener('keydown', escHandler);
     },
 
-    // ============================================
-    // History Export
-    // ============================================
-
-    /**
-     * Export command history to JSON file
-     */
-    async exportHistory() {
-        try {
-            const result = await this.apiRequest('getCommandHistory');
-            
-            if (result.ok && result.data.data?.history) {
-                const dataStr = JSON.stringify(result.data.data.history, null, 2);
-                const dataBlob = new Blob([dataStr], { type: 'application/json' });
-                
-                const link = document.createElement('a');
-                link.href = URL.createObjectURL(dataBlob);
-                link.download = `command-history-${new Date().toISOString().split('T')[0]}.json`;
-                link.click();
-                
-                this.showToast('History exported successfully', 'success');
-            } else {
-                this.showToast('No history to export', 'warning');
-            }
-        } catch (error) {
-            this.showToast('Failed to export history', 'error');
-        }
-    }
+    // The history export used to live here as `exportHistory()`, and it could
+    // never succeed: it read `result.data.data.history`, while the command
+    // answers `entries`, so every run fell through to "No history to export".
+    // It also re-fetched with no filters, so had it worked it would have
+    // exported something other than what the page was showing. Replaced in S6.6
+    // by history.js's CSV export, which serialises the records already on
+    // screen. Removed rather than fixed in place — an export belongs with the
+    // page that holds the data, not in the shared admin object.
 };
 
 // Kick off the permission fetch immediately at parse time (admin.js is in the footer so

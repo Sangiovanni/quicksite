@@ -52,6 +52,11 @@ class AdminRouter {
         'setup',       // First-run page (C14; renders only while the user registry is empty)
         'dashboard',   // Main admin panel after login
         'command',     // Individual command pages
+        'history',     // Command history — its own page since S6.6, so the audit
+                       //   trail does not live inside the console it audits (and
+                       //   does not vanish with it). ⚠ There is no `history`
+                       //   directory under public/admin/ — one would shadow this
+                       //   page; see the reserved-segment note above.
         'settings',    // Settings and configuration
         'workflows',   // Workflows (AI and manual)
         'ai-settings', // Legacy alias (redirects to ai-connections)
@@ -554,6 +559,12 @@ class AdminRouter {
         // because those three live in the `build` category (developer+). A
         // non-member has no role at all and bounces, like every other page.
         'builds'         => ['getBuild'],
+        // S6.6 — the `history` category is granted to admin and owner only, so
+        // this is a REAL gate rather than chrome-hiding: a lower rank never
+        // receives the page. The nav entry is filtered separately client-side,
+        // which only hides what is already there; this is what makes the page
+        // unreachable.
+        'history'        => ['getCommandHistory'],
         'optimize'       => ['getStyles', 'editStyles'],
         // 'ai-connections' has no permission gate: it is a UI over
         // browser-stored data. Any authenticated admin can view it.
@@ -716,6 +727,14 @@ class AdminRouter {
         // (server-side gate — the command enforces the same flag independently).
         if ($this->page === 'register' && !$this->isRegistrationOpen()) {
             $this->redirect('login');
+        }
+
+        // S6.6 — history moved off the command console onto its own page. The old
+        // tab URL is kept working rather than broken: the dashboard links to it,
+        // and so does anyone's bookmark. Placed BEFORE the permission check so
+        // the redirect target is what gets authorised, not the page being left.
+        if ($this->page === 'command' && ($_GET['tab'] ?? '') === 'history') {
+            $this->redirect('history');
         }
 
         // Check page-level permissions (role-based access control)
