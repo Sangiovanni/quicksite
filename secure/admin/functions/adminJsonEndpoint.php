@@ -8,10 +8,11 @@
  * authenticate exactly as `/management` does, because they run engine code on
  * the caller's behalf.
  *
- * There are two of them today:
+ * There are three of them today:
  *   - public/admin/api/index.php    read-only helper arms (form options, the
  *                                   update check)
  *   - public/admin/state/index.php  the panel's own per-user state (writes)
+ *   - public/admin/self/index.php   the account and its project memberships
  *
  * ONE implementation of the gate, not two. A second hand-rolled copy of a
  * bearer-token check is the kind of thing that stays right for one release and

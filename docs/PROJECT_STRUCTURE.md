@@ -13,6 +13,10 @@ quicksite/
 │   │   ├── index.php             # Front controller — renders a project from its own folder
 │   │   └── .htaccess             # Routes all /p/* to this index.php
 │   ├── admin/                    # Admin panel UI (HTML/JS/CSS)
+│   │   ├── index.php             # Panel router — pages, auth, rendering
+│   │   ├── api/                  # Read-only helper arms (form options, update check)
+│   │   ├── self/                 # The signed-in account and its project memberships
+│   │   └── state/                # The panel's own per-user state (which project it edits)
 │   └── management/               # API entry point
 │       ├── index.php             # API router — auth, dispatch, logging
 │       └── .htaccess             # Routes all /management/* to this index.php
@@ -98,7 +102,7 @@ quicksite/
 Note what is **not** under `public/`: no site assets, styles, generated scripts,
 sitemap or builds. Those belong to a project and live in that project's own
 `secure/projects/<id>/public/`, reached through `/p/<id>/`. The web root holds
-the two entry points and nothing else, which is what leaves it free for an
+QuickSite's entry points and nothing else, which is what leaves it free for an
 operator's own site.
 
 ## Key concepts

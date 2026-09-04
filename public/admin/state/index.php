@@ -8,7 +8,7 @@
  * it; panel state is therefore not a command and is served here.
  *
  * WHY ITS OWN FILE rather than an arm of /admin/api. That helper is read-only —
- * twenty-seven arms, every one a read — and its whole contract is "give the form
+ * twenty-eight arms, every one a read — and its whole contract is "give the form
  * its options". Putting the first mutation into it would quietly turn a lookup
  * surface into a write surface, and the next person adding an arm would have no
  * way to tell which kind they were adding. Writes get their own door.
