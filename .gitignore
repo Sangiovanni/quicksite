@@ -29,7 +29,8 @@ ENV/
 
 # AI agent instructions (local only)
 .github/copilot-instructions.md
-CLAUDE.md
+# CLAUDE.md is TRACKED — it holds the project's engineering standards.
+# Only the machine-local companion is ignored.
 CLAUDE.local.md
 
 # Claude Code local state (worktrees, session data)
