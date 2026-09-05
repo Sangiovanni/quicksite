@@ -20,22 +20,23 @@ QuickSite started as a simple HTML template and evolved into a full CMS. The ide
 
 It now includes a **visual admin panel** with an iframe-based page editor, letting you build and edit sites directly in the browser without writing code. The API remains the backbone — the admin panel is a client of its own API.
 
-QuickSite focuses on **frontend sites** — it manages HTML structure, CSS, translations, and assets. It doesn't handle backend logic or databases, though the built-in [interactions system](docs/README.md) can connect your pages to external APIs and services.
+QuickSite focuses on **frontend sites** — it manages HTML structure, CSS, translations, and assets. It doesn't handle backend logic or databases, though the built-in [interactions system](docs/ARCHITECTURE.md) can connect your pages to external APIs and services.
 
 ### Architecture
 
 For a deeper view of how QuickSite is organized:
 
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — three-layer model (Project / Management / Admin), JSON-to-HTML pipeline, request lifecycle, multi-project model, security boundary.
-- [docs/ADMIN_PANEL.md](docs/ADMIN_PANEL.md) — admin panel internals: boot flow, page modules, visual editor, preview subsystem.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — three-layer model (Project / Management / Admin), JSON-to-HTML pipeline, translation system, request lifecycle, multi-project model, security boundary, interactions, style management, build and deploy.
+- [docs/ADMIN_PANEL.md](docs/ADMIN_PANEL.md) — admin panel internals: boot flow, page modules, storage keys, visual editor, preview subsystem, `data-*` attribute reference.
 - [docs/COMMAND_API.md](docs/COMMAND_API.md) — Management API surface and command catalogue.
 - [docs/PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md) — on-disk layout.
 - [docs/WORKFLOW_SYSTEM.md](docs/WORKFLOW_SYSTEM.md) — workflow engine reference.
+- [docs/DESIGN_DECISIONS.md](docs/DESIGN_DECISIONS.md) — locked design decisions: what was chosen, why, and what was rejected.
 
 ### Key features
 
 - **Visual Admin Panel** — iframe-based page editor with drag-and-drop node management, live preview, and component library
-- **176 API Commands** — RESTful endpoints covering pages, translations, styles, assets, builds, projects, backups, membership, and more
+- **A complete API** — one RESTful command per operation, covering pages, routes, translations, styles, assets, builds, projects, backups, membership, and more. `GET /management/help` documents the whole surface and reports how many commands this installation routes
 - **JSON-Driven Templates** — page structures defined in JSON, compiled to optimized PHP for production
 - **Multilingual** — built-in translation system with validation, health checks, and mono/multi-language modes
 - **Multi-Project** — host multiple independent sites from one installation
@@ -43,13 +44,19 @@ For a deeper view of how QuickSite is organized:
 - **File-Based** — no database, no migrations. JSON + PHP files, deployable anywhere
 - **Role-Based Access** — username + password login establishes a session; authority is **per project**, with six fixed roles (viewer, editor, designer, developer, admin, owner)
 - **Update Notices** — the panel tells the operator when a newer version exists; updating itself is done on the server, with git
-- **AI Integration (BYOK)** — the admin panel calls AI providers **directly from the browser** with your own API keys (OpenAI, Anthropic, Google, Mistral); no key ever reaches the server
+- **AI Integration (BYOK)** — the admin panel calls AI providers **directly from the browser** with your own API keys; no key ever reaches the server. Presets for OpenAI, Anthropic, Google, Mistral, DeepSeek, Groq, xAI and OpenRouter, any other OpenAI-compatible endpoint, and local runtimes such as Ollama and LM Studio
 
 ## Requirements
 
 - **PHP** 8.0+ (tested on 8.0 and 8.4)
 - **Web server**: Apache with `mod_rewrite`, **or** nginx
-- **PHP extensions**: json, fileinfo, zip
+- **PHP extensions**: json, mbstring, fileinfo, zip, curl — all five ship
+  enabled in a stock PHP build and in every mainstream distribution package.
+  `mbstring` measures the password when an account is created or changed, so an
+  install without it cannot get past the first-run form. `fileinfo` reads an
+  upload's real type, `zip` packages builds, exports and backups, and `curl`
+  makes every request the server sends on your behalf — data resolvers, the API
+  endpoint test, OAuth back-channels, importing an asset by URL.
 
 **Verified on:** Apache 2.4 (WAMP) and nginx as configured by [CloudPanel](https://www.cloudpanel.io/). Other nginx setups are expected to work — the routing is plain `try_files` and QuickSite generates it for you — but they are not what these instructions were tested against. What differs between nginx installs is the php-fpm upstream name, where `fastcgi_params` lives, and whether your control panel owns the server block; see `secure/deploy/nginx-vhosts.conf.example`.
 
@@ -133,6 +140,7 @@ re-run, so changing one setting later never means answering the others again:
 | **6** | Show my setup token | reads the first-run credential off disk once it exists |
 | **7** | Storage quotas | per-account ceilings on total size and upload rate. Leave both blank for no limits, which is the default |
 | **8** | Self-deploy on / off | may this installation copy a built site onto a filesystem path? **Default off** — building and downloading still work either way |
+| **9** | Command console on / off | should the panel offer the raw command runner at `/admin/command`? **Default on.** Turning it off removes reach and discoverability, not access — every command stays reachable at `/management/` to any caller whose role allows it, and the command history stays either way |
 
 The menu header always shows the values currently on disk, so nothing is
 guessed. Every item is optional — skip anything you do not need.
@@ -152,8 +160,11 @@ see *Create your first account* below for the order.
 
 Items 1–3 update `init.php` constants and the `.htaccess` routing, and drop the
 generated nginx routing config so the engine rebuilds it for the new layout on
-the next page load. Items 4–5 write config files under the secure folder.
-Item 6 only reads.
+the next page load. Item 4 writes `environment.php` and item 5 edits `auth.php`.
+Items 7, 8 and 9 write a config file only when you ask for something other than
+the default — accept the default and the file stays absent, which is already
+what it means, so an install that never opted out never looks as though somebody
+opted in. Item 6 only reads.
 
 Outside the menu, the **first** run does one thing more: if the web root has no
 index file, it copies `secure/deploy/index.html.example` to `public/index.html`
@@ -309,10 +320,10 @@ nginx ignores `.htaccess` files. QuickSite handles this automatically:
    > Apache needs nothing here: `LimitRequestBody` is unlimited by default.
    >
    > **Already have a `dynamic_routes.conf`?** It is generated when absent and
-   > rewritten after every build deploy, but not in between — so an install set
-   > up before this line existed and never deployed still has the old file.
-   > Delete `secure/nginx/dynamic_routes.conf`, load any page to regenerate it,
-   > and reload nginx.
+   > rewritten after every build deploy, but not in between — so an install that
+   > has never deployed is still serving the file it was first given, however
+   > long ago that was. Delete `secure/nginx/dynamic_routes.conf`, load any page
+   > to regenerate it, and reload nginx.
 
    **Both blocks are required.** Project pages would still render without
    `@quicksite_project`, but every stylesheet, script and image would fail — and
@@ -409,17 +420,17 @@ exactly one site, with resolvers, param routes, server-side auth and
 `serverFetch` all working as they did in development. What it removes is the
 work of re-reading the page structure on every request, not what the site can do.
 
-> **Why the install does not serve production directly.** It used to be possible
-> to point a domain at the install and declare which project it served. That put
-> uncompiled pages on the public internet — every request re-parsing JSON that a
-> build turns into PHP once — and it broke the visual editor on that hostname,
-> because a domain serving one project had to refuse the `/p/<projectId>/` URLs
-> the editor's preview iframe loads. Building is faster for visitors, keeps the
-> install's other projects off the public domain entirely, and leaves the
-> authoring hostname free to do the one thing it is for.
+> **Why the install does not serve production directly.** Pointing a domain at
+> the install and declaring which project it serves would put uncompiled pages on
+> the public internet — every request re-parsing JSON that a build turns into PHP
+> once — and it would break the visual editor on that hostname, because a domain
+> serving one project has to refuse the `/p/<projectId>/` URLs the editor's
+> preview iframe loads. Building is faster for visitors, keeps the install's
+> other projects off the public domain entirely, and leaves the authoring
+> hostname free to do the one thing it is for.
 >
-> If you have `SetEnv QS_PROJECT` or `fastcgi_param QS_PROJECT` left in a vhost,
-> it now does nothing and can be deleted. `QS_PUBLIC_BASE_URL` and
+> `SetEnv QS_PROJECT` and `fastcgi_param QS_PROJECT` do nothing: if a vhost of
+> yours carries one, it can be deleted. `QS_PUBLIC_BASE_URL` and
 > `QS_TRUSTED_HOSTS` are unaffected — see below.
 
 Two per-vhost variables remain on the authoring install, and neither picks a
@@ -470,9 +481,14 @@ pull` works there too — it is an ordinary clone with an extra file or two of y
 own.
 
 **What it never touches.** Your own files are not in the repository, so an update
-has nothing to overwrite them with: `users.php`, `auth.php`, `environment.php`,
-`operator.php`, `quota.php`, `deploy-roots.php`, and every project under
-`secure/projects/`. Git only knows tracked files, so it cannot reach any of them.
+has nothing to overwrite them with: everything under
+`secure/management/config/` that is yours rather than shipped — `users.php`,
+`auth.php`, `roles.php`, `environment.php`, `operator.php`, `quota.php`,
+`console.php`, `deploy.php`, `deploy-roots.php`, `import-policy.php` — the
+server-side secrets in `secure/admin/config/`, your logs, and every project
+under `secure/projects/`. Git only knows tracked files, so it cannot reach any
+of them. What it *does* replace is the `.example` template beside each of those,
+which is the shipped documentation of the defaults and is meant to move.
 
 **If you have local edits**, git will say so and stop rather than pulling over
 them. Commit or stash, then pull again.
@@ -518,7 +534,7 @@ All steps support renaming, nesting, un-nesting, and are re-runnable. On nginx, 
 QuickSite exposes a single self-documenting Management API. Once installed:
 
 ```
-GET /management/help              # full docs for all 176 commands
+GET /management/help              # full docs for every command, plus the live count
 GET /management/help/addRoute     # docs for one command
 ```
 
@@ -551,7 +567,7 @@ This affects the **deployed/built site only** — the admin panel preview and vi
 **Added a `<source>` and the browser ignores it?**
 
 `<source>` means two different things depending on where it sits, and the
-editor's parameter form does not yet distinguish them. Inside `<picture>` a
+editor's parameter form does not distinguish them. Inside `<picture>` a
 source is selected by `srcset` plus `media` or `type`, and a plain `src` is
 invalid and ignored. Inside `<video>` or `<audio>` it is `src` (with `type`)
 that does the work. The editor asks for `src` in both cases, so a `<source>`
