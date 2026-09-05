@@ -10952,3 +10952,117 @@ structure).
 (`$validPages`, `PAGE_PERMISSIONS`, the `?tab=history` redirect),
 `secure/admin/templates/layout.php`, `secure/admin/templates/pages/command.php`.
 Behaviour: [ADMIN_PANEL.md](ADMIN_PANEL.md) §9.18.
+
+### Security events get their own trail, not the `_global` command bucket (locked 2026-09-05)
+
+**Decision**: signing in, failing to sign in, signing out, creating an account,
+changing a password, deleting an account, and joining or leaving a project are
+written to `<secure>/logs/_security/security_<date>.json` — an installation-wide
+file, separate from both the per-project command log and the `_global` bucket.
+No command reads it; the operator reads it on the server. `logoutSession` was
+moved out of `_global` into it, leaving `_global` holding project lifecycle and
+nothing else.
+
+**Reasoning**: none of these events could reach the command log even in
+principle. `login` and `register` answer before the dispatcher installs its
+logging callback, and account and membership self-service are served from
+`/admin/self`, which never touches the command dispatcher at all. They are also
+not *about* a project — they belong to an account and to the installation — so
+the per-project trail has no bucket for them that anyone is entitled to read.
+
+Separate from `_global` because a bucket with two audiences has two retention
+policies. `_global` answers "who created or destroyed a project"; a security
+trail answers "who signed in, from where, and what happened to their account".
+An operator archiving one on a schedule is not making the same decision about the
+other, and merging them would force one policy onto both.
+
+No reader, deliberately, and for the same reason `secure/cli/session-sweep.php`
+is a script rather than a command: the file is installation-wide, and authority
+in QuickSite is per project — no role could be entitled to it, and inventing one
+would be inventing the superadmin the model does not have. Filesystem access is
+the credential.
+
+**Alternatives considered**: the `_global` bucket (rejected — see above; it also
+already had the property of being written by nobody's decision and read by
+nothing, and doubling its contents would have entrenched that). Extending the
+per-project command log with a null-project convention (rejected — the reader is
+membership-gated by construction, so the records would be unreachable by anyone
+rather than merely unread). A `security` category and a `getSecurityLog` command
+(rejected — it is installation-wide, so no per-project role could authorise it;
+this is the same wall update-application runs into). Recording the forwarded
+client address from `X-Forwarded-For` (rejected — it is a caller-supplied header,
+so an attacker directly exposed to the server would author their own audit trail;
+`REMOTE_ADDR` is what the server observed, and an operator behind a proxy reads
+the proxy's log).
+
+**Source**: `secure/src/functions/securityLog.php`, with the file/lock/append
+primitive shared from `secure/src/functions/LoggingManagement.php`
+(`qs_log_append`) and the same deny-by-default redaction (`qs_log_redact_secrets`).
+Call sites: `login.php`, `register.php`, `logoutSession.php`,
+`AuthManagement.php` (`sendUnauthorizedResponse`), `accountSelf.php`,
+`membershipSelf.php`. Behaviour: [COMMAND_API.md](COMMAND_API.md) (*The security
+trail*).
+
+### A refusal is an ordinary envelope: no field lives outside `data` (locked 2026-09-05)
+
+**Decision**: `sendUnauthorizedResponse` and `sendForbiddenResponse` are built by
+`ApiResponse` rather than hand-composed. The 403's `command` and the 401's `hint`
+moved from the top level of the envelope into `data`, so the response shape is
+`status` / `code` / `message` / `data` / `errors` with no exceptions anywhere on
+the surface.
+
+**Reasoning**: hand-composing bought three defects at once, and the shape was
+only the visible one. The hand-built responses bypassed `qs_scrub_path_string()`,
+so a path reaching a refusal message would have travelled out unrewritten, on the
+two responses most likely to be produced from deep inside the auth stack. They
+bypassed the envelope's own rules, so a missing message became a silent empty
+string rather than the reported 500 every other response gets. And they bypassed
+`ApiResponse`'s beforeSend callback, which is what records a command — so no
+refusal could ever be logged, whatever the logging gate said. One composer fixes
+all three, and the field move is what falls out of it.
+
+Two exceptional fields for two responses was also the kind of special case a
+client has to be told about and will not be: an integrator who validated the
+envelope against its documented field list would reject a 403 as malformed.
+
+**Alternatives considered**: adding `withHint()` to `ApiResponse` to preserve the
+top-level `hint` (rejected — it adds an envelope field to the shared class for
+one caller, when every other command in the tree already puts advice in
+`data.hint`). Keeping the hand-built responses and logging separately from them
+(rejected — it leaves the path-scrubbing and missing-message defects in place,
+which are the two that matter more than the logging).
+
+**Source**: `secure/src/functions/AuthManagement.php` (`sendUnauthorizedResponse`,
+`sendForbiddenResponse`), `public/management/index.php` (the logging callback is
+installed before the permission check so a refusal can reach it). Behaviour:
+[COMMAND_API.md](COMMAND_API.md) (*Response shape*).
+
+### `help` states how a command must be addressed (locked 2026-09-05)
+
+**Decision**: every entry `help` returns carries a `scope` (`project` or
+`global`), an `access` rule where the category declares one, and an `endpoint`
+showing the URL shape — `/management/p/<projectId>/addRoute`. Derived from
+`categories.php`, the same map the permission check resolves through.
+
+**Reasoning**: whether a call needs the project marker is the single fact that
+decides whether it succeeds at all, and `help` did not carry it. A caller could
+read a command's parameters, method, responses and errors from the
+self-documenting endpoint and still get `400 project.required`, with nothing in
+the response to explain why. The catalogue in `COMMAND_API.md` was the only place
+the distinction appeared, which made a hand-maintained list the authority on
+runtime behaviour — the arrangement that puts one copy quietly out of date.
+
+`endpoint` is a URL *shape*, not a URL: no host, no resolved path, `<projectId>`
+left as a placeholder. `help` answers before authentication and must read
+identically on every installation.
+
+**Alternatives considered**: documenting the seven global commands in
+`COMMAND_API.md` only (rejected — that is the third hand-kept copy the catalogue
+rule exists to prevent, and it was already wrong by omission before this slice).
+Exposing only the category name and letting callers resolve it themselves
+(rejected — it makes every client re-implement a lookup against a file they
+cannot read).
+
+**Source**: `secure/management/command/help.php` (`__help_command_scopes`,
+`__help_with_scope`). Behaviour: [COMMAND_API.md](COMMAND_API.md) (*Endpoint*,
+*Self-documenting*).

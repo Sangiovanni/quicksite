@@ -1578,46 +1578,79 @@ function getCurrentUser(): ?array {
 }
 
 /**
- * Send 401 Unauthorized response
+ * Send 401 Unauthorized response.
+ *
+ * ⚠ BUILT BY ApiResponse, not by hand. Both refusal helpers below used to
+ * compose their own array and `echo json_encode(...)`, which cost three things:
+ * the response bypassed `qs_scrub_path_string()`, so any path that reached a
+ * refusal message would have travelled out unrewritten; it bypassed the
+ * envelope's own rules (a missing message became a silent empty string rather
+ * than a reported 500); and it bypassed `ApiResponse`'s beforeSend callback, so
+ * no refusal could ever be logged no matter what the logging gate said.
+ *
+ * The hint travels under `data`, where every other command puts one. There is
+ * no top-level `hint` field on the envelope any more.
+ *
+ * The record goes to the SECURITY log, not the command log: an unauthenticated
+ * caller has no user and no project, so the per-project trail has no bucket for
+ * it that anyone can read.
  *
  * @param string $message Error message
  * @param string|null $hint Optional hint for fixing the error
  * @param string $code Response code — always 'auth.unauthorized' today: there
  *                     is nothing to refresh, so every refusal means sign in again
+ * @param string|null $command The command that was asked for, when the URL named
+ *                    one. Unvalidated — it is what the caller typed.
  */
-function sendUnauthorizedResponse(string $message, ?string $hint = null, string $code = 'auth.unauthorized'): void {
-    http_response_code(401);
-    header('Content-Type: application/json');
+function sendUnauthorizedResponse(
+    string $message,
+    ?string $hint = null,
+    string $code = 'auth.unauthorized',
+    ?string $command = null
+): void {
+    // Required here rather than at the top of the file: AuthManagement is loaded
+    // very early on several paths (the CLI sweeper, admin templates) and these
+    // two helpers are the only things in it that need either dependency.
+    require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+    require_once __DIR__ . '/securityLog.php';
+
+    qs_security_log(QS_SEC_UNAUTHENTICATED, [
+        'command' => $command,
+        'method'  => $_SERVER['REQUEST_METHOD'] ?? null,
+        'reason'  => $code,
+    ]);
+
     header('WWW-Authenticate: Bearer realm="Template Vitrine Management API"');
 
-    $response = [
-        'status' => 401,
-        'code' => $code,
-        'message' => $message
-    ];
-    
+    $data = [];
     if ($hint) {
-        $response['hint'] = $hint;
+        $data['hint'] = $hint;
     }
-    
-    echo json_encode($response, JSON_PRETTY_PRINT);
-    exit;
+
+    $response = ApiResponse::create(401, $code)->withMessage($message);
+    if ($data !== []) {
+        $response->withData($data);
+    }
+    $response->send();
 }
 
 /**
- * Send 403 Forbidden response (for permission denied)
- * 
+ * Send 403 Forbidden response (for permission denied).
+ *
+ * The denied command travels under `data`, like every other payload — see the
+ * note on sendUnauthorizedResponse for why these are no longer hand-composed.
+ *
+ * This one is NOT logged here: it happens after the dispatcher has resolved the
+ * caller and the project, so `ApiResponse`'s beforeSend callback records it in
+ * that project's own command trail, which is where an admin or owner reads it.
+ *
  * @param string $command The command that was denied
  */
 function sendForbiddenResponse(string $command): void {
-    http_response_code(403);
-    header('Content-Type: application/json');
-    
-    echo json_encode([
-        'status' => 403,
-        'code' => 'auth.forbidden',
-        'message' => 'Insufficient permissions for this command',
-        'command' => $command
-    ], JSON_PRETTY_PRINT);
-    exit;
+    require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+
+    ApiResponse::create(403, 'auth.forbidden')
+        ->withMessage('Insufficient permissions for this command')
+        ->withData(['command' => $command])
+        ->send();
 }

@@ -30,6 +30,9 @@
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+// This command answers BEFORE the dispatcher installs its logging callback, so
+// nothing downstream can record it. The security log is written from here.
+require_once SECURE_FOLDER_PATH . '/src/functions/securityLog.php';
 
 function __command_login(array $params = [], array $urlParams = []): ApiResponse {
     $username = (string)($params['username'] ?? '');
@@ -43,6 +46,16 @@ function __command_login(array $params = [], array $urlParams = []): ApiResponse
     $attempt = qs_auth_attempt_login($username, $password);
 
     if (!$attempt['ok']) {
+        // The username that was tried, never what was tried with it. The refusal
+        // stays uniform to the caller — this record is for the operator, and the
+        // distinction between "unknown username" and "wrong password" is
+        // deliberately absent here too, because the attempt does not resolve to
+        // an account and inventing one would put an oracle in the log.
+        qs_security_log(QS_SEC_SIGNIN_FAILURE, [
+            'username' => $username,
+            'reason'   => $attempt['error'] === 'throttled' ? 'throttled' : 'invalid_credentials',
+        ]);
+
         if ($attempt['error'] === 'throttled') {
             return ApiResponse::create(429, 'auth.throttled')
                 ->withMessage('Too many failed attempts — try again later')
@@ -57,6 +70,16 @@ function __command_login(array $params = [], array $urlParams = []): ApiResponse
         (string)$user['id'],
         qs_user_generation($user),
         !empty($params['remember'])
+    );
+
+    // The session token is NOT recorded — it is the credential this call just
+    // minted. `remember` is, because a long-lived session is the thing an
+    // operator reading this trail would want to know was created.
+    qs_security_log(
+        QS_SEC_SIGNIN_SUCCESS,
+        ['remember' => !empty($params['remember'])],
+        (string)$user['id'],
+        $user['name'] ?? null
     );
 
     return ApiResponse::create(200, 'operation.success')

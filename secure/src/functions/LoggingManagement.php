@@ -127,21 +127,47 @@ const QS_LOG_SKIP_BODY_COMMANDS = [
  * holds the server's filesystem. That makes it worth writing for something an
  * operator would go looking for, and worth not writing for a poll.
  *
- * WHAT STAYS, AND WHY THE LIST IS READS ONLY. `_global` also collects the
- * project LIFECYCLE — createProject, importProject, and deleteProject rerouted
- * here by writeLogEntry when the project's own directory is already gone. Those
- * have nowhere else to live: the project does not exist yet, or no longer does.
- * "Who deleted this project, and when" is exactly the question the bucket should
+ * WHAT STAYS: THE PROJECT LIFECYCLE, AND ONLY THAT. `_global` collects
+ * createProject, importProject, and deleteProject rerouted here by
+ * writeLogEntry when the project's own directory is already gone. Those have
+ * nowhere else to live: the project does not exist yet, or no longer does. "Who
+ * deleted this project, and when" is exactly the question the bucket should
  * still be able to answer, so lifecycle events are never dropped.
  *
+ * `logoutSession` is dropped here for a DIFFERENT reason from the two reads
+ * above it, and the difference matters. It is not noise — it is an event about
+ * an ACCOUNT rather than about a project, so it belongs in the security log
+ * (securityLog.php), which is where it is now written from. Dropping it here
+ * prevents the same act being recorded twice in two files with two audiences and
+ * two retention policies.
+ *
  * `login` / `register` are absent because the dispatcher installs its logging
- * callback after they have already answered — they are not logged today at all,
- * and naming them here would imply this is what stops them.
+ * callback after they have already answered — they never reach this code at all,
+ * and naming them here would imply this is what stops them. They too are
+ * recorded in the security log.
  */
 const QS_LOG_SKIP_GLOBAL_COMMANDS = [
     'listProjects',
     'help',
+    'logoutSession',
 ];
+
+/**
+ * Non-2xx response codes the COMMAND log records.
+ *
+ * One name only: `auth.forbidden`, the refusal an authenticated caller gets when
+ * their role does not carry the command on that project. It belongs in the
+ * project's own trail because that is where the person entitled to read it — an
+ * admin or owner of that project — already looks.
+ *
+ * A function rather than a const so a probe can assert it against the codes the
+ * refusal sites emit; see the note at the gate in logCommand().
+ *
+ * @return string[]
+ */
+function qs_authz_logged_codes(): array {
+    return ['auth.forbidden'];
+}
 
 /**
  * Key names whose VALUE is a credential. Matched case-insensitively against every
@@ -336,6 +362,25 @@ function writeLogEntry(array $entry, ?string $project = null): bool {
     if ($logFile === null) {
         return false; // invalid projectId — fail closed, never log to a guessed path
     }
+
+    return qs_log_append($logFile, $entry);
+}
+
+/**
+ * Append one entry to a daily JSON log file, under an exclusive lock.
+ *
+ * The file/lock/append discipline, separated from WHICH log is being written so
+ * the security log (securityLog.php) reuses it rather than growing a second
+ * implementation. A second writer that locked differently — or redacted
+ * differently — is the defect this split exists to prevent.
+ *
+ * Never throws and never fatals: a log that cannot be written must not take the
+ * request down with it. Every failure path returns false.
+ *
+ * @param string $logFile Absolute path to the daily file.
+ * @param array  $entry   The record to append.
+ */
+function qs_log_append(string $logFile, array $entry): bool {
     if (!ensureLogsDirectory(dirname($logFile))) {
         return false;
     }
@@ -420,11 +465,24 @@ function logCommand(
 
     // Determine if this is a success response (2xx status codes)
     $isSuccess = $httpStatus >= 200 && $httpStatus < 300;
-    
-    // Only log successful commands and auth failures
-    $shouldLog = $isSuccess || 
-                 (in_array($responseCode, ['auth.invalid_token', 'auth.missing_token', 'auth.permission_denied']));
-    
+
+    // Successful commands, plus the refusal that says an authenticated caller
+    // was not allowed to run this on this project.
+    //
+    // ⚠ THESE NAMES MUST BE THE CODES THE ENGINE ACTUALLY EMITS. This gate
+    // previously listed `auth.invalid_token`, `auth.missing_token` and
+    // `auth.permission_denied`, none of which exists anywhere in the tree — so
+    // no refusal was ever recorded while the API documentation promised they
+    // were. A rename introduces that silently: nothing errors, a branch simply
+    // stops being taken. `qs_authz_logged_codes()` is asserted against the
+    // emitting sites by the S5.g probe.
+    //
+    // `auth.unauthorized` is deliberately NOT here: an unauthenticated caller
+    // has no user and no project, so the command log has no bucket for it that
+    // anyone can read. Those go to the security log instead (securityLog.php),
+    // which is installation-wide and is where the operator looks for them.
+    $shouldLog = $isSuccess || in_array($responseCode, qs_authz_logged_codes(), true);
+
     if (!$shouldLog) {
         return true; // Not an error, just nothing to log
     }

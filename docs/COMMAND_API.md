@@ -20,6 +20,12 @@ project-scoped command answers `400 project.required`.
 Only seven commands belong to no project and take the first form: `help`, `login`,
 `register`, `logoutSession`, `listProjects`, `createProject` and `importProject`.
 
+**Which form a command takes is part of its own spec.** Every entry `help`
+returns carries a `scope` (`project` or `global`) and an `endpoint` showing the
+URL shape, so a client can read it per command rather than against this list —
+`GET /management/help/addRoute` answers
+`"endpoint": "/management/p/<projectId>/addRoute"`.
+
 `public/management/index.php` authenticates the request, dispatches to a command handler in `<secure>/management/command/`, and returns a uniform JSON response.
 
 **These commands develop a project.** Anything about the installation itself, your account, your access to projects, or the admin panel's own state is deliberately *not* here: the panel serves those from its own endpoints (`/admin/api`, `/admin/state`, `/admin/self`), so a script driving this API gets a surface that is about websites and nothing else. If you are looking for one of those, see *What is deliberately not a command* below.
@@ -32,7 +38,7 @@ The API documents itself. Once installed:
 GET /management/help
 ```
 
-returns the per-command reference — parameters, examples, validation rules, and error codes. For a specific command:
+returns the per-command reference — scope, parameters, examples, validation rules, and error codes. For a specific command:
 
 ```
 GET /management/help/addRoute
@@ -83,8 +89,11 @@ Every command — success or failure — returns the same JSON envelope. Command
 | `message` | string | Human-readable summary, always written by the command itself — there is no per-code default, so the text describes what actually happened rather than what the code generally means. A refusal for a missing parameter names the parameter. Localized when called from the admin panel. |
 | `data` | object (optional) | Command-specific payload. **Omitted entirely when there is nothing to report** — read it as "absent or an object", not as "always present, sometimes null". |
 | `errors` | array (optional) | On validation failures, structured entries with `field` / `value` / `reason`. Omitted when empty. |
-| `hint` | string (optional) | Appears on some `401` refusals with a concrete next step (which header to send, for example). Advisory text for a human — never branch on it. |
-| `command` | string (optional) | Appears on the `403 auth.forbidden` a permission check raises, naming the command that was refused. |
+
+A refusal carries its payload under `data` like any other response: a `401` puts
+its next-step advice in `data.hint` (advisory text for a human — never branch on
+it), and the `403 auth.forbidden` a permission check raises names the refused
+command in `data.command`. There are no envelope fields outside the five above.
 
 There is **no separate error envelope**. A failed call uses the same `status` / `code` / `message` triple with a non-2xx status and an error code, and carries `data` only when it has something useful to say — a `404` for an unknown command, for instance, echoes back the name that was requested. This keeps clients simple: parse once, branch on `status` or `code`.
 
@@ -549,9 +558,11 @@ curl -b jar -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: applicat
 
 ## Command history storage
 
-Every successful command is appended to a daily JSON file. A record carries the
-command, the caller, the result, the timing, and **what the command was asked
-for** — `params` beside `body`:
+Every successful command is appended to a daily JSON file, and so is the one
+refusal that names an authenticated caller: `403 auth.forbidden`, which records
+that somebody who was signed in asked for something their role on this project
+does not carry. A record holds the command, the caller, the result, the timing,
+and **what the command was asked for** — `params` beside `body`:
 
 | Field | Holds |
 |---|---|
@@ -633,11 +644,10 @@ never stored.** Sanitization is deny-by-default and command-independent:
   matching key discards its entire value, so an `auth` or `credentials` object is
   removed whole rather than walked into. The key itself is kept, so the trail still
   records *that* a credential was submitted.
-- Session commands (`login`, `register`, `logoutSession`) log **no body at all**;
-  it would carry only credentials. `logoutSession` still leaves an entry
-  recording who acted, when, and with what result. `login` and `register` leave
-  **no entry of any kind** — they answer before the dispatcher installs its
-  logging callback — so the command log is not where a record of sign-ins lives.
+- Session commands (`login`, `register`, `logoutSession`) leave **no entry here
+  at all**. Their bodies carry only credentials, and the acts themselves belong
+  to an account rather than to a project — they are recorded in the security
+  trail below instead. The command log is not where a record of sign-ins lives.
 - `uploadAsset` records file metadata instead of file content, and `editStyles`
   truncates stylesheets over 5 KB.
 
@@ -660,15 +670,14 @@ administrator role to expose it to.
 |---|---|
 | `createProject`, `importProject` | The project does not exist yet when the command runs. |
 | `deleteProject` | Rerouted here by the logger when the project's own directory is already gone, so the audit of a project's death outlives the project. |
-| `logoutSession` | Belongs to an account, not a project. |
 
 **Global-scope READS are deliberately not written.** `listProjects` and `help`
 answer without changing anything, and a bucket nothing reads is not the place for
 a poll: the panel calls them constantly, and their records would be the bulk of
 what accumulates. Dropping them is a signal decision, not a privacy one — nothing
-in those entries is sensitive. `login` and `register` are not recorded either, for
-a different reason: they answer before the dispatcher installs its logging
-callback.
+in those entries is sensitive. `logoutSession` is absent for a different reason:
+ending a session is an event about an account, so it goes to the security trail
+below rather than being recorded twice in two files with two audiences.
 
 Because nothing serves or rotates it, `_global` still grows and is the operator's
 to manage. Treat it like any other server-side log: archive or delete files on
@@ -676,6 +685,47 @@ whatever schedule your retention policy requires (a scheduled task, a logrotate
 rule, or manual deletion are all fine — the files are plain JSON and nothing
 references them). Credentials are stripped before writing (see above), but the
 entries still describe who did what and when.
+
+## The security trail
+
+Some things that matter are not commands and never touch a project: signing in,
+failing to sign in, signing out, creating an account, changing a password,
+deleting an account, and joining or leaving a project. Two of those cannot reach
+the command log even in principle — `login` and `register` answer before the
+dispatcher installs its logging callback — and the rest are served from
+`/admin/self`, which is not the command surface at all.
+
+They are written to an installation-wide trail of their own:
+
+```
+<secure>/logs/_security/security_<YYYY-MM-DD>.json
+```
+
+| Event | Written when |
+|---|---|
+| `auth.signin_success` | A sign-in succeeded. Records whether a "remember me" session was created; never the session token. |
+| `auth.signin_failure` | A sign-in was refused. Records the username that was tried and whether the refusal was the throttle — never the password, and never whether the username exists. |
+| `auth.signout` | A session was ended, and whether every other session of the account went with it. |
+| `auth.unauthenticated_request` | A call arrived at the API without a usable session. Records the command that was reached for, which is unvalidated — it is what the caller typed. |
+| `account.created` | Self-registration created an account. A duplicate username writes nothing, so the log does not reconstruct the account-existence oracle the uniform response denies. |
+| `account.password_changed` | A password was changed through the panel. |
+| `account.deleted` | An account was deleted. Written before the record is gone, so it is the only remaining trace that it existed. |
+| `membership.changed` | An invitation was accepted or declined, or a member left a project. Asking to join, withdrawing a request and dismissing a notice grant nothing and are not recorded. |
+
+Each entry holds the event, the time, the acting account when one is resolved,
+the request's source address and user agent, and event-specific detail. **No
+credential is ever written** — details go through the same deny-by-default
+redaction the command log applies, so a password, a token or a session id cannot
+reach the file even if a caller submits one. A record that cannot be written
+never fails the request it describes: the sign-in still succeeds or fails on its
+own merits, and the failure to log goes to the server error log.
+
+**No command reads this trail**, and none is planned. It is installation-wide,
+and authority in QuickSite is per project — no role could be entitled to it. The
+operator reads the file on the server, the same reasoning that makes the session
+sweeper a script rather than a command. Nothing rotates it either, so treat it
+like any other server-side log and archive or delete files on whatever schedule
+your retention policy requires.
 
 ## What is deliberately not a command
 
@@ -734,9 +784,9 @@ behaviour a caller can rely on:
 - **A private login username is never returned by any of them.**
 
 They leave no entry in the per-project command log — they are not commands, and
-the logger runs only on the command surface. No other audit trail records them,
-so a change of password or an accepted invitation is not something the
-installation can be asked about afterwards.
+the logger runs only on the command surface. They are not unrecorded, though:
+changing a password, deleting an account, and accepting, declining or leaving a
+project are written to the security trail described above.
 
 ## Update detection is not part of this API
 

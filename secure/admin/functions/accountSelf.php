@@ -25,6 +25,9 @@
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+// Account self-service is served from /admin/self and never touches the command
+// dispatcher, so nothing else would record these acts. See securityLog.php.
+require_once SECURE_FOLDER_PATH . '/src/functions/securityLog.php';
 
 /**
  * Change the authenticated caller's password.
@@ -111,6 +114,8 @@ function qs_account_change_password(array $params): ApiResponse {
             ->withMessage('Password changed, but your other sessions could not be ended — sign out everywhere to be sure');
     }
     qs_session_restamp($generation);
+
+    qs_security_log(QS_SEC_PASSWORD_CHANGED, ['other_sessions_ended' => true], $userId);
 
     return ApiResponse::create(200, 'operation.success')
         ->withMessage('Password changed')
@@ -285,6 +290,14 @@ function qs_account_delete(array $params): ApiResponse {
     // session resolves to a user any more (the panel must not keep rendering
     // pages for a deleted account). This one is destroyed outright so the
     // browser is not left holding a cookie for a session that cannot work.
+    // Written before the session is destroyed. The account record is already
+    // gone, so this entry is the only remaining trace that it ever existed —
+    // which is exactly why it is worth writing.
+    qs_security_log(QS_SEC_ACCOUNT_DELETED, [
+        'memberships_removed' => $memberships,
+        'invitations_removed' => $invitations,
+    ], $userId);
+
     qs_session_destroy();
 
     return ApiResponse::create(200, 'resource.deleted')

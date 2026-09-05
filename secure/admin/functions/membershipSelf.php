@@ -29,6 +29,11 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
+// Membership self-service is served from /admin/self and never touches the
+// command dispatcher. The three calls below record the acts that CHANGE WHO CAN
+// REACH A PROJECT; withdrawing a request, dismissing a notice and asking to join
+// are queue management and grant nothing, so they are deliberately not recorded.
+require_once SECURE_FOLDER_PATH . '/src/functions/securityLog.php';
 
 /**
  * Shared preamble: the caller's id, plus an F1-validated `project` parameter.
@@ -328,6 +333,8 @@ function qs_membership_accept(array $params): ApiResponse {
         error_log("membership accept: cache mirror write failed for '{$userId}' on '{$project}'");
     }
 
+    qs_security_log(QS_SEC_MEMBERSHIP, ['action' => 'accepted_invitation', 'project' => $project], $userId);
+
     return ApiResponse::create(200, 'operation.success')
         ->withMessage('Invitation accepted — welcome aboard')
         ->withData([
@@ -378,6 +385,8 @@ function qs_membership_decline(array $params): ApiResponse {
     if (!qs_membership_cache_set($userId, $project, null)) {
         error_log("membership decline: cache mirror removal failed for '{$userId}' on '{$project}'");
     }
+
+    qs_security_log(QS_SEC_MEMBERSHIP, ['action' => 'declined_invitation', 'project' => $project], $userId);
 
     return ApiResponse::create(200, 'operation.success')
         ->withMessage('Invitation declined')
@@ -437,6 +446,8 @@ function qs_membership_leave(array $params): ApiResponse {
     if (!qs_membership_cache_set($userId, $project, null)) {
         error_log("membership leave: cache mirror removal failed for '{$userId}' on '{$project}'");
     }
+
+    qs_security_log(QS_SEC_MEMBERSHIP, ['action' => 'left_project', 'project' => $project], $userId);
 
     return ApiResponse::create(200, 'operation.success')
         ->withMessage('You left the project')

@@ -25,6 +25,7 @@
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/securityLog.php';
 
 function __command_logoutSession(array $params = [], array $urlParams = []): ApiResponse {
     $auth = getCurrentAuth();
@@ -43,6 +44,18 @@ function __command_logoutSession(array $params = [], array $urlParams = []): Api
         }
         $othersEnded = true;
     }
+
+    // Recorded here, in the security log, rather than in the `_global` command
+    // bucket. Ending a session is an event about an ACCOUNT, and `_global` is
+    // the project-lifecycle trail — one file with two audiences is one file with
+    // two retention policies. The record is written before the session is
+    // destroyed, while the caller's identity is still resolved.
+    qs_security_log(
+        QS_SEC_SIGNOUT,
+        ['everywhere' => $everywhere, 'other_sessions_ended' => $othersEnded],
+        (string)$auth['userId'],
+        $auth['user']['name'] ?? null
+    );
 
     qs_session_destroy();
 

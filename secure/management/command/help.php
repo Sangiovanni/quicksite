@@ -17,7 +17,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 // Define commands in global scope for access from __command_help()
 $GLOBALS['__help_commands'] = [
     'addRoute' => [
-        'description' => 'Creates a new route with PHP page template and empty JSON structure. Supports nested routes (e.g., "guides/getting-started") and parameterised routes (beta.8 A1) via ":name" segments (e.g., "products/:slug").',
+        'description' => 'Creates a new route with PHP page template and empty JSON structure. Supports nested routes (e.g., "guides/getting-started") and parameterised routes via ":name" segments (e.g., "products/:slug").',
         'method' => 'POST',
         'parameters' => [
             'route' => [
@@ -46,7 +46,7 @@ $GLOBALS['__help_commands'] = [
                 'php_file' => '/templates/pages/products/__slug/__slug.php',
                 'json_file' => '/templates/model/json/pages/products/__slug/__slug.json',
                 'routes_updated' => '/path/to/routes.php',
-                'warnings' => '(optional) Array of structured conflict warnings (beta.8 A1) — see notes'
+                'warnings' => '(optional) Array of structured conflict warnings — see notes'
             ]
         ],
         'error_responses' => [
@@ -61,7 +61,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_type' => 'The route parameter is neither a string nor a number - an array, object, boolean or null. An integer or float is accepted and used as its string form.',
             '500.server.operation_failed' => 'An unexpected failure while creating the route files; any directories already created are removed first. The exception message is returned.'
         ],
-        'notes' => 'Creates PHP template + empty JSON structure. **Filesystem mapping**: ":slug" segments become "__slug" on disk (NTFS reserves ":") via routeHelpers.php. **Conflict warnings** (beta.8 A1, non-blocking): the response data.warnings[] array surfaces situations the user should confirm. Each warning carries a machine-readable `type` (i18n key) + EN `message` fallback + structured details. Two shapes today: `route.warning.param_shadows_exact_siblings` (param route alongside existing literals — runtime-safe via specificity but worth verifying intent) and `route.warning.duplicate_param_at_depth` (two ":name" siblings — declaration order resolves, but ambiguous).'
+        'notes' => 'Creates PHP template + empty JSON structure. **Filesystem mapping**: ":slug" segments become "__slug" on disk (NTFS reserves ":") via routeHelpers.php. **Conflict warnings** (non-blocking): the response data.warnings[] array surfaces situations the user should confirm. Each warning carries a machine-readable `type` (i18n key) + EN `message` fallback + structured details. Two shapes today: `route.warning.param_shadows_exact_siblings` (param route alongside existing literals — runtime-safe via specificity but worth verifying intent) and `route.warning.duplicate_param_at_depth` (two ":name" siblings — declaration order resolves, but ambiguous).'
     ],
     
     'deleteRoute' => [
@@ -608,7 +608,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_date' => 'Invalid date format (expected YYYY-MM-DD)',
             '400.project.required' => 'No project marker on the request. This command is project-scoped: target a project with /management/p/<projectId>/.'
         ],
-        'notes' => 'PROJECT-SCOPED: returns the history of the project named by the URL marker (/management/p/<projectId>/getCommandHistory) and nothing else - there is no installation-wide view. Logs are stored in daily files under <secure>/logs/p/<projectId>/. By default returns last 7 days. The getCommandHistory command itself is not logged to prevent recursion. Commands that target no project (registration, login, project creation) are recorded separately in <secure>/logs/_global/, which no command reads. Request bodies are sanitized DENY-BY-DEFAULT: any key that looks like a credential (password/secret/token/credential/key/auth/authorization/signature/salt) has its value replaced with [redacted] at every depth, for every command including ones added later; the session commands (login/register/logoutSession) log no body at all; uploadAsset logs file metadata only and editStyles truncates stylesheets over 5KB.'
+        'notes' => 'PROJECT-SCOPED: returns the history of the project named by the URL marker (/management/p/<projectId>/getCommandHistory) and nothing else - there is no installation-wide view. Logs are stored in daily files under <secure>/logs/p/<projectId>/. By default returns last 7 days. The getCommandHistory command itself is not logged to prevent recursion. Project lifecycle actions, which belong to no project (project creation, import and deletion), are recorded separately in <secure>/logs/_global/, which no command reads. Sign-ins, sign-outs, account changes and membership changes are not commands and are not here at all: they go to the security trail in <secure>/logs/_security/, which no command reads either. Request bodies are sanitized DENY-BY-DEFAULT: any key that looks like a credential (password/secret/token/credential/key/auth/authorization/signature/salt) has its value replaced with [redacted] at every depth, for every command including ones added later; the session commands (login/register/logoutSession) log no body at all; uploadAsset logs file metadata only and editStyles truncates stylesheets over 5KB.'
     ],
 
     'clearCommandHistory' => [
@@ -3157,7 +3157,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.file_write_failed' => 'Failed to write structure file.',
             '500.server.internal_error' => 'Builder failed unexpectedly. See server log. Invalid JSON.'
         ],
-        'notes' => 'After save, the emitted subtree is INDISTINGUISHABLE from a hand-built one — same JSON shape, same renderer, editable with the regular visual-editor tools. Wizard is build-time only; nothing at render time knows the element came from here. Builders live in <secure>/src/classes/complexElements/*.php as ComplexElementBuilder subclasses and are auto-discovered by the dispatcher. Drop a new builder file + a matching public/admin/.../contextual-complex/complex-<kind>.js wizard to add a kind — zero registration. Reuses addNode\'s insertion helper for non-root targets (same atomicity). For targetNodeId="root", detects page (list-shape root) vs component (object-shape root) and splices accordingly.'
+        'notes' => 'After save, the emitted subtree is INDISTINGUISHABLE from a hand-built one — same JSON shape, same renderer, editable with the regular visual-editor tools. Wizard is build-time only; nothing at render time knows the element came from here. Builders live in <secure>/src/classes/complexElements/*.php as ComplexElementBuilder subclasses and are auto-discovered by the dispatcher. Drop a new builder file + a matching <public>/admin/.../contextual-complex/complex-<kind>.js wizard to add a kind — zero registration. Reuses addNode\'s insertion helper for non-root targets (same atomicity). For targetNodeId="root", detects page (list-shape root) vs component (object-shape root) and splices accordingly.'
     ],
 
     'duplicateNode' => [
@@ -4632,7 +4632,7 @@ $GLOBALS['__help_commands'] = [
                 'secure' => ['total' => '...', 'folders' => '...', 'projects_detail' => '...']
             ]
         ],
-        'notes' => 'Project-scoped: the report covers ONLY the project in the URL marker. secure.projects_detail holds that single project (name, size, file count, its backups); it does not enumerate other projects on the installation, and folder entries carry no absolute filesystem path. summary.project names the reported project (it is NOT the globally served main). Categories combine related folders: projects, backups, admin (public/admin+<secure>/admin), management (API system), core (src+config+logs). Used by dashboard storage overview widget.',
+        'notes' => 'Project-scoped: the report covers ONLY the project in the URL marker. secure.projects_detail holds that single project (name, size, file count, its backups); it does not enumerate other projects on the installation, and folder entries carry no absolute filesystem path. summary.project names the reported project (it is NOT the globally served main). Categories combine related folders: projects, backups, admin (<public>/admin+<secure>/admin), management (API system), core (src+config+logs). Used by dashboard storage overview widget.',
         'error_responses' => [
             '400.project.mismatch' => 'The project named in the body does not match the project in the URL marker. The marker decides; a disagreeing echo is refused rather than ignored.',
             '400.project.required' => 'No project marker on the request. This command is project-scoped: target a project with /management/p/<projectId>/.'
@@ -4717,7 +4717,7 @@ $GLOBALS['__help_commands'] = [
     ],
 
     'listDataBindings' => [
-        'description' => 'Lists the QuickSite-runtime `data-*` attribute catalog — what each attribute does, what value shape it expects, which attrs it pairs with. Consumed by the in-editor autocomplete in the Add Element wizard so users can discover which data-* attributes the runtime recognises (data-state-*, data-auth-*, data-storage-*, data-bind, data-error-for, data-qs-complex, …). Single source of truth lives in <secure>/src/functions/qsDataAttributeCatalog.php — mirrors the qsVerbCatalog.php pattern from beta.7.',
+        'description' => 'Lists the QuickSite-runtime `data-*` attribute catalog — what each attribute does, what value shape it expects, which attrs it pairs with. Consumed by the in-editor autocomplete in the Add Element wizard so users can discover which data-* attributes the runtime recognises (data-state-*, data-auth-*, data-storage-*, data-bind, data-error-for, data-qs-complex, …). Single source of truth lives in <secure>/src/functions/qsDataAttributeCatalog.php.',
         'method' => 'GET',
         'parameters' => [],
         'url_segments' => [
@@ -5406,7 +5406,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_value' => 'A store failed validation (bad store id; endpoint not "@apiId/endpointId"; no fields; bad field name; dir not request|response|both; or missing "from" for a response/both field)',
             '404.route.not_found' => 'Route does not exist'
         ],
-        'notes' => 'Store definition shape — endpoint: "@apiId/endpointId" (required); fetchOnLoad: bool (optional); fields: {name => {dir, init?, default?, from?, append?}} (at least one field). Field directions: "request" (sent only), "response" (set from the response only — requires "from"), "both" (sent from its current value, then updated from the response — requires "from"). init (for sent fields): a literal, or "query:<param>" | "localStorage:<key>" | "sessionStorage:<key>". from (for received fields): a response dot-path (e.g. "data" or "meta.total"). append: true makes a list field grow (infinite scroll) instead of replacing. The definition is runtime-agnostic JSON; beta.8\'s server-side data-resolver reads the same shape. Permission: editStructure.'
+        'notes' => 'Store definition shape — endpoint: "@apiId/endpointId" (required); fetchOnLoad: bool (optional); fields: {name => {dir, init?, default?, from?, append?}} (at least one field). Field directions: "request" (sent only), "response" (set from the response only — requires "from"), "both" (sent from its current value, then updated from the response — requires "from"). init (for sent fields): a literal, or "query:<param>" | "localStorage:<key>" | "sessionStorage:<key>". from (for received fields): a response dot-path (e.g. "data" or "meta.total"). append: true makes a list field grow (infinite scroll) instead of replacing. The definition is runtime-agnostic JSON; the server-side data-resolver reads the same shape. Permission: editStructure.'
     ],
 
     // =========================================================================
@@ -6086,7 +6086,7 @@ $GLOBALS['__help_commands'] = [
             'addEndpoint' => [
                 'required' => false,
                 'type' => 'object',
-                'description' => 'Add a single endpoint: {id, name, path, method, description?, requestSchema?, responseSchema?, headers?, queryParams?, responseBindings?, callableFrom?}. callableFrom (beta.8 A4): "client" | "server" | "both". Absent = auto-derived from auth type (apiKey → server; others → both). Server-only endpoints are filtered out of qs-api-config.js.',
+                'description' => 'Add a single endpoint: {id, name, path, method, description?, requestSchema?, responseSchema?, headers?, queryParams?, responseBindings?, callableFrom?}. callableFrom: "client" | "server" | "both". Absent = auto-derived from auth type (apiKey → server; others → both). Server-only endpoints are filtered out of qs-api-config.js.',
                 'example' => '{"id": "contact", "name": "Contact Form", "path": "/contact", "method": "POST"}'
             ],
             'editEndpoint' => [
@@ -6128,7 +6128,7 @@ $GLOBALS['__help_commands'] = [
             '400.api.error.invalid_parameter' => 'Endpoint already exists (when adding), invalid update operation, or invalid callableFrom value (must be client/server/both or omitted for auto-derive)',
             '404.api.error.not_found' => 'API or endpoint not found'
         ],
-        'notes' => 'Use ONE endpoint operation per request: endpoints (full replace), addEndpoint, editEndpoint, or deleteEndpoint. Regenerates qs-api-config.js automatically (server-only endpoints are filtered out). **callableFrom** (beta.8 A4): per-endpoint marker — "client"/"server"/"both", or absent for auto-derive (apiKey → server, others → both). **countKeyWarnings**: advisory list of count-sentence bindings whose translation key does not resolve in every project language (empty array when all resolve). The edit is saved regardless. **auth.csrf**: optional on auth type "cookie" only — {"from": "cookie:XSRF-TOKEN", "to": "header:X-XSRF-TOKEN"} makes QS.fetch echo the named cookie into the named request header (the double-submit pattern used by the AUTHOR\'s own API, unrelated to QuickSite\'s session).'
+        'notes' => 'Use ONE endpoint operation per request: endpoints (full replace), addEndpoint, editEndpoint, or deleteEndpoint. Regenerates qs-api-config.js automatically (server-only endpoints are filtered out). **callableFrom**: per-endpoint marker — "client"/"server"/"both", or absent for auto-derive (apiKey → server, others → both). **countKeyWarnings**: advisory list of count-sentence bindings whose translation key does not resolve in every project language (empty array when all resolve). The edit is saved regardless. **auth.csrf**: optional on auth type "cookie" only — {"from": "cookie:XSRF-TOKEN", "to": "header:X-XSRF-TOKEN"} makes QS.fetch echo the named cookie into the named request header (the double-submit pattern used by the AUTHOR\'s own API, unrelated to QuickSite\'s session).'
     ],
     
     'deleteApi' => [
@@ -6733,6 +6733,61 @@ function __help_command_surface(): array {
 }
 
 /**
+ * Per-command scope, derived from the same category map the permission check
+ * resolves through.
+ *
+ * WHY THIS EXISTS. Whether a call needs the project marker
+ * (`/management/p/<projectId>/<command>`) or not is the single fact that decides
+ * whether it succeeds at all, and `help` did not carry it — a caller reading the
+ * self-documenting endpoint could learn a command's parameters, its method, its
+ * responses and its errors, and still get `400 project.required` because nothing
+ * told them which URL shape to use.
+ *
+ * DERIVED, never hand-listed. `categories.php` already records the scope of every
+ * command; a second list here would be a third copy of the same fact and the one
+ * that goes wrong. `null` means the command is in no category at all, which is a
+ * configuration defect rather than a scope — it is surfaced rather than guessed,
+ * because guessing "project" would send a caller to a URL shape nothing accepts.
+ *
+ * @return array<string, array{scope:string|null, access:string|null}>
+ */
+function __help_command_scopes(): array {
+    $surface = __help_command_surface();
+    $map = [];
+    foreach ($surface['categories'] as $def) {
+        foreach ($def['commands'] as $cmd) {
+            $map[$cmd] = [
+                'scope'  => $def['scope'] ?? null,
+                'access' => $def['access'] ?? null,
+            ];
+        }
+    }
+    return $map;
+}
+
+/**
+ * Stamp one documentation entry with how it must be addressed.
+ *
+ * `endpoint` is the URL shape rather than a URL: no host, no resolved path, and
+ * `<projectId>` left as a placeholder. `help` answers before authentication and
+ * must read identically on every installation.
+ */
+function __help_with_scope(string $command, array $entry, array $scopes): array {
+    $scope  = $scopes[$command]['scope']  ?? null;
+    $access = $scopes[$command]['access'] ?? null;
+
+    $entry['scope'] = $scope;
+    if ($access !== null) {
+        $entry['access'] = $access;
+    }
+    $entry['endpoint'] = $scope === 'global'
+        ? '/management/' . $command
+        : ($scope === 'project' ? '/management/p/<projectId>/' . $command : null);
+
+    return $entry;
+}
+
+/**
  * Command function for internal execution via CommandRunner
  *
  * @param array $params Body parameters (unused for this command)
@@ -6750,7 +6805,7 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
         if (isset($commands[$cmd])) {
             return ApiResponse::create(200, 'operation.success')
                 ->withMessage('Command documentation retrieved')
-                ->withData($commands[$cmd]);
+                ->withData(__help_with_scope($cmd, $commands[$cmd], __help_command_scopes()));
         } else {
             return ApiResponse::create(404, 'route.not_found')
                 ->withMessage("Command documentation not found")
@@ -6768,6 +6823,13 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
     // most component __enums__ tables declare. Lossy on purpose — the
     // primary `commands` object map keeps the full per-command schema
     // for any tool that needs deep details.
+    // Every entry carries how it must be addressed, from the same category map
+    // the permission check reads — see __help_command_scopes().
+    $scopes = __help_command_scopes();
+    foreach ($commands as $cmdName => $cmdDef) {
+        $commands[$cmdName] = __help_with_scope($cmdName, $cmdDef, $scopes);
+    }
+
     $commandsList = [];
     foreach ($commands as $cmdName => $cmdDef) {
         $methodLower = isset($cmdDef['method']) ? strtolower((string)$cmdDef['method']) : 'get';
@@ -6780,6 +6842,8 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
         $commandsList[] = [
             'name'        => $cmdName,
             'method'      => $methodLower,
+            'scope'       => $cmdDef['scope'] ?? null,
+            'endpoint'    => $cmdDef['endpoint'] ?? null,
             'description' => $cmdDef['description'] ?? '',
             'example'     => $exampleStr,
         ];

@@ -34,6 +34,9 @@
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+// Public command: it answers before the dispatcher installs its logging
+// callback, so the security log is written from here.
+require_once SECURE_FOLDER_PATH . '/src/functions/securityLog.php';
 
 function __command_register(array $params = [], array $urlParams = []): ApiResponse {
     $name = (string)($params['name'] ?? '');
@@ -82,6 +85,20 @@ function __command_register(array $params = [], array $urlParams = []): ApiRespo
                 return ApiResponse::create(500, 'server.registration_failed')
                     ->withMessage('Could not register the account');
         }
+    }
+
+    // Recorded ONLY when an account was really created. The response above is
+    // deliberately identical either way, so a duplicate username must leave no
+    // trace here either — a log entry per attempt would rebuild, on disk, the
+    // account-existence oracle the uniform response exists to deny. The log is
+    // server-side and never reaches the caller, but an operator reading two
+    // entries where one account exists would be reading a wrong trail.
+    if (!empty($attempt['created'])) {
+        qs_security_log(
+            QS_SEC_ACCOUNT_CREATED,
+            ['via' => 'self_registration'],
+            isset($attempt['userId']) ? (string)$attempt['userId'] : null
+        );
     }
 
     // UNIFORM success — identical whether the account was created or the

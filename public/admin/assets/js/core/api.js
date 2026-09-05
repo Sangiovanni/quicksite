@@ -279,11 +279,22 @@ window.QuickSiteAPI = (function() {
     // the one worth naming precisely: on nginx it is the default 1 MB request
     // body limit, which is SMALLER than the upload size PHP accepts, so it is
     // the failure a deployer actually hits.
+    //
+    // ⚠ NAMES THE DIRECTIVE, NOT A PATH. This used to point at
+    // `secure/deploy/nginx-vhosts.conf.example`, which is wrong on any install
+    // whose secure folder was renamed — the same defect the engine avoids by
+    // interpolating SECURE_FOLDER_NAME. That constant cannot reach this file
+    // without publishing the folder name into every admin page's HTML via
+    // QUICKSITE_CONFIG, which is a disclosure trade for one sentence. It is not
+    // needed: the person who sees this message is whoever tried the upload, not
+    // necessarily the operator, and `client_max_body_size` is the actionable
+    // fact. Anyone with server access finds the shipped example by name.
     function nonJsonMessage(status) {
         if (status === 413) {
             return 'The file is too large for this server to accept. It was refused by the web '
                  + 'server before QuickSite saw it — on nginx this is client_max_body_size, '
-                 + 'which defaults to 1 MB (see secure/deploy/nginx-vhosts.conf.example).';
+                 + 'which defaults to 1 MB. Raising it is a server change: see the shipped '
+                 + 'nginx-vhosts.conf.example in the deploy folder.';
         }
         if (status === 502 || status === 503 || status === 504) {
             return 'The server is not responding (HTTP ' + status + '). It may be restarting, '

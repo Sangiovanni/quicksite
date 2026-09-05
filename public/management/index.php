@@ -118,10 +118,15 @@ $authResult = validateBearerToken($authHeader);
 if (!$authResult['valid']) {
     // Both halves are required — the session cookie AND the session token in
     // the header. A caller missing either is told the same thing: sign in.
+    // $earlyCommand is what the URL asked for, parsed above and NOT yet checked
+    // against the routable list — the caller is unauthenticated, so nothing here
+    // is trusted. It is passed only so the security record says what was being
+    // reached for; an unroutable name is itself worth seeing in that trail.
     sendUnauthorizedResponse(
         $authResult['error'],
         'Sign in with the login command, then send its session cookie plus the header: Authorization: Bearer <session_token>',
-        $authResult['code'] ?? 'auth.unauthorized'
+        $authResult['code'] ?? 'auth.unauthorized',
+        $earlyCommand
     );
 }
 
@@ -207,6 +212,60 @@ $commandCategory  = getCommandCategory($command);
 $categoriesConfig = loadCategoriesConfig();
 $commandScope     = $categoriesConfig[$commandCategory]['scope'] ?? 'project';
 
+// ============================================================================
+// Logging callback
+// ============================================================================
+// ⚠ INSTALLED BEFORE THE PERMISSION CHECK, DELIBERATELY. `sendForbiddenResponse`
+// answers through ApiResponse, so the callback is what records a refusal — and a
+// callback registered after the check could never see one. Everything the
+// closure needs is already resolved at this point: the caller, the command, the
+// marker project and its scope. The 400s raised between here and the command
+// (project.required / project.invalid) reach the callback too and are dropped by
+// its own gate, which records 2xx plus the authorization refusal and nothing else.
+// Parse request body for logging.
+// is_array, NOT `?? []`: null-coalesce only catches a decode FAILURE. A JSON
+// SCALAR body ('5', '"s"', 'true', '1.5') decodes to a non-null NON-array, which
+// then reached logCommand()'s `array $body` parameter as a TypeError — a fatal
+// raised inside ApiResponse's beforeSend callback, i.e. on the way OUT of an
+// otherwise-successful request (beta.10 C13 F-C13-10, second carrier).
+$decodedBody = json_decode(REQUEST_BODY_RAW, true);
+$requestBody = is_array($decodedBody) ? $decodedBody : [];
+
+// The command log is PER-PROJECT (C10 10.1b). The bucket comes from the command's
+// SCOPE, never from PROJECT_NAME: a global command is given a benign working
+// context from the caller's UX-default project below, so PROJECT_NAME would
+// mis-file global actions into whichever project the user happens to have
+// selected. Project-scoped => the authorized marker project; global => null,
+// which logCommand routes to the write-only `_global` bucket.
+$logProject = ($commandScope === 'project') ? $requestedProject : null;
+
+// The command's REQUEST PARAMETERS, which are not in the body (beta.11 S6.6).
+// Much of the surface takes arguments as URL path segments
+// (`getStructure/pages/home`) or as a query string
+// (`getCommandHistory?start_date=…`), and until now neither reached the log —
+// so the trail recorded that a command ran without recording what it was asked
+// for. Captured here, beside the body, from the same parser the command itself
+// reads. Sanitised in sanitizeLogParams().
+$logUrlParams = $trimParametersManagement->additionalParams();
+$logQuery     = $_GET;
+
+// Set up logging callback
+ApiResponse::setBeforeSendCallback(function($status, $responseCode) use ($command, $currentUser, $commandStartTime, $requestBody, $logProject, $logUrlParams, $logQuery) {
+    logCommand(
+        $command,
+        $_SERVER['REQUEST_METHOD'],
+        $requestBody,
+        $currentUser,
+        $status,
+        $responseCode,
+        $commandStartTime,
+        $logProject,
+        $logUrlParams,
+        $logQuery
+    );
+});
+
+
 if ($commandScope === 'project') {
     // A project-scoped command MUST target a project.
     if ($requestedProject === null || $requestedProject === '') {
@@ -242,48 +301,5 @@ if ($commandScope === 'project') {
 // ============================================================================
 // Execute Command
 // ============================================================================
-
-// Parse request body for logging.
-// is_array, NOT `?? []`: null-coalesce only catches a decode FAILURE. A JSON
-// SCALAR body ('5', '"s"', 'true', '1.5') decodes to a non-null NON-array, which
-// then reached logCommand()'s `array $body` parameter as a TypeError — a fatal
-// raised inside ApiResponse's beforeSend callback, i.e. on the way OUT of an
-// otherwise-successful request (beta.10 C13 F-C13-10, second carrier).
-$decodedBody = json_decode(REQUEST_BODY_RAW, true);
-$requestBody = is_array($decodedBody) ? $decodedBody : [];
-
-// The command log is PER-PROJECT (C10 10.1b). The bucket comes from the command's
-// SCOPE, never from PROJECT_NAME: a global command is given a benign working
-// context from the caller's UX-default project above, so PROJECT_NAME would
-// mis-file global actions into whichever project the user happens to have
-// selected. Project-scoped => the authorized marker project; global => null,
-// which logCommand routes to the write-only `_global` bucket.
-$logProject = ($commandScope === 'project') ? $requestedProject : null;
-
-// The command's REQUEST PARAMETERS, which are not in the body (beta.11 S6.6).
-// Much of the surface takes arguments as URL path segments
-// (`getStructure/pages/home`) or as a query string
-// (`getCommandHistory?start_date=…`), and until now neither reached the log —
-// so the trail recorded that a command ran without recording what it was asked
-// for. Captured here, beside the body, from the same parser the command itself
-// reads. Sanitised in sanitizeLogParams().
-$logUrlParams = $trimParametersManagement->additionalParams();
-$logQuery     = $_GET;
-
-// Set up logging callback
-ApiResponse::setBeforeSendCallback(function($status, $responseCode) use ($command, $currentUser, $commandStartTime, $requestBody, $logProject, $logUrlParams, $logQuery) {
-    logCommand(
-        $command,
-        $_SERVER['REQUEST_METHOD'],
-        $requestBody,
-        $currentUser,
-        $status,
-        $responseCode,
-        $commandStartTime,
-        $logProject,
-        $logUrlParams,
-        $logQuery
-    );
-});
 
 require_once SECURE_FOLDER_PATH . '/management/command/'. $command .'.php';
