@@ -38,12 +38,18 @@ The requirement lives at the shared account-creation path rather than in the pag
 
 `layout.php` emits `<script>` tags in this exact order:
 
-1. Inline `<script>` defines `window.QUICKSITE_CONFIG` (apiBase, adminBase, baseUrl, publicSpace, defaultLang, multilingual, translations, token, …). The `token` is the panel session's **per-session token**, sent back on every management call as `Authorization: Bearer` so the server can tell the call came from a page of this session. It is not a credential on its own — the session cookie is — and it MUST be in this first block, because `api.js` seeds from it and `admin.js` loads permissions at parse time.
+1. Inline `<script>` — the language bootstrap. Reads the admin language from browser storage and may redirect before anything else runs.
 2. `core/storage-keys.js` → defines `window.QuickSiteStorageKeys` (single source of truth for localStorage / sessionStorage key strings).
-3. `core/api.js` → defines `window.QuickSiteAPI` (`request()`, `upload()`; emits `quicksite:command-executed` after every successful write). Holds the session token in memory and sends it with every call alongside the session cookie. There is nothing to refresh or expire client-side: a session ends by signing out, by going idle, or by the account's session generation being bumped, and all three surface as a `401` that sends the user to the login page. `setTokenSource(fn)` lets an embedding platform plug its own token provider, and that is the only case with a transparent retry.
-4. `core/utils.js` → defines `window.QuickSiteUtils` (toasts, confirms, escaping, prefs, pending messages).
-5. `admin.js` → defines `window.QuickSiteAdmin` (singleton: permissions load, user badge, nav, page utility delegation).
-6. The page template loads its page-specific module(s). For preview pages, `preview-config.php` runs first and exposes `window.PreviewConfig`.
+3. `core/dom.js` → defines `window.QSDom`, in `<head>` so page scripts can use it at parse time.
+4. `core/searchable-select.js` → the type-ahead select widget.
+5. Inline `<script>` defines `window.QUICKSITE_CONFIG` (apiBase, adminBase, baseUrl, publicSpace, defaultLang, multilingual, translations, token, …). The `token` is the panel session's **per-session token**, sent back on every management call as `Authorization: Bearer` so the server can tell the call came from a page of this session. It is not a credential on its own — the session cookie is — and it MUST come before the scripts below, because `api.js` seeds from it and `admin.js` loads permissions at parse time.
+6. `core/api.js` → defines `window.QuickSiteAPI` (`request()`, `upload()`; emits `quicksite:command-executed` after every successful write). Holds the session token in memory and sends it with every call alongside the session cookie. There is nothing to refresh or expire client-side: a session ends by signing out, by going idle, or by the account's session generation being bumped, and all three surface as a `401` that sends the user to the login page. `setTokenSource(fn)` lets an embedding platform plug its own token provider, and that is the only case with a transparent retry.
+7. `core/utils.js` → defines `window.QuickSiteUtils` (toasts, confirms, escaping, prefs, pending messages).
+8. `core/members-badge.js` → the membership counts behind the Members nav badge.
+9. `admin.js` → defines `window.QuickSiteAdmin` (singleton: permissions load, user badge, nav, page utility delegation).
+10. `core/update-notice.js` → emitted **only** for an account named in `operator.php`, so nobody else downloads it. After `api.js`, which is where its helper call comes from.
+11. Inline `<script>` sets `QUICKSITE_CONFIG.apiUrl` (skipped on the login page).
+12. The page template loads its page-specific module(s). For preview pages, `preview-config.php` runs first and exposes `window.PreviewConfig`.
 
 Any reorder breaks the chain. Treat the load order as a published contract.
 
@@ -69,17 +75,17 @@ There is **no** `pages/ai.js`, `pages/batch.js`, or `pages/docs.js` in the curre
 
 ## 4. Event bus
 
-One custom event system-wide:
+Four custom events, each with one emitter and one listener:
 
-```
-emitter:   js/core/api.js  (after successful non-GET command responses)
-event:     CustomEvent('quicksite:command-executed', { detail: { command, response } })
+| Event | Emitted by | Listened for by |
+|---|---|---|
+| `quicksite:command-executed` | `js/core/api.js`, after a successful non-GET command | `js/components/miniplayer.js` — reloads the floating preview iframe |
+| `quicksite:workflow-complete` | `js/pages/preview/preview-ai-tools.js`, after a workflow batch runs | `js/components/miniplayer.js` |
+| `quicksite:memberships-changed` | the membership pages, after a roster or inbox action | `js/core/members-badge.js` — recomputes the counts |
+| `quicksite:membership-counts-updated` | `js/core/members-badge.js`, once counts are recomputed | `js/pages/dashboard-memberships.js` — fills the dashboard card |
 
-listeners: js/components/miniplayer.js                    (reloads floating preview iframe)
-           js/pages/preview/preview-miniplayer.js          (preview-page instance)
-```
-
-Payload shape is implicit — there is no schema or version field.
+`quicksite:command-executed` carries `{ detail: { command, response } }`. Payload
+shapes are implicit — there is no schema or version field on any of them.
 
 ---
 
@@ -197,7 +203,7 @@ Public API: `QSEasingPicker.open({ anchor, value, onConfirm, onCancel })` → on
 
 ## 6. Storage key registry
 
-Every localStorage / sessionStorage key is declared as a constant in `js/core/storage-keys.js`.
+Almost every localStorage / sessionStorage key is declared as a constant in `js/core/storage-keys.js`. The exception is the admin language, which `layout.php` reads and writes directly as `quicksite_admin_lang`: it is needed by the language bootstrap that runs before any script loads, including the registry itself.
 
 The panel and every project on the install share **one browser-storage origin** —
 a path is not part of an origin, so `/admin/` and `/p/<id>/` address the same
@@ -226,19 +232,19 @@ Two other cookies exist, both HttpOnly and neither readable by page scripts. `QS
 
 | Constant | Storage | Used by |
 |---|---|---|
-| `PREFS` | localStorage | `utils.js`, `admin.js`, `settings.js`, `preview-sidebar-resize.js` |
-| `PENDING_MESSAGE` | sessionStorage | `utils.js`, `admin.js` |
-| `API_AUTH_TOKENS` | localStorage | `apis.js` |
-| `AI_CONNECTIONS_V3` | localStorage | `connections-store.js` (canonical), `ai-connections.js` |
-| `AI_KEYS_V2` | localStorage / sessionStorage | `connections-store.js`, `settings.js` — read-only, for the v2 → v3 migration |
-| `AI_DEFAULT_PROVIDER` | localStorage / sessionStorage | `connections-store.js`, `settings.js` |
-| `AI_PERSIST` | localStorage | `connections-store.js`, `ai-connections.js`, `settings.js` |
-| `AI_AUTO_PREVIEW` | localStorage | declared; no current reader |
-| `AI_AUTO_EXECUTE` | localStorage | `preview-ai-tools.js`, `ai-connections.js`, `settings.js` |
-| `STYLE_SOURCE_DRAFT` | localStorage | `preview-style-source.js` (visual-editor CSS mode → Source view; debounced draft of unsaved edits, restored on next entry, cleared on save / discard) |
-| `UPDATE_CHECK_AT` | localStorage | `update-notice.js` — epoch ms of the last update check, so a panel navigation does not spend a GitHub API call each time |
-| `UPDATE_NOTICE_HIDDEN` | localStorage | `update-notice.js` — the version string the operator dismissed; stored as the version, not a flag, so the next release shows the notice again |
-| `UPDATE_LAST_SEEN` | localStorage | `update-notice.js` — the newest version the last check reported, so the banner can re-render inside the throttle window without another call |
+| `adminPrefs` | localStorage | `utils.js`, `admin.js`, `settings.js`, `preview-sidebar-resize.js` |
+| `pendingMessage` | sessionStorage | `utils.js`, `admin.js` |
+| `apiAuthTokens` | localStorage | `apis.js` |
+| `aiConnectionsV3` | localStorage | `connections-store.js` (canonical), `ai-connections.js` |
+| `aiKeysV2` | localStorage / sessionStorage | `connections-store.js`, `settings.js` — read-only, for the v2 → v3 migration |
+| `aiDefaultProvider` | localStorage / sessionStorage | `connections-store.js`, `settings.js` |
+| `aiPersist` | localStorage | `connections-store.js`, `ai-connections.js`, `settings.js` |
+| `aiAutoPreview` | localStorage | declared; no current reader |
+| `aiAutoExecute` | localStorage | `preview-ai-tools.js`, `ai-connections.js`, `settings.js` |
+| `styleSourceDraft` | localStorage | `preview-style-source.js` (visual-editor CSS mode → Source view; debounced draft of unsaved edits, restored on next entry, cleared on save / discard) |
+| `updateCheckAt` | localStorage | `update-notice.js` — epoch ms of the last update check, so a panel navigation does not spend a GitHub API call each time |
+| `updateNoticeHidden` | localStorage | `update-notice.js` — the version string the operator dismissed; stored as the version, not a flag, so the next release shows the notice again |
+| `updateLastSeen` | localStorage | `update-notice.js` — the newest version the last check reported, so the banner can re-render inside the throttle window without another call |
 
 ---
 
@@ -284,7 +290,7 @@ The sidebar exposes eight modes, each backed by a `data-mode="..."` button. Sour
 | **Select** | `select` | Click an element → inspect node, add a sibling/child, **edit its params + class + mandatory attrs in place** (via the Edit Params button), delete, duplicate, or save as snippet / component. |
 | **Drag** | `drag` | Drag elements to reorder within parent (`preview-drag.js`). |
 | **Text** | `text` | Inline-edit a text node's translation **for the currently selected language**. Intentionally primitive: no rich text, no line breaks. Edits the value, never the key. |
-| **CSS** | `style` | Click an element → CSS panel (Theme / Selectors / Motion tabs); edits apply to the element's selector with full pseudo-state support. The Theme tab includes an inline **+ Add variable** form per section (Colors / Fonts / Spacing) for scope-aware writes (current light/dark scope, optional "also other scope" when dark mode is enabled). The Motion tab (formerly Animations) is reshaped around two sections: **Selectors with motion** (transitions + animations + a "hover-state-only" diagnostic) and the **Keyframes library** below — see §8.11. Designer / developer / admin roles also see a top-row **Source** advanced view that opens the whole `style.css` in a code editor — see §8.10. |
+| **CSS** | `style` | Click an element → CSS panel (Theme / Selectors / Motion tabs); edits apply to the element's selector with full pseudo-state support. The Theme tab includes an inline **+ Add variable** form per section (Colors / Fonts / Spacing) for scope-aware writes (current light/dark scope, optional "also other scope" when dark mode is enabled). The Motion tab carries two sections: **Selectors with motion** (transitions + animations + a "hover-state-only" diagnostic) and the **Keyframes library** below — see §8.11. Designer / developer / admin roles also see a top-row **Source** advanced view that opens the whole `style.css` in a code editor — see §8.10. |
 | **Interactions** | `js` | Event editor (`preview-js-interactions.js`). Three CRUD-capable panels: **per-element interactions** (the selected node's `onclick`/`oninput`/etc.), **Page Events** (page-level `onload`/`onresize`/`onscroll`), and **State Stores** (page-scoped state). Each interaction is a `{{call:fn:args}}` chain using a QS.* verb from the catalog. |
 | **Translations** | `translation` | Site-wide translation key manager (`preview-translation.js`). Per-language coverage % + counts, scope picker (Pages / Layout / Components), inline row-expand editor, per-row + bulk delete. Mono- and multi-lingual. See §8.9. |
 | **AI tools** | `ai-tools` | In-editor workflow runner. Searchable + tag-filtered list of workflow specs grouped by category; picking one swaps the panel into a 3-zone runner (INPUTS / AI EXCHANGE / EXECUTION). Element clicks in the iframe behave as in Select mode — workflows with a `selector` parameter auto-fill from the current selection. See §8.12. |
@@ -301,7 +307,7 @@ The toolbar carries a **Page** dropdown (any route in `routes.php`) and a **Lang
 
 ### 8.3 Device preview
 
-Three breakpoints: Desktop (1920), Tablet (768), Mobile (375). The iframe is resized; the project's media queries apply automatically.
+Three device widths: Desktop, Tablet (768 x 1024) and Mobile (375 x 667). Desktop is the iframe's full available width rather than a fixed pixel size, so it follows the window; the other two resize the iframe. The project's media queries apply automatically.
 
 ### 8.4 Shared regions
 
@@ -325,7 +331,7 @@ Menu and footer are global — editing them in any page's preview applies site-w
 1. Iframe loads with `?_editor=1` → renderer adds `data-qs-node` / `data-qs-struct`.
 2. Click → iframe sends node path via `postMessage`.
 3. Sidebar shows properties of the selected node.
-4. Edit → API call to `editStructure` / `editNode` / `setStyleRule` / `editTranslation` / etc.
+4. Edit → API call to `editStructure` / `editNode` / `setStyleRule` / `setTranslationKeys` / etc.
 5. Preview reloads, or updates inline for text-only changes.
 
 **A page with no nodes still has something to click.** Selection is anchored to
@@ -385,7 +391,7 @@ selects with all their options, lists, field rows with the
 2. The **kind-specific form** rendered by that wizard's
    `renderWizard(container)`.
 3. The standard footer **Save** button calls the controller's
-   `validate()` then `getConfig()`, then `POST /management/addComplexElement`.
+   `validate()` then `getConfig()`, then `POST /management/p/<projectId>/addComplexElement`.
 
 The top-of-page "Add Element" quick-add button is hidden while the
 Complex tab is active — the wizard needs config first, so the
@@ -500,7 +506,7 @@ on their root node become **translatable in bulk**: select the rendered
 element in Select mode, click **Translate from CSV** in the action
 toolbar (button auto-shows when the marker is present), paste a CSV
 in another language, pick the target language, click Apply. The
-`POST /management/importStructureTranslations` command validates that
+`POST /management/p/<projectId>/importStructureTranslations` command validates that
 the existing structure's dimensions match the pasted grid exactly
 (returns a 422 with a diff on mismatch — no partial writes) and writes
 the values into the picked language's translation file for every key
@@ -824,7 +830,7 @@ The AI call is browser-direct via `QSAiCall.call(...)` (see `public/admin/assets
 | Styles | `public/admin/assets/css/preview-ai-tools.css` |
 | Workflow detail endpoint | `public/admin/api/index.php` (`ai-spec-raw`, `ai-spec`) |
 | Deterministic resolver endpoint | `public/admin/api/index.php` (`workflow-generate-steps`) |
-| Per-command execution | direct `POST /management/{command}` |
+| Per-command execution | direct `POST /management/p/<projectId>/{command}` — the marker comes from `PreviewConfig.managementUrl` |
 | AI dispatch | `public/admin/assets/js/pages/ai/lib/ai-call.js` (+ `provider-catalog.js`, `connections-store.js`, `stream-parsers.js`) |
 | Workflow framework | `secure/src/classes/WorkflowManager.php` |
 
