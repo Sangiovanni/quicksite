@@ -2083,8 +2083,8 @@ splits).
 | Storage + validation helpers | `secure/src/functions/resolverHelpers.php` |
 | Cache layer | `secure/src/functions/resolverCache.php` + `cleanResolverCache` command |
 | Read / write commands | `setRouteResolver` (set / clear / patch / append / remove single slot) |
-| Page emit — flat namespace | `secure/src/classes/Page.php` (templates read via `{{resolved:NAME}}` substitution) |
-| Page emit — `r0`/`r1` namespaced | Same, plus `secure/src/functions/runtimeHandoff.php` for the JS-side mirror |
+| Page emit — flat namespace | `secure/src/classes/JsonToHtmlRenderer.php` performs the `{{resolved:NAME}}` / `{{resolved:NAME.dot.path}}` substitution; the values reach it through `secure/src/functions/resolverRegistry.php` (`qs_set_resolved_vars` / `qs_get_resolved_vars`) |
+| Page emit — `r0`/`r1` namespaced | Same substitution, with `secure/src/functions/runtimeHandoff.php` building the JS-side mirror |
 | Hydration handoff to client | `secure/src/functions/runtimeHandoff.php` → `window.QS_RESOLVED` + `window.QS_RESOLVED_BY_INDEX`. One writer, so a built site emits the same blocks the live view does. |
 | Admin UI — list view + per-config modal | `/admin/sitemap` → context menu ⋯ → "Configure resolver" — partials `sitemap-resolver-list.php` + `sitemap-resolver.php`; logic in `public/admin/assets/js/pages/sitemap.js` |
 
@@ -3075,7 +3075,7 @@ Below the build, the page reports what the project occupies, how much of that is
 A build is roughly the size of the project's content, so a project can grow past the point where its own build still fits. The page warns before that happens:
 
 - **What must fit**: the projected build, taken as the project's current content size.
-- **What is available**: the free quota **plus** the bytes the existing build already occupies — at one build per project the old one is deleted before the new one is made, so its space comes back.
+- **What is available**: the free quota **plus** the bytes the existing build already occupies — at one build per project you have to delete the old one before a new one is allowed, so its space is back by the time the new build is written.
 - **When it warns**: once the projected build would take more than **half** of that.
 
 Below the line the panel is silent. With no quota configured there is no ceiling to run into and the page says so instead of inventing a number.
@@ -3163,7 +3163,7 @@ Three routes, each gated on the same read the page is:
 
 ### 9.17 Command console (/admin/command)
 
-A form for every command in the Management API, generated from the same `help` metadata the API serves, plus a searchable index of them by category. It is the escape hatch into the raw API from inside the panel: everything the purpose-built pages do, and everything they do not. Command history used to be a second tab here; it is now its own page (§9.18), and `/admin/command?tab=history` redirects there.
+A form for every command in the Management API, generated from the same `help` metadata the API serves, plus a searchable index of them by category. It is the escape hatch into the raw API from inside the panel: everything the purpose-built pages do, and everything they do not. Command history is its own page (§9.18), not a tab here; `/admin/command?tab=history` redirects there.
 
 #### An installation can decline to offer it
 
@@ -3202,7 +3202,7 @@ What ran on this project, who ran it, and what came back. Reached from **Build �
 
 #### The table
 
-Each row is one executed command: when, which command, the HTTP method, **who ran it**, whether it succeeded, and how long it took. The command name links into the console — unless the installation has the console switched off (§9.17), in which case it is plain text rather than a link to a page that would only say it is unavailable.
+Each row is one command the project answered: when, which command, the HTTP method, **who ran it**, whether it succeeded, and how long it took. Successful commands are recorded, and so is the one refusal that names a caller — a `403 auth.forbidden`, where somebody signed in asked for something their role on this project does not carry. The command name links into the console — unless the installation has the console switched off (§9.17), in which case it is plain text rather than a link to a page that would only say it is unavailable.
 
 "Who" is the account's display name, with the stable user id on hover; the detail view shows both separately, since a display name can change and a user id cannot.
 
@@ -3232,10 +3232,10 @@ Clearing is available here whether or not the command console is switched on. Th
 
 QuickSite's runtime understands a small set of `data-*` attributes that
 turn plain HTML elements into bindings (state-store readers, auth-state
-toggles, storage value displays, complex-element markers, …). Every
+toggles, storage value displays, complex-element markers, …). Nearly every
 attribute on this page is **catalogued in
 `secure/src/functions/qsDataAttributeCatalog.php`** — the single source
-of truth read by `GET /management/listDataBindings` and by the in-editor
+of truth read by `GET /management/p/<projectId>/listDataBindings` and by the in-editor
 autocomplete + smart widgets, available on **both** the Add Element
 wizard's Advanced custom-params section AND the Edit Params surface
 (action panel button next to Add / Duplicate). The same picker —
@@ -3243,6 +3243,10 @@ autocomplete dropdown, per-attribute description box, smart widgets
 (store/field cascader, enum select, storage-spec composer), reserved-
 storage-key blocking — applies whether you're authoring a new element OR
 editing an existing one's bindings.
+
+The consent bindings are the exception: `data-consent-show` and its siblings are
+read by the runtime but carry no catalogue entry, so the picker does not offer
+them and they have to be typed by hand. They are documented in §9.10.
 
 This section is the task-oriented index for those attributes. For
 per-feature deep-dives (semantics, edge cases, full examples), see the
@@ -3274,7 +3278,7 @@ deep-dive.
 **Editor-only chrome** (auto-emitted by the renderer in editor mode;
 users should NOT author these): `data-qs-textkey`, `data-qs-raw`,
 `data-qs-textonly`, `data-qs-node`, `data-qs-struct`. The picker
-hides these by default. Pass `GET /management/listDataBindings/all`
+hides these by default. Pass `GET /management/p/<projectId>/listDataBindings/all`
 to see them.
 
 ### 10.2 How to author these — admin-panel click paths
