@@ -922,9 +922,10 @@ match, so an unrelated literal like `users` is never removed. A placeholder that
 is only *part* of a segment is left alone, because removing half a segment has no
 defensible meaning.
 
-One rule, three implementations that must agree: `qs_api_substitute_path()` in
-`secure/src/functions/apiRegistry.php` (the test panel and the server-side
-resolver) and `substitutePath()` in `secure/src/runtime/qs.js` (the browser).
+One rule, two implementations that must agree: `qs_api_substitute_path()` in
+`secure/src/functions/apiRegistry.php` (used by the test panel and the
+server-side resolver) and `substitutePath()` in `secure/src/runtime/qs.js` (the
+browser).
 
 Direct-URL mode is deliberately excluded: `QS.fetch('GET', 'https://…')` has no
 `parameters` list to say what is optional, and the author typed that URL by hand,
@@ -949,7 +950,7 @@ top-level keys and picks the appropriate converter:
 | Top-level `apis: {...}` | Native | Pasted as-is. The shape exported by the page's Export button. |
 | Top-level `openapi: "3.x"` | OpenAPI 3.x | Converted by the OpenAPI converter (below). |
 | Top-level `swagger: "2.0"` | Swagger 2.0 | Detected and explicitly unsupported — the preview points the user at `converter.swagger.io` to convert to 3.x first. |
-| Top-level `endpoints.{public, secured, ...}` | File-manager | Legacy converter — each group becomes its own API named `<base>-<group>`; bearer/basic/apiKey auth derived from the group's `authentication.type`; `:placeholders` rebuilt from each endpoint's declared parameters + `route_format` (a `"path segments"` hint turns a `name` parameter into `/name/:name`), and an endpoint that already carries a `:placeholder` keeps it. |
+| Top-level `endpoints.{public, secured, ...}` | File-manager | Legacy converter — each group becomes its own API, its id always `test-api-<group>` and its display name `<api_name> (<group>)` from the document's own `api_name` (defaulting to `Test API`); bearer/basic/apiKey auth derived from the group's `authentication.type`; `:placeholders` rebuilt from each endpoint's declared parameters + `route_format` (a `"path segments"` hint turns a `name` parameter into `/name/:name`), and an endpoint that already carries a `:placeholder` keeps it. |
 
 **OpenAPI 3.x converter** (`openapi-converter.js`). Maps an OpenAPI
 document to one QuickSite API + one endpoint per `paths.<path>.<method>`:
@@ -1017,8 +1018,9 @@ table + data-bind coverage warning + empty-text input.
 
 **When the picker cannot offer a binding, it says so**
 
-Three conditions used to produce nothing at all — no rows, no radios, no
-message — which reads as a broken panel rather than a missing prerequisite:
+Three conditions would otherwise produce nothing at all — no rows, no radios, no
+message — which reads as a broken panel rather than a missing prerequisite. In
+each, the picker explains instead:
 
 | Condition | What you see |
 |---|---|
@@ -1634,7 +1636,7 @@ Phase 2 — User clicks the email link (out of band):
 Phase 3 — Page loads, exchange runs:
   Browser              QuickSite site         Auth API
    │ GET /auth/magic/abc123 │                    │
-   ├───────────────────────>│ A1 matches /auth/magic/:key
+   ├───────────────────────>│ the param route /auth/magic/:key matches
    │<───────────────────────│ renders page (with magic-link-handler component)
    │ onload chain fires:    │                    │
    │ POST /exchange-magic   │                    │
@@ -1978,7 +1980,7 @@ init / `setState` / `fetchState`:
   Handy for hiding Next at the last page, "Load more" when `hasMore` is
   false, etc.
 - `data-state-pagenav="storeId"` (+ optional `-page-field` / `-totalpages-field`
-  / `-window` / `-prev-next` companion attributes — see `ARCHITECTURE.md §9`)
+  / `-window` / `-prev-next` companion attributes, with their defaults, in §10.3)
   — runtime-rendered numbered-page navigator. Emitted by the `paged-navigator`
   complex element wizard; hand-author the bindings if you want a custom shape.
 
