@@ -4,13 +4,23 @@
 
 ## Endpoint
 
-All API calls go through one entry point:
+All API calls go through one entry point, in one of two forms:
 
 ```
-http(s)://<your-domain>/management/<command>[/<urlParam>]
+http(s)://<your-domain>/management/<command>[/<urlParam>]                 global
+http(s)://<your-domain>/management/p/<projectId>/<command>[/<urlParam>]   project-scoped
 ```
 
-`public/management/index.php` authenticates the request, dispatches to a command handler in `secure/management/command/`, and returns a uniform JSON response.
+**Nearly every command is project-scoped and takes the second form.** The
+`p/<projectId>` marker names the project the command acts on, and it is the only
+thing that does: a project named in the request body is an optional echo that must
+agree with the marker, never a substitute for it. Called without a marker, a
+project-scoped command answers `400 project.required`.
+
+Only seven commands belong to no project and take the first form: `help`, `login`,
+`register`, `logoutSession`, `listProjects`, `createProject` and `importProject`.
+
+`public/management/index.php` authenticates the request, dispatches to a command handler in `<secure>/management/command/`, and returns a uniform JSON response.
 
 **These commands develop a project.** Anything about the installation itself, your account, your access to projects, or the admin panel's own state is deliberately *not* here: the panel serves those from its own endpoints (`/admin/api`, `/admin/state`, `/admin/self`), so a script driving this API gets a surface that is about websites and nothing else. If you are looking for one of those, see *What is deliberately not a command* below.
 
@@ -28,7 +38,7 @@ returns the per-command reference — parameters, examples, validation rules, an
 GET /management/help/addRoute
 ```
 
-The `help` endpoint is publicly accessible, takes no token, and is the contract for how a command behaves: what it accepts, what it answers, and how it fails. This document is a high-level map on top of it. Which commands *exist* is decided elsewhere — `secure/management/routes.php` is the routable allowlist, and a command is reachable whether or not `help` carries an entry for it.
+The `help` endpoint is publicly accessible, takes no token, and is the contract for how a command behaves: what it accepts, what it answers, and how it fails. This document is a high-level map on top of it. Which commands *exist* is decided elsewhere — `<secure>/management/routes.php` is the routable allowlist, and a command is reachable whether or not `help` carries an entry for it.
 
 ## Authentication
 
@@ -48,14 +58,14 @@ The `help` endpoint is publicly accessible, takes no token, and is the contract 
 - Three commands are public: `help`, `login`, `register`. `login` is self-authenticating (the credentials in the body ARE the authentication); `register` is self-gating — it enforces the `registration.allow_self_registration` flag server-side (default: **disabled**) plus flood controls (attempts per IP per minute, successful registrations per hour install-wide, and an optional absolute account cap). Failed logins are throttled per username (doubling cooldown after 5 attempts). A duplicate username at `register` returns the same success response as a real creation — login identifiers are private, so no account-existence oracle.
 - **Changing your password and deleting your account are not commands.** The command surface is a CLI for *developing a project*; managing the login you sign in with is not that, so both are served by the admin panel at `POST /admin/self/change-password` and `POST /admin/self/delete`. Nothing about them got cheaper in the move: each still requires the **current password**, still shares the login throttle, and still runs behind the same session credential as every command. A password change ends every **other** session of the user (the one performing the change survives).
 - Account deletion permanently removes the caller's **own** account: it requires the current password plus `confirm=true`, and ends every session. There is no way to delete someone else's account at all — authorization in QuickSite is per project, so the ways to part with a person are `removeMember` (evict them from one project) and, for the operator, editing `users.php` directly. Deletion is **refused** while the caller is the sole owner of any project: the response lists them, and each must be handed over with `transferOwnership` or destroyed with `deleteProject` first. On success the caller is removed from every project they belong to, along with any invitation addressed to them and any join request they filed. References to them *inside other people's* pending entries (who invited or sponsored whom) are deliberately kept so a third party never loses an invitation, and render with a `null` name.
-- Session lifetimes (`idle_ttl` — inactivity before a session stops being accepted, slid forward as the caller works; `remember_ttl` — how long a "remember me" cookie survives a browser restart; `sweep_divisor` — the 1-in-N chance that a login also tidies the session store, 0 to never) and the registration policy (`allow_self_registration`, `min_password_length`, `max_users`, `throttle.per_ip_per_minute`, `throttle.global_per_hour` — 0 disables a limit) live in `secure/management/config/auth.php` (gitignored, auto-created from `.example`). Sessions are PHP's own, written under `secure/tmp/sessions` rather than the shared system path so another application on the same host cannot garbage-collect them out from under a working user. QuickSite tidies that directory itself, on its own idle rule — after a login on the die above, or on demand with `php secure/cli/session-sweep.php` (add `--dry-run` to see what would go). It is a script and not a command because clearing the session store is installation-wide, and every permission here is per project.
+- Session lifetimes (`idle_ttl` — inactivity before a session stops being accepted, slid forward as the caller works; `remember_ttl` — how long a "remember me" cookie survives a browser restart; `sweep_divisor` — the 1-in-N chance that a login also tidies the session store, 0 to never) and the registration policy (`allow_self_registration`, `min_password_length`, `max_users`, `throttle.per_ip_per_minute`, `throttle.global_per_hour` — 0 disables a limit) live in `<secure>/management/config/auth.php` (gitignored, auto-created from `.example`). Sessions are PHP's own, written under `<secure>/tmp/sessions` rather than the shared system path so another application on the same host cannot garbage-collect them out from under a working user. QuickSite tidies that directory itself, on its own idle rule — after a login on the die above, or on demand with `php <secure>/cli/session-sweep.php` (add `--dry-run` to see what would go). It is a script and not a command because clearing the session store is installation-wide, and every permission here is per project.
 - Presenting a `QSSESSID` that names no session gets no session: the call is answered as an anonymous one and no new cookie is set. A client that discards cookies therefore has to log in again rather than being handed a fresh empty session on every request.
 - Authorization is **per project**: a user's role comes from the target project's `config/members.json`. The six fixed roles (`viewer` … `owner`) are defined by trust-coherent command **categories** in `categories.php`; `roles.php` grants each role a `rank` and its categories, expanded to a per-command allowlist at load time. There is no superadmin and no custom roles.
-- There is **no default account and no default password**. While no account exists, every admin URL shows a first-run page that creates the first one. It asks for a **setup token**, which the engine writes to `secure/management/config/setup-token.txt` — being able to read that file is the authorisation, so no command line is needed. The token is destroyed on use and the page disappears permanently once an account exists. The requirement is enforced at the shared account-creation path, not in the page: while the registry is empty, `register` cannot create an account either (403 `auth.setup_required`), whatever `allow_self_registration` says. To bootstrap by hand instead, copy `users.php.example` to `users.php` and follow the instructions in that file.
+- There is **no default account and no default password**. While no account exists, every admin URL shows a first-run page that creates the first one. It asks for a **setup token**, which the engine writes to `<secure>/management/config/setup-token.txt` — being able to read that file is the authorisation, so no command line is needed. The token is destroyed on use and the page disappears permanently once an account exists. The requirement is enforced at the shared account-creation path, not in the page: while the registry is empty, `register` cannot create an account either (403 `auth.setup_required`), whatever `allow_self_registration` says. To bootstrap by hand instead, copy `users.php.example` to `users.php` and follow the instructions in that file.
 
 ## Response shape
 
-Every command — success or failure — returns the same JSON envelope. Command results are assembled by `secure/src/classes/ApiResponse.php`; a few refusals raised before dispatch, such as a missing `Authorization` header, are written directly but use the same shape.
+Every command — success or failure — returns the same JSON envelope. Command results are assembled by `<secure>/src/classes/ApiResponse.php`; a few refusals raised before dispatch, such as a missing `Authorization` header, are written directly but use the same shape.
 
 ```json
 {
@@ -74,6 +84,7 @@ Every command — success or failure — returns the same JSON envelope. Command
 | `data` | object (optional) | Command-specific payload. **Omitted entirely when there is nothing to report** — read it as "absent or an object", not as "always present, sometimes null". |
 | `errors` | array (optional) | On validation failures, structured entries with `field` / `value` / `reason`. Omitted when empty. |
 | `hint` | string (optional) | Appears on some `401` refusals with a concrete next step (which header to send, for example). Advisory text for a human — never branch on it. |
+| `command` | string (optional) | Appears on the `403 auth.forbidden` a permission check raises, naming the command that was refused. |
 
 There is **no separate error envelope**. A failed call uses the same `status` / `code` / `message` triple with a non-2xx status and an error code, and carries `data` only when it has something useful to say — a `404` for an unknown command, for instance, echoes back the name that was requested. This keeps clients simple: parse once, branch on `status` or `code`.
 
@@ -88,18 +99,18 @@ Whenever the envelope names a file or directory — `data.file`, `data.path`, `d
 | Where the file lives | How it appears | Example |
 |---|---|---|
 | Inside the project the request targeted | Relative to that project's root | `templates/model/json/pages/home/home.json`, `public/style/style.css` |
-| Elsewhere in the installation | Relative to the installation root | `secure/projects/other-site`, `public/style/style.css` |
+| Elsewhere in the installation | Relative to the installation root | `<secure>/projects/other-site`, `<secure>/snippets/core` |
 | The project root or installation root itself | A single dot | `.` |
 
 A rewritten path always uses `/` as its separator, on every platform. A path the **caller** supplied — a deploy target outside the installation, for instance — is left exactly as given, separators included, since it discloses nothing the caller did not already have.
 
 The rule applies to the whole envelope, not just to fields that look like paths: `data` at any depth (values *and* keys, so a payload keyed by filename is covered), `errors`, and the `message` string, which often interpolates a path into a sentence. It applies identically however a command's result leaves the engine — over HTTP, through the admin panel's internal relay, or through `CommandRunner`.
 
-The relative form is the same in development and production. Only *diagnostic* detail varies by environment: an uncaught exception's message and a fatal's file/line appear in a response body only when `secure/management/config/environment.php` declares the install as development, and go to the PHP error log otherwise.
+The relative form is the same in development and production. Only *diagnostic* detail varies by environment: an uncaught exception's message and a fatal's file/line appear in a response body only when `<secure>/management/config/environment.php` declares the install as development, and go to the PHP error log otherwise.
 
 ### Partial success (`207`)
 
-A command that acts on a **set** — deleting several builds, clearing a folder of archives, sweeping orphaned files — can finish with some members done and some refused. Those commands answer `207` with the code `operation.partial_success`:
+A command that acts on a **set** — clearing a folder of export archives, sweeping orphaned translation files — can finish with some members done and some refused. Those commands answer `207` with the code `operation.partial_success`:
 
 ```json
 {
@@ -123,7 +134,7 @@ The 153 commands group into the categories below. Use `GET /management/help` for
 
 > **AI is browser-direct (BYOK).** There is no `callAi` / `testAiKey` / `detectProvider` / `listAiProviders` server command — the admin panel calls AI providers directly from the browser using credentials stored in `aiConnectionsV3` (localStorage). The Management API only handles workflow specs and command execution.
 
-Each row enumerates the commands in that category — comma-separated, alphabetical within the category — followed by what the category covers. Categories are derived from `secure/management/routes.php`; if a command isn't here, it isn't routed.
+Each row enumerates the commands in that category — comma-separated — followed by what the category covers. The command names come from `<secure>/management/routes.php`, which decides what is routed; the categories are this document's own grouping and the engine stores nothing by that name. Every routed command appears in exactly one row, so if a command isn't in the table, it isn't routed.
 
 | Category | Commands & detail |
 |---|---|
@@ -140,7 +151,7 @@ Each row enumerates the commands in that category — comma-separated, alphabeti
 | **CSS variables** | `getRootVariables`, `setRootVariables`, `setThemeMode` — CSS custom-property registries used by the color picker and theme switcher. |
 | **Animations** | `listKeyframes`, `getKeyframes`, `setKeyframes`, `deleteKeyframes`, `getAnimatedSelectors` — named keyframes + per-element animation bindings. |
 | **Builds** | `build`, `getBuild`, `deleteBuild`, `downloadBuild`, `deployBuild` — compile a project to a self-contained deliverable under its own `qs_build/<name>/`, then inspect / download / delete / deploy it. **Deploying is refused unless the installation's operator enabled it** (`<secure>/management/config/deploy.php`; absent means no) — see *Self-deploy* below, which also covers the target allowlist and the route-collision check. **A build lives outside the project's `public/`**, which is the only directory `/p/<id>/` serves — so no URL reaches a build, on a public project or a private one, and `downloadBuild` is the only way to fetch one. It archives the folder on demand and streams it, so the download carries the same authentication as every other command and nothing stale is kept on disk. **A project holds at most one build**: `build` answers `409 conflict.already_exists` while one exists rather than overwriting it, and its response names `downloadBuild` and `deleteBuild` as the way forward. A build that fails removes its own partial directory; should that removal fail too, the leftover has no `build_manifest.json` (written last for exactly this reason) and `getBuild` reports `complete: false` — an incomplete build can be deleted, but not downloaded or deployed. `getBuild`, `deleteBuild` and `downloadBuild` therefore take **no parameters at all**, and `deployBuild`'s `name` is optional — supplying it asserts which build was meant rather than selecting between several. `build` copies a project's `style/` and `assets/` through a **publish allowlist**, so a file existing inside a project and a file being published to a web-served directory are two separate decisions — anything not publishable is left out of the build and reported in the response. The permitted extensions are configurable in `<secure>/management/config/import-policy.php` (see *Archive import limits* below). **A build that cannot serve is not reported as a success**: before answering, `build` walks the finished tree along the request path — the file its `.htaccess` funnels to, that file's parameters, `config.php` and `routes.php`, the runtime the compiled pages require, the menu and footer, every compiled route's page at the exact path routing will compute for it, and the 404 — and answers `500 server.internal_error` with `data.problems` naming what is missing, discarding the partial. The site it emits carries the project's REAL id, so a built site and the same project at `/p/<projectId>/` share one browser-storage namespace. `build_manifest.json` records whether the build carries **OAuth client secrets**, and `getBuild` reports it — that changes what the deliverable is (a credential, not just a website) and the moment it matters is the download, long after `build`'s own response is gone. |
-| **Projects** | `listProjects`, `createProject`, `cloneProject`, `deleteProject`, `setProjectVisibility` — per-project CRUD under `secure/projects/`. No project is privileged, so none of these decides what a domain serves: that is a web-server mapping (see ARCHITECTURE.md). `listProjects` is membership-filtered: it returns only the caller's projects, each with `my_role` (no all-projects view). **Your storage total is not a command either**: "how much disk do my projects use" is a fact about an *account*, so it is served at `GET /admin/self/space-usage` (add `?refresh=1` to force a re-walk). It answers an owner-wide total, a category breakdown, and one row per project, aggregated across every project where the caller's role is `owner`; ownership is resolved per project from `members.json`, so it can only ever describe projects you own — owning nothing returns a zeroed report. Names of backups and exports are never returned, only sizes and counts. For one project in depth, use the project-scoped `getSizeInfo` command. **No command sets which project you are editing.** That pointer is panel state, written by the admin panel at `POST /admin/state/selected-project` (per-user, member-only), and it is the only project pointer there is: what a production domain serves is decided by the web server, so no command can publish a project at a domain root either (see [ARCHITECTURE.md §7](ARCHITECTURE.md)). Every command names the project it acts on in the URL marker instead. `createProject`'s `switch_to` sets only the creator's edited pointer, through the same writer. `setProjectVisibility` (`private`/`public`, **owner-only**) flips whether the project is served to the public internet via surface-B — a graver exposure decision than the admin-tier `setJoinPolicy`, so it sits at the delete/transfer tier; making a project private while its join policy is open re-creates the knockable-by-id state (an advisory note is returned). See [ARCHITECTURE.md §7](ARCHITECTURE.md). |
+| **Projects** | `listProjects`, `createProject`, `cloneProject`, `deleteProject`, `setProjectVisibility` — per-project CRUD under `<secure>/projects/`. No project is privileged, so none of these decides what a domain serves: that is a web-server mapping (see ARCHITECTURE.md). `listProjects` is membership-filtered: it returns only the caller's projects, each with `my_role` (no all-projects view). **Your storage total is not a command either**: "how much disk do my projects use" is a fact about an *account*, so it is served at `GET /admin/self/space-usage` (add `?refresh=1` to force a re-walk). It answers an owner-wide total, a category breakdown, and one row per project, aggregated across every project where the caller's role is `owner`; ownership is resolved per project from `members.json`, so it can only ever describe projects you own — owning nothing returns a zeroed report. Names of backups and exports are never returned, only sizes and counts. For one project in depth, use the project-scoped `getSizeInfo` command. **No command sets which project you are editing.** That pointer is panel state, written by the admin panel at `POST /admin/state/selected-project` (per-user, member-only), and it is the only project pointer there is: what a production domain serves is decided by the web server, so no command can publish a project at a domain root either (see [ARCHITECTURE.md §7](ARCHITECTURE.md)). Every command names the project it acts on in the URL marker instead. `createProject`'s `switch_to` sets only the creator's edited pointer, through the same writer. `setProjectVisibility` (`private`/`public`, **owner-only**) flips whether the project is served to the public internet via surface-B — a graver exposure decision than the admin-tier `setJoinPolicy`, so it sits at the delete/transfer tier; making a project private while its join policy is open re-creates the knockable-by-id state (an advisory note is returned). See [ARCHITECTURE.md §7](ARCHITECTURE.md). |
 | **Project members** | `listMembers`, `getProjectRoster`, `inviteMember`, `cancelInvitation`, `changeMemberRole`, `removeMember`, `transferOwnership`, `approveJoinRequest`, `denyJoinRequest`, `proposeMember`, `setJoinPolicy`, `reconcileMemberships` — the project's roster, on a consent model: `getProjectRoster` is the reduced roster for EVERY member rank — active members only (`{user_id, name, role, rank, is_owner}`, rank-descending), no pending queue, so any member can see who is on the project with them; the full `listMembers` (roster + pending invitations/requests) stays admin/owner. Otherwise: an admin/owner *invites* an existing account (by `user_id`, discovered with the panel's user lookup — see *What is deliberately not a command*) and membership materializes only when the invitee accepts. Incoming join requests and member proposals are adjudicated with `approveJoinRequest` (a self-request joins immediately; a sponsored proposal converts into a real invitation carried by the approver's rank, `sponsored_by` kept — the approver may name the `role` to grant, defaulting to the requested/proposed one, so approval and role assignment are one atomic, rank-checked step) and `denyJoinRequest` (mandatory `note` — a refusal always carries its reason; a denied self-request leaves a dismissable `refused` notice, a denied proposal tells the never-engaged target nothing). `proposeMember` is the sponsor lane: ANY member — viewer included — vouches an outsider with a mandatory note, at a role no higher than the sponsor's own rank; nothing is granted and the person is told nothing until validation. `setJoinPolicy` (`open`/`closed`, default closed, admin+) gates only the self-service request door — proposals always reach the queue, and closing never purges pending requests. Rank rules throughout: you can only offer, change to, cancel, approve, deny, or remove roles of strictly lower rank than your own (nobody can veto what they could not grant); `cancelInvitation` withdraws invites only (requests are adjudicated, never silently cancelled); the owner's role is immutable except via `transferOwnership` (owner-only, member-only target, `confirm: true`, departing owner keeps `old_owner_role` — default `admin`). Members are referenced as `{user_id, name}` — the public display name and the opaque id; the private login username never appears. `reconcileMemberships` (admin/owner) is the maintenance sweep: it heals every member's users.php membership cache for the project against the authoritative members.json — rebuilding derivable statuses (member / pending) while **preserving** the non-derivable tombstones (`refused` / `removed` / `deleted`, which live only in the cache) and pruning stale positives; it aborts rather than wipe real memberships if the authority is unreadable. All are project-scoped on the URL marker (`/management/p/<projectId>/…`) and ignore any project named in the body. |
 | **Backups** | `backupProject`, `listBackups`, `restoreBackup`, `deleteBackup` — snapshot / restore (configurable scope). All are project-scoped on the URL marker and act only on the targeted project; a project named in the body must match the marker or the call is refused (`400 project.mismatch`). Backups never include `config/members.json`, so a restore never touches membership. **`restoreBackup` overwrites and takes no snapshot unless you ask for one.** It replaces the project's `config.php`, `routes.php`, `templates/`, `translate/`, `data/` and `public/` from the named backup. The *pre-restore backup* — a snapshot of the project's **current** state, taken before it is overwritten, so the restore itself can be undone by restoring that snapshot — is **opt-in**: pass `create_backup: true`. The default is `false`, in which case no snapshot is taken and the overwritten state is not recoverable through QuickSite. On success `data.pre_restore_backup` names the snapshot (`pre-restore_<timestamp>`) or is `null` when none was requested. The admin panel offers the snapshot as an unchecked box on its restore dialog; a direct API caller gets no prompt at all, so the parameter is the only safeguard. |
 | **Export / Import** | `exportProject`, `downloadExport`, `clearExports`, `importProject` — pack a project as ZIP for portability; import a ZIP back. `exportProject` is project-scoped (marker-bound, like the backups) and **excludes `config/members.json`** from the archive (the membership graph + private invitation notes never travel). `importProject` is **global** (create-from-archive, any authenticated user, like `createProject`): it mints a NEW project and **birth-writes the importer as sole owner**, discarding any `members.json` the archive carried (an untrusted roster is never accepted). An archive is treated as untrusted input throughout: entries are accepted against an **extension allowlist**, **hidden paths are refused** (no path segment may begin with a dot, so a `.git/`, `.svn/` or `.idea/` directory never becomes project content), each entry's **content is checked against what its name claims** (signature for binary formats, parseable JSON for `.json`, no PHP opening tag for text, sanitisation for SVG), and archive **resource limits** — entry count, total and per-entry uncompressed size, per-entry compression ratio — are enforced from the ZIP headers before anything is written. A refused entry is skipped and listed in the response with its reason; the rest of the archive still imports. Both the permitted extensions and the limits are configurable — see *Archive import limits* below. `cloneProject` (see *Projects*) does the same birth-write — a clone/import is a fresh project owned solely by you; collaborators are not carried over. **A project id is unique across the installation and an import never reassigns one**: if the id is already taken the import answers `409 resource.already_exists` and writes nothing, with no option that overrides it. An id is a project's identity *and* the namespace its browser storage lives in, so reusing one means deleting the existing project first — an owner-gated action of its own, not a side effect of an upload. |
@@ -162,9 +173,9 @@ A snippet is a reusable chunk of page structure — a nav bar, a card, a contact
 
 | Tier | Who can use it | Where it lives | Written by |
 |---|---|---|---|
-| **core** | everyone on the installation | `secure/snippets/core/` | ships with the engine; read-only |
-| **personal** | you, in every project you work on | `secure/snippets/custom/<userId>/` | `createSnippet` with `scope: "personal"` |
-| **project** | anyone with access to that one project | `secure/projects/<projectId>/snippets/` | `createSnippet` (default) |
+| **core** | everyone on the installation | `<secure>/snippets/core/` | ships with the engine; read-only |
+| **personal** | you, in every project you work on | `<secure>/snippets/custom/<userId>/` | `createSnippet` with `scope: "personal"` |
+| **project** | anyone with access to that one project | `<secure>/projects/<projectId>/snippets/` | `createSnippet` (default) |
 
 **A personal snippet belongs to the person who wrote it, not to the installation.** It follows you across every project you are a member of, and it is invisible to everybody else: another user cannot list it, read it, insert it into their own pages, or delete it — not even a member of the same project. The library is keyed by your user id, so two people can hold snippets of the same name without either seeing the other's.
 
@@ -226,7 +237,7 @@ A client that receives a non-JSON error — from nginx, a proxy, or a gateway �
 
 Creating projects and uploading into them are open to any authenticated account. On a shared install, nothing stops an ordinary signed-in user from filling the disk, so `uploadAsset` and `importProject` enforce two optional per-user ceilings.
 
-**Nothing is limited by default.** With no `secure/management/config/quota.php` both axes are unlimited, and updating QuickSite never changes that — an existing install cannot start refusing uploads because it was upgraded. A malformed file is ignored, with a line in the server error log, and again nothing is limited: a typo in a quota file must not lock every author out of their own site.
+**Nothing is limited by default.** With no `<secure>/management/config/quota.php` both axes are unlimited, and updating QuickSite never changes that — an existing install cannot start refusing uploads because it was upgraded. A malformed file is ignored, with a line in the server error log, and again nothing is limited: a typo in a quota file must not lock every author out of their own site.
 
 | Axis | Setting | Refusal |
 |---|---|---|
@@ -256,7 +267,7 @@ The rate axis counts uploads that actually wrote something — a refused upload 
 
 Sizes come from a short-lived measurement cache. The write paths drop a project's cached measurement after they write to it, so growth is always measured exactly; a **deletion** elsewhere can leave a total reading high for up to five minutes, which makes the quota briefly stricter than reality and never looser. Re-measuring on the spot is what the dashboard's refresh control does (`GET /admin/self/space-usage?refresh=1`), and the refusal message says so.
 
-Copy `secure/management/config/quota.php.example` to `quota.php` to set the numbers; every value is an integer and 0 means unlimited for that axis.
+Copy `<secure>/management/config/quota.php.example` to `quota.php` to set the numbers; every value is an integer and 0 means unlimited for that axis.
 
 ## Self-deploy
 
@@ -291,7 +302,7 @@ Deploying site B never damages site A. `deployBuild` enforces that with a subtre
 
 **A build owns its own subtree and nothing else.** That is `<public>/<space>/**` and `<secure>/**`. A spaced build also emits a `.htaccess` for the document root itself — `Options -Indexes` plus headers, no `FallbackResource` — and the document root is *outside* its subtree. Outside the subtree a deploy **creates but never overwrites**, and `overwrite: true` does not reach those paths. Skipped paths come back as `shared_paths_skipped`.
 
-Without that rule, a spaced build deployed over a root build replaced the root site's funnel: its home page kept working (a real `index.php`) and every route 404'd. Order-dependent — root-then-spaced broke, spaced-then-root did not — so it passed a test and broke the next deploy.
+Without that rule, a spaced build deployed over a root build would replace the root site's funnel: its home page would keep working (a real `index.php`) while every other route 404'd. The damage is order-dependent — root-then-spaced would break, spaced-then-root would not — so a single test can pass and the next deploy still break.
 
 #### The deployment marker
 
@@ -367,6 +378,7 @@ The response reports the outcome under `nginx`, and never claims a reload that d
 | `reloaded` | `nginx -t` passed and the running nginx took the new configuration. |
 | `pending` | The file was written, the reload failed. `.pending_reload` is left for the optional cron script; a manual `nginx -t && nginx -s reload` is still needed. |
 | `not_applicable` | Not an nginx server. Nothing was attempted and no flag was written — an Apache install generates the file and never reads it. |
+| `not_attempted` | The file could not be written at all (the `nginx/` directory could not be created, or the write failed), so there was nothing to reload. Always paired with `config_regenerated: false`. |
 
 `nginx.config_regenerated` reports whether the file itself was written; a failure there is a warning on a successful deploy, not a rollback, because the files are already copied and the deployer needs to be told rather than surprised.
 
@@ -416,7 +428,7 @@ An extension also needs a detected-MIME entry for an *upload* of it to succeed �
 
 ### Changing the limits and the lists
 
-The defaults are built into the engine and apply with no configuration at all. To change them, copy `secure/management/config/import-policy.php.example` to `secure/management/config/import-policy.php` and edit the values — that file carries the taxonomy, both extension allowlists, and the limits.
+The defaults are built into the engine and apply with no configuration at all. To change them, copy `<secure>/management/config/import-policy.php.example` to `<secure>/management/config/import-policy.php` and edit the values — that file carries the taxonomy, both extension allowlists, and the limits.
 
 The kinds of setting merge differently:
 
@@ -442,38 +454,51 @@ A refused entry is skipped and reported with its reason under `security.skipped_
 
 ## Calling the API
 
-Any HTTP client works. Examples:
+Any HTTP client works. Every authenticated call needs **both halves** of the
+credential — the session cookie and the session token — so a command-line client
+signs in once into a cookie jar and then sends that jar alongside the header on
+every later call. Sending the header alone is answered `401 auth.unauthorized`.
+`my-site` below stands for the project id in the URL marker.
 
 ```bash
-# List routes
-curl -H "Authorization: Bearer $TOKEN" http://local.quicksite/management/getRoutes
+# Sign in once. -c writes the QSSESSID cookie into the jar; the response body
+# carries the session token that pairs with it.
+curl -c jar -X POST \
+     -H "Content-Type: application/json" \
+     -d '{"username":"your-username","password":"…"}' \
+     http://local.quicksite/management/login
+TOKEN="…the session_token from that response…"
 
-# Add an exact route (POST + JSON body)
-curl -X POST \
+# List routes — the jar (-b) AND the header, on this and every call below
+curl -b jar -H "Authorization: Bearer $TOKEN" http://local.quicksite/management/p/my-site/getRoutes
+
+# Add an exact route (POST + JSON body). The page's title is not set here —
+# `route` is addRoute's only required parameter; use editTitle for the title.
+curl -b jar -X POST \
      -H "Authorization: Bearer $TOKEN" \
      -H "Content-Type: application/json" \
-     -d '{"name":"about","title":"About"}' \
-     http://local.quicksite/management/addRoute
+     -d '{"route":"about"}' \
+     http://local.quicksite/management/p/my-site/addRoute
 
 # Add a parameterised route — the ':slug' segment captures any URL value
 # at request time (one template serves many URLs). See ARCHITECTURE §6.3
 # for the matching algorithm + how params flow to PHP / qs.js.
-curl -X POST \
+curl -b jar -X POST \
      -H "Authorization: Bearer $TOKEN" \
      -H "Content-Type: application/json" \
-     -d '{"name":"products/:slug","title":"Product"}' \
-     http://local.quicksite/management/addRoute
+     -d '{"route":"products/:slug"}' \
+     http://local.quicksite/management/p/my-site/addRoute
 # Response data may carry a 'warnings' array when the new route shadows
 # exact siblings (curated landing + param catch-all is supported and not
 # blocked — the warning surfaces intent so the user can confirm).
 
-# Read the live spec for a command
+# Read the live spec for a command — help is public, so no jar and no header
 curl http://local.quicksite/management/help/addRoute
 
 # Attach a server-side data resolver to a route (single — scalar shape).
 # Body shape: {route, resolver}. The resolver fires once per request,
 # server-side, before the page template renders.
-curl -X POST \
+curl -b jar -X POST \
      -H "Authorization: Bearer $TOKEN" \
      -H "Content-Type: application/json" \
      -d '{
@@ -485,14 +510,14 @@ curl -X POST \
          "cacheTTL": 300
        }
      }' \
-     http://local.quicksite/management/setRouteResolver
+     http://local.quicksite/management/p/my-site/setRouteResolver
 
 # Same command, multi-resolver shape (array). Resolvers fire concurrently
 # via curl_multi_*. Save is REJECTED with reason 'collision' if any two
 # resolvers expose the same flat-namespace key — disambiguate by renaming
 # OR by using the namespaced address ($r0.title / $r1.title in templates,
 # window.QS_RESOLVED_BY_INDEX.r0.title / .r1.title in JS).
-curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+curl -b jar -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
      -d '{
        "route": "compare/:a/vs/:b",
        "resolver": [
@@ -500,37 +525,37 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/jso
          {"endpoint":"@products-api/get-product","inputs":{"id":"param:b"},"expose":{"productB":"data.product"}}
        ]
      }' \
-     http://local.quicksite/management/setRouteResolver
+     http://local.quicksite/management/p/my-site/setRouteResolver
 
 # Patch one resolver slot in a multi-resolver route (the `index` param
 # targets a specific slot). Same command supports append (index === length),
 # remove (no `resolver` body + `index`), and clear-all (no `resolver` + no
 # `index`) — see help/setRouteResolver for the full body-shape matrix.
-curl -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+curl -b jar -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
      -d '{"route":"compare/:a/vs/:b","resolver":{"endpoint":"@products-api/get-product","inputs":{"id":"param:a"},"expose":{"productA":"data.product"}},"index":0}' \
-     http://local.quicksite/management/setRouteResolver
+     http://local.quicksite/management/p/my-site/setRouteResolver
 ```
 
 ## Internals
 
-- Command handlers live in `secure/management/command/<command>.php`, one file per command.
-- The whitelist of valid commands is `secure/management/routes.php` (153 entries — this file is the single source of truth for which commands exist).
-- Shared helpers live in `secure/src/functions/utilsManagement.php` (e.g., `varExportNested()`, `SPECIAL_PAGES`, role helpers).
+- Command handlers live in `<secure>/management/command/<command>.php`, one file per command.
+- The whitelist of valid commands is `<secure>/management/routes.php` (153 entries — this file is the single source of truth for which commands exist).
+- Shared helpers live in `<secure>/src/functions/utilsManagement.php` (e.g., `varExportNested()`, `SPECIAL_PAGES`, role helpers).
 - An unknown command answers `404` with code `route.not_found` and echoes back the name that was requested, so a typo is diagnosable. It does **not** enumerate the commands that do exist — `help` is where the catalogue lives, and it is a deliberate decision to publish it there rather than from every mistyped call.
-- Internal callers (visual editor data gathering, workflow steps) bypass the HTTP layer and invoke commands through `secure/src/classes/CommandRunner.php`. CommandRunner carries a **hardcoded read-only allowlist** of 25 commands it will execute internally — reads and audits, mostly `get*` / `list*` but also `help` and the `analyze*` / `validate*` / `checkStructureMulti` inspectors. Membership and other mutating commands are not on it.
+- Internal callers (visual editor data gathering, workflow steps) bypass the HTTP layer and invoke commands through `<secure>/src/classes/CommandRunner.php`. CommandRunner carries a **hardcoded read-only allowlist** of 25 commands it will execute internally — reads and audits, mostly `get*` / `list*` but also `help` and the `analyze*` / `validate*` / `checkStructureMulti` inspectors. Membership and other mutating commands are not on it.
 - When an internally-invoked command throws, the caller gets the command name and a fixed message. The exception's own message, file and line go to the PHP error log instead — unless the install declares itself development, in which case the real message is passed through (see *File paths in a response are relative*).
 - Because that allowlist bypasses the permission check, it **is** the boundary: every command on it is reachable by the lowest membership tier, so it holds only commands inside the `viewer` grant (`content.read`) or a global any-authenticated category. Admin-tier reads — command history, backup listings — are deliberately absent and must go through the HTTP layer, where the role check applies.
 - Workflow execution adds a second, per-command role check via `WorkflowManager::setTokenInfo()`, so a workflow's declared data commands are authorized against the calling user and the targeted project before they run.
 
 ## Command history storage
 
-Every successful command (plus authentication failures) is appended to a daily
-JSON file. A record carries the command, the caller, the result, the timing, and
-**what the command was asked for** — `params` beside `body`:
+Every successful command is appended to a daily JSON file. A record carries the
+command, the caller, the result, the timing, and **what the command was asked
+for** — `params` beside `body`:
 
 | Field | Holds |
 |---|---|
-| `body` | The decoded JSON request body, credential-shaped keys redacted. `null` when the command's body is never recorded (see the deny-list above). |
+| `body` | The decoded JSON request body, credential-shaped keys redacted. `null` when the command's body is never recorded (see *What is recorded, and what is stripped* below). |
 | `params` | The request's **non-body** arguments, or `null` when there are none. `params.url` is the ordered URL path segments (`getStructure/page/home` → `["page","home"]`); `params.query` is the query string, redacted the same way a body is. Commands like `getStructure` and `getRoutes` carry no body at all, so this is the only record of what they operated on. |
 
 ⚠ Redaction matches **key names**, so it covers `params.query` exactly as it covers
@@ -543,8 +568,8 @@ The store is **partitioned by project**, so a project's audit trail is readable
 only by someone who holds the `history` category **on that project**:
 
 ```
-secure/logs/p/<projectId>/commands_<YYYY-MM-DD>.json   one directory per project
-secure/logs/_global/commands_<YYYY-MM-DD>.json         commands that target no project
+<secure>/logs/p/<projectId>/commands_<YYYY-MM-DD>.json   one directory per project
+<secure>/logs/_global/commands_<YYYY-MM-DD>.json         commands that target no project
 ```
 
 - `getCommandHistory` and `clearCommandHistory` read and delete **only** inside the
@@ -602,13 +627,17 @@ the response status and code, the duration, and the request body. **Credentials 
 never stored.** Sanitization is deny-by-default and command-independent:
 
 - Any body key whose name looks like a credential — `password`, `secret`, `token`,
-  `credential`, `key` / `apiKey`, `auth`, `authorization`, `signature`, `salt` — has
+  `credential`, `key` / `apiKey` / `privateKey`, `auth`, `authorization`,
+  `signature`, `salt` — has
   its **value** replaced with `[redacted]`, at every depth of a nested body. A
   matching key discards its entire value, so an `auth` or `credentials` object is
   removed whole rather than walked into. The key itself is kept, so the trail still
   records *that* a credential was submitted.
-- Session commands (`login`, `register`, `logoutSession`) log **no body at all**.
-  The entry still records who acted, when, and with what result.
+- Session commands (`login`, `register`, `logoutSession`) log **no body at all**;
+  it would carry only credentials. `logoutSession` still leaves an entry
+  recording who acted, when, and with what result. `login` and `register` leave
+  **no entry of any kind** — they answer before the dispatcher installs its
+  logging callback — so the command log is not where a record of sign-ins lives.
 - `uploadAsset` records file metadata instead of file content, and `editStyles`
   truncates stylesheets over 5 KB.
 
@@ -620,7 +649,7 @@ deliberate.
 
 ### The `_global` bucket — operators should manage this directly
 
-Some actions belong to no project, and their records go to `secure/logs/_global/`.
+Some actions belong to no project, and their records go to `<secure>/logs/_global/`.
 **No API command reads this directory.** It exists so those actions leave a
 forensic trail rather than going unrecorded; there is no installation-wide
 administrator role to expose it to.
@@ -635,10 +664,11 @@ administrator role to expose it to.
 
 **Global-scope READS are deliberately not written.** `listProjects` and `help`
 answer without changing anything, and a bucket nothing reads is not the place for
-a poll: the panel calls them constantly, and their records were the bulk of what
-accumulated. Dropping them is a signal decision, not a privacy one — nothing in
-those entries is sensitive. `login` and `register` are not recorded either, for a
-different reason: they answer before the dispatcher installs its logging callback.
+a poll: the panel calls them constantly, and their records would be the bulk of
+what accumulates. Dropping them is a signal decision, not a privacy one — nothing
+in those entries is sensitive. `login` and `register` are not recorded either, for
+a different reason: they answer before the dispatcher installs its logging
+callback.
 
 Because nothing serves or rotates it, `_global` still grows and is the operator's
 to manage. Treat it like any other server-side log: archive or delete files on
@@ -683,29 +713,30 @@ for them. Inviting somebody, adjudicating their request and managing the roster
 authority makes about the project. The line falls between the two sides of a
 consent: the offer is a project decision, the answer is yours.
 
-**Nothing about their rules changed when they moved.** The behaviour a caller can
-rely on is the same in every respect that matters:
+**Being panel endpoints rather than commands relaxes none of their rules.** The
+behaviour a caller can rely on:
 
-- **Consent still materializes the grant.** An invitation grants nothing until the
+- **Consent materializes the grant.** An invitation grants nothing until the
   invitee accepts, and acceptance re-validates the inviter's authority at that
   moment — a demoted or removed inviter's offer is void and never grants.
 - **Each acts only on the caller's own entries.** `project` is a validated data
   parameter, not an authorization input. Withdrawing accepts a `user_id` only for
   a proposal you authored, and the `by == you` rule is what enforces that.
-- **The enumeration posture is unchanged.** A project that does not exist answers
+- **Nothing is enumerable through them.** A project that does not exist answers
   exactly like one that has nothing for you: a private closed project and a
   nonexistent one are indistinguishable, while a *public* project honestly says
   requests are closed, because its existence is already public.
-- **Both credential operations still require the current password**, on the same
+- **Both credential operations require the current password**, on the same
   throttle as `login`. A stolen session token cannot change a password or delete
   an account on its own. Deletion additionally needs `confirm: true` and is
   refused while you solely own a project — the response lists them, and each must
   be handed over with `transferOwnership` or destroyed with `deleteProject` first.
 - **A private login username is never returned by any of them.**
 
-One thing did change, deliberately: these no longer appear in the per-project
-command log, because they are no longer commands. They were previously recorded in
-the write-only `_global` bucket that no command reads.
+They leave no entry in the per-project command log — they are not commands, and
+the logger runs only on the command surface. No other audit trail records them,
+so a change of password or an accepted invitation is not something the
+installation can be asked about afterwards.
 
 ## Update detection is not part of this API
 
@@ -728,7 +759,7 @@ every project on the installation, and authority in QuickSite is per-project —
 project role cannot sanely imply "may rewrite the shared engine". Applying is
 done on the server with `git pull`; the panel only *reports*.
 
-Who sees that report is decided by `secure/management/config/operator.php` — a
+Who sees that report is decided by `<secure>/management/config/operator.php` — a
 list of user ids, written at first run, that grants nothing and only controls
 whether the notice renders. The endpoint itself answers any authenticated
 account.
