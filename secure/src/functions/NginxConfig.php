@@ -15,14 +15,39 @@ require_once __DIR__ . '/deploymentMarker.php'; // qs_deployed_sites
 /**
  * Generate nginx location block content for QuickSite routing
  *
- * Creates 5 location blocks in order of specificity:
+ * Creates 7 location blocks in order of specificity:
  *   1. /prefix/admin/api/    — Admin panel AJAX helper
- *   2. /prefix/management/   — Management API
- *   3. /prefix/admin/        — Admin panel
- *   4. /prefix/p/            — Project renderer (surface B, /p/<id>/)
- *   5. /prefix/              — Public root: FREE by default, a front-controller
+ *   2. /prefix/admin/self/   — The caller's own account and memberships
+ *   3. /prefix/admin/state/  — The panel's own per-user state
+ *   4. /prefix/management/   — Management API
+ *   5. /prefix/admin/        — Admin panel
+ *   6. /prefix/p/            — Project renderer (surface B, /p/<id>/)
+ *   7. /prefix/              — Public root: FREE by default, a front-controller
  *                              funnel once a build is deployed there
  *   (+ one funnel per build deployed under a URL space)
+ *
+ * ── WHY THREE BLOCKS UNDER /admin/ AND NOT ONE ───────────────────────────────
+ *
+ * public/admin/ holds three self-contained front controllers — api/, self/ and
+ * state/ — each with its own index.php and its own .htaccess, and each one
+ * answers JSON. nginx takes the LONGEST MATCHING PREFIX, so without a block of
+ * its own a request for /admin/self/permissions matches `location /admin/`,
+ * whose try_files deliberately omits `$uri/` and therefore falls through to the
+ * PANEL front controller. AdminRouter has no page called `self` or `state`, so
+ * it answers its HTML 404 page to a client parsing JSON.
+ *
+ * That is not theory: /admin/self/ and /admin/state/ were added after this
+ * generator was written, nothing re-checked it, and on every nginx install the
+ * project picker, My Account, My Memberships, the members badge and the
+ * dashboard account panel were unreachable. Apache never showed it — each
+ * directory's own .htaccess is picked up automatically, so no central list has
+ * to be kept in step there and none was.
+ *
+ * ⚠ ADDING A FOURTH FRONT CONTROLLER UNDER public/admin/ MEANS ADDING A BLOCK
+ * HERE. NOTES/tests/beta11/s27_admin_route_collision_probe.php checks both
+ * directions off the filesystem — that no directory shadows a panel page, and
+ * that every front-controller directory has a location block — so the omission
+ * is caught here rather than on somebody's nginx.
  *
  * ── WHY THE ROOT BLOCK IS NOT A CONSTANT ─────────────────────────────────────
  *
@@ -146,10 +171,29 @@ function generate_nginx_config(string $publicFolderSpace, array $deployedSites =
     $config .= "# Cron fallback: {$secureFolderName}/cron/nginx_reload.sh (optional)\n";
     $config .= "# ==========================================================\n\n";
 
-    // Admin API (most specific path — must come first)
+    // The three JSON front controllers under public/admin/ — see the function
+    // docblock for why each needs its own location. They come FIRST because they
+    // are the most specific paths; ordering is for the reader, since nginx picks
+    // the longest matching prefix regardless of the order they appear in.
     $config .= "# Admin panel API (AJAX helper for dynamic form fields)\n";
     $config .= "location {$prefix}/admin/api/ {\n";
     $config .= "    try_files \$uri \$uri/ {$prefix}/admin/api/index.php\$is_args\$args;\n";
+    $config .= "}\n\n";
+
+    $config .= "# Admin panel account endpoint — the caller's own account and their project\n";
+    $config .= "# memberships. Needs its OWN location for the same reason /admin/api/ does:\n";
+    $config .= "# nginx picks the longest matching prefix, so without this block a request\n";
+    $config .= "# for /admin/self/… falls into the {$prefix}/admin/ block below and is answered\n";
+    $config .= "# by the panel's HTML front controller, which has no page by that name and\n";
+    $config .= "# returns its 404 PAGE to a caller that is parsing JSON.\n";
+    $config .= "location {$prefix}/admin/self/ {\n";
+    $config .= "    try_files \$uri \$uri/ {$prefix}/admin/self/index.php\$is_args\$args;\n";
+    $config .= "}\n\n";
+
+    $config .= "# Admin panel state endpoint — the panel's own per-user state (which project\n";
+    $config .= "# you have open). Same reason for its own location as the two blocks above.\n";
+    $config .= "location {$prefix}/admin/state/ {\n";
+    $config .= "    try_files \$uri \$uri/ {$prefix}/admin/state/index.php\$is_args\$args;\n";
     $config .= "}\n\n";
 
     // Management API. This is the ONLY namespace that receives file uploads

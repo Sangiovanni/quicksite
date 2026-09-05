@@ -63,17 +63,22 @@
 # Copy what you need into your Apache configuration and adjust paths/domains.
 # This file is documentation — nothing in QuickSite reads or writes it.
 #
-# ---- THE FOUR ENTRY POINTS --------------------------------------------------
-# QuickSite is four self-contained namespaces under the public folder, each with
+# ---- THE SIX ENTRY POINTS ---------------------------------------------------
+# QuickSite is six self-contained namespaces under the public folder, each with
 # its own front controller and its own per-directory .htaccess:
 #
-#   /admin/api/   -> public/admin/api/index.php   panel AJAX helper
-#   /management/  -> public/management/index.php  the command API
-#   /admin/       -> public/admin/index.php       the admin panel
-#   /p/           -> public/p/index.php           the project renderer
+#   /admin/api/    -> public/admin/api/index.php    panel AJAX helper
+#   /admin/self/   -> public/admin/self/index.php   the account + memberships
+#   /admin/state/  -> public/admin/state/index.php  the panel's per-user state
+#   /management/   -> public/management/index.php   the command API
+#   /admin/        -> public/admin/index.php        the admin panel
+#   /p/            -> public/p/index.php            the project renderer
 #
-# Those four .htaccess files ship with QuickSite and need no configuration —
-# they apply to every vhost pointed at the same DocumentRoot. There is
+# Those six .htaccess files ship with QuickSite and need no configuration —
+# they apply to every vhost pointed at the same DocumentRoot. Apache resolves
+# each directory's own file automatically, which is why nothing central has to
+# be kept in step here; nginx has no such mechanism and needs a location per
+# namespace (see nginx-vhosts.conf.example). There is
 # deliberately NO public/index.php and no FallbackResource at the root: the web
 # root is FREE, so your own hand-made site can live there and QuickSite never
 # squats the domain root.

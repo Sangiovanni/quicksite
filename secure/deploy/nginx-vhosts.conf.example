@@ -52,19 +52,28 @@
 # described further down, the public block terminates the client connection, so
 # its own 1 MB default rejects the body before the backend is ever dialled.
 #
-# ---- THE FOUR ENTRY POINTS --------------------------------------------------
-# QuickSite is four self-contained namespaces under the public folder, each with
+# ---- THE SIX ENTRY POINTS ---------------------------------------------------
+# QuickSite is six self-contained namespaces under the public folder, each with
 # its own front controller. Every routing rule below exists to put a request in
 # front of the RIGHT one:
 #
-#   /admin/api/   -> public/admin/api/index.php   panel AJAX helper
-#   /management/  -> public/management/index.php  the command API
-#   /admin/       -> public/admin/index.php       the admin panel
-#   /p/           -> public/p/index.php           the project renderer
+#   /admin/api/    -> public/admin/api/index.php    panel AJAX helper
+#   /admin/self/   -> public/admin/self/index.php   the account + memberships
+#   /admin/state/  -> public/admin/state/index.php  the panel's per-user state
+#   /management/   -> public/management/index.php   the command API
+#   /admin/        -> public/admin/index.php        the admin panel
+#   /p/            -> public/p/index.php            the project renderer
 #
-# `/admin/api/` needs its OWN location. nginx picks the LONGEST matching prefix,
-# so without it `location /admin/` wins for /admin/api/… and hands those
-# requests to the panel's front controller instead of the API's.
+# THE THREE UNDER /admin/ EACH NEED THEIR OWN LOCATION. nginx picks the LONGEST
+# matching prefix, so without one `location /admin/` wins for /admin/api/… ,
+# /admin/self/… and /admin/state/… alike and hands those requests to the PANEL's
+# front controller. The panel has no page by any of those names, so it answers
+# its HTML 404 to a caller that is parsing JSON — and the visible result is that
+# the project picker, My Account and My Memberships stop working while every
+# ordinary panel page looks fine.
+#
+# The generated include below carries all six. You only hit this if you are
+# writing the locations by hand instead of including it.
 #
 # There is deliberately NO public/index.php: the web root is free, so your own
 # hand-made site can live there and QuickSite never squats the domain root.

@@ -304,8 +304,9 @@ nginx ignores `.htaccess` files. QuickSite handles this automatically:
 
    There is no `index index.php;` — QuickSite has no front controller at the web
    root, on purpose: the root stays free for your own site. The generated
-   include carries the routing for all four of QuickSite's namespaces
-   (`/admin/api/`, `/management/`, `/admin/`, `/p/`).
+   include carries the routing for all six of QuickSite's namespaces
+   (`/admin/api/`, `/admin/self/`, `/admin/state/`, `/management/`, `/admin/`,
+   `/p/`).
 
    > **⚠ Uploads: nginx allows a 1 MB request body by default**, which is
    > *smaller* than what a normal PHP configuration accepts — and it refuses the
