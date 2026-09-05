@@ -88,6 +88,7 @@ secure/management/config/import-policy.php
 secure/management/config/environment.php
 secure/management/config/operator.php
 secure/management/config/quota.php
+secure/management/config/console.php
 
 # Login/registration/upload-throttle runtime state - machine-written JSON
 # (auto-created; hashed-key backoff counters) plus flock sidecars and
