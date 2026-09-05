@@ -8,11 +8,12 @@
 2. [Architecture](#architecture)
 3. [Files Involved](#files-involved)
 4. [Workflow Types](#workflow-types)
-5. [JSON Spec Reference](#json-spec-reference)
-6. [Markdown Template Reference](#markdown-template-reference)
-7. [Execution Flow](#execution-flow)
-8. [Condition Syntax](#condition-syntax)
-9. [Known Patterns & Gotchas](#known-patterns--gotchas)
+5. [Adding a workflow](#adding-a-workflow)
+6. [JSON Spec Reference](#json-spec-reference)
+7. [Markdown Template Reference](#markdown-template-reference)
+8. [Execution Flow](#execution-flow)
+9. [Condition Syntax](#condition-syntax)
+10. [Known Patterns & Gotchas](#known-patterns--gotchas)
 
 ---
 
@@ -56,8 +57,8 @@ User fills parameters in the AI tools panel
         │                    │
         └────────┬───────────┘
                  ▼
-   Each command POSTed to /management/<command>
-   in turn, with the caller's own bearer token
+   Each command POSTed to /management/p/<projectId>/<command>
+   in turn, with the caller's session cookie + bearer token
 ```
 
 ---
@@ -68,23 +69,25 @@ User fills parameters in the AI tools panel
 
 | File | Purpose |
 |------|---------|
-| `secure/src/classes/WorkflowManager.php` (~1540 lines) | Core orchestrator — loading, validation, data fetching, step generation, prompt rendering |
-| `secure/src/classes/CommandRunner.php` | Executes API commands internally (used by `fetchDataRequirements`) |
+| `<secure>/src/classes/WorkflowManager.php` | Core orchestrator — loading, data fetching, step generation, prompt rendering, spec validation |
+| `<secure>/src/classes/CommandRunner.php` | Executes API commands internally (used by `fetchDataRequirements`) |
 
 ### Workflow Definitions
 
 | Path | Content |
 |------|---------|
-| `secure/admin/workflows/schema.json` | JSON Schema defining the spec format |
-| `secure/admin/workflows/core/*.json` | Core workflow specs (shipped with QuickSite) |
-| `secure/admin/workflows/core/*.md` | Core markdown templates |
-| `secure/admin/workflows/blocks/*.md` | Reusable prompt blocks injected via `{{> name}}` |
-| `secure/admin/workflows/pins/*.md` | Pinned reminders auto-injected at top when listed in `pins: [...]` |
-| `secure/admin/workflows/warnings/*.md` | Warnings auto-injected at top when listed in `warnings: [...]` |
-| `secure/admin/workflows/examples/*.md` | Example fragments referenced via `{{> example.X}}` |
+| `<secure>/admin/workflows/schema.json` | JSON Schema defining the spec format |
+| `<secure>/admin/workflows/core/*.json` | Workflow specs. **The only directory the engine reads** — a workflow you add goes here, beside the shipped ones. |
+| `<secure>/admin/workflows/core/*.md` | Markdown templates, beside the spec that names them |
+| `<secure>/admin/workflows/blocks/*.md` | Reusable prompt blocks injected via `{{> name}}` |
+| `<secure>/admin/workflows/pins/*.md` | Pinned reminders auto-injected at top when listed in `pins: [...]` |
+| `<secure>/admin/workflows/warnings/*.md` | Warnings auto-injected at top when listed in `warnings: [...]` |
+| `<secure>/admin/workflows/examples/*.md` | Example fragments referenced via `{{> example.X}}` |
 
-Workflows are QuickSite's own shipped catalogue. There is no in-app authoring
-surface: specs are files, edited on disk.
+**Workflows are extensible by file.** There is no in-app authoring surface and no
+authoring command: a workflow *is* a JSON spec, plus a Markdown template beside it
+when it drives an AI. Anyone with file access to the installation can add one —
+see *Adding a workflow* below. The panel runs workflows; it does not create them.
 
 ### Admin UI
 
@@ -93,7 +96,7 @@ Workflows are run from the visual editor's **AI tools** mode
 
 | File | Purpose |
 |------|---------|
-| `secure/admin/templates/pages/preview/contextual-ai-tools.php` | DOM scaffold — workflow list + runner |
+| `<secure>/admin/templates/pages/preview/contextual-ai-tools.php` | DOM scaffold — workflow list + runner |
 | `public/admin/assets/js/pages/preview/preview-ai-tools.js` | Client-side logic (list, filters, parameter forms, streaming, batch execution) |
 | `public/admin/assets/js/pages/ai/lib/ai-call.js` | Browser-direct AI dispatch (BYOK) — no PHP proxy |
 
@@ -101,8 +104,14 @@ See [ADMIN_PANEL.md §8.12](ADMIN_PANEL.md) for the runner UX.
 
 ### API Endpoints (via admin router)
 
-The helper endpoints live in `public/admin/api/index.php` and are reached at
-`/admin/api/[p/<projectId>/]<action>`:
+The helper endpoints live in `public/admin/api/index.php`. All three are
+project-scoped, so the project marker is **required**, not optional — a call
+without it is refused with `400`:
+
+```
+/admin/api/p/<projectId>/<action>
+```
+
 
 | Action | Method | Purpose |
 |----------|--------|---------|
@@ -110,10 +119,12 @@ The helper endpoints live in `public/admin/api/index.php` and are reached at
 | `ai-spec-raw/<id>` | GET | Load the spec definition itself (parameter schema, metadata) |
 | `workflow-generate-steps` | POST | Resolve steps for deterministic workflow execution |
 
-Resolved commands are **not** executed through a batch endpoint. The client
-runs them one at a time against the Management API (`POST /management/<command>`
-with the caller's bearer token), so every step passes the same authorization
-as any other API call.
+Resolved commands are **not** executed through a batch endpoint. The client runs
+them one at a time against the Management API — `POST
+/management/p/<projectId>/<command>`, carrying the session cookie and the
+caller's bearer token — so every step passes the same authorization as any other
+API call. The marker is part of the base URL the panel hands the runner, which is
+why a step never names a project itself.
 
 ---
 
@@ -155,6 +166,148 @@ Workflows can reference other workflows via `preWorkflows` and `postWorkflows`:
 ```
 
 Sub-workflows are fully resolved (their own data requirements fetched, steps generated) and injected before/after the main steps.
+
+---
+
+## Adding a workflow
+
+A workflow is one or two files on disk. Nothing else registers it — no command,
+no database row, no build step. Drop the files in and the panel picks them up on
+the next page load.
+
+Both files go in the same directory, and it is the only one the engine reads:
+
+```
+<secure>/admin/workflows/core/my-workflow.json     the spec  — always
+<secure>/admin/workflows/core/my-workflow.md       the template — AI workflows only
+```
+
+The spec's filename **is** the workflow id the engine looks up, so
+`my-workflow.json` must declare `"id": "my-workflow"`.
+
+### The smallest thing that works
+
+This is `global-design`, shipped under `core/`, quoted whole. It is an AI
+workflow with no parameters — the least a real spec can carry:
+
+```json
+{
+    "$schema": "../schema.json",
+    "id": "global-design",
+    "version": "1.0.0",
+    "meta": {
+        "icon": "🎨",
+        "titleKey": "ai.specs.globalDesign.title",
+        "descriptionKey": "ai.specs.globalDesign.description",
+        "category": "style",
+        "tags": ["design", "colors", "variables", "theme"],
+        "difficulty": "beginner"
+    },
+    "parameters": [],
+    "dataRequirements": [
+        {
+            "id": "rootVariables",
+            "command": "getRootVariables",
+            "extract": "data.variables"
+        },
+        {
+            "id": "helpSetRootVariables",
+            "command": "help",
+            "urlParams": ["setRootVariables"],
+            "extract": "data"
+        }
+    ],
+    "relatedCommands": ["setRootVariables"],
+    "promptTemplate": "global-design.md"
+}
+```
+
+Required: `id`, `version`, and a `meta` carrying `icon`, `category`, and one of
+`name` or `titleKey` — plus either `steps` or `promptTemplate`. Everything else
+above is optional.
+
+⚠ `schema.json` lists only `icon` and `category` as required inside `meta`, so an
+editor validating against the schema will accept a spec with no name. The engine
+will not: it refuses one at render time. Give every workflow a `name`.
+
+⚠ **Use `name` and `description`, not `titleKey` and `descriptionKey`.** The
+shipped workflows use translation keys because their text lives in the admin
+locale files. A key that resolves to nothing falls back to the workflow's raw id,
+so your own workflow will display as `my-workflow` until you add translations.
+Direct strings need none:
+
+```json
+"meta": { "icon": "🎨", "name": "My Workflow", "description": "What it does", "category": "style" }
+```
+
+### How the template consumes what the spec declares
+
+This is the whole contract between the two files. Every reference in the
+template resolves against something the spec named:
+
+| In `global-design.md` | Comes from |
+|---|---|
+| `{{json rootVariables}}` | the `dataRequirements` entry with `"id": "rootVariables"` |
+| `{{> command.setRootVariables}}` | the name listed in `relatedCommands` |
+| `{{> output-json-only}}` | `<secure>/admin/workflows/blocks/output-json-only.md` |
+| `{{> example.global-design-output}}` | `<secure>/admin/workflows/examples/global-design-output.md` |
+
+So the rule is: **a template can only reach data the spec asked for.** Adding
+`{{json somethingElse}}` to the template does nothing unless a
+`dataRequirements` entry with that `id` fetches it first. The same holds in the
+other direction for manual workflows — a step's `forEach` and `{{data.x}}`
+placeholders resolve against `dataRequirements` ids, not against arbitrary names.
+
+### Steps 1 to 5
+
+1. **Write the spec.** Copy a shipped one whose shape matches what you want —
+   `global-design.json` for an AI workflow, `setup-theme-switch.json` for a
+   manual one — and change the `id` to match your filename. Point `$schema` at
+   `../schema.json` so an editor that understands JSON Schema will complete and
+   check the shape as you type.
+
+2. **Declare the data you need.** Each `dataRequirements` entry runs one
+   read-only command through the workflow engine before anything renders. Its
+   `id` is the name your template and steps will use. `extract` picks a path out
+   of the response — without it you get the whole `data` object.
+
+3. **Write the template** (AI workflows only), named exactly as `promptTemplate`
+   says, in the same directory. Reference your data requirements by their ids.
+   `{{> command.X}}` inlines the API documentation for command `X`, which is the
+   most reliable way to tell an AI what a command actually accepts.
+
+4. **List `relatedCommands`.** Every command the workflow will end up calling.
+   This is what decides whether the workflow is offered to a given role — leave a
+   command out and the workflow is shown to people who cannot run it.
+
+5. **Reload the panel and run it.** Open the visual editor, switch to **AI
+   tools**, and your workflow appears in the list under its category. Running it
+   is the check — see below.
+
+### How you know it worked
+
+**There is no validator, no linter and no dry run.** The only check the product
+offers is running the workflow and seeing whether it does what you intended. That
+is deliberate: a spec is only correct with respect to what you wanted, and
+nothing but a run can tell you that.
+
+What the engine does check, and what it does not, decides where a mistake shows
+up:
+
+| Mistake | Where you find out |
+|---|---|
+| The JSON does not parse, or has no `id` | The workflow never appears in the list at all. |
+| The shape is wrong — no `category`, a parameter with no `type`, neither `steps` nor `promptTemplate` | The card appears, and running it answers with the validation error list. |
+| A `dataRequirements` command name is misspelt, or your role cannot run it | The run fails on that data requirement. |
+| A template references data no `dataRequirements` entry fetched | The placeholder renders empty. |
+| A partial name is misspelt | `{{> yourtypo}}` appears verbatim in the rendered prompt, and a line goes to the server's PHP error log. |
+| A step calls a command your role lacks | That step is refused when it executes; earlier steps have already run. |
+
+⚠ **A manual workflow's steps are not a transaction.** They execute one at a
+time against the Management API, and a failure part-way leaves the earlier
+commands applied. Test a destructive workflow on a project you can throw away, or take a backup
+first — the shipped `fresh-start` deletes every route, asset, language and
+component before it resets styles.
 
 ---
 
@@ -304,54 +457,18 @@ Hardcoded data available as `data.*` in steps and templates:
 ```
 
 #### `relatedCommands` (array of strings)
-List of API command names. Used for:
-1. Permission checking (user must have access to these commands)
-2. Building `{{#each commands}}` context in markdown templates (auto-fetches help data)
+List of API command names. Used for two things:
 
-#### `loadPreset` (object)
-Shows a dropdown that loads existing data into the parameter form. Useful for "edit existing" workflows.
-
-```json
-"loadPreset": {
-    "command": "listBackups",
-    "dataPath": "backups",
-    "labelKey": "workflows.specs.restoreBackup.loadPreset.label",
-    "placeholderKey": "workflows.specs.restoreBackup.loadPreset.placeholder",
-    "valueField": "name",
-    "setParam": "backupExists",
-    "fieldMap": {
-        "backupName": "name"
-    }
-}
-```
-
-- `command` — API endpoint to call for the preset list
-- `dataPath` — path in the response to the items array (e.g., `"backups"`)
-- `valueField` — field used as the unique identifier in each item
-- `setParam` — hidden parameter toggled to `"true"` when a preset is selected
-- `fieldMap` — maps form parameter IDs to data fields (fills the form on selection)
-- `labelKey` / `placeholderKey` — translation keys for the dropdown label and placeholder
-
-#### `examples` (array)
-Pre-built example scenarios shown as clickable cards. Clicking one fills the form with preset parameters.
-
-```json
-"examples": [
-    {
-        "id": "example-blog",
-        "titleKey": "workflows.createWebsite.example1.title",
-        "promptKey": "workflows.createWebsite.example1.prompt",
-        "params": {
-            "pages": "home, about, blog",
-            "style": "modern"
-        }
-    }
-]
-```
-
-- `titleKey` — translation key for the example card title
-- `promptKey` — translation key for the description (also shown as subtitle)
-- `params` — pre-filled parameter values applied when clicked
+1. **Deciding whether the workflow is listed at all.** The panel hides a workflow
+   from anyone whose role does not grant every command in `relatedCommands` — and
+   every command named by a `steps` entry. This is a visibility filter, not the
+   enforcement: each command is authorized again when it actually runs, once by
+   the workflow engine for a data requirement and once by the Management API for
+   a step. A workflow that slips through the filter still fails at the refused
+   command.
+2. **Building command documentation into the prompt** — `{{> command.X}}`,
+   `{{> command.$relatedCommands}}` and the `{{#each commands}}` context all draw
+   on help data fetched for these names.
 
 #### `promptTemplate` (string)
 Filename of the markdown template (e.g., `"create-website.md"`). Loaded from the same folder as the JSON spec.
@@ -420,7 +537,7 @@ If the workflow JSON declares `pins: [...]` or `warnings: [...]`, the renderer p
 ---
 ```
 
-at the top of the template before any other pass. Each ID maps to a file under `secure/admin/workflows/pins/` or `secure/admin/workflows/warnings/`. Set `meta.suppressPinsHeader: true` to opt out (rare).
+at the top of the template before any other pass. Each ID maps to a file under `<secure>/admin/workflows/pins/` or `<secure>/admin/workflows/warnings/`. Set `meta.suppressPinsHeader: true` to opt out (rare).
 
 ### Pass 0.5: Partials — `{{> name}}`
 
@@ -428,16 +545,16 @@ Reusable prompt blocks. Resolved BEFORE conditionals/loops, so an inlined block 
 
 | Form | Resolves to |
 |---|---|
-| `{{> blockname}}` | `secure/admin/workflows/blocks/blockname.md` |
-| `{{> pin.X}}` | `secure/admin/workflows/pins/X.md` |
-| `{{> warning.X}}` | `secure/admin/workflows/warnings/X.md` |
-| `{{> example.X}}` | `secure/admin/workflows/examples/X.md` |
+| `{{> blockname}}` | `<secure>/admin/workflows/blocks/blockname.md` |
+| `{{> pin.X}}` | `<secure>/admin/workflows/pins/X.md` |
+| `{{> warning.X}}` | `<secure>/admin/workflows/warnings/X.md` |
+| `{{> example.X}}` | `<secure>/admin/workflows/examples/X.md` |
 | `{{> command.X}}` | `formatCommandFull(X, helpCache[X])` — inline command docs |
 | `{{> command.$relatedCommands}}` | One `formatCommandFull` per item in the workflow's `relatedCommands` list, joined by `---` |
 
-Recursion is depth-limited (max 5 levels). Cycles are detected and broken. Missing/typo'd partials are LEFT INTACT in the rendered prompt and an entry is written to `secure/logs/` so the typo is visible.
+Recursion is depth-limited (max 5 levels). Cycles are detected and broken. Missing or mistyped partials are LEFT INTACT in the rendered prompt — you see `{{> yourtypo}}` in the output rather than a silent gap — and a line is written to the server's PHP error log.
 
-**`relatedCommands` controls permissions; `{{> command.X}}` controls prompt rendering.** Keep the command listed in `relatedCommands` even when you reference it via a partial — otherwise users without that command's permission can trigger a workflow they can't actually run.
+**`relatedCommands` decides who sees the workflow; `{{> command.X}}` decides what the prompt says.** Keep a command listed in `relatedCommands` even when you reference it only through a partial — otherwise the workflow is offered to people whose role cannot run it, and they find out when a step is refused.
 
 ### Pass 1: Conditionals — `{{#if}}`
 
@@ -501,7 +618,7 @@ Then wire styles:
 {{> command.editStyles}}
 ```
 
-The partial form routes to `formatCommandFull()` which produces cleaner markdown (description, method, parameters with types, one fenced example). The `{{formatCommand}}` helper still works, but emits an HTML comment marking it deprecated and writes a notice to `secure/logs/`.
+The partial form routes to `formatCommandFull()` which produces cleaner markdown (description, method, parameters with types, one fenced example). The `{{formatCommand}}` helper still works, but emits an HTML comment marking it deprecated into the rendered prompt and writes a notice to the server's PHP error log.
 
 ### Pass 3: JSON Export — `{{json}}`
 
@@ -574,7 +691,7 @@ Fallback: checks `$fetchedData[key]`. Unknown placeholders are left as-is.
    connection is configured, otherwise copied out and pasted back
 5. Client validates the JSON response structure
 6. Client normalizes commands (ensures correct format)
-7. Each command is POSTed to /management/{command} in turn,
+7. Each command is POSTed to /management/p/<projectId>/{command} in turn,
    results shown per-row in the Batch panel
 ```
 
@@ -683,12 +800,22 @@ This generates an array of translation objects, one per language.
 - **Meta section:** `titleKey`/`descriptionKey` (translation keys) are preferred; `name`/`description` (direct strings) are accepted.
 - **Parameters:** Use `label` (direct text) OR `labelKey` (translation key). Non-hidden parameters must have one or the other. `labelKey` is resolved through the admin locale files, then returned as-is.
 
-### 10. Spec validation
-Every spec is validated when it loads, and an invalid one is refused with its
-error list rather than half-run. `WorkflowManager::validateWorkflow()` checks:
+### 10. When a spec is checked, and when it is not
+Loading a spec does **not** validate it. `loadWorkflow()` only requires the file
+to be valid JSON carrying an `id`, so a spec with a broken shape still appears in
+the workflow list and still looks runnable.
+
+The check happens when the runner asks for the rendered prompt. That request
+refuses an invalid spec outright, answering `500` with the error list rather than
+rendering half a prompt. `WorkflowManager::validateWorkflow()` checks:
 - Required fields: `id`, `version`, `meta`
 - Meta must have `titleKey` or `name`, and `category`
 - Category must be valid
 - Parameters need `id` and `type`
 - Data requirements need `id` and `command`
 - Must have either `steps` or `promptTemplate`
+
+It is a **shape** check and nothing more. It does not confirm that a command you
+named exists, that a `dataRequirements` id you referenced is the one your template
+reads, or that a partial you wrote resolves to a file. Those surface when you run
+the workflow — see *Adding a workflow*.
