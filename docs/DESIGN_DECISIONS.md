@@ -69,7 +69,7 @@ api-endpoints convention. `{slug}` (Laravel curly) — same divergence
 
 **Source**: `secure/src/classes/TrimParameters.php`,
 `secure/src/functions/routeHelpers.php`. Behaviour:
-[ARCHITECTURE.md §5.3](ARCHITECTURE.md).
+[ARCHITECTURE.md §6.3](ARCHITECTURE.md).
 
 ### Mixed `routes.php` shape — strings OR records (locked 2026-06-04)
 
@@ -93,7 +93,7 @@ files; harder to keep in sync).
 **Source**: `secure/management/routes.php` (the project's sidecar),
 `secure/src/functions/utilsManagement.php` (`varExportNested`),
 `secure/management/command/addRoute.php` (the writer). Behaviour:
-[ARCHITECTURE.md §5.3](ARCHITECTURE.md).
+[ARCHITECTURE.md §6.3](ARCHITECTURE.md).
 
 ### `urldecode` happens in the matcher, not the consumer (locked 2026-06-04)
 
@@ -138,7 +138,7 @@ valid curated-exact + catch-all pattern).
 **Source**: `secure/src/classes/TrimParameters.php` (the scorer +
 matcher), `secure/management/command/addRoute.php` (warns on ambiguous
 cases without blocking). Behaviour:
-[ARCHITECTURE.md §5.3](ARCHITECTURE.md).
+[ARCHITECTURE.md §6.3](ARCHITECTURE.md).
 
 ### Sibling-exact + param conflict — WARN, don't BLOCK (revised 2026-06-04)
 
@@ -236,7 +236,7 @@ authored filenames containing underscores.
 
 **Source**: `secure/src/functions/routeHelpers.php` (single source of
 truth for the `:` ↔ `__` mapping). Behaviour:
-[ARCHITECTURE.md §5.3](ARCHITECTURE.md).
+[ARCHITECTURE.md §6.3](ARCHITECTURE.md).
 
 ---
 
@@ -372,7 +372,7 @@ errors). DURING template render (rejected — couples the resolver to
 template-rendering internals; harder to test).
 
 **Source**: `public/index.php` (the lifecycle). Behaviour:
-[ARCHITECTURE.md §8.4](ARCHITECTURE.md) (lifecycle position),
+[ARCHITECTURE.md §9.4](ARCHITECTURE.md) (lifecycle position),
 [ADMIN_PANEL.md §9.7](ADMIN_PANEL.md).
 
 ### No type coercion of exposed values (locked 2026-06-04)
@@ -418,7 +418,7 @@ resolver concept with a different lifecycle position + a different
 failure mode, just to share the `session:` source kind).
 
 **Source**: `public/index.php` (the gate + the resolver lifecycle).
-Behaviour: [ARCHITECTURE.md §8.4](ARCHITECTURE.md).
+Behaviour: [ARCHITECTURE.md §9.4](ARCHITECTURE.md).
 
 ### `data-state-show-empty` companion attribute (locked 2026-06-04)
 
@@ -475,7 +475,7 @@ confuse the contract).
 `secure/management/command/setRouteResolver.php`,
 `secure/admin/templates/pages/sitemap-resolver-list.php`. Behaviour:
 [ADMIN_PANEL.md §9.7](ADMIN_PANEL.md),
-[ARCHITECTURE.md §8.4](ARCHITECTURE.md).
+[ARCHITECTURE.md §9.4](ARCHITECTURE.md).
 
 ### Storage shape — scalar OR array, backward-compat (locked 2026-06-08)
 
@@ -548,7 +548,7 @@ first; revisit if real cases need ordering).
 **Source**: `secure/src/functions/serverFetch.php`
 (`serverFetchMulti`), `secure/src/classes/DataResolver.php`
 (`resolveMany`). Behaviour:
-[ARCHITECTURE.md §8.4](ARCHITECTURE.md).
+[ARCHITECTURE.md §9.4](ARCHITECTURE.md).
 
 ### Var collision — error at save time + namespace-by-index fallback (locked 2026-06-08)
 
@@ -5224,7 +5224,7 @@ parameter (rejected — the same ambiguity plus caching and logging quirks).
 **Source**: `secure/src/classes/TrimParametersManagement.php`,
 `secure/src/functions/projectContext.php` (`qs_load_project_context`),
 `public/management/index.php`. Behaviour:
-[ARCHITECTURE.md §5](ARCHITECTURE.md).
+[ARCHITECTURE.md §6](ARCHITECTURE.md).
 
 ### The "served project" concept is deleted; the web server decides what sits at root (locked 2026-07-19)
 
@@ -5261,7 +5261,7 @@ that changes what the world sees is not a default).
 **Source**: `secure/src/functions/surfaceB.php`, `public/p/index.php`,
 `secure/deploy/apache-vhosts.conf.example`,
 `secure/deploy/nginx-vhosts.conf.example`. Behaviour:
-[ARCHITECTURE.md §6](ARCHITECTURE.md).
+[ARCHITECTURE.md §7](ARCHITECTURE.md).
 
 ### Generated links are root-relative by default; absolute is reserved for generation-time output (locked 2026-07-24)
 
@@ -5290,7 +5290,7 @@ has one correct answer per output kind).
 **Source**: `secure/src/functions/renderBootstrap.php` (`QS_PUBLIC_BASE`,
 `QS_PUBLIC_BASE_ABS`), `secure/src/classes/JsonToHtmlRenderer.php` (`processUrl`),
 `secure/src/classes/PageManagement.php`. Behaviour:
-[ARCHITECTURE.md §5](ARCHITECTURE.md).
+[ARCHITECTURE.md §6](ARCHITECTURE.md).
 
 ### The public base URL is resolved per request and never stored per project (locked 2026-07-24)
 
@@ -5320,7 +5320,7 @@ value (rejected — turns a typo into an outage). Derive from the request only
 **Source**: `secure/src/functions/renderBootstrap.php`
 (`qs_resolve_public_base`, `qs_public_base_normalize`),
 `secure/deploy/apache-vhosts.conf.example`. Behaviour:
-[ARCHITECTURE.md §6](ARCHITECTURE.md).
+[ARCHITECTURE.md §7](ARCHITECTURE.md).
 
 ### Static sub-resources are served only from a project's `public/` subtree (locked 2026-07-10)
 
@@ -5352,7 +5352,7 @@ deployment would silently expose everything).
 
 **Source**: `secure/src/functions/surfaceB.php`
 (`qs_surface_b_resolve_static`). Behaviour:
-[ARCHITECTURE.md §7](ARCHITECTURE.md).
+[ARCHITECTURE.md §8](ARCHITECTURE.md).
 
 ### A private project and a nonexistent project are indistinguishable (locked 2026-07-24) (superseded 2026-08-11)
 
@@ -5378,7 +5378,7 @@ production domain refuses the `/p/` prefix anyway (rejected — that narrows it 
 the authoring host, and a deployment that skips the vhost has it everywhere).
 
 **Source**: `secure/src/functions/surfaceB.php` (`qs_sb_deny`). Behaviour:
-[ARCHITECTURE.md §6](ARCHITECTURE.md).
+[ARCHITECTURE.md §7](ARCHITECTURE.md).
 
 ### Generated artifacts live under their own project (locked 2026-07-19)
 
@@ -5465,7 +5465,7 @@ stays free for the user's own site).
 
 **Source**: `secure/src/functions/surfaceB.php` (`qs_sb_deny`),
 `secure/deploy/apache-vhosts.conf.example`. Behaviour:
-[ARCHITECTURE.md §6](ARCHITECTURE.md).
+[ARCHITECTURE.md §7](ARCHITECTURE.md).
 
 ---
 
@@ -5762,7 +5762,7 @@ scheme).
 **Source**: `secure/src/classes/UrlPolicy.php`,
 `secure/src/classes/JsonToHtmlRenderer.php`,
 `secure/src/classes/JsonToPhpCompiler.php`. Behaviour:
-[ARCHITECTURE.md §7](ARCHITECTURE.md).
+[ARCHITECTURE.md §8](ARCHITECTURE.md).
 
 ### Share the policy, differ the action: writers reject, renderers neutralise (locked 2026-07-04)
 
@@ -5796,7 +5796,7 @@ whole SVG asset through a sanitiser, not exposing primitives as editor nodes).
 **Source**: `secure/src/classes/TagRegistry.php` (`isRenderable`),
 `secure/src/functions/nodeParamPolicy.php` (`firstUnsafeParam`),
 `secure/src/classes/CallTransformer.php`. Behaviour:
-[ARCHITECTURE.md §7](ARCHITECTURE.md).
+[ARCHITECTURE.md §8](ARCHITECTURE.md).
 
 ### The `style` attribute is HTML-escaped only — residual CSS injection accepted for beta.10 (locked 2026-07-03)
 
@@ -5823,7 +5823,7 @@ indistinguishable from an oversight).
 
 **Source**: `secure/src/classes/JsonToHtmlRenderer.php` (generic attribute
 branch) and its compiler counterpart. Behaviour:
-[ARCHITECTURE.md §7](ARCHITECTURE.md).
+[ARCHITECTURE.md §8](ARCHITECTURE.md).
 
 ### Path safety is enforced in the shared resolvers, not in each command (locked 2026-07-05)
 
@@ -5850,7 +5850,7 @@ duplication, and easy to get subtly wrong per site).
 **Source**: `secure/src/functions/utilsManagement.php` (`routePathIsSafe`,
 `resolvePageJsonPath`, `resolvePagePhpPath`),
 `secure/src/functions/PathManagement.php` (`is_valid_project_name`). Behaviour:
-[ARCHITECTURE.md §7](ARCHITECTURE.md).
+[ARCHITECTURE.md §8](ARCHITECTURE.md).
 
 ### Outbound fetches are checked at fetch time, not at store time (locked 2026-07-05)
 
@@ -5886,7 +5886,7 @@ enumeration of today's cloud providers).
 **Source**: `secure/src/classes/OutboundUrlPolicy.php`,
 `secure/src/functions/serverFetch.php`,
 `secure/management/config/environment.php.example`. Behaviour:
-[ARCHITECTURE.md §8](ARCHITECTURE.md).
+[ARCHITECTURE.md §9](ARCHITECTURE.md).
 
 ### Deployment targets outside the installation must be declared (locked 2026-07-05)
 
@@ -5991,7 +5991,7 @@ its own root without QuickSite running at all).
 (`qs_policy_has_hidden_segment`), `secure/src/functions/surfaceB.php`
 (`qs_surface_b_resolve_static`), `secure/management/command/importProject.php`.
 Related: *Path safety is enforced in the shared resolvers, not in each command*
-(see above). Behaviour: [ARCHITECTURE.md §7](ARCHITECTURE.md),
+(see above). Behaviour: [ARCHITECTURE.md §8](ARCHITECTURE.md),
 [COMMAND_API.md](COMMAND_API.md).
 
 ### What may be imported and what may be published are allowlists, not blocklists (locked 2026-07-30)
@@ -6545,7 +6545,7 @@ to serve a case the editor does not use).
 
 **Source**: `secure/src/functions/surfaceB.php` (`qs_surface_b_gate`),
 `secure/admin/templates/layout.php`. Behaviour:
-[ARCHITECTURE.md §5.1](ARCHITECTURE.md), [ADMIN_PANEL.md](ADMIN_PANEL.md).
+[ARCHITECTURE.md §6.1](ARCHITECTURE.md), [ADMIN_PANEL.md](ADMIN_PANEL.md).
 
 ### Session files live in the installation, not the shared system path (locked 2026-08-10)
 
@@ -6608,7 +6608,7 @@ same panel without one is an inconsistency that will not survive the next reader
 **Source**: `secure/admin/AdminRouter.php` (`formToken`, `formTokenValid`,
 `sessionTokenValid`, the logout branch of `dispatch`), the three auth templates,
 `secure/admin/templates/layout.php`. Behaviour:
-[ADMIN_PANEL.md §6](ADMIN_PANEL.md), [ARCHITECTURE.md §7](ARCHITECTURE.md).
+[ADMIN_PANEL.md §6](ADMIN_PANEL.md), [ARCHITECTURE.md §8](ARCHITECTURE.md).
 
 ### Project visibility lives on the members page, shaped deliberately unlike the join policy (locked 2026-08-11)
 
@@ -6736,7 +6736,7 @@ whole entry is about).
 
 **Source**: `secure/src/functions/surfaceB.php` (`qs_surface_b_gate`,
 `qs_surface_b_maybe_handle`, `qs_sb_deny`). Behaviour:
-[ARCHITECTURE.md §5.1](ARCHITECTURE.md), [ARCHITECTURE.md §6](ARCHITECTURE.md).
+[ARCHITECTURE.md §6.1](ARCHITECTURE.md), [ARCHITECTURE.md §7](ARCHITECTURE.md).
 
 ---
 
@@ -7155,7 +7155,7 @@ already answers it).
 
 **Source**: `secure/src/functions/surfaceB.php` (`qs_sb_send_file`, `qs_sb_etag`,
 `qs_sb_not_modified`, `qs_sb_parse_range`, `qs_sb_emit_range`). Behaviour:
-[ARCHITECTURE.md](ARCHITECTURE.md) §5.1, §6.
+[ARCHITECTURE.md](ARCHITECTURE.md) §6.1, §7.
 
 ### Browser storage is namespaced per project, inside qs.js, always (locked 2026-08-15)
 
@@ -7235,7 +7235,7 @@ looks before opening developer tools).
 `_storageGet` / `_storageSet` / `_storageRemove`, `QS.storageKey`),
 `secure/src/classes/PageManagement.php`, `secure/src/classes/Page.php`,
 `public/p/index.php`, `public/admin/assets/js/pages/storage.js`. Behaviour:
-[ARCHITECTURE.md](ARCHITECTURE.md) §8, [ADMIN_PANEL.md](ADMIN_PANEL.md) §6, §9.10.
+[ARCHITECTURE.md](ARCHITECTURE.md) §9, [ADMIN_PANEL.md](ADMIN_PANEL.md) §6, §9.10.
 
 ### QS.redirect enforces a scheme allowlist at the sink (locked 2026-08-15)
 
@@ -7280,7 +7280,7 @@ script execution is exactly what the storage namespace assumes cannot happen).
 
 **Source**: `secure/src/runtime/qs.js` (`QS_ALLOWED_URL_SCHEMES`,
 `_qsSafeNavigationUrl`, `QS.redirect`). Behaviour:
-[ARCHITECTURE.md](ARCHITECTURE.md) §8.
+[ARCHITECTURE.md](ARCHITECTURE.md) §9.
 
 ---
 
@@ -7460,7 +7460,7 @@ been handed a cacheable copy). Re-reading `members.json` inside the sender
 read on the hot path of every asset request).
 
 **Source**: `secure/src/functions/surfaceB.php` (`qs_surface_b_gate` stashes,
-`qs_sb_send_file` reads). Behaviour: [ARCHITECTURE.md](ARCHITECTURE.md) §6.
+`qs_sb_send_file` reads). Behaviour: [ARCHITECTURE.md](ARCHITECTURE.md) §7.
 
 ---
 
@@ -7686,7 +7686,7 @@ duplication the shared resolver exists to prevent).
 
 **Source**: `secure/src/functions/renderBootstrap.php`
 (`qs_render_public_base`), `secure/src/classes/JsonToHtmlRenderer.php`.
-Behaviour: [ARCHITECTURE.md](ARCHITECTURE.md) §5.1.
+Behaviour: [ARCHITECTURE.md](ARCHITECTURE.md) §6.1.
 
 ## Deployment resource limits and front-end truthfulness (beta.11)
 
@@ -7922,7 +7922,7 @@ cost).
 `/p/` refusal, both removed), `secure/admin/templates/layout.php` (warning
 removed), `secure/deploy/apache-vhosts.conf.example`,
 `secure/deploy/nginx-vhosts.conf.example`, `README.md`, `docs/ARCHITECTURE.md`
-§5.1 / §6 / §10.
+§6.1 / §7 / §11.
 
 ### A build is not static and has no feature gap (locked 2026-08-16)
 
@@ -7948,7 +7948,7 @@ behaviour, and there is no point at which it was decided that it should.
 (rejected — it was the original roadmap line, and it presumes the gap it would
 describe; writing the limitation down is what makes it permanent).
 
-**Source**: `docs/ARCHITECTURE.md` §10 and the renderer/compiler diagram in §4,
+**Source**: `docs/ARCHITECTURE.md` §11 and the renderer/compiler diagram in §4,
 `docs/COMMAND_API.md` (Builds), `README.md`. This entry records the framing only;
 build behaviour is unchanged by it.
 
@@ -8662,7 +8662,7 @@ two copies drift apart).
 every caller uses), `secure/management/command/build.php`,
 `secure/management/command/downloadBuild.php`,
 `public/admin/assets/js/core/api.js` (`downloadFile`).
-[ARCHITECTURE.md §10](ARCHITECTURE.md), [COMMAND_API.md](COMMAND_API.md).
+[ARCHITECTURE.md §11](ARCHITECTURE.md), [COMMAND_API.md](COMMAND_API.md).
 Sangio's ruling, design conversation 2026-08-21.
 
 ### One build per project, and a second build is refused rather than overwriting (locked 2026-08-22)
@@ -8713,7 +8713,7 @@ with a weaker shape and one more command to keep registered in nine places).
 **Source**: `secure/management/command/build.php` (`abort_build`, the retention
 refusal), `getBuild.php`, `deleteBuild.php`, `downloadBuild.php`,
 `secure/src/functions/utilsManagement.php`. [COMMAND_API.md](COMMAND_API.md),
-[ARCHITECTURE.md §10](ARCHITECTURE.md). Sangio's ruling, design conversation
+[ARCHITECTURE.md §11](ARCHITECTURE.md). Sangio's ruling, design conversation
 2026-08-21.
 
 ---
@@ -8786,7 +8786,7 @@ for free).
 **Source**: `secure/src/runtime/site/index.php`,
 `secure/src/functions/buildSiteRuntime.php`,
 `secure/management/command/build.php` (step 2).
-[ARCHITECTURE.md §10](ARCHITECTURE.md), [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md).
+[ARCHITECTURE.md §11](ARCHITECTURE.md), [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md).
 Sangio's ruling, design conversation during beta.11.
 
 ---
@@ -8827,7 +8827,7 @@ already existed and a build with no entry point still wrote one; it marks
 
 **Source**: `secure/src/functions/buildSiteRuntime.php`
 (`qs_site_verify_servable`), `secure/management/command/build.php`.
-[ARCHITECTURE.md §10](ARCHITECTURE.md), [COMMAND_API.md](COMMAND_API.md).
+[ARCHITECTURE.md §11](ARCHITECTURE.md), [COMMAND_API.md](COMMAND_API.md).
 
 ---
 
@@ -8919,7 +8919,7 @@ to match them against the route's resolvers).
 **Source**: `secure/src/functions/runtimeHandoff.php`,
 `secure/src/classes/PageManagement.php`, `secure/src/classes/Page.php`,
 `secure/src/classes/JsonToPhpCompiler.php`.
-[ARCHITECTURE.md §8.5](ARCHITECTURE.md), [ADMIN_PANEL.md §9.7](ADMIN_PANEL.md).
+[ARCHITECTURE.md §9.5](ARCHITECTURE.md), [ADMIN_PANEL.md §9.7](ADMIN_PANEL.md).
 
 ---
 
@@ -8976,7 +8976,7 @@ recommendation applies); copying the needed functions into build-only files
 in step).
 
 **Source**: `secure/src/functions/{apiRegistry,resolverRegistry,requestRuntime,jsonIo}.php`,
-`secure/management/command/build.php`. [ARCHITECTURE.md §8.6](ARCHITECTURE.md).
+`secure/management/command/build.php`. [ARCHITECTURE.md §11.2](ARCHITECTURE.md).
 
 ---
 
@@ -9091,7 +9091,7 @@ are different bases, and conflating them was the root of the second defect.
 
 **Source**: `secure/src/functions/{resolverRuntime,oauthRuntime,aliasRouting}.php`,
 `public/p/index.php`, `secure/src/runtime/site/index.php`.
-[ARCHITECTURE.md §8.4](ARCHITECTURE.md).
+[ARCHITECTURE.md §9.4](ARCHITECTURE.md).
 
 ---
 
@@ -9197,7 +9197,7 @@ the wrong trade).
 **Source**: `secure/src/classes/JsonToHtmlRenderer.php`,
 `secure/src/classes/JsonToPhpCompiler.php`,
 `secure/src/functions/runtimePlaceholders.php`.
-[ARCHITECTURE.md §8.7](ARCHITECTURE.md).
+[ARCHITECTURE.md §4.2](ARCHITECTURE.md).
 
 ---
 
@@ -10284,7 +10284,7 @@ comment around it.
 (`compileTagNode`, `compileComponent`, `compilePage`),
 `secure/src/classes/JsonToHtmlRenderer.php` (`renderAttribute`, `renderNode`),
 `secure/src/functions/nodeParamPolicy.php` (`firstUnsafeParam`).
-Behaviour: [ARCHITECTURE.md](ARCHITECTURE.md) §7 and §8.7.
+Behaviour: [ARCHITECTURE.md](ARCHITECTURE.md) §8 and §4.2.
 
 ### A component reference is a name, not a path (locked 2026-09-01)
 
@@ -10359,7 +10359,7 @@ the reason the three existing copies had already drifted apart).
 `secure/src/classes/JsonToPhpCompiler.php` (`compileComponent`),
 `secure/src/functions/utilsManagement.php`
 (`qs_first_invalid_component_reference`).
-Behaviour: [ARCHITECTURE.md](ARCHITECTURE.md) §8.7.
+Behaviour: [ARCHITECTURE.md](ARCHITECTURE.md) §4.2.
 
 ### The build reports what it does, not what it wishes it did (locked 2026-09-01)
 

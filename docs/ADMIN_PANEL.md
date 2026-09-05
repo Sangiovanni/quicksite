@@ -266,13 +266,13 @@ The visual editor is the panel's flagship feature. It runs as a sidebar UI in th
 
 ### 8.0 Which project the editor edits
 
-The panel edits one project at a time — the user's **selected project** (a per-user preference; ARCHITECTURE §6). The header carries a **project picker** listing the projects the user is a member of; changing it posts to `/admin/state/selected-project` and does a cache-busted reload, so the header badge, the editor's command target, and the preview iframe all follow together. The dashboard's project switch and the *Edit this project* button on My Memberships go through the same endpoint.
+The panel edits one project at a time — the user's **selected project** (a per-user preference; ARCHITECTURE §7). The header carries a **project picker** listing the projects the user is a member of; changing it posts to `/admin/state/selected-project` and does a cache-busted reload, so the header badge, the editor's command target, and the preview iframe all follow together. The dashboard's project switch and the *Edit this project* button on My Memberships go through the same endpoint.
 
 This pointer is **not** a command. Which project a person has open is a fact about the panel, not about any project, so it is panel state — the command API names its project in the URL marker instead and has no notion of a current one. The endpoint is POST-only, takes `{"project": "<id>"}`, and refuses a project the caller is not a member of (`403 authz.not_a_member`), so the panel can never open a project it cannot edit. The value is a UX default and never an authorization input: every request is re-authorized against the target project's `members.json`.
 
 An account that is a member of no project has nothing to edit. `/admin/preview` sends it to the dashboard with a note saying the editor needs a project and pointing at creating or joining one — the editor is never opened bound to nothing, and the header's "Back to site" button is hidden, since there is no site to go back to. This applies only when there is no membership at all; asking for a project you are simply not a member of is refused by the usual gates.
 
-The preview iframe loads the edited project in editor mode through its per-project live view (`/p/<id>/?_editor=1`) — the same way for every project, since none is privileged. That view registers the shared fatal handler (ARCHITECTURE §7), so a PHP fatal inside the previewed project shows a neutral error page under a `500` rather than a stack trace, and the details go to the PHP error log — or into the page too, if the install declares itself development. "Back to site" and the floating miniplayer resolve to that same view. Private projects authenticate on the panel's own session cookie — the iframe is a plain browser navigation with no headers of its own, and the cookie covers the whole origin. A project mapped to its own domain is a different origin and does not receive it, so a private project is previewed at `/p/<id>/` on the panel's hostname. The iframe URL carries a per-load cache-buster so a switch always loads the new project fresh — the editor's command target and the iframe DOM can never drift onto different projects.
+The preview iframe loads the edited project in editor mode through its per-project live view (`/p/<id>/?_editor=1`) — the same way for every project, since none is privileged. That view registers the shared fatal handler (ARCHITECTURE §8), so a PHP fatal inside the previewed project shows a neutral error page under a `500` rather than a stack trace, and the details go to the PHP error log — or into the page too, if the install declares itself development. "Back to site" and the floating miniplayer resolve to that same view. Private projects authenticate on the panel's own session cookie — the iframe is a plain browser navigation with no headers of its own, and the cookie covers the whole origin. A project mapped to its own domain is a different origin and does not receive it, so a private project is previewed at `/p/<id>/` on the panel's hostname. The iframe URL carries a per-load cache-buster so a switch always loads the new project fresh — the editor's command target and the iframe DOM can never drift onto different projects.
 
 ### 8.1 Modes
 
@@ -943,7 +943,7 @@ top-level keys and picks the appropriate converter:
 | Top-level `apis: {...}` | Native | Pasted as-is. The shape exported by the page's Export button. |
 | Top-level `openapi: "3.x"` | OpenAPI 3.x | Converted by the OpenAPI converter (below). |
 | Top-level `swagger: "2.0"` | Swagger 2.0 | Detected and explicitly unsupported — the preview points the user at `converter.swagger.io` to convert to 3.x first. |
-| Top-level `endpoints.{public, secured, ...}` | File-manager | Legacy converter — each group becomes its own API named `<base>-<group>`; bearer/basic/apiKey auth derived from the group's `authentication.type`; `:placeholders` rebuilt from each endpoint's declared parameters + `route_format`. |
+| Top-level `endpoints.{public, secured, ...}` | File-manager | Legacy converter — each group becomes its own API named `<base>-<group>`; bearer/basic/apiKey auth derived from the group's `authentication.type`; `:placeholders` rebuilt from each endpoint's declared parameters + `route_format` (a `"path segments"` hint turns a `name` parameter into `/name/:name`), and an endpoint that already carries a `:placeholder` keeps it. |
 
 **OpenAPI 3.x converter** (`openapi-converter.js`). Maps an OpenAPI
 document to one QuickSite API + one endpoint per `paths.<path>.<method>`:
@@ -1352,7 +1352,7 @@ NOT stored alongside the main interaction — each row is persisted as
 a **sibling interaction** on the same event. The shared
 `CallTransformer::transform` then compiles the chain in storage order with
 `await` between awaitable steps (see
-`docs/ARCHITECTURE.md §8.0.1`).
+`docs/ARCHITECTURE.md §9.0.1`).
 
 Save model is **replace-on-save**: when the user clicks Save, the
 picker deletes any existing sibling interactions for this event
@@ -1398,7 +1398,7 @@ the list.
 Parallel path for translatable **positional** args (catalog-driven):
 args declaring `inputType: 'translationKey'` in `qsVerbCatalog.php` are
 resolved automatically at render time — no per-verb code change
-required. See §9.9.7 + ARCHITECTURE §8.0.2 for the resolution mechanics.
+required. See §9.9.7 + ARCHITECTURE §9.0.2 for the resolution mechanics.
 
 ### 9.5 Auth flows — Tier 1 (token persistence), cookie pattern, Tier 2 (refresh on 401), Tier 3 (magic-link)
 
@@ -1646,7 +1646,7 @@ Phase 3 — Page loads, exchange runs:
 
 | Verb | Purpose | Typical chain |
 |---|---|---|
-| `QS.exchangeMagicLink(endpoint, paramName, returnTo?)` | Landing-page exchange. Reads `QS.routeParams[paramName]` (populated by the path matcher — see [ARCHITECTURE §5.3](ARCHITECTURE.md)), POSTs `{key:<code>}`, stores response in `QS._lastFetchResult`. Dispatches `qs:auth:exchange-started` before fetch + `qs:auth:exchange-failed` in catch so the `magic-link-handler` component's `data-auth-show="connecting"` / `"failed"` UI morphs. | `exchangeMagicLink` → `saveToken` × 2 → `redirect` |
+| `QS.exchangeMagicLink(endpoint, paramName, returnTo?)` | Landing-page exchange. Reads `QS.routeParams[paramName]` (populated by the path matcher — see [ARCHITECTURE §6.3](ARCHITECTURE.md)), POSTs `{key:<code>}`, stores response in `QS._lastFetchResult`. Dispatches `qs:auth:exchange-started` before fetch + `qs:auth:exchange-failed` in catch so the `magic-link-handler` component's `data-auth-show="connecting"` / `"failed"` UI morphs. | `exchangeMagicLink` → `saveToken` × 2 → `redirect` |
 | `QS.requestMagicLink(endpoint, email, returnTo?)` | Forward path. POSTs `{email}` to the issue endpoint. `email` accepts a literal address OR a `#selector` / `.selector` to read from an `<input>` (same convention as `setState`'s value arg). | `validate` → `requestMagicLink` → optional `redirect` to "check your email" page |
 | `QS.logoutServer(endpoint)` | Server-side logout — POST so the auth API can invalidate the session / revoke the refresh token. Thin wrapper over `QS.fetch` so registry bearer auth is applied. Errors are intentionally swallowed (the user wants out either way). | `logoutServer` BEFORE `clearToken` × 2 → `redirect` |
 
@@ -1897,7 +1897,7 @@ guard.
 
 State stores give page interactions memory — named, page-scoped client state
 bound to one API endpoint. The runtime and definition shape live in
-[ARCHITECTURE.md §8.3](ARCHITECTURE.md); this section covers the editor UX.
+[ARCHITECTURE.md §9.3](ARCHITECTURE.md); this section covers the editor UX.
 
 **Where.** Visual editor → **JS mode** → the **"State stores"** area, a collapsible
 section directly under **Page Events** (both are page-level, independent of the
@@ -1926,7 +1926,7 @@ actions. Delete is read-modify-write — it re-saves the route's remaining store
   `URL path param "slug"` → `init: "param:slug"`; etc.). On edit it parses the
   stored string back into the pair, so existing `state-stores.json` files
   round-trip unchanged. The **URL path param** kind reads from `QS.routeParams`
-  (populated by qs.js's client-side path matcher — see ARCHITECTURE §5.3),
+  (populated by qs.js's client-side path matcher — see ARCHITECTURE §6.3),
   closing the URL → live data loop: a field with `init: 'param:slug'` on a
   `/products/:slug` page starts with the captured slug. Missing on a static
   route → silent fallback to `default`, matching `query:` semantics.
@@ -1972,7 +1972,7 @@ init / `setState` / `fetchState`:
   Handy for hiding Next at the last page, "Load more" when `hasMore` is
   false, etc.
 - `data-state-pagenav="storeId"` (+ optional `-page-field` / `-totalpages-field`
-  / `-window` / `-prev-next` companion attributes — see `ARCHITECTURE.md §8`)
+  / `-window` / `-prev-next` companion attributes — see `ARCHITECTURE.md §9`)
   — runtime-rendered numbered-page navigator. Emitted by the `paged-navigator`
   complex element wizard; hand-author the bindings if you want a custom shape.
 
@@ -2362,7 +2362,7 @@ separated.
 Visual route tree, reachability analyzer, layout toggles, and `sitemap.txt`
 generator — all backed by `getSiteMap` + `addRoute` / `deleteRoute` +
 `setRouteLayout` + `analyzeReachability` + `setSiteMapConfig`. The runtime +
-matching algorithm live in [ARCHITECTURE §5.3](ARCHITECTURE.md); this section
+matching algorithm live in [ARCHITECTURE §6.3](ARCHITECTURE.md); this section
 covers the editor UX.
 
 **Tree**. One row per route, hierarchical. Each row carries:
@@ -2401,7 +2401,7 @@ ambiguous (param at a level with exact siblings, or two params at the same
 depth), the success toast is followed by one warning toast per entry in the
 response's `warnings` array. The matching rule still picks a winner at
 runtime (more literal segments wins; declaration order breaks ties — see
-ARCHITECTURE §5.3), so the toast is a "did you mean this?" surface rather
+ARCHITECTURE §6.3), so the toast is a "did you mean this?" surface rather
 than a block.
 
 **Edit title**. The context menu's `Edit title` opens a modal with one
@@ -2463,7 +2463,7 @@ locked render order (most-authored first):
 | `fetch` | Fetch / network | fetch |
 | `auth` | Auth | saveToken, clearToken, refresh, exchangeMagicLink, requestMagicLink, logoutServer |
 | `nav` | Navigation | redirect, scrollTo |
-| `state-store` | State stores | setState, fetchState, onScrollFetchState |
+| `state-store` | State stores | store, setState, fetchState, onScrollFetchState |
 | `focus` | DOM focus | focus, blur |
 | `display` | Rendering / display | filter, renderList |
 | `general` | General | toast (intentionally cross-cutting) |
@@ -3248,7 +3248,8 @@ deep-dive.
 | `data-state-value` | state | `storeId.field` | Element text = scalar field of a state store | §9.6 |
 | `data-state-list` | state | `storeId.field` | Container becomes a list — first child is the per-item template | §9.6 |
 | `data-state-empty` | state | text | Text shown when `data-state-list`'s array is empty | §9.6 |
-| `data-state-show` | state | `storeId.field` | Toggles `hidden` on truthiness — gate Next/Prev on cursors, "Load more" on hasMore, etc. | §9.6 |
+| `data-state-show` | state | `storeId.field` | Toggles `hidden` on truthiness — gate Next/Prev on cursors, "Load more" on hasMore, etc. Falsy means `null` / `undefined` / `''` / `0` / `false` / `[]` | §9.6 |
+| `data-state-show-empty` | state | `storeId.field` | The inverse of `data-state-show`: visible when the field is falsy. Pair the two on one field to carry a "no data" fallback beside the happy path; it is also what a route using the resolver's `onMiss: 'render-empty'` renders when the fetch fails | §9.7 |
 | `data-state-pagenav` | state | `storeId` | Runtime-rendered numbered-page navigator. Companion attrs: `-page-field`, `-totalpages-field`, `-window`, `-prev-next` | §8.7 (paged-navigator) |
 | `data-auth-show` | auth | `in` / `out` | Show only when logged in / out. Needs `data-auth-source` on element or ancestor | §9.5 |
 | `data-auth-source` | auth | `localStorage:key` | Where the token lives for `data-auth-show` resolution | §9.5 |
@@ -3366,6 +3367,20 @@ Several attributes are designed to pair with another:
 
 The catalog encodes these in each entry's `companion` field; the
 autocomplete surfaces them as "+ Add companion" hints.
+
+`data-state-pagenav`'s four are all optional, and each has a default that
+covers the ordinary offset-pagination store:
+
+| Companion | Default | What it does |
+|---|---|---|
+| `data-state-pagenav-page-field` | `page` | the store field holding the current page number — written on click, then the store re-fetches |
+| `data-state-pagenav-totalpages-field` | `totalPages` | the store field holding the page count, read to size the navigator. When it is missing or `≤ 1`, the navigator hides itself |
+| `data-state-pagenav-window` | `2` | how many sibling pages to show each side of the current one before ellipsing. `0` collapses the whole thing to `1 … current … N` |
+| `data-state-pagenav-prev-next` | `true` | adds `‹ Prev` / `Next ›` chevrons. Anything other than the literal string `"true"` hides them |
+
+The navigator itself re-renders on every store update. It is emitted by the
+`paged-navigator` complex element (§8.7), but the binding is hand-authorable —
+nothing about it depends on having used the wizard.
 
 ### 10.4 Tldr by family
 
