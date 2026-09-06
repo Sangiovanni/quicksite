@@ -121,7 +121,7 @@ quicksite/
 ├── LICENSE                       # AGPL-3.0
 ├── PHILOSOPHY.md                 # Design principles
 ├── CLAUDE.md                     # Engineering standards — for somebody CHANGING QuickSite
-├── MAINTAINING.md                # The procedures for adding or removing a command
+├── MAINTAINING.md                # Maintenance procedures: doc triggers, commands, releases
 └── README.md
 ```
 

@@ -24,7 +24,7 @@ rule, and the `docs/` content-hygiene rules).
 |---|---|
 | [Documentation maintenance — the trigger table](#documentation-maintenance--the-trigger-table) | **Every change.** You edited a file and need to know which `docs/` file that obliges you to re-check. |
 | [Adding a new command](#adding-a-new-command--checklist) | You are adding a `secure/management/command/<name>.php`. |
-| [Removing a command](#removing-a-command--the-checklist-is-six-layers-not-four) | You are deleting one. It is a longer list than adding. |
+| [Removing a command](#removing-a-command--the-checklist-is-eight-layers-and-it-is-longer-than-adding) | You are deleting one. It is a longer list than adding. |
 | [Release discipline](#release-discipline) | You are about to cut a git tag. |
 | [How to write and review a `docs/` file](#how-to-write-and-review-a-docs-file) | You are restructuring or reviewing one of the six canonical docs. |
 
@@ -75,7 +75,7 @@ re-check the corresponding doc.
 ---
 ## Adding a new command — checklist
 
-Adding a `secure/management/command/<name>.php` is only the first of **five** registrations. The command is **invisible** at four different layers (router, category map, role permissions, /admin/command UI listing) until each is updated.
+Adding a `secure/management/command/<name>.php` is the first of **six** steps: the file, then **five** registrations. Until every registration is done the command is missing at a different layer — router, category map, role permissions, `help` documentation, and the `/admin/command` UI listing.
 
 1. **Create** `secure/management/command/<name>.php`. **Two file styles are legitimate — pick by whether the command must be callable in-process:**
    - **Top-level script** (50 of the 172 command files). The file simply executes on include: it reads its parameters, does the work, and calls `->send()`. The dispatcher includes exactly one command file per request, so this is safe and is the simpler default.
@@ -96,7 +96,7 @@ Adding a `secure/management/command/<name>.php` is only the first of **five** re
 9. **"Command exists but doesn't appear on /admin/command"** — almost always step 6 (missing from `AdminHelper.php → getCommandCategories()`). Confirm with grep + hard-refresh the page.
 10. **Doc trigger** — see the *Documentation maintenance* table above: routes.php change ⇒ re-check `ARCHITECTURE.md §3` + `COMMAND_API.md` (command count).
 
-### REMOVING a command — the checklist is SIX layers, not four
+### REMOVING a command — the checklist is EIGHT layers, and it is longer than adding
 
 Adding needs the registrations above. **Removing** needs every place that can hold a
 command NAME, and two of them are outside the add-checklist entirely — both were missed
