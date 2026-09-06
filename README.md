@@ -2,7 +2,7 @@
 
 A file-based PHP CMS with a built-in visual admin panel. Define page structures in JSON, manage everything through a REST API or the admin UI, and deploy production builds — no database required.
 
-> **Current version: `1.0.0-beta.10.2`** — Actively developed.
+> **Actively developed.** The current version is the latest entry on the [releases page](https://github.com/Sangiovanni/quicksite/releases).
 
 <a href="https://www.youtube.com/watch?v=LHheKkI1rLw">
   <img src="https://img.youtube.com/vi/LHheKkI1rLw/maxresdefault.jpg" alt="Watch the demo" width="50%">
@@ -542,10 +542,6 @@ GET /management/help/addRoute     # docs for one command
 Three commands are public — `help`, `login`, `register`. Every other endpoint requires the session `login` established: its cookie, plus the session token it returned sent as `Authorization: Bearer`. Both are needed, and the request is authorized against the caller's role **on the target project**.
 
 Full reference — endpoint shape, response envelope, command catalogue, auth, internals: **[docs/COMMAND_API.md](docs/COMMAND_API.md)**.
-
-## Tutorials
-
-Step-by-step tutorials for the admin panel, visual editor, and API workflows are planned.
 
 ## Troubleshooting
 
