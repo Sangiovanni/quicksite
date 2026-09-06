@@ -20,7 +20,7 @@ require_once __DIR__ . '/jsonIo.php'; // qs_json_write — NOT the whole utility
  *       "response":   { ok, status, data, error? }  // raw serverFetch envelope
  *   }
  *
- * Auth-cacheable rule (LOCKED in BETA8_DATA_RESOLVER.md):
+ * Auth-cacheable rule (LOCKED):
  *   - `none` → cacheable (no user identity)
  *   - `apiKey` → cacheable (server-side shared secret, not per-user)
  *   - `bearer` / `cookie` / `basic` → NOT cacheable. The response is

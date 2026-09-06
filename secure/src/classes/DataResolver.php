@@ -7,7 +7,7 @@
  * template-scope variables for the renderer to consume.
  *
  *
- * Lifecycle position (locked Q4 in BETA8_DATA_RESOLVER.md):
+ * Lifecycle position (locked design):
  *
  *   AFTER the auth gate (yes/no decision) but BEFORE template render.
  *   The gate is hard-wired framework middleware; the resolver is the
@@ -235,9 +235,8 @@ class DataResolver {
      *                                     // AND wasn't covered by onMiss
      *       'exposed'         => array,   // FLAT namespace — merged
      *                                     // across all resolvers (collisions
-     *                                     // are rejected at save time per
-     *                                     // BETA8_MULTI_RESOLVER.md, so this
-     *                                     // merge is collision-free at
+     *                                     // are rejected at save time, so
+     *                                     // this merge is collision-free at
      *                                     // runtime).
      *       'exposedByIndex'  => array,   // [resolverIdx => [varName => value]]
      *                                     // — for the namespaced address
@@ -251,7 +250,7 @@ class DataResolver {
      *                                     // {error, status, resolverIndex}
      *   ]
      *
-     * Failure semantics (locked in BETA8_MULTI_RESOLVER.md #5):
+     * Failure semantics (locked design):
      *   - Per-resolver onMiss applies independently to its exposed vars.
      *   - Any resolver failure WITHOUT onMiss='render-empty' short-circuits
      *     the whole page (ok=false; caller emits 404/500 with firstError).

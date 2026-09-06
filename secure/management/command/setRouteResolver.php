@@ -7,7 +7,7 @@
  * @route /management/setRouteResolver
  * @auth required (write permission)
  *
- * Body shapes (locked in BETA8_MULTI_RESOLVER.md decision #7):
+ * Body shapes (locked decision):
  *
  *   1. {route, resolver}                     → REPLACE whole entry with
  *                                              ONE resolver (scalar shape
@@ -46,7 +46,7 @@
  *                                       in the array shape for patch /
  *                                       append / remove operations.
  *
- * Resolver config shape (per BETA8_DATA_RESOLVER.md):
+ * Resolver config shape:
  *   {
  *       "endpoint": "@apiId/endpointId",   required
  *       "inputs":   {"<name>": "<spec>"},  optional (param:/query:/session:/literal)

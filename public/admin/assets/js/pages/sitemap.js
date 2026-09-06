@@ -1466,7 +1466,7 @@
 
     /**
      * Split a source spec into its (kind, value) parts. The on-disk
-     * convention (per resolverHelpers.php + BETA8_DATA_RESOLVER.md):
+     * convention (per resolverHelpers.php):
      *   "param:<name>"   → {kind:'param',   value:<name>}
      *   "query:<name>"   → {kind:'query',   value:<name>}
      *   "session:<name>" → {kind:'session', value:<name>}
@@ -1599,8 +1599,8 @@
      * Endpoint-level auth wins over API-level auth; missing /
      * 'inherit' fields fall through to API-level, then to 'none' as
      * final fallback. Used by the cacheTTL section to drive the
-     * shared-cache-safe badge (locked in BETA8_DATA_RESOLVER.md
-     * Slice 4 — TTL is enforced disabled for bearer/cookie/basic).
+     * shared-cache-safe badge (locked design — TTL is enforced
+     * disabled for bearer/cookie/basic).
      */
     function _findCurrentEndpointAuth() {
         const refs = _resolverRefs;
@@ -2259,7 +2259,7 @@
     // worth flagging:
     //
     //   1. Empty dot-path is LEGITIMATE (means "expose the whole
-    //      response as varName" per BETA8_DATA_RESOLVER.md). The
+    //      response as varName"). The
     //      filled-name + empty-path case is ACCEPTED, unlike the
     //      inputs editor which blocks empty values.
     //
@@ -2517,8 +2517,7 @@
     // Number input (seconds) + shared-cache-safe badge. The badge is a
     // read-only surface for the server-side rule: caching is force-
     // disabled for bearer/cookie/basic auth REGARDLESS of TTL (locked
-    // in BETA8_DATA_RESOLVER.md Slice 4 — would leak per-user data
-    // across users via shared cache).
+    // design — would leak per-user data across users via shared cache).
 
     /**
      * Refresh both the auth-cacheable badge AND the TTL input's
@@ -2634,7 +2633,7 @@
     // ====================================================================
     // Single-select for the failure-mode behaviour. Two options now
     // (default + render-empty); future values (redirect:<url> etc.)
-    // reserved per BETA8_DATA_RESOLVER.md but not in v1 scope.
+    // reserved but not in v1 scope.
 
     function _renderResolverOnMissSection(onMiss) {
         const section = document.getElementById('sitemap-resolver-onmiss-section');

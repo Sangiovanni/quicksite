@@ -6,8 +6,7 @@ require_once __DIR__ . '/utilsManagement.php'; // qs_json_write
  *
  * The registry is the single declared model of every browser-storage key the
  * site uses (localStorage / sessionStorage / cookie). It powers the
- * `storageKey` picker and the GDPR / cookie-consent surface. See
- * NOTES/planning/BETA9_STORAGE_REGISTRY.md for the locked design.
+ * `storageKey` picker and the GDPR / cookie-consent surface.
  *
  * Item shape:
  *   {

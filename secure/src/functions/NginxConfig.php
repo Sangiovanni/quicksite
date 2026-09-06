@@ -44,10 +44,10 @@ require_once __DIR__ . '/deploymentMarker.php'; // qs_deployed_sites
  * to be kept in step there and none was.
  *
  * ⚠ ADDING A FOURTH FRONT CONTROLLER UNDER public/admin/ MEANS ADDING A BLOCK
- * HERE. NOTES/tests/beta11/s27_admin_route_collision_probe.php checks both
- * directions off the filesystem — that no directory shadows a panel page, and
- * that every front-controller directory has a location block — so the omission
- * is caught here rather than on somebody's nginx.
+ * HERE. Check both directions off the filesystem — that no directory
+ * shadows a panel page, and that every front-controller directory has a
+ * location block — so the omission is caught here rather than on
+ * somebody's nginx.
  *
  * ── WHY THE ROOT BLOCK IS NOT A CONSTANT ─────────────────────────────────────
  *

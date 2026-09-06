@@ -141,8 +141,8 @@ function __command_importStructureTranslations(array $params = [], array $urlPar
     $header = $params['header'] ?? [];
     $rows = $params['rows'];
 
-    // Only 'table' supported today; the design (BETA7_TABLE_TRANSLATION_CSV.md)
-    // anticipates expanding to list / accordion / etc. as more kinds become
+    // Only 'table' supported today; the design anticipates expanding to
+    // list / accordion / etc. as more kinds become
     // CSV-shaped. Reject unknown kinds now so a future addition forces an
     // explicit code change.
     if ($kind !== 'table') {

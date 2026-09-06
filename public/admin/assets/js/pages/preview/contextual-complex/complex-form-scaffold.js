@@ -294,7 +294,7 @@
             return (api.endpoints || []).find(ep => ep.id === epId) || null;
         }
 
-        // Type inference per the BETA7_FORM_SCAFFOLD_AUTOSEED.md table.
+        // Type inference for the form-scaffold auto-seed.
         // Returns one of INPUT_TYPES; defaults to 'text' for unknown shapes
         // (arrays / objects render as text so the user gets a visible
         // field they can then manually convert via the type dropdown).

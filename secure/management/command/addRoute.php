@@ -395,8 +395,7 @@ function resolveNewRouteJsonPath(array $segments, string $jsonDir): string {
 /**
  * Detect conflicts when adding a param route at a level that already
  * has siblings. Returns structured warnings[] (NOT blocking — the route
- * still saves). Locked design 2026-06-04, BETA8_PARAMETERISED_ROUTES.md
- * slice 4.
+ * still saves). Locked design 2026-06-04.
  *
  * Two warning shapes:
  *  - 'route.warning.param_shadows_exact_siblings' — when adding a

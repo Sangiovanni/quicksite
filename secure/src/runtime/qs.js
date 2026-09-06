@@ -2363,7 +2363,7 @@
      * Why a code, not the token directly: a token-in-URL leaks via email
      * forwarding, browser history, corporate HTTPS proxies, and email-
      * client link prefetchers. The code is single-use (server marks it
-     * USED on exchange) and short-lived. See BETA8_AUTH_TIER_3.md.
+     * USED on exchange) and short-lived.
      *
      * @param {string} endpointRef Registry ref like '@auth-api/exchange-magic'.
      *                             The endpoint should be configured with

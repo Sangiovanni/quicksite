@@ -35,7 +35,7 @@ require_once __DIR__ . '/../functions/environment.php';
  * "Mandatory" is enforced twice, because neither mechanism covers the other's
  * blind spot:
  *
- *   1. STATICALLY, before anything ships — NOTES/tests/beta11/s210_create_scan.php
+ *   1. STATICALLY, before anything ships — a static scan
  *      walks the token stream of every command and exits non-zero if any
  *      create() reaches its terminating `;` without a withMessage(). That sees
  *      branches no test ever executes, which is exactly where a forgotten

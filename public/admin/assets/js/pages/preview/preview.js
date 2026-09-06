@@ -84,7 +84,7 @@
     const ctxNodeSaveSnippet = document.getElementById('ctx-node-save-snippet');
     const ctxNodeVariables = document.getElementById('ctx-node-variables');
     // Translate-from-CSV: button + modal refs. Shown when the selected
-    // node has data-qs-complex='table'. See BETA7_TABLE_TRANSLATION_CSV.md.
+    // node has data-qs-complex='table'.
     const ctxNodeTranslateCsv = document.getElementById('ctx-node-translate-csv');
     const translateCsvModal       = document.getElementById('preview-translate-csv-modal');
     const translateCsvClose       = document.getElementById('translate-csv-modal-close');
@@ -3759,7 +3759,7 @@
     }
 
     // ============================================================
-    // Translate-from-CSV (BETA7_TABLE_TRANSLATION_CSV.md)
+    // Translate-from-CSV
     // ============================================================
     // Translate an existing complex-element subtree (currently only
     // Table) to another language by pasting a CSV-shaped grid. UI:

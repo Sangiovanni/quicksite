@@ -16,7 +16,7 @@
  * consolidating — see public/index.php and the bug-fix path in
  * JsonToHtmlRenderer::renderPage).
  *
- * Locked design 2026-06-04, BETA8_PARAMETERISED_ROUTES.md.
+ * Locked design 2026-06-04.
  */
 
 if (!function_exists('paramRoutePathToFs')) {

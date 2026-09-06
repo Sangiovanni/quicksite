@@ -29,8 +29,8 @@ class CommandRunner {
      * must be inside the viewer grant (content.read) or a global 'any' category —
      * NOTHING admin-tier. getCommandHistory (history) + listBackups (project.data)
      * were removed for exactly this reason: their data is admin+ and was reachable
-     * through WorkflowManager without a role check. The matrix suite
-     * (10_1_authz_matrix.php) asserts this invariant on every run.
+     * through WorkflowManager without a role check. The authorisation
+     * matrix suite asserts this invariant on every run.
      *
      * If you need to add a command, verify it (1) cannot cause data loss or side
      * effects AND (2) is not above the viewer tier.

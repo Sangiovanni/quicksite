@@ -729,7 +729,7 @@
      * the endpoint modal is) and applies the same derivation rule as
      * ApiEndpointManager::deriveCallableFrom server-side: 'apiKey' →
      * 'server'; everything else → 'both'. Per the locked design
-     * 2026-06-04 (BETA8_DATA_RESOLVER.md "callableFrom marker").
+     * of 2026-06-04 for the `callableFrom` marker.
      * Beta.8 Track A4.
      */
     function updateCallableFromAutoPreview() {

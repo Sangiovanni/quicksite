@@ -8,7 +8,7 @@ require_once __DIR__ . '/../functions/opcacheHygiene.php';
  * `responseBindings`. Single synchronisation point — no auto-generated
  * commands, no per-binding inline state.
  *
- * Invariant (per BETA7_COMPONENT_LIST_BINDING.md §2a):
+ * Invariant:
  *   bindings ⊆ qs-enums.js ⊆ union of all components' __enums__
  *
  * Where:

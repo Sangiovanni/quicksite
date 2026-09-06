@@ -144,8 +144,8 @@ class TrimParameters {
         while (!empty($remaining) && $depth < self::MAX_DEPTH) {
             $segment = $remaining[0];
 
-            // Specificity rule (locked 2026-06-04, BETA8_PARAMETERISED_ROUTES.md
-            // slice 2): exact literal match wins over any `:name` param sibling.
+            // Specificity rule (locked 2026-06-04): exact literal match wins
+            // over any `:name` param sibling.
             // Try exact first; fall back to the first `:name` key at this level
             // when no literal match exists. Declaration order in routes.php
             // breaks ties between multiple `:name` siblings (associative array

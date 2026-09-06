@@ -3,7 +3,7 @@
  *
  * Calls listStorageItems / addStorageItem / editStorageItem /
  * deleteStorageItem via QuickSiteAdmin.apiRequest. The registry is the
- * GDPR / cookie-consent data layer (see BETA9_STORAGE_REGISTRY.md).
+ * GDPR / cookie-consent data layer.
  *
  * Built with createElement + textContent + named _render* helpers per the
  * CLAUDE.md HTML-in-JS hygiene rule. No innerHTML string-glueing. Styling

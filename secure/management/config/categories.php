@@ -10,7 +10,7 @@
  * Engine plumbing → stays PHP (CLAUDE.md: internal admin config the engine consumes;
  * NOT author-extended — there are no custom roles/categories, L8). Every command in
  * routes.php belongs to exactly ONE category (verified 1:1). Adding a new command =
- * add its name to exactly one category here (see CLAUDE.md "Adding a new command").
+ * add its name to exactly one category here (see MAINTAINING.md "Adding a new command").
  *
  * Category shape:
  *   'scope'   => 'project' | 'global'

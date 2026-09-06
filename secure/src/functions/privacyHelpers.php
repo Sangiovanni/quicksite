@@ -24,8 +24,6 @@ require_once __DIR__ . '/utilsManagement.php'; // qs_json_write
  *
  * A datum's recipient is DERIVED, never stored: atom -> endpoint -> baseUrl ->
  * host classification. The mapping holds only (endpoint, field) -> datum id.
- *
- * See NOTES/planning/PRIVACY_POLICY_GENERATOR.md for the locked design.
  */
 
 if (!defined('SECURE_FOLDER_PATH')) {

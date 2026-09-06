@@ -7,8 +7,7 @@
  * orchestration lives in storage.js (calls listStorageItems /
  * addStorageItem / editStorageItem / deleteStorageItem).
  *
- * The registry is the GDPR / cookie-consent data layer — see
- * NOTES/planning/BETA9_STORAGE_REGISTRY.md.
+ * The registry is the GDPR / cookie-consent data layer.
  */
 
 $baseUrl = rtrim(BASE_URL, '/');

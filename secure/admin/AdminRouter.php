@@ -42,9 +42,9 @@ class AdminRouter {
      * reserved-name idea already exists for project aliases — see
      * $reservedPaths in secure/management/command/createAlias.php.
      *
-     * NOTES/tests/beta11/s27_admin_route_collision_probe.php checks this list
-     * against what is actually on disk, so a new collision is caught rather
-     * than discovered on somebody else's web server.
+     * Check this list against what is actually on disk whenever a directory is
+     * added under public/admin/, so a new collision is caught here rather than
+     * discovered on somebody else's web server.
      */
     private array $validPages = [
         'login',       // Authentication page

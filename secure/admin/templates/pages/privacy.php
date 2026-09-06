@@ -8,7 +8,7 @@
  *
  * The privacy helper is the data-SHARING half of the compliance story (what the
  * site sends to APIs / third parties); the storage registry is the browser-
- * storage half. See NOTES/planning/PRIVACY_POLICY_GENERATOR.md.
+ * storage half.
  */
 
 $baseUrl = rtrim(BASE_URL, '/');

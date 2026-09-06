@@ -98,8 +98,7 @@ function saveResolversSidecar(array $resolvers): bool {
  *     Multi-resolver route. Written when a route has >1 resolver.
  *     Fires in parallel via curl_multi_*; exposed vars go into a flat
  *     namespace AND namespaced-by-index ($r0, $r1, ...) — collision
- *     in the flat namespace is rejected at save time per
- *     BETA8_MULTI_RESOLVER.md locked decisions.
+ *     in the flat namespace is rejected at save time.
  *
  * Detection: a SCALAR entry has 'endpoint' as a top-level key (the
  * required resolver field). An ARRAY entry is a sequential 0-indexed
@@ -163,7 +162,7 @@ function setResolversForRoute(string $routePath, ?array $configs): bool {
         }
         unset($all[$routePath]);
     } else {
-        // Storage shape locked in BETA8_MULTI_RESOLVER.md decision #1:
+        // Storage shape (locked decision):
         //   scalar when single resolver (back-compat with Slices 1-7)
         //   array  when multiple resolvers
         $list = array_values($configs);
@@ -690,7 +689,7 @@ function validateResolverConfig(array $config, ?ApiEndpointManager $apiManager =
     // strict allowed list so typos like 'render-empy' are caught at
     // save time instead of silently falling through to default at
     // request time. Future onMiss values (e.g. 'redirect:<url>') are
-    // reserved per BETA8_DATA_RESOLVER.md — when added, extend
+    // reserved for later — when added, extend
     // ALLOWED_ONMISS here AND the dropdown in sitemap.js's
     // _renderResolverOnMissSection.
     $ALLOWED_ONMISS = ['render-empty'];
@@ -720,8 +719,8 @@ function validateResolverConfig(array $config, ?ApiEndpointManager $apiManager =
  * resolver configs, runs validateResolverConfig on each (collecting
  * per-config errors with the array index baked into the field path),
  * then runs the collision check: expose key names must be unique
- * across all resolvers in the array (locked decision in
- * BETA8_MULTI_RESOLVER.md — flat-namespace collisions are rejected at
+ * across all resolvers in the array (locked decision: flat-namespace
+ * collisions are rejected at
  * save time, authors disambiguate by renaming OR by using the
  * always-available $r0/$r1 namespaced form in the template).
  *
@@ -791,7 +790,7 @@ function validateResolverConfigs(array $configs, ?ApiEndpointManager $apiManager
     }
 
     // Phase 3 — flat-namespace collision detection (data resolvers only).
-    // Locked decision (BETA8_MULTI_RESOLVER.md #4): when two data
+    // Locked decision: when two data
     // resolvers in the same route expose a key with the same name, the
     // save is REJECTED. Authors disambiguate by renaming, OR by accessing
     // the colliding values through the always-available namespaced form

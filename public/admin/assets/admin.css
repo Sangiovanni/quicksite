@@ -17725,7 +17725,7 @@ body[data-page="preview"] .global-miniplayer {
     color: inherit; padding: 0 4px;
 }
 
-/* Translate-from-CSV modal (BETA7_TABLE_TRANSLATION_CSV.md).
+/* Translate-from-CSV modal.
    Mirrors .preview-add-node-modal layout — same fixed overlay + centered
    card pattern. The inner form uses the project's shared .admin-* classes
    so visual styling stays consistent with every other admin form. */

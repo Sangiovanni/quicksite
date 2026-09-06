@@ -233,7 +233,7 @@ if (!file_exists($templateFile)) {
 // ============================================================================
 
 
-// Lifecycle position (locked Q4 in BETA8_DATA_RESOLVER.md): AFTER the
+// Lifecycle position (locked design): AFTER the
 // route/auth gate, BEFORE the page template runs. Templates pick up the
 // exposed vars via JsonToHtmlRenderer's {{resolved:NAME}} substitution
 // or by calling getResolvedVars() directly in PHP scope.

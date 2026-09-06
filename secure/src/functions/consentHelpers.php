@@ -14,7 +14,7 @@
  *
  * When enabled, the page emits window.QS_CONSENT carrying the key→category map
  * so qs.js can gate non-essential storage writes against the consent_prefs
- * cookie. See NOTES/planning/BETA9_STORAGE_REGISTRY.md (Phase 2 build spec).
+ * cookie.
  */
 
 if (!defined('SECURE_FOLDER_PATH')) {

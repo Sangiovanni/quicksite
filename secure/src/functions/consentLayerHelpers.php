@@ -13,8 +13,7 @@
  *   [data-consent-toggle="<category>"]       — per-category checkbox in the popup
  *
  * Visible copy uses translation keys (textKey) so the layer shows in the
- * visitor's language from day one. See NOTES/planning/BETA9_STORAGE_REGISTRY.md
- * (Phase 2 build spec).
+ * visitor's language from day one.
  */
 
 if (!defined('SECURE_FOLDER_PATH')) {

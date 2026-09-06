@@ -27,7 +27,7 @@ require_once __DIR__ . '/opcacheHygiene.php';
  * gate.
  *
  * Two hazards this function exists to contain, both measured rather than
- * assumed (C12 slice 12.0, suite `12_0_leak_surface.php` §D):
+ * assumed:
  *
  *   - **A syntax error must not take the request down.** `@require` does NOT
  *     suppress a `ParseError` — verified on PHP 8.0.30 and 8.4.0 — so the old

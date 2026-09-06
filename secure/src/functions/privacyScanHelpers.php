@@ -10,8 +10,6 @@
  * a (endpoint, field) pair. Two coverage flags: (a) an atom not mapped to a
  * collected datum; (b) a body-bearing endpoint with NO request schema — we
  * can't verify what it sends and won't guess.
- *
- * See NOTES/planning/PRIVACY_POLICY_GENERATOR.md.
  */
 
 if (!defined('SECURE_FOLDER_PATH')) {

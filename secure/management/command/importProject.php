@@ -63,8 +63,8 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
     // string rather than in the multipart body — but it was already met: the
     // dispatcher's TrimParametersManagement builds $params as $_GET merged
     // with $_POST, in that same precedence, before this file is included. Over
-    // HTTP the merge was a no-op, and the probe that proves those options
-    // still arrive is NOTES/tests/beta11/s56a_import_query_options_probe.sh.
+    // HTTP the merge was a no-op, and that those options still arrive was
+    // verified end to end.
     //
     // What it DID add was reach: it re-imported the ambient superglobals on
     // EVERY call, an in-process one included, so every parameter this function
@@ -166,8 +166,7 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
     // `projects.create` is a global access:'any' category, so that made
     // "replace any project on this installation and take its id" available to
     // every signed-in account, including one invited to edit a single
-    // unrelated project. Reproduced end to end in
-    // NOTES/tests/beta11/s25_import_collision_probe.sh: a non-member replaced
+    // unrelated project. Reproduced end to end: a non-member replaced
     // another account's project and members.json came back naming the
     // attacker as owner.
     //

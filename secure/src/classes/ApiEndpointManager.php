@@ -45,7 +45,7 @@ class ApiEndpointManager {
     /** @var array Valid `callableFrom` values (beta.8 Track A4). */
     // The marker declares whether an endpoint can be invoked from
     // the client (browser via QS.fetch), the server (PHP via the
-    // future data resolver from BETA8_DATA_RESOLVER.md), or both.
+    // data resolver), or both.
     // When absent on an endpoint, the effective value is auto-derived
     // from the auth type by deriveCallableFrom() below.
     public const VALID_CALLABLE_FROM = ['client', 'server', 'both'];
@@ -65,8 +65,7 @@ class ApiEndpointManager {
      * derived value (see effectiveCallableFrom() below). Use this
      * helper only when the endpoint has no explicit value.
      *
-     * Locked design 2026-06-04 in BETA8_DATA_RESOLVER.md "callableFrom
-     * marker (Track A4)".
+     * Locked design 2026-06-04 for the "callableFrom" marker.
      */
     public static function deriveCallableFrom(string $authType): string {
         // One definition, in apiRegistry.php — a build carries that file and
@@ -1077,10 +1076,9 @@ class ApiEndpointManager {
                     // whose effective callableFrom is 'server' never reach
                     // the client config (would either leak a secret-keyed
                     // endpoint's path OR mislead QS.fetch into thinking
-                    // the endpoint is callable from the browser). The
-                    // future data resolver (BETA8_DATA_RESOLVER.md) reads
-                    // the raw config server-side and respects the same
-                    // marker — so server-only endpoints stay reachable
+                    // the endpoint is callable from the browser). The data
+                    // resolver reads the raw config server-side and respects
+                    // the same marker — so server-only endpoints stay reachable
                     // server-side without ever appearing here.
                     if (self::effectiveCallableFrom($api, $endpoint) === 'server') {
                         continue;

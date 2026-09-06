@@ -12,7 +12,7 @@
  *  - data/page-events.json — per-route event handler chains (WRITES / CLEARS)
  *  - State stores (per page) — init sources localStorage:/sessionStorage: (READS)
  *
- * Reconcile states (see NOTES/planning/BETA9_STORAGE_REGISTRY.md):
+ * Reconcile states:
  *   ok             declared + written
  *   incomplete     written/referenced but UNDECLARED (the GDPR gap — declare it)
  *   dangling_read  read somewhere but never written (likely a deleted writer)

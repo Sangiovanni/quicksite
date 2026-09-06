@@ -30,7 +30,7 @@
  *
  * Wired by: public/admin/assets/js/pages/sitemap.js (search for
  * `openResolverListModal`). Submits via `setRouteResolver` POSTs with
- * the locked-decision body shapes from BETA8_MULTI_RESOLVER.md.
+ * the locked-decision body shapes for multi-resolver routes.
  */
 ?>
 <div class="sitemap-resolver-list-modal" id="sitemap-resolver-list-modal" style="display: none;">

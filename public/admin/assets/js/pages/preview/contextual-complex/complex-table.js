@@ -629,8 +629,7 @@
 
             // Single request to the target language only. We deliberately
             // do NOT write empty stubs to other languages here — that's
-            // the cross-language CSV workflow's job
-            // (BETA7_TABLE_TRANSLATION_CSV.md). Other-language render-time
+            // the cross-language CSV workflow's job. Other-language render-time
             // lookups will warn for keys missing in those languages — that
             // matches user intent ("I only translated this one language").
             var tree = {};

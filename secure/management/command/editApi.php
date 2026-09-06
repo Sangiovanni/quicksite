@@ -119,7 +119,7 @@ function __command_editApi(array $params = [], array $urlParams = []): ApiRespon
     $enumSync = qs_emit_enums();
 
     // Beta.8 A2 Slice 4 — auto-clear the resolver response cache for
-    // this API (locked Q1 of BETA8_DATA_RESOLVER.md). Any cached
+    // this API (locked design). Any cached
     // response was issued against the previous endpoint config; the
     // config just changed, so honour-the-edit means dropping stale
     // entries. Common case: author tweaked the endpoint URL or response

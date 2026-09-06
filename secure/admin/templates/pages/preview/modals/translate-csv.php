@@ -7,8 +7,6 @@
  *
  * Wired by: public/admin/assets/js/pages/preview/preview.js (search
  * for translateCsvModal). Submits to POST /management/importStructureTranslations.
- *
- * Design: BETA7_TABLE_TRANSLATION_CSV.md
  */
 ?>
 <div class="preview-translate-csv-modal" id="preview-translate-csv-modal" style="display: none;">

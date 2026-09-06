@@ -6,8 +6,6 @@
  *   - structural copy: privacy.policy.* (seeded EN/FR)
  *   - collected-data labels/purposes: privacy.collected.<id>.label / .purpose
  *     (authored via the registry, resolved live)
- *
- * See NOTES/planning/PRIVACY_POLICY_GENERATOR.md.
  */
 
 if (!defined('SECURE_FOLDER_PATH')) {

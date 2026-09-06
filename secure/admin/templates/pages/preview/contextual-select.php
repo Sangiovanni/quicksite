@@ -102,7 +102,7 @@
             </button>
             <!-- Translate from CSV button (complex-element only — currently
                  only Table; shown when selected node has data-qs-complex='table').
-                 Opens the translate-csv modal. See BETA7_TABLE_TRANSLATION_CSV.md. -->
+                 Opens the translate-csv modal. -->
             <button type="button" class="admin-btn admin-btn--secondary" id="ctx-node-translate-csv" title="<?= __admin('preview.translateCsv', 'Translate from CSV') ?>" style="display: none;">
                 <!-- "language / translate" icon: two stacked horizontal text-lines + a tiny arrow hint -->
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

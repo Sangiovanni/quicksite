@@ -16,8 +16,6 @@
  *   Footer — Model + Touches (inline, discreet)
  *
  * Deterministic workflows (no promptTemplate) skip AI EXCHANGE entirely.
- *
- * See NOTES/planning/BETA9_AI_TOOLS_INTEGRATION.md for the phased plan.
  */
 window.PreviewAiTools = (function () {
     'use strict';

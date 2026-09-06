@@ -308,7 +308,7 @@ function _serverFetchPrepare(string $endpointRef, array $inputs, array $context)
         }
     }
 
-    // TODO: telemetry hook — see POST_1_0_RESOLVER_OBSERVABILITY.md.
+    // TODO: telemetry hook (post-1.0).
     // The right place for a per-call observe(start, endpoint, callableFrom)
     // before curl_exec + observe(end, status, durationMs, cacheHit) after.
 

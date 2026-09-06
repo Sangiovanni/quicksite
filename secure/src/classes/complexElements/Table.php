@@ -31,9 +31,7 @@
  * Config:
  *   - id           string, optional  — HTML id of the <table>. Required
  *                                      for the cross-language CSV
- *                                      translation workflow (planned
- *                                      follow-up — see
- *                                      `NOTES/planning/BETA7_TABLE_TRANSLATION_CSV.md`).
+ *                                      translation workflow.
  *                                      Format: letters, digits, hyphens,
  *                                      underscores; must start with a
  *                                      letter.
@@ -169,7 +167,7 @@ class TableBuilder extends ComplexElementBuilder {
             // subtree the editor + importStructureTranslations command can
             // recognise by id (no inverse-render-to-config — just the bare
             // minimum metadata to find this table later for cross-language
-            // CSV translation, see BETA7_TABLE_TRANSLATION_CSV.md).
+            // CSV translation).
             // Forward-compatible: future complex elements opt in by
             // stamping the same `data-qs-complex` + `data-qs-complex-id`
             // pair with their own kind name.

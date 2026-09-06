@@ -17,8 +17,6 @@
  *   - getTranslation/<lang>: full translations for the value column
  *   - setTranslationKeys: write a key's value (per lang)
  *   - deleteTranslationKeys: delete one or many keys
- *
- * See NOTES/planning/BETA9_TRANSLATION_MANAGER.md for design rationale.
  */
 window.PreviewTranslation = (function () {
     'use strict';
