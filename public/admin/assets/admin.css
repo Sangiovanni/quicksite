@@ -243,8 +243,7 @@ code,
 /* =============================================================================
    NAVIGATION
    ============================================================================= */
-.admin-nav,
-.preview-keyframe-modal__property-input-group--transform {
+.admin-nav {
     display: flex;
     gap: var(--space-xs);
     flex: 1;
@@ -422,7 +421,6 @@ code,
 .admin-ai-execution-summary__item,
 .preview-style-property__value,
 .qs-value-input--range,
-.preview-keyframe-modal__property-input-group--color,
 .animation-preview__input-group,
 #animation-preview-play {
     display: flex;
@@ -968,8 +966,7 @@ input.admin-checkbox {
     align-items: flex-end;
 }
 
-.admin-filter-group,
-.preview-keyframe-modal__property-value--transform {
+.admin-filter-group {
     flex: 1;
     min-width: 150px;
 }
@@ -1042,7 +1039,6 @@ input.admin-checkbox {
 .ai-auto-option:hover,
 .preview-toolbar__toggle:hover .preview-toolbar__toggle-label,
 .preview-sidebar__tools-label:hover,
-.transform-editor__drag-handle:hover,
 .preview-animated-selector-group__toggle:hover,
 .preview-js-interaction__body strong,
 .preview-contextual-js-form-advanced-toggle:hover {
@@ -1105,8 +1101,7 @@ input.admin-checkbox {
 .admin-tree__item,
 .ai-spec-prompt,
 .admin-file-input,
-.admin-nav__group,
-.transform-editor__add-wrapper {
+.admin-nav__group {
     position: relative;
 }
 
@@ -1145,7 +1140,6 @@ input.admin-checkbox {
 .admin-nav__group--open .admin-nav__group-dropdown,
 .preview-contextual-section--active,
 .preview-theme-panel,
-.transform-editor__dropdown--open,
 .tag-selector__panel.active,
 .preview-page--miniplayer .preview-miniplayer-icon--expand {
     display: block;
@@ -1725,7 +1719,6 @@ kbd {
 .ai-spec-examples,
 .execution-results,
 .preview-keyframe-modal__properties,
-.transform-editor__functions,
 .transition-editor__animations,
 .preview-contextual-section--js,
 .preview-contextual-js-content,
@@ -2668,7 +2661,6 @@ kbd {
 .ai-spec-node-selector__select-ui,
 .admin-datetime-picker,
 .preview-sidebar__tools-buttons,
-.transform-editor__preview,
 .transition-editor__timing-row,
 .transition-editor__add-property-form,
 .transition-editor__animation-config,
@@ -3120,7 +3112,6 @@ kbd {
 .admin-file-list__item:last-child,
 .preview-mobile-section:last-child,
 .preview-keyframe-item:last-child,
-.transform-editor__dropdown-category:last-child,
 .preview-animated-selector:last-child,
 .preview-animated-selector-group:last-child,
 .preview-asset-picker__item:last-child,
@@ -3737,8 +3728,7 @@ kbd {
 
 .admin-ai-import-status--invalid,
 .preview-keyframe-modal__frame-delete:hover,
-.preview-keyframe-modal__delete-frame:hover,
-.transform-editor__delete:hover {
+.preview-keyframe-modal__delete-frame:hover {
     background: #ef44441a;
     color: #ef4444;
 }
@@ -4084,7 +4074,6 @@ kbd {
 
 .ai-spec__sidebar,
 .ai-spec__main,
-.transform-editor__body,
 .asset-page {
     display: flex;
     flex-direction: column;
@@ -6946,7 +6935,6 @@ kbd {
 .preview-mobile-section--expanded .preview-mobile-section__content,
 .preview-element-info--expanded .preview-element-info__details,
 .preview-keyframe-modal.preview-keyframe-modal--visible,
-.transform-editor__input-group,
 .transition-editor__property:hover .transition-editor__property-actions,
 .preview-contextual-js-page-events__actions,
 .preview-add-node-modal__context--expanded .preview-add-node-modal__context-details,
@@ -8147,10 +8135,7 @@ code.preview-contextual-info__value {
 
 .preview-theme-color__value:focus,
 .preview-theme-input__field:focus,
-.preview-keyframe-modal__property-select:focus,
-.preview-keyframe-modal__property-enum:focus,
-.transform-editor__input:focus,
-.transform-editor__unit:focus {
+.preview-keyframe-modal__property-select:focus {
     outline: none;
     border-color: #8b5cf6;
 }
@@ -10247,7 +10232,6 @@ code.preview-contextual-info__value {
 /* Specialized inputs for Style Editor properties */
 
 .preview-style-property__range-container,
-.preview-keyframe-modal__property-input-group,
 .preview-contextual-form__param-input-group {
     display: flex;
     align-items: center;
@@ -10750,158 +10734,6 @@ code.preview-contextual-info__value {
     color: var(--admin-text);
 }
 
-/* Property-Specific Input Types */
-
-/* Range slider (opacity) */
-.preview-keyframe-modal__property-input-group--range {
-    gap: var(--space-sm);
-}
-
-.preview-keyframe-modal__property-range {
-    flex: 1;
-    height: 6px;
-    -webkit-appearance: none;
-    appearance: none;
-    background: var(--admin-border);
-    border-radius: 3px;
-    outline: none;
-    cursor: pointer;
-}
-
-.preview-keyframe-modal__property-range::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 16px;
-    height: 16px;
-    background: #8b5cf6;
-    border-radius: 50%;
-    cursor: pointer;
-    transition: transform 0.15s, box-shadow 0.15s;
-}
-
-.preview-keyframe-modal__property-range::-webkit-slider-thumb:hover,
-.preview-keyframe-modal__property-range::-moz-range-thumb:hover {
-    transform: scale(1.15);
-    box-shadow: 0 0 0 4px #8b5cf633;
-}
-
-.preview-keyframe-modal__property-range::-moz-range-thumb {
-    width: 16px;
-    height: 16px;
-    background: #8b5cf6;
-    border-radius: 50%;
-    cursor: pointer;
-    border: none;
-    transition: transform 0.15s, box-shadow 0.15s;
-}
-
-.preview-keyframe-modal__property-range-value {
-    min-width: 36px;
-    text-align: right;
-    font-size: var(--font-size-sm);
-    color: var(--admin-text);
-    font-family: monospace;
-}
-
-/* Color input with picker button */
-
-.preview-keyframe-modal__color-picker-btn {
-    width: 32px;
-    height: 32px;
-    min-width: 32px;
-    border-radius: var(--radius-sm);
-    border: 2px solid var(--admin-border);
-    cursor: pointer;
-    transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
-    padding: 0;
-    background: transparent;
-    position: relative;
-    overflow: hidden;
-}
-
-.preview-keyframe-modal__color-picker-btn:hover {
-    border-color: #8b5cf6;
-    transform: scale(1.05);
-    box-shadow: 0 0 0 3px #8b5cf633;
-}
-
-.preview-keyframe-modal__color-picker-btn::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: inherit;
-}
-
-.preview-keyframe-modal__property-value--color {
-    flex: 1;
-    min-width: 80px;
-}
-
-/* Length/Angle input with unit dropdown */
-.preview-keyframe-modal__property-input-group--length,
-.preview-keyframe-modal__property-input-group--angle {
-    gap: 0;
-}
-
-.preview-keyframe-modal__property-number {
-    flex: 1;
-    padding: var(--space-xs) var(--space-sm);
-    font-size: var(--font-size-sm);
-    border: 1px solid var(--admin-border);
-    border-radius: var(--radius-sm) 0 0 var(--radius-sm);
-    border-right: none;
-    background: var(--admin-card-bg);
-    color: var(--admin-text);
-    min-width: 60px;
-}
-
-.preview-keyframe-modal__property-number:disabled {
-    background: var(--admin-bg);
-    color: var(--admin-text-muted);
-    cursor: not-allowed;
-}
-
-.preview-keyframe-modal__property-unit {
-    padding: var(--space-xs) var(--space-sm);
-    font-size: var(--font-size-sm);
-    border: 1px solid var(--admin-border);
-    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-    background: var(--admin-bg);
-    color: var(--admin-text);
-    cursor: pointer;
-    min-width: 50px;
-}
-
-.preview-keyframe-modal__property-unit:focus {
-    outline: none;
-    border-color: #8b5cf6;
-    z-index: 1;
-}
-
-/* Enum dropdown */
-.preview-keyframe-modal__property-enum {
-    flex: 1;
-    padding: var(--space-xs) var(--space-sm);
-    font-size: var(--font-size-sm);
-    border: 1px solid var(--admin-border);
-    border-radius: var(--radius-sm);
-    background: var(--admin-card-bg);
-    color: var(--admin-text);
-    cursor: pointer;
-}
-
-.preview-keyframe-modal__property-enum option {
-    background: var(--admin-card-bg, #1e1e2e);
-    color: var(--admin-text, #e0e0e0);
-    padding: var(--space-xs);
-}
-
-/* Unitless number input */
-.preview-keyframe-modal__property-value--number {
-    width: 80px;
-    flex: 0 0 auto;
-}
-
 .preview-keyframe-modal__property-delete {
     background: none;
     border: none;
@@ -10972,234 +10804,16 @@ code.preview-contextual-info__value {
     background: var(--admin-surface);
 }
 
-/* ==================== Transform Editor ==================== */
-
-/* Transform input group in property row */
-
-.preview-keyframe-modal__transform-edit-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--space-2xs);
-    padding: var(--space-2xs) var(--space-xs) !important;
-    white-space: nowrap;
-}
-
-/* Transform Editor Modal Specifics */
-.transform-editor__content {
-    max-width: 600px;
-    width: 90%;
-}
-
-/* Current transform preview */
-
-.transform-editor__preview label,
-.transform-editor__functions-header label {
-    font-size: var(--font-size-sm);
-    font-weight: 500;
-    color: var(--admin-text-muted);
-}
-
-.transform-editor__current {
-    padding: var(--space-sm);
-    background: var(--admin-surface);
-    border: 1px solid var(--admin-border);
-    border-radius: var(--radius-sm);
-    font-family: var(--font-mono);
-    font-size: var(--font-size-sm);
-    color: var(--admin-text);
-    word-break: break-all;
-    min-height: 36px;
-}
-
-/* Functions list section */
-
-.transform-editor__functions-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-/* Add function dropdown wrapper */
-
-.transform-editor__dropdown {
-    position: absolute;
-    top: 100%;
-    right: 0;
-    margin-top: var(--space-xs);
-    background: var(--admin-card-bg, #1e1e2e);
-    border: 1px solid var(--admin-border);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-lg);
-    z-index: 100;
-    min-width: 180px;
-    max-height: 350px;
-    overflow-y: auto;
-    display: none;
-}
-
-.transform-editor__dropdown-category {
-    padding: var(--space-xs) 0;
-    border-bottom: 1px solid var(--admin-border);
-    background: var(--admin-card-bg, #1e1e2e);
-}
-
-.transform-editor__dropdown-label {
-    padding: var(--space-xs) var(--space-sm);
-    font-size: var(--font-size-xs);
-    font-weight: 600;
-    color: var(--admin-text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-
-.transform-editor__dropdown button {
-    display: block;
-    width: 100%;
-    padding: var(--space-xs) var(--space-sm);
-    background: none;
-    border: none;
-    text-align: left;
-    font-size: var(--font-size-sm);
-    color: var(--admin-text);
-    cursor: pointer;
-    transition: background 0.15s;
-}
-
-.transform-editor__dropdown button:hover {
-    background: var(--admin-surface-hover);
-    color: #8b5cf6;
-}
-
-/* Functions list container */
-.transform-editor__functions-list {
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-xs);
-    min-height: 100px;
-    max-height: 300px;
-    overflow-y: auto;
-    padding: var(--space-sm);
-    background: var(--admin-surface);
-    border: 1px solid var(--admin-border);
-    border-radius: var(--radius-md);
-}
-
-/* Empty state */
-.transform-editor__empty {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 80px;
-    color: var(--admin-text-muted);
-    font-size: var(--font-size-sm);
-    font-style: italic;
-}
-
-/* Individual function row */
-.transform-editor__function-row {
-    display: flex;
-    align-items: center;
-    gap: var(--space-sm);
-    padding: var(--space-sm);
-    background: var(--admin-card-bg);
-    border: 1px solid var(--admin-border);
-    border-radius: var(--radius-sm);
-    transition: all 0.15s;
-}
-
-.transform-editor__function-row:hover {
-    border-color: #8b5cf64d;
-}
-
-.transform-editor__function-row--dragging {
-    opacity: 0.6;
-    border-color: #8b5cf6;
-    box-shadow: 0 4px 12px #8b5cf64d;
-}
-
-/* Drag handle */
-.transform-editor__drag-handle {
-    cursor: grab;
-    color: var(--admin-text-muted);
-    padding: var(--space-2xs);
-    font-size: var(--font-size-sm);
-    user-select: none;
-}
-
-.transform-editor__drag-handle:active,
 .preview-node-panel__header:active {
     cursor: grabbing;
 }
 
-/* Function name badge */
-.transform-editor__function-name {
-    font-family: var(--font-mono);
-    font-size: var(--font-size-sm);
-    font-weight: 600;
-    color: #8b5cf6;
-    min-width: 100px;
-}
-
-/* Parameters container */
-.transform-editor__params {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-sm);
-    flex: 1;
-}
-
-/* Individual parameter */
-.transform-editor__param,
 .transition-editor__setting,
 .animation-preview__control,
 .animation-preview__css-preview {
     display: flex;
     flex-direction: column;
     gap: var(--space-2xs);
-}
-
-.transform-editor__param label {
-    font-size: var(--font-size-xs);
-    color: var(--admin-text-muted);
-    text-transform: uppercase;
-}
-
-.transform-editor__input {
-    width: 70px;
-    padding: var(--space-2xs) var(--space-xs);
-    font-size: var(--font-size-sm);
-    border: 1px solid var(--admin-border);
-    border-radius: var(--radius-sm);
-    background: var(--admin-bg);
-    color: var(--admin-text);
-}
-
-.transform-editor__input-group .transform-editor__input {
-    border-radius: var(--radius-sm) 0 0 var(--radius-sm);
-    border-right: none;
-}
-
-.transform-editor__unit {
-    padding: var(--space-2xs) var(--space-xs);
-    font-size: var(--font-size-sm);
-    border: 1px solid var(--admin-border);
-    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-    background: var(--admin-card-bg);
-    color: var(--admin-text);
-    cursor: pointer;
-    min-width: 45px;
-}
-
-/* Delete function button */
-.transform-editor__delete {
-    background: none;
-    border: none;
-    padding: var(--space-2xs);
-    cursor: pointer;
-    color: var(--admin-text-muted);
-    border-radius: var(--radius-sm);
-    transition: all 0.15s;
-    margin-left: auto;
 }
 
 /* ==================== Transition Editor ==================== */

@@ -1,4 +1,9 @@
-<!-- Transition Editor Modal -->
+<!-- Transition Editor Modal
+     UI PATH: Style tool → Selectors → pick a selector → [Animate]
+     (#selector-animate-btn in contextual-style.php). The interface calls this
+     modal "State & Animation Editor" and never says "transition editor" — the
+     file name and the label differ, so write test steps from this file.
+     Wired by: public/admin/assets/js/pages/preview/preview-transition-editor.js -->
 <div class="preview-keyframe-modal transition-editor" id="transition-editor-modal">
     <div class="preview-keyframe-modal__backdrop"></div>
     <div class="preview-keyframe-modal__content transition-editor__content">

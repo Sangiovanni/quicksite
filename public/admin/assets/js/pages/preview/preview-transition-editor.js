@@ -1,9 +1,18 @@
 /**
  * Preview Transition Editor Module
- * 
+ *
+ * UI PATH: Style tool → Selectors → pick a selector → [Animate].
+ * The modal is titled "State & Animation Editor". Nothing in the interface
+ * says "transition editor" — this file's name and its UI label differ, and
+ * that mismatch has already produced two wrong conclusions and one round of
+ * verification steps for controls that do not exist. Its play triangle beside
+ * an animation name is previewAnimation(); its "Preview Hover" button is
+ * previewTransitionHover(), which hides this modal for the 1.5s the preview
+ * runs, because it otherwise covers the very thing it is previewing.
+ *
  * Handles the State & Animation Editor modal for creating CSS transitions
  * and managing base/trigger state styles with animations.
- * 
+ *
  * Dependencies:
  * - PreviewConfig (for i18n and URLs)
  * - QSPropertySelector, QSValueInput (property selection components)
@@ -19,8 +28,9 @@ window.PreviewTransitionEditor = (function() {
     let escapeHtml = (str) => String(str);
     let parseStylesString = (str) => ({});
     let refreshPreviewFrame = () => {};
-    let openAnimationPreviewModal = null;
+    let openAnimationPreviewModal = null;   // takes a keyframe NAME, not a keyframe object
     let getKeyframesData = () => [];
+    let ensureKeyframesData = async () => {};   // ask the list's owner to load it if it has not
     let getThemeVariables = () => ({});
 
     // API configuration
@@ -959,12 +969,20 @@ window.PreviewTransitionEditor = (function() {
     /**
      * Preview animation using the Animation Preview Modal
      */
-    function previewAnimation(target) {
+    async function previewAnimation(target) {
         const animation = target === 'base' ? transitionEditorBaseAnimation : transitionEditorTriggerAnimation;
         if (!animation || !animation.name) {
             showToast(PreviewConfig.i18n.noAnimationToPreview || 'No animation to preview', 'warning');
             return;
         }
+
+        // The keyframe list belongs to the Motion tab's module and is empty
+        // until that tab has been opened at least once. Both the lookup below
+        // and the preview modal's own CSS injection read it, so reaching this
+        // modal from Selectors → Animate without ever visiting Motion has to
+        // load it first — otherwise the preview reports "Keyframe not found"
+        // for a keyframe that plainly exists.
+        await ensureKeyframesData();
 
         const keyframesData = getKeyframesData();
         const keyframe = keyframesData?.find(kf => kf.name === animation.name);
@@ -974,7 +992,7 @@ window.PreviewTransitionEditor = (function() {
         }
 
         if (typeof openAnimationPreviewModal === 'function') {
-            openAnimationPreviewModal(keyframe);
+            openAnimationPreviewModal(keyframe.name);
         } else {
             showToast(PreviewConfig.i18n.previewNotAvailable || 'Preview not available', 'warning');
         }
@@ -1186,7 +1204,7 @@ window.PreviewTransitionEditor = (function() {
      * Preview hover effect in iframe
      */
     function previewTransitionHover() {
-        const iframe = document.getElementById('preview-frame');
+        const iframe = document.getElementById('preview-iframe');
         if (!iframe?.contentDocument || !transitionEditorSelector) return;
 
         try {
@@ -1195,6 +1213,20 @@ window.PreviewTransitionEditor = (function() {
                 showToast(PreviewConfig.i18n.noElementsFound || 'No elements found', 'warning');
                 return;
             }
+
+            // Step out of the way. This modal sits over the middle of the page
+            // behind a dimming backdrop, so previewing a hover state underneath
+            // it showed the author nothing. Hide it for the duration; the toast
+            // below says what is happening while it is gone.
+            transitionEditorModal?.classList.remove('preview-keyframe-modal--visible');
+
+            // Two separate waits, and they are not the same thing. The first is
+            // how long the trigger styles stay applied; the second is a beat of
+            // unobstructed page AFTER they come off, so the author can see what
+            // changed back. Restoring the modal the instant the effect ends
+            // reads as a flicker and gives no time to take it in.
+            const HOVER_HOLD_MS = 1500;
+            const HOVER_SETTLE_MS = 1500;
 
             elements.forEach(el => {
                 el.dataset.originalStyle = el.getAttribute('style') || '';
@@ -1214,12 +1246,27 @@ window.PreviewTransitionEditor = (function() {
                     }
                     delete el.dataset.originalStyle;
                 });
-            }, 1500);
+
+                // Only come back if the editor is still open. close() nulls the
+                // selector, so this will not resurrect a modal the author shut
+                // while the preview was running — and it is re-checked after
+                // the settle wait, not before it, because they can close during
+                // the gap too.
+                setTimeout(() => {
+                    if (transitionEditorSelector) {
+                        transitionEditorModal?.classList.add('preview-keyframe-modal--visible');
+                    }
+                }, HOVER_SETTLE_MS);
+            }, HOVER_HOLD_MS);
 
             showToast(PreviewConfig.i18n.previewingHover || 'Previewing hover effect', 'info');
 
         } catch (error) {
             console.error('Failed to preview hover:', error);
+            // Never leave the author staring at a modal that vanished.
+            if (transitionEditorSelector) {
+                transitionEditorModal?.classList.add('preview-keyframe-modal--visible');
+            }
         }
     }
 
@@ -1373,6 +1420,7 @@ window.PreviewTransitionEditor = (function() {
         setRefreshPreviewFrame: (fn) => { refreshPreviewFrame = fn; },
         setOpenAnimationPreviewModal: (fn) => { openAnimationPreviewModal = fn; },
         setGetKeyframesData: (fn) => { getKeyframesData = fn; },
+        setEnsureKeyframesData: (fn) => { ensureKeyframesData = fn; },
         setGetThemeVariables: (fn) => { getThemeVariables = fn; },
 
         // Getters for current state

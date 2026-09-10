@@ -142,7 +142,6 @@ if (is_dir($componentsDir)) {
 
 <!-- Modals (top-level so position:fixed isn't constrained by any ancestor containing block) -->
 <?php include __DIR__ . '/preview/modals/keyframe.php'; ?>
-<?php include __DIR__ . '/preview/modals/transform.php'; ?>
 <?php include __DIR__ . '/preview/modals/transition.php'; ?>
 <?php include __DIR__ . '/preview/modals/animation-preview.php'; ?>
 <?php include __DIR__ . '/preview/modals/apply-keyframe.php'; ?>

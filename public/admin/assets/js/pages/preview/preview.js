@@ -8,7 +8,6 @@
  * - ColorPicker (from colorpicker.js)
  * 
  * @version 1.0.0
- * @filesize ~5,400 lines
  */
 (function() {
     'use strict';
@@ -443,48 +442,17 @@
     let overlayInjected = false;
     let layoutAutoSelectTarget = null; // 'menu' or 'footer' - auto-select after iframe loads
     
-    // Theme variables state (Phase 8.3)
-    let themeVariablesLoaded = false;
-    let originalThemeVariables = {};  // Original values from CSS file
-    let currentThemeVariables = {};   // Current working values (modified)
-    let activeStyleTab = 'theme';     // 'theme' or 'selectors'
-    
-    // Selector browser state (Phase 8.4)
-    let selectorsLoaded = false;
-    let allSelectors = [];            // All selectors from CSS
-    let categorizedSelectors = { tags: [], classes: [], ids: [], attributes: [], media: {} };
-    let currentSelectedSelector = null;  // Currently selected selector
-    let hoveredSelector = null;       // Currently hovered selector (for highlight)
-    
+    // Which Style-tool tab is showing: 'theme' or 'selectors'.
+    let activeStyleTab = 'theme';
+
     // Page structure classes (for JS mode picker)
     let pageStructureClasses = [];    // Classes from actual DOM (not just CSS)
-    
-    // Style Editor state (Phase 8.5)
-    let styleEditorVisible = false;
-    let editingSelector = null;       // Selector being edited
-    let editingSelectorCount = 0;     // Number of matching elements
-    let originalStyles = {};          // Original property values from CSS
-    let currentStyles = {};           // Current working values (modified)
-    let newProperties = [];           // Newly added properties
-    let deletedProperties = [];       // Original properties that have been deleted
-    let stylePreviewInjected = false; // Whether live preview style is injected
-    
-    // Animations tab state
-    let animationsLoaded = false;     // Whether animations data has been loaded
-    let keyframesData = [];           // All @keyframes from CSS
-    let animatedSelectorsData = {     // Selectors with transition/animation properties
-        transitions: [],
-        animations: [],
-        triggersWithoutTransition: []
-    };
-    let keyframePreviewActive = null; // Name of keyframe being previewed
-    
-    // Keyframe Editor state
-    let keyframeEditorMode = 'edit';  // 'edit' or 'create'
-    let editingKeyframeName = null;   // Original name (for rename detection)
-    let keyframeFrames = {};          // Current frame data: { '0%': { opacity: '0' }, '100%': { opacity: '1' } }
-    let selectedFramePercent = null;  // Currently selected frame in timeline
-    
+
+    // Theme-variable, selector-browser, style-editor, animations and
+    // keyframe-editor state lives in those panels' own modules
+    // (preview-style-theme.js, -selectors.js, -editor.js, -motion.js).
+    // This file keeps no copy of any of it — reach them through the module.
+
     // ==================== Property Type Registry ====================
     
     /**
@@ -575,8 +543,8 @@
         // Scale (unitless numbers, can be space-separated for X Y)
         'scale': { type: 'text' },  // e.g., "1.5" or "1.2 0.8"
         
-        // Complex properties - text input fallback (Phase 2 for specialized editors)
-        'transform': { type: 'transform' },  // Transform Sub-Editor
+        // Complex properties - text input fallback
+        'transform': { type: 'transform' },  // no dedicated widget — QSValueInput falls through to a text field
         'filter': { type: 'text' },
         'box-shadow': { type: 'text' },
         'text-shadow': { type: 'text' },
@@ -1306,778 +1274,12 @@
         }
     }
     
-    /**
-     * Get the input type configuration for a CSS property
-     * @param {string} propertyName - CSS property name
-     * @returns {object} Configuration object with type and settings
-     */
-    function getPropertyInputType(propertyName) {
-        const prop = propertyName.toLowerCase().trim();
-        return KEYFRAME_PROPERTY_TYPES[prop] || { type: 'text' };
-    }
-    
-    /**
-     * Parse a CSS length value into number and unit parts
-     * @param {string} value - CSS value like "100px", "50%", "1.5em"
-     * @returns {object} { num: number, unit: string }
-     */
-    function parseLength(value) {
-        if (!value || value === 'auto' || value === 'none' || value === 'normal') {
-            return { num: '', unit: value || '' };
-        }
-        const match = String(value).match(/^(-?[\d.]+)(.*)$/);
-        if (match) {
-            return { num: parseFloat(match[1]), unit: match[2].trim() || 'px' };
-        }
-        return { num: '', unit: value };
-    }
-    
-    /**
-     * Parse a CSS angle value into number and unit parts
-     * @param {string} value - CSS value like "45deg", "1.5rad"
-     * @returns {object} { num: number, unit: string }
-     */
-    function parseAngle(value) {
-        if (!value) return { num: 0, unit: 'deg' };
-        const match = String(value).match(/^(-?[\d.]+)(.*)$/);
-        if (match) {
-            return { num: parseFloat(match[1]), unit: match[2].trim() || 'deg' };
-        }
-        return { num: 0, unit: 'deg' };
-    }
-    
-    /**
-     * Render a property-specific input based on the property type
-     * @param {string} property - CSS property name
-     * @param {string} value - Current value
-     * @param {number} frameIndex - Frame index
-     * @param {number} propIndex - Property index
-     * @returns {string} HTML string for the input
-     */
-    function renderPropertyValueInput(property, value, frameIndex, propIndex) {
-        const config = getPropertyInputType(property);
-        const dataAttrs = `data-frame="${frameIndex}" data-prop="${propIndex}" data-field="value"`;
-        
-        switch (config.type) {
-            case 'range':
-                const rangeVal = parseFloat(value) || config.min || 0;
-                return `
-                    <div class="preview-keyframe-modal__property-input-group preview-keyframe-modal__property-input-group--range">
-                        <input type="range" class="preview-keyframe-modal__property-range" 
-                               min="${config.min}" max="${config.max}" step="${config.step}"
-                               value="${rangeVal}" ${dataAttrs}>
-                        <span class="preview-keyframe-modal__property-range-value">${rangeVal}</span>
-                    </div>`;
-            
-            case 'color':
-                const colorVal = escapeHTML(value || '#000000');
-                return `
-                    <div class="preview-keyframe-modal__property-input-group preview-keyframe-modal__property-input-group--color">
-                        <button type="button" class="preview-keyframe-modal__color-picker-btn" 
-                                style="background: ${colorVal};"
-                                title="${PreviewConfig.i18n.clickToPickColor}"></button>
-                        <input type="text" class="preview-keyframe-modal__property-value preview-keyframe-modal__property-value--color" 
-                               value="${colorVal}" ${dataAttrs}
-                               placeholder="${PreviewConfig.i18n.colorValue}">
-                    </div>`;
-            
-            case 'length':
-                const lengthParsed = parseLength(value);
-                const unitOptions = config.units.map(u => 
-                    `<option value="${u}" ${lengthParsed.unit === u ? 'selected' : ''}>${u || '(none)'}</option>`
-                ).join('');
-                return `
-                    <div class="preview-keyframe-modal__property-input-group preview-keyframe-modal__property-input-group--length">
-                        <input type="number" class="preview-keyframe-modal__property-number" 
-                               value="${lengthParsed.num}" step="any" ${dataAttrs}>
-                        <select class="preview-keyframe-modal__property-unit" 
-                                data-frame="${frameIndex}" data-prop="${propIndex}" data-field="unit">
-                            ${unitOptions}
-                        </select>
-                    </div>`;
-            
-            case 'angle':
-                const angleParsed = parseAngle(value);
-                const angleUnitOptions = config.units.map(u => 
-                    `<option value="${u}" ${angleParsed.unit === u ? 'selected' : ''}>${u}</option>`
-                ).join('');
-                return `
-                    <div class="preview-keyframe-modal__property-input-group preview-keyframe-modal__property-input-group--angle">
-                        <input type="number" class="preview-keyframe-modal__property-number" 
-                               value="${angleParsed.num}" step="any" ${dataAttrs}>
-                        <select class="preview-keyframe-modal__property-unit" 
-                                data-frame="${frameIndex}" data-prop="${propIndex}" data-field="unit">
-                            ${angleUnitOptions}
-                        </select>
-                    </div>`;
-            
-            case 'enum':
-                const enumOptions = config.values.map(v => 
-                    `<option value="${v}" ${value === v ? 'selected' : ''}>${v}</option>`
-                ).join('');
-                return `
-                    <select class="preview-keyframe-modal__property-enum" ${dataAttrs}>
-                        ${enumOptions}
-                    </select>`;
-            
-            case 'number':
-                const numVal = value !== '' ? parseFloat(value) : '';
-                return `
-                    <input type="number" class="preview-keyframe-modal__property-value preview-keyframe-modal__property-value--number" 
-                           value="${numVal}" step="${config.step || 1}" 
-                           ${config.min !== undefined ? `min="${config.min}"` : ''} ${dataAttrs}>`;
-            
-            case 'transform':
-                // Transform editor - text input + Edit button
-                return `
-                    <div class="preview-keyframe-modal__property-input-group preview-keyframe-modal__property-input-group--transform">
-                        <input type="text" class="preview-keyframe-modal__property-value preview-keyframe-modal__property-value--transform" 
-                               value="${escapeHTML(value || 'none')}" 
-                               placeholder="${PreviewConfig.i18n.transformValue}" ${dataAttrs}>
-                        <button type="button" class="preview-keyframe-modal__transform-edit-btn admin-btn admin-btn--xs admin-btn--secondary"
-                                data-frame="${frameIndex}" data-prop="${propIndex}"
-                                title="${PreviewConfig.i18n.openTransformEditor}">
-                            ${QuickSiteUtils.iconEdit(12)}
-                            ${PreviewConfig.i18n.edit}
-                        </button>
-                    </div>`;
-            
-            default: // text fallback
-                return `
-                    <input type="text" class="preview-keyframe-modal__property-value" 
-                           value="${escapeHTML(value)}" 
-                           placeholder="${PreviewConfig.i18n.keyframePropertyValue}" ${dataAttrs}>`;
-        }
-    }
-    
-    /**
-     * Attach event handlers for property value inputs based on their type
-     * @param {HTMLElement} propEl - The property row element
-     * @param {number} frameIndex - Frame index
-     * @param {number} propIndex - Property index
-     * @param {string} property - CSS property name
-     */
-    function attachPropertyValueHandlers(propEl, frameIndex, propIndex, property) {
-        const config = getPropertyInputType(property);
-        
-        switch (config.type) {
-            case 'range':
-                // Range slider with live value display
-                const rangeInput = propEl.querySelector('.preview-keyframe-modal__property-range');
-                const rangeValue = propEl.querySelector('.preview-keyframe-modal__property-range-value');
-                if (rangeInput) {
-                    rangeInput.addEventListener('input', (e) => {
-                        const val = e.target.value;
-                        rangeValue.textContent = val;
-                        keyframeFrames[frameIndex].properties[propIndex].value = val;
-                    });
-                }
-                break;
-            
-            case 'color':
-                // Color picker button + text input
-                const colorInput = propEl.querySelector('.preview-keyframe-modal__property-value--color');
-                const colorBtn = propEl.querySelector('.preview-keyframe-modal__color-picker-btn');
-                if (colorInput) {
-                    // Manual input change
-                    colorInput.addEventListener('input', (e) => {
-                        const val = e.target.value;
-                        keyframeFrames[frameIndex].properties[propIndex].value = val;
-                        if (colorBtn) {
-                            colorBtn.style.background = val;
-                        }
-                    });
-                    
-                    // Initialize QSColorPicker attached to the input
-                    if (typeof QSColorPicker !== 'undefined') {
-                        const picker = new QSColorPicker(colorInput, {
-                            showAlpha: true,
-                            onChange: (color) => {
-                                keyframeFrames[frameIndex].properties[propIndex].value = color;
-                                if (colorBtn) {
-                                    colorBtn.style.background = color;
-                                }
-                            }
-                        });
-                        
-                        // Also open picker when button is clicked
-                        if (colorBtn) {
-                            colorBtn.addEventListener('click', (e) => {
-                                e.stopPropagation();
-                                picker.open();
-                            });
-                        }
-                    } else if (colorBtn) {
-                        // Fallback: focus the text input when button clicked
-                        colorBtn.addEventListener('click', () => {
-                            colorInput.focus();
-                            colorInput.select();
-                        });
-                    }
-                }
-                break;
-            
-            case 'length':
-            case 'angle':
-                // Number input + unit dropdown
-                const numInput = propEl.querySelector('.preview-keyframe-modal__property-number');
-                const unitSelect = propEl.querySelector('.preview-keyframe-modal__property-unit');
-                if (numInput && unitSelect) {
-                    const updateValue = () => {
-                        const num = numInput.value;
-                        const unit = unitSelect.value;
-                        // Handle special units like 'auto', 'none', 'normal'
-                        let combinedValue;
-                        if (unit === 'auto' || unit === 'none' || unit === 'normal') {
-                            combinedValue = unit;
-                        } else if (num === '' || num === null) {
-                            combinedValue = '';
-                        } else {
-                            combinedValue = num + unit;
-                        }
-                        keyframeFrames[frameIndex].properties[propIndex].value = combinedValue;
-                    };
-                    
-                    numInput.addEventListener('input', updateValue);
-                    unitSelect.addEventListener('change', () => {
-                        // If selecting 'auto', 'none', or 'normal', clear the number
-                        const unit = unitSelect.value;
-                        if (unit === 'auto' || unit === 'none' || unit === 'normal') {
-                            numInput.value = '';
-                            numInput.disabled = true;
-                        } else {
-                            numInput.disabled = false;
-                        }
-                        updateValue();
-                    });
-                    
-                    // Initial state check for special units
-                    if (['auto', 'none', 'normal'].includes(unitSelect.value)) {
-                        numInput.disabled = true;
-                    }
-                }
-                break;
-            
-            case 'enum':
-                // Enum dropdown
-                const enumSelect = propEl.querySelector('.preview-keyframe-modal__property-enum');
-                if (enumSelect) {
-                    enumSelect.addEventListener('change', (e) => {
-                        keyframeFrames[frameIndex].properties[propIndex].value = e.target.value;
-                    });
-                }
-                break;
-            
-            case 'number':
-                // Unitless number input
-                const plainNumInput = propEl.querySelector('.preview-keyframe-modal__property-value--number');
-                if (plainNumInput) {
-                    plainNumInput.addEventListener('input', (e) => {
-                        keyframeFrames[frameIndex].properties[propIndex].value = e.target.value;
-                    });
-                }
-                break;
-            
-            case 'transform':
-                // Transform editor - text input + Edit button
-                const transformTextInput = propEl.querySelector('.preview-keyframe-modal__property-value--transform');
-                const transformEditBtn = propEl.querySelector('.preview-keyframe-modal__transform-edit-btn');
-                
-                // Text input for manual editing
-                if (transformTextInput) {
-                    transformTextInput.addEventListener('input', (e) => {
-                        keyframeFrames[frameIndex].properties[propIndex].value = e.target.value;
-                    });
-                }
-                
-                // Edit button to open Transform Editor modal
-                if (transformEditBtn) {
-                    transformEditBtn.addEventListener('click', () => {
-                        const currentValue = keyframeFrames[frameIndex].properties[propIndex].value || '';
-                        
-                        // Live preview target is optional - we don't have direct access
-                        // to the selected element from the keyframe modal context
-                        openTransformEditor(currentValue, (newValue) => {
-                            // Update the stored value
-                            keyframeFrames[frameIndex].properties[propIndex].value = newValue;
-                            // Update the text input
-                            if (transformTextInput) {
-                                transformTextInput.value = newValue;
-                            }
-                        }, null);
-                    });
-                }
-                break;
-            
-            default:
-                // Text input (fallback)
-                const textInput = propEl.querySelector('.preview-keyframe-modal__property-value');
-                if (textInput) {
-                    textInput.addEventListener('input', (e) => {
-                        keyframeFrames[frameIndex].properties[propIndex].value = e.target.value;
-                    });
-                }
-                break;
-        }
-    }
-    
-    // ==================== Transform Sub-Editor ====================
-    
-    /**
-     * Transform function definitions
-     * Maps function names to their parameter configs
-     */
-    const TRANSFORM_FUNCTIONS = {
-        // Translation functions
-        translateX: { params: ['x'], units: ['px', '%', 'em', 'rem', 'vw', 'vh'], category: 'translate' },
-        translateY: { params: ['y'], units: ['px', '%', 'em', 'rem', 'vw', 'vh'], category: 'translate' },
-        translateZ: { params: ['z'], units: ['px', 'em', 'rem'], category: 'translate' },
-        translate: { params: ['x', 'y'], units: ['px', '%', 'em', 'rem', 'vw', 'vh'], category: 'translate' },
-        translate3d: { params: ['x', 'y', 'z'], units: ['px', '%', 'em', 'rem', 'vw', 'vh'], category: 'translate' },
-        
-        // Rotation functions
-        rotate: { params: ['angle'], units: ['deg', 'rad', 'turn'], category: 'rotate' },
-        rotateX: { params: ['angle'], units: ['deg', 'rad', 'turn'], category: 'rotate' },
-        rotateY: { params: ['angle'], units: ['deg', 'rad', 'turn'], category: 'rotate' },
-        rotateZ: { params: ['angle'], units: ['deg', 'rad', 'turn'], category: 'rotate' },
-        rotate3d: { params: ['x', 'y', 'z', 'angle'], units: ['deg'], category: 'rotate', special: true },
-        
-        // Scale functions
-        scale: { params: ['x', 'y'], units: [], category: 'scale', unitless: true },
-        scaleX: { params: ['x'], units: [], category: 'scale', unitless: true },
-        scaleY: { params: ['y'], units: [], category: 'scale', unitless: true },
-        scaleZ: { params: ['z'], units: [], category: 'scale', unitless: true },
-        scale3d: { params: ['x', 'y', 'z'], units: [], category: 'scale', unitless: true },
-        
-        // Skew functions
-        skew: { params: ['x', 'y'], units: ['deg', 'rad', 'turn'], category: 'skew' },
-        skewX: { params: ['x'], units: ['deg', 'rad', 'turn'], category: 'skew' },
-        skewY: { params: ['y'], units: ['deg', 'rad', 'turn'], category: 'skew' },
-        
-        // Other
-        perspective: { params: ['d'], units: ['px'], category: 'other' }
-    };
-    
-    /**
-     * Parse a CSS transform string into an array of function objects
-     * @param {string} transformStr - e.g., "translateY(-10px) rotate(5deg) scale(1.1)"
-     * @returns {Array} Array of { fn: 'translateY', args: [{ num: -10, unit: 'px' }] }
-     */
-    function parseTransformString(transformStr) {
-        if (!transformStr || transformStr === 'none') return [];
-        
-        const functions = [];
-        // Match function calls: name(args)
-        const regex = /(\w+)\(([^)]+)\)/g;
-        let match;
-        
-        while ((match = regex.exec(transformStr)) !== null) {
-            const fnName = match[1];
-            const argsStr = match[2];
-            const config = TRANSFORM_FUNCTIONS[fnName];
-            
-            if (!config) continue; // Unknown function, skip
-            
-            // Parse arguments (comma or space separated)
-            const argParts = argsStr.split(/[,\s]+/).filter(a => a.trim());
-            const args = [];
-            
-            for (let i = 0; i < argParts.length; i++) {
-                const argStr = argParts[i].trim();
-                
-                if (config.unitless) {
-                    // Unitless number (scale)
-                    args.push({ num: parseFloat(argStr) || 0, unit: '' });
-                } else if (config.special && fnName === 'rotate3d' && i < 3) {
-                    // rotate3d first 3 params are unitless vector
-                    args.push({ num: parseFloat(argStr) || 0, unit: '' });
-                } else {
-                    // Parse number + unit
-                    const numMatch = argStr.match(/^(-?[\d.]+)(.*)$/);
-                    if (numMatch) {
-                        args.push({ 
-                            num: parseFloat(numMatch[1]) || 0, 
-                            unit: numMatch[2].trim() || config.units[0] || ''
-                        });
-                    } else {
-                        args.push({ num: 0, unit: config.units[0] || '' });
-                    }
-                }
-            }
-            
-            // Fill missing args with defaults
-            while (args.length < config.params.length) {
-                const defaultUnit = config.unitless ? '' : (config.units[0] || '');
-                args.push({ num: 0, unit: defaultUnit });
-            }
-            
-            functions.push({ fn: fnName, args });
-        }
-        
-        return functions;
-    }
-    
-    /**
-     * Serialize transform functions array back to CSS string
-     * @param {Array} functions - Array of { fn, args }
-     * @returns {string} CSS transform string
-     */
-    function serializeTransform(functions) {
-        if (!functions || functions.length === 0) return 'none';
-        
-        return functions.map(({ fn, args }) => {
-            const config = TRANSFORM_FUNCTIONS[fn];
-            const argStrs = args.map((arg, i) => {
-                if (config.unitless || (config.special && fn === 'rotate3d' && i < 3)) {
-                    return String(arg.num);
-                }
-                return `${arg.num}${arg.unit}`;
-            });
-            return `${fn}(${argStrs.join(', ')})`;
-        }).join(' ');
-    }
-    
-    // Transform Editor state
-    let transformEditorOpen = false;
-    let transformEditorCallback = null;  // Called with final value when Apply clicked
-    let transformFunctions = [];          // Current transform functions being edited
-    let transformEditorTarget = null;     // Element to preview on
-    
-    /**
-     * Open the Transform Editor modal
-     * @param {string} initialValue - Current transform CSS value
-     * @param {function} onApply - Callback with new transform value
-     * @param {HTMLElement} previewTarget - Element in iframe to preview on
-     */
-    function openTransformEditor(initialValue, onApply, previewTarget) {
-        transformEditorCallback = onApply;
-        transformEditorTarget = previewTarget;
-        transformFunctions = parseTransformString(initialValue);
-        transformEditorOpen = true;
-        
-        renderTransformEditor();
-        document.getElementById('transform-editor-modal').classList.add('preview-keyframe-modal--visible');
-    }
-    
-    /**
-     * Close the Transform Editor modal
-     * @param {boolean} apply - If true, call callback with current value
-     */
-    function closeTransformEditor(apply = false) {
-        if (apply && transformEditorCallback) {
-            const value = serializeTransform(transformFunctions);
-            transformEditorCallback(value);
-        }
-        
-        // Remove preview
-        if (transformEditorTarget) {
-            transformEditorTarget.style.transform = '';
-        }
-        
-        transformEditorOpen = false;
-        transformEditorCallback = null;
-        transformEditorTarget = null;
-        transformFunctions = [];
-        
-        document.getElementById('transform-editor-modal').classList.remove('preview-keyframe-modal--visible');
-    }
-    
-    /**
-     * Render the Transform Editor UI
-     */
-    function renderTransformEditor() {
-        const currentValue = serializeTransform(transformFunctions);
-        const currentDisplay = document.getElementById('transform-current-value');
-        const functionsContainer = document.getElementById('transform-functions-list');
-        
-        if (currentDisplay) {
-            currentDisplay.textContent = currentValue || 'none';
-        }
-        
-        if (!functionsContainer) return;
-        functionsContainer.innerHTML = '';
-        
-        if (transformFunctions.length === 0) {
-            functionsContainer.innerHTML = `
-                <div class="transform-editor__empty">
-                    ${PreviewConfig.i18n.transformEmpty}
-                </div>`;
-            return;
-        }
-        
-        transformFunctions.forEach((func, index) => {
-            const config = TRANSFORM_FUNCTIONS[func.fn];
-            if (!config) return;
-            
-            const row = document.createElement('div');
-            row.className = 'transform-editor__function-row';
-            row.dataset.index = index;
-            
-            // Build input fields based on params
-            let inputsHTML = '';
-            func.args.forEach((arg, argIndex) => {
-                const paramName = config.params[argIndex] || '';
-                
-                if (config.unitless || (config.special && func.fn === 'rotate3d' && argIndex < 3)) {
-                    // Unitless number input
-                    inputsHTML += `
-                        <div class="transform-editor__param">
-                            <label>${paramName}</label>
-                            <input type="number" step="any" value="${arg.num}" 
-                                   data-func="${index}" data-arg="${argIndex}" class="transform-editor__input">
-                        </div>`;
-                } else {
-                    // Number + unit dropdown
-                    const unitOptions = config.units.map(u => 
-                        `<option value="${u}" ${arg.unit === u ? 'selected' : ''}>${u}</option>`
-                    ).join('');
-                    
-                    inputsHTML += `
-                        <div class="transform-editor__param">
-                            <label>${paramName}</label>
-                            <div class="transform-editor__input-group">
-                                <input type="number" step="any" value="${arg.num}" 
-                                       data-func="${index}" data-arg="${argIndex}" class="transform-editor__input">
-                                <select data-func="${index}" data-arg="${argIndex}" class="transform-editor__unit">
-                                    ${unitOptions}
-                                </select>
-                            </div>
-                        </div>`;
-                }
-            });
-            
-            row.innerHTML = `
-                <div class="transform-editor__drag-handle" title="${PreviewConfig.i18n.dragToReorder}">⋮⋮</div>
-                <div class="transform-editor__function-name">${func.fn}</div>
-                <div class="transform-editor__params">${inputsHTML}</div>
-                <button type="button" class="transform-editor__delete" title="${PreviewConfig.i18n.removeFunction}">
-                    ${QuickSiteUtils.iconClose(14)}
-                </button>
-            `;
-            
-            // Event: Input change
-            row.querySelectorAll('.transform-editor__input').forEach(input => {
-                input.addEventListener('input', (e) => {
-                    const funcIdx = parseInt(e.target.dataset.func);
-                    const argIdx = parseInt(e.target.dataset.arg);
-                    transformFunctions[funcIdx].args[argIdx].num = parseFloat(e.target.value) || 0;
-                    updateTransformPreview();
-                    updateTransformCurrentDisplay();
-                });
-            });
-            
-            // Event: Unit change
-            row.querySelectorAll('.transform-editor__unit').forEach(select => {
-                select.addEventListener('change', (e) => {
-                    const funcIdx = parseInt(e.target.dataset.func);
-                    const argIdx = parseInt(e.target.dataset.arg);
-                    transformFunctions[funcIdx].args[argIdx].unit = e.target.value;
-                    updateTransformPreview();
-                    updateTransformCurrentDisplay();
-                });
-            });
-            
-            // Event: Delete function
-            row.querySelector('.transform-editor__delete').addEventListener('click', () => {
-                transformFunctions.splice(index, 1);
-                renderTransformEditor();
-                updateTransformPreview();
-            });
-            
-            functionsContainer.appendChild(row);
-        });
-        
-        // Make rows draggable for reordering
-        setupTransformDragReorder(functionsContainer);
-    }
-    
-    /**
-     * Update the current value display
-     */
-    function updateTransformCurrentDisplay() {
-        const display = document.getElementById('transform-current-value');
-        if (display) {
-            display.textContent = serializeTransform(transformFunctions) || 'none';
-        }
-    }
-    
-    /**
-     * Apply live preview to target element
-     */
-    function updateTransformPreview() {
-        if (transformEditorTarget) {
-            transformEditorTarget.style.transform = serializeTransform(transformFunctions);
-        }
-    }
-    
-    /**
-     * Setup drag-and-drop reordering for function rows
-     */
-    function setupTransformDragReorder(container) {
-        let draggedEl = null;
-        let draggedIndex = -1;
-        
-        container.querySelectorAll('.transform-editor__function-row').forEach(row => {
-            const handle = row.querySelector('.transform-editor__drag-handle');
-            
-            handle.addEventListener('mousedown', (e) => {
-                e.preventDefault();
-                draggedEl = row;
-                draggedIndex = parseInt(row.dataset.index);
-                row.classList.add('transform-editor__function-row--dragging');
-                
-                const onMouseMove = (e) => {
-                    const rows = Array.from(container.querySelectorAll('.transform-editor__function-row'));
-                    const y = e.clientY;
-                    
-                    rows.forEach((r, idx) => {
-                        if (r === draggedEl) return;
-                        const rect = r.getBoundingClientRect();
-                        const midY = rect.top + rect.height / 2;
-                        
-                        if (y < midY && idx < draggedIndex) {
-                            container.insertBefore(draggedEl, r);
-                            draggedIndex = idx;
-                        } else if (y > midY && idx > draggedIndex) {
-                            container.insertBefore(draggedEl, r.nextSibling);
-                            draggedIndex = idx;
-                        }
-                    });
-                };
-                
-                const onMouseUp = () => {
-                    row.classList.remove('transform-editor__function-row--dragging');
-                    
-                    // Reorder transformFunctions array based on DOM order
-                    const newOrder = [];
-                    container.querySelectorAll('.transform-editor__function-row').forEach(r => {
-                        const oldIdx = parseInt(r.dataset.index);
-                        newOrder.push(transformFunctions[oldIdx]);
-                    });
-                    transformFunctions = newOrder;
-                    
-                    // Re-render to update indices
-                    renderTransformEditor();
-                    updateTransformPreview();
-                    updateTransformCurrentDisplay();
-                    
-                    document.removeEventListener('mousemove', onMouseMove);
-                    document.removeEventListener('mouseup', onMouseUp);
-                };
-                
-                document.addEventListener('mousemove', onMouseMove);
-                document.addEventListener('mouseup', onMouseUp);
-            });
-        });
-    }
-    
-    /**
-     * Add a new transform function
-     * @param {string} fnName - Function name (e.g., 'translateX', 'rotate')
-     */
-    function addTransformFunction(fnName) {
-        const config = TRANSFORM_FUNCTIONS[fnName];
-        if (!config) return;
-        
-        // Create default args
-        const args = config.params.map((param, i) => {
-            if (config.unitless || (config.special && fnName === 'rotate3d' && i < 3)) {
-                return { num: fnName.startsWith('scale') ? 1 : 0, unit: '' };
-            }
-            return { num: 0, unit: config.units[0] || '' };
-        });
-        
-        transformFunctions.push({ fn: fnName, args });
-        renderTransformEditor();
-        updateTransformPreview();
-        
-        // Close dropdown
-        document.getElementById('transform-add-dropdown').classList.remove('transform-editor__dropdown--open');
-    }
-    
-    /**
-     * Toggle add function dropdown
-     */
-    function toggleTransformDropdown() {
-        const dropdown = document.getElementById('transform-add-dropdown');
-        dropdown.classList.toggle('transform-editor__dropdown--open');
-    }
-    
-    /**
-     * Initialize Transform Editor event handlers
-     */
-    function initTransformEditorHandlers() {
-        const transformModal = document.getElementById('transform-editor-modal');
-        const transformClose = document.getElementById('transform-editor-close');
-        const transformCancel = document.getElementById('transform-cancel');
-        const transformApply = document.getElementById('transform-apply');
-        const transformClear = document.getElementById('transform-clear');
-        const transformAddBtn = document.getElementById('transform-add-btn');
-        const transformDropdown = document.getElementById('transform-add-dropdown');
-        
-        // Close button
-        if (transformClose) {
-            transformClose.addEventListener('click', () => closeTransformEditor(false));
-        }
-        
-        // Cancel button
-        if (transformCancel) {
-            transformCancel.addEventListener('click', () => closeTransformEditor(false));
-        }
-        
-        // Apply button
-        if (transformApply) {
-            transformApply.addEventListener('click', () => closeTransformEditor(true));
-        }
-        
-        // Clear All button
-        if (transformClear) {
-            transformClear.addEventListener('click', () => {
-                transformFunctions = [];
-                renderTransformEditor();
-                updateTransformPreview();
-            });
-        }
-        
-        // Add Function button
-        if (transformAddBtn) {
-            transformAddBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                toggleTransformDropdown();
-            });
-        }
-        
-        // Dropdown function buttons
-        if (transformDropdown) {
-            transformDropdown.querySelectorAll('[data-fn]').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    addTransformFunction(e.target.dataset.fn);
-                });
-            });
-            
-            // Close dropdown when clicking outside
-            document.addEventListener('click', (e) => {
-                if (!transformDropdown.contains(e.target) && e.target !== transformAddBtn) {
-                    transformDropdown.classList.remove('transform-editor__dropdown--open');
-                }
-            });
-        }
-        
-        // Close modal on backdrop click
-        if (transformModal) {
-            transformModal.addEventListener('click', (e) => {
-                if (e.target === transformModal || e.target.classList.contains('preview-keyframe-modal__backdrop')) {
-                    closeTransformEditor(false);
-                }
-            });
-        }
-    }
-
-
     // ==================== Transition Editor ====================
+    // The modal the UI calls "State & Animation Editor" — Style tool →
+    // Selectors → pick a selector → [Animate]. There is no "Transition editor"
+    // label anywhere in the interface; the code name and the UI name differ.
     // Functionality moved to preview-transition-editor.js module
-    
+
     /**
      * Open the Transition Editor (delegates to module)
      */
@@ -2107,7 +1309,6 @@
             PreviewTransitionEditor.setEscapeHtml(escapeHTML);
             PreviewTransitionEditor.setParseStylesString(parseStylesString);
             PreviewTransitionEditor.setRefreshPreviewFrame(() => {
-                const iframe = document.getElementById('preview-frame');
                 if (iframe?.contentWindow) {
                     iframe.contentWindow.location.reload();
                 }
@@ -2115,12 +1316,26 @@
             PreviewTransitionEditor.setOpenAnimationPreviewModal(
                 window.PreviewStyleMotion?.openAnimationPreviewModal || function() {}
             );
-            PreviewTransitionEditor.setGetKeyframesData(() => keyframesData);
+            // The keyframe list belongs to the Motion tab's module, which fills
+            // it from a real fetch. Read it at call time — this file keeps no
+            // copy of its own.
+            PreviewTransitionEditor.setGetKeyframesData(
+                () => window.PreviewStyleMotion?.getKeyframesData?.() || []
+            );
+            // …and load it on demand, because Selectors → [Animate] can reach
+            // the preview without the Motion tab ever having been opened. Same
+            // isLoaded/load pattern the style tabs use in initStyleTabs().
+            PreviewTransitionEditor.setEnsureKeyframesData(async () => {
+                const motion = window.PreviewStyleMotion;
+                if (motion && motion.isLoaded && !motion.isLoaded() && motion.load) {
+                    await motion.load();
+                }
+            });
             PreviewTransitionEditor.setGetThemeVariables(() => {
                 if (window.PreviewStyleTheme && PreviewStyleTheme.isLoaded()) {
                     return PreviewStyleTheme.getCurrent();
                 }
-                return originalThemeVariables;
+                return {};
             });
             PreviewTransitionEditor.init();
         }
@@ -3603,7 +2818,7 @@
         }
     }
     
-    // ==================== Style Editor (Phase 8.5) ====================
+    // ==================== Style Editor ====================
     // Delegated to preview-style-editor.js module
     
     function initStyleEditor() {
@@ -3615,7 +2830,7 @@
                 if (window.PreviewStyleTheme && PreviewStyleTheme.isLoaded()) {
                     return PreviewStyleTheme.getCurrent();
                 }
-                return originalThemeVariables;
+                return {};
             });
             PreviewStyleEditor.setGetPropertyTypes((prop) => KEYFRAME_PROPERTY_TYPES[prop] || { type: 'text' });
         }
@@ -4619,13 +3834,19 @@
             PreviewJsInteractions.setShowToast(showToast);
             PreviewJsInteractions.setSendToIframe(sendToIframe);
             PreviewJsInteractions.setReloadPreview(reloadPreview);
-            PreviewJsInteractions.setGetSelectorsLoaded(() => selectorsLoaded);
+            // Always false. The real flag lives in PreviewSelectorBrowser, and
+            // the consumer only uses this to decide whether to call
+            // loadSelectorsData(), which guards on its own copy — so reporting
+            // false costs one no-op call and nothing else. Left reporting false
+            // rather than wired to PreviewSelectorBrowser.isLoaded(), because
+            // wiring it would change behaviour and this is a deletion.
+            PreviewJsInteractions.setGetSelectorsLoaded(() => false);
             PreviewJsInteractions.setLoadSelectorsData(loadSelectorsData);
             PreviewJsInteractions.setGetCategorizedSelectors(() => {
                 if (window.PreviewSelectorBrowser) {
                     return PreviewSelectorBrowser.getCategorizedSelectors();
                 }
-                return categorizedSelectors;
+                return { tags: [], classes: [], ids: [], attributes: [], media: {} };
             });
             PreviewJsInteractions.setGetPageStructureClasses(() => pageStructureClasses);
         }
@@ -4660,9 +3881,18 @@
         // loading overlay stuck over a "blank" iframe until a manual refresh. If the
         // iframe document is already complete, run the handler now. (Same-origin; a
         // cross-origin access throws and we fall back to waiting for the event.)
+        // ⚠ about:blank reports readyState 'complete' straight away, so
+        // readyState alone is not evidence the real page is there. Injecting
+        // into about:blank makes the overlay script run in a document whose
+        // location.origin is the string "null", and its opening
+        // postMessage(..., ALLOWED_ORIGIN) then throws
+        // "An invalid or illegal string was specified" — which also skips the
+        // rest of that script, including scanEmptyElements(). Same guard as the
+        // sibling injection attempt at the end of this file.
         try {
             var _idoc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);
-            if (_idoc && _idoc.readyState === 'complete') {
+            var _iloc = (iframe.contentWindow && iframe.contentWindow.location && iframe.contentWindow.location.href) || '';
+            if (_idoc && _idoc.readyState === 'complete' && _iloc && _iloc !== 'about:blank') {
                 handleIframeLoad();
             }
         } catch (e) { /* cross-origin or not ready — the load event will handle it */ }
@@ -5271,7 +4501,6 @@
     initStyleTabs();
     initStyleSource();
     initSelectorBrowser();
-    initTransformEditorHandlers();
 
 
     // ==================== Sidebar Add/Edit Forms (Phase 8 - Mode Refactoring) ====================
