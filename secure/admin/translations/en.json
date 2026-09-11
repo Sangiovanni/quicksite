@@ -1148,7 +1148,6 @@
         "languages": "Languages",
         "preferences": "Admin Preferences",
         "keyboardShortcuts": "Keyboard Shortcuts",
-        "confirmDestructive": "Destructive Action Confirmation",
         "toastDuration": "Toast Notification Duration",
         "addRoute": "Add Route",
         "loadingRoutes": "Loading routes...",

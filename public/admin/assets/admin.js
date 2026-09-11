@@ -35,9 +35,7 @@ const QuickSiteAdmin = {
         },
         get multilingual() {
             return window.QUICKSITE_CONFIG?.multilingual || false;
-        },
-        tokenStorageKey: 'quicksite_admin_token',
-        rememberStorageKey: 'quicksite_admin_remember'
+        }
     },
 
     // ============================================
@@ -143,14 +141,6 @@ const QuickSiteAdmin = {
     hasAllPermissions(commands) {
         if (this.permissions.isSuperAdmin) return true;
         return commands.every(cmd => this.permissions.commands.includes(cmd));
-    },
-
-    /**
-     * Check if user has any command in a list
-     */
-    hasAnyPermission(commands) {
-        if (this.permissions.isSuperAdmin) return true;
-        return commands.some(cmd => this.permissions.commands.includes(cmd));
     },
 
     /**
@@ -269,17 +259,6 @@ const QuickSiteAdmin = {
             }
         });
     },
-    
-    /**
-     * Expand a nav group programmatically
-     * @param {string} groupName - 'build' or 'inspect'
-     */
-    expandNavGroup(groupName) {
-        const group = document.querySelector(`.admin-nav__group[data-nav-group="${groupName}"]`);
-        if (group) {
-            group.classList.add('admin-nav__group--open');
-        }
-    },
 
     /**
      * Check for pending message from redirect - delegates to QuickSiteUtils
@@ -307,107 +286,21 @@ const QuickSiteAdmin = {
      * browser storage; the page-embedded config is the fallback)
      */
     getToken() {
-        if (window.QuickSiteAPI) {
-            return window.QuickSiteAPI.getToken();
-        }
-        return (window.QUICKSITE_CONFIG && window.QUICKSITE_CONFIG.token) || null;
+        return window.QuickSiteAPI.getToken();
     },
 
     /**
      * Clear the per-session token - delegates to QuickSiteAPI
      */
     clearToken() {
-        if (window.QuickSiteAPI) {
-            return window.QuickSiteAPI.clearToken();
-        }
-        if (window.QUICKSITE_CONFIG) window.QUICKSITE_CONFIG.token = '';
+        return window.QuickSiteAPI.clearToken();
     },
 
     /**
      * Make an API request - delegates to QuickSiteAPI
      */
     async apiRequest(command, method = 'GET', data = null, urlParams = [], queryParams = {}, opts = {}) {
-        if (window.QuickSiteAPI) {
-            return window.QuickSiteAPI.request(command, method, data, urlParams, queryParams, false, opts);
-        }
-        
-        // Fallback implementation
-        const token = this.getToken();
-        if (!token) {
-            throw new Error('No authentication token');
-        }
-
-        let url = `${this.config.apiBase}/${command}`;
-        if (urlParams.length > 0) {
-            url += '/' + urlParams.join('/');
-        }
-        
-        // Add query parameters for GET requests
-        if (Object.keys(queryParams).length > 0) {
-            const searchParams = new URLSearchParams();
-            for (const [key, value] of Object.entries(queryParams)) {
-                if (value !== null && value !== undefined && value !== '') {
-                    searchParams.append(key, value);
-                }
-            }
-            const queryString = searchParams.toString();
-            if (queryString) {
-                url += '?' + queryString;
-            }
-        }
-
-        const options = {
-            method: method,
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
-        };
-
-        if (data && method !== 'GET') {
-            options.body = JSON.stringify(data);
-        }
-
-        const response = await fetch(url, options);
-        
-        // Handle 204 No Content responses (empty body)
-        let result = null;
-        if (response.status !== 204) {
-            const text = await response.text();
-            if (text) {
-                try {
-                    result = JSON.parse(text);
-                } catch {
-                    result = { message: text };
-                }
-            }
-        }
-        
-        // For 204, create a success response
-        if (response.status === 204) {
-            result = { status: 204, code: 'operation.success', message: 'Operation completed successfully' };
-        }
-        
-        // Dispatch event for successful write operations (non-GET)
-        // This allows miniplayer to auto-reload preview
-        if (response.ok && method !== 'GET') {
-            window.dispatchEvent(new CustomEvent('quicksite:command-executed', {
-                detail: { command, method, success: true }
-            }));
-        }
-
-        // Auto-logout on 401 — token is invalid or expired
-        if (response.status === 401 && window.QuickSiteAPI) {
-            window.QuickSiteAPI.clearToken();
-            window.location.href = (this.config.adminBase || '/admin') + '/login';
-            return { ok: false, status: 401, data: result };
-        }
-
-        return {
-            ok: response.ok,
-            status: response.status,
-            data: result
-        };
+        return window.QuickSiteAPI.request(command, method, data, urlParams, queryParams, false, opts);
     },
 
     /**
@@ -422,10 +315,7 @@ const QuickSiteAdmin = {
      * @returns {Promise<{ok: boolean, status: number, data: Object|null, filename?: string}>}
      */
     async downloadFile(command, urlParams = [], queryParams = {}, opts = {}) {
-        if (window.QuickSiteAPI) {
-            return window.QuickSiteAPI.downloadFile(command, urlParams, queryParams, opts);
-        }
-        return { ok: false, status: 0, data: { message: 'Download unavailable: QuickSiteAPI not loaded' } };
+        return window.QuickSiteAPI.downloadFile(command, urlParams, queryParams, opts);
     },
 
     /**
@@ -439,10 +329,7 @@ const QuickSiteAdmin = {
      * @returns {Promise<{ok: boolean, status: number, data: Object|null}>}
      */
     async setSelectedProject(projectId) {
-        if (window.QuickSiteAPI) {
-            return window.QuickSiteAPI.setSelectedProject(projectId);
-        }
-        return { ok: false, status: 0, data: { message: 'Project switching unavailable: QuickSiteAPI not loaded' } };
+        return window.QuickSiteAPI.setSelectedProject(projectId);
     },
 
     /**
@@ -456,66 +343,14 @@ const QuickSiteAdmin = {
      * @returns {Promise<{ok: boolean, status: number, data: Object|null}>}
      */
     async accountRequest(route, method, body) {
-        if (window.QuickSiteAPI) {
-            return window.QuickSiteAPI.accountRequest(route, method, body);
-        }
-        return { ok: false, status: 0, data: { message: 'Account request unavailable: QuickSiteAPI not loaded' } };
+        return window.QuickSiteAPI.accountRequest(route, method, body);
     },
 
     /**
      * Make an API request with file upload - delegates to QuickSiteAPI
      */
     async apiUpload(command, formData, urlParams = []) {
-        if (window.QuickSiteAPI) {
-            return window.QuickSiteAPI.upload(command, formData, urlParams);
-        }
-        
-        // Fallback implementation
-        const token = this.getToken();
-        if (!token) {
-            throw new Error('No authentication token');
-        }
-
-        let url = `${this.config.apiBase}/${command}`;
-        if (urlParams.length > 0) {
-            url += '/' + urlParams.join('/');
-        }
-
-        const response = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${token}`
-            },
-            body: formData
-        });
-
-        // Same shape as the apiRequest fallback above, and for the sharper
-        // reason: an oversized upload is refused by the web server BEFORE PHP
-        // runs, with an HTML error page. response.json() throws on that, and the
-        // caller sees a parse error instead of "the file is too large".
-        let result = null;
-        const text = await response.text();
-        if (text) {
-            try {
-                result = JSON.parse(text);
-            } catch {
-                result = {
-                    success: false,
-                    code: 'client.non_json_response',
-                    message: response.status === 413
-                        ? 'The file is too large for this server to accept.'
-                        : 'The server answered HTTP ' + response.status + ' with a response QuickSite could not read.',
-                    http_status: response.status
-                };
-                result.error = result.message;
-            }
-        }
-
-        return {
-            ok: response.ok,
-            status: response.status,
-            data: result
-        };
+        return window.QuickSiteAPI.upload(command, formData, urlParams);
     },
 
     /**
@@ -842,51 +677,7 @@ const QuickSiteAdmin = {
      * Fetch data from admin helper API - delegates to QuickSiteAPI
      */
     async fetchHelperData(action, params = []) {
-        if (window.QuickSiteAPI) {
-            return window.QuickSiteAPI.fetchHelper(action, params);
-        }
-        
-        // Fallback
-        const token = this.getToken();
-        if (!token) {
-            throw new Error('No authentication token');
-        }
-
-        // C8 8.X — same project marker core/api.js sends (see fetchHelper). This
-        // fallback only runs when core/api.js failed to load; without the marker
-        // every project-scoped arm would 400.
-        const project = (window.QUICKSITE_CONFIG && window.QUICKSITE_CONFIG.currentProject) || null;
-        const marker = project ? `p/${encodeURIComponent(project)}/` : '';
-        let url = `${this.config.adminBase}/api/${marker}${action}`;
-        if (params.length > 0) {
-            url += '/' + params.join('/');
-        }
-
-        const response = await fetch(url, {
-            headers: {
-                'Authorization': `Bearer ${token}`
-            }
-        });
-
-        // Same reasoning as apiUpload above: this can be answered by the web
-        // server or a proxy rather than by QuickSite, and the contract here is
-        // to throw a message a caller can show — never a JSON parse error.
-        let result = null;
-        const text = await response.text();
-        if (text) {
-            try {
-                result = JSON.parse(text);
-            } catch {
-                throw new Error('The server answered HTTP ' + response.status
-                    + ' with a response QuickSite could not read.');
-            }
-        }
-
-        if (response.ok && result && result.success) {
-            return result.data;
-        }
-
-        throw new Error((result && (result.error || result.message)) || 'Failed to fetch data');
+        return window.QuickSiteAPI.fetchHelper(action, params);
     },
 
     /**
@@ -1077,7 +868,6 @@ const QuickSiteAdmin = {
      */
     initKeyboardShortcuts() {
         document.addEventListener('keydown', (e) => {
-            // Check preference dynamically so changes take effect immediately
             if (!this.getPref('shortcuts', true)) return;
             
             // Don't trigger when typing in inputs
@@ -1236,14 +1026,6 @@ const QuickSiteAdmin = {
         document.addEventListener('keydown', escHandler);
     },
 
-    // The history export used to live here as `exportHistory()`, and it could
-    // never succeed: it read `result.data.data.history`, while the command
-    // answers `entries`, so every run fell through to "No history to export".
-    // It also re-fetched with no filters, so had it worked it would have
-    // exported something other than what the page was showing. Replaced in S6.6
-    // by history.js's CSV export, which serialises the records already on
-    // screen. Removed rather than fixed in place — an export belongs with the
-    // page that holds the data, not in the shared admin object.
 };
 
 // Kick off the permission fetch immediately at parse time (admin.js is in the footer so

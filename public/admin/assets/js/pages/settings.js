@@ -190,34 +190,31 @@
      * Load user preferences
      */
     function loadPreferences() {
-        const prefs = JSON.parse(localStorage.getItem('quicksite_admin_prefs') || '{}');
-        
+        // Through getPref for the same reason savePreferences goes through
+        // setPref: one store, one cache, one API. Reading the key by hand here
+        // would answer from localStorage while everything else answers from
+        // the cache.
         const shortcutsEl = document.getElementById('pref-shortcuts');
-        const confirmEl = document.getElementById('pref-confirm');
         const toastEl = document.getElementById('pref-toast-duration');
-        
-        if (shortcutsEl) shortcutsEl.checked = prefs.shortcuts !== false;
-        if (confirmEl) confirmEl.checked = prefs.confirmDestructive !== false;
-        if (toastEl) toastEl.value = prefs.toastDuration || '4000';
+
+        if (shortcutsEl) shortcutsEl.checked = QuickSiteUtils.getPref('shortcuts', true) !== false;
+        if (toastEl) toastEl.value = QuickSiteUtils.getPref('toastDuration', '4000');
     }
     
     /**
      * Save user preferences
      */
     window.savePreferences = function() {
-        const prefs = {
-            shortcuts: document.getElementById('pref-shortcuts')?.checked ?? true,
-            confirmDestructive: document.getElementById('pref-confirm')?.checked ?? true,
-            toastDuration: document.getElementById('pref-toast-duration')?.value || '4000'
-        };
-        
-        localStorage.setItem('quicksite_admin_prefs', JSON.stringify(prefs));
-        
-        // localStorage is the store; core/utils.js reads it. There used to be a
-        // `QuickSiteAdmin.prefs = prefs` here too, updating a second copy that
-        // only admin.js's own getPref fallback ever read - and that fallback was
-        // unreachable, because core/utils.js always loads first. Both are gone.
-        
+        // Through QuickSiteUtils.setPref, never straight to localStorage.
+        // setPref updates the in-memory cache getPref serves from AND
+        // persists. Writing the key by hand persists without telling the
+        // cache, so every reader keeps answering with the old value until
+        // the page is reloaded.
+        QuickSiteUtils.setPref('shortcuts',
+            document.getElementById('pref-shortcuts')?.checked ?? true);
+        QuickSiteUtils.setPref('toastDuration',
+            document.getElementById('pref-toast-duration')?.value || '4000');
+
         QuickSiteAdmin.showToast('Preferences saved', 'success');
     };
     

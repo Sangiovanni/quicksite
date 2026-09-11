@@ -91,17 +91,6 @@ window.QUICKSITE_CONFIG.quicksiteVersion = '<?= htmlspecialchars($version, ENT_Q
         </div>
         
         <div class="admin-form-group">
-            <label class="admin-label"><?= __admin('settings.confirmDestructive') ?></label>
-            <div class="admin-toggle-group">
-                <label class="admin-toggle">
-                    <input type="checkbox" id="pref-confirm" checked>
-                    <span class="admin-toggle__slider"></span>
-                    <span class="admin-toggle__label">Show confirmation for destructive actions</span>
-                </label>
-            </div>
-        </div>
-        
-        <div class="admin-form-group">
             <label class="admin-label"><?= __admin('settings.toastDuration') ?></label>
             <select id="pref-toast-duration" class="admin-select" style="max-width: 200px;">
                 <option value="2000">2 seconds</option>
