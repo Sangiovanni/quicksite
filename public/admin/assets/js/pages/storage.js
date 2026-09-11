@@ -45,42 +45,15 @@
         return adminApi.apiRequest(cmd, method, body);
     }
 
-    function _el(tag, props, children) {
-        var e = document.createElement(tag);
-        if (props) {
-            for (var k in props) {
-                if (k === 'dataset' && typeof props[k] === 'object') {
-                    Object.assign(e.dataset, props[k]);
-                } else if (k.indexOf('on') === 0 && typeof props[k] === 'function') {
-                    e.addEventListener(k.slice(2).toLowerCase(), props[k]);
-                } else if (k === 'class') {
-                    e.className = props[k];
-                } else if (k === 'text') {
-                    e.textContent = props[k];
-                } else {
-                    e.setAttribute(k, props[k]);
-                }
-            }
-        }
-        if (children) {
-            children.forEach(function (c) {
-                if (c == null) return;
-                if (typeof c === 'string') e.appendChild(document.createTextNode(c));
-                else e.appendChild(c);
-            });
-        }
-        return e;
-    }
-
     function _renderLabel(text, required) {
-        var l = _el('label', { class: 'admin-label' });
+        var l = QSDom.el('label', { class: 'admin-label' });
         l.appendChild(document.createTextNode(text));
-        if (required) l.appendChild(_el('span', { class: 'admin-text-danger', text: ' *' }));
+        if (required) l.appendChild(QSDom.el('span', { class: 'admin-text-danger', text: ' *' }));
         return l;
     }
-    function _renderHint(text) { return _el('p', { class: 'admin-hint', text: text }); }
+    function _renderHint(text) { return QSDom.el('p', { class: 'admin-hint', text: text }); }
     function _renderGroup(label, child, hint) {
-        var g = _el('div', { class: 'admin-form-group' });
+        var g = QSDom.el('div', { class: 'admin-form-group' });
         if (label) g.appendChild(label);
         if (child) g.appendChild(child);
         if (hint) g.appendChild(hint);
@@ -107,7 +80,7 @@
     var ICON_X = 'M18 6L6 18M6 6l12 12';
 
     function _renderPill(text, kind) {
-        return _el('span', { class: 'storage-pill storage-pill--' + kind, text: text });
+        return QSDom.el('span', { class: 'storage-pill storage-pill--' + kind, text: text });
     }
 
     // The prefix qs.js writes browser-storage keys under. Kept in step with
@@ -139,7 +112,7 @@
      */
     function _renderKeyPrefixChip() {
         var project = (window.QUICKSITE_CONFIG && window.QUICKSITE_CONFIG.currentProject) || '';
-        return _el('span', {
+        return QSDom.el('span', {
             class: 'storage-keyfield__prefix',
             text: PHYSICAL_KEY_PREFIX + project + '_',
             title: 'Added automatically. Every project on this host shares one '
@@ -164,11 +137,11 @@
     function _renderPhysicalKey(item) {
         var physical = _physicalKey(item);
         if (physical === null) return null;
-        var line = _el('div', { class: 'storage-card__physical' });
-        line.appendChild(_el('span', {
+        var line = QSDom.el('div', { class: 'storage-card__physical' });
+        line.appendChild(QSDom.el('span', {
             class: 'storage-card__physical-label', text: 'stored as',
         }));
-        line.appendChild(_el('code', {
+        line.appendChild(QSDom.el('code', {
             class: 'storage-card__physical-key',
             text: physical,
             title: 'Every project on this host shares one browser-storage origin, '
@@ -187,7 +160,7 @@
     }
 
     function _renderActionBtn(iconD, label, onClick) {
-        var b = _el('button', {
+        var b = QSDom.el('button', {
             class: 'admin-btn admin-btn--ghost storage-card__action',
             'aria-label': label, title: label, type: 'button', onclick: onClick,
         });
@@ -196,12 +169,12 @@
     }
 
     function _renderCard(item) {
-        var card = _el('div', { class: 'storage-card' });
-        var row = _el('div', { class: 'storage-card__row' });
+        var card = QSDom.el('div', { class: 'storage-card' });
+        var row = QSDom.el('div', { class: 'storage-card__row' });
 
-        var main = _el('div', { class: 'storage-card__main' });
-        var pills = _el('div', { class: 'storage-card__pills' });
-        pills.appendChild(_el('span', { class: 'storage-card__id', text: item.id }));
+        var main = QSDom.el('div', { class: 'storage-card__main' });
+        var pills = QSDom.el('div', { class: 'storage-card__pills' });
+        pills.appendChild(QSDom.el('span', { class: 'storage-card__id', text: item.id }));
         pills.appendChild(_renderPill(item.scope || '—', 'scope'));
         pills.appendChild(_renderPill(item.category || '—', 'cat-' + (item.category || 'functional')));
         if (item.consentRequired) {
@@ -218,13 +191,13 @@
         if (physical) main.appendChild(physical);
 
         var desc = _descOf(item);
-        main.appendChild(_el('div', {
+        main.appendChild(QSDom.el('div', {
             class: 'storage-card__summary',
             text: desc || 'No description yet.',
         }));
         row.appendChild(main);
 
-        var actions = _el('div', { class: 'storage-card__actions' });
+        var actions = QSDom.el('div', { class: 'storage-card__actions' });
         actions.appendChild(_renderActionBtn(ICON_EDIT, 'Edit', function () { openEditModal(item); }));
         actions.appendChild(_renderActionBtn(ICON_TRASH, 'Delete', function () { openDeleteConfirm(item); }));
         row.appendChild(actions);
@@ -234,7 +207,7 @@
     }
 
     function _renderFilterBar() {
-        var bar = _el('div', { class: 'storage-filter-bar' });
+        var bar = QSDom.el('div', { class: 'storage-filter-bar' });
         var keys = ['all'].concat(state.scopes);
         keys.forEach(function (key) {
             var count = key === 'all'
@@ -242,7 +215,7 @@
                 : state.items.filter(function (it) { return it.scope === key; }).length;
             var isActive = state.filter === key;
             var cls = 'admin-btn admin-btn--ghost storage-filter-bar__btn' + (isActive ? ' storage-filter-bar__btn--active' : '');
-            bar.appendChild(_el('button', {
+            bar.appendChild(QSDom.el('button', {
                 class: cls, type: 'button',
                 onclick: function () { state.filter = key; renderList(); },
                 text: (key === 'all' ? 'All' : key) + ' · ' + count,
@@ -257,7 +230,7 @@
     }
 
     function _renderEmptyState(filter) {
-        return _el('div', {
+        return QSDom.el('div', {
             class: 'storage-list__empty',
             text: filter === 'all'
                 ? 'No storage keys declared yet. Click "Add storage key" to declare one.'
@@ -324,7 +297,7 @@
         if (!host) return;
         host.textContent = '';
         if (state.languages.length <= 1) return; // monolingual: nothing to choose
-        host.appendChild(_el('span', { class: 'storage-desc-lang-bar__label', text: 'Description language:' }));
+        host.appendChild(QSDom.el('span', { class: 'storage-desc-lang-bar__label', text: 'Description language:' }));
         var sel = _renderSelect(state.languages, state.descLang);
         sel.classList.add('storage-desc-lang-bar__select');
         sel.addEventListener('change', function () { onDescLangChange(sel); });
@@ -373,15 +346,15 @@
         if (!root) return null;
         root.textContent = '';
 
-        var backdrop = _el('div', {
+        var backdrop = QSDom.el('div', {
             class: 'storage-modal-backdrop',
             onclick: function (e) { if (e.target === backdrop) onClose(); },
         });
-        var dialog = _el('div', { class: 'storage-modal-dialog' });
+        var dialog = QSDom.el('div', { class: 'storage-modal-dialog' });
 
-        var header = _el('div', { class: 'storage-modal-header' });
-        header.appendChild(_el('h2', { class: 'storage-modal-header__title', text: titleText }));
-        var closeBtn = _el('button', {
+        var header = QSDom.el('div', { class: 'storage-modal-header' });
+        header.appendChild(QSDom.el('h2', { class: 'storage-modal-header__title', text: titleText }));
+        var closeBtn = QSDom.el('button', {
             class: 'admin-btn admin-btn--ghost storage-modal-header__close',
             type: 'button', 'aria-label': 'Close', onclick: onClose,
         });
@@ -400,9 +373,9 @@
     }
 
     function _renderSelect(options, selected) {
-        var sel = _el('select', { class: 'admin-input' });
+        var sel = QSDom.el('select', { class: 'admin-input' });
         options.forEach(function (opt) {
-            var o = _el('option', { value: opt, text: opt });
+            var o = QSDom.el('option', { value: opt, text: opt });
             if (opt === selected) o.selected = true;
             sel.appendChild(o);
         });
@@ -421,14 +394,14 @@
         // id — shown behind the non-editable prefix chip, so the author reads
         // the WHOLE physical key as they type rather than discovering it in
         // devtools later.
-        var idInput = _el('input', {
+        var idInput = QSDom.el('input', {
             type: 'text', class: 'admin-input storage-keyfield__input', autocomplete: 'off',
             placeholder: 'key name, e.g. cartSession',
             value: isEdit ? item.id : (isDeclare ? prefill.id : ''),
         });
         if (isDeclare) idInput.readOnly = true;
         var keyPrefixChip = _renderKeyPrefixChip();
-        var keyField = _el('div', { class: 'storage-keyfield' }, [keyPrefixChip, idInput]);
+        var keyField = QSDom.el('div', { class: 'storage-keyfield' }, [keyPrefixChip, idInput]);
         var keyHint = _renderHint('');
         dialog.appendChild(_renderGroup(_renderLabel('Key name', true), keyField, keyHint));
 
@@ -458,7 +431,7 @@
         var retentionSelect = _renderSelect(RETENTION_PRESETS.concat(['__custom__']), retentionPresetVal);
         // relabel the custom option
         Array.prototype.forEach.call(retentionSelect.options, function (o) { if (o.value === '__custom__') o.textContent = 'Custom…'; });
-        var retentionCustom = _el('input', {
+        var retentionCustom = QSDom.el('input', {
             type: 'text', class: 'admin-input storage-retention-custom',
             placeholder: 'e.g. 6 months, 13 months, until-logout',
             value: (retentionPresetVal === '__custom__') ? (item.retention || '') : '',
@@ -467,7 +440,7 @@
         retentionSelect.addEventListener('change', function () {
             retentionCustom.style.display = (retentionSelect.value === '__custom__') ? '' : 'none';
         });
-        var retentionWrap = _el('div', { class: 'storage-retention' }, [retentionSelect, retentionCustom]);
+        var retentionWrap = QSDom.el('div', { class: 'storage-retention' }, [retentionSelect, retentionCustom]);
         dialog.appendChild(_renderGroup(_renderLabel('Retention'), retentionWrap,
             _renderHint('How long the key lives — disclosed on the cookie/privacy page.')));
 
@@ -475,7 +448,7 @@
         // page-level selector). Value lives in translate/ (keyed); editing is
         // live (no regenerate needed). Other languages are translated separately
         // via the visual-editor language tool.
-        var descInput = _el('input', {
+        var descInput = QSDom.el('input', {
             type: 'text', class: 'admin-input', autocomplete: 'off',
             placeholder: 'What this key is used for',
             value: isEdit ? _descOf(item) : '',
@@ -484,12 +457,12 @@
             _renderHint('Shown on the generated cookie/privacy page, in the description language. Edits are live — no regenerate needed. Other languages: use the visual-editor language tool.')));
 
         // cookie-only conditional fields
-        var cookieWrap = _el('div', { class: 'storage-cookie-fields' });
-        var domainInput = _el('input', { type: 'text', class: 'admin-input', placeholder: 'auto (or .example.com)', value: (isEdit && item.domain) || '' });
-        var pathInput = _el('input', { type: 'text', class: 'admin-input', placeholder: '/', value: (isEdit && item.path) || '' });
+        var cookieWrap = QSDom.el('div', { class: 'storage-cookie-fields' });
+        var domainInput = QSDom.el('input', { type: 'text', class: 'admin-input', placeholder: 'auto (or .example.com)', value: (isEdit && item.domain) || '' });
+        var pathInput = QSDom.el('input', { type: 'text', class: 'admin-input', placeholder: '/', value: (isEdit && item.path) || '' });
         var sameSiteSelect = _renderSelect(SAMESITE_OPTIONS, (isEdit && item.sameSite) || 'Lax');
-        var secureLabel = _el('label', { class: 'storage-cookie-secure' });
-        var secureCb = _el('input', { type: 'checkbox' });
+        var secureLabel = QSDom.el('label', { class: 'storage-cookie-secure' });
+        var secureCb = QSDom.el('input', { type: 'checkbox' });
         if (isEdit && item.secure) secureCb.checked = true;
         secureLabel.appendChild(secureCb);
         secureLabel.appendChild(document.createTextNode(' Secure (HTTPS only)'));
@@ -505,11 +478,11 @@
         dialog.appendChild(cookieWrap);
 
         // Actions
-        var actionsRow = _el('div', { class: 'storage-modal-actions' });
-        var errBox = _el('div', { class: 'storage-modal-actions__error' });
+        var actionsRow = QSDom.el('div', { class: 'storage-modal-actions' });
+        var errBox = QSDom.el('div', { class: 'storage-modal-actions__error' });
         actionsRow.appendChild(errBox);
-        actionsRow.appendChild(_el('button', { class: 'admin-btn admin-btn--ghost', type: 'button', text: 'Cancel', onclick: closeModal }));
-        var saveBtn = _el('button', { class: 'admin-btn admin-btn--primary', type: 'button', text: isEdit ? 'Save changes' : 'Add storage key' });
+        actionsRow.appendChild(QSDom.el('button', { class: 'admin-btn admin-btn--ghost', type: 'button', text: 'Cancel', onclick: closeModal }));
+        var saveBtn = QSDom.el('button', { class: 'admin-btn admin-btn--primary', type: 'button', text: isEdit ? 'Save changes' : 'Add storage key' });
         actionsRow.appendChild(saveBtn);
         dialog.appendChild(actionsRow);
 
@@ -576,16 +549,16 @@
         var dialog = _renderModalShell('Delete "' + item.id + '"?', closeModal);
         if (!dialog) return;
 
-        var body = _el('div');
+        var body = QSDom.el('div');
         body.appendChild(_renderHint('Removes this key from the registry. It does not touch any code that reads or writes the key — the scan slice will flag a now-undeclared key if it is still referenced.'));
-        var errPanel = _el('div', { class: 'storage-modal-actions__error' });
+        var errPanel = QSDom.el('div', { class: 'storage-modal-actions__error' });
         errPanel.hidden = true;
         body.appendChild(errPanel);
         dialog.appendChild(body);
 
-        var actions = _el('div', { class: 'storage-modal-actions' });
-        actions.appendChild(_el('button', { class: 'admin-btn admin-btn--ghost', type: 'button', text: 'Cancel', onclick: closeModal }));
-        var confirmBtn = _el('button', { class: 'admin-btn admin-btn--primary storage-modal-actions__btn--danger', type: 'button', text: 'Delete key' });
+        var actions = QSDom.el('div', { class: 'storage-modal-actions' });
+        actions.appendChild(QSDom.el('button', { class: 'admin-btn admin-btn--ghost', type: 'button', text: 'Cancel', onclick: closeModal }));
+        var confirmBtn = QSDom.el('button', { class: 'admin-btn admin-btn--primary storage-modal-actions__btn--danger', type: 'button', text: 'Delete key' });
         actions.appendChild(confirmBtn);
         dialog.appendChild(actions);
 
@@ -620,10 +593,10 @@
     // page/component/menu labels the scan engine returns). Null when empty.
     function _renderRefChips(label, list) {
         if (!list || !list.length) return null;
-        var wrap = _el('span', { class: 'storage-refs' });
-        wrap.appendChild(_el('span', { class: 'storage-refs__label', text: label }));
+        var wrap = QSDom.el('span', { class: 'storage-refs' });
+        wrap.appendChild(QSDom.el('span', { class: 'storage-refs__label', text: label }));
         list.forEach(function (loc) {
-            wrap.appendChild(_el('span', { class: 'storage-loc', text: loc }));
+            wrap.appendChild(QSDom.el('span', { class: 'storage-loc', text: loc }));
         });
         return wrap;
     }
@@ -631,17 +604,17 @@
     // One row in a scan bucket. `opts.declare` adds the one-click Declare button
     // (incomplete bucket only).
     function _renderScanRow(row, opts) {
-        var r = _el('div', { class: 'storage-scan-row' });
+        var r = QSDom.el('div', { class: 'storage-scan-row' });
 
-        var mainCol = _el('div', { class: 'storage-scan-row__main' });
-        var head = _el('div', { class: 'storage-scan-row__head' });
-        head.appendChild(_el('span', { class: 'storage-card__id', text: row.id }));
+        var mainCol = QSDom.el('div', { class: 'storage-scan-row__main' });
+        var head = QSDom.el('div', { class: 'storage-scan-row__head' });
+        head.appendChild(QSDom.el('span', { class: 'storage-card__id', text: row.id }));
         var scope = row.inferredScope || row.scope;
         if (scope) head.appendChild(_renderPill(scope, 'scope'));
         if (row.category) head.appendChild(_renderPill(row.category, 'cat-' + row.category));
         mainCol.appendChild(head);
 
-        var refs = _el('div', { class: 'storage-scan-row__refs' });
+        var refs = QSDom.el('div', { class: 'storage-scan-row__refs' });
         var w = _renderRefChips('writes', row.writers);
         var c = _renderRefChips('clears', row.clearers);
         var rd = _renderRefChips('reads', row.readers);
@@ -652,8 +625,8 @@
         r.appendChild(mainCol);
 
         if (opts && opts.declare) {
-            var act = _el('div', { class: 'storage-scan-row__action' });
-            var btn = _el('button', {
+            var act = QSDom.el('div', { class: 'storage-scan-row__action' });
+            var btn = QSDom.el('button', {
                 class: 'admin-btn admin-btn--primary storage-scan-row__declare',
                 type: 'button', text: 'Declare',
             });
@@ -665,19 +638,19 @@
     }
 
     function _renderScanSecHead(title, count, subtitle) {
-        var head = _el('div', { class: 'storage-scan-sec__head' });
-        head.appendChild(_el('h3', { class: 'storage-scan-sec__title', text: title + ' (' + count + ')' }));
-        if (subtitle) head.appendChild(_el('p', { class: 'storage-scan-sec__sub', text: subtitle }));
+        var head = QSDom.el('div', { class: 'storage-scan-sec__head' });
+        head.appendChild(QSDom.el('h3', { class: 'storage-scan-sec__title', text: title + ' (' + count + ')' }));
+        if (subtitle) head.appendChild(QSDom.el('p', { class: 'storage-scan-sec__sub', text: subtitle }));
         return head;
     }
 
     // Incomplete = used-but-undeclared (the GDPR gap). Most prominent; always open.
     function _renderIncompleteSection(list) {
-        var sec = _el('section', { class: 'storage-scan-sec storage-scan-sec--incomplete' });
+        var sec = QSDom.el('section', { class: 'storage-scan-sec storage-scan-sec--incomplete' });
         sec.appendChild(_renderScanSecHead('Undeclared keys', list.length,
             'Used in the build but not in the registry — the GDPR gap. Declare each to add it.'));
         if (!list.length) {
-            sec.appendChild(_el('div', { class: 'storage-scan__ok-note', text: 'All used keys are declared. ✓' }));
+            sec.appendChild(QSDom.el('div', { class: 'storage-scan__ok-note', text: 'All used keys are declared. ✓' }));
         } else {
             list.forEach(function (row) { sec.appendChild(_renderScanRow(row, { declare: true })); });
         }
@@ -687,7 +660,7 @@
     // Dangling reads = read by a binding but never written. Not a GDPR item; a
     // likely-leftover flag. No Declare.
     function _renderDanglingSection(list) {
-        var sec = _el('section', { class: 'storage-scan-sec storage-scan-sec--dangling' });
+        var sec = QSDom.el('section', { class: 'storage-scan-sec storage-scan-sec--dangling' });
         sec.appendChild(_renderScanSecHead('Dangling reads', list.length,
             'Read by a binding but never written anywhere — likely a leftover after the writer was deleted. Review these.'));
         list.forEach(function (row) { sec.appendChild(_renderScanRow(row, null)); });
@@ -696,20 +669,20 @@
 
     // OK / Orphan — collapsible, ignorable-by-default sections.
     function _renderCollapsibleSection(key, title, list, subtitle) {
-        var sec = _el('section', { class: 'storage-scan-sec storage-scan-sec--' + key });
-        var toggle = _el('button', { class: 'storage-scan-sec__toggle', type: 'button' });
+        var sec = QSDom.el('section', { class: 'storage-scan-sec storage-scan-sec--' + key });
+        var toggle = QSDom.el('button', { class: 'storage-scan-sec__toggle', type: 'button' });
         var open = !!scan.expanded[key];
-        toggle.appendChild(_el('span', { class: 'storage-scan-sec__chevron', text: open ? '▾' : '▸' }));
-        toggle.appendChild(_el('span', { text: title + ' (' + list.length + ')' }));
+        toggle.appendChild(QSDom.el('span', { class: 'storage-scan-sec__chevron', text: open ? '▾' : '▸' }));
+        toggle.appendChild(QSDom.el('span', { text: title + ' (' + list.length + ')' }));
         toggle.addEventListener('click', function () {
             scan.expanded[key] = !scan.expanded[key];
             renderScanPanel();
         });
         sec.appendChild(toggle);
         if (open) {
-            if (subtitle) sec.appendChild(_el('p', { class: 'storage-scan-sec__sub', text: subtitle }));
+            if (subtitle) sec.appendChild(QSDom.el('p', { class: 'storage-scan-sec__sub', text: subtitle }));
             if (!list.length) {
-                sec.appendChild(_el('div', { class: 'storage-scan__empty-note', text: 'None.' }));
+                sec.appendChild(QSDom.el('div', { class: 'storage-scan__empty-note', text: 'None.' }));
             } else {
                 list.forEach(function (row) { sec.appendChild(_renderScanRow(row, null)); });
             }
@@ -718,9 +691,9 @@
     }
 
     function _renderScanHeader() {
-        var h = _el('div', { class: 'storage-scan__header' });
-        h.appendChild(_el('h2', { class: 'storage-scan__title', text: 'Scan results' }));
-        var dismiss = _el('button', {
+        var h = QSDom.el('div', { class: 'storage-scan__header' });
+        h.appendChild(QSDom.el('h2', { class: 'storage-scan__title', text: 'Scan results' }));
+        var dismiss = QSDom.el('button', {
             class: 'admin-btn admin-btn--ghost storage-scan__dismiss',
             type: 'button', 'aria-label': 'Dismiss scan results',
             onclick: dismissScan,
@@ -750,11 +723,11 @@
         root.appendChild(_renderScanHeader());
 
         if (scan.loading) {
-            root.appendChild(_el('div', { class: 'storage-scan__loading', text: 'Scanning the build…' }));
+            root.appendChild(QSDom.el('div', { class: 'storage-scan__loading', text: 'Scanning the build…' }));
             return;
         }
         if (scan.error) {
-            root.appendChild(_el('div', { class: 'storage-scan__error', text: scan.error }));
+            root.appendChild(QSDom.el('div', { class: 'storage-scan__error', text: scan.error }));
             return;
         }
 
@@ -808,7 +781,7 @@
                     btn.disabled = false;
                     btn.textContent = 'Declare';
                     var msg = (r && r.data && r.data.message) || 'Declare failed';
-                    var err = _el('span', { class: 'storage-scan-row__err', text: msg });
+                    var err = QSDom.el('span', { class: 'storage-scan-row__err', text: msg });
                     if (btn.parentNode) btn.parentNode.appendChild(err);
                 }
                 return;
@@ -840,9 +813,9 @@
         // All body content lives in one container we can clear + rebuild as the
         // state changes (after Generate / Update / Delete), so the modal always
         // reflects the real status (e.g. locks the route once a page exists).
-        var content = _el('div', { class: 'storage-consent-content' });
+        var content = QSDom.el('div', { class: 'storage-consent-content' });
         dialog.appendChild(content);
-        content.appendChild(_el('p', { class: 'admin-hint', text: 'Loading…' }));
+        content.appendChild(QSDom.el('p', { class: 'admin-hint', text: 'Loading…' }));
         await _refreshConsentContent(content, '');
     }
 
@@ -868,7 +841,7 @@
 
         var cats = _declaredNonEssentialCategories();
         content.appendChild(_renderHint('Generates (or refreshes) the cookie banner + preferences popup from your declared keys, seeds EN/FR default copy (new keys only), and enables the consent layer. Both render on every page and are editable in the visual editor.'));
-        content.appendChild(_el('p', {
+        content.appendChild(QSDom.el('p', {
             class: 'admin-hint',
             text: cats.length
                 ? 'Popup toggle rows: ' + cats.join(', ') + ' (Essential is always-on, locked).'
@@ -879,13 +852,13 @@
         // input otherwise — so an existing page can't be duplicated by a typo.
         var routeInput = null;
         if (hasPage) {
-            var fixed = _el('div', { class: 'storage-consent-policy' });
-            fixed.appendChild(_el('span', { class: 'admin-label', text: 'Cookie-policy page' }));
-            fixed.appendChild(_el('code', { class: 'storage-consent-policy__route', text: status.policyRoute }));
+            var fixed = QSDom.el('div', { class: 'storage-consent-policy' });
+            fixed.appendChild(QSDom.el('span', { class: 'admin-label', text: 'Cookie-policy page' }));
+            fixed.appendChild(QSDom.el('code', { class: 'storage-consent-policy__route', text: status.policyRoute }));
             content.appendChild(_renderGroup(null, fixed,
                 _renderHint('Update refreshes this page from the registry. To move it to another route, delete it and generate again.')));
         } else {
-            routeInput = _el('input', {
+            routeInput = QSDom.el('input', {
                 type: 'text', class: 'admin-input', autocomplete: 'off',
                 placeholder: 'e.g. cookies (leave blank to skip the policy page)',
                 value: staleRoute,
@@ -896,19 +869,19 @@
                     : 'Optional. Generates a deterministic cookie-policy page at this route (the banner links to it).')));
         }
 
-        var resultBox = _el('div', { class: 'storage-modal-actions__error' });
+        var resultBox = QSDom.el('div', { class: 'storage-modal-actions__error' });
         resultBox.style.color = 'var(--admin-success)';
         if (message) { resultBox.textContent = message; } else { resultBox.hidden = true; }
         content.appendChild(resultBox);
-        var errBox = _el('div', { class: 'storage-modal-actions__error' });
+        var errBox = QSDom.el('div', { class: 'storage-modal-actions__error' });
         errBox.hidden = true;
         content.appendChild(errBox);
 
-        var actions = _el('div', { class: 'storage-modal-actions' });
-        actions.appendChild(_el('button', { class: 'admin-btn admin-btn--ghost', type: 'button', text: 'Close', onclick: closeModal }));
+        var actions = QSDom.el('div', { class: 'storage-modal-actions' });
+        actions.appendChild(QSDom.el('button', { class: 'admin-btn admin-btn--ghost', type: 'button', text: 'Close', onclick: closeModal }));
 
         if (hasPage) {
-            var delBtn = _el('button', { class: 'admin-btn admin-btn--ghost storage-modal-actions__btn--danger', type: 'button', text: 'Delete page' });
+            var delBtn = QSDom.el('button', { class: 'admin-btn admin-btn--ghost storage-modal-actions__btn--danger', type: 'button', text: 'Delete page' });
             delBtn.addEventListener('click', async function () {
                 if (!window.confirm('Delete the cookie-policy page at ' + status.policyRoute + '? This removes the route and its page.')) return;
                 delBtn.disabled = true; errBox.hidden = true;
@@ -930,7 +903,7 @@
             actions.appendChild(delBtn);
         }
 
-        var genBtn = _el('button', { class: 'admin-btn admin-btn--primary', type: 'button', text: hasPage ? 'Update' : 'Generate' });
+        var genBtn = QSDom.el('button', { class: 'admin-btn admin-btn--primary', type: 'button', text: hasPage ? 'Update' : 'Generate' });
         actions.appendChild(genBtn);
         content.appendChild(actions);
 

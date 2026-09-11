@@ -27,42 +27,15 @@
         return adminApi.apiRequest(cmd, method, body);
     }
 
-    function _el(tag, props, children) {
-        var e = document.createElement(tag);
-        if (props) {
-            for (var k in props) {
-                if (k === 'dataset' && typeof props[k] === 'object') {
-                    Object.assign(e.dataset, props[k]);
-                } else if (k.indexOf('on') === 0 && typeof props[k] === 'function') {
-                    e.addEventListener(k.slice(2).toLowerCase(), props[k]);
-                } else if (k === 'class') {
-                    e.className = props[k];
-                } else if (k === 'text') {
-                    e.textContent = props[k];
-                } else {
-                    e.setAttribute(k, props[k]);
-                }
-            }
-        }
-        if (children) {
-            children.forEach(function (c) {
-                if (c == null) return;
-                if (typeof c === 'string') e.appendChild(document.createTextNode(c));
-                else e.appendChild(c);
-            });
-        }
-        return e;
-    }
-
     function _pill(text, kind) {
-        return _el('span', { class: 'privacy-pill privacy-pill--' + kind, text: text });
+        return QSDom.el('span', { class: 'privacy-pill privacy-pill--' + kind, text: text });
     }
 
     function _section(title, sub, body) {
-        var s = _el('section', { class: 'privacy-section' });
-        var head = _el('div', { class: 'privacy-section__head' });
-        head.appendChild(_el('h2', { class: 'privacy-section__title', text: title }));
-        if (sub) head.appendChild(_el('span', { class: 'privacy-section__count', text: sub }));
+        var s = QSDom.el('section', { class: 'privacy-section' });
+        var head = QSDom.el('div', { class: 'privacy-section__head' });
+        head.appendChild(QSDom.el('h2', { class: 'privacy-section__title', text: title }));
+        if (sub) head.appendChild(QSDom.el('span', { class: 'privacy-section__count', text: sub }));
         s.appendChild(head);
         if (body) s.appendChild(body);
         return s;
@@ -71,19 +44,19 @@
     // ---- coverage summary -------------------------------------------------
 
     function _renderCoverage(cov) {
-        var box = _el('div', { class: 'privacy-coverage' + (cov.complete ? ' privacy-coverage--ok' : '') });
+        var box = QSDom.el('div', { class: 'privacy-coverage' + (cov.complete ? ' privacy-coverage--ok' : '') });
         var items = [
             { label: 'fields mapped', value: cov.mappedAtoms + ' / ' + cov.totalAtoms, warn: cov.unmappedAtoms > 0 },
             { label: 'unverifiable endpoints', value: String((cov.undeclaredEndpoints || []).length), warn: (cov.undeclaredEndpoints || []).length > 0 },
             { label: 'unclassified hosts', value: String(cov.unclassifiedHosts), warn: cov.unclassifiedHosts > 0 },
         ];
         items.forEach(function (it) {
-            var cell = _el('div', { class: 'privacy-coverage__cell' + (it.warn ? ' privacy-coverage__cell--warn' : '') });
-            cell.appendChild(_el('span', { class: 'privacy-coverage__value', text: it.value }));
-            cell.appendChild(_el('span', { class: 'privacy-coverage__label', text: it.label }));
+            var cell = QSDom.el('div', { class: 'privacy-coverage__cell' + (it.warn ? ' privacy-coverage__cell--warn' : '') });
+            cell.appendChild(QSDom.el('span', { class: 'privacy-coverage__value', text: it.value }));
+            cell.appendChild(QSDom.el('span', { class: 'privacy-coverage__label', text: it.label }));
             box.appendChild(cell);
         });
-        var status = _el('div', { class: 'privacy-coverage__status' });
+        var status = QSDom.el('div', { class: 'privacy-coverage__status' });
         status.appendChild(_pill(cov.complete ? 'Complete' : 'Incomplete', cov.complete ? 'ok' : 'warn'));
         box.appendChild(status);
         return box;
@@ -108,9 +81,9 @@
     var ICON_TRASH = 'M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2';
 
     function _renderSelect(options, selected) {
-        var sel = _el('select', { class: 'admin-input' });
+        var sel = QSDom.el('select', { class: 'admin-input' });
         options.forEach(function (opt) {
-            var o = _el('option', { value: opt, text: opt });
+            var o = QSDom.el('option', { value: opt, text: opt });
             if (opt === selected) o.selected = true;
             sel.appendChild(o);
         });
@@ -118,41 +91,41 @@
     }
 
     function _iconBtn(pathD, label, onClick) {
-        var b = _el('button', { class: 'admin-btn admin-btn--ghost privacy-collected__action', 'aria-label': label, title: label, type: 'button', onclick: onClick });
+        var b = QSDom.el('button', { class: 'admin-btn admin-btn--ghost privacy-collected__action', 'aria-label': label, title: label, type: 'button', onclick: onClick });
         b.appendChild(_svgIcon(pathD));
         return b;
     }
 
     function _renderCollectedSection(list) {
-        var s = _el('section', { class: 'privacy-section' });
-        var head = _el('div', { class: 'privacy-section__head' });
-        head.appendChild(_el('h2', { class: 'privacy-section__title', text: 'Data collected' }));
-        head.appendChild(_el('span', { class: 'privacy-section__count', text: String(list.length) }));
+        var s = QSDom.el('section', { class: 'privacy-section' });
+        var head = QSDom.el('div', { class: 'privacy-section__head' });
+        head.appendChild(QSDom.el('h2', { class: 'privacy-section__title', text: 'Data collected' }));
+        head.appendChild(QSDom.el('span', { class: 'privacy-section__count', text: String(list.length) }));
 
-        var actions = _el('div', { class: 'privacy-section__actions' });
+        var actions = QSDom.el('div', { class: 'privacy-section__actions' });
         if (state.languages.length > 1) {
-            actions.appendChild(_el('span', { class: 'privacy-desclang__label', text: 'Language:' }));
+            actions.appendChild(QSDom.el('span', { class: 'privacy-desclang__label', text: 'Language:' }));
             var langSel = _renderSelect(state.languages, state.descLang);
             langSel.classList.add('privacy-desclang__select');
             langSel.addEventListener('change', function () { onDescLangChange(langSel); });
             actions.appendChild(langSel);
         }
-        actions.appendChild(_el('button', { class: 'admin-btn admin-btn--primary privacy-add-btn', type: 'button', text: '+ Add data collected', onclick: function () { openDatumModal(null); } }));
+        actions.appendChild(QSDom.el('button', { class: 'admin-btn admin-btn--primary privacy-add-btn', type: 'button', text: '+ Add data collected', onclick: function () { openDatumModal(null); } }));
         head.appendChild(actions);
         s.appendChild(head);
 
         if (!list.length) {
-            s.appendChild(_el('p', { class: 'privacy-empty', text: 'No "data collected" entries yet. Add one, then map the fields below to it.' }));
+            s.appendChild(QSDom.el('p', { class: 'privacy-empty', text: 'No "data collected" entries yet. Add one, then map the fields below to it.' }));
             return s;
         }
-        var wrap = _el('div', { class: 'privacy-collected' });
+        var wrap = QSDom.el('div', { class: 'privacy-collected' });
         list.forEach(function (d) {
-            var card = _el('div', { class: 'privacy-collected__card' });
-            var body = _el('div', { class: 'privacy-collected__body' });
-            body.appendChild(_el('span', { class: 'privacy-collected__label', text: d.label || d.id }));
-            body.appendChild(_el('span', { class: 'privacy-collected__purpose', text: d.purpose || '—' }));
+            var card = QSDom.el('div', { class: 'privacy-collected__card' });
+            var body = QSDom.el('div', { class: 'privacy-collected__body' });
+            body.appendChild(QSDom.el('span', { class: 'privacy-collected__label', text: d.label || d.id }));
+            body.appendChild(QSDom.el('span', { class: 'privacy-collected__purpose', text: d.purpose || '—' }));
             card.appendChild(body);
-            var acts = _el('div', { class: 'privacy-collected__actions' });
+            var acts = QSDom.el('div', { class: 'privacy-collected__actions' });
             acts.appendChild(_iconBtn(ICON_EDIT, 'Edit', function () { openDatumModal(d); }));
             acts.appendChild(_iconBtn(ICON_TRASH, 'Delete', function () { onDeleteDatum(d); }));
             card.appendChild(acts);
@@ -176,25 +149,25 @@
         if (!root) return;
         root.textContent = '';
 
-        var backdrop = _el('div', { class: 'privacy-modal-backdrop', onclick: function (e) { if (e.target === backdrop) closeModal(); } });
-        var dialog = _el('div', { class: 'privacy-modal-dialog' });
-        dialog.appendChild(_el('h2', { class: 'privacy-modal__title', text: isEdit ? 'Edit data collected' : 'Add data collected' }));
+        var backdrop = QSDom.el('div', { class: 'privacy-modal-backdrop', onclick: function (e) { if (e.target === backdrop) closeModal(); } });
+        var dialog = QSDom.el('div', { class: 'privacy-modal-dialog' });
+        dialog.appendChild(QSDom.el('h2', { class: 'privacy-modal__title', text: isEdit ? 'Edit data collected' : 'Add data collected' }));
 
-        var labelInput = _el('input', { type: 'text', class: 'admin-input', autocomplete: 'off', placeholder: 'e.g. Email address', value: isEdit ? (datum.label || '') : (opts.prefillLabel || '') });
-        dialog.appendChild(_el('label', { class: 'admin-label', text: 'Label (' + state.descLang + ')' }));
+        var labelInput = QSDom.el('input', { type: 'text', class: 'admin-input', autocomplete: 'off', placeholder: 'e.g. Email address', value: isEdit ? (datum.label || '') : (opts.prefillLabel || '') });
+        dialog.appendChild(QSDom.el('label', { class: 'admin-label', text: 'Label (' + state.descLang + ')' }));
         dialog.appendChild(labelInput);
 
-        var purposeInput = _el('input', { type: 'text', class: 'admin-input', autocomplete: 'off', placeholder: 'What you do with it', value: isEdit ? (datum.purpose || '') : '' });
-        dialog.appendChild(_el('label', { class: 'admin-label', text: 'Purpose (' + state.descLang + ')' }));
+        var purposeInput = QSDom.el('input', { type: 'text', class: 'admin-input', autocomplete: 'off', placeholder: 'What you do with it', value: isEdit ? (datum.purpose || '') : '' });
+        dialog.appendChild(QSDom.el('label', { class: 'admin-label', text: 'Purpose (' + state.descLang + ')' }));
         dialog.appendChild(purposeInput);
-        dialog.appendChild(_el('p', { class: 'admin-hint', text: isEdit ? 'Editing is live — no regenerate needed.' : 'A stable id is derived from the label; the label stays editable afterwards.' }));
+        dialog.appendChild(QSDom.el('p', { class: 'admin-hint', text: isEdit ? 'Editing is live — no regenerate needed.' : 'A stable id is derived from the label; the label stays editable afterwards.' }));
 
-        var errBox = _el('div', { class: 'privacy-modal__error', hidden: 'hidden' });
+        var errBox = QSDom.el('div', { class: 'privacy-modal__error', hidden: 'hidden' });
         dialog.appendChild(errBox);
 
-        var actions = _el('div', { class: 'privacy-modal__actions' });
-        actions.appendChild(_el('button', { class: 'admin-btn admin-btn--ghost', type: 'button', text: 'Cancel', onclick: closeModal }));
-        var saveBtn = _el('button', { class: 'admin-btn admin-btn--primary', type: 'button', text: isEdit ? 'Save' : 'Add' });
+        var actions = QSDom.el('div', { class: 'privacy-modal__actions' });
+        actions.appendChild(QSDom.el('button', { class: 'admin-btn admin-btn--ghost', type: 'button', text: 'Cancel', onclick: closeModal }));
+        var saveBtn = QSDom.el('button', { class: 'admin-btn admin-btn--primary', type: 'button', text: isEdit ? 'Save' : 'Add' });
         actions.appendChild(saveBtn);
         dialog.appendChild(actions);
 
@@ -227,27 +200,27 @@
         var root = document.getElementById('privacy-modal-root');
         if (!root) return;
         root.textContent = '';
-        var backdrop = _el('div', { class: 'privacy-modal-backdrop', onclick: function (e) { if (e.target === backdrop) closeModal(); } });
-        var dialog = _el('div', { class: 'privacy-modal-dialog' });
-        dialog.appendChild(_el('h2', { class: 'privacy-modal__title', text: 'Classify host' }));
-        dialog.appendChild(_el('code', { class: 'privacy-host__url', text: h.baseUrl }));
+        var backdrop = QSDom.el('div', { class: 'privacy-modal-backdrop', onclick: function (e) { if (e.target === backdrop) closeModal(); } });
+        var dialog = QSDom.el('div', { class: 'privacy-modal-dialog' });
+        dialog.appendChild(QSDom.el('h2', { class: 'privacy-modal__title', text: 'Classify host' }));
+        dialog.appendChild(QSDom.el('code', { class: 'privacy-host__url', text: h.baseUrl }));
 
         var kind = h.kind || 'self';
-        var selfRadio = _el('input', { type: 'radio', name: 'privacy-host-kind', value: 'self' });
+        var selfRadio = QSDom.el('input', { type: 'radio', name: 'privacy-host-kind', value: 'self' });
         if (kind === 'self') selfRadio.checked = true;
-        var selfLabel = _el('label', { class: 'privacy-radio' }, [selfRadio, ' A server you operate']);
-        var thirdRadio = _el('input', { type: 'radio', name: 'privacy-host-kind', value: 'third-party' });
+        var selfLabel = QSDom.el('label', { class: 'privacy-radio' }, [selfRadio, ' A server you operate']);
+        var thirdRadio = QSDom.el('input', { type: 'radio', name: 'privacy-host-kind', value: 'third-party' });
         if (kind === 'third-party') thirdRadio.checked = true;
-        var thirdLabel = _el('label', { class: 'privacy-radio' }, [thirdRadio, ' A third party']);
+        var thirdLabel = QSDom.el('label', { class: 'privacy-radio' }, [thirdRadio, ' A third party']);
         dialog.appendChild(selfLabel);
         dialog.appendChild(thirdLabel);
 
-        var tpWrap = _el('div', { class: 'privacy-host-tp' });
-        var nameInput = _el('input', { type: 'text', class: 'admin-input', placeholder: 'Name, e.g. Mailchimp', value: h.name || '' });
-        var urlInput = _el('input', { type: 'text', class: 'admin-input', placeholder: 'https://…/privacy', value: h.privacyUrl || '' });
-        tpWrap.appendChild(_el('label', { class: 'admin-label', text: 'Third-party name' }));
+        var tpWrap = QSDom.el('div', { class: 'privacy-host-tp' });
+        var nameInput = QSDom.el('input', { type: 'text', class: 'admin-input', placeholder: 'Name, e.g. Mailchimp', value: h.name || '' });
+        var urlInput = QSDom.el('input', { type: 'text', class: 'admin-input', placeholder: 'https://…/privacy', value: h.privacyUrl || '' });
+        tpWrap.appendChild(QSDom.el('label', { class: 'admin-label', text: 'Third-party name' }));
         tpWrap.appendChild(nameInput);
-        tpWrap.appendChild(_el('label', { class: 'admin-label', text: 'Privacy-policy URL' }));
+        tpWrap.appendChild(QSDom.el('label', { class: 'admin-label', text: 'Privacy-policy URL' }));
         tpWrap.appendChild(urlInput);
         dialog.appendChild(tpWrap);
         function syncTp() { tpWrap.style.display = thirdRadio.checked ? '' : 'none'; }
@@ -255,11 +228,11 @@
         thirdRadio.addEventListener('change', syncTp);
         syncTp();
 
-        var errBox = _el('div', { class: 'privacy-modal__error', hidden: 'hidden' });
+        var errBox = QSDom.el('div', { class: 'privacy-modal__error', hidden: 'hidden' });
         dialog.appendChild(errBox);
-        var actions = _el('div', { class: 'privacy-modal__actions' });
-        actions.appendChild(_el('button', { class: 'admin-btn admin-btn--ghost', type: 'button', text: 'Cancel', onclick: closeModal }));
-        var saveBtn = _el('button', { class: 'admin-btn admin-btn--primary', type: 'button', text: 'Save' });
+        var actions = QSDom.el('div', { class: 'privacy-modal__actions' });
+        actions.appendChild(QSDom.el('button', { class: 'admin-btn admin-btn--ghost', type: 'button', text: 'Cancel', onclick: closeModal }));
+        var saveBtn = QSDom.el('button', { class: 'admin-btn admin-btn--primary', type: 'button', text: 'Save' });
         actions.appendChild(saveBtn);
         dialog.appendChild(actions);
 
@@ -323,15 +296,15 @@
 
     function openAtomMenu(endpoint, field, currentDatum, anchorEl) {
         _closeAtomMenu();
-        var menu = _el('div', { class: 'privacy-atom-menu' });
-        menu.appendChild(_el('div', { class: 'privacy-atom-menu__head', text: 'Map "' + field + '" to:' }));
-        var listing = _el('div', { class: 'privacy-atom-menu__list' });
+        var menu = QSDom.el('div', { class: 'privacy-atom-menu' });
+        menu.appendChild(QSDom.el('div', { class: 'privacy-atom-menu__head', text: 'Map "' + field + '" to:' }));
+        var listing = QSDom.el('div', { class: 'privacy-atom-menu__list' });
         var data = (state.status && state.status.collectedData) || [];
         if (!data.length) {
-            listing.appendChild(_el('div', { class: 'privacy-atom-menu__empty', text: 'No data collected yet.' }));
+            listing.appendChild(QSDom.el('div', { class: 'privacy-atom-menu__empty', text: 'No data collected yet.' }));
         }
         data.forEach(function (d) {
-            listing.appendChild(_el('button', {
+            listing.appendChild(QSDom.el('button', {
                 type: 'button',
                 class: 'privacy-atom-menu__item' + (d.id === currentDatum ? ' privacy-atom-menu__item--active' : ''),
                 text: d.label || d.id,
@@ -340,9 +313,9 @@
         });
         menu.appendChild(listing);
         if (currentDatum) {
-            menu.appendChild(_el('button', { type: 'button', class: 'privacy-atom-menu__action', text: 'Unset', onclick: function () { _closeAtomMenu(); setMapping(endpoint, field, null); } }));
+            menu.appendChild(QSDom.el('button', { type: 'button', class: 'privacy-atom-menu__action', text: 'Unset', onclick: function () { _closeAtomMenu(); setMapping(endpoint, field, null); } }));
         }
-        menu.appendChild(_el('button', {
+        menu.appendChild(QSDom.el('button', {
             type: 'button', class: 'privacy-atom-menu__action privacy-atom-menu__action--new',
             text: '+ New data collected from this field',
             onclick: function () { _closeAtomMenu(); openDatumModal(null, { prefillLabel: field, afterSave: function (id) { return setMapping(endpoint, field, id); } }); },
@@ -370,20 +343,20 @@
 
     function _renderHosts(hosts) {
         if (!hosts.length) {
-            return _el('p', { class: 'privacy-empty', text: 'No API hosts in the registry.' });
+            return QSDom.el('p', { class: 'privacy-empty', text: 'No API hosts in the registry.' });
         }
-        var wrap = _el('div', { class: 'privacy-hosts' });
+        var wrap = QSDom.el('div', { class: 'privacy-hosts' });
         hosts.forEach(function (h) {
-            var row = _el('div', { class: 'privacy-host' });
-            var main = _el('div', { class: 'privacy-host__main' });
-            main.appendChild(_el('code', { class: 'privacy-host__url', text: h.baseUrl }));
+            var row = QSDom.el('div', { class: 'privacy-host' });
+            var main = QSDom.el('div', { class: 'privacy-host__main' });
+            main.appendChild(QSDom.el('code', { class: 'privacy-host__url', text: h.baseUrl }));
             var kind = h.kind === 'third-party' ? _pill('third party' + (h.name ? ': ' + h.name : ''), 'third')
                 : h.kind === 'self' ? _pill('your server', 'self')
                 : _pill('unclassified', 'warn');
             main.appendChild(kind);
-            main.appendChild(_el('span', { class: 'privacy-host__apis', text: (h.apiIds || []).join(', ') }));
+            main.appendChild(QSDom.el('span', { class: 'privacy-host__apis', text: (h.apiIds || []).join(', ') }));
             row.appendChild(main);
-            row.appendChild(_el('button', {
+            row.appendChild(QSDom.el('button', {
                 class: 'admin-btn admin-btn--ghost privacy-host__classify', type: 'button',
                 text: h.kind ? 'Edit' : 'Classify',
                 onclick: function () { openHostModal(h); },
@@ -397,35 +370,35 @@
 
     function _renderEndpoints(endpoints) {
         if (!endpoints.length) {
-            return _el('p', { class: 'privacy-empty', text: 'No endpoints in the API registry.' });
+            return QSDom.el('p', { class: 'privacy-empty', text: 'No endpoints in the API registry.' });
         }
-        var wrap = _el('div', { class: 'privacy-endpoints' });
+        var wrap = QSDom.el('div', { class: 'privacy-endpoints' });
         endpoints.forEach(function (ep) {
-            var card = _el('div', { class: 'privacy-endpoint' });
-            var head = _el('div', { class: 'privacy-endpoint__head' });
+            var card = QSDom.el('div', { class: 'privacy-endpoint' });
+            var head = QSDom.el('div', { class: 'privacy-endpoint__head' });
             head.appendChild(_pill(ep.method, 'method'));
-            head.appendChild(_el('code', { class: 'privacy-endpoint__key', text: ep.key }));
+            head.appendChild(QSDom.el('code', { class: 'privacy-endpoint__key', text: ep.key }));
             if (ep.undeclaredBody) head.appendChild(_pill('no declared body', 'warn'));
             card.appendChild(head);
 
             if (ep.fields && ep.fields.length) {
-                var atoms = _el('div', { class: 'privacy-endpoint__atoms' });
+                var atoms = QSDom.el('div', { class: 'privacy-endpoint__atoms' });
                 ep.fields.forEach(function (f) {
                     var mapped = f.datum != null;
-                    var chip = _el('button', {
+                    var chip = QSDom.el('button', {
                         type: 'button',
                         class: 'privacy-atom' + (mapped ? ' privacy-atom--mapped' : ' privacy-atom--unset'),
                         title: 'Click to map',
                     });
-                    chip.appendChild(_el('span', { class: 'privacy-atom__field', text: f.field }));
-                    chip.appendChild(_el('span', { class: 'privacy-atom__datum', text: mapped ? '→ ' + f.datum : 'unset' }));
+                    chip.appendChild(QSDom.el('span', { class: 'privacy-atom__field', text: f.field }));
+                    chip.appendChild(QSDom.el('span', { class: 'privacy-atom__datum', text: mapped ? '→ ' + f.datum : 'unset' }));
                     chip.addEventListener('click', function () { openAtomMenu(ep.key, f.field, f.datum, chip); });
                     atoms.appendChild(chip);
                 });
                 card.appendChild(atoms);
             } else if (!ep.undeclaredBody) {
                 // (undeclared-body endpoints already carry the head pill)
-                card.appendChild(_el('span', { class: 'privacy-endpoint__nofields', text: 'no fields sent' }));
+                card.appendChild(QSDom.el('span', { class: 'privacy-endpoint__nofields', text: 'no fields sent' }));
             }
             wrap.appendChild(card);
         });
@@ -436,19 +409,19 @@
 
     function _renderAuthSeed(seed) {
         if (!seed || (!seed.oauth.wired && !seed.magicLink.wired)) {
-            return _el('p', { class: 'privacy-empty', text: 'No sign-in flows detected (OAuth / magic-link). Nothing to auto-suggest.' });
+            return QSDom.el('p', { class: 'privacy-empty', text: 'No sign-in flows detected (OAuth / magic-link). Nothing to auto-suggest.' });
         }
-        var wrap = _el('div', { class: 'privacy-authseed' });
+        var wrap = QSDom.el('div', { class: 'privacy-authseed' });
         if (seed.oauth.wired) {
-            var o = _el('div', { class: 'privacy-authseed__row' });
-            o.appendChild(_el('span', { class: 'privacy-authseed__name', text: 'OAuth sign-in' }));
-            o.appendChild(_el('span', { class: 'privacy-authseed__detail', text: 'providers: ' + seed.oauth.providers.map(function (p) { return p.name; }).join(', ') + ' · collects: ' + seed.oauth.collectedSuggestions.join(', ') }));
+            var o = QSDom.el('div', { class: 'privacy-authseed__row' });
+            o.appendChild(QSDom.el('span', { class: 'privacy-authseed__name', text: 'OAuth sign-in' }));
+            o.appendChild(QSDom.el('span', { class: 'privacy-authseed__detail', text: 'providers: ' + seed.oauth.providers.map(function (p) { return p.name; }).join(', ') + ' · collects: ' + seed.oauth.collectedSuggestions.join(', ') }));
             wrap.appendChild(o);
         }
         if (seed.magicLink.wired) {
-            var m = _el('div', { class: 'privacy-authseed__row' });
-            m.appendChild(_el('span', { class: 'privacy-authseed__name', text: 'Magic-link sign-in' }));
-            m.appendChild(_el('span', { class: 'privacy-authseed__detail', text: 'collects: ' + seed.magicLink.collectedSuggestions.join(', ') }));
+            var m = QSDom.el('div', { class: 'privacy-authseed__row' });
+            m.appendChild(QSDom.el('span', { class: 'privacy-authseed__name', text: 'Magic-link sign-in' }));
+            m.appendChild(QSDom.el('span', { class: 'privacy-authseed__detail', text: 'collects: ' + seed.magicLink.collectedSuggestions.join(', ') }));
             wrap.appendChild(m);
         }
         return wrap;
@@ -457,7 +430,7 @@
     // ---- cookie cross-link note ------------------------------------------
 
     function _renderCookieNote(s) {
-        var note = _el('p', { class: 'admin-hint privacy-cookie-note' });
+        var note = QSDom.el('p', { class: 'admin-hint privacy-cookie-note' });
         if (s.cookieSection === 'omit') {
             note.textContent = 'Cookie section: omitted (set by you). The privacy page will not mention cookies.';
         } else if (s.cookie && s.cookie.policyRoute && s.cookie.policyRouteExists) {
@@ -471,36 +444,36 @@
     // ---- privacy page generation (Generate / Update / Delete) -------------
 
     function _renderPrivacyPageSection(s) {
-        var sec = _el('section', { class: 'privacy-section' });
-        var head = _el('div', { class: 'privacy-section__head' });
-        head.appendChild(_el('h2', { class: 'privacy-section__title', text: 'Privacy page' }));
+        var sec = QSDom.el('section', { class: 'privacy-section' });
+        var head = QSDom.el('div', { class: 'privacy-section__head' });
+        head.appendChild(QSDom.el('h2', { class: 'privacy-section__title', text: 'Privacy page' }));
         sec.appendChild(head);
 
         var hasPage = !!(s.privacyRoute && s.privacyRouteExists);
         if (hasPage) {
-            var routeRow = _el('div', { class: 'privacy-page-gen' });
-            routeRow.appendChild(_el('span', { class: 'admin-label', text: 'Generated at' }));
-            routeRow.appendChild(_el('code', { class: 'privacy-host__url', text: s.privacyRoute }));
+            var routeRow = QSDom.el('div', { class: 'privacy-page-gen' });
+            routeRow.appendChild(QSDom.el('span', { class: 'admin-label', text: 'Generated at' }));
+            routeRow.appendChild(QSDom.el('code', { class: 'privacy-host__url', text: s.privacyRoute }));
             sec.appendChild(routeRow);
-            var acts = _el('div', { class: 'privacy-page-actions' });
-            acts.appendChild(_el('button', { class: 'admin-btn admin-btn--primary', type: 'button', text: 'Update', onclick: function () { onGeneratePrivacy(String(s.privacyRoute).replace(/^\/+|\/+$/g, ''), true); } }));
-            acts.appendChild(_el('button', { class: 'admin-btn admin-btn--ghost', type: 'button', text: 'Delete', onclick: onDeletePrivacy }));
+            var acts = QSDom.el('div', { class: 'privacy-page-actions' });
+            acts.appendChild(QSDom.el('button', { class: 'admin-btn admin-btn--primary', type: 'button', text: 'Update', onclick: function () { onGeneratePrivacy(String(s.privacyRoute).replace(/^\/+|\/+$/g, ''), true); } }));
+            acts.appendChild(QSDom.el('button', { class: 'admin-btn admin-btn--ghost', type: 'button', text: 'Delete', onclick: onDeletePrivacy }));
             sec.appendChild(acts);
-            sec.appendChild(_el('p', { class: 'admin-hint', text: 'Update refreshes the page from the current data. Descriptions edit live; regenerate only after data changes (new mappings, host changes).' }));
+            sec.appendChild(QSDom.el('p', { class: 'admin-hint', text: 'Update refreshes the page from the current data. Descriptions edit live; regenerate only after data changes (new mappings, host changes).' }));
         } else {
-            var input = _el('input', { type: 'text', class: 'admin-input', placeholder: 'e.g. privacy', value: s.privacyRoute ? String(s.privacyRoute).replace(/^\/+/, '') : '' });
-            var gen = _el('button', { class: 'admin-btn admin-btn--primary', type: 'button', text: 'Generate', onclick: function () { var r = input.value.trim().replace(/^\/+|\/+$/g, ''); if (!r) { window.alert('Enter a route, e.g. privacy'); return; } onGeneratePrivacy(r, false); } });
-            sec.appendChild(_el('label', { class: 'admin-label', text: 'Page route' }));
-            sec.appendChild(_el('div', { class: 'privacy-page-gen' }, [input, gen]));
+            var input = QSDom.el('input', { type: 'text', class: 'admin-input', placeholder: 'e.g. privacy', value: s.privacyRoute ? String(s.privacyRoute).replace(/^\/+/, '') : '' });
+            var gen = QSDom.el('button', { class: 'admin-btn admin-btn--primary', type: 'button', text: 'Generate', onclick: function () { var r = input.value.trim().replace(/^\/+|\/+$/g, ''); if (!r) { window.alert('Enter a route, e.g. privacy'); return; } onGeneratePrivacy(r, false); } });
+            sec.appendChild(QSDom.el('label', { class: 'admin-label', text: 'Page route' }));
+            sec.appendChild(QSDom.el('div', { class: 'privacy-page-gen' }, [input, gen]));
             if (s.privacyRoute && !s.privacyRouteExists) {
-                sec.appendChild(_el('p', { class: 'admin-hint', text: 'The previous route "' + s.privacyRoute + '" no longer exists — generate to recreate it.' }));
+                sec.appendChild(QSDom.el('p', { class: 'admin-hint', text: 'The previous route "' + s.privacyRoute + '" no longer exists — generate to recreate it.' }));
             }
         }
 
-        var cb = _el('input', { type: 'checkbox' });
+        var cb = QSDom.el('input', { type: 'checkbox' });
         if (s.cookieSection === 'omit') cb.checked = true;
         cb.addEventListener('change', function () { onToggleCookieSection(cb.checked); });
-        sec.appendChild(_el('label', { class: 'privacy-radio privacy-cookie-toggle' }, [cb, ' Don’t mention cookies on this page']));
+        sec.appendChild(QSDom.el('label', { class: 'privacy-radio privacy-cookie-toggle' }, [cb, ' Don’t mention cookies on this page']));
         sec.appendChild(_renderCookieNote(s));
         return sec;
     }
@@ -552,7 +525,7 @@
         root.className = 'privacy-root';
         var s = state.status;
         if (!s) {
-            root.appendChild(_el('p', { class: 'privacy-empty', text: 'Could not load privacy status.' }));
+            root.appendChild(QSDom.el('p', { class: 'privacy-empty', text: 'Could not load privacy status.' }));
             return;
         }
         root.appendChild(_renderCoverage(s.coverage));

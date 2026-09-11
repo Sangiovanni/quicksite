@@ -2,6 +2,8 @@
     "common": {
         "appName": "QuickSite Admin",
         "loading": "Loading...",
+        "current": "Current:",
+        "custom": "Custom...",
         "saving": "Saving...",
         "error": "Error",
         "success": "Success",
@@ -515,8 +517,161 @@
     "commandForm": {
         "errors": {
             "docNotFound": "Command documentation not found",
-            "docLoadFailed": "Failed to load command documentation:"
-        }
+            "docLoadFailed": "Failed to load command documentation:",
+            "loadKeys": "Error loading keys",
+            "loadNodes": "Error loading nodes",
+            "loadImages": "Error loading images",
+            "loadVariables": "Error loading variables",
+            "loadSelectors": "Error loading selectors",
+            "refreshKeys": "Error refreshing keys",
+            "loadFiles": "Failed to load files"
+        },
+        "select": {
+            "typeFirst": "Select type first...",
+            "nameFirst": "Select name first...",
+            "structureFirst": "Select structure first...",
+            "languageFirst": "Select language first...",
+            "notRequiredForType": "Not required for this type",
+            "nodeOptional": "(Optional) Select node for targeted edit...",
+            "targetNode": "Select target node...",
+            "componentNode": "Select component node...",
+            "translationKey": "Select a translation key...",
+            "existingOrNew": "Select existing or type new...",
+            "faviconImage": "Select image for favicon...",
+            "targetRoute": "Select target route...",
+            "allCategories": "All categories",
+            "allKeyframes": "All keyframes (leave empty)",
+            "keyframe": "Select keyframe..."
+        },
+        "empty": {
+            "noKeys": "No keys found",
+            "noFiles": "No files found",
+            "noImages": "No images found in assets/images",
+            "noVariables": "No variables found",
+            "noCssRules": "No CSS rules found",
+            "noComponentNodes": "No component nodes found"
+        },
+        "status": {
+            "loadingFiles": "Loading files...",
+            "loadingImages": "Loading images...",
+            "refreshing": "Refreshing..."
+        },
+        "assets": {
+            "filterByCategory": "Filter by category"
+        },
+        "deleteAsset": {
+            "filesToDelete": "Files to delete",
+            "selectAll": "Select all",
+            "selectedOne": ":count file selected for deletion",
+            "selectedMany": ":count files selected for deletion",
+            "deletingOne": "Deleting :count file...",
+            "deletingMany": "Deleting :count files..."
+        },
+        "uploadAsset": {
+            "or": "or",
+            "multiFileTip": "Need to upload multiple files? Use the :link page.",
+            "assetManagement": "Assets"
+        },
+        "editFavicon": {
+            "pngOnlyHint": "💡 Only PNG images are supported for favicon. Images marked with ✓ are PNG files."
+        },
+        "clearHistory": {
+            "hint": "💡 All log entries :before this date will be deleted. Set :confirm to false first to preview what will be deleted.",
+            "hintBefore": "before"
+        },
+        "editStyles": {
+            "reload": "🔄 Reload Current Styles",
+            "formatCss": "✨ Format CSS",
+            "replaceWarning": "⚠️ This will replace the entire style.css file. Make sure to include all styles you want to keep."
+        },
+        "setRootVariables": {
+            "title": "Variable Selector",
+            "loadingVariables": "Loading variables...",
+            "newValue": "New value...",
+            "addUpdate": "Add/Update →",
+            "hint": "Select a variable to edit, or type a new value. This merges with existing variables."
+        },
+        "styleRule": {
+            "title": "CSS Selector Picker",
+            "loadingSelectors": "Loading selectors...",
+            "hint": "Select a CSS rule from the list above. The selector and media query fields will be filled automatically."
+        },
+        "setKeyframes": {
+            "title": "Keyframe Builder",
+            "animationName": "Animation Name",
+            "newNamePlaceholder": "Or type new name (e.g., fadeIn)",
+            "currentFrames": "Current Frames",
+            "noAnimationSelected": "Select an animation to see its frames",
+            "noFrames": "No frames",
+            "newAnimation": "(New animation)",
+            "addFrame": "Add Frame",
+            "customKeyPlaceholder": "e.g., 0%, 100%",
+            "framePropsPlaceholder": "CSS properties (e.g., opacity: 0; transform: scale(0.5);)",
+            "insertProperty": "Insert a property...",
+            "applyName": "Apply Name to Form",
+            "clearFrames": "Clear Frames",
+            "loadExisting": "Load Existing Frames",
+            "hint": "Build your keyframe animation using the form above. The frames will be added to the JSON below."
+        },
+        "getStructure": {
+            "optionNone": "None (full structure)",
+            "optionShowIds": "showIds (add node identifiers)",
+            "optionSummary": "summary (tree overview)"
+        },
+        "addComponent": {
+            "selectPosition": "Select position...",
+            "positionInside": "Inside (as child)",
+            "positionBefore": "Before",
+            "positionAfter": "After",
+            "dataSubtitle": "Select a component to see its variables",
+            "dataEmpty": "Select a component to configure its variables"
+        },
+        "editComponent": {
+            "dataSubtitle": "Select a component node to see and edit its data",
+            "dataEmpty": "Select a component node to edit its data"
+        },
+        "componentData": {
+            "title": "Component Data (Variables)",
+            "noVariables": "This component has no variables",
+            "loadFailed": "Error loading component variables",
+            "loadingKeys": "Loading translation keys...",
+            "orEnterManually": "or enter manually:",
+            "textKeyPlaceholder": "e.g., page.home.title",
+            "valuePlaceholder": "Enter :name..."
+        },
+        "setTranslationKeys": {
+            "title": "Translation Key Selector",
+            "valuePlaceholder": "Translation value...",
+            "addTranslation": "Add Translation →",
+            "clearAllTitle": "Clear all translations",
+            "legend": "🟢 Used keys are active in structure. 🟡 Unused keys exist but aren't used. 🔴 Unset keys need translation."
+        },
+        "deleteTranslationKeys": {
+            "title": "Key Selector Helper",
+            "addSelected": "Add Selected →",
+            "addAllUnused": "Add All Unused",
+            "addAllUnusedTitle": "Add all unused keys",
+            "clearList": "Clear List",
+            "clearListTitle": "Clear deletion list",
+            "hint": "Hold Ctrl/Cmd to select multiple keys. Unused keys are safe to delete."
+        },
+        "fileUpload": {
+            "dropHint": "Click to select a file or drag and drop",
+            "maxSize": "Max file size: 10MB"
+        },
+        "field": {
+            "urlSegment": "(URL segment)",
+            "date": "Date",
+            "hour": "Hour",
+            "minute": "Min",
+            "apply": "Apply",
+            "orEnterManually": "Or enter manually:",
+            "showPassword": "Show password",
+            "hidePassword": "Hide password",
+            "selectPlaceholder": "-- Select --",
+            "validationLabel": "Validation:"
+        },
+        "noDocumentation": "No additional documentation available."
     },
     "history": {
         "title": "Command History",

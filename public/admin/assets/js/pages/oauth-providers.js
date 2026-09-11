@@ -1,6 +1,6 @@
 /**
  * OAuth providers admin page — list + add/edit modal + delete with
- * in-use block + override-in-project pre-fill (beta.9 A1 Slice 8).
+ * in-use block + override-in-project pre-fill (beta.9).
  *
  * Calls listOAuthProviders / addOAuthProvider / editOAuthProvider /
  * deleteOAuthProvider via QuickSiteAdmin.apiRequest.
@@ -44,42 +44,15 @@
         return adminApi.apiRequest(cmd, method, body);
     }
 
-    function _el(tag, props, children) {
-        const e = document.createElement(tag);
-        if (props) {
-            for (const k in props) {
-                if (k === 'dataset' && typeof props[k] === 'object') {
-                    Object.assign(e.dataset, props[k]);
-                } else if (k.indexOf('on') === 0 && typeof props[k] === 'function') {
-                    e.addEventListener(k.slice(2).toLowerCase(), props[k]);
-                } else if (k === 'class') {
-                    e.className = props[k];
-                } else if (k === 'text') {
-                    e.textContent = props[k];
-                } else {
-                    e.setAttribute(k, props[k]);
-                }
-            }
-        }
-        if (children) {
-            children.forEach(function (c) {
-                if (c == null) return;
-                if (typeof c === 'string') e.appendChild(document.createTextNode(c));
-                else e.appendChild(c);
-            });
-        }
-        return e;
-    }
-
     function _renderLabel(text, required) {
-        const l = _el('label', { class: 'admin-label' });
+        const l = QSDom.el('label', { class: 'admin-label' });
         l.appendChild(document.createTextNode(text));
-        if (required) l.appendChild(_el('span', { class: 'admin-text-danger', text: ' *' }));
+        if (required) l.appendChild(QSDom.el('span', { class: 'admin-text-danger', text: ' *' }));
         return l;
     }
-    function _renderHint(text) { return _el('p', { class: 'admin-hint', text: text }); }
+    function _renderHint(text) { return QSDom.el('p', { class: 'admin-hint', text: text }); }
     function _renderGroup(label, child, hint) {
-        const g = _el('div', { class: 'admin-form-group' });
+        const g = QSDom.el('div', { class: 'admin-form-group' });
         if (label) g.appendChild(label);
         if (child) g.appendChild(child);
         if (hint) g.appendChild(hint);
@@ -113,7 +86,7 @@
     const ICON_MINUS = 'M5 12h14';
 
     function _renderPill(text, kind, iconNode) {
-        const p = _el('span', { class: 'oauth-pill oauth-pill--' + kind });
+        const p = QSDom.el('span', { class: 'oauth-pill oauth-pill--' + kind });
         if (iconNode) p.appendChild(iconNode);
         p.appendChild(document.createTextNode(text));
         return p;
@@ -123,7 +96,7 @@
         opts = opts || {};
         const classes = ['admin-btn', 'admin-btn--ghost', 'oauth-provider-card__action'];
         if (opts.disabled) classes.push('oauth-provider-card__action--disabled');
-        const b = _el('button', {
+        const b = QSDom.el('button', {
             class: classes.join(' '),
             'aria-label': label,
             title: label,
@@ -136,12 +109,12 @@
     }
 
     function _renderCard(p) {
-        const card = _el('div', { class: 'oauth-provider-card' });
-        const row = _el('div', { class: 'oauth-provider-card__row' });
+        const card = QSDom.el('div', { class: 'oauth-provider-card' });
+        const row = QSDom.el('div', { class: 'oauth-provider-card__row' });
 
-        const main = _el('div', { class: 'oauth-provider-card__main' });
-        const pills = _el('div', { class: 'oauth-provider-card__pills' });
-        pills.appendChild(_el('span', { class: 'oauth-provider-card__id', text: p.id }));
+        const main = QSDom.el('div', { class: 'oauth-provider-card__main' });
+        const pills = QSDom.el('div', { class: 'oauth-provider-card__pills' });
+        pills.appendChild(QSDom.el('span', { class: 'oauth-provider-card__id', text: p.id }));
 
         const sourceKind  = p.source === 'project-override' ? 'override' : (p.source === 'project' ? 'project' : 'admin');
         const sourceLabel = p.source === 'project-override' ? 'project override' : p.source;
@@ -166,13 +139,13 @@
         }
         main.appendChild(pills);
 
-        main.appendChild(_el('div', {
+        main.appendChild(QSDom.el('div', {
             class: 'oauth-provider-card__summary',
             text: ((p.preset && p.preset.authorize_url) || '—') + ' · scope: ' + (p.scope || '—'),
         }));
         row.appendChild(main);
 
-        const actions = _el('div', { class: 'oauth-provider-card__actions' });
+        const actions = QSDom.el('div', { class: 'oauth-provider-card__actions' });
         actions.appendChild(_renderActionBtn(ICON_EDIT, 'Edit', function () { openEditModal(p); }));
         if (p.source === 'admin') {
             actions.appendChild(_renderActionBtn(ICON_FORK, 'Override in this project', function () { openOverrideModal(p); }));
@@ -188,7 +161,7 @@
     }
 
     function _renderFilterBar() {
-        const bar = _el('div', { class: 'oauth-filter-bar' });
+        const bar = QSDom.el('div', { class: 'oauth-filter-bar' });
         const counts = {
             all:       state.providers.length,
             admin:     state.providers.filter(function (p) { return p.source === 'admin'; }).length,
@@ -199,7 +172,7 @@
             const text = (key === 'overrides' ? 'Has overrides' : key.charAt(0).toUpperCase() + key.slice(1)) + ' · ' + counts[key];
             const isActive = state.filter === key;
             const cls = 'admin-btn admin-btn--ghost oauth-filter-bar__btn' + (isActive ? ' oauth-filter-bar__btn--active' : '');
-            bar.appendChild(_el('button', {
+            bar.appendChild(QSDom.el('button', {
                 class: cls,
                 type: 'button',
                 onclick: function () { state.filter = key; renderList(); },
@@ -217,7 +190,7 @@
     }
 
     function _renderEmptyState(filter) {
-        return _el('div', {
+        return QSDom.el('div', {
             class: 'oauth-providers-list__empty',
             text: filter === 'all'
                 ? 'No providers configured. Click "Add provider" to add one.'
@@ -266,15 +239,15 @@
         if (!root) return null;
         root.textContent = '';
 
-        const backdrop = _el('div', {
+        const backdrop = QSDom.el('div', {
             class: 'oauth-modal-backdrop',
             onclick: function (e) { if (e.target === backdrop) onClose(); },
         });
-        const dialog = _el('div', { class: 'oauth-modal-dialog' });
+        const dialog = QSDom.el('div', { class: 'oauth-modal-dialog' });
 
-        const header = _el('div', { class: 'oauth-modal-header' });
-        header.appendChild(_el('h2', { class: 'oauth-modal-header__title', text: titleText }));
-        const closeBtn = _el('button', {
+        const header = QSDom.el('div', { class: 'oauth-modal-header' });
+        header.appendChild(QSDom.el('h2', { class: 'oauth-modal-header__title', text: titleText }));
+        const closeBtn = QSDom.el('button', {
             class: 'admin-btn admin-btn--ghost oauth-modal-header__close',
             type: 'button', 'aria-label': 'Close', onclick: onClose,
         });
@@ -293,11 +266,11 @@
     }
 
     function _renderCredentialsSection(existingClientId, existingHint) {
-        const section = _el('div', { class: 'oauth-credentials' });
-        section.appendChild(_el('h3', { class: 'oauth-credentials__title', text: 'Credentials' }));
+        const section = QSDom.el('div', { class: 'oauth-credentials' });
+        section.appendChild(QSDom.el('h3', { class: 'oauth-credentials__title', text: 'Credentials' }));
         section.appendChild(_renderHint('Stored in oauth-secrets.{php|json} at the same scope. Required if you want this provider to actually authenticate users.'));
 
-        const clientIdInput = _el('input', {
+        const clientIdInput = QSDom.el('input', {
             type: 'text', class: 'admin-input',
             placeholder: 'client_id (from provider console)',
             value: existingClientId || '',
@@ -305,8 +278,8 @@
         });
         section.appendChild(_renderGroup(_renderLabel('Client ID', true), clientIdInput));
 
-        const secretRow = _el('div', { class: 'oauth-credentials__secret-row' });
-        const clientSecretInput = _el('input', {
+        const secretRow = QSDom.el('div', { class: 'oauth-credentials__secret-row' });
+        const clientSecretInput = QSDom.el('input', {
             type: 'password', class: 'admin-input',
             placeholder: existingClientId ? '•••••••• (leave empty to keep current)' : 'client_secret (optional for public clients)',
             autocomplete: 'new-password',
@@ -314,11 +287,11 @@
         secretRow.appendChild(clientSecretInput);
 
         if (existingHint) {
-            const reveal = _el('button', {
+            const reveal = QSDom.el('button', {
                 class: 'admin-btn admin-btn--ghost oauth-credentials__reveal-btn',
                 type: 'button', 'aria-label': 'Reveal first characters of stored secret',
                 onclick: function () {
-                    const revealed = _el('span', { class: 'oauth-credentials__revealed-value', text: existingHint });
+                    const revealed = QSDom.el('span', { class: 'oauth-credentials__revealed-value', text: existingHint });
                     reveal.replaceWith(revealed);
                 },
             });
@@ -347,15 +320,15 @@
     }
 
     function _renderExtraParamsEditor(initialKv) {
-        const wrap = _el('div', { class: 'oauth-extra-params' });
-        const rows = _el('div', { class: 'oauth-extra-params__rows' });
+        const wrap = QSDom.el('div', { class: 'oauth-extra-params' });
+        const rows = QSDom.el('div', { class: 'oauth-extra-params__rows' });
         wrap.appendChild(rows);
 
         function addRow(k, v) {
-            const row = _el('div', { class: 'oauth-extra-params__row' });
-            const keyI = _el('input', { type: 'text', class: 'admin-input', placeholder: 'key (e.g. access_type)', value: k || '' });
-            const valI = _el('input', { type: 'text', class: 'admin-input', placeholder: 'value (e.g. offline)', value: v || '' });
-            const rm = _el('button', {
+            const row = QSDom.el('div', { class: 'oauth-extra-params__row' });
+            const keyI = QSDom.el('input', { type: 'text', class: 'admin-input', placeholder: 'key (e.g. access_type)', value: k || '' });
+            const valI = QSDom.el('input', { type: 'text', class: 'admin-input', placeholder: 'value (e.g. offline)', value: v || '' });
+            const rm = QSDom.el('button', {
                 class: 'admin-btn admin-btn--ghost', type: 'button',
                 'aria-label': 'Remove this extra param',
                 onclick: function () { row.remove(); },
@@ -369,7 +342,7 @@
             Object.keys(initialKv).forEach(function (k) { addRow(k, String(initialKv[k] || '')); });
         }
 
-        const addBtn = _el('button', {
+        const addBtn = QSDom.el('button', {
             class: 'admin-btn admin-btn--ghost oauth-extra-params__add',
             type: 'button',
             onclick: function () { addRow('', ''); },
@@ -406,11 +379,11 @@
         const initialId = provider ? provider.id : '';
 
         // Scope toggle (radio "cards")
-        const scopeWrap = _el('div', { class: 'oauth-scope-toggle' });
+        const scopeWrap = QSDom.el('div', { class: 'oauth-scope-toggle' });
         function makeScopeOption(value, labelText, hintText) {
-            const opt = _el('label', { class: 'oauth-scope-toggle__option' });
-            const head = _el('div', { class: 'oauth-scope-toggle__head' });
-            const radio = _el('input', { type: 'radio', name: 'oauth-prov-scope', value: value });
+            const opt = QSDom.el('label', { class: 'oauth-scope-toggle__option' });
+            const head = QSDom.el('div', { class: 'oauth-scope-toggle__head' });
+            const radio = QSDom.el('input', { type: 'radio', name: 'oauth-prov-scope', value: value });
             if (initialScope === value) {
                 radio.checked = true;
                 opt.classList.add('oauth-scope-toggle__option--checked');
@@ -422,9 +395,9 @@
                 if (radio.checked) opt.classList.add('oauth-scope-toggle__option--checked');
             });
             head.appendChild(radio);
-            head.appendChild(_el('span', { class: 'oauth-scope-toggle__label', text: labelText }));
+            head.appendChild(QSDom.el('span', { class: 'oauth-scope-toggle__label', text: labelText }));
             opt.appendChild(head);
-            opt.appendChild(_el('p', { class: 'oauth-scope-toggle__hint', text: hintText }));
+            opt.appendChild(QSDom.el('p', { class: 'oauth-scope-toggle__hint', text: hintText }));
             return { opt: opt, radio: radio };
         }
         const scopeAdmin = makeScopeOption('admin', 'Engine catalogue (admin)', 'Available in every project on this install.');
@@ -434,7 +407,7 @@
         dialog.appendChild(_renderGroup(_renderLabel('Scope', true), scopeWrap));
 
         // Provider id
-        const idInput = _el('input', {
+        const idInput = QSDom.el('input', {
             type: 'text', class: 'admin-input',
             placeholder: 'lowercase id, e.g. mycorp-sso',
             value: initialId, autocomplete: 'off',
@@ -445,7 +418,7 @@
         // Preset text fields
         const fieldInputs = {};
         PRESET_TEXT_FIELDS.forEach(function (f) {
-            const inp = _el('input', {
+            const inp = QSDom.el('input', {
                 type: 'text', class: 'admin-input',
                 placeholder: f.placeholder,
                 value: initialPreset[f.key] != null ? String(initialPreset[f.key]) : '',
@@ -460,15 +433,15 @@
         dialog.appendChild(_renderGroup(_renderLabel('Extra authorize params'), extraEditor.element, _renderHint('Provider-specific (e.g. Google\'s access_type=offline, prompt=consent).')));
 
         // Refresh token supported
-        const refreshLabel = _el('label', { class: 'oauth-scope-toggle__head' });
-        const refreshCb = _el('input', { type: 'checkbox' });
+        const refreshLabel = QSDom.el('label', { class: 'oauth-scope-toggle__head' });
+        const refreshCb = QSDom.el('input', { type: 'checkbox' });
         if (initialPreset.refresh_token_supported) refreshCb.checked = true;
         refreshLabel.appendChild(refreshCb);
         refreshLabel.appendChild(document.createTextNode(' Provider issues refresh tokens with the standard flow'));
         dialog.appendChild(_renderGroup(_renderLabel('Refresh token supported'), refreshLabel, _renderHint('Most do (Google, Amazon). GitHub OAuth Apps and Meta\'s default access tokens do not.')));
 
         // Comment
-        const commentInput = _el('textarea', {
+        const commentInput = QSDom.el('textarea', {
             class: 'admin-input', rows: '2',
             placeholder: 'Optional notes (becomes _comment in the preset entry)',
         });
@@ -483,14 +456,14 @@
         dialog.appendChild(credentialsCtl.element);
 
         // Actions row
-        const actionsRow = _el('div', { class: 'oauth-modal-actions' });
-        const errBox = _el('div', { class: 'oauth-modal-actions__error' });
+        const actionsRow = QSDom.el('div', { class: 'oauth-modal-actions' });
+        const errBox = QSDom.el('div', { class: 'oauth-modal-actions__error' });
         actionsRow.appendChild(errBox);
-        const cancelBtn = _el('button', { class: 'admin-btn admin-btn--ghost', type: 'button', text: 'Cancel', onclick: closeModal });
+        const cancelBtn = QSDom.el('button', { class: 'admin-btn admin-btn--ghost', type: 'button', text: 'Cancel', onclick: closeModal });
         const saveBtnText = mode === 'add'
             ? 'Add provider'
             : (mode === 'override' ? 'Create override' : 'Save changes');
-        const saveBtn = _el('button', { class: 'admin-btn admin-btn--primary', type: 'button', text: saveBtnText });
+        const saveBtn = QSDom.el('button', { class: 'admin-btn admin-btn--primary', type: 'button', text: saveBtnText });
         actionsRow.appendChild(cancelBtn);
         actionsRow.appendChild(saveBtn);
         dialog.appendChild(actionsRow);
@@ -559,20 +532,20 @@
         const dialog = _renderModalShell(title, closeModal);
         if (!dialog) return;
 
-        const body = _el('div');
+        const body = QSDom.el('div');
         if (isOverride) {
             body.appendChild(_renderHint('Removes the project-level override. The admin catalogue entry remains; this provider will still resolve via the admin entry.'));
         } else {
             body.appendChild(_renderHint('Removes the preset and credentials at scope "' + provider.source + '". If any routes or oauth-buttons still reference this provider, the deletion is blocked and you\'ll see the list below.'));
         }
-        const errPanel = _el('div');
+        const errPanel = QSDom.el('div');
         errPanel.hidden = true;
         body.appendChild(errPanel);
         dialog.appendChild(body);
 
-        const actions = _el('div', { class: 'oauth-modal-actions' });
-        actions.appendChild(_el('button', { class: 'admin-btn admin-btn--ghost', type: 'button', text: 'Cancel', onclick: closeModal }));
-        const confirmBtn = _el('button', {
+        const actions = QSDom.el('div', { class: 'oauth-modal-actions' });
+        actions.appendChild(QSDom.el('button', { class: 'admin-btn admin-btn--ghost', type: 'button', text: 'Cancel', onclick: closeModal }));
+        const confirmBtn = QSDom.el('button', {
             class: 'admin-btn admin-btn--primary oauth-modal-actions__btn--danger',
             type: 'button',
             text: isOverride ? 'Remove override' : 'Delete provider',
@@ -607,24 +580,24 @@
     }
 
     function _renderInUsePanel(msg, usage) {
-        const wrap = _el('div', { class: 'oauth-in-use-panel' });
-        wrap.appendChild(_el('p', { class: 'oauth-in-use-panel__msg', text: msg }));
+        const wrap = QSDom.el('div', { class: 'oauth-in-use-panel' });
+        wrap.appendChild(QSDom.el('p', { class: 'oauth-in-use-panel__msg', text: msg }));
         if (usage) {
             if (usage.routes && usage.routes.length > 0) {
-                wrap.appendChild(_el('div', { class: 'oauth-in-use-panel__group-title', text: 'Resolvers (' + usage.routes.length + ')' }));
-                const ul = _el('ul', { class: 'oauth-in-use-panel__list' });
-                usage.routes.forEach(function (r) { ul.appendChild(_el('li', { text: '/' + r.route + ' (' + r.kind + ')' })); });
+                wrap.appendChild(QSDom.el('div', { class: 'oauth-in-use-panel__group-title', text: 'Resolvers (' + usage.routes.length + ')' }));
+                const ul = QSDom.el('ul', { class: 'oauth-in-use-panel__list' });
+                usage.routes.forEach(function (r) { ul.appendChild(QSDom.el('li', { text: '/' + r.route + ' (' + r.kind + ')' })); });
                 wrap.appendChild(ul);
             }
             if (usage.buttons && usage.buttons.length > 0) {
-                wrap.appendChild(_el('div', { class: 'oauth-in-use-panel__group-title', text: 'oauth-button on pages (' + usage.buttons.length + ')' }));
-                const ul = _el('ul', { class: 'oauth-in-use-panel__list' });
+                wrap.appendChild(QSDom.el('div', { class: 'oauth-in-use-panel__group-title', text: 'oauth-button on pages (' + usage.buttons.length + ')' }));
+                const ul = QSDom.el('ul', { class: 'oauth-in-use-panel__list' });
                 usage.buttons.forEach(function (b) {
-                    ul.appendChild(_el('li', { text: '/' + b.page + ' (' + b.count + ' button' + (b.count === 1 ? '' : 's') + ')' }));
+                    ul.appendChild(QSDom.el('li', { text: '/' + b.page + ' (' + b.count + ' button' + (b.count === 1 ? '' : 's') + ')' }));
                 });
                 wrap.appendChild(ul);
             }
-            wrap.appendChild(_el('p', { class: 'oauth-in-use-panel__hint', text: 'Remove these consumers (delete the routes / oauth-button elements) then try again.' }));
+            wrap.appendChild(QSDom.el('p', { class: 'oauth-in-use-panel__hint', text: 'Remove these consumers (delete the routes / oauth-button elements) then try again.' }));
         }
         return wrap;
     }

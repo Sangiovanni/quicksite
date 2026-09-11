@@ -1,14 +1,14 @@
 /**
- * QuickSite Admin — shared DOM construction helpers (C8 8.3c).
+ * QuickSite Admin — shared DOM construction helpers.
  *
  * The house idiom for HTML-in-JS hygiene (CLAUDE.md): createElement +
  * textContent via a tiny element factory; no innerHTML string-glueing.
  * Loaded in the layout <head> (like storage-keys.js) so page scripts can
- * reference it at parse time.
+ * reference it at parse time — every admin page renders through
+ * AdminRouter::render() -> templates/layout.php, so every page has it.
  *
- * NOTE: storage.js / privacy.js / oauth-providers.js each still carry a
- * file-local copy of this factory (they predate this module); new code uses
- * QSDom, migrating the older pages is a separate cleanup.
+ * This is the ONE base factory. Page-specific _render* helpers stay in their
+ * own page and build on it rather than re-declaring the factory.
  */
 window.QSDom = (function () {
     'use strict';
@@ -77,5 +77,45 @@ window.QSDom = (function () {
         }
     }
 
-    return { el: el, svgIcon: svgIcon, clear: clear };
+    /**
+     * Reset a <select> to a single placeholder option.
+     *
+     * The createElement replacement for the panel's most-repeated innerHTML
+     * idiom, `select.innerHTML = '<option value="">Select type first…</option>'`.
+     * It REPLACES every existing option, because that is what the assignment
+     * it stands in for did — a cascading select calls this to empty itself
+     * before repopulating, and an append would leave the stale list behind.
+     *
+     * `text` is set with textContent, so a label carrying <, & or a quote —
+     * a filename, an API error message, a translation value — renders as
+     * itself instead of being parsed as markup.
+     *
+     * @param {HTMLSelectElement} select  the select to reset (no-op if falsy)
+     * @param {string} text               visible label; '' gives a blank option
+     * @param {Object}  [opts]
+     * @param {string}  [opts.value='']   the option's value attribute
+     * @param {boolean} [opts.disabled]   render it unselectable — a pure label,
+     *                                    the shape used by the list-box pickers
+     * @param {boolean} [opts.selected]   mark it selected
+     * @returns {HTMLOptionElement|null}  the option, so a caller can hold on to it
+     */
+    function setSelectPlaceholder(select, text, opts) {
+        if (!select) return null;
+        var o = opts || {};
+        clear(select);
+        var option = document.createElement('option');
+        option.value = o.value == null ? '' : String(o.value);
+        option.textContent = text == null ? '' : String(text);
+        if (o.disabled) option.disabled = true;
+        if (o.selected) option.selected = true;
+        select.appendChild(option);
+        return option;
+    }
+
+    return {
+        el: el,
+        svgIcon: svgIcon,
+        clear: clear,
+        setSelectPlaceholder: setSelectPlaceholder
+    };
 })();

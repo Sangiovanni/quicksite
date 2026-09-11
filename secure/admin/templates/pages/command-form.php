@@ -38,14 +38,7 @@ function getCommandDocumentation(string $command): ?array {
 ?>
 
 <div class="admin-command-form-page"
-     data-command-name="<?= adminAttr($selectedCommand) ?>"
-     data-t-no-parameters="<?= adminAttr(__admin('commands.noParameters')) ?>"
-     data-t-required-params="<?= adminAttr(__admin('commands.requiredParams')) ?>"
-     data-t-optional-params="<?= adminAttr(__admin('commands.optionalParams')) ?>"
-     data-t-notes="<?= adminAttr(__admin('commands.notes')) ?>"
-     data-t-example="<?= adminAttr(__admin('commands.example')) ?>"
-     data-t-success-response="<?= adminAttr(__admin('commands.successResponse')) ?>"
-     data-t-error-responses="<?= adminAttr(__admin('commands.errorResponses')) ?>">
+     data-command-name="<?= adminAttr($selectedCommand) ?>">
 
 
 
@@ -122,6 +115,19 @@ function getCommandDocumentation(string $command): ?array {
     </div>
 </div>
 
+<?php
+// The strings command-form.js needs, emitted under the SAME dot-paths PHP uses.
+// Whole sub-trees, verbatim — a hand-copied mirror that renames levels while it
+// copies is how the panel ended up with JS asking for paths nothing supplies.
+// JSON_HEX_TAG is what stops a translation value closing this script element.
+$qsCommandFormI18n = [];
+foreach (['commandForm', 'commands', 'common'] as $qsSubtree) {
+    $qsCommandFormI18n[$qsSubtree] = AdminTranslation::getInstance()->getRaw($qsSubtree) ?: new stdClass();
+}
+?>
+<script>
+    window.QS_COMMAND_FORM_I18N = <?= json_encode($qsCommandFormI18n, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+</script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/command-form.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/command-form.js') ?>"></script>
 
 </div> <!-- .admin-command-form-page -->
