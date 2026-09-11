@@ -646,7 +646,11 @@ $langNames = [
                     success: '<?= __adminJs('common.status.success') ?>',
                     error: '<?= __adminJs('common.status.error') ?>',
                     loading: '<?= __adminJs('common.loading') ?>',
-                    noResults: '<?= __adminJs('common.noResults') ?>'
+                    noResults: '<?= __adminJs('common.noResults') ?>',
+                    execute: '<?= __adminJs('common.execute') ?>',
+                    copy: '<?= __adminJs('common.copy') ?>',
+                    close: '<?= __adminJs('common.close') ?>',
+                    validate: '<?= __adminJs('common.validate') ?>'
                 },
                 dashboard: {
                     columns: {
@@ -691,6 +695,38 @@ $langNames = [
                         docNotFound: '<?= __adminJs('commandForm.errors.docNotFound') ?>',
                         docLoadFailed: '<?= __adminJs('commandForm.errors.docLoadFailed') ?>'
                     }
+                },
+                // admin.js is loaded on EVERY page, so the strings it builds in
+                // JS are emitted for every page too: the command executor's
+                // button states and destructive-command prompt, the response
+                // panel, the JSON editor toolbar, and the '?' shortcuts dialog.
+                commands: {
+                    execute: '<?= __adminJs('commands.execute') ?>',
+                    uploading: '<?= __adminJs('commands.uploading') ?>',
+                    executing: '<?= __adminJs('commands.executing') ?>',
+                    responseStatus: '<?= __adminJs('commands.responseStatus') ?>',
+                    errorLoadingOptions: '<?= __adminJs('commands.errorLoadingOptions') ?>',
+                    confirmDestructive: {
+                        title: '<?= __adminJs('commands.confirmDestructive.title') ?>',
+                        message: '<?= __adminJs('commands.confirmDestructive.message') ?>'
+                    },
+                    jsonEditor: {
+                        format: '<?= __adminJs('commands.jsonEditor.format') ?>'
+                    }
+                },
+                shortcuts: {
+                    title: '<?= __adminJs('shortcuts.title') ?>',
+                    navGroup: '<?= __adminJs('shortcuts.navGroup') ?>',
+                    actionsGroup: '<?= __adminJs('shortcuts.actionsGroup') ?>',
+                    focusSearch: '<?= __adminJs('shortcuts.focusSearch') ?>',
+                    showHelp: '<?= __adminJs('shortcuts.showHelp') ?>',
+                    closeModal: '<?= __adminJs('shortcuts.closeModal') ?>'
+                },
+                nav: {
+                    dashboard: '<?= __adminJs('nav.dashboard') ?>',
+                    commands: '<?= __adminJs('nav.commands') ?>',
+                    history: '<?= __adminJs('nav.history') ?>',
+                    settings: '<?= __adminJs('nav.settings') ?>'
                 },
                 <?php if ($isOperator): ?>
                 // Only an operator's page loads update-notice.js, so only an

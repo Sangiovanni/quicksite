@@ -783,7 +783,11 @@ function flattenRoutes(array $routes, string $prefix = ''): array {
  * @return bool True if route exists
  */
 function routeExists(string $routePath, array $routes): bool {
-    $segments = array_filter(explode('/', trim($routePath, '/')));
+    // The callback is not optional. A bare array_filter() drops every FALSY
+    // value, and the string '0' is falsy in PHP — so a route segment literally
+    // named '0' vanished from the path and routeExists('home/0') answered true
+    // for a page that does not exist. Only empty segments may be dropped.
+    $segments = array_filter(explode('/', trim($routePath, '/')), fn($s) => $s !== '');
     $current = $routes;
     
     foreach ($segments as $segment) {

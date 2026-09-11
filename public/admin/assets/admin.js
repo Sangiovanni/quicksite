@@ -582,12 +582,64 @@ const QuickSiteAdmin = {
     },
 
     /**
-     * Commands that require confirmation before execution
+     * Look up a translation by dot path.
+     *
+     * Reads the same QUICKSITE_CONFIG.translations object layout.php emits, so
+     * a key missing from a language renders as its own dot path — which is how
+     * an unset string stays visible and findable instead of hiding behind an
+     * English fallback.
+     *
+     * @param {string} path        e.g. 'commands.execute'
+     * @param {*} [fallback]       returned only when the path is absent
+     * @returns {*} the value, or `fallback`, or the path itself
      */
-    destructiveCommands: [
-        'deleteRoute', 'deleteAsset', 'removeLang', 'resetAll', 
-        'deleteComponent', 'clearLogs', 'removeBackup'
-    ],
+    t(path, fallback) {
+        const parts = path.split('.');
+        let current = window.QUICKSITE_CONFIG?.translations || {};
+        for (const part of parts) {
+            if (current && typeof current === 'object' && part in current) {
+                current = current[part];
+            } else {
+                return fallback !== undefined ? fallback : path;
+            }
+        }
+        return current === undefined || current === '' ? (fallback !== undefined ? fallback : path) : current;
+    },
+
+    /**
+     * Does executing this command warrant an "are you sure"?
+     *
+     * TWO sources, in this order:
+     *
+     *  1. The command's own `help` entry, handed over by command-form.js as
+     *     `data-destructive` on the form. Driven by the spec, exactly like
+     *     `data-binary-response` beside it — so declaring a command destructive
+     *     is a help.php edit and nothing else, and a deleted command takes its
+     *     flag with it.
+     *  2. A naming convention, for everything the flag does not name.
+     *
+     * The convention exists because the list this replaced was SEVEN command
+     * names of which FIVE no longer existed: it gated 2 live commands while a
+     * dozen genuinely destructive ones ran with no prompt. A convention cannot
+     * rot that way — a removed command simply stops existing — and it covers 24
+     * of the 153. The flag covers what a name does not reveal
+     * (transferOwnership, restoreBackup, importProject, deployBuild …).
+     *
+     * Reading flag OR convention means forgetting the flag on an obvious
+     * `deleteFoo` is harmless.
+     *
+     * ⚠ This is a safety net, not a security control. Permissions authorise
+     * every one of these commands server-side; the prompt only asks a human to
+     * look twice.
+     *
+     * @param {string} command
+     * @param {HTMLFormElement} [form]  the submitting form, for the help flag
+     * @returns {boolean}
+     */
+    isDestructiveCommand(command, form) {
+        if (form && form.dataset.destructive === '1') return true;
+        return /^(delete|remove|clear|reset|purge)/i.test(command || '');
+    },
 
     /**
      * Handle command form submission
@@ -603,17 +655,17 @@ const QuickSiteAdmin = {
         const responseDiv = document.getElementById('command-response');
         
         // Check if this is a destructive command that needs confirmation
-        if (this.destructiveCommands.includes(command)) {
+        if (this.isDestructiveCommand(command, form)) {
             const confirmed = await this.confirm(
-                `You are about to execute "${command}". This action may make permanent changes. Continue?`,
+                String(this.t('commands.confirmDestructive.message')).replace(':command', command),
                 {
-                    title: 'Confirm Action',
+                    title: this.t('commands.confirmDestructive.title'),
                     type: 'warning',
-                    confirmText: 'Execute',
+                    confirmText: this.t('common.execute'),
                     confirmClass: 'primary'
                 }
             );
-            
+
             if (!confirmed) {
                 return;
             }
@@ -635,8 +687,7 @@ const QuickSiteAdmin = {
         
         if (hasFile) {
             // Use FormData for file uploads
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<span class="admin-spinner"></span> Uploading...';
+            QSDom.setButtonBusy(submitBtn, this.t('commands.uploading'));
             
             try {
                 const result = await this.apiUpload(command, formData, urlParams);
@@ -658,7 +709,7 @@ const QuickSiteAdmin = {
             }
             
             submitBtn.disabled = false;
-            submitBtn.innerHTML = 'Execute Command';
+            submitBtn.textContent = this.t('commands.execute');
         } else {
             // Build JSON data
             for (const [key, value] of formData.entries()) {
@@ -681,8 +732,7 @@ const QuickSiteAdmin = {
                 }
             }
             
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = '<span class="admin-spinner"></span> Executing...';
+            QSDom.setButtonBusy(submitBtn, this.t('commands.executing'));
             
             try {
                 // A command declared 'binary' in help.php streams a FILE. Route it
@@ -731,7 +781,7 @@ const QuickSiteAdmin = {
             }
             
             submitBtn.disabled = false;
-            submitBtn.innerHTML = 'Execute Command';
+            submitBtn.textContent = this.t('commands.execute');
         }
     },
 
@@ -742,28 +792,42 @@ const QuickSiteAdmin = {
         if (!container) return;
         
         const statusClass = result.ok ? 'admin-alert--success' : 'admin-alert--error';
-        const statusText = result.ok ? 'Success' : 'Error';
+        const statusText = this.t(result.ok ? 'common.success' : 'common.error');
         const responseJson = JSON.stringify(result.data, null, 2);
-        
-        container.innerHTML = `
-            <div class="admin-alert ${statusClass}">
-                <strong>${statusText}</strong> (Status: ${result.status})
-            </div>
-            <div class="admin-code admin-code--response">
-                <div class="admin-code__header">
-                    <button type="button" class="admin-btn admin-btn--ghost admin-btn--sm" onclick="QuickSiteAdmin.copyResponse(this)">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-                        </svg>
-                        Copy
-                    </button>
-                </div>
-                <pre>${this.escapeHtml(responseJson)}</pre>
-            </div>
-        `;
-        
+
+        QSDom.clear(container);
+        container.appendChild(this._renderResponseAlert(statusClass, statusText, result.status));
+        container.appendChild(this._renderResponseBody(responseJson));
+
         container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    },
+
+    /** The status line above a command response. @returns {HTMLElement} */
+    _renderResponseAlert(statusClass, statusText, status) {
+        return QSDom.el('div', { class: 'admin-alert ' + statusClass }, [
+            QSDom.el('strong', { text: statusText }),
+            ' (' + this.t('commands.responseStatus') + ': ' + status + ')'
+        ]);
+    },
+
+    /** The response JSON plus its copy button. @returns {HTMLElement} */
+    _renderResponseBody(responseJson) {
+        const copyBtn = QSDom.el('button', {
+            type: 'button',
+            class: 'admin-btn admin-btn--ghost admin-btn--sm',
+            onclick: () => this.copyResponse(copyBtn)
+        }, [
+            QSDom.iconEl(window.QuickSiteUtils.ICON_PATHS.copy, 16),
+            ' ' + this.t('common.copy')
+        ]);
+
+        return QSDom.el('div', { class: 'admin-code admin-code--response' }, [
+            QSDom.el('div', { class: 'admin-code__header' }, [copyBtn]),
+            // textContent, so a response carrying < or & shows the bytes the
+            // server actually sent rather than being parsed as markup. This is
+            // what escapeHtml() was doing by hand.
+            QSDom.el('pre', { text: responseJson })
+        ]);
     },
 
     /**
@@ -778,6 +842,12 @@ const QuickSiteAdmin = {
 
     /**
      * Show form error message
+     *
+     * ⚠ NO CALLERS. The whole tree holds exactly ONE occurrence of this name:
+     * this definition. Its innerHTML was left as it is rather than rewritten —
+     * rewriting unreachable markup fixes nothing and would mint translation
+     * keys that can never resolve, which fights the "0 unused keys" exit
+     * criterion. The correct fix is deletion; see NOTES/reports/beta12/S3b.md.
      */
     showFormError(errorDiv, message) {
         if (errorDiv) {
@@ -897,11 +967,11 @@ const QuickSiteAdmin = {
         
         // Show loading state
         selectElement.disabled = true;
-        selectElement.innerHTML = `<option value="">${placeholder}</option>`;
+        QSDom.setSelectPlaceholder(selectElement, placeholder);
         
         try {
             const options = await this.fetchHelperData(action, params);
-            selectElement.innerHTML = `<option value="">${placeholder}</option>`;
+            QSDom.setSelectPlaceholder(selectElement, placeholder);
             
             // Handle flat array or hierarchical structure
             if (Array.isArray(options)) {
@@ -909,8 +979,8 @@ const QuickSiteAdmin = {
             }
         } catch (error) {
             console.error('Failed to populate select:', error);
-            const errorMsg = error.message || 'Error loading options';
-            selectElement.innerHTML = `<option value="">Error: ${errorMsg}</option>`;
+            const errorMsg = error.message || this.t('commands.errorLoadingOptions');
+            QSDom.setSelectPlaceholder(selectElement, this.t('common.error') + ': ' + errorMsg);
         }
         
         selectElement.disabled = false;
@@ -944,6 +1014,12 @@ const QuickSiteAdmin = {
     
     /**
      * Populate a select with grouped options (e.g., used/unused keys)
+     *
+     * ⚠ NO CALLERS. The whole tree holds exactly ONE occurrence of this name:
+     * this definition. Its innerHTML was left as it is rather than rewritten —
+     * rewriting unreachable markup fixes nothing and would mint translation
+     * keys that can never resolve, which fights the "0 unused keys" exit
+     * criterion. The correct fix is deletion; see NOTES/reports/beta12/S3b.md.
      */
     async populateSelectGrouped(selectElement, action, params = [], placeholder = 'Select...', groups = {}) {
         if (!selectElement) return;
@@ -984,6 +1060,12 @@ const QuickSiteAdmin = {
     /**
      * Initialize cascading selects for a form
      * @param {Object} config - Configuration object with dependencies
+     *
+     * ⚠ NO CALLERS. The whole tree holds exactly ONE occurrence of this name:
+     * this definition. Its innerHTML was left as it is rather than rewritten —
+     * rewriting unreachable markup fixes nothing and would mint translation
+     * keys that can never resolve, which fights the "0 unused keys" exit
+     * criterion. The correct fix is deletion; see NOTES/reports/beta12/S3b.md.
      */
     initCascadingSelects(config) {
         const { container, selects } = config;
@@ -1029,6 +1111,12 @@ const QuickSiteAdmin = {
 
     /**
      * Show a toast notification - delegates to QuickSiteUtils
+     *
+     * ⚠ THE FALLBACK BODY BELOW IS UNREACHABLE. layout.php loads
+     * js/core/utils.js unconditionally and BEFORE admin.js, and there is no
+     * other load path for either file, so window.QuickSiteUtils is always
+     * defined by the time this runs. Its innerHTML was left as it is for the
+     * same reason as the dead methods above — see NOTES/reports/beta12/S3b.md.
      */
     showToast(message, type = 'info', duration = null) {
         if (window.QuickSiteUtils) {
@@ -1088,6 +1176,12 @@ const QuickSiteAdmin = {
 
     /**
      * Show a confirmation dialog - delegates to QuickSiteUtils
+     *
+     * ⚠ THE FALLBACK BODY BELOW IS UNREACHABLE. layout.php loads
+     * js/core/utils.js unconditionally and BEFORE admin.js, and there is no
+     * other load path for either file, so window.QuickSiteUtils is always
+     * defined by the time this runs. Its innerHTML was left as it is for the
+     * same reason as the dead methods above — see NOTES/reports/beta12/S3b.md.
      */
     async confirm(message, options = {}) {
         if (window.QuickSiteUtils) {
@@ -1175,17 +1269,7 @@ const QuickSiteAdmin = {
         wrapper.appendChild(textarea);
 
         // Add toolbar
-        const toolbar = document.createElement('div');
-        toolbar.className = 'admin-json-editor__toolbar';
-        toolbar.innerHTML = `
-            <button type="button" class="admin-btn admin-btn--small admin-btn--secondary" data-action="format">
-                Format JSON
-            </button>
-            <button type="button" class="admin-btn admin-btn--small admin-btn--secondary" data-action="validate">
-                Validate
-            </button>
-            <span class="admin-json-editor__status"></span>
-        `;
+        const toolbar = this._renderJsonToolbar();
         wrapper.insertBefore(toolbar, textarea);
 
         // Add validation indicator
@@ -1225,6 +1309,25 @@ const QuickSiteAdmin = {
                 this.setJsonStatus(statusEl, '✗', 'error');
             }
         });
+    },
+
+    /**
+     * The JSON editor's Format / Validate bar plus its status slot.
+     * Buttons keep their data-action hooks — initJsonEditor binds by selector.
+     * @returns {HTMLElement}
+     */
+    _renderJsonToolbar() {
+        const btn = (action, label) => QSDom.el('button', {
+            type: 'button',
+            class: 'admin-btn admin-btn--small admin-btn--secondary',
+            dataset: { action: action },
+            text: label
+        });
+        return QSDom.el('div', { class: 'admin-json-editor__toolbar' }, [
+            btn('format', this.t('commands.jsonEditor.format')),
+            btn('validate', this.t('common.validate')),
+            QSDom.el('span', { class: 'admin-json-editor__status' })
+        ]);
     },
 
     /**
@@ -1314,38 +1417,71 @@ const QuickSiteAdmin = {
     },
 
     /**
+     * One `<kbd>g</kbd> <kbd>d</kbd> <span>Dashboard</span>` row.
+     * @param {string[]} keys
+     * @param {string} label
+     * @returns {HTMLElement}
+     */
+    _renderShortcutRow(keys, label) {
+        const children = [];
+        keys.forEach(k => {
+            children.push(QSDom.el('kbd', { text: k }));
+            children.push(' ');
+        });
+        children.push(QSDom.el('span', { text: label }));
+        return QSDom.el('div', { class: 'admin-shortcut' }, children);
+    },
+
+    /**
+     * The keyboard-shortcuts help dialog.
+     *
+     * ⚠ The rows are written from what initKeyboardShortcuts ACTUALLY binds.
+     * The markup this replaced listed `g s → Structure` and `g t → Settings`;
+     * the switch has no `t` case at all, and its `s` case goes to /settings. So
+     * the panel documented one shortcut that does nothing and mislabelled
+     * another. Documentation corrected to match behaviour — changing the
+     * bindings instead would be a behaviour change, which this slice is not.
+     *
+     * @returns {HTMLElement}
+     */
+    _renderShortcutsModal() {
+        const nav = QSDom.el('div', { class: 'admin-shortcut-group' }, [
+            QSDom.el('h4', { text: this.t('shortcuts.navGroup') }),
+            this._renderShortcutRow(['g', 'd'], this.t('nav.dashboard')),
+            this._renderShortcutRow(['g', 'c'], this.t('nav.commands')),
+            this._renderShortcutRow(['g', 'h'], this.t('nav.history')),
+            this._renderShortcutRow(['g', 's'], this.t('nav.settings'))
+        ]);
+
+        const actions = QSDom.el('div', { class: 'admin-shortcut-group' }, [
+            QSDom.el('h4', { text: this.t('shortcuts.actionsGroup') }),
+            this._renderShortcutRow(['/'], this.t('shortcuts.focusSearch')),
+            this._renderShortcutRow(['?'], this.t('shortcuts.showHelp')),
+            this._renderShortcutRow(['Esc'], this.t('shortcuts.closeModal'))
+        ]);
+
+        return QSDom.el('div', { class: 'admin-modal-dialog admin-modal-dialog--shortcuts' }, [
+            QSDom.el('div', { class: 'admin-modal-dialog__content' }, [
+                QSDom.el('h3', { class: 'admin-modal-dialog__title', text: this.t('shortcuts.title') }),
+                QSDom.el('div', { class: 'admin-shortcuts-grid' }, [nav, actions]),
+                QSDom.el('div', { class: 'admin-modal-dialog__actions' }, [
+                    QSDom.el('button', {
+                        class: 'admin-btn admin-btn--primary admin-modal-dialog__close',
+                        text: this.t('common.close')
+                    })
+                ])
+            ])
+        ]);
+    },
+
+    /**
      * Show keyboard shortcuts help modal
      */
     showShortcutsHelp() {
         const overlay = document.createElement('div');
         overlay.className = 'admin-modal-overlay admin-modal-overlay--visible';
         
-        const modal = document.createElement('div');
-        modal.className = 'admin-modal-dialog admin-modal-dialog--shortcuts';
-        modal.innerHTML = `
-            <div class="admin-modal-dialog__content">
-                <h3 class="admin-modal-dialog__title">Keyboard Shortcuts</h3>
-                <div class="admin-shortcuts-grid">
-                    <div class="admin-shortcut-group">
-                        <h4>Navigation (g + key)</h4>
-                        <div class="admin-shortcut"><kbd>g</kbd> <kbd>d</kbd> <span>Dashboard</span></div>
-                        <div class="admin-shortcut"><kbd>g</kbd> <kbd>c</kbd> <span>Commands</span></div>
-                        <div class="admin-shortcut"><kbd>g</kbd> <kbd>h</kbd> <span>History</span></div>
-                        <div class="admin-shortcut"><kbd>g</kbd> <kbd>s</kbd> <span>Structure</span></div>
-                        <div class="admin-shortcut"><kbd>g</kbd> <kbd>t</kbd> <span>Settings</span></div>
-                    </div>
-                    <div class="admin-shortcut-group">
-                        <h4>Actions</h4>
-                        <div class="admin-shortcut"><kbd>/</kbd> <span>Focus search</span></div>
-                        <div class="admin-shortcut"><kbd>?</kbd> <span>Show this help</span></div>
-                        <div class="admin-shortcut"><kbd>Esc</kbd> <span>Close modal / blur input</span></div>
-                    </div>
-                </div>
-                <div class="admin-modal-dialog__actions">
-                    <button class="admin-btn admin-btn--primary admin-modal-dialog__close">Close</button>
-                </div>
-            </div>
-        `;
+        const modal = this._renderShortcutsModal();
 
         overlay.appendChild(modal);
         document.body.appendChild(overlay);

@@ -3327,6 +3327,21 @@ function renderCommandForm(doc) {
     } else {
         delete form.dataset.binaryResponse;
     }
+
+    // Destructive commands get an "are you sure" before they run. The panel
+    // already has this command's help doc in hand, so the flag rides across on
+    // the form exactly as binaryResponse above does — admin.js reads it in
+    // isDestructiveCommand() and there is no second help fetch.
+    //
+    // The flag names only what a command's NAME does not already reveal
+    // (transferOwnership, restoreBackup, importProject, deployBuild …); the
+    // gate falls back to a delete/remove/clear/reset/purge naming convention,
+    // so an obvious deleteFoo is covered whether or not anyone flagged it.
+    if (doc.destructive === true) {
+        form.dataset.destructive = '1';
+    } else {
+        delete form.dataset.destructive;
+    }
     
     // Generate form fields
     const params = doc.parameters || {};

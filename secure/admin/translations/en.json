@@ -480,6 +480,17 @@
         }
     },
     "commands": {
+        "uploading": "Uploading...",
+        "executing": "Executing...",
+        "responseStatus": "Status",
+        "errorLoadingOptions": "Error loading options",
+        "confirmDestructive": {
+            "title": "Confirm Action",
+            "message": "You are about to execute \":command\". This action may make permanent changes. Continue?"
+        },
+        "jsonEditor": {
+            "format": "Format JSON"
+        },
         "title": "Commands",
         "subtitle": "Browse and execute API commands",
         "tabs": {
@@ -922,6 +933,14 @@
         "deployUnmarkedBody": "The folder “{folder}” at this target has contents and carries no QuickSite deployment marker, so who owns it cannot be established — a deployment made before markers existed, or something else entirely. Going ahead writes this site's files into it; nothing is deleted.",
         "deployAdoptBtn": "Use it anyway",
         "optUnlock": "I want to change this"
+    },
+    "shortcuts": {
+        "title": "Keyboard Shortcuts",
+        "navGroup": "Navigation (g + key)",
+        "actionsGroup": "Actions",
+        "focusSearch": "Focus search",
+        "showHelp": "Show this help",
+        "closeModal": "Close modal / blur input"
     },
     "nav": {
         "members": "Members",

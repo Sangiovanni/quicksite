@@ -128,64 +128,158 @@
     }
 
     /**
-     * Render route tree as HTML
+     * One route row — a link carrying its icon, name, path and the
+     * external-link marker.
+     * @returns {HTMLElement}
+     */
+    function _renderRouteLink(url, name, routePath, cls, depth, iconPath, iconCls) {
+        const a = QSDom.el('a', {
+            href: url,
+            target: '_blank',
+            class: cls,
+            title: url,
+            style: '--depth: ' + depth
+        }, [
+            QSDom.iconEl(iconPath, 14, iconCls),
+            QSDom.el('span', { class: 'sitemap__route-name', text: name }),
+            QSDom.el('span', { class: 'sitemap__route-path', text: routePath }),
+            QSDom.iconEl(QuickSiteUtils.ICON_PATHS.externalLink, 12, 'sitemap__route-external')
+        ]);
+        return a;
+    }
+
+    /**
+     * Render the route tree.
+     *
+     * Returns a DocumentFragment rather than one element because a level of
+     * the tree is a SIBLING LIST — the markup this replaces concatenated
+     * siblings into a string with no wrapper, and adding one would change the
+     * CSS the sitemap depends on.
+     *
+     * @returns {DocumentFragment}
      */
     function renderRouteTree(tree, lang, depth = 0) {
-        let html = '';
+        const frag = document.createDocumentFragment();
         const entries = Object.entries(tree).filter(([key]) => key !== '_route');
-        
+
         entries.sort(([a], [b]) => {
             if (a === 'home') return -1;
             if (b === 'home') return 1;
             return a.localeCompare(b);
         });
-        
+
         entries.forEach(([name, node]) => {
             const route = node._route;
             const children = Object.entries(node).filter(([key]) => key !== '_route');
             const hasChildren = children.length > 0;
             const isHome = name === 'home';
-            
-            if (route) {
-                const url = route.urls[lang] || route.urls['default'];
-                const routePath = route.path;
-                
-                if (hasChildren) {
-                    const isExpanded = depth === 0;
-                    html += `<div class="sitemap__tree-node${isExpanded ? ' sitemap__tree-node--open' : ''}" style="--depth: ${depth}">
-                        <div class="sitemap__tree-header">
-                            <button class="sitemap__tree-toggle" type="button" aria-label="Toggle">
-                                ${QuickSiteUtils.iconChevronRight(12)}
-                            </button>
-                            <a href="${QuickSiteAdmin.escapeHtml(url)}" target="_blank" class="sitemap__route sitemap__route--parent" title="${QuickSiteAdmin.escapeHtml(url)}">
-                                ${QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.folder, 14, 'sitemap__route-icon')}
-                                <span class="sitemap__route-name">${name}</span>
-                                <span class="sitemap__route-path">${routePath}</span>
-                                ${QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.externalLink, 12, 'sitemap__route-external')}
-                            </a>
-                        </div>
-                        <div class="sitemap__tree-children">
-                            ${renderRouteTree(node, lang, depth + 1)}
-                        </div>
-                    </div>`;
-                } else {
-                    const iconPath = isHome 
-                        ? QuickSiteUtils.ICON_PATHS.home
-                        : QuickSiteUtils.ICON_PATHS.file;
-                    
-                    html += `<a href="${QuickSiteAdmin.escapeHtml(url)}" target="_blank" class="sitemap__route sitemap__route--leaf" style="--depth: ${depth}" title="${QuickSiteAdmin.escapeHtml(url)}">
-                        <svg class="sitemap__route-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                            ${iconPath}
-                        </svg>
-                        <span class="sitemap__route-name">${name}</span>
-                        <span class="sitemap__route-path">${routePath}</span>
-                        ${QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.externalLink, 12, 'sitemap__route-external')}
-                    </a>`;
-                }
+
+            if (!route) return;
+
+            const url = route.urls[lang] || route.urls['default'];
+            const routePath = route.path;
+
+            if (hasChildren) {
+                const isExpanded = depth === 0;
+                const toggle = QSDom.el('button', {
+                    class: 'sitemap__tree-toggle',
+                    type: 'button',
+                    'aria-label': 'Toggle'
+                }, [QSDom.iconEl(QuickSiteUtils.ICON_PATHS.chevronRight, 12)]);
+
+                const header = QSDom.el('div', { class: 'sitemap__tree-header' }, [
+                    toggle,
+                    _renderRouteLink(url, name, routePath,
+                        'sitemap__route sitemap__route--parent', depth,
+                        QuickSiteUtils.ICON_PATHS.folder, 'sitemap__route-icon')
+                ]);
+
+                const kids = QSDom.el('div', { class: 'sitemap__tree-children' }, [
+                    renderRouteTree(node, lang, depth + 1)
+                ]);
+
+                frag.appendChild(QSDom.el('div', {
+                    class: 'sitemap__tree-node' + (isExpanded ? ' sitemap__tree-node--open' : ''),
+                    style: '--depth: ' + depth
+                }, [header, kids]));
+            } else {
+                frag.appendChild(_renderRouteLink(url, name, routePath,
+                    'sitemap__route sitemap__route--leaf', depth,
+                    isHome ? QuickSiteUtils.ICON_PATHS.home : QuickSiteUtils.ICON_PATHS.file,
+                    'sitemap__route-icon'));
             }
         });
-        
-        return html;
+
+        return frag;
+    }
+
+    /**
+     * The counts line above the sitemap: URLs, routes, and either the language
+     * count or the "single language" badge.
+     * @returns {HTMLElement}
+     */
+    function _renderSitemapSummary(data, routes, languages, multilingual, sitemap) {
+        const dot = () => QSDom.el('span', { class: 'sitemap__divider', text: '\u2022' });
+        const children = [
+            QSDom.el('span', {
+                class: 'sitemap__total',
+                text: data.totalUrls + ' ' + (sitemap.urls || 'URLs')
+            }),
+            dot(),
+            QSDom.el('span', { text: routes.length + ' ' + (sitemap.routes || 'routes') }),
+            dot(),
+            multilingual
+                ? QSDom.el('span', {
+                    text: languages.length + ' ' + (sitemap.languages || 'languages')
+                })
+                : QSDom.el('span', {
+                    class: 'badge badge--ghost',
+                    text: sitemap.monolingual || 'Single language'
+                })
+        ];
+        return QSDom.el('div', { class: 'sitemap__summary' }, children);
+    }
+
+    /**
+     * One collapsible language block of the sitemap: its header (flag, name,
+     * default badge, page count, coverage) and its route tree.
+     * @returns {HTMLElement}
+     */
+    function _renderSitemapLanguage(lang, isDefault, languageNames, coverage, routeTree, routes, sitemap) {
+        const langName = languageNames[lang] || lang.toUpperCase();
+        const coveragePercent = coverage[lang]?.coverage_percent ?? null;
+
+        const header = QSDom.el('div', {
+            class: 'sitemap__lang-header',
+            dataset: { toggleLang: lang }
+        }, [
+            QSDom.iconEl(QuickSiteUtils.ICON_PATHS.chevronRight, 16, 'sitemap__lang-toggle'),
+            QSDom.el('span', { class: 'sitemap__lang-flag', text: getFlagEmoji(lang) }),
+            QSDom.el('span', { class: 'sitemap__lang-name', text: langName }),
+            isDefault
+                ? QSDom.el('span', { class: 'badge badge--primary', text: sitemap.default || 'Default' })
+                : null,
+            QSDom.el('span', {
+                class: 'sitemap__lang-count',
+                text: routes.length + ' ' + (sitemap.pages || 'pages')
+            }),
+            coveragePercent !== null
+                ? QSDom.el('span', {
+                    class: 'sitemap__lang-coverage ' + getCoverageClass(coveragePercent),
+                    text: coveragePercent + '%'
+                })
+                : null
+        ]);
+
+        const routesBox = QSDom.el('div', {
+            class: 'sitemap__routes sitemap__routes--tree'
+        }, [renderRouteTree(routeTree, lang)]);
+
+        // The default language is the one that starts open.
+        return QSDom.el('div', {
+            class: 'sitemap__lang' + (isDefault ? ' sitemap__lang--open' : ''),
+            dataset: { lang: lang }
+        }, [header, routesBox]);
     }
 
     /**
@@ -266,72 +360,35 @@
             const routes = data.routes || [];
             
             const routeTree = buildRouteTree(routes);
-            
-            let html = '<div class="sitemap">';
-            
-            if (multilingual) {
-                html += `<div class="sitemap__summary">
-                    <span class="sitemap__total">${data.totalUrls} ${sitemap.urls || 'URLs'}</span>
-                    <span class="sitemap__divider">•</span>
-                    <span>${routes.length} ${sitemap.routes || 'routes'}</span>
-                    <span class="sitemap__divider">•</span>
-                    <span>${languages.length} ${sitemap.languages || 'languages'}</span>
-                </div>`;
-            } else {
-                html += `<div class="sitemap__summary">
-                    <span class="sitemap__total">${data.totalUrls} ${sitemap.urls || 'URLs'}</span>
-                    <span class="sitemap__divider">•</span>
-                    <span>${routes.length} ${sitemap.routes || 'routes'}</span>
-                    <span class="sitemap__divider">•</span>
-                    <span class="badge badge--ghost">${sitemap.monolingual || 'Single language'}</span>
-                </div>`;
-            }
-            
+
+            const root = QSDom.el('div', { class: 'sitemap' }, [
+                _renderSitemapSummary(data, routes, languages, multilingual, sitemap)
+            ]);
+
             if (multilingual) {
                 const sortedLangs = [...languages].sort((a, b) => {
                     if (a === defaultLang) return -1;
                     if (b === defaultLang) return 1;
                     return a.localeCompare(b);
                 });
-                
-                html += '<div class="sitemap__languages">';
-                
+
+                const langsBox = QSDom.el('div', { class: 'sitemap__languages' });
                 sortedLangs.forEach((lang) => {
-                    const langName = languageNames[lang] || lang.toUpperCase();
-                    const isDefault = lang === defaultLang;
-                    const isOpen = isDefault;
-                    const langCoverage = coverage[lang];
-                    const coveragePercent = langCoverage?.coverage_percent ?? null;
-                    
-                    html += `<div class="sitemap__lang ${isOpen ? 'sitemap__lang--open' : ''}" data-lang="${lang}">`;
-                    
-                    html += `<div class="sitemap__lang-header" data-toggle-lang="${lang}">
-                        ${QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.chevronRight, 16, 'sitemap__lang-toggle')}
-                        <span class="sitemap__lang-flag">${getFlagEmoji(lang)}</span>
-                        <span class="sitemap__lang-name">${QuickSiteAdmin.escapeHtml(langName)}</span>
-                        ${isDefault ? `<span class="badge badge--primary">${sitemap.default || 'Default'}</span>` : ''}
-                        <span class="sitemap__lang-count">${routes.length} ${sitemap.pages || 'pages'}</span>
-                        ${coveragePercent !== null ? `<span class="sitemap__lang-coverage ${getCoverageClass(coveragePercent)}">${coveragePercent}%</span>` : ''}
-                    </div>`;
-                    
-                    html += '<div class="sitemap__routes sitemap__routes--tree">';
-                    html += renderRouteTree(routeTree, lang);
-                    html += '</div>';
-                    
-                    html += '</div>';
+                    langsBox.appendChild(_renderSitemapLanguage(
+                        lang, lang === defaultLang, languageNames, coverage,
+                        routeTree, routes, sitemap
+                    ));
                 });
-                
-                html += '</div>';
+                root.appendChild(langsBox);
             } else {
-                html += '<div class="sitemap__routes sitemap__routes--flat sitemap__routes--tree">';
-                html += renderRouteTree(routeTree, 'default');
-                html += '</div>';
+                root.appendChild(QSDom.el('div', {
+                    class: 'sitemap__routes sitemap__routes--flat sitemap__routes--tree'
+                }, [renderRouteTree(routeTree, 'default')]));
             }
-            
-            html += '</div>';
-            
-            container.innerHTML = html;
-            
+
+            QSDom.clear(container);
+            container.appendChild(root);
+
             // Event delegation for toggles
             container.addEventListener('click', function(e) {
                 const header = e.target.closest('[data-toggle-lang]');
@@ -343,7 +400,7 @@
                         langEl.classList.toggle('sitemap__lang--open');
                     }
                 }
-                
+
                 const treeToggle = e.target.closest('.sitemap__tree-toggle');
                 if (treeToggle) {
                     e.preventDefault();
@@ -354,14 +411,11 @@
                     }
                 }
             });
-            
+
         } catch (error) {
             console.error('Failed to load sitemap:', error);
-            container.innerHTML = `
-                <div class="admin-empty" style="padding: var(--space-lg);">
-                    <p>${sitemap.error || 'Failed to load site map'}</p>
-                </div>
-            `;
+            QSDom.clear(container);
+            container.appendChild(_renderEmpty(sitemap.error || 'Failed to load site map', true));
         }
     }
 
@@ -369,53 +423,72 @@
     // Recent Commands
     // ========================================================================
 
+    /**
+     * One row of the recent-commands table.
+     * @returns {HTMLElement}
+     */
+    function _renderRecentCommandRow(entry, common) {
+        const httpStatus = entry.result?.http_status || entry.result?.status;
+        const isSuccess = typeof httpStatus === 'number'
+            ? httpStatus >= 200 && httpStatus < 300
+            : httpStatus === 'success';
+
+        return QSDom.el('tr', null, [
+            QSDom.el('td', null, [QSDom.el('code', { text: entry.command })]),
+            QSDom.el('td', null, [
+                QSDom.el('span', {
+                    class: 'badge ' + (isSuccess ? 'badge--success' : 'badge--error'),
+                    text: isSuccess ? (common.success || 'Success') : (common.error || 'Error')
+                })
+            ]),
+            QSDom.el('td', { text: entry.duration_ms + 'ms' }),
+            QSDom.el('td', { text: new Date(entry.timestamp).toLocaleString() })
+        ]);
+    }
+
+    /**
+     * The recent-commands table: header row plus one row per entry.
+     * @returns {HTMLElement}
+     */
+    function _renderRecentCommandsTable(entries, cols, common) {
+        const head = QSDom.el('thead', null, [
+            QSDom.el('tr', null, [
+                QSDom.el('th', { text: cols.command || 'Command' }),
+                QSDom.el('th', { text: cols.status || 'Status' }),
+                QSDom.el('th', { text: cols.duration || 'Duration' }),
+                QSDom.el('th', { text: cols.time || 'Time' })
+            ])
+        ]);
+
+        const body = QSDom.el('tbody');
+        entries.forEach(entry => body.appendChild(_renderRecentCommandRow(entry, common)));
+
+        return QSDom.el('table', { class: 'admin-table' }, [head, body]);
+    }
+
     async function loadRecentCommands() {
         const container = document.getElementById('recent-commands');
         const cols = t('dashboard.history.columns', {});
         const common = t('common', {});
         const noHistoryText = t('dashboard.noHistory', 'No recent commands');
-        
+
+        const showEmpty = () => {
+            QSDom.clear(container);
+            container.appendChild(_renderEmpty(noHistoryText, true));
+        };
+
         try {
             const result = await QuickSiteAdmin.apiRequest('getCommandHistory', 'GET', null, []);
-            
+
             if (result.ok && result.data.data?.entries?.length > 0) {
                 const entries = result.data.data.entries.slice(0, 5);
-                
-                let html = '<table class="admin-table"><thead><tr>';
-                html += `<th>${cols.command || 'Command'}</th><th>${cols.status || 'Status'}</th><th>${cols.duration || 'Duration'}</th><th>${cols.time || 'Time'}</th>`;
-                html += '</tr></thead><tbody>';
-                
-                entries.forEach(entry => {
-                    const httpStatus = entry.result?.http_status || entry.result?.status;
-                    const isSuccess = typeof httpStatus === 'number' 
-                        ? httpStatus >= 200 && httpStatus < 300
-                        : httpStatus === 'success';
-                    const statusClass = isSuccess ? 'badge--success' : 'badge--error';
-                    const statusText = isSuccess ? (common.success || 'Success') : (common.error || 'Error');
-                    
-                    html += `<tr>
-                        <td><code>${QuickSiteAdmin.escapeHtml(entry.command)}</code></td>
-                        <td><span class="badge ${statusClass}">${statusText}</span></td>
-                        <td>${entry.duration_ms}ms</td>
-                        <td>${new Date(entry.timestamp).toLocaleString()}</td>
-                    </tr>`;
-                });
-                
-                html += '</tbody></table>';
-                container.innerHTML = html;
+                QSDom.clear(container);
+                container.appendChild(_renderRecentCommandsTable(entries, cols, common));
             } else {
-                container.innerHTML = `
-                    <div class="admin-empty" style="padding: var(--space-lg);">
-                        <p>${noHistoryText}</p>
-                    </div>
-                `;
+                showEmpty();
             }
         } catch (error) {
-            container.innerHTML = `
-                <div class="admin-empty" style="padding: var(--space-lg);">
-                    <p>${noHistoryText}</p>
-                </div>
-            `;
+            showEmpty();
         }
     }
 
@@ -431,10 +504,35 @@
         return (sel && sel.value) ? sel.value : currentProject;
     }
 
-    // Folder icon as an ELEMENT (QuickSiteUtils.icon* return HTML strings, which
-    // can't be QSDom children without re-introducing innerHTML).
+    // Folder icon as an ELEMENT. QuickSiteUtils.icon* return HTML STRINGS; the
+    // element-shaped route through the same catalogue is QSDom.iconEl.
+    //
+    // ⚠ This one keeps its own path rather than moving to ICON_PATHS.folder:
+    // the two are DIFFERENT drawings (this is the tabbed folder, the catalogue's
+    // is the square-cornered one), so switching would quietly change the icon
+    // in the project-manager rows. Unifying them is a design call, not a
+    // refactor — flagged in NOTES/reports/beta12/S3b.md rather than taken here.
     function _folderIcon(size) {
         return QSDom.svgIcon('M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z', size || 18);
+    }
+
+    /** The panel's spinner-plus-label loading block. @returns {HTMLElement} */
+    function _renderLoading(text) {
+        const spinner = QSDom.el('span', { class: 'admin-spinner' });
+        return QSDom.el('div', { class: 'admin-loading' }, [spinner, ' ' + text]);
+    }
+
+    /** A red alert box holding one message. @returns {HTMLElement} */
+    function _renderAlertError(message) {
+        return QSDom.el('div', { class: 'admin-alert admin-alert--error', text: message });
+    }
+
+    /** The "nothing here" block. @returns {HTMLElement} */
+    function _renderEmpty(text, pad) {
+        return QSDom.el('div',
+            pad ? { class: 'admin-empty', style: 'padding: var(--space-lg);' }
+                : { class: 'admin-empty' },
+            [QSDom.el('p', { text: text })]);
     }
 
     async function loadProjectManager() {
@@ -1017,8 +1115,7 @@
             
             if (!newProject || newProject === currentProject) return;
             
-            this.disabled = true;
-            this.innerHTML = QuickSiteUtils.htmlSpinner() + ' ' + (common.loading || 'Switching...');
+            QSDom.setButtonBusy(this, common.loading || 'Switching...');
             try {
                 // C9 — the dashboard's project switch changes which project you EDIT,
                 // the SAME as the header picker; it does NOT change the served main
@@ -1066,8 +1163,7 @@
                 return;
             }
             
-            this.disabled = true;
-            this.innerHTML = QuickSiteUtils.htmlSpinner() + ' ' + (proj.cloning || 'Cloning...');
+            QSDom.setButtonBusy(this, proj.cloning || 'Cloning...');
             try {
                 // Source = the selected target project (bound to the URL marker
                 // server-side); body carries only the new name + switch_to.
@@ -1112,8 +1208,7 @@
                 return;
             }
             
-            this.disabled = true;
-            this.innerHTML = QuickSiteUtils.htmlSpinner() + ' ' + (common.loading || 'Creating...');
+            QSDom.setButtonBusy(this, common.loading || 'Creating...');
             try {
                 const result = await QuickSiteAdmin.apiRequest('createProject', 'POST', {
                     name: name,
@@ -1144,9 +1239,7 @@
         
         // Export project
         document.getElementById('btn-export-project').addEventListener('click', async function() {
-            this.disabled = true;
-            const originalText = this.textContent;
-            this.innerHTML = '<span class="spinner"></span> ' + (proj.exporting || 'Exporting...');
+            const originalText = QSDom.setButtonBusy(this, proj.exporting || 'Exporting...');
 
             try {
                 // exportProject streams a binary ZIP (can't go through request()), but
@@ -1250,9 +1343,7 @@
         
         // Backup project
         document.getElementById('btn-backup-project').addEventListener('click', async function() {
-            this.disabled = true;
-            const originalText = this.textContent;
-            this.innerHTML = '<span class="spinner"></span> ' + (proj.backing_up || 'Creating backup...');
+            const originalText = QSDom.setButtonBusy(this, proj.backing_up || 'Creating backup...');
             
             try {
                 const result = await QuickSiteAdmin.apiRequest('backupProject', 'GET', null, [], {}, { project: getTargetProject() });
@@ -1272,7 +1363,7 @@
             }
             
             this.disabled = false;
-            this.innerHTML = originalText;
+            this.textContent = originalText;
         });
         
         // Restore backup modal — pin the target project the modal operates on.
@@ -1382,7 +1473,8 @@
         const common = t('common', {});
         const target = restoreTargetProject || currentProject;
 
-        container.innerHTML = QuickSiteUtils.htmlLoading(common.loading || 'Loading...');
+        QSDom.clear(container);
+        container.appendChild(_renderLoading(common.loading || 'Loading...'));
 
         let result;
         try {
@@ -1525,25 +1617,25 @@
             const type = this.value;
             
             if (!type) {
-                nameSelect.innerHTML = `<option value="">${trans.typeFirst || 'Select type first...'}</option>`;
+                QSDom.setSelectPlaceholder(nameSelect, trans.typeFirst || 'Select type first...');
                 nameSelect.disabled = true;
                 loadBtn.disabled = true;
                 return;
             }
             
             if (type === 'menu' || type === 'footer') {
-                nameSelect.innerHTML = `<option value="">${(trans.notRequired || 'Not required for :type').replace(':type', type)}</option>`;
+                QSDom.setSelectPlaceholder(nameSelect, (trans.notRequired || 'Not required for :type').replace(':type', type));
                 nameSelect.disabled = true;
                 loadBtn.disabled = false;
             } else {
                 nameSelect.disabled = true;
-                nameSelect.innerHTML = '<option value="">Loading...</option>';
+                QSDom.setSelectPlaceholder(nameSelect, t('common.loading'));
                 
                 try {
                     const endpoint = type === 'page' ? 'pages' : 'components';
                     const options = await QuickSiteAdmin.fetchHelperData(endpoint);
                     
-                    nameSelect.innerHTML = `<option value="">${(trans.selectType || 'Select :type...').replace(':type', type)}</option>`;
+                    QSDom.setSelectPlaceholder(nameSelect, (trans.selectType || 'Select :type...').replace(':type', type));
                     options.forEach(opt => {
                         const option = document.createElement('option');
                         option.value = opt.value;
@@ -1552,7 +1644,7 @@
                     });
                     nameSelect.disabled = false;
                 } catch (error) {
-                    nameSelect.innerHTML = '<option value="">Error loading options</option>';
+                    QSDom.setSelectPlaceholder(nameSelect, t('commands.errorLoadingOptions'));
                 }
                 
                 loadBtn.disabled = true;
@@ -1581,7 +1673,8 @@
         
         const trans = window.QUICKSITE_CONFIG?.translations?.structure?.tree || {};
         
-        treeContainer.innerHTML = QuickSiteUtils.htmlLoading(trans.loading || 'Loading structure...');
+        QSDom.clear(treeContainer);
+        treeContainer.appendChild(_renderLoading(trans.loading || 'Loading structure...'));
         
         try {
             let urlParams = [type];
@@ -1600,18 +1693,16 @@
                 };
                 renderDashboardStructureTree(result.data.data.structure, treeContainer);
             } else {
-                treeContainer.innerHTML = `
-                    <div class="admin-alert admin-alert--error">
-                        ${result.data?.message || trans.loadFailed || 'Failed to load structure'}
-                    </div>
-                `;
+                QSDom.clear(treeContainer);
+                treeContainer.appendChild(_renderAlertError(
+                    result.data?.message || trans.loadFailed || 'Failed to load structure'
+                ));
             }
         } catch (error) {
-            treeContainer.innerHTML = `
-                <div class="admin-alert admin-alert--error">
-                    Error: ${error.message}
-                </div>
-            `;
+            QSDom.clear(treeContainer);
+            treeContainer.appendChild(_renderAlertError(
+                t('common.error') + ': ' + error.message
+            ));
         }
     }
 
@@ -1621,72 +1712,113 @@
     function renderDashboardStructureTree(structure, container) {
         if (!structure || (Array.isArray(structure) && structure.length === 0)) {
             const trans = window.QUICKSITE_CONFIG?.translations?.structure?.tree || {};
-            container.innerHTML = `<div class="admin-empty"><p>${trans.isEmpty || 'Structure is empty'}</p></div>`;
+            QSDom.clear(container);
+            container.appendChild(_renderEmpty(trans.isEmpty || 'Structure is empty'));
             return;
         }
         
         const tree = Array.isArray(structure) ? structure : [structure];
-        container.innerHTML = renderDashboardNodes(tree, 0, '');
+        QSDom.clear(container);
+        container.appendChild(renderDashboardNodes(tree, 0, ''));
     }
 
     /**
-     * Render tree nodes recursively for dashboard
+     * The label spans describing one node: <tag#id.class>, <Component/>,
+     * {{translation.key}}, "raw text", or <unknown> — then its [nodeId].
+     *
+     * The angle brackets are TEXT here. They were &lt;/&gt; entities while this
+     * was built as a string; textContent takes the characters themselves, so
+     * the rendered result is identical.
+     *
+     * @returns {Node[]} the spans, in order
+     */
+    function _renderNodeLabel(node, element, attributes, nodeId) {
+        const span = (cls, text) => QSDom.el('span', { class: cls, text: text });
+        const parts = [];
+
+        if (node.component) {
+            parts.push(span('admin-tree__component', '<' + node.component + '/>'));
+        } else if (node.tag) {
+            parts.push(span('admin-tree__element', '<' + element));
+            if (attributes.id) {
+                parts.push(span('admin-tree__attr-id', '#' + attributes.id));
+            }
+            if (attributes.class) {
+                const classes = Array.isArray(attributes.class)
+                    ? attributes.class.join(' ')
+                    : attributes.class;
+                parts.push(span('admin-tree__attr-class', '.' + classes.replace(/\s+/g, '.')));
+            }
+            parts.push(span('admin-tree__element', '>'));
+        } else if (node.textKey) {
+            parts.push(span('admin-tree__trans', '{{' + node.textKey + '}}'));
+        } else if (node.text) {
+            const preview = node.text.length > 30
+                ? node.text.substring(0, 30) + '...'
+                : node.text;
+            parts.push(span('admin-tree__text', '"' + preview + '"'));
+        } else {
+            parts.push(span('admin-tree__element', '<unknown>'));
+        }
+
+        parts.push(span('admin-tree__node-id', '[' + nodeId + ']'));
+        return parts;
+    }
+
+    /**
+     * The expand/collapse triangle for a node that has children.
+     *
+     * What this replaces carried the entire toggle as an inline onclick
+     * attribute, quote-escaped through two levels of string literal. Same
+     * behaviour, as a listener.
+     *
+     * @returns {HTMLElement}
+     */
+    function _renderTreeToggle() {
+        const toggle = QSDom.el('span', { class: 'admin-tree__toggle', text: '\u25b6' });
+        toggle.addEventListener('click', function (event) {
+            event.stopPropagation();
+            const item = toggle.closest('.admin-tree__item');
+            if (!item) return;
+            const expanded = item.classList.toggle('admin-tree__item--expanded');
+            toggle.textContent = expanded ? '\u25bc' : '\u25b6';
+        });
+        return toggle;
+    }
+
+    /**
+     * Render tree nodes recursively for dashboard.
+     * @returns {HTMLElement} ONE <ul>
      */
     function renderDashboardNodes(nodes, depth, parentPath) {
-        let html = '<ul class="admin-tree">';
-        
+        const ul = QSDom.el('ul', { class: 'admin-tree' });
+
         nodes.forEach((node, index) => {
-            const nodePath = parentPath ? `${parentPath}.${index}` : `${index}`;
+            const nodePath = parentPath ? parentPath + '.' + index : String(index);
             const nodeId = node._nodeId ?? nodePath;
-            
+
             const element = node.tag || node.component || (node.textKey ? 'text' : (node.text ? 'raw' : 'node'));
             const hasChildren = node.children && node.children.length > 0;
             const attributes = node.params || {};
-            
-            // Build label
-            let label = '';
-            if (node.component) {
-                label = `<span class="admin-tree__component">&lt;${QuickSiteAdmin.escapeHtml(node.component)}/&gt;</span>`;
-            } else if (node.tag) {
-                label = `<span class="admin-tree__element">&lt;${element}</span>`;
-                
-                if (attributes.id) {
-                    label += `<span class="admin-tree__attr-id">#${QuickSiteAdmin.escapeHtml(attributes.id)}</span>`;
-                }
-                if (attributes.class) {
-                    const classes = Array.isArray(attributes.class) ? attributes.class.join(' ') : attributes.class;
-                    label += `<span class="admin-tree__attr-class">.${QuickSiteAdmin.escapeHtml(classes.replace(/\s+/g, '.'))}</span>`;
-                }
-                
-                label += `<span class="admin-tree__element">&gt;</span>`;
-            } else if (node.textKey) {
-                label = `<span class="admin-tree__trans">{{${QuickSiteAdmin.escapeHtml(node.textKey)}}}</span>`;
-            } else if (node.text) {
-                const preview = node.text.length > 30 ? node.text.substring(0, 30) + '...' : node.text;
-                label = `<span class="admin-tree__text">"${QuickSiteAdmin.escapeHtml(preview)}"</span>`;
-            } else {
-                label = `<span class="admin-tree__element">&lt;unknown&gt;</span>`;
-            }
-            
-            label += `<span class="admin-tree__node-id">[${nodeId}]</span>`;
-            
-            html += `
-                <li class="admin-tree__item ${hasChildren ? 'admin-tree__item--has-children' : ''}" data-node-id="${nodeId}">
-                    <div class="admin-tree__row">
-                        ${hasChildren ? '<span class="admin-tree__toggle" onclick="event.stopPropagation(); this.closest(\'.admin-tree__item\').classList.toggle(\'admin-tree__item--expanded\'); this.textContent = this.closest(\'.admin-tree__item\').classList.contains(\'admin-tree__item--expanded\') ? \'▼\' : \'▶\';">▶</span>' : '<span class="admin-tree__spacer"></span>'}
-                        ${label}
-                    </div>
-            `;
-            
+
+            const row = QSDom.el('div', { class: 'admin-tree__row' }, [
+                hasChildren ? _renderTreeToggle() : QSDom.el('span', { class: 'admin-tree__spacer' })
+            ]);
+            _renderNodeLabel(node, element, attributes, nodeId).forEach(n => row.appendChild(n));
+
+            const li = QSDom.el('li', {
+                class: 'admin-tree__item' + (hasChildren ? ' admin-tree__item--has-children' : ''),
+                dataset: { nodeId: String(nodeId) }
+            }, [row]);
+
             if (hasChildren) {
-                html += renderDashboardNodes(node.children, depth + 1, nodePath);
+                li.appendChild(renderDashboardNodes(node.children, depth + 1, nodePath));
             }
-            
-            html += '</li>';
+
+            ul.appendChild(li);
         });
-        
-        html += '</ul>';
-        return html;
+
+        return ul;
     }
 
     /**
@@ -1715,7 +1847,11 @@
         const confirmRestoreBtn = document.getElementById('btn-confirm-restore');
         if (!confirmRestoreBtn) return;
 
-        const restoreSvg = QuickSiteUtils.iconRefresh(16);
+        // The button's resting label, rebuilt after a failed restore.
+        const restoreLabel = () => [
+            QSDom.iconEl(QuickSiteUtils.ICON_PATHS.refresh, 16),
+            ' ' + (t('dashboard.projects', {}).restoreBtn || 'Restore')
+        ];
 
         confirmRestoreBtn.addEventListener('click', async function() {
             if (!pendingRestoreBackup) return;
@@ -1723,8 +1859,7 @@
             const proj = t('dashboard.projects', {});
             const createBackup = document.getElementById('restore-create-backup').checked;
             
-            this.disabled = true;
-            this.innerHTML = QuickSiteUtils.htmlSpinner(16) + ' ' + (proj.restoring || 'Restoring...');
+            QSDom.setButtonBusy(this, proj.restoring || 'Restoring...', { size: 16 });
             
             try {
                 const result = await QuickSiteAdmin.apiRequest('restoreBackup', 'POST', {
@@ -1739,12 +1874,14 @@
                 } else {
                     QuickSiteAdmin.showToast(result.data?.message || 'Failed to restore backup', 'error');
                     this.disabled = false;
-                    this.innerHTML = `${restoreSvg} ${proj.restoreBtn || 'Restore'}`;
+                    QSDom.clear(this);
+                    restoreLabel().forEach(n => this.append(n));
                 }
             } catch (error) {
                 QuickSiteAdmin.showToast('Failed to restore backup', 'error');
                 this.disabled = false;
-                this.innerHTML = `${restoreSvg} ${proj.restoreBtn || 'Restore'}`;
+                QSDom.clear(this);
+                restoreLabel().forEach(n => this.append(n));
             }
         });
     }
