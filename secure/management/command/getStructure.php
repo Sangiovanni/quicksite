@@ -59,6 +59,17 @@ function __command_getStructure(array $params = [], array $urlParams = []): ApiR
             ]);
     }
 
+    // Special pages that exist but are not in ROUTES (error pages, etc.).
+    // Declared up here, not beside the existence check further down, because the
+    // route-or-nodeId decision below has to know about them too.
+    $specialPages = ['404', '500', '403', '401'];
+
+    // Which trailing segment, if any, the page branch took as an option. It is
+    // decided once, while the route path is being resolved, and reused when the
+    // option is interpreted: the same segment cannot be both the page name and a
+    // node selector, and letting the two decisions disagree is the defect below.
+    $pageOption = null;
+
 // For pages and components, name is from URL segments
     if ($type === 'page' || $type === 'component') {
         if (!isset($urlParams[1]) || empty($urlParams[1])) {
@@ -66,22 +77,41 @@ function __command_getStructure(array $params = [], array $urlParams = []): ApiR
                 ->withMessage("Name required in URL for type={$type}")
                 ->withErrors([['field' => 'name', 'reason' => 'missing', 'usage' => "GET /management/getStructure/{$type}/{name}"]]);
         }
-        
+
         // For pages, support nested routes: getStructure/page/guides/getting-started
         // Collect all URL segments after type as the route path
         if ($type === 'page') {
             $routeSegments = array_slice($urlParams, 1);
-            
+
             // Check if last segment is a special option (showIds, summary, or nodeId)
             $lastSegment = end($routeSegments);
             if ($lastSegment === 'showIds' || $lastSegment === 'summary') {
                 // Remove option from route segments
+                $pageOption = $lastSegment;
                 array_pop($routeSegments);
             } elseif ($lastSegment !== false && RegexPatterns::match('node_id', $lastSegment)) {
-                // Last segment is a nodeId - remove it from route segments
-                array_pop($routeSegments);
+                // A nodeId and an all-digit PAGE NAME are spelled the same way:
+                // '404', '2024' both satisfy the node_id pattern. Resolve the
+                // WHOLE path as a route first and read the tail as a nodeId only
+                // if that misses. Popping first meant getStructure/page/404 asked
+                // for the page named '' — so the $specialPages allowance below
+                // could never fire for the very pages it names — and
+                // getStructure/page/blog/2024 quietly answered with page 'blog'.
+                $wholePath = implode('/', array_filter($routeSegments, fn($s) => $s !== ''));
+                $isRoutedPage = routeExists($wholePath, ROUTES)
+                    || in_array($wholePath, $specialPages, true);
+                // AND a structure file, not just a route. routeExists() filters
+                // its segments with a bare array_filter(), and '0' is falsy in
+                // PHP — so it drops a '0' segment and reports 'home/0' as an
+                // existing route. Requiring the file too makes this decision
+                // immune to that, and the file is what gets read next anyway.
+                if (!$isRoutedPage || resolvePageJsonPath($wholePath) === null) {
+                    // Not a page in its own right: the tail really is a nodeId.
+                    $pageOption = $lastSegment;
+                    array_pop($routeSegments);
+                }
             }
-            
+
             // Filter out empty segments
             $routeSegments = array_filter($routeSegments, fn($s) => $s !== '');
             $name = implode('/', $routeSegments);
@@ -132,9 +162,6 @@ function __command_getStructure(array $params = [], array $urlParams = []): ApiR
                     ->withErrors([RegexPatterns::validationError('identifier_alphanum', 'name', $segment)]);
             }
         }
-        
-        // Special pages that exist but are not in ROUTES (error pages, etc.)
-        $specialPages = ['404', '500', '403', '401'];
         
         // Validate page exists (only for pages, not components)
         // Allow special pages (404, 500, etc.) even if not in ROUTES
@@ -187,12 +214,17 @@ function __command_getStructure(array $params = [], array $urlParams = []): ApiR
     // For menu/footer: urlParams[1] would be the option
     $optionSegment = null;
     
-    if ($type === 'page' || $type === 'component') {
-        // For pages/components, use the last segment if it looks like an option
-        $lastSeg = end($urlParams);
-        if ($lastSeg === 'showIds' || $lastSeg === 'summary' || RegexPatterns::match('node_id', $lastSeg)) {
-            $optionSegment = $lastSeg;
-        }
+    if ($type === 'page') {
+        // Already decided while the route path was resolved. Re-reading the last
+        // segment here is what made the fix above incomplete on its own: with the
+        // name correctly kept as '404', end($urlParams) still said '404', and the
+        // 404 page was then asked for its node number 404.
+        $optionSegment = $pageOption;
+    } elseif ($type === 'component') {
+        // A component name is always exactly one segment, so the option is always
+        // the third. end() would read an all-digit component NAME as a nodeId,
+        // the same confusion the page branch above had to resolve.
+        $optionSegment = $urlParams[2] ?? null;
     } else {
         // For menu/footer, option is simply the second segment
         $optionSegment = $urlParams[1] ?? null;

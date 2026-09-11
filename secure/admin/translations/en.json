@@ -655,10 +655,6 @@
             "clearListTitle": "Clear deletion list",
             "hint": "Hold Ctrl/Cmd to select multiple keys. Unused keys are safe to delete."
         },
-        "fileUpload": {
-            "dropHint": "Click to select a file or drag and drop",
-            "maxSize": "Max file size: 10MB"
-        },
         "field": {
             "urlSegment": "(URL segment)",
             "date": "Date",

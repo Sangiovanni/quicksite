@@ -307,10 +307,9 @@ async function initEnhancedFeatures() {
         case 'deleteAsset':
             await initDeleteAssetForm();
             break;
-        case 'downloadAsset':
         case 'editAsset':
             await initAssetSelectForm();
-            if (COMMAND_NAME === 'editAsset') initEditAssetExtensionHint();
+            initEditAssetExtensionHint();
             break;
         case 'listAssets':
             await initListAssetsForm();
@@ -325,7 +324,6 @@ async function initEnhancedFeatures() {
         case 'addRoute':
             await initAddRouteParentSelect();
             break;
-        case 'removeLang':
         case 'getTranslation':
         case 'getTranslationKeys':
         case 'validateTranslations':
@@ -1310,28 +1308,37 @@ async function initBuildSelectForm() {
  */
 async function initClearHistoryForm() {
     const form = document.getElementById('command-form');
+
+    // `before` declares ui_type 'date' in help.php, so renderFormField has
+    // ALREADY built the date-picker widget: a date input, an Apply button, and
+    // the "Or enter manually" field that carries the submitted value.
+    //
+    // This function used to replace that manual field with a second date input.
+    // Two consequences: the Apply button wrote to an element id that no longer
+    // existed, so it silently did nothing; and a field labelled "enter manually"
+    // was itself a date picker. Enhance the picker the form already has instead.
+    const today = new Date().toISOString().split('T')[0];
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const defaultDate = thirtyDaysAgo.toISOString().split('T')[0];
+
     const beforeInput = form.querySelector('[name="before"]');
-    
-    if (beforeInput && beforeInput.type !== 'date') {
-        // Convert text input to date input
-        const dateInput = document.createElement('input');
-        dateInput.type = 'date';
-        dateInput.name = 'before';
-        dateInput.className = 'admin-input';
-        dateInput.required = beforeInput.required;
-        
-        // Set max date to today
-        const today = new Date().toISOString().split('T')[0];
-        dateInput.max = today;
-        
-        // Set a sensible default (30 days ago)
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        dateInput.value = thirtyDaysAgo.toISOString().split('T')[0];
-        
-        beforeInput.replaceWith(dateInput);
+    // The picker's own date input is bound to the value field by id — the
+    // association renderFormField sets up — so find it that way rather than
+    // rebuilding the id here.
+    const picker = beforeInput && beforeInput.id
+        ? form.querySelector('[data-datetime-date="' + beforeInput.id + '"]')
+        : null;
+    if (picker) {
+        picker.max = today;            // nothing later than today is clearable
+        picker.value = defaultDate;
     }
-    
+    // Seed the submitted field too, so the form arrives ready to run — what the
+    // old conversion gave — and so Apply visibly changes something.
+    if (beforeInput && !beforeInput.value) {
+        beforeInput.value = defaultDate;
+    }
+
     // Add hint. `confirm` is the command's own parameter name, so it stays
     // literal inside the <code> — only the sentence around it is translated.
     const hint = _renderHint([
@@ -2675,7 +2682,8 @@ async function initEditComponentToNodeForm() {
 }
 
 /**
- * Initialize language selection for removeLang, getTranslation, etc.
+ * Initialize language selection for getTranslation, validateTranslations and the
+ * other read-only language commands.
  */
 async function initLanguageSelectForm() {
     const form = document.getElementById('command-form');
@@ -2696,13 +2704,10 @@ async function initLanguageSelectForm() {
         
         await QuickSiteAdmin.populateSelect(langSelect, 'languages', [], 'Select language...');
 
-        // Refresh language list after successful removal
-        form.addEventListener('command-success', async (e) => {
-            if (e.detail.command === 'removeLang') {
-                await QuickSiteAdmin.populateSelect(langSelect, 'languages', [], 'Select language...');
-                langSelect.selectedIndex = 0;
-            }
-        });
+        // No refresh-after-success listener: every command that reaches this form
+        // is read-only, so the language list cannot go stale under it. The one
+        // command here that DID delete a language takes `code` rather than
+        // `lang`, so it renders a different form entirely.
     }
 }
 
@@ -3285,86 +3290,6 @@ async function initDeleteTranslationKeysForm() {
 }
 
 /**
- * Initialize file upload forms with drag-and-drop
- */
-function initFileUploadForm() {
-    const form = document.getElementById('command-form');
-    const fileInputs = form.querySelectorAll('input[type="file"]');
-    
-    fileInputs.forEach(input => {
-        // Wrap in styled container
-        const wrapper = document.createElement('div');
-        wrapper.className = 'admin-file-input';
-        input.parentNode.insertBefore(wrapper, input);
-        wrapper.appendChild(input);
-        
-        // Add label. The icon is the ONE innerHTML this file keeps: its source is
-        // QuickSiteUtils.ICON_PATHS, a static in-tree constant of SVG shapes, and
-        // ICON_PATHS.upload is three shapes rather than the single path QSDom's
-        // own svgIcon builds. CLAUDE.md's HTML-in-JS rule names exactly this case
-        // ("small SVG icons ... where the indirection costs more than it gains");
-        // copying the coordinates here instead would duplicate a shared constant.
-        const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        icon.setAttribute('class', 'admin-file-input__icon');
-        icon.setAttribute('viewBox', '0 0 24 24');
-        icon.setAttribute('fill', 'none');
-        icon.setAttribute('stroke', 'currentColor');
-        icon.setAttribute('stroke-width', '2');
-        icon.setAttribute('aria-hidden', 'true');
-        icon.innerHTML = QuickSiteUtils.ICON_PATHS.upload;
-
-        const label = QSDom.el('div', { class: 'admin-file-input__label' }, [
-            icon,
-            QSDom.el('div', { class: 'admin-file-input__text' }, [
-                QSDom.el('span', { text: t('commandForm.fileUpload.dropHint') }),
-                QSDom.el('span', {
-                    class: 'admin-file-input__hint',
-                    text: t('commandForm.fileUpload.maxSize')
-                })
-            ])
-        ]);
-        wrapper.appendChild(label);
-        
-        // Preview container
-        const preview = document.createElement('div');
-        preview.className = 'admin-file-input__preview';
-        preview.style.display = 'none';
-        wrapper.appendChild(preview);
-        
-        // Handle file selection
-        input.addEventListener('change', () => {
-            const file = input.files[0];
-            if (file) {
-                preview.textContent = `Selected: ${file.name} (${formatFileSize(file.size)})`;
-                preview.style.display = 'block';
-            } else {
-                preview.style.display = 'none';
-            }
-        });
-        
-        // Drag and drop handling
-        wrapper.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            wrapper.classList.add('admin-file-input--dragover');
-        });
-        
-        wrapper.addEventListener('dragleave', () => {
-            wrapper.classList.remove('admin-file-input--dragover');
-        });
-        
-        wrapper.addEventListener('drop', (e) => {
-            e.preventDefault();
-            wrapper.classList.remove('admin-file-input--dragover');
-            
-            if (e.dataTransfer.files.length) {
-                input.files = e.dataTransfer.files;
-                input.dispatchEvent(new Event('change'));
-            }
-        });
-    });
-}
-
-/**
  * Format file size for display
  */
 function formatFileSize(bytes) {
@@ -3549,15 +3474,16 @@ function renderFormField(rawName, param, required) {
                 _renderTwoDigitSelect(inputId + '-min', 'data-datetime-min', 60)
             ]));
         }
-        // The inline onclick is preserved AS AN ATTRIBUTE, not converted to a
-        // listener: applyDateTimeToField is declared inside this file's IIFE, so
-        // the attribute cannot reach it and this button does nothing. Turning it
-        // into a real listener would fix that — which is a behaviour change, so
-        // it is reported rather than made here.
+        // A real listener, not an inline onclick attribute. An attribute is
+        // compiled in GLOBAL scope, and applyDateTimeToField lives inside this
+        // file's IIFE, so the attribute could never reach it — clicking Apply
+        // threw a ReferenceError and did nothing. QSDom.el turns a FUNCTION
+        // passed as `onclick` into an addEventListener, which closes over the
+        // function properly.
         selectors.push(QSDom.el('button', {
             type: 'button',
             class: 'admin-btn admin-btn--small admin-btn--secondary',
-            onclick: "applyDateTimeToField('" + inputId + "', " + includeTime + ")",
+            onclick: () => applyDateTimeToField(inputId, includeTime),
             text: t('commandForm.field.apply')
         }));
 
@@ -3723,10 +3649,10 @@ function renderFormField(rawName, param, required) {
 
 /**
  * ui_type 'password' visibility toggle — DELEGATED click handler.
- * Delegation, not inline onclick: this whole file is IIFE-scoped, so an inline
- * handler cannot reach its functions. The datetime picker's onclick
- * applyDateTimeToField has exactly that bug and is dead for the same reason.
- * The fields themselves are built and inserted after the page loads.
+ * Delegation, not an inline onclick attribute: this whole file is IIFE-scoped,
+ * so an attribute compiled in global scope cannot reach its functions. The
+ * fields themselves are built and inserted after the page loads, which is why
+ * the listener sits on `document` rather than on each button.
  */
 document.addEventListener('click', function (e) {
     const btn = e.target.closest('[data-password-toggle]');
