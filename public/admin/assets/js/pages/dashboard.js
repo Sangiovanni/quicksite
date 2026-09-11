@@ -1137,10 +1137,20 @@
         });
         
         // Create project modal
-        document.getElementById('btn-create-project').addEventListener('click', function() {
+        function openCreateProjectModal() {
             document.getElementById('modal-create-project').style.display = 'flex';
             document.getElementById('create-project-name').focus();
-        });
+        }
+
+        document.getElementById('btn-create-project').addEventListener('click', openCreateProjectModal);
+
+        // ?create=project opens the form directly. The memberships page's
+        // zero-membership empty state links here rather than carrying its own
+        // copy of this modal, and a link that only gets you to the right PAGE
+        // leaves the reader hunting for the button.
+        if (new URLSearchParams(window.location.search).get('create') === 'project') {
+            openCreateProjectModal();
+        }
         
         // Clone project modal
         document.getElementById('btn-clone-project').addEventListener('click', function() {

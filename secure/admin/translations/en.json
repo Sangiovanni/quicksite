@@ -150,6 +150,7 @@
         "myProjects": {
             "title": "My projects",
             "empty": "You are not a member of any project yet. Accept an invitation or send a join request below.",
+        "createCta": "Create your own project",
             "roleChip": "role",
             "ownedChip": "OWNED",
             "editingChip": "editing",

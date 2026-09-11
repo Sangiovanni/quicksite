@@ -5536,6 +5536,13 @@ kbd {
     color: var(--admin-text-muted);
 }
 
+/* The zero-membership empty state's way out: make your own project. Spaced
+   off the explanatory line above it so it reads as an action, not a footnote. */
+.members-empty__cta {
+    margin-top: var(--space-lg);
+    display: inline-flex;
+}
+
 .admin-empty__icon {
     width: 64px;
     height: 64px;

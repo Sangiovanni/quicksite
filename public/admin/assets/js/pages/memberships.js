@@ -112,6 +112,32 @@
         return el('div', { class: 'admin-empty members-empty', text: text });
     }
 
+    /**
+     * The zero-membership empty state.
+     *
+     * Three ways out of an account that belongs to nothing: accept an
+     * invitation (the inbox below), ask to join (the form below), or make your
+     * own project - the only one that needs nobody else's cooperation, and the
+     * one the page never offered. createProject is scope global / access any,
+     * so every authenticated caller may take it.
+     *
+     * It LINKS to the dashboard rather than repeating the create modal here: a
+     * second copy of that form would be a second source of truth.
+     *
+     * @returns {HTMLElement} ONE .admin-empty
+     */
+    function _renderProjectsEmpty() {
+        var children = [el('p', { text: T.projectsEmpty || 'No projects.' })];
+        if (CFG.createUrl) {
+            children.push(el('a', {
+                class: 'admin-btn admin-btn--primary members-empty__cta',
+                href: CFG.createUrl,
+                text: T.projectsEmptyCreate || 'memberships.myProjects.createCta'
+            }));
+        }
+        return el('div', { class: 'admin-empty members-empty' }, children);
+    }
+
     function _renderRow(mainChildren, actionButtons) {
         var main = el('div', { class: 'members-row__main' }, mainChildren);
         var actions = el('div', { class: 'members-row__actions' }, actionButtons);
@@ -204,7 +230,7 @@
         var root = document.getElementById('memberships-projects');
         clearNode(root);
         if (!projects.length) {
-            root.appendChild(_renderEmpty(T.projectsEmpty || 'No projects.'));
+            root.appendChild(_renderProjectsEmpty());
             return;
         }
         projects.forEach(function (p) { root.appendChild(_renderProjectRow(p)); });

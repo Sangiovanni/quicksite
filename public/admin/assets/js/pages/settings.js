@@ -213,10 +213,10 @@
         
         localStorage.setItem('quicksite_admin_prefs', JSON.stringify(prefs));
         
-        // Update QuickSiteAdmin.prefs immediately
-        if (window.QuickSiteAdmin) {
-            QuickSiteAdmin.prefs = prefs;
-        }
+        // localStorage is the store; core/utils.js reads it. There used to be a
+        // `QuickSiteAdmin.prefs = prefs` here too, updating a second copy that
+        // only admin.js's own getPref fallback ever read - and that fallback was
+        // unreachable, because core/utils.js always loads first. Both are gone.
         
         QuickSiteAdmin.showToast('Preferences saved', 'success');
     };

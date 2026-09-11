@@ -253,8 +253,11 @@ if (isset($_GET['denied'])): ?>
                     
                     <!-- Quick Actions Row -->
                     <div class="project-manager__quick-actions">
-                        <!-- Create Project -->
-                        <button type="button" id="btn-create-project" class="admin-btn admin-btn--ghost">
+                        <!-- Create Project — PRIMARY among the quick actions. Every
+                             other action here operates on a project you already have;
+                             this is the only one a brand-new account can use, so it is
+                             the one that should read as the thing to do. -->
+                        <button type="button" id="btn-create-project" class="admin-btn admin-btn--primary">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                                 <line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/>

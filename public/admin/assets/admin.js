@@ -37,8 +37,7 @@ const QuickSiteAdmin = {
             return window.QUICKSITE_CONFIG?.multilingual || false;
         },
         tokenStorageKey: 'quicksite_admin_token',
-        rememberStorageKey: 'quicksite_admin_remember',
-        prefsStorageKey: 'quicksite_admin_prefs'
+        rememberStorageKey: 'quicksite_admin_remember'
     },
 
     // ============================================
@@ -201,7 +200,6 @@ const QuickSiteAdmin = {
      * Initialize the admin panel
      */
     init() {
-        this.loadPreferences();
         this.initNavGroups();
         this.initCategoryToggles();
         this.initForms();
@@ -287,57 +285,21 @@ const QuickSiteAdmin = {
      * Check for pending message from redirect - delegates to QuickSiteUtils
      */
     checkPendingMessage() {
-        if (window.QuickSiteUtils) {
-            return window.QuickSiteUtils.checkPendingMessage();
-        }
-        
-        // Fallback
-        const pending = sessionStorage.getItem('quicksite_pending_message');
-        if (pending) {
-            sessionStorage.removeItem('quicksite_pending_message');
-            try {
-                const msg = JSON.parse(pending);
-                // Small delay to ensure page is loaded
-                setTimeout(() => {
-                    this.showToast(msg.message, msg.type || 'success', msg.duration || 6000);
-                }, 500);
-            } catch (e) {
-                console.error('Failed to parse pending message:', e);
-            }
-        }
+        return window.QuickSiteUtils.checkPendingMessage();
     },
 
     /**
      * Store a message to show after redirect - delegates to QuickSiteUtils
      */
     setPendingMessage(message, type = 'success', duration = 6000) {
-        if (window.QuickSiteUtils) {
-            return window.QuickSiteUtils.setPendingMessage(message, type, duration);
-        }
-        // Fallback
-        sessionStorage.setItem('quicksite_pending_message', JSON.stringify({
-            message,
-            type,
-            duration
-        }));
-    },
-
-    /**
-     * Load user preferences from localStorage
-     */
-    loadPreferences() {
-        this.prefs = JSON.parse(localStorage.getItem(this.config.prefsStorageKey) || '{}');
+        return window.QuickSiteUtils.setPendingMessage(message, type, duration);
     },
 
     /**
      * Get a preference value with default
      */
     getPref(key, defaultValue) {
-        // Delegate to core utils if available, otherwise use local prefs
-        if (window.QuickSiteUtils) {
-            return window.QuickSiteUtils.getPref(key, defaultValue);
-        }
-        return this.prefs[key] !== undefined ? this.prefs[key] : defaultValue;
+        return window.QuickSiteUtils.getPref(key, defaultValue);
     },
 
     /**
@@ -841,29 +803,6 @@ const QuickSiteAdmin = {
     },
 
     /**
-     * Show form error message
-     *
-     * ⚠ NO CALLERS. The whole tree holds exactly ONE occurrence of this name:
-     * this definition. Its innerHTML was left as it is rather than rewritten —
-     * rewriting unreachable markup fixes nothing and would mint translation
-     * keys that can never resolve, which fights the "0 unused keys" exit
-     * criterion. The correct fix is deletion; see NOTES/reports/beta12/S3b.md.
-     */
-    showFormError(errorDiv, message) {
-        if (errorDiv) {
-            errorDiv.innerHTML = `
-                <svg class="admin-alert__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10"/>
-                    <line x1="12" y1="8" x2="12" y2="12"/>
-                    <line x1="12" y1="16" x2="12.01" y2="16"/>
-                </svg>
-                <span>${this.escapeHtml(message)}</span>
-            `;
-            errorDiv.style.display = 'flex';
-        }
-    },
-
-    /**
      * Initialize copy to clipboard buttons
      */
     initCopyButtons() {
@@ -885,23 +824,14 @@ const QuickSiteAdmin = {
      * Escape HTML to prevent XSS - delegates to QuickSiteUtils
      */
     escapeHtml(text) {
-        if (window.QuickSiteUtils) {
-            return window.QuickSiteUtils.escapeHtml(text);
-        }
-        // Fallback
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+        return window.QuickSiteUtils.escapeHtml(text);
     },
 
     /**
      * Format JSON for display - delegates to QuickSiteUtils
      */
     formatJson(data) {
-        if (window.QuickSiteUtils) {
-            return window.QuickSiteUtils.formatJson(data);
-        }
-        return JSON.stringify(data, null, 2);
+        return window.QuickSiteUtils.formatJson(data);
     },
 
     // ============================================
@@ -1011,99 +941,6 @@ const QuickSiteAdmin = {
             }
         });
     },
-    
-    /**
-     * Populate a select with grouped options (e.g., used/unused keys)
-     *
-     * ⚠ NO CALLERS. The whole tree holds exactly ONE occurrence of this name:
-     * this definition. Its innerHTML was left as it is rather than rewritten —
-     * rewriting unreachable markup fixes nothing and would mint translation
-     * keys that can never resolve, which fights the "0 unused keys" exit
-     * criterion. The correct fix is deletion; see NOTES/reports/beta12/S3b.md.
-     */
-    async populateSelectGrouped(selectElement, action, params = [], placeholder = 'Select...', groups = {}) {
-        if (!selectElement) return;
-        
-        // Show loading state
-        selectElement.disabled = true;
-        selectElement.innerHTML = `<option value="">${placeholder}</option>`;
-        
-        try {
-            const data = await this.fetchHelperData(action, params);
-            selectElement.innerHTML = `<option value="">${placeholder}</option>`;
-            
-            // data should be an object with group keys
-            // groups maps data keys to display labels
-            for (const [dataKey, groupLabel] of Object.entries(groups)) {
-                if (data[dataKey] && data[dataKey].length > 0) {
-                    const optgroup = document.createElement('optgroup');
-                    optgroup.label = `${groupLabel} (${data[dataKey].length})`;
-                    
-                    data[dataKey].forEach(opt => {
-                        const option = document.createElement('option');
-                        option.value = opt.value;
-                        option.textContent = opt.label;
-                        optgroup.appendChild(option);
-                    });
-                    
-                    selectElement.appendChild(optgroup);
-                }
-            }
-        } catch (error) {
-            console.error('Failed to populate grouped select:', error);
-            selectElement.innerHTML = `<option value="">Error loading options</option>`;
-        }
-        
-        selectElement.disabled = false;
-    },
-
-    /**
-     * Initialize cascading selects for a form
-     * @param {Object} config - Configuration object with dependencies
-     *
-     * ⚠ NO CALLERS. The whole tree holds exactly ONE occurrence of this name:
-     * this definition. Its innerHTML was left as it is rather than rewritten —
-     * rewriting unreachable markup fixes nothing and would mint translation
-     * keys that can never resolve, which fights the "0 unused keys" exit
-     * criterion. The correct fix is deletion; see NOTES/reports/beta12/S3b.md.
-     */
-    initCascadingSelects(config) {
-        const { container, selects } = config;
-        const form = typeof container === 'string' ? document.querySelector(container) : container;
-        if (!form) return;
-
-        selects.forEach((selectConfig, index) => {
-            const select = form.querySelector(`[name="${selectConfig.name}"]`);
-            if (!select) return;
-
-            // Initial population for selects without dependencies
-            if (!selectConfig.dependsOn) {
-                this.populateSelect(select, selectConfig.action, [], selectConfig.placeholder);
-            }
-
-            // Add change listener for selects that others depend on
-            select.addEventListener('change', async () => {
-                // Find dependent selects and update them
-                selects.forEach((depConfig, depIndex) => {
-                    if (depConfig.dependsOn === selectConfig.name) {
-                        const depSelect = form.querySelector(`[name="${depConfig.name}"]`);
-                        if (depSelect) {
-                            const parentValue = select.value;
-                            if (parentValue) {
-                                const params = typeof depConfig.params === 'function' 
-                                    ? depConfig.params(form)
-                                    : [parentValue];
-                                this.populateSelect(depSelect, depConfig.action, params, depConfig.placeholder);
-                            } else {
-                                // Reset dependent select
-                                depSelect.innerHTML = `<option value="">${depConfig.placeholder}</option>`;
-                            }
-                        }
-                    }
-                });
-            });
-        });
-    },
 
     // ============================================
     // Toast Notifications
@@ -1119,55 +956,7 @@ const QuickSiteAdmin = {
      * same reason as the dead methods above — see NOTES/reports/beta12/S3b.md.
      */
     showToast(message, type = 'info', duration = null) {
-        if (window.QuickSiteUtils) {
-            return window.QuickSiteUtils.showToast(message, type, duration);
-        }
-        
-        // Fallback implementation
-        // Use preference duration if not explicitly provided
-        if (duration === null) {
-            duration = parseInt(this.getPref('toastDuration', 4000));
-        }
-        
-        // Create toast container if it doesn't exist
-        let container = document.querySelector('.admin-toast-container');
-        if (!container) {
-            container = document.createElement('div');
-            container.className = 'admin-toast-container';
-            document.body.appendChild(container);
-        }
-
-        // Create toast element
-        const toast = document.createElement('div');
-        toast.className = `admin-toast admin-toast--${type}`;
-        
-        const icons = {
-            success: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
-            error: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
-            warning: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
-            info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>'
-        };
-
-        toast.innerHTML = `
-            <span class="admin-toast__icon">${icons[type] || icons.info}</span>
-            <span class="admin-toast__message">${this.escapeHtml(message)}</span>
-            <button class="admin-toast__close" onclick="this.parentElement.remove()">×</button>
-        `;
-
-        container.appendChild(toast);
-
-        // Animate in
-        requestAnimationFrame(() => toast.classList.add('admin-toast--visible'));
-
-        // Auto dismiss
-        if (duration > 0) {
-            setTimeout(() => {
-                toast.classList.remove('admin-toast--visible');
-                setTimeout(() => toast.remove(), 300);
-            }, duration);
-        }
-
-        return toast;
+        return window.QuickSiteUtils.showToast(message, type, duration);
     },
 
     // ============================================
@@ -1184,73 +973,14 @@ const QuickSiteAdmin = {
      * same reason as the dead methods above — see NOTES/reports/beta12/S3b.md.
      */
     async confirm(message, options = {}) {
-        if (window.QuickSiteUtils) {
-            return window.QuickSiteUtils.confirm(message, options);
-        }
-        
-        // Fallback implementation
-        return new Promise((resolve) => {
-            const overlay = document.createElement('div');
-            overlay.className = 'admin-modal-overlay';
-            
-            const modal = document.createElement('div');
-            modal.className = 'admin-modal-dialog admin-modal-dialog--confirm';
-            modal.innerHTML = `
-                <div class="admin-modal-dialog__content">
-                    <div class="admin-modal-dialog__icon admin-modal-dialog__icon--${options.type || 'warning'}">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                            <line x1="12" y1="9" x2="12" y2="13"/>
-                            <line x1="12" y1="17" x2="12.01" y2="17"/>
-                        </svg>
-                    </div>
-                    <h3 class="admin-modal-dialog__title">${options.title || 'Confirm Action'}</h3>
-                    <p class="admin-modal-dialog__message">${this.escapeHtml(message)}</p>
-                    <div class="admin-modal-dialog__actions">
-                        <button class="admin-btn admin-btn--secondary admin-modal-dialog__cancel">
-                            ${options.cancelText || 'Cancel'}
-                        </button>
-                        <button class="admin-btn admin-btn--${options.confirmClass || 'primary'} admin-modal-dialog__confirm">
-                            ${options.confirmText || 'Confirm'}
-                        </button>
-                    </div>
-                </div>
-            `;
-
-            overlay.appendChild(modal);
-            document.body.appendChild(overlay);
-
-            // Animate in
-            requestAnimationFrame(() => overlay.classList.add('admin-modal-overlay--visible'));
-
-            const cleanup = (result) => {
-                overlay.classList.remove('admin-modal-overlay--visible');
-                setTimeout(() => overlay.remove(), 300);
-                resolve(result);
-            };
-
-            modal.querySelector('.admin-modal-dialog__cancel').addEventListener('click', () => cleanup(false));
-            modal.querySelector('.admin-modal-dialog__confirm').addEventListener('click', () => cleanup(true));
-            overlay.addEventListener('click', (e) => {
-                if (e.target === overlay) cleanup(false);
-            });
-        });
+        return window.QuickSiteUtils.confirm(message, options);
     },
 
     /**
      * Confirm destructive action - delegates to QuickSiteUtils
      */
     async confirmDelete(itemName) {
-        if (window.QuickSiteUtils) {
-            return window.QuickSiteUtils.confirmDelete(itemName);
-        }
-        // Fallback
-        return this.confirm(`Are you sure you want to delete "${itemName}"? This action cannot be undone.`, {
-            title: 'Confirm Deletion',
-            type: 'danger',
-            confirmText: 'Delete',
-            confirmClass: 'danger'
-        });
+        return window.QuickSiteUtils.confirmDelete(itemName);
     },
 
     // ============================================

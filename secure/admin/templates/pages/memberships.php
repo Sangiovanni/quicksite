@@ -46,7 +46,10 @@ window.QS_MEMBERSHIPS_CONFIG = {
     myUserId: <?= json_encode($__myUserId) ?>,
     editedProject: <?= json_encode($router->getCurrentProject()) ?>,
     buildRoles: <?= json_encode($__buildRoles) ?>,
-    buildsUrl: <?= json_encode($router->url('builds')) ?>
+    buildsUrl: <?= json_encode($router->url('builds')) ?>,
+    // Project creation lives on the dashboard; the zero-membership empty state
+    // links there rather than carrying a second copy of the create modal.
+    createUrl: <?= json_encode($router->url('dashboard') . '?create=project') ?>
 };
 window.QS_MEMBERSHIPS_I18N = <?= json_encode([
     'loading'            => __admin('common.loading'),
@@ -63,6 +66,10 @@ window.QS_MEMBERSHIPS_I18N = <?= json_encode([
     'leaveConfirm'       => __admin('memberships.myProjects.leaveConfirm', 'You are about to leave {project}. You will need a fresh invitation to rejoin.'),
     'leftMsg'            => __admin('memberships.myProjects.leftMsg', 'You left the project'),
     'projectsEmpty'      => __admin('memberships.myProjects.empty', 'You are not a member of any project yet. Accept an invitation or send a join request below.'),
+    // The third way out of a zero-membership account, and the only one that
+    // needs nobody else: make your own. projects.create is scope global /
+    // access any, so every authenticated caller may use it.
+    'projectsEmptyCreate' => __admin('memberships.myProjects.createCta'),
     'inboxEmpty'         => __admin('memberships.inbox.empty', 'No pending invitations.'),
     'invitedBy'          => __admin('memberships.inbox.invitedBy', 'Invited by'),
     'proposedBy'         => __admin('memberships.inbox.proposedBy', 'proposed by'),
