@@ -324,6 +324,27 @@ async function loadCommandDocumentation() {
  * `allowEmpty` keeps the blank option selectable where blank is meaningful:
  * getStateStores reads "omit to retrieve stores for ALL routes".
  */
+// Documented value sets, read from each parameter's own help.php description.
+// Bare labels and no translation keys: these are the literal strings the
+// command receives, and the boolean renderer below labels its options
+// 'true'/'false' for the same reason.
+const ENUM_VALUES = {
+    // "Where to insert: before, after, or inside". The labels REUSE the keys
+    // initAddComponentToNodeForm already uses for the same three values - one
+    // set of words for one concept, and they are prose worth translating.
+    position: [
+        { value: 'before', labelKey: 'commandForm.addComponent.positionBefore' },
+        { value: 'after', labelKey: 'commandForm.addComponent.positionAfter' },
+        { value: 'inside', labelKey: 'commandForm.addComponent.positionInside' }
+    ],
+    // "Page-level event the interaction sits on: onload, onresize or onscroll".
+    // Literal DOM event names, not prose - labelled bare, the same reasoning
+    // the boolean renderer uses for 'true'/'false'.
+    pageEvent: [
+        { value: 'onload' }, { value: 'onresize' }, { value: 'onscroll' }
+    ]
+};
+
 const FIELD_PICKERS = {
     // --- the route must already exist: a real dropdown ---------------------
     setRouteResolver:            { kind: 'select', param: 'route', source: 'routes' },
@@ -333,8 +354,14 @@ const FIELD_PICKERS = {
     ],
     getStateStores:              { kind: 'select', param: 'route', source: 'routes', allowEmpty: true },
     addPageEvent:                { kind: 'select', param: 'pageName', source: 'routes' },
-    editPageEvent:               { kind: 'select', param: 'pageName', source: 'routes' },
-    deletePageEvent:             { kind: 'select', param: 'pageName', source: 'routes' },
+    editPageEvent: [
+        { kind: 'select', param: 'pageName', source: 'routes' },
+        { kind: 'enum', param: 'event', values: 'pageEvent' }
+    ],
+    deletePageEvent: [
+        { kind: 'select', param: 'pageName', source: 'routes' },
+        { kind: 'enum', param: 'event', values: 'pageEvent' }
+    ],
     getPageEvents:               { kind: 'select', param: 'pageName', source: 'routes' },
 
     // --- a valid value may be OUTSIDE the list: input + suggestions --------
@@ -376,13 +403,21 @@ const FIELD_PICKERS = {
     moveNode:          { kind: 'structure', typeParam: 'type',       param: 'name' },
     deleteNode:        { kind: 'structure', typeParam: 'type',       param: 'name' },
     duplicateNode:     { kind: 'structure', typeParam: 'type',       param: 'name' },
-    addNode:           { kind: 'structure', typeParam: 'type',       param: 'name' },
+    addNode: [
+        { kind: 'structure', typeParam: 'type', param: 'name' },
+        // "default after" — optional, so the select shows what it will send.
+        { kind: 'enum', param: 'position', values: 'position', defaultValue: 'after' }
+    ],
     editNode:          { kind: 'structure', typeParam: 'type',       param: 'name' },
     insertSnippet: [
         { kind: 'structure', typeParam: 'type', param: 'name' },
         { kind: 'snippet', param: 'snippetId' }
     ],
-    addComplexElement: { kind: 'structure', typeParam: 'structType', param: 'pageName' },
+    addComplexElement: [
+        { kind: 'structure', typeParam: 'structType', param: 'pageName' },
+        // 'Default "after"' — optional.
+        { kind: 'enum', param: 'position', values: 'position', defaultValue: 'after' }
+    ],
     listInteractions:  { kind: 'structure', typeParam: 'structType', param: 'pageName' },
     addInteraction:    { kind: 'structure', typeParam: 'structType', param: 'pageName' },
     editInteraction:   { kind: 'structure', typeParam: 'structType', param: 'pageName' },
@@ -494,6 +529,38 @@ function _fillSelect(select, rows, placeholder) {
     rows.forEach(r => {
         select.appendChild(QSDom.el('option', { value: r.value, text: r.label }));
     });
+}
+
+/**
+ * Replace a text input with a select of documented literal values.
+ *
+ * No fetch and no source: the values come from the parameter's own description.
+ * cfg.defaultValue preselects the documented default, so a field that would
+ * otherwise default SERVER-side shows what it is about to send. A parameter
+ * with no documented default starts on the blank placeholder instead - which
+ * on a required field is what makes it an explicit choice.
+ *
+ * ⚠ Every value is offered even where the description says one is FORCED under
+ * some condition (position becomes "inside" when targetNodeId="root"). The
+ * server enforces that; a dropdown that pre-empted it would be guessing at
+ * state this form does not have.
+ *
+ * @param {HTMLFormElement} form
+ * @param {Object} cfg  a FIELD_PICKERS row
+ */
+function _initEnumSelect(form, cfg) {
+    const select = _swapForSelect(form, cfg.param);
+    if (!select) return;
+
+    _fillSelect(
+        select,
+        (ENUM_VALUES[cfg.values] || []).map(v => ({
+            value: v.value,
+            label: v.labelKey ? t(v.labelKey) : v.value
+        })),
+        t('commandForm.field.selectPlaceholder'));
+
+    if (cfg.defaultValue) select.value = cfg.defaultValue;
 }
 
 /**
@@ -709,6 +776,8 @@ async function applyPagePickers() {
             await _initSnippetSelect(form, cfg);
         } else if (cfg.kind === 'api') {
             await _initApiEndpointPicker(form, cfg);
+        } else if (cfg.kind === 'enum') {
+            _initEnumSelect(form, cfg);
         }
     }
 }
