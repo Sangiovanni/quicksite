@@ -292,12 +292,23 @@ async function loadCommandDocumentation() {
  * Initialize enhanced features for complex commands
  */
 /**
- * The page/route picker table.
+ * The identifier-picker table.
  *
- * Twenty-one command forms take the name of a page that already exists. Every
- * one of them reads the SAME source, so this is one mechanism wired twenty-one
- * times rather than twenty-one implementations: a row here is the whole
- * wiring, and a new command is a row.
+ * Command forms whose field names something that ALREADY EXISTS: a page, a
+ * route, an API, an endpoint, a snippet, a language. One mechanism wired many
+ * times rather than many implementations - a row here is the whole wiring, and
+ * a new command is a row.
+ *
+ * A row is one spec, or an ARRAY of them when a command carries two pickers
+ * (insertSnippet takes a page AND a snippet; importStructureTranslations takes
+ * a route AND a language).
+ *
+ * ⚠ A field is only ever wired when its own help.php description says it
+ * REFERENCES an existing thing. A field that NAMES something being created
+ * (createProject.name, addStorageItem.id) and a field that merely ECHOES the
+ * URL marker (backupProject.name - "the project backed up is ALWAYS the one in
+ * the URL marker") are both left as text boxes. A dropdown on either would
+ * offer a choice that is refused if taken.
  *
  * `kind` picks the shape:
  *   'select'    the route must already exist -> a real dropdown of routes.
@@ -313,15 +324,18 @@ async function loadCommandDocumentation() {
  * `allowEmpty` keeps the blank option selectable where blank is meaningful:
  * getStateStores reads "omit to retrieve stores for ALL routes".
  */
-const PAGE_PICKERS = {
+const FIELD_PICKERS = {
     // --- the route must already exist: a real dropdown ---------------------
-    setRouteResolver:            { kind: 'select', param: 'route' },
-    importStructureTranslations: { kind: 'select', param: 'route' },
-    getStateStores:              { kind: 'select', param: 'route', allowEmpty: true },
-    addPageEvent:                { kind: 'select', param: 'pageName' },
-    editPageEvent:               { kind: 'select', param: 'pageName' },
-    deletePageEvent:             { kind: 'select', param: 'pageName' },
-    getPageEvents:               { kind: 'select', param: 'pageName' },
+    setRouteResolver:            { kind: 'select', param: 'route', source: 'routes' },
+    importStructureTranslations: [
+        { kind: 'select', param: 'route', source: 'routes' },
+        { kind: 'select', param: 'language', source: 'languages' }
+    ],
+    getStateStores:              { kind: 'select', param: 'route', source: 'routes', allowEmpty: true },
+    addPageEvent:                { kind: 'select', param: 'pageName', source: 'routes' },
+    editPageEvent:               { kind: 'select', param: 'pageName', source: 'routes' },
+    deletePageEvent:             { kind: 'select', param: 'pageName', source: 'routes' },
+    getPageEvents:               { kind: 'select', param: 'pageName', source: 'routes' },
 
     // --- a valid value may be OUTSIDE the list: input + suggestions --------
     // setStateStores accepts the special pages 404/500/403/401, which getRoutes
@@ -331,13 +345,43 @@ const PAGE_PICKERS = {
     generateCookiePolicy:        { kind: 'suggest', param: 'route' },
     generatePrivacyPolicy:       { kind: 'suggest', param: 'route' },
 
+    // --- API and endpoint. Endpoints arrive nested inside each api, so the
+    //     cascade filters what it already has instead of fetching again. A
+    //     blank api means "no filter", which is what the optional apiId
+    //     parameters document, so the endpoint list then spans every api.
+    editApi:            { kind: 'api', apiParam: 'apiId' },
+    deleteApi:          { kind: 'api', apiParam: 'apiId' },
+    listApiEndpoints:   { kind: 'api', apiParam: 'apiId', allowEmpty: true },
+    getApiEndpoint:     { kind: 'api', apiParam: 'apiId', endpointParam: 'endpointId', allowEmpty: true },
+    testApiEndpoint:    { kind: 'api', apiParam: 'apiId', endpointParam: 'endpointId', allowEmpty: true },
+    cleanResolverCache: [
+        { kind: 'api', apiParam: 'apiId', allowEmpty: true },
+        // "Exact endpoint reference (@apiId/endpointId)" - the compound form.
+        { kind: 'api', endpointRefParam: 'endpoint', allowEmpty: true }
+    ],
+
+    // --- Snippet -----------------------------------------------------------
+    getSnippet:       { kind: 'snippet', param: 'id' },
+    injectSnippetCss: { kind: 'snippet', param: 'id' },
+    duplicateSnippet: { kind: 'snippet', param: 'id' },
+    // ⚠ user snippets only: "Core snippets cannot be deleted", so offering one
+    // would offer a choice the command refuses.
+    deleteSnippet:    { kind: 'snippet', param: 'id', userOnly: true },
+
+    // --- Language: the languages the project ALREADY HAS -------------------
+    setStorageDescLang: { kind: 'select', param: 'lang', source: 'languages' },
+    setPrivacyDescLang: { kind: 'select', param: 'lang', source: 'languages' },
+
     // --- the parameter is a page OR a component, per its type field -------
     moveNode:          { kind: 'structure', typeParam: 'type',       param: 'name' },
     deleteNode:        { kind: 'structure', typeParam: 'type',       param: 'name' },
     duplicateNode:     { kind: 'structure', typeParam: 'type',       param: 'name' },
     addNode:           { kind: 'structure', typeParam: 'type',       param: 'name' },
     editNode:          { kind: 'structure', typeParam: 'type',       param: 'name' },
-    insertSnippet:     { kind: 'structure', typeParam: 'type',       param: 'name' },
+    insertSnippet: [
+        { kind: 'structure', typeParam: 'type', param: 'name' },
+        { kind: 'snippet', param: 'snippetId' }
+    ],
     addComplexElement: { kind: 'structure', typeParam: 'structType', param: 'pageName' },
     listInteractions:  { kind: 'structure', typeParam: 'structType', param: 'pageName' },
     addInteraction:    { kind: 'structure', typeParam: 'structType', param: 'pageName' },
@@ -395,29 +439,188 @@ async function _initRouteSuggest(form, cfg) {
 }
 
 /**
- * Replace a text input with a dropdown of the project's routes.
+ * Swap a text input for a dropdown fed by one of the /admin/api helper arms.
  *
- * Used where the parameter's own description says the route must already
- * exist, so nothing valid is refused by constraining it.
+ * Used where the parameter's own description says the value must already
+ * exist, so constraining it refuses nothing valid.
  *
  * @param {HTMLFormElement} form
- * @param {Object} cfg  a PAGE_PICKERS row
- * @returns {Promise<void>}
+ * @param {Object} cfg  a FIELD_PICKERS row; cfg.source names the arm
+ * @returns {Promise<HTMLSelectElement|null>}
  */
-async function _initRouteSelect(form, cfg) {
-    const input = form.querySelector('[name="' + cfg.param + '"]');
-    if (!input || input.tagName === 'SELECT') return;
-
-    const select = QSDom.el('select', { name: cfg.param, class: 'admin-select' });
-    if (input.required) select.required = true;
-    if (input.dataset.urlParam !== undefined) select.dataset.urlParam = '';
-    input.replaceWith(select);
+async function _initArmSelect(form, cfg) {
+    const select = _swapForSelect(form, cfg.param);
+    if (!select) return null;
 
     // allowEmpty keeps the blank option meaningful: getStateStores reads
     // "omit to retrieve stores for ALL routes".
-    await QuickSiteAdmin.populateSelect(
-        select, 'routes', [],
-        cfg.allowEmpty ? t('commandForm.select.allRoutes') : t('commandForm.select.route'));
+    const placeholder = cfg.source === 'languages'
+        ? t('commandForm.select.language')
+        : (cfg.allowEmpty ? t('commandForm.select.allRoutes') : t('commandForm.select.route'));
+
+    await QuickSiteAdmin.populateSelect(select, cfg.source || 'routes', [], placeholder);
+    return select;
+}
+
+/**
+ * Replace a form field with an empty <select> carrying its name, its required
+ * flag and its url-param marker. Returns null when the field is missing or has
+ * already been converted, so every caller can no-op safely.
+ *
+ * @param {HTMLFormElement} form
+ * @param {string} paramName
+ * @returns {HTMLSelectElement|null}
+ */
+function _swapForSelect(form, paramName) {
+    const input = form.querySelector('[name="' + paramName + '"]');
+    if (!input || input.tagName === 'SELECT') return null;
+
+    const select = QSDom.el('select', { name: paramName, class: 'admin-select' });
+    if (input.required) select.required = true;
+    if (input.dataset.urlParam !== undefined) select.dataset.urlParam = '';
+    input.replaceWith(select);
+    return select;
+}
+
+/**
+ * Fill a <select> with {value, label} rows behind a placeholder.
+ *
+ * @param {HTMLSelectElement} select
+ * @param {Array<{value: string, label: string}>} rows
+ * @param {string} placeholder
+ */
+function _fillSelect(select, rows, placeholder) {
+    QSDom.setSelectPlaceholder(select, placeholder);
+    rows.forEach(r => {
+        select.appendChild(QSDom.el('option', { value: r.value, text: r.label }));
+    });
+}
+
+/**
+ * Snippet picker, read from the listSnippets COMMAND.
+ *
+ * There is no /admin/api arm for snippets; preview.js reads the command
+ * directly and so does this, which keeps the caller's own permission check as
+ * the gate rather than adding a registration layer for the same data.
+ *
+ * ⚠ cfg.userOnly drops the core snippets. deleteSnippet's description is
+ * "Core snippets cannot be deleted", so listing one would offer a choice the
+ * command refuses - the same defect as a dropdown on an echo-check field.
+ *
+ * @param {HTMLFormElement} form
+ * @param {Object} cfg  a FIELD_PICKERS row
+ * @returns {Promise<void>}
+ */
+async function _initSnippetSelect(form, cfg) {
+    const select = _swapForSelect(form, cfg.param);
+    if (!select) return;
+
+    QSDom.setSelectPlaceholder(select, t('commandForm.select.snippet'));
+
+    let snippets = [];
+    try {
+        const res = await QuickSiteAdmin.apiRequest('listSnippets', 'GET');
+        snippets = (res && res.ok && res.data && res.data.data && res.data.data.snippets) || [];
+    } catch (error) {
+        return; // the placeholder stands; the field is still submittable
+    }
+
+    const rows = snippets
+        .filter(s => !(cfg.userOnly && s.isCore))
+        .map(s => ({
+            value: s.id,
+            label: s.name ? s.name + ' (' + s.id + ')' : s.id
+        }));
+
+    _fillSelect(select, rows, t('commandForm.select.snippet'));
+}
+
+/**
+ * API picker, and the endpoint picker that cascades from it.
+ *
+ * listApiEndpoints returns every api with its endpoints NESTED inside it, so
+ * one fetch feeds both levels and changing the api filters what is already in
+ * hand. A blank api means "no filter" - which is what the optional apiId
+ * parameters document - so the endpoint list then spans every api and its
+ * labels carry the api id to tell duplicates apart.
+ *
+ * cfg.endpointRefParam handles cleanResolverCache's compound
+ * "@apiId/endpointId" form instead of a plain endpoint id.
+ *
+ * @param {HTMLFormElement} form
+ * @param {Object} cfg  a FIELD_PICKERS row
+ * @returns {Promise<void>}
+ */
+async function _initApiEndpointPicker(form, cfg) {
+    const apiSelect = cfg.apiParam ? _swapForSelect(form, cfg.apiParam) : null;
+    const endpointSelect = cfg.endpointParam ? _swapForSelect(form, cfg.endpointParam) : null;
+    const refSelect = cfg.endpointRefParam ? _swapForSelect(form, cfg.endpointRefParam) : null;
+    if (!apiSelect && !endpointSelect && !refSelect) return;
+
+    const apiPlaceholder = cfg.allowEmpty
+        ? t('commandForm.select.allApis')
+        : t('commandForm.select.api');
+    if (apiSelect) QSDom.setSelectPlaceholder(apiSelect, apiPlaceholder);
+    if (endpointSelect) QSDom.setSelectPlaceholder(endpointSelect, t('commandForm.select.endpoint'));
+    if (refSelect) QSDom.setSelectPlaceholder(refSelect, t('commandForm.select.endpointRef'));
+
+    let apis = [];
+    try {
+        const res = await QuickSiteAdmin.apiRequest('listApiEndpoints', 'GET');
+        apis = (res && res.ok && res.data && res.data.data && res.data.data.apis) || [];
+    } catch (error) {
+        return;
+    }
+
+    if (apiSelect) {
+        _fillSelect(apiSelect,
+            apis.map(a => ({ value: a.apiId, label: a.name ? a.name + ' (' + a.apiId + ')' : a.apiId })),
+            apiPlaceholder);
+    }
+
+    /** Endpoints of one api, or of every api when none is chosen. */
+    function endpointRows(apiId, compound) {
+        const chosen = apiId ? apis.filter(a => a.apiId === apiId) : apis;
+        const rows = [];
+        chosen.forEach(a => {
+            (a.endpoints || []).forEach(e => {
+                const label = (e.name || e.id) + (apiId ? '' : ' — ' + a.apiId);
+                rows.push({ value: compound ? '@' + a.apiId + '/' + e.id : e.id, label: label });
+            });
+        });
+        return rows;
+    }
+
+    if (endpointSelect) {
+        _fillSelect(endpointSelect, endpointRows(apiSelect ? apiSelect.value : '', false),
+            t('commandForm.select.endpoint'));
+    }
+    if (refSelect) {
+        _fillSelect(refSelect, endpointRows('', true), t('commandForm.select.endpointRef'));
+    }
+
+    // The api drives the endpoint list, so it belongs ABOVE it. The form
+    // renders required parameters first and `apiId` is an optional filter,
+    // which put the field you pick FIRST in second place.
+    if (apiSelect && endpointSelect) {
+        const apiGroup = apiSelect.closest('.admin-form-group');
+        const endpointGroup = endpointSelect.closest('.admin-form-group');
+        if (apiGroup && endpointGroup && apiGroup.parentNode === endpointGroup.parentNode) {
+            endpointGroup.parentNode.insertBefore(apiGroup, endpointGroup);
+        }
+    }
+
+    if (apiSelect && (endpointSelect || refSelect)) {
+        apiSelect.addEventListener('change', () => {
+            const id = apiSelect.value;
+            if (endpointSelect) {
+                _fillSelect(endpointSelect, endpointRows(id, false), t('commandForm.select.endpoint'));
+            }
+            if (refSelect) {
+                _fillSelect(refSelect, endpointRows(id, true), t('commandForm.select.endpointRef'));
+            }
+        });
+    }
 }
 
 /**
@@ -489,18 +692,24 @@ async function _initStructurePicker(form, cfg) {
  * @returns {Promise<void>}
  */
 async function applyPagePickers() {
-    const cfg = PAGE_PICKERS[COMMAND_NAME];
-    if (!cfg) return;
+    const specs = FIELD_PICKERS[COMMAND_NAME];
+    if (!specs) return;
 
     const form = document.getElementById('command-form');
     if (!form) return;
 
-    if (cfg.kind === 'select') {
-        await _initRouteSelect(form, cfg);
-    } else if (cfg.kind === 'suggest') {
-        await _initRouteSuggest(form, cfg);
-    } else if (cfg.kind === 'structure') {
-        await _initStructurePicker(form, cfg);
+    for (const cfg of (Array.isArray(specs) ? specs : [specs])) {
+        if (cfg.kind === 'select') {
+            await _initArmSelect(form, cfg);
+        } else if (cfg.kind === 'suggest') {
+            await _initRouteSuggest(form, cfg);
+        } else if (cfg.kind === 'structure') {
+            await _initStructurePicker(form, cfg);
+        } else if (cfg.kind === 'snippet') {
+            await _initSnippetSelect(form, cfg);
+        } else if (cfg.kind === 'api') {
+            await _initApiEndpointPicker(form, cfg);
+        }
     }
 }
 

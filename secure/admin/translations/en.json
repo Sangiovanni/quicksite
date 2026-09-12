@@ -570,6 +570,11 @@
             "loadFiles": "Failed to load files"
         },
         "select": {
+            "api": "Select API...",
+            "allApis": "All APIs (leave empty)",
+            "endpoint": "Select endpoint...",
+            "endpointRef": "Select an endpoint (@api/endpoint)...",
+            "snippet": "Select snippet...",
             "allRoutes": "All routes (leave empty)",
             "page": "Select page...",
             "component": "Select component...",

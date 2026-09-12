@@ -537,9 +537,21 @@ const QuickSiteAdmin = {
                 // and hands the blob to the browser. apiRequest would read the ZIP
                 // as text, fail to parse it, and print the mangled bytes into the
                 // response panel.
+                // A GET carries its parameters in the QUERY STRING, not a body:
+                // the dispatcher reads $_GET into the command's $params. Passing
+                // them as the body on GET dropped them entirely, so any GET
+                // command with a non-URL parameter answered as if the field had
+                // been left blank. downloadFile below has always passed them
+                // correctly; this is the same handling for the JSON path.
                 const result = form.dataset.binaryResponse === '1'
                     ? await this.downloadFile(command, urlParams, method === 'GET' ? data : {})
-                    : await this.apiRequest(command, method, method === 'GET' ? null : data, urlParams);
+                    : await this.apiRequest(
+                        command,
+                        method,
+                        method === 'GET' ? null : data,
+                        urlParams,
+                        method === 'GET' ? data : {}
+                    );
 
                 // A successful download has no envelope to show — displayResponse
                 // would print "null". Describe what was saved instead. Errors keep
