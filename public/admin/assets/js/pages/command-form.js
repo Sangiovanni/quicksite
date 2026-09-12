@@ -291,6 +291,219 @@ async function loadCommandDocumentation() {
 /**
  * Initialize enhanced features for complex commands
  */
+/**
+ * The page/route picker table.
+ *
+ * Twenty-one command forms take the name of a page that already exists. Every
+ * one of them reads the SAME source, so this is one mechanism wired twenty-one
+ * times rather than twenty-one implementations: a row here is the whole
+ * wiring, and a new command is a row.
+ *
+ * `kind` picks the shape:
+ *   'select'    the route must already exist -> a real dropdown of routes.
+ *   'suggest'   a valid value may be OUTSIDE the list -> keep the text input,
+ *               hang a <datalist> on it and say so in a hint. Only three
+ *               commands need this: setStateStores accepts the special pages
+ *               404/500/403/401 that getRoutes does not return, and the two
+ *               policy generators NAME a route they are about to create.
+ *   'structure' the parameter means a page OR a component depending on a
+ *               type/structType field beside it -> convert both to selects and
+ *               cascade, the shape editStructure already uses.
+ *
+ * `allowEmpty` keeps the blank option selectable where blank is meaningful:
+ * getStateStores reads "omit to retrieve stores for ALL routes".
+ */
+const PAGE_PICKERS = {
+    // --- the route must already exist: a real dropdown ---------------------
+    setRouteResolver:            { kind: 'select', param: 'route' },
+    importStructureTranslations: { kind: 'select', param: 'route' },
+    getStateStores:              { kind: 'select', param: 'route', allowEmpty: true },
+    addPageEvent:                { kind: 'select', param: 'pageName' },
+    editPageEvent:               { kind: 'select', param: 'pageName' },
+    deletePageEvent:             { kind: 'select', param: 'pageName' },
+    getPageEvents:               { kind: 'select', param: 'pageName' },
+
+    // --- a valid value may be OUTSIDE the list: input + suggestions --------
+    // setStateStores accepts the special pages 404/500/403/401, which getRoutes
+    // does not return; the two policy commands NAME a route they are about to
+    // create. A <select> would refuse all three.
+    setStateStores:              { kind: 'suggest', param: 'route' },
+    generateCookiePolicy:        { kind: 'suggest', param: 'route' },
+    generatePrivacyPolicy:       { kind: 'suggest', param: 'route' },
+
+    // --- the parameter is a page OR a component, per its type field -------
+    moveNode:          { kind: 'structure', typeParam: 'type',       param: 'name' },
+    deleteNode:        { kind: 'structure', typeParam: 'type',       param: 'name' },
+    duplicateNode:     { kind: 'structure', typeParam: 'type',       param: 'name' },
+    addNode:           { kind: 'structure', typeParam: 'type',       param: 'name' },
+    editNode:          { kind: 'structure', typeParam: 'type',       param: 'name' },
+    insertSnippet:     { kind: 'structure', typeParam: 'type',       param: 'name' },
+    addComplexElement: { kind: 'structure', typeParam: 'structType', param: 'pageName' },
+    listInteractions:  { kind: 'structure', typeParam: 'structType', param: 'pageName' },
+    addInteraction:    { kind: 'structure', typeParam: 'structType', param: 'pageName' },
+    editInteraction:   { kind: 'structure', typeParam: 'structType', param: 'pageName' },
+    deleteInteraction: { kind: 'structure', typeParam: 'structType', param: 'pageName' }
+};
+
+/**
+ * Swap a text input for one carrying a <datalist> of the project's routes.
+ *
+ * The input stays an input, so any value remains typable; the list is a
+ * suggestion, not a constraint.
+ *
+ * @param {HTMLFormElement} form
+ * @param {Object} cfg  a PAGE_PICKERS row
+ * @returns {Promise<void>}
+ */
+async function _initRouteSuggest(form, cfg) {
+    const input = form.querySelector('[name="' + cfg.param + '"]');
+    if (!input || input.tagName === 'SELECT' || input.list) return;
+
+    const listId = 'qs-routes-' + cfg.param;
+    const datalist = QSDom.el('datalist', { id: listId });
+    input.setAttribute('list', listId);
+    input.parentNode.insertBefore(datalist, input.nextSibling);
+
+    let routes = [];
+    try {
+        routes = await QuickSiteAdmin.fetchHelperData('routes');
+    } catch (error) {
+        return; // no suggestions; the field still works as a plain text box
+    }
+    if (!Array.isArray(routes)) return;
+
+    QSDom.clear(datalist);
+    routes.forEach(r => {
+        datalist.appendChild(QSDom.el('option', { value: r.value }));
+    });
+
+    if (!input.placeholder) {
+        input.placeholder = t('commandForm.select.routeSuggest');
+    }
+
+    // Say out loud that the list is a suggestion. Without this the field is
+    // indistinguishable from a plain text box until the caller happens to
+    // click it, which is how it read as "not implemented".
+    if (!input.parentNode.querySelector('.qs-route-suggest-hint')) {
+        input.parentNode.insertBefore(
+            QSDom.el('p', {
+                class: 'admin-hint qs-route-suggest-hint',
+                text: t('commandForm.hint.routeSuggest')
+            }),
+            datalist.nextSibling);
+    }
+}
+
+/**
+ * Replace a text input with a dropdown of the project's routes.
+ *
+ * Used where the parameter's own description says the route must already
+ * exist, so nothing valid is refused by constraining it.
+ *
+ * @param {HTMLFormElement} form
+ * @param {Object} cfg  a PAGE_PICKERS row
+ * @returns {Promise<void>}
+ */
+async function _initRouteSelect(form, cfg) {
+    const input = form.querySelector('[name="' + cfg.param + '"]');
+    if (!input || input.tagName === 'SELECT') return;
+
+    const select = QSDom.el('select', { name: cfg.param, class: 'admin-select' });
+    if (input.required) select.required = true;
+    if (input.dataset.urlParam !== undefined) select.dataset.urlParam = '';
+    input.replaceWith(select);
+
+    // allowEmpty keeps the blank option meaningful: getStateStores reads
+    // "omit to retrieve stores for ALL routes".
+    await QuickSiteAdmin.populateSelect(
+        select, 'routes', [],
+        cfg.allowEmpty ? t('commandForm.select.allRoutes') : t('commandForm.select.route'));
+}
+
+/**
+ * Convert a type/structType field and its page-or-component field into
+ * cascading selects.
+ *
+ * Which list the second field takes depends on the first: a page name when the
+ * type is "page", a component name when it is "component", and nothing at all
+ * for menu/footer, where the parameter is not required.
+ *
+ * @param {HTMLFormElement} form
+ * @param {Object} cfg  a PAGE_PICKERS row
+ * @returns {Promise<void>}
+ */
+async function _initStructurePicker(form, cfg) {
+    const typeInput = form.querySelector('[name="' + cfg.typeParam + '"]');
+    const nameInput = form.querySelector('[name="' + cfg.param + '"]');
+    if (!typeInput || !nameInput) return;
+
+    let typeSelect = typeInput;
+    if (typeInput.tagName !== 'SELECT') {
+        typeSelect = QSDom.el('select', {
+            name: cfg.typeParam,
+            class: 'admin-select'
+        });
+        if (typeInput.required) typeSelect.required = true;
+        if (typeInput.dataset.urlParam !== undefined) typeSelect.dataset.urlParam = '';
+        typeInput.replaceWith(typeSelect);
+        await QuickSiteAdmin.populateSelect(
+            typeSelect, 'structure-types', [], t('commandForm.select.structureType'));
+    }
+
+    let nameSelect = nameInput;
+    if (nameInput.tagName !== 'SELECT') {
+        nameSelect = QSDom.el('select', {
+            name: cfg.param,
+            class: 'admin-select'
+        });
+        if (nameInput.dataset.urlParam !== undefined) nameSelect.dataset.urlParam = '';
+        nameInput.replaceWith(nameSelect);
+        QSDom.setSelectPlaceholder(nameSelect, t('commandForm.select.typeFirst'));
+        nameSelect.disabled = true;
+    }
+
+    typeSelect.addEventListener('change', async () => {
+        const type = typeSelect.value;
+        if (type === 'page') {
+            nameSelect.disabled = false;
+            await QuickSiteAdmin.populateSelect(
+                nameSelect, 'pages', [], t('commandForm.select.page'));
+        } else if (type === 'component') {
+            nameSelect.disabled = false;
+            await QuickSiteAdmin.populateSelect(
+                nameSelect, 'components', [], t('commandForm.select.component'));
+        } else {
+            QSDom.setSelectPlaceholder(nameSelect, t('commandForm.select.notRequiredForType'));
+            nameSelect.disabled = true;
+        }
+    });
+}
+
+/**
+ * Wire whichever picker this command's table row asks for.
+ *
+ * Runs after the per-command switch, so a command may appear in both without
+ * either clobbering the other - each helper no-ops on a field already
+ * converted.
+ *
+ * @returns {Promise<void>}
+ */
+async function applyPagePickers() {
+    const cfg = PAGE_PICKERS[COMMAND_NAME];
+    if (!cfg) return;
+
+    const form = document.getElementById('command-form');
+    if (!form) return;
+
+    if (cfg.kind === 'select') {
+        await _initRouteSelect(form, cfg);
+    } else if (cfg.kind === 'suggest') {
+        await _initRouteSuggest(form, cfg);
+    } else if (cfg.kind === 'structure') {
+        await _initStructurePicker(form, cfg);
+    }
+}
+
 async function initEnhancedFeatures() {
     const form = document.getElementById('command-form');
     
@@ -397,6 +610,11 @@ async function initEnhancedFeatures() {
             await initEditComponentToNodeForm();
             break;
     }
+
+    // The page/route group: twenty-one forms whose page field is wired from one
+    // table rather than a case each. After the switch, so a command listed in
+    // both gets both.
+    await applyPagePickers();
 }
 
 /**
@@ -421,7 +639,7 @@ async function initEditStructureForm() {
         typeSelect.className = 'admin-select';
         typeSelect.required = typeInput.required;
         typeInput.replaceWith(typeSelect);
-        await QuickSiteAdmin.populateSelect(typeSelect, 'structure-types', [], 'Select structure type...');
+        await QuickSiteAdmin.populateSelect(typeSelect, 'structure-types', [], t('commandForm.select.structureType'));
     }
     
     // Convert name input to select
@@ -442,7 +660,7 @@ async function initEditStructureForm() {
         actionSelect.name = 'action';
         actionSelect.className = 'admin-select';
         actionInput.replaceWith(actionSelect);
-        await QuickSiteAdmin.populateSelect(actionSelect, 'edit-actions', [], 'Select action...');
+        await QuickSiteAdmin.populateSelect(actionSelect, 'edit-actions', [], t('commandForm.select.action'));
     }
     
     // Convert nodeId input to select (if exists)
@@ -530,19 +748,19 @@ async function initEditStructureForm() {
         apiParams.push(nodeId); // This fetches the specific node
         
         try {
-            structureTextarea.placeholder = 'Loading node content...';
+            structureTextarea.placeholder = t('commandForm.placeholder.loadingNode');
             const result = await QuickSiteAdmin.apiRequest('getStructure', 'GET', null, apiParams);
             
             if (result.ok && result.data.data?.node) {
                 // Format the node JSON nicely
                 const nodeJson = JSON.stringify(result.data.data.node, null, 2);
                 structureTextarea.value = nodeJson;
-                structureTextarea.placeholder = 'Node content loaded - modify and submit to update';
-                QuickSiteAdmin.showToast('Node content loaded into structure field', 'info');
+                structureTextarea.placeholder = t('commandForm.placeholder.nodeLoaded');
+                QuickSiteAdmin.showToast(t('commandForm.toast.nodeLoaded'), 'info');
             }
         } catch (error) {
             console.error('Failed to load node content:', error);
-            structureTextarea.placeholder = 'Enter new structure JSON...';
+            structureTextarea.placeholder = t('commandForm.placeholder.newStructure');
         }
     }
     
@@ -552,9 +770,9 @@ async function initEditStructureForm() {
             nameSelect.disabled = false;
             
             if (type === 'page') {
-                await QuickSiteAdmin.populateSelect(nameSelect, 'pages', [], 'Select page...');
+                await QuickSiteAdmin.populateSelect(nameSelect, 'pages', [], t('commandForm.select.page'));
             } else if (type === 'component') {
-                await QuickSiteAdmin.populateSelect(nameSelect, 'components', [], 'Select component...');
+                await QuickSiteAdmin.populateSelect(nameSelect, 'components', [], t('commandForm.select.component'));
             } else {
                 QSDom.setSelectPlaceholder(nameSelect, t('commandForm.select.notRequiredForType'));
                 nameSelect.disabled = true;
@@ -598,10 +816,10 @@ async function initEditStructureForm() {
             if (structureTextarea) {
                 if (actionSelect.value === 'delete') {
                     structureTextarea.removeAttribute('required');
-                    structureTextarea.placeholder = 'Not required for delete action';
+                    structureTextarea.placeholder = t('commandForm.placeholder.notRequiredDelete');
                 } else {
                     structureTextarea.setAttribute('required', '');
-                    structureTextarea.placeholder = 'Enter JSON structure...';
+                    structureTextarea.placeholder = t('commandForm.placeholder.jsonStructure');
                 }
             }
         });
@@ -657,7 +875,7 @@ async function initGetStructureForm() {
             typeSelect.dataset.urlParam = '';
         }
         typeInput.replaceWith(typeSelect);
-        await QuickSiteAdmin.populateSelect(typeSelect, 'structure-types', [], 'Select structure type...');
+        await QuickSiteAdmin.populateSelect(typeSelect, 'structure-types', [], t('commandForm.select.structureType'));
     }
     
     // Convert name input to select
@@ -703,9 +921,9 @@ async function initGetStructureForm() {
             nameSelect.disabled = false;
             
             if (type === 'page') {
-                await QuickSiteAdmin.populateSelect(nameSelect, 'pages', [], 'Select page...');
+                await QuickSiteAdmin.populateSelect(nameSelect, 'pages', [], t('commandForm.select.page'));
             } else if (type === 'component') {
-                await QuickSiteAdmin.populateSelect(nameSelect, 'components', [], 'Select component...');
+                await QuickSiteAdmin.populateSelect(nameSelect, 'components', [], t('commandForm.select.component'));
             } else {
                 // menu and footer don't need name
                 QSDom.setSelectPlaceholder(nameSelect, t('commandForm.select.notRequiredForType'));
@@ -801,7 +1019,7 @@ async function initAssetSelectForm() {
 async function populateAssetFilenames(selectEl, category) {
     try {
         const args = category ? [category] : [];
-        await QuickSiteAdmin.populateSelect(selectEl, 'assets', args, 'Select file...');
+        await QuickSiteAdmin.populateSelect(selectEl, 'assets', args, t('commandForm.select.file'));
     } catch (e) {
         QSDom.setSelectPlaceholder(selectEl, t('commandForm.errors.loadFiles'));
     }
@@ -838,7 +1056,7 @@ function initEditAssetExtensionHint() {
     // Hint below the input
     const hint = document.createElement('small');
     hint.style.cssText = 'display:block;margin-top:0.25rem;color:var(--admin-text-tertiary,#6b7280);font-size:0.75rem;';
-    hint.textContent = 'Enter new name without extension — it is preserved automatically';
+    hint.textContent = t('commandForm.hint.renameNoExtension');
     wrapper.parentNode.insertBefore(hint, wrapper.nextSibling);
 
     // Update suffix when filename changes
@@ -1024,7 +1242,7 @@ async function initDeleteAssetForm() {
             }
         } catch (error) {
             QuickSiteAdmin.displayResponse(responseDiv, { ok: false, status: 0, data: { error: error.message } });
-            QuickSiteAdmin.showToast('Delete failed: ' + error.message, 'error');
+            QuickSiteAdmin.showToast(t('commandForm.toast.deleteFailed') + ' ' + error.message, 'error');
         }
 
         QSDom.clear(submitBtn);
@@ -1222,7 +1440,7 @@ async function initEditTitleForm() {
         routeSelect.className = 'admin-select';
         routeSelect.required = routeInput.required;
         routeInput.replaceWith(routeSelect);
-        await QuickSiteAdmin.populateSelect(routeSelect, 'routes', [], 'Select route...');
+        await QuickSiteAdmin.populateSelect(routeSelect, 'routes', [], t('commandForm.select.route'));
     }
     
     // Convert lang input to select
@@ -1232,7 +1450,7 @@ async function initEditTitleForm() {
         langSelect.className = 'admin-select';
         langSelect.required = langInput.required;
         langInput.replaceWith(langSelect);
-        await QuickSiteAdmin.populateSelect(langSelect, 'languages', [], 'Select language...');
+        await QuickSiteAdmin.populateSelect(langSelect, 'languages', [], t('commandForm.select.language'));
     }
     
     // Function to load current title
@@ -1255,7 +1473,7 @@ async function initEditTitleForm() {
             }
         } catch (error) {
             console.error('Error loading current title:', error);
-            titleInput.placeholder = 'Enter new title...';
+            titleInput.placeholder = t('commandForm.placeholder.newTitle');
         }
     };
     
@@ -1291,12 +1509,12 @@ async function initBuildSelectForm() {
             nameSelect.dataset.urlParam = '';
         }
         nameInput.replaceWith(nameSelect);
-        await QuickSiteAdmin.populateSelect(nameSelect, 'builds', [], 'Select build...');
+        await QuickSiteAdmin.populateSelect(nameSelect, 'builds', [], t('commandForm.select.build'));
 
         // Refresh after a delete performed elsewhere in the panel.
         form.addEventListener('command-success', async (e) => {
             if (e.detail.command === 'deleteBuild') {
-                await QuickSiteAdmin.populateSelect(nameSelect, 'builds', [], 'Select build...');
+                await QuickSiteAdmin.populateSelect(nameSelect, 'builds', [], t('commandForm.select.build'));
                 nameSelect.selectedIndex = 0;
             }
         });
@@ -1362,7 +1580,7 @@ async function initEditStylesForm() {
     
     if (contentTextarea) {
         // Add loading indicator
-        contentTextarea.placeholder = 'Loading current styles...';
+        contentTextarea.placeholder = t('commandForm.placeholder.loadingStyles');
         contentTextarea.disabled = true;
         
         // Add helper buttons above textarea
@@ -1383,16 +1601,16 @@ async function initEditStylesForm() {
         // Function to load current styles
         async function loadCurrentStyles() {
             contentTextarea.disabled = true;
-            contentTextarea.placeholder = 'Loading...';
+            contentTextarea.placeholder = t('common.loading');
             
             try {
                 const data = await QuickSiteAdmin.fetchHelperData('current-styles', []);
                 // Normalize line endings for textarea display
                 contentTextarea.value = data.content ? data.content.replace(/\r\n/g, '\n') : '';
-                contentTextarea.placeholder = 'CSS content...';
+                contentTextarea.placeholder = t('commandForm.placeholder.cssContent');
             } catch (error) {
-                contentTextarea.placeholder = 'Failed to load styles. Enter CSS manually.';
-                QuickSiteAdmin.showToast('Failed to load current styles', 'error');
+                contentTextarea.placeholder = t('commandForm.placeholder.stylesFailed');
+                QuickSiteAdmin.showToast(t('commandForm.toast.stylesFailed'), 'error');
             }
             
             contentTextarea.disabled = false;
@@ -1404,7 +1622,7 @@ async function initEditStylesForm() {
         // Reload button
         loadBtn.addEventListener('click', async () => {
             await loadCurrentStyles();
-            QuickSiteAdmin.showToast('Styles reloaded', 'success');
+            QuickSiteAdmin.showToast(t('commandForm.toast.stylesReloaded'), 'success');
         });
         
         // Basic CSS formatting (just normalizes whitespace)
@@ -1419,7 +1637,7 @@ async function initEditStylesForm() {
                 .replace(/  }/g, '}')
                 .trim();
             contentTextarea.value = css;
-            QuickSiteAdmin.showToast('CSS formatted', 'success');
+            QuickSiteAdmin.showToast(t('commandForm.toast.cssFormatted'), 'success');
         });
         
         // Make textarea taller for CSS editing
@@ -1521,11 +1739,11 @@ async function initSetRootVariablesForm() {
             const varValue = varValueInput.value.trim();
             
             if (!varName) {
-                QuickSiteAdmin.showToast('Please select a variable', 'warning');
+                QuickSiteAdmin.showToast(t('commandForm.toast.selectVariable'), 'warning');
                 return;
             }
             if (!varValue) {
-                QuickSiteAdmin.showToast('Please enter a value', 'warning');
+                QuickSiteAdmin.showToast(t('commandForm.toast.enterValue'), 'warning');
                 return;
             }
             
@@ -1942,11 +2160,11 @@ async function initSetKeyframesForm() {
             const frameValue = kfFrameValue.value.trim();
             
             if (!frameKey) {
-                QuickSiteAdmin.showToast('Please select or enter a frame key', 'warning');
+                QuickSiteAdmin.showToast(t('commandForm.toast.selectFrameKey'), 'warning');
                 return;
             }
             if (!frameValue) {
-                QuickSiteAdmin.showToast('Please enter CSS properties', 'warning');
+                QuickSiteAdmin.showToast(t('commandForm.toast.enterCssProps'), 'warning');
                 return;
             }
             
@@ -1977,14 +2195,14 @@ async function initSetKeyframesForm() {
                 nameInput.value = name;
                 QuickSiteAdmin.showToast(`Name set: ${name}`, 'success');
             } else {
-                QuickSiteAdmin.showToast('Please select or enter an animation name', 'warning');
+                QuickSiteAdmin.showToast(t('commandForm.toast.selectAnimationName'), 'warning');
             }
         });
         
         // Clear frames button
         kfClearBtn.addEventListener('click', () => {
             framesTextarea.value = '{}';
-            QuickSiteAdmin.showToast('Frames cleared', 'success');
+            QuickSiteAdmin.showToast(t('commandForm.toast.framesCleared'), 'success');
         });
         
         // Load existing frames into textarea
@@ -1995,7 +2213,7 @@ async function initSetKeyframesForm() {
                 nameInput.value = name;
                 QuickSiteAdmin.showToast(`Loaded frames for: ${name}`, 'success');
             } else {
-                QuickSiteAdmin.showToast('Please select an existing animation first', 'warning');
+                QuickSiteAdmin.showToast(t('commandForm.toast.selectExistingAnimation'), 'warning');
             }
         });
         
@@ -2031,12 +2249,12 @@ async function initRouteSelectForm() {
         
         routeInput.replaceWith(routeSelect);
         
-        await QuickSiteAdmin.populateSelect(routeSelect, 'routes', [], 'Select route...');
+        await QuickSiteAdmin.populateSelect(routeSelect, 'routes', [], t('commandForm.select.route'));
 
         // Refresh route list after successful delete
         form.addEventListener('command-success', async (e) => {
             if (e.detail.command === 'deleteRoute') {
-                await QuickSiteAdmin.populateSelect(routeSelect, 'routes', [], 'Select route...');
+                await QuickSiteAdmin.populateSelect(routeSelect, 'routes', [], t('commandForm.select.route'));
                 routeSelect.selectedIndex = 0;
             }
         });
@@ -2065,15 +2283,15 @@ async function initAddRouteParentSelect() {
         // Add "None (root level)" as first option
         const noneOption = document.createElement('option');
         noneOption.value = '';
-        noneOption.textContent = 'None (root level)';
+        noneOption.textContent = t('commandForm.select.noneRoot');
         parentSelect.appendChild(noneOption);
         
-        await QuickSiteAdmin.populateSelect(parentSelect, 'routes', [], 'None (root level)');
+        await QuickSiteAdmin.populateSelect(parentSelect, 'routes', [], t('commandForm.select.noneRoot'));
 
         // Refresh route list after successful add
         form.addEventListener('command-success', async (e) => {
             if (e.detail.command === 'addRoute') {
-                await QuickSiteAdmin.populateSelect(parentSelect, 'routes', [], 'None (root level)');
+                await QuickSiteAdmin.populateSelect(parentSelect, 'routes', [], t('commandForm.select.noneRoot'));
             }
         });
     }
@@ -2097,7 +2315,7 @@ async function initFindComponentUsagesForm() {
         }
         
         componentInput.replaceWith(componentSelect);
-        await QuickSiteAdmin.populateSelect(componentSelect, 'components', [], 'Select component...');
+        await QuickSiteAdmin.populateSelect(componentSelect, 'components', [], t('commandForm.select.component'));
     }
 }
 
@@ -2114,12 +2332,12 @@ async function initRenameComponentForm() {
         oldNameSelect.className = 'admin-select';
         oldNameSelect.required = oldNameInput.required;
         oldNameInput.replaceWith(oldNameSelect);
-        await QuickSiteAdmin.populateSelect(oldNameSelect, 'components', [], 'Select component to rename...');
+        await QuickSiteAdmin.populateSelect(oldNameSelect, 'components', [], t('commandForm.select.componentRename'));
 
         // Refresh component list after successful rename
         form.addEventListener('command-success', async (e) => {
             if (e.detail.command === 'renameComponent') {
-                await QuickSiteAdmin.populateSelect(oldNameSelect, 'components', [], 'Select component to rename...');
+                await QuickSiteAdmin.populateSelect(oldNameSelect, 'components', [], t('commandForm.select.componentRename'));
                 oldNameSelect.selectedIndex = 0;
             }
         });
@@ -2139,12 +2357,12 @@ async function initDuplicateComponentForm() {
         sourceSelect.className = 'admin-select';
         sourceSelect.required = sourceInput.required;
         sourceInput.replaceWith(sourceSelect);
-        await QuickSiteAdmin.populateSelect(sourceSelect, 'components', [], 'Select component to duplicate...');
+        await QuickSiteAdmin.populateSelect(sourceSelect, 'components', [], t('commandForm.select.componentDuplicate'));
 
         // Refresh component list after successful duplicate
         form.addEventListener('command-success', async (e) => {
             if (e.detail.command === 'duplicateComponent') {
-                await QuickSiteAdmin.populateSelect(sourceSelect, 'components', [], 'Select component to duplicate...');
+                await QuickSiteAdmin.populateSelect(sourceSelect, 'components', [], t('commandForm.select.componentDuplicate'));
                 sourceSelect.selectedIndex = 0;
             }
         });
@@ -2165,7 +2383,7 @@ async function initAddComponentToNodeForm() {
         typeSelect.className = 'admin-select';
         typeSelect.required = typeInput.required;
         typeInput.replaceWith(typeSelect);
-        await QuickSiteAdmin.populateSelect(typeSelect, 'structure-types', [], 'Select structure type...');
+        await QuickSiteAdmin.populateSelect(typeSelect, 'structure-types', [], t('commandForm.select.structureType'));
     }
     
     // Convert name input to select
@@ -2214,7 +2432,7 @@ async function initAddComponentToNodeForm() {
         componentSelect.className = 'admin-select';
         componentSelect.required = componentInput.required;
         componentInput.replaceWith(componentSelect);
-        await QuickSiteAdmin.populateSelect(componentSelect, 'components', [], 'Select component to add...');
+        await QuickSiteAdmin.populateSelect(componentSelect, 'components', [], t('commandForm.select.componentAdd'));
     }
     
     // Find or create data field container
@@ -2369,9 +2587,9 @@ async function initAddComponentToNodeForm() {
             nameSelect.disabled = false;
             
             if (type === 'page') {
-                await QuickSiteAdmin.populateSelect(nameSelect, 'pages', [], 'Select page...');
+                await QuickSiteAdmin.populateSelect(nameSelect, 'pages', [], t('commandForm.select.page'));
             } else if (type === 'component') {
-                await QuickSiteAdmin.populateSelect(nameSelect, 'components', [], 'Select component...');
+                await QuickSiteAdmin.populateSelect(nameSelect, 'components', [], t('commandForm.select.component'));
             } else {
                 QSDom.setSelectPlaceholder(nameSelect, t('commandForm.select.notRequiredForType'));
                 nameSelect.disabled = true;
@@ -2409,7 +2627,7 @@ async function initEditComponentToNodeForm() {
         typeSelect.className = 'admin-select';
         typeSelect.required = typeInput.required;
         typeInput.replaceWith(typeSelect);
-        await QuickSiteAdmin.populateSelect(typeSelect, 'structure-types', [], 'Select structure type...');
+        await QuickSiteAdmin.populateSelect(typeSelect, 'structure-types', [], t('commandForm.select.structureType'));
     }
     
     // Convert name input to select
@@ -2652,9 +2870,9 @@ async function initEditComponentToNodeForm() {
             nameSelect.disabled = false;
             
             if (type === 'page') {
-                await QuickSiteAdmin.populateSelect(nameSelect, 'pages', [], 'Select page...');
+                await QuickSiteAdmin.populateSelect(nameSelect, 'pages', [], t('commandForm.select.page'));
             } else if (type === 'component') {
-                await QuickSiteAdmin.populateSelect(nameSelect, 'components', [], 'Select component...');
+                await QuickSiteAdmin.populateSelect(nameSelect, 'components', [], t('commandForm.select.component'));
             } else {
                 QSDom.setSelectPlaceholder(nameSelect, t('commandForm.select.notRequiredForType'));
                 nameSelect.disabled = true;
@@ -2702,7 +2920,7 @@ async function initLanguageSelectForm() {
         
         langInput.replaceWith(langSelect);
         
-        await QuickSiteAdmin.populateSelect(langSelect, 'languages', [], 'Select language...');
+        await QuickSiteAdmin.populateSelect(langSelect, 'languages', [], t('commandForm.select.language'));
 
         // No refresh-after-success listener: every command that reaches this form
         // is read-only, so the language list cannot go stale under it. The one
@@ -2730,7 +2948,7 @@ async function initCreateAliasForm() {
         
         typeInput.replaceWith(typeSelect);
         
-        await QuickSiteAdmin.populateSelect(typeSelect, 'alias-types', [], 'Select alias type...');
+        await QuickSiteAdmin.populateSelect(typeSelect, 'alias-types', [], t('commandForm.select.aliasType'));
     }
     
     // Convert target input to select with routes
@@ -2778,13 +2996,13 @@ async function initDeleteAliasForm() {
         
         aliasInput.replaceWith(aliasSelect);
         
-        await QuickSiteAdmin.populateSelect(aliasSelect, 'aliases', [], 'Select alias to delete...');
+        await QuickSiteAdmin.populateSelect(aliasSelect, 'aliases', [], t('commandForm.select.aliasDelete'));
         
         // Listen for successful deletion to refresh the select
         form.addEventListener('command-success', async (e) => {
             if (e.detail.command === 'deleteAlias') {
                 // Refresh the select after successful deletion
-                await QuickSiteAdmin.populateSelect(aliasSelect, 'aliases', [], 'Select alias to delete...');
+                await QuickSiteAdmin.populateSelect(aliasSelect, 'aliases', [], t('commandForm.select.aliasDelete'));
                 // Reset to default option
                 aliasSelect.selectedIndex = 0;
             }
@@ -2813,7 +3031,7 @@ async function initSetTranslationKeysForm() {
         
         langInput.replaceWith(langSelect);
         
-        await QuickSiteAdmin.populateSelect(langSelect, 'languages', [], 'Select language...');
+        await QuickSiteAdmin.populateSelect(langSelect, 'languages', [], t('commandForm.select.language'));
         
         // Add key selector helper above the translations textarea
         if (translationsTextarea) {
@@ -2939,11 +3157,11 @@ async function initSetTranslationKeysForm() {
                 const value = valueInput.value;
                 
                 if (!key) {
-                    QuickSiteAdmin.showToast('Please select a key', 'warning');
+                    QuickSiteAdmin.showToast(t('commandForm.toast.selectKey'), 'warning');
                     return;
                 }
                 if (!value) {
-                    QuickSiteAdmin.showToast('Please enter a value', 'warning');
+                    QuickSiteAdmin.showToast(t('commandForm.toast.enterValue'), 'warning');
                     return;
                 }
                 
@@ -3089,7 +3307,7 @@ async function initDeleteTranslationKeysForm() {
         
         langInput.replaceWith(langSelect);
         
-        await QuickSiteAdmin.populateSelect(langSelect, 'languages', [], 'Select language...');
+        await QuickSiteAdmin.populateSelect(langSelect, 'languages', [], t('commandForm.select.language'));
         
         // Add key selector helper above the keys textarea
         if (keysTextarea) {
@@ -3202,7 +3420,7 @@ async function initDeleteTranslationKeysForm() {
             // Add all unused keys button handler
             addAllUnusedBtn.addEventListener('click', () => {
                 if (unusedKeys.length === 0) {
-                    QuickSiteAdmin.showToast('No unused keys to add', 'warning');
+                    QuickSiteAdmin.showToast(t('commandForm.toast.noUnusedKeys'), 'warning');
                     return;
                 }
                 

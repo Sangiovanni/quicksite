@@ -527,6 +527,37 @@
         }
     },
     "commandForm": {
+        "hint": {
+            "routeSuggest": "Existing routes are suggested, but any route may be typed — including one that does not exist yet.",
+            "renameNoExtension": "Enter new name without extension — it is preserved automatically"
+        },
+        "toast": {
+            "deleteFailed": "Delete failed:",
+            "nodeLoaded": "Node content loaded into structure field",
+            "stylesFailed": "Failed to load current styles",
+            "stylesReloaded": "Styles reloaded",
+            "cssFormatted": "CSS formatted",
+            "selectVariable": "Please select a variable",
+            "enterValue": "Please enter a value",
+            "selectFrameKey": "Please select or enter a frame key",
+            "enterCssProps": "Please enter CSS properties",
+            "selectAnimationName": "Please select or enter an animation name",
+            "framesCleared": "Frames cleared",
+            "selectExistingAnimation": "Please select an existing animation first",
+            "selectKey": "Please select a key",
+            "noUnusedKeys": "No unused keys to add"
+        },
+        "placeholder": {
+            "loadingNode": "Loading node content...",
+            "nodeLoaded": "Node content loaded - modify and submit to update",
+            "newStructure": "Enter new structure JSON...",
+            "notRequiredDelete": "Not required for delete action",
+            "jsonStructure": "Enter JSON structure...",
+            "newTitle": "Enter new title...",
+            "loadingStyles": "Loading current styles...",
+            "cssContent": "CSS content...",
+            "stylesFailed": "Failed to load styles. Enter CSS manually."
+        },
         "errors": {
             "docNotFound": "Command documentation not found",
             "docLoadFailed": "Failed to load command documentation:",
@@ -539,6 +570,22 @@
             "loadFiles": "Failed to load files"
         },
         "select": {
+            "allRoutes": "All routes (leave empty)",
+            "page": "Select page...",
+            "component": "Select component...",
+            "route": "Select route...",
+            "structureType": "Select structure type...",
+            "language": "Select language...",
+            "noneRoot": "None (root level)",
+            "build": "Select build...",
+            "file": "Select file...",
+            "action": "Select action...",
+            "componentRename": "Select component to rename...",
+            "componentDuplicate": "Select component to duplicate...",
+            "componentAdd": "Select component to add...",
+            "aliasType": "Select alias type...",
+            "aliasDelete": "Select alias to delete...",
+            "routeSuggest": "Type a route, or pick one from the list",
             "typeFirst": "Select type first...",
             "nameFirst": "Select name first...",
             "structureFirst": "Select structure first...",
