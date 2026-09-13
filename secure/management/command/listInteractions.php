@@ -168,21 +168,9 @@ function __command_listInteractions(array $params = [], array $urlParams = []): 
     // FIND NODE BY ID
     // ==========================================================================
     
-    // NodeNavigator uses numeric path like "0.1.2" 
-    // But our nodeId from data-qs-node is like "hero/cta-button"
-    // We need to convert or use addNodeIds to find it
-    
-    // First, add node IDs to structure
-    $structureWithIds = NodeNavigator::addNodeIds($structure);
-    
-    // Find the node - try direct numeric path first
+    // nodeId is a dot-separated path of child indices, the same shape the
+    // renderer writes into data-qs-node.
     $node = NodeNavigator::getNode($structure, $nodeId);
-    
-    if ($node === null) {
-        // nodeId might be a semantic ID (generated from classes/ids)
-        // Search structure for matching data-qs-node
-        $node = findNodeBySemanticId($structureWithIds, $nodeId);
-    }
     
     if ($node === null) {
         return ApiResponse::create(404, 'node.not_found')
@@ -197,9 +185,7 @@ function __command_listInteractions(array $params = [], array $urlParams = []): 
     $tag = $node['tag'] ?? 'div';
     $interactions = extractInteractionsFromNode($node);
     $availableEventsBucketed = getAvailableEventsForTag($tag);
-    // Flat list kept for back-compat with the current picker UI;
-    // step 4 of the beta.6 picker rewrite will consume the bucketed
-    // shape directly and this flat field can then be dropped.
+    // Flat list of the same events the bucketed field carries.
     $availableEvents = flattenAvailableEvents($availableEventsBucketed);
     
     // Group interactions by event for better UI representation
@@ -231,44 +217,6 @@ function __command_listInteractions(array $params = [], array $urlParams = []): 
             ],
             'totalInteractions' => count($interactions)
         ]);
-}
-
-/**
- * Find a node by its semantic ID (from data-qs-node attribute value)
- * This searches the structure recursively
- */
-function findNodeBySemanticId(array $structure, string $targetId, string $currentPath = ''): ?array {
-    // Check if this is the target node
-    $nodeId = $structure['__nodeId'] ?? null;
-    if ($nodeId === $targetId) {
-        return $structure;
-    }
-    
-    // Search in children
-    if (isset($structure['children']) && is_array($structure['children'])) {
-        foreach ($structure['children'] as $index => $child) {
-            if (is_array($child)) {
-                $found = findNodeBySemanticId($child, $targetId, $currentPath . '.' . $index);
-                if ($found !== null) {
-                    return $found;
-                }
-            }
-        }
-    }
-    
-    // Handle array of root elements
-    if (isset($structure[0])) {
-        foreach ($structure as $index => $item) {
-            if (is_array($item)) {
-                $found = findNodeBySemanticId($item, $targetId, (string)$index);
-                if ($found !== null) {
-                    return $found;
-                }
-            }
-        }
-    }
-    
-    return null;
 }
 
 // Execute via HTTP (only when not called internally)

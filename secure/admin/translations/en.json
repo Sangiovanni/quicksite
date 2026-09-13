@@ -561,7 +561,10 @@
             "newTitle": "Enter new title...",
             "loadingStyles": "Loading current styles...",
             "cssContent": "CSS content...",
-            "stylesFailed": "Failed to load styles. Enter CSS manually."
+            "stylesFailed": "Failed to load styles. Enter CSS manually.",
+            "newName": "new-name (without extension)",
+            "currentTitle": "Current: :title",
+            "noTitleSet": "No title set for this route/language"
         },
         "errors": {
             "docNotFound": "Command documentation not found",
@@ -572,7 +575,8 @@
             "loadVariables": "Error loading variables",
             "loadSelectors": "Error loading selectors",
             "refreshKeys": "Error refreshing keys",
-            "loadFiles": "Failed to load files"
+            "loadFiles": "Failed to load files",
+            "loadEvents": "Error loading events"
         },
         "select": {
             "api": "Select API...",
@@ -620,7 +624,16 @@
             "routeCustomHint": "Create a new route instead of picking an existing one",
             "routeExisting": "Existing routes",
             "routeSpecial": "Special pages",
-            "backToPicker": "Back to the list"
+            "backToPicker": "Back to the list",
+            "nodeFirst": "Select node first...",
+            "event": "Select event...",
+            "eventWithCount": ":event (:count)",
+            "eventsCommon": "Common",
+            "eventsCommonFor": "Common for <:tag>",
+            "eventsLessCommon": "Less common",
+            "eventCustom": "Type an event that is not listed…",
+            "eventCustomHint": "Use an event name the element does not normally carry",
+            "eventCustomPlaceholder": "Event name, for example onclick"
         },
         "empty": {
             "noKeys": "No keys found",
@@ -628,7 +641,8 @@
             "noImages": "No images found in assets/images",
             "noVariables": "No variables found",
             "noCssRules": "No CSS rules found",
-            "noComponentNodes": "No component nodes found"
+            "noComponentNodes": "No component nodes found",
+            "noInteractionsOnNode": "This node has no interactions yet"
         },
         "status": {
             "loadingFiles": "Loading files...",
@@ -704,7 +718,12 @@
         "getStructure": {
             "optionNone": "None (full structure)",
             "optionShowIds": "showIds (add node identifiers)",
-            "optionSummary": "summary (tree overview)"
+            "optionSummary": "summary (tree overview)",
+            "optionKeywords": "Whole structure",
+            "optionNodes": "A single node"
+        },
+        "fileSize": {
+            "bytes": "Bytes"
         },
         "addComponent": {
             "selectPosition": "Select position...",

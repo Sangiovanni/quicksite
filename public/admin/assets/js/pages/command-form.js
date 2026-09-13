@@ -345,10 +345,11 @@ const ENUM_VALUES = {
     ]
 };
 
-// The sentinel value the route picker's "type a new one" entry carries. Not a
-// route anyone can name: RegexPatterns::route_name is lowercase alphanumerics
-// and hyphens, so no real route can collide with it.
-const QS_ROUTE_CUSTOM = '__custom__';
+// The sentinel value a pick-or-type field's "type your own" entry carries.
+// Nothing it stands in for can collide with it: RegexPatterns::route_name is
+// lowercase alphanumerics and hyphens, and an event name is validated against a
+// fixed allowlist of on* names.
+const QS_PICK_CUSTOM = '__custom__';
 
 const FIELD_PICKERS = {
     // --- the route must already exist: a real dropdown ---------------------
@@ -461,20 +462,45 @@ const FIELD_PICKERS = {
         // 'Default "after"' — optional.
         { kind: 'enum', param: 'position', values: 'position', defaultValue: 'after' }
     ],
+    //
+    // `eventParams` is a FOURTH cascade level: type -> name -> node -> event.
+    // One fetch of listInteractions feeds it, and the SOURCE differs per field
+    // because the commands mean different things by "event":
+    //
+    //   'available' — availableEventsGrouped, what the chosen node's TAG can
+    //                 carry. For attaching something new, or moving it.
+    //   'existing'  — the keys of groupedByEvent, the events the node ACTUALLY
+    //                 has. "Event name containing the interaction to edit" —
+    //                 an event with nothing on it is not editable, and offering
+    //                 one is the defect this picker work exists to avoid.
+    //
+    // ⚠ 'available' is NARROWER than what the command accepts: addInteraction
+    // and editInteraction validate against the flat union of every tag's events
+    // (25), while the tag-filtered list is the subset this element supports.
+    // Those two therefore get the free-entry escape; 'existing' needs none,
+    // because the node's own interactions ARE the complete valid set.
     listInteractions:  { kind: 'structure', typeParam: 'structType', param: 'pageName',
                          nodeParams: ['nodeId'] },
     addInteraction: [
         { kind: 'structure', typeParam: 'structType', param: 'pageName',
-          nodeParams: ['nodeId'] },
+          nodeParams: ['nodeId'],
+          eventParams: [{ param: 'event', source: 'available' }] },
         { kind: 'jsfunction', param: 'function', eventParam: 'event' }
     ],
     editInteraction: [
         { kind: 'structure', typeParam: 'structType', param: 'pageName',
-          nodeParams: ['nodeId'] },
+          nodeParams: ['nodeId'],
+          eventParams: [
+              { param: 'event', source: 'existing' },
+              // "New event name to move this interaction to" — a destination,
+              // so it takes the tag's events, not the node's current ones.
+              { param: 'newEvent', source: 'available' }
+          ] },
         { kind: 'jsfunction', param: 'function', eventParam: 'event' }
     ],
     deleteInteraction: { kind: 'structure', typeParam: 'structType', param: 'pageName',
-                         nodeParams: ['nodeId'] }
+                         nodeParams: ['nodeId'],
+                         eventParams: [{ param: 'event', source: 'existing' }] }
 };
 
 /**
@@ -562,30 +588,32 @@ function _placeholder(select, text, opts) {
 }
 
 /**
- * Put the structure NAME field directly under the TYPE field, and show it only
- * for the types that have one.
+ * Move one field's group to sit directly after another's.
  *
- * The form renders required parameters first and optional ones after, and on
- * the four interaction commands `pageName` is optional ("required when
- * structType is page"). That put it BELOW the node field it has to be answered
- * before — so choosing "page" left the node dropdown stuck on "select name
- * first" with the name field itself far down the form under a second heading,
- * and the cascade read as broken.
+ * The form renders REQUIRED parameters first and optional ones under a second
+ * heading, which separates pairs that have to be answered together:
+ *
+ *   - `pageName` is optional ("required when structType is page"), so it landed
+ *     below the node field it must be answered BEFORE — the cascade read as
+ *     broken when it was only badly ordered.
+ *   - `newEvent` is optional, so the field saying where an interaction moves TO
+ *     landed far below the one saying where it is now.
  *
  * Safe to move: the URL is built from fields marked `data-url-param`, which is
- * set only for parameters help.php writes in braces, and none of the fourteen
- * structure commands has one — so no request changes shape.
- * (NOTES/tests/beta12/s4e_urlparam_order.php.)
+ * set only for parameters help.php writes in braces, and no command this is
+ * used on has one — so no request changes shape. Every pair is checked in
+ * NOTES/tests/beta12/s4e_urlparam_order.php, which counts them so a pair
+ * cannot be added without being checked.
  *
- * @param {HTMLElement} typeSelect
- * @param {HTMLElement} nameSelect
+ * @param {HTMLElement} anchorEl  the field to sit after
+ * @param {HTMLElement} movedEl   the field to move
  */
-function _placeNameAfterType(typeSelect, nameSelect) {
-    const typeGroup = typeSelect && typeSelect.closest('.admin-form-group');
-    const nameGroup = nameSelect && nameSelect.closest('.admin-form-group');
-    if (!typeGroup || !nameGroup || typeGroup === nameGroup) return;
-    if (typeGroup.parentNode !== nameGroup.parentNode) return;
-    typeGroup.parentNode.insertBefore(nameGroup, typeGroup.nextSibling);
+function _placeFieldAfter(anchorEl, movedEl) {
+    const anchorGroup = anchorEl && anchorEl.closest('.admin-form-group');
+    const movedGroup = movedEl && movedEl.closest('.admin-form-group');
+    if (!anchorGroup || !movedGroup || anchorGroup === movedGroup) return;
+    if (anchorGroup.parentNode !== movedGroup.parentNode) return;
+    anchorGroup.parentNode.insertBefore(movedGroup, anchorGroup.nextSibling);
 }
 
 /**
@@ -646,16 +674,38 @@ function _setDisabled(select, flag) {
  * @param {Object} cfg  a FIELD_PICKERS row
  * @returns {Promise<void>}
  */
-async function _initRouteSuggest(form, cfg) {
-    const input = form.querySelector('[name="' + cfg.param + '"]');
-    if (!input || input.tagName === 'SELECT' || input.closest('.qs-route-picker')) return;
+/**
+ * Turn a plain text field into a PICK-OR-TYPE field: a searchable dropdown of
+ * the known values, with a sentinel entry at the top of the list that swaps the
+ * row to a free-text input and a back button that returns.
+ *
+ * ⚠ EXACTLY ONE of the select and the input carries the field's `name` at a
+ * time, and its `required` flag and url-param marker travel with it — the form
+ * is collected with `new FormData(form)`, so two elements sharing a name would
+ * submit both values.
+ *
+ * The `qs-route-picker*` classes are this widget's styling in `admin.css`, and
+ * they are the same classes the preview's copy of the widget uses, so the two
+ * surfaces stay identical without the rules being written twice.
+ *
+ * Caller fills the select AFTER this returns, and calls `syncPicker()` when it
+ * does. The sentinel is already in place by then, so it stays at the top.
+ *
+ * @param {HTMLFormElement} form
+ * @param {string} param            the field name
+ * @param {Object} opts             {sentinelText, sentinelHint, inputPlaceholder, placeholder}
+ * @returns {{select: HTMLSelectElement, input: HTMLInputElement}|null}
+ */
+function _initPickOrType(form, param, opts) {
+    const input = form.querySelector('[name="' + param + '"]');
+    if (!input || input.tagName === 'SELECT' || input.closest('.qs-route-picker')) return null;
 
     const wrap = QSDom.el('div', { class: 'qs-route-picker' });
-    const select = QSDom.el('select', { name: cfg.param, class: 'admin-select' });
+    const select = QSDom.el('select', { name: param, class: 'admin-select' });
     const custom = QSDom.el('input', {
         type: 'text',
         class: 'qs-route-picker__custom-input',
-        placeholder: t('commandForm.select.routeSuggest')
+        placeholder: opts.inputPlaceholder
     });
     custom.style.display = 'none';
     const backBtn = QSDom.el('button', {
@@ -683,7 +733,7 @@ async function _initRouteSuggest(form, cfg) {
         other.removeAttribute('name');
         other.required = false;
         if (isUrlParam) delete other.dataset.urlParam;
-        el.setAttribute('name', cfg.param);
+        el.setAttribute('name', param);
         el.required = wasRequired;
         if (isUrlParam) el.dataset.urlParam = '';
     }
@@ -711,20 +761,44 @@ async function _initRouteSuggest(form, cfg) {
     }
 
     select.addEventListener('change', () => {
-        if (select.value === QS_ROUTE_CUSTOM) swapToCustom();
+        if (select.value === QS_PICK_CUSTOM) swapToCustom();
     });
     backBtn.addEventListener('click', swapToPicker);
 
-    _makeSearchable(select, t('commandForm.select.route'));
-    _placeholder(select, t('commandForm.select.route'));
+    _makeSearchable(select, opts.placeholder);
+    _placeholder(select, opts.placeholder);
 
     // The escape hatch sits at the TOP of the list, where it is seen before the
     // caller concludes the value they want is missing.
     select.appendChild(QSDom.el('option', {
-        value: QS_ROUTE_CUSTOM,
-        text: t('commandForm.select.routeCustom'),
-        'data-description': t('commandForm.select.routeCustomHint')
+        value: QS_PICK_CUSTOM,
+        text: opts.sentinelText,
+        'data-description': opts.sentinelHint
     }));
+
+    return { select: select, input: custom };
+}
+
+/**
+ * A route field where the value may legitimately NOT exist yet.
+ *
+ * cfg.specialValues names documented values the arm does not return (the state
+ * stores accept 404/500/403/401, which getRoutes has no reason to list); they
+ * are offered under their own heading rather than left for the caller to guess.
+ *
+ * @param {HTMLFormElement} form
+ * @param {Object} cfg  a FIELD_PICKERS row
+ * @returns {Promise<void>}
+ */
+async function _initRouteSuggest(form, cfg) {
+    const built = _initPickOrType(form, cfg.param, {
+        placeholder: t('commandForm.select.route'),
+        sentinelText: t('commandForm.select.routeCustom'),
+        sentinelHint: t('commandForm.select.routeCustomHint'),
+        inputPlaceholder: t('commandForm.select.routeSuggest')
+    });
+    if (!built) return;
+    const select = built.select;
 
     let routes = [];
     try {
@@ -1038,7 +1112,7 @@ async function _initStructurePicker(form, cfg) {
 
     // The name field belongs directly under the type field that decides it, and
     // only for the types that have one.
-    _placeNameAfterType(typeSelect, nameSelect);
+    _placeFieldAfter(typeSelect, nameSelect);
     _showNameField(nameSelect, ['page', 'component'].indexOf(typeSelect.value) !== -1);
 
     const nodeSelects = (cfg.nodeParams || [])
@@ -1049,6 +1123,28 @@ async function _initStructurePicker(form, cfg) {
         _placeholder(select, t('commandForm.select.typeFirst'));
         _setDisabled(select, true);
     });
+
+    // The fourth level. An 'available' field gets the free-entry escape,
+    // because the tag-filtered list is narrower than what the command
+    // accepts; an 'existing' field does not, because the events already on
+    // the node are the whole valid set.
+    const eventFields = (cfg.eventParams || []).map(spec => {
+        if (spec.source === 'available') {
+            const built = _initPickOrType(form, spec.param, {
+                placeholder: t('commandForm.select.nodeFirst'),
+                sentinelText: t('commandForm.select.eventCustom'),
+                sentinelHint: t('commandForm.select.eventCustomHint'),
+                inputPlaceholder: t('commandForm.select.eventCustomPlaceholder')
+            });
+            return built ? { spec: spec, select: built.select } : null;
+        }
+        const select = _swapForSelect(form, spec.param);
+        if (!select) return null;
+        _makeSearchable(select, t('commandForm.select.nodeFirst'));
+        _placeholder(select, t('commandForm.select.nodeFirst'));
+        return { spec: spec, select: select };
+    }).filter(Boolean);
+    eventFields.forEach(f => _setDisabled(f.select, true));
 
     /** Does this structure type accept the literal "root" for a node field? */
     function rootAllowedFor(type) {
@@ -1103,6 +1199,112 @@ async function _initStructurePicker(form, cfg) {
         });
     }
 
+    /**
+     * Refill every event select for the chosen node, or park it.
+     *
+     * ONE listInteractions call answers both sources: it returns the tag's
+     * available events AND the node's existing ones. That is the command the
+     * preview's interaction editor already uses for the same question, so no
+     * new /admin/api arm is registered for data the caller can already read.
+     */
+    async function loadEvents() {
+        if (eventFields.length === 0) return;
+
+        const park = key => eventFields.forEach(f => {
+            _placeholder(f.select, t(key));
+            _setDisabled(f.select, true);
+        });
+
+        const type = typeSelect.value;
+        const name = nameSelect.value;
+        const nodeId = nodeSelects.length ? nodeSelects[0].value : '';
+        if (!type || ((type === 'page' || type === 'component') && !name) || !nodeId) {
+            park('commandForm.select.nodeFirst');
+            return;
+        }
+
+        const urlParams = (type === 'page' || type === 'component')
+            ? [type, name, nodeId]
+            : [type, nodeId];
+        let data;
+        try {
+            const res = await QuickSiteAdmin.apiRequest('listInteractions', 'GET', null, urlParams);
+            data = res && res.ok && res.data && res.data.data;
+        } catch (error) {
+            data = null;
+        }
+        if (!data) {
+            park('commandForm.errors.loadEvents');
+            return;
+        }
+
+        const grouped = data.availableEventsGrouped || {};
+        const existing = data.groupedByEvent || {};
+        const tag = (data.element && data.element.tag) || '';
+
+        eventFields.forEach(f => {
+            const select = f.select;
+            if (f.spec.source === 'existing') {
+                const names = Object.keys(existing);
+                if (names.length === 0) {
+                    // ⚠ NOT an empty dropdown on a required field. The node
+                    // carries nothing to edit or delete, and saying so is the
+                    // only useful answer — the command would refuse anything
+                    // this field could offer.
+                    _placeholder(select, t('commandForm.empty.noInteractionsOnNode'));
+                    _setDisabled(select, true);
+                    return;
+                }
+                _setDisabled(select, false);
+                _placeholder(select, t('commandForm.select.event'));
+                names.forEach(ev => select.appendChild(QSDom.el('option', {
+                    value: ev,
+                    text: t('commandForm.select.eventWithCount',
+                            { event: ev, count: (existing[ev] || []).length })
+                })));
+                _syncPicker(select);
+                return;
+            }
+
+            // 'available' — two of the three buckets listInteractions returns.
+            //
+            // ⚠ THE `advanced` BUCKET IS DROPPED, and this is the one thing
+            // here that is not obvious. The command validates `event`
+            // against the union of UNIVERSAL_EVENTS and TAG_SPECIFIC_EVENTS;
+            // the advanced bucket comes from ADVANCED_EVENTS, which is in
+            // NEITHER. Measured by calling the command with each offered
+            // event: every advanced one answers 400, on every tag that has
+            // such a bucket, with zero overlap with the accepted set
+            // (NOTES/tests/beta12/s4f_event_acceptance.php). Offering them
+            // would be the exact defect this picker work exists to avoid.
+            //
+            // Dropping the BUCKET rather than filtering against a copy of
+            // the accepted list keeps this correct without the panel holding
+            // a second copy of an engine constant. Anything in it stays
+            // reachable through the free-entry escape below.
+            _setDisabled(select, false);
+            _placeholder(select, t('commandForm.select.event'));
+            select.appendChild(QSDom.el('option', {
+                value: QS_PICK_CUSTOM,
+                text: t('commandForm.select.eventCustom'),
+                'data-description': t('commandForm.select.eventCustomHint')
+            }));
+            [['common', tag ? t('commandForm.select.eventsCommonFor', { tag: tag })
+                            : t('commandForm.select.eventsCommon')],
+             ['lessCommon', t('commandForm.select.eventsLessCommon')]
+            ].forEach(pair => {
+                const list = grouped[pair[0]] || [];
+                if (!list.length) return;
+                const group = QSDom.el('optgroup', { label: pair[1] });
+                list.forEach(ev => group.appendChild(QSDom.el('option', { value: ev, text: ev })));
+                select.appendChild(group);
+            });
+            _syncPicker(select);
+        });
+    }
+
+    nodeSelects.forEach(select => select.addEventListener('change', loadEvents));
+
     typeSelect.addEventListener('change', async () => {
         const type = typeSelect.value;
         _showNameField(nameSelect, type === 'page' || type === 'component');
@@ -1116,11 +1318,16 @@ async function _initStructurePicker(form, cfg) {
             _placeholder(nameSelect, t('commandForm.select.notRequiredForType'));
             _setDisabled(nameSelect, true);
         }
-        // A new type invalidates whatever node was chosen under the old one.
+        // A new type invalidates whatever node was chosen under the old one,
+        // and with it whatever event was chosen under that node.
         await loadNodes();
+        await loadEvents();
     });
 
-    nameSelect.addEventListener('change', loadNodes);
+    nameSelect.addEventListener('change', async () => {
+        await loadNodes();
+        await loadEvents();
+    });
 }
 
 /**
@@ -1241,6 +1448,14 @@ async function applyPagePickers() {
             await _initJsFunctionSelect(form, cfg);
         }
     }
+
+    // `newEvent` answers "move it to which event?", so it belongs beside the
+    // field that says which event it is on now — not under the Optional
+    // heading the form would otherwise put it below. A convention rather than
+    // a per-command row: the two commands that carry the pair mean the same
+    // thing by it, and a third would too.
+    _placeFieldAfter(form.querySelector('[name="event"]'),
+                     form.querySelector('[name="newEvent"]'));
 }
 
 async function initEnhancedFeatures() {
@@ -1435,7 +1650,7 @@ async function initEditStructureForm() {
 
     // The name field sits under the type field that decides it, and appears
     // only for the types that have one.
-    _placeNameAfterType(typeSelect, nameSelect);
+    _placeFieldAfter(typeSelect, nameSelect);
     _showNameField(nameSelect, ['page', 'component'].indexOf(typeSelect && typeSelect.value) !== -1);
     
     // Function to load node options and return them for selection
@@ -1657,14 +1872,8 @@ async function initGetStructureForm() {
         if (optionInput.dataset.urlParam !== undefined) {
             optionSelect.dataset.urlParam = '';
         }
-        QSDom.setSelectPlaceholder(optionSelect, t('commandForm.getStructure.optionNone'));
-        // showIds / summary are the command's own argument values, so they stay
-        // literal; only the parenthetical explanation is translated.
-        QuickSiteAdmin.appendOptionsToSelect(optionSelect, [
-            { value: 'showIds', label: t('commandForm.getStructure.optionShowIds') },
-            { value: 'summary', label: t('commandForm.getStructure.optionSummary') }
-        ]);
         optionInput.replaceWith(optionSelect);
+        _makeSearchable(optionSelect, t('commandForm.getStructure.optionNone'));
     }
     
     // Set up cascading behavior
@@ -1676,12 +1885,65 @@ async function initGetStructureForm() {
     // order — and the form already renders them in it. _placeNameAfterType is
     // a no-op on an adjacent pair and is called for the same reason the other
     // four call it: so a later parameter change cannot silently break it.
-    _placeNameAfterType(typeSelect, nameSelect);
+    _placeFieldAfter(typeSelect, nameSelect);
     _showNameField(nameSelect, ['page', 'component'].indexOf(typeSelect && typeSelect.value) !== -1);
     if (nameSelect && nameSelect.tagName === 'SELECT') {
         _makeSearchable(nameSelect, t('commandForm.select.typeFirst'));
     }
     
+    const optionSelect = form.querySelector('[name="option"]');
+
+    /**
+     * One field, two kinds of value.
+     *
+     * The parameter documents exactly three things: the keyword showIds, the
+     * keyword summary, or a node id. A dropdown of only the keywords would
+     * refuse every node id; a dropdown of only nodes would refuse both
+     * keywords. Two optgroups offer all three, and the node group refills
+     * from the same structure-nodes arm the other forms use as soon as the
+     * structure above it is chosen.
+     */
+    async function fillOptions() {
+        if (!optionSelect) return;
+        _placeholder(optionSelect, t('commandForm.getStructure.optionNone'));
+
+        // showIds / summary are the command's own argument values, so they
+        // stay literal; only the parenthetical explanation is translated.
+        const keywords = QSDom.el('optgroup', { label: t('commandForm.getStructure.optionKeywords') });
+        [['showIds', 'commandForm.getStructure.optionShowIds'],
+         ['summary', 'commandForm.getStructure.optionSummary']
+        ].forEach(pair => keywords.appendChild(
+            QSDom.el('option', { value: pair[0], text: t(pair[1]) })));
+        optionSelect.appendChild(keywords);
+
+        const type = typeSelect ? typeSelect.value : '';
+        const name = nameSelect ? nameSelect.value : '';
+        if (!type || ((type === 'page' || type === 'component') && !name)) {
+            _syncPicker(optionSelect);
+            return;
+        }
+
+        const params = (type === 'page' || type === 'component') ? [type, name] : [type];
+        let nodes;
+        try {
+            nodes = await QuickSiteAdmin.fetchHelperData('structure-nodes', params);
+        } catch (error) {
+            _syncPicker(optionSelect);
+            return; // the keywords still stand; the field is still usable
+        }
+        if (!Array.isArray(nodes) || !nodes.length) {
+            _syncPicker(optionSelect);
+            return;
+        }
+        const group = QSDom.el('optgroup', { label: t('commandForm.getStructure.optionNodes') });
+        nodes.forEach(n => group.appendChild(
+            QSDom.el('option', { value: n.value, text: n.label || n.value })));
+        optionSelect.appendChild(group);
+        _syncPicker(optionSelect);
+    }
+
+    await fillOptions();
+
     if (typeSelect && nameSelect) {
         typeSelect.addEventListener('change', async () => {
             const type = typeSelect.value;
@@ -1697,7 +1959,9 @@ async function initGetStructureForm() {
                 _placeholder(nameSelect, t('commandForm.select.notRequiredForType'));
                 _setDisabled(nameSelect, true);
             }
+            await fillOptions();
         });
+        nameSelect.addEventListener('change', fillOptions);
     }
 }
 
@@ -1842,7 +2106,7 @@ function initEditAssetExtensionHint() {
     updateSuffix();
 
     // Update placeholder based on selection
-    newFilenameInput.setAttribute('placeholder', 'new-name (without extension)');
+    newFilenameInput.setAttribute('placeholder', t('commandForm.placeholder.newName'));
 }
 
 /**
@@ -2240,7 +2504,9 @@ async function initEditTitleForm() {
             const result = await QuickSiteAdmin.fetchHelperData('page-title', [route, lang]);
             if (result && result.title !== undefined) {
                 titleInput.value = result.title;
-                titleInput.placeholder = result.title ? 'Current: ' + result.title : 'No title set for this route/language';
+                titleInput.placeholder = result.title
+                    ? t('commandForm.placeholder.currentTitle', { title: result.title })
+                    : t('commandForm.placeholder.noTitleSet');
             }
         } catch (error) {
             console.error('Error loading current title:', error);
@@ -3235,7 +3501,7 @@ async function initAddComponentToNodeForm() {
 
     // The name field sits under the type field that decides it, and appears
     // only for the types that have one.
-    _placeNameAfterType(typeSelect, nameSelect);
+    _placeFieldAfter(typeSelect, nameSelect);
     _showNameField(nameSelect, ['page', 'component'].indexOf(typeSelect && typeSelect.value) !== -1);
     
     // Function to load node options
@@ -3468,7 +3734,7 @@ async function initEditComponentToNodeForm() {
 
     // The name field sits under the type field that decides it, and appears
     // only for the types that have one.
-    _placeNameAfterType(typeSelect, nameSelect);
+    _placeFieldAfter(typeSelect, nameSelect);
     _showNameField(nameSelect, ['page', 'component'].indexOf(typeSelect && typeSelect.value) !== -1);
     
     // Store component nodes data for extracting component names
@@ -4312,9 +4578,10 @@ async function initDeleteTranslationKeysForm() {
  * Format file size for display
  */
 function formatFileSize(bytes) {
-    if (bytes === 0) return '0 Bytes';
+    const bytesLabel = t('commandForm.fileSize.bytes');
+    if (bytes === 0) return '0 ' + bytesLabel;
     const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const sizes = [bytesLabel, 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
