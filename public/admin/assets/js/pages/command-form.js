@@ -345,6 +345,11 @@ const ENUM_VALUES = {
     ]
 };
 
+// The sentinel value the route picker's "type a new one" entry carries. Not a
+// route anyone can name: RegexPatterns::route_name is lowercase alphanumerics
+// and hyphens, so no real route can collide with it.
+const QS_ROUTE_CUSTOM = '__custom__';
+
 const FIELD_PICKERS = {
     // --- the route must already exist: a real dropdown ---------------------
     setRouteResolver:            { kind: 'select', param: 'route', source: 'routes' },
@@ -353,10 +358,20 @@ const FIELD_PICKERS = {
         { kind: 'select', param: 'language', source: 'languages' }
     ],
     getStateStores:              { kind: 'select', param: 'route', source: 'routes', allowEmpty: true },
-    addPageEvent:                { kind: 'select', param: 'pageName', source: 'routes' },
+    // addPageEvent's `event` takes the same three literals its two siblings
+    // already offer as a dropdown (the server's allowlist is one shared array);
+    // it was the only one of the three still asking you to type them.
+    addPageEvent: [
+        { kind: 'select', param: 'pageName', source: 'routes' },
+        { kind: 'enum', param: 'event', values: 'pageEvent' },
+        { kind: 'jsfunction', param: 'function', eventParam: 'event' }
+    ],
     editPageEvent: [
         { kind: 'select', param: 'pageName', source: 'routes' },
-        { kind: 'enum', param: 'event', values: 'pageEvent' }
+        { kind: 'enum', param: 'event', values: 'pageEvent' },
+        // "Move the interaction to a different page-level event" — same three.
+        { kind: 'enum', param: 'newEvent', values: 'pageEvent' },
+        { kind: 'jsfunction', param: 'function', eventParam: 'event' }
     ],
     deletePageEvent: [
         { kind: 'select', param: 'pageName', source: 'routes' },
@@ -368,7 +383,13 @@ const FIELD_PICKERS = {
     // setStateStores accepts the special pages 404/500/403/401, which getRoutes
     // does not return; the two policy commands NAME a route they are about to
     // create. A <select> would refuse all three.
-    setStateStores:              { kind: 'suggest', param: 'route' },
+    // ⚠ The four special pages are a HARDCODED list, and deliberately so: they
+    // are the fixed set setStateStores documents, they are the same on every
+    // installation, and getRoutes has no reason to return them. Offering them
+    // turns "type 404 and hope" into a pick. If they ever become configurable
+    // this is the one place to read them from instead.
+    setStateStores:              { kind: 'suggest', param: 'route',
+                                   specialValues: ['404', '500', '403', '401'] },
     generateCookiePolicy:        { kind: 'suggest', param: 'route' },
     generatePrivacyPolicy:       { kind: 'suggest', param: 'route' },
 
@@ -400,77 +421,328 @@ const FIELD_PICKERS = {
     setPrivacyDescLang: { kind: 'select', param: 'lang', source: 'languages' },
 
     // --- the parameter is a page OR a component, per its type field -------
-    moveNode:          { kind: 'structure', typeParam: 'type',       param: 'name' },
-    deleteNode:        { kind: 'structure', typeParam: 'type',       param: 'name' },
-    duplicateNode:     { kind: 'structure', typeParam: 'type',       param: 'name' },
+    //
+    // `nodeParams` is the THIRD cascade level: type -> name -> node. One row
+    // carries every node field of its command, so moveNode's two ids are one
+    // row rather than two - a second row for the same command is the collision
+    // insertSnippet already had to have unpicked.
+    //
+    // ⚠ EVERY node field here takes a DOT PATH. The four interaction commands
+    // are documented as taking a `data-qs-node` value like "hero/cta-button";
+    // that documentation is stale. data-qs-node CARRIES the dot path, and all
+    // four resolve their id through NodeNavigator::getNode, which parses
+    // nothing else. See NOTES/tests/beta12/s4e_nodeid_shape_probe.php.
+    //
+    // `allowRoot` prepends the literal "root", which is a documented value that
+    // is NOT a node - true for every structure type, or an array naming the
+    // types that accept it (duplicateNode refuses root unless type=component).
+    moveNode:          { kind: 'structure', typeParam: 'type', param: 'name',
+                         nodeParams: ['sourceNodeId', 'targetNodeId'] },
+    deleteNode:        { kind: 'structure', typeParam: 'type', param: 'name',
+                         nodeParams: ['nodeId'] },
+    duplicateNode:     { kind: 'structure', typeParam: 'type', param: 'name',
+                         nodeParams: ['nodeId'], allowRoot: ['component'] },
     addNode: [
-        { kind: 'structure', typeParam: 'type', param: 'name' },
+        { kind: 'structure', typeParam: 'type', param: 'name',
+          nodeParams: ['targetNodeId'], allowRoot: true },
         // "default after" — optional, so the select shows what it will send.
         { kind: 'enum', param: 'position', values: 'position', defaultValue: 'after' }
     ],
-    editNode:          { kind: 'structure', typeParam: 'type',       param: 'name' },
+    editNode:          { kind: 'structure', typeParam: 'type', param: 'name',
+                         nodeParams: ['nodeId'] },
     insertSnippet: [
-        { kind: 'structure', typeParam: 'type', param: 'name' },
+        { kind: 'structure', typeParam: 'type', param: 'name',
+          nodeParams: ['targetNodeId'], allowRoot: true },
         { kind: 'snippet', param: 'snippetId' }
     ],
     addComplexElement: [
-        { kind: 'structure', typeParam: 'structType', param: 'pageName' },
+        { kind: 'structure', typeParam: 'structType', param: 'pageName',
+          nodeParams: ['targetNodeId'], allowRoot: true },
         // 'Default "after"' — optional.
         { kind: 'enum', param: 'position', values: 'position', defaultValue: 'after' }
     ],
-    listInteractions:  { kind: 'structure', typeParam: 'structType', param: 'pageName' },
-    addInteraction:    { kind: 'structure', typeParam: 'structType', param: 'pageName' },
-    editInteraction:   { kind: 'structure', typeParam: 'structType', param: 'pageName' },
-    deleteInteraction: { kind: 'structure', typeParam: 'structType', param: 'pageName' }
+    listInteractions:  { kind: 'structure', typeParam: 'structType', param: 'pageName',
+                         nodeParams: ['nodeId'] },
+    addInteraction: [
+        { kind: 'structure', typeParam: 'structType', param: 'pageName',
+          nodeParams: ['nodeId'] },
+        { kind: 'jsfunction', param: 'function', eventParam: 'event' }
+    ],
+    editInteraction: [
+        { kind: 'structure', typeParam: 'structType', param: 'pageName',
+          nodeParams: ['nodeId'] },
+        { kind: 'jsfunction', param: 'function', eventParam: 'event' }
+    ],
+    deleteInteraction: { kind: 'structure', typeParam: 'structType', param: 'pageName',
+                         nodeParams: ['nodeId'] }
 };
 
 /**
- * Swap a text input for one carrying a <datalist> of the project's routes.
+ * Wrap a <select> in QSSearchableSelect: inline search, keyboard navigation,
+ * optgroup filtering, and matching on data-description as well as the label.
  *
- * The input stays an input, so any value remains typable; the list is a
- * suggestion, not a constraint.
+ * The component WRAPS rather than replaces — the native <select> stays in the
+ * DOM as the data store, so `.value`, `change` events, `required` and the
+ * form's own field collection keep working. Nothing about the shared component
+ * is modified by adopting it here.
+ *
+ * Applied to every picker select whose options come from PROJECT DATA, where
+ * the list is as long as the project is big. NOT applied to the enum selects,
+ * whose options are three or four documented literals — a search box over three
+ * items is chrome, not help.
+ *
+ * @param {HTMLSelectElement} select
+ * @param {string} placeholder  shown on the trigger while nothing is chosen
+ * @returns {Object|null} the picker instance, also parked on select._qsPicker
+ */
+function _makeSearchable(select, placeholder) {
+    if (!select || !window.QSSearchableSelect) return null;
+    if (select._qsPicker) return select._qsPicker;
+
+    // The search box and the empty state reuse the keys the panel already has
+    // for exactly those two strings rather than minting a pair beside them.
+    select._qsPicker = new window.QSSearchableSelect(select, {
+        placeholder: placeholder,
+        searchPlaceholder: t('common.search'),
+        emptyText: t('common.noResults')
+    });
+    _syncPicker(select);
+    return select._qsPicker;
+}
+
+/**
+ * Re-read a wrapped select after its options or its disabled state changed.
+ *
+ * Two jobs, because the wrapper handles one of them and not the other:
+ *   - refresh() re-reads the options and the trigger label;
+ *   - `disabled` it does not mirror at all. The native select is hidden, so a
+ *     disabled one still looks clickable through the wrapper's own <button>.
+ *     The cascade's "pick the level above first" affordance IS that disabled
+ *     state, so it is mirrored onto the trigger here.
+ *
+ * A no-op on an unwrapped select, so every call site can be unconditional.
+ *
+ * @param {HTMLSelectElement} select
+ */
+function _syncPicker(select) {
+    const picker = select && select._qsPicker;
+    if (!picker) return;
+    picker.refresh();
+    if (picker.triggerEl) picker.triggerEl.disabled = !!select.disabled;
+}
+
+/**
+ * populateSelect + appendOptionsToSelect + setSelectPlaceholder, each followed
+ * by the wrapper sync.
+ *
+ * They exist so that adopting the wrapper did not scatter a `_syncPicker` call
+ * beside every populate in the file — one forgotten call is a dropdown that
+ * silently shows the previous level's options.
+ */
+async function _populateArm(select, arm, params, placeholder) {
+    await QuickSiteAdmin.populateSelect(select, arm, params || [], placeholder);
+    _syncPicker(select);
+}
+
+function _appendOptions(select, rows) {
+    QuickSiteAdmin.appendOptionsToSelect(select, rows);
+    _syncPicker(select);
+}
+
+function _placeholder(select, text, opts) {
+    const option = QSDom.setSelectPlaceholder(select, text, opts);
+    // ⚠ The wrapper shows ITS OWN `placeholder` whenever the blank option is
+    // selected, not the blank option's text — so a cascade that changes its
+    // placeholder ("Select type first…" -> "Select name first…" -> "Select
+    // target node…") would keep reading the first one on the trigger, and the
+    // field would say the wrong thing about why it is empty.
+    if (select && select._qsPicker) select._qsPicker.placeholder = text;
+    _syncPicker(select);
+    return option;
+}
+
+/**
+ * Put the structure NAME field directly under the TYPE field, and show it only
+ * for the types that have one.
+ *
+ * The form renders required parameters first and optional ones after, and on
+ * the four interaction commands `pageName` is optional ("required when
+ * structType is page"). That put it BELOW the node field it has to be answered
+ * before — so choosing "page" left the node dropdown stuck on "select name
+ * first" with the name field itself far down the form under a second heading,
+ * and the cascade read as broken.
+ *
+ * Safe to move: the URL is built from fields marked `data-url-param`, which is
+ * set only for parameters help.php writes in braces, and none of the fourteen
+ * structure commands has one — so no request changes shape.
+ * (NOTES/tests/beta12/s4e_urlparam_order.php.)
+ *
+ * @param {HTMLElement} typeSelect
+ * @param {HTMLElement} nameSelect
+ */
+function _placeNameAfterType(typeSelect, nameSelect) {
+    const typeGroup = typeSelect && typeSelect.closest('.admin-form-group');
+    const nameGroup = nameSelect && nameSelect.closest('.admin-form-group');
+    if (!typeGroup || !nameGroup || typeGroup === nameGroup) return;
+    if (typeGroup.parentNode !== nameGroup.parentNode) return;
+    typeGroup.parentNode.insertBefore(nameGroup, typeGroup.nextSibling);
+}
+
+/**
+ * Show the name field only for the types that take one.
+ *
+ * menu and footer have no name, and the field said so in a placeholder nobody
+ * had reason to read. Hiding it removes the question instead of answering it.
+ * The field stays disabled while hidden, so `new FormData(form)` skips it and
+ * the request is unchanged either way.
+ *
+ * @param {HTMLElement} nameSelect
+ * @param {boolean} show
+ */
+function _showNameField(nameSelect, show) {
+    const group = nameSelect && nameSelect.closest('.admin-form-group');
+    if (group) group.hidden = !show;
+}
+
+/**
+ * Set a cascade field's disabled state through the wrapper as well as on the
+ * native element, so the level you cannot use yet also LOOKS unusable.
+ *
+ * @param {HTMLSelectElement} select
+ * @param {boolean} flag
+ */
+function _setDisabled(select, flag) {
+    if (!select) return;
+    select.disabled = !!flag;
+    _syncPicker(select);
+}
+
+/**
+ * A route field where the value may legitimately NOT exist yet: a picker of the
+ * project's real routes, plus an explicit escape to type something new.
+ *
+ * ⚠ This is the hybrid shape the preview's own route picker already uses
+ * (`preview-js-interactions.js` -> `_renderRouteArgRow`), reproduced here rather
+ * than reinvented: a QSSearchableSelect over the known values, a sentinel
+ * option at the top of the list that swaps the row to a free-text input, and a
+ * back button to return. It even reuses that picker's CSS classes
+ * (`qs-route-picker*`, which live in the globally loaded `admin.css`), so the
+ * two surfaces look identical because they ARE the same widget.
+ *
+ * It replaces an <input> + <datalist>, which was correct but unreadable: a
+ * datalist looks exactly like a plain text box until you happen to click it, so
+ * nothing told the caller either that suggestions existed or that typing a new
+ * value was allowed. Both are now visible without clicking anything.
+ *
+ * ⚠ EXACTLY ONE of the select and the input carries the field's `name` at a
+ * time, because the form is collected with `new FormData(form)` — two elements
+ * sharing a name would submit both values.
+ *
+ * cfg.specialValues names documented values the arm does not return (the state
+ * stores accept 404/500/403/401, which getRoutes has no reason to list); they
+ * are offered under their own heading rather than left for the caller to guess.
  *
  * @param {HTMLFormElement} form
- * @param {Object} cfg  a PAGE_PICKERS row
+ * @param {Object} cfg  a FIELD_PICKERS row
  * @returns {Promise<void>}
  */
 async function _initRouteSuggest(form, cfg) {
     const input = form.querySelector('[name="' + cfg.param + '"]');
-    if (!input || input.tagName === 'SELECT' || input.list) return;
+    if (!input || input.tagName === 'SELECT' || input.closest('.qs-route-picker')) return;
 
-    const listId = 'qs-routes-' + cfg.param;
-    const datalist = QSDom.el('datalist', { id: listId });
-    input.setAttribute('list', listId);
-    input.parentNode.insertBefore(datalist, input.nextSibling);
+    const wrap = QSDom.el('div', { class: 'qs-route-picker' });
+    const select = QSDom.el('select', { name: cfg.param, class: 'admin-select' });
+    const custom = QSDom.el('input', {
+        type: 'text',
+        class: 'qs-route-picker__custom-input',
+        placeholder: t('commandForm.select.routeSuggest')
+    });
+    custom.style.display = 'none';
+    const backBtn = QSDom.el('button', {
+        type: 'button',
+        class: 'qs-route-picker__back',
+        title: t('commandForm.select.backToPicker'),
+        text: '←'
+    });
+    backBtn.style.display = 'none';
+
+    const wasRequired = input.required;
+    const isUrlParam = input.dataset.urlParam !== undefined;
+    // The select starts as the live field, so it starts holding the flags.
+    // activate() moves them on every swap; this is the initial state.
+    if (wasRequired) select.required = true;
+    if (isUrlParam) select.dataset.urlParam = '';
+
+    input.replaceWith(wrap);
+    wrap.appendChild(select);
+    wrap.appendChild(custom);
+    wrap.appendChild(backBtn);
+
+    /** Move the field's identity — and its required flag — to one element. */
+    function activate(el, other) {
+        other.removeAttribute('name');
+        other.required = false;
+        if (isUrlParam) delete other.dataset.urlParam;
+        el.setAttribute('name', cfg.param);
+        el.required = wasRequired;
+        if (isUrlParam) el.dataset.urlParam = '';
+    }
+
+    function swapToCustom() {
+        if (select._qsPicker && select._qsPicker.containerEl) {
+            select._qsPicker.containerEl.style.display = 'none';
+        }
+        custom.style.display = '';
+        backBtn.style.display = '';
+        activate(custom, select);
+        custom.focus();
+    }
+
+    function swapToPicker() {
+        if (select._qsPicker && select._qsPicker.containerEl) {
+            select._qsPicker.containerEl.style.display = '';
+        }
+        custom.style.display = 'none';
+        backBtn.style.display = 'none';
+        custom.value = '';
+        activate(select, custom);
+        select.value = '';
+        _syncPicker(select);
+    }
+
+    select.addEventListener('change', () => {
+        if (select.value === QS_ROUTE_CUSTOM) swapToCustom();
+    });
+    backBtn.addEventListener('click', swapToPicker);
+
+    _makeSearchable(select, t('commandForm.select.route'));
+    _placeholder(select, t('commandForm.select.route'));
+
+    // The escape hatch sits at the TOP of the list, where it is seen before the
+    // caller concludes the value they want is missing.
+    select.appendChild(QSDom.el('option', {
+        value: QS_ROUTE_CUSTOM,
+        text: t('commandForm.select.routeCustom'),
+        'data-description': t('commandForm.select.routeCustomHint')
+    }));
 
     let routes = [];
     try {
         routes = await QuickSiteAdmin.fetchHelperData('routes');
     } catch (error) {
-        return; // no suggestions; the field still works as a plain text box
+        routes = []; // the sentinel still stands; the field is still usable
     }
-    if (!Array.isArray(routes)) return;
-
-    QSDom.clear(datalist);
-    routes.forEach(r => {
-        datalist.appendChild(QSDom.el('option', { value: r.value }));
-    });
-
-    if (!input.placeholder) {
-        input.placeholder = t('commandForm.select.routeSuggest');
+    if (Array.isArray(routes) && routes.length) {
+        const group = QSDom.el('optgroup', { label: t('commandForm.select.routeExisting') });
+        routes.forEach(r => group.appendChild(QSDom.el('option', { value: r.value, text: r.label || r.value })));
+        select.appendChild(group);
     }
-
-    // Say out loud that the list is a suggestion. Without this the field is
-    // indistinguishable from a plain text box until the caller happens to
-    // click it, which is how it read as "not implemented".
-    if (!input.parentNode.querySelector('.qs-route-suggest-hint')) {
-        input.parentNode.insertBefore(
-            QSDom.el('p', {
-                class: 'admin-hint qs-route-suggest-hint',
-                text: t('commandForm.hint.routeSuggest')
-            }),
-            datalist.nextSibling);
+    if (cfg.specialValues && cfg.specialValues.length) {
+        const group = QSDom.el('optgroup', { label: t('commandForm.select.routeSpecial') });
+        cfg.specialValues.forEach(v => group.appendChild(QSDom.el('option', { value: v, text: v })));
+        select.appendChild(group);
     }
+    _syncPicker(select);
 }
 
 /**
@@ -493,7 +765,8 @@ async function _initArmSelect(form, cfg) {
         ? t('commandForm.select.language')
         : (cfg.allowEmpty ? t('commandForm.select.allRoutes') : t('commandForm.select.route'));
 
-    await QuickSiteAdmin.populateSelect(select, cfg.source || 'routes', [], placeholder);
+    _makeSearchable(select, placeholder);
+    await _populateArm(select, cfg.source || 'routes', [], placeholder);
     return select;
 }
 
@@ -527,8 +800,14 @@ function _swapForSelect(form, paramName) {
 function _fillSelect(select, rows, placeholder) {
     QSDom.setSelectPlaceholder(select, placeholder);
     rows.forEach(r => {
-        select.appendChild(QSDom.el('option', { value: r.value, text: r.label }));
+        const props = { value: r.value, text: r.label };
+        // The wrapper matches a search against data-description as well as the
+        // label, so a row carrying one becomes findable by it. The verb picker
+        // supplies it; the rest have nothing to say beyond their label.
+        if (r.description) props['data-description'] = r.description;
+        select.appendChild(QSDom.el('option', props));
     });
+    _syncPicker(select);
 }
 
 /**
@@ -582,7 +861,8 @@ async function _initSnippetSelect(form, cfg) {
     const select = _swapForSelect(form, cfg.param);
     if (!select) return;
 
-    QSDom.setSelectPlaceholder(select, t('commandForm.select.snippet'));
+    _makeSearchable(select, t('commandForm.select.snippet'));
+    _placeholder(select, t('commandForm.select.snippet'));
 
     let snippets = [];
     try {
@@ -627,9 +907,18 @@ async function _initApiEndpointPicker(form, cfg) {
     const apiPlaceholder = cfg.allowEmpty
         ? t('commandForm.select.allApis')
         : t('commandForm.select.api');
-    if (apiSelect) QSDom.setSelectPlaceholder(apiSelect, apiPlaceholder);
-    if (endpointSelect) QSDom.setSelectPlaceholder(endpointSelect, t('commandForm.select.endpoint'));
-    if (refSelect) QSDom.setSelectPlaceholder(refSelect, t('commandForm.select.endpointRef'));
+    if (apiSelect) {
+        _makeSearchable(apiSelect, apiPlaceholder);
+        _placeholder(apiSelect, apiPlaceholder);
+    }
+    if (endpointSelect) {
+        _makeSearchable(endpointSelect, t('commandForm.select.endpoint'));
+        _placeholder(endpointSelect, t('commandForm.select.endpoint'));
+    }
+    if (refSelect) {
+        _makeSearchable(refSelect, t('commandForm.select.endpointRef'));
+        _placeholder(refSelect, t('commandForm.select.endpointRef'));
+    }
 
     let apis = [];
     try {
@@ -691,15 +980,26 @@ async function _initApiEndpointPicker(form, cfg) {
 }
 
 /**
- * Convert a type/structType field and its page-or-component field into
- * cascading selects.
+ * Convert a type/structType field, its page-or-component field, and any node-id
+ * fields into cascading selects: type -> name -> node.
  *
  * Which list the second field takes depends on the first: a page name when the
  * type is "page", a component name when it is "component", and nothing at all
  * for menu/footer, where the parameter is not required.
  *
+ * The third level reads the `structure-nodes` arm, which runs getStructure and
+ * returns EVERY node of the chosen structure, labelled with its tag, first
+ * class and id and indented by depth — the same arm and the same labels
+ * editStructure has always used. Because the enumeration is complete, a select
+ * refuses nothing the command would have accepted from a text box, with one
+ * exception the row has to name: the literal "root", which is a valid value
+ * that is not a node. cfg.allowRoot prepends it.
+ *
+ * menu and footer have nodes but no name, so they load as soon as the type is
+ * picked; page and component wait for the name.
+ *
  * @param {HTMLFormElement} form
- * @param {Object} cfg  a PAGE_PICKERS row
+ * @param {Object} cfg  a FIELD_PICKERS row
  * @returns {Promise<void>}
  */
 async function _initStructurePicker(form, cfg) {
@@ -716,8 +1016,11 @@ async function _initStructurePicker(form, cfg) {
         if (typeInput.required) typeSelect.required = true;
         if (typeInput.dataset.urlParam !== undefined) typeSelect.dataset.urlParam = '';
         typeInput.replaceWith(typeSelect);
-        await QuickSiteAdmin.populateSelect(
-            typeSelect, 'structure-types', [], t('commandForm.select.structureType'));
+        // ⚠ NOT wrapped. structure-types is four fixed documented values
+        // (page / component / menu / footer), the same on every installation —
+        // the same category as the position and page-event enums, which stay
+        // native too. A search box over four items is chrome, not help.
+        await _populateArm(typeSelect, 'structure-types', [], t('commandForm.select.structureType'));
     }
 
     let nameSelect = nameInput;
@@ -728,25 +1031,181 @@ async function _initStructurePicker(form, cfg) {
         });
         if (nameInput.dataset.urlParam !== undefined) nameSelect.dataset.urlParam = '';
         nameInput.replaceWith(nameSelect);
-        QSDom.setSelectPlaceholder(nameSelect, t('commandForm.select.typeFirst'));
-        nameSelect.disabled = true;
+        _makeSearchable(nameSelect, t('commandForm.select.typeFirst'));
+        _placeholder(nameSelect, t('commandForm.select.typeFirst'));
+        _setDisabled(nameSelect, true);
+    }
+
+    // The name field belongs directly under the type field that decides it, and
+    // only for the types that have one.
+    _placeNameAfterType(typeSelect, nameSelect);
+    _showNameField(nameSelect, ['page', 'component'].indexOf(typeSelect.value) !== -1);
+
+    const nodeSelects = (cfg.nodeParams || [])
+        .map(param => _swapForSelect(form, param))
+        .filter(Boolean);
+    nodeSelects.forEach(select => {
+        _makeSearchable(select, t('commandForm.select.typeFirst'));
+        _placeholder(select, t('commandForm.select.typeFirst'));
+        _setDisabled(select, true);
+    });
+
+    /** Does this structure type accept the literal "root" for a node field? */
+    function rootAllowedFor(type) {
+        if (cfg.allowRoot === true) return true;
+        return Array.isArray(cfg.allowRoot) && cfg.allowRoot.indexOf(type) !== -1;
+    }
+
+    /** Refill every node select for the chosen type/name, or park it. */
+    async function loadNodes() {
+        if (nodeSelects.length === 0) return;
+
+        const type = typeSelect.value;
+        const name = nameSelect.value;
+
+        if (!type) {
+            nodeSelects.forEach(s => {
+                _placeholder(s, t('commandForm.select.typeFirst'));
+                _setDisabled(s, true);
+            });
+            return;
+        }
+        if ((type === 'page' || type === 'component') && !name) {
+            nodeSelects.forEach(s => {
+                _placeholder(s, t('commandForm.select.nameFirst'));
+                _setDisabled(s, true);
+            });
+            return;
+        }
+
+        const params = (type === 'page' || type === 'component') ? [type, name] : [type];
+        let nodes;
+        try {
+            nodes = await QuickSiteAdmin.fetchHelperData('structure-nodes', params);
+        } catch (error) {
+            nodeSelects.forEach(s => {
+                _placeholder(s, t('commandForm.errors.loadNodes'));
+                _setDisabled(s, true);
+            });
+            return;
+        }
+
+        const withRoot = rootAllowedFor(type);
+        nodeSelects.forEach(select => {
+            _setDisabled(select, false);
+            _placeholder(select, t('commandForm.select.targetNode'));
+            if (withRoot) {
+                select.appendChild(QSDom.el('option', {
+                    value: 'root', text: t('commandForm.select.structureRoot')
+                }));
+            }
+            _appendOptions(select, Array.isArray(nodes) ? nodes : []);
+        });
     }
 
     typeSelect.addEventListener('change', async () => {
         const type = typeSelect.value;
+        _showNameField(nameSelect, type === 'page' || type === 'component');
         if (type === 'page') {
-            nameSelect.disabled = false;
-            await QuickSiteAdmin.populateSelect(
-                nameSelect, 'pages', [], t('commandForm.select.page'));
+            _setDisabled(nameSelect, false);
+            await _populateArm(nameSelect, 'pages', [], t('commandForm.select.page'));
         } else if (type === 'component') {
-            nameSelect.disabled = false;
-            await QuickSiteAdmin.populateSelect(
-                nameSelect, 'components', [], t('commandForm.select.component'));
+            _setDisabled(nameSelect, false);
+            await _populateArm(nameSelect, 'components', [], t('commandForm.select.component'));
         } else {
-            QSDom.setSelectPlaceholder(nameSelect, t('commandForm.select.notRequiredForType'));
-            nameSelect.disabled = true;
+            _placeholder(nameSelect, t('commandForm.select.notRequiredForType'));
+            _setDisabled(nameSelect, true);
         }
+        // A new type invalidates whatever node was chosen under the old one.
+        await loadNodes();
     });
+
+    nameSelect.addEventListener('change', loadNodes);
+}
+
+/**
+ * QS.* verb picker, narrowed by the event the caller chose.
+ *
+ * Read from the listJsFunctions COMMAND, the same source the preview's
+ * interaction editor uses — there is no /admin/api arm for verbs, and adding
+ * one would be a registration layer for data the caller's own permission check
+ * already gates. Each verb declares the events it is meant for; the preview
+ * filters on exactly that field, and a setup verb hooked to the wrong event is
+ * a silent break rather than an error, which is why the narrowing exists.
+ *
+ * ⚠ The narrowing is presented as TWO OPTGROUPS, not as a filter that removes
+ * rows. Measured: 15 of the 25 events the engine recognises have no verb
+ * declaring them, and two of the three page-level events (onresize, onscroll)
+ * are among them — so a filter that removed non-matching verbs would leave the
+ * dropdown EMPTY on a required field, for events the event picker right above
+ * it offers. The suggested ones come first under a heading naming the event;
+ * everything else stays reachable below it. The wrapper's search hides an
+ * optgroup with no matches, so typing collapses whichever group is irrelevant.
+ *
+ * @param {HTMLFormElement} form
+ * @param {Object} cfg  a FIELD_PICKERS row; cfg.eventParam names the field that narrows it
+ * @returns {Promise<void>}
+ */
+async function _initJsFunctionSelect(form, cfg) {
+    const select = _swapForSelect(form, cfg.param);
+    if (!select) return;
+
+    _makeSearchable(select, t('commandForm.select.jsFunction'));
+    _placeholder(select, t('commandForm.select.jsFunction'));
+
+    let functions = [];
+    try {
+        const res = await QuickSiteAdmin.apiRequest('listJsFunctions', 'GET');
+        functions = (res && res.ok && res.data && res.data.data && res.data.data.functions) || [];
+    } catch (error) {
+        return; // the placeholder stands; the field is still submittable
+    }
+
+    const eventField = cfg.eventParam ? form.querySelector('[name="' + cfg.eventParam + '"]') : null;
+
+    /** One <option> per verb, carrying its description for the search to match. */
+    function verbOption(fn) {
+        const props = { value: fn.name, text: fn.name };
+        if (fn.description) props['data-description'] = fn.description;
+        return QSDom.el('option', props);
+    }
+
+    function repopulate() {
+        const eventName = eventField ? eventField.value : '';
+        const chosen = select.value;
+
+        _placeholder(select, t('commandForm.select.jsFunction'));
+
+        const matching = eventName
+            ? functions.filter(fn => Array.isArray(fn.events) && fn.events.indexOf(eventName) !== -1)
+            : [];
+        const rest = functions.filter(fn => matching.indexOf(fn) === -1);
+
+        if (matching.length > 0) {
+            const group = QSDom.el('optgroup', {
+                label: t('commandForm.select.verbsForEvent', { event: eventName })
+            });
+            matching.forEach(fn => group.appendChild(verbOption(fn)));
+            select.appendChild(group);
+        }
+        if (rest.length > 0) {
+            const group = QSDom.el('optgroup', {
+                label: matching.length > 0
+                    ? t('commandForm.select.verbsOther')
+                    : t('commandForm.select.verbsAll')
+            });
+            rest.forEach(fn => group.appendChild(verbOption(fn)));
+            select.appendChild(group);
+        }
+
+        // Re-narrowing must not silently drop a choice already made: every verb
+        // is still in the list, just in a different group.
+        if (chosen) select.value = chosen;
+        _syncPicker(select);
+    }
+
+    repopulate();
+    if (eventField) eventField.addEventListener('change', repopulate);
 }
 
 /**
@@ -778,6 +1237,8 @@ async function applyPagePickers() {
             await _initApiEndpointPicker(form, cfg);
         } else if (cfg.kind === 'enum') {
             _initEnumSelect(form, cfg);
+        } else if (cfg.kind === 'jsfunction') {
+            await _initJsFunctionSelect(form, cfg);
         }
     }
 }
@@ -917,20 +1378,25 @@ async function initEditStructureForm() {
         typeSelect.className = 'admin-select';
         typeSelect.required = typeInput.required;
         typeInput.replaceWith(typeSelect);
-        await QuickSiteAdmin.populateSelect(typeSelect, 'structure-types', [], t('commandForm.select.structureType'));
+        // ⚠ NOT wrapped. structure-types is four fixed documented values
+        // (page / component / menu / footer), the same on every installation —
+        // the same category as the position and page-event enums, which stay
+        // native too. A search box over four items is chrome, not help.
+        await _populateArm(typeSelect, 'structure-types', [], t('commandForm.select.structureType'));
     }
-    
+
     // Convert name input to select
     const nameInput = form.querySelector('[name="name"]');
     if (nameInput && nameInput.tagName !== 'SELECT') {
         const nameSelect = document.createElement('select');
         nameSelect.name = 'name';
         nameSelect.className = 'admin-select';
-        QSDom.setSelectPlaceholder(nameSelect, t('commandForm.select.typeFirst'));
-        nameSelect.disabled = true;
         nameInput.replaceWith(nameSelect);
+        _makeSearchable(nameSelect, t('commandForm.select.typeFirst'));
+        _placeholder(nameSelect, t('commandForm.select.typeFirst'));
+        _setDisabled(nameSelect, true);
     }
-    
+
     // Convert action input to select
     const actionInput = form.querySelector('[name="action"]');
     if (actionInput && actionInput.tagName !== 'SELECT') {
@@ -938,18 +1404,19 @@ async function initEditStructureForm() {
         actionSelect.name = 'action';
         actionSelect.className = 'admin-select';
         actionInput.replaceWith(actionSelect);
-        await QuickSiteAdmin.populateSelect(actionSelect, 'edit-actions', [], t('commandForm.select.action'));
+        await _populateArm(actionSelect, 'edit-actions', [], t('commandForm.select.action'));
     }
-    
+
     // Convert nodeId input to select (if exists)
     const nodeIdInput = form.querySelector('[name="nodeId"]');
     if (nodeIdInput && nodeIdInput.tagName !== 'SELECT') {
         const nodeIdSelect = document.createElement('select');
         nodeIdSelect.name = 'nodeId';
         nodeIdSelect.className = 'admin-select';
-        QSDom.setSelectPlaceholder(nodeIdSelect, t('commandForm.select.structureFirst'));
-        nodeIdSelect.disabled = true;
         nodeIdInput.replaceWith(nodeIdSelect);
+        _makeSearchable(nodeIdSelect, t('commandForm.select.nodeOptional'));
+        _placeholder(nodeIdSelect, t('commandForm.select.structureFirst'));
+        _setDisabled(nodeIdSelect, true);
     }
     
     // Move structure field to the end (before the action buttons)
@@ -965,6 +1432,11 @@ async function initEditStructureForm() {
     const nodeIdSelect = form.querySelector('[name="nodeId"]');
     const actionSelect = form.querySelector('[name="action"]');
     const structureTextarea = form.querySelector('[name="structure"]');
+
+    // The name field sits under the type field that decides it, and appears
+    // only for the types that have one.
+    _placeNameAfterType(typeSelect, nameSelect);
+    _showNameField(nameSelect, ['page', 'component'].indexOf(typeSelect && typeSelect.value) !== -1);
     
     // Function to load node options and return them for selection
     async function loadNodeOptions(selectValue = null) {
@@ -974,35 +1446,36 @@ async function initEditStructureForm() {
         const name = nameSelect?.value;
         
         if (!type) {
-            QSDom.setSelectPlaceholder(nodeIdSelect, t('commandForm.select.typeFirst'));
-            nodeIdSelect.disabled = true;
+            _placeholder(nodeIdSelect, t('commandForm.select.typeFirst'));
+            _setDisabled(nodeIdSelect, true);
             return;
         }
-        
+
         if ((type === 'page' || type === 'component') && !name) {
-            QSDom.setSelectPlaceholder(nodeIdSelect, t('commandForm.select.nameFirst'));
-            nodeIdSelect.disabled = true;
+            _placeholder(nodeIdSelect, t('commandForm.select.nameFirst'));
+            _setDisabled(nodeIdSelect, true);
             return;
         }
-        
-        nodeIdSelect.disabled = false;
-        
+
+        _setDisabled(nodeIdSelect, false);
+
         // Build params based on type
         const params = (type === 'page' || type === 'component') ? [type, name] : [type];
-        
+
         try {
             const nodes = await QuickSiteAdmin.fetchHelperData('structure-nodes', params);
-            QSDom.setSelectPlaceholder(nodeIdSelect, t('commandForm.select.nodeOptional'));
-            QuickSiteAdmin.appendOptionsToSelect(nodeIdSelect, nodes);
-            
+            _placeholder(nodeIdSelect, t('commandForm.select.nodeOptional'));
+            _appendOptions(nodeIdSelect, nodes);
+
             // Select the prefilled value if provided
             if (selectValue) {
                 nodeIdSelect.value = selectValue;
+                _syncPicker(nodeIdSelect);
                 // Trigger the node content loading
                 await loadNodeContent();
             }
         } catch (error) {
-            QSDom.setSelectPlaceholder(nodeIdSelect, t('commandForm.errors.loadNodes'));
+            _placeholder(nodeIdSelect, t('commandForm.errors.loadNodes'));
         }
     }
     
@@ -1045,23 +1518,24 @@ async function initEditStructureForm() {
     if (typeSelect && nameSelect) {
         typeSelect.addEventListener('change', async () => {
             const type = typeSelect.value;
-            nameSelect.disabled = false;
-            
+            _setDisabled(nameSelect, false);
+            _showNameField(nameSelect, type === 'page' || type === 'component');
+
             if (type === 'page') {
-                await QuickSiteAdmin.populateSelect(nameSelect, 'pages', [], t('commandForm.select.page'));
+                await _populateArm(nameSelect, 'pages', [], t('commandForm.select.page'));
             } else if (type === 'component') {
-                await QuickSiteAdmin.populateSelect(nameSelect, 'components', [], t('commandForm.select.component'));
+                await _populateArm(nameSelect, 'components', [], t('commandForm.select.component'));
             } else {
-                QSDom.setSelectPlaceholder(nameSelect, t('commandForm.select.notRequiredForType'));
-                nameSelect.disabled = true;
+                _placeholder(nameSelect, t('commandForm.select.notRequiredForType'));
+                _setDisabled(nameSelect, true);
                 // For menu/footer, load nodes directly
                 await loadNodeOptions();
             }
-            
+
             // Reset nodeId for page/component (will be populated after name selection)
             if (nodeIdSelect && (type === 'page' || type === 'component')) {
-                QSDom.setSelectPlaceholder(nodeIdSelect, t('commandForm.select.nameFirst'));
-                nodeIdSelect.disabled = true;
+                _placeholder(nodeIdSelect, t('commandForm.select.nameFirst'));
+                _setDisabled(nodeIdSelect, true);
             }
             
             // Clear structure textarea when type changes
@@ -1106,22 +1580,26 @@ async function initEditStructureForm() {
     // Pre-fill form from URL parameters
     if (prefillType) {
         typeSelect.value = prefillType;
-        
+        _syncPicker(typeSelect);
+
         // Trigger cascading for name select
         if (prefillType === 'page' || prefillType === 'component') {
             const endpoint = prefillType === 'page' ? 'pages' : 'components';
-            await QuickSiteAdmin.populateSelect(nameSelect, endpoint, [], `Select ${prefillType}...`);
-            nameSelect.disabled = false;
-            
+            await _populateArm(nameSelect, endpoint, [], prefillType === 'page'
+                ? t('commandForm.select.page')
+                : t('commandForm.select.component'));
+            _setDisabled(nameSelect, false);
+
             if (prefillName) {
                 nameSelect.value = prefillName;
+                _syncPicker(nameSelect);
                 // Load node options and select the prefilled nodeId
                 await loadNodeOptions(prefillNodeId);
             }
         } else {
             // menu/footer
-            QSDom.setSelectPlaceholder(nameSelect, t('commandForm.select.notRequiredForType'));
-            nameSelect.disabled = true;
+            _placeholder(nameSelect, t('commandForm.select.notRequiredForType'));
+            _setDisabled(nameSelect, true);
             await loadNodeOptions(prefillNodeId);
         }
     }
@@ -1192,20 +1670,32 @@ async function initGetStructureForm() {
     // Set up cascading behavior
     const typeSelect = form.querySelector('[name="type"]');
     const nameSelect = form.querySelector('[name="name"]');
+
+    // ⚠ No reorder happens here: getStructure writes all three parameters as
+    // URL segments ({type}/{name?}/{option?}), so their DOM order IS the URL
+    // order — and the form already renders them in it. _placeNameAfterType is
+    // a no-op on an adjacent pair and is called for the same reason the other
+    // four call it: so a later parameter change cannot silently break it.
+    _placeNameAfterType(typeSelect, nameSelect);
+    _showNameField(nameSelect, ['page', 'component'].indexOf(typeSelect && typeSelect.value) !== -1);
+    if (nameSelect && nameSelect.tagName === 'SELECT') {
+        _makeSearchable(nameSelect, t('commandForm.select.typeFirst'));
+    }
     
     if (typeSelect && nameSelect) {
         typeSelect.addEventListener('change', async () => {
             const type = typeSelect.value;
-            nameSelect.disabled = false;
+            _setDisabled(nameSelect, false);
+            _showNameField(nameSelect, type === 'page' || type === 'component');
             
             if (type === 'page') {
-                await QuickSiteAdmin.populateSelect(nameSelect, 'pages', [], t('commandForm.select.page'));
+                await _populateArm(nameSelect, 'pages', [], t('commandForm.select.page'));
             } else if (type === 'component') {
-                await QuickSiteAdmin.populateSelect(nameSelect, 'components', [], t('commandForm.select.component'));
+                await _populateArm(nameSelect, 'components', [], t('commandForm.select.component'));
             } else {
                 // menu and footer don't need name
-                QSDom.setSelectPlaceholder(nameSelect, t('commandForm.select.notRequiredForType'));
-                nameSelect.disabled = true;
+                _placeholder(nameSelect, t('commandForm.select.notRequiredForType'));
+                _setDisabled(nameSelect, true);
             }
         });
     }
@@ -1513,10 +2003,13 @@ async function initDeleteAssetForm() {
                 });
                 updateCount();
 
-                const msg = checked.length === 1 ? 'File deleted!' : `${checked.length} files deleted!`;
+                const msg = t(checked.length === 1
+                    ? 'commandForm.deleteAsset.deletedOne'
+                    : 'commandForm.deleteAsset.deletedMany', { count: checked.length });
                 QuickSiteAdmin.showToast(msg, 'success');
             } else {
-                QuickSiteAdmin.showToast(result.data?.message || 'Delete failed', 'error');
+                QuickSiteAdmin.showToast(
+                    result.data?.message || t('commandForm.deleteAsset.deleteFailed'), 'error');
             }
         } catch (error) {
             QuickSiteAdmin.displayResponse(responseDiv, { ok: false, status: 0, data: { error: error.message } });
@@ -1592,7 +2085,7 @@ async function initUploadAssetForm() {
     if (fileInput && allExtensions.length) {
         const hint = document.createElement('small');
         hint.className = 'admin-form-hint';
-        hint.textContent = `Allowed: ${allExtensions.join(', ')} · Category auto-detected from extension`;
+        hint.textContent = t('commandForm.uploadAsset.allowedExtensions', { list: allExtensions.join(', ') });
         const group = fileInput.closest('.admin-form-group');
         if (group) group.appendChild(hint);
     }
@@ -2043,7 +2536,7 @@ async function initSetRootVariablesForm() {
             varValueInput.value = '';
             currentValueSpan.textContent = '-';
             
-            QuickSiteAdmin.showToast(`Added: ${varName}`, 'success');
+            QuickSiteAdmin.showToast(t('commandForm.toast.addedVariable', { name: varName }), 'success');
         });
         
         // Clear button
@@ -2463,7 +2956,7 @@ async function initSetKeyframesForm() {
             // Clear value input
             kfFrameValue.value = '';
             
-            QuickSiteAdmin.showToast(`Added frame: ${frameKey}`, 'success');
+            QuickSiteAdmin.showToast(t('commandForm.toast.addedFrame', { key: frameKey }), 'success');
         });
         
         // Apply name button
@@ -2471,7 +2964,7 @@ async function initSetKeyframesForm() {
             const name = kfNameInput.value || kfNameSelector.value;
             if (name) {
                 nameInput.value = name;
-                QuickSiteAdmin.showToast(`Name set: ${name}`, 'success');
+                QuickSiteAdmin.showToast(t('commandForm.toast.nameSet', { name: name }), 'success');
             } else {
                 QuickSiteAdmin.showToast(t('commandForm.toast.selectAnimationName'), 'warning');
             }
@@ -2489,7 +2982,7 @@ async function initSetKeyframesForm() {
             if (name && existingKeyframes[name]) {
                 framesTextarea.value = JSON.stringify(existingKeyframes[name], null, 2);
                 nameInput.value = name;
-                QuickSiteAdmin.showToast(`Loaded frames for: ${name}`, 'success');
+                QuickSiteAdmin.showToast(t('commandForm.toast.framesLoaded', { name: name }), 'success');
             } else {
                 QuickSiteAdmin.showToast(t('commandForm.toast.selectExistingAnimation'), 'warning');
             }
@@ -2661,20 +3154,25 @@ async function initAddComponentToNodeForm() {
         typeSelect.className = 'admin-select';
         typeSelect.required = typeInput.required;
         typeInput.replaceWith(typeSelect);
-        await QuickSiteAdmin.populateSelect(typeSelect, 'structure-types', [], t('commandForm.select.structureType'));
+        // ⚠ NOT wrapped. structure-types is four fixed documented values
+        // (page / component / menu / footer), the same on every installation —
+        // the same category as the position and page-event enums, which stay
+        // native too. A search box over four items is chrome, not help.
+        await _populateArm(typeSelect, 'structure-types', [], t('commandForm.select.structureType'));
     }
-    
+
     // Convert name input to select
     const nameInput = form.querySelector('[name="name"]');
     if (nameInput && nameInput.tagName !== 'SELECT') {
         const nameSelect = document.createElement('select');
         nameSelect.name = 'name';
         nameSelect.className = 'admin-select';
-        QSDom.setSelectPlaceholder(nameSelect, t('commandForm.select.typeFirst'));
-        nameSelect.disabled = true;
         nameInput.replaceWith(nameSelect);
+        _makeSearchable(nameSelect, t('commandForm.select.typeFirst'));
+        _placeholder(nameSelect, t('commandForm.select.typeFirst'));
+        _setDisabled(nameSelect, true);
     }
-    
+
     // Convert targetNodeId input to select
     const targetNodeIdInput = form.querySelector('[name="targetNodeId"]');
     if (targetNodeIdInput && targetNodeIdInput.tagName !== 'SELECT') {
@@ -2682,11 +3180,12 @@ async function initAddComponentToNodeForm() {
         targetNodeIdSelect.name = 'targetNodeId';
         targetNodeIdSelect.className = 'admin-select';
         targetNodeIdSelect.required = targetNodeIdInput.required;
-        QSDom.setSelectPlaceholder(targetNodeIdSelect, t('commandForm.select.structureFirst'));
-        targetNodeIdSelect.disabled = true;
         targetNodeIdInput.replaceWith(targetNodeIdSelect);
+        _makeSearchable(targetNodeIdSelect, t('commandForm.select.targetNode'));
+        _placeholder(targetNodeIdSelect, t('commandForm.select.structureFirst'));
+        _setDisabled(targetNodeIdSelect, true);
     }
-    
+
     // Convert position input to select
     const positionInput = form.querySelector('[name="position"]');
     if (positionInput && positionInput.tagName !== 'SELECT') {
@@ -2710,9 +3209,10 @@ async function initAddComponentToNodeForm() {
         componentSelect.className = 'admin-select';
         componentSelect.required = componentInput.required;
         componentInput.replaceWith(componentSelect);
-        await QuickSiteAdmin.populateSelect(componentSelect, 'components', [], t('commandForm.select.componentAdd'));
+        _makeSearchable(componentSelect, t('commandForm.select.componentAdd'));
+        await _populateArm(componentSelect, 'components', [], t('commandForm.select.componentAdd'));
     }
-    
+
     // Find or create data field container
     const dataInput = form.querySelector('[name="data"]');
     let dataContainer = null;
@@ -2732,6 +3232,11 @@ async function initAddComponentToNodeForm() {
     const nameSelect = form.querySelector('[name="name"]');
     const targetNodeIdSelect = form.querySelector('[name="targetNodeId"]');
     const componentSelect = form.querySelector('[name="component"]');
+
+    // The name field sits under the type field that decides it, and appears
+    // only for the types that have one.
+    _placeNameAfterType(typeSelect, nameSelect);
+    _showNameField(nameSelect, ['page', 'component'].indexOf(typeSelect && typeSelect.value) !== -1);
     
     // Function to load node options
     async function loadNodeOptions() {
@@ -2741,27 +3246,32 @@ async function initAddComponentToNodeForm() {
         const name = nameSelect?.value;
         
         if (!type) {
-            QSDom.setSelectPlaceholder(targetNodeIdSelect, t('commandForm.select.typeFirst'));
-            targetNodeIdSelect.disabled = true;
+            _placeholder(targetNodeIdSelect, t('commandForm.select.typeFirst'));
+            _setDisabled(targetNodeIdSelect, true);
             return;
         }
         
         if ((type === 'page' || type === 'component') && !name) {
-            QSDom.setSelectPlaceholder(targetNodeIdSelect, t('commandForm.select.nameFirst'));
-            targetNodeIdSelect.disabled = true;
+            _placeholder(targetNodeIdSelect, t('commandForm.select.nameFirst'));
+            _setDisabled(targetNodeIdSelect, true);
             return;
         }
         
-        targetNodeIdSelect.disabled = false;
+        _setDisabled(targetNodeIdSelect, false);
         
         const params = (type === 'page' || type === 'component') ? [type, name] : [type];
         
         try {
             const nodes = await QuickSiteAdmin.fetchHelperData('structure-nodes', params);
-            QSDom.setSelectPlaceholder(targetNodeIdSelect, t('commandForm.select.targetNode'));
-            QuickSiteAdmin.appendOptionsToSelect(targetNodeIdSelect, nodes);
+            _placeholder(targetNodeIdSelect, t('commandForm.select.targetNode'));
+            // addComponentToNode accepts the literal "root" to splice at the top
+            // of the structure, the same as addNode and addComplexElement.
+            targetNodeIdSelect.appendChild(QSDom.el('option', {
+                value: 'root', text: t('commandForm.select.structureRoot')
+            }));
+            _appendOptions(targetNodeIdSelect, nodes);
         } catch (error) {
-            QSDom.setSelectPlaceholder(targetNodeIdSelect, t('commandForm.errors.loadNodes'));
+            _placeholder(targetNodeIdSelect, t('commandForm.errors.loadNodes'));
         }
     }
     
@@ -2862,21 +3372,22 @@ async function initAddComponentToNodeForm() {
     if (typeSelect && nameSelect) {
         typeSelect.addEventListener('change', async () => {
             const type = typeSelect.value;
-            nameSelect.disabled = false;
+            _setDisabled(nameSelect, false);
+            _showNameField(nameSelect, type === 'page' || type === 'component');
             
             if (type === 'page') {
-                await QuickSiteAdmin.populateSelect(nameSelect, 'pages', [], t('commandForm.select.page'));
+                await _populateArm(nameSelect, 'pages', [], t('commandForm.select.page'));
             } else if (type === 'component') {
-                await QuickSiteAdmin.populateSelect(nameSelect, 'components', [], t('commandForm.select.component'));
+                await _populateArm(nameSelect, 'components', [], t('commandForm.select.component'));
             } else {
-                QSDom.setSelectPlaceholder(nameSelect, t('commandForm.select.notRequiredForType'));
-                nameSelect.disabled = true;
+                _placeholder(nameSelect, t('commandForm.select.notRequiredForType'));
+                _setDisabled(nameSelect, true);
                 await loadNodeOptions();
             }
             
             if (targetNodeIdSelect && (type === 'page' || type === 'component')) {
-                QSDom.setSelectPlaceholder(targetNodeIdSelect, t('commandForm.select.nameFirst'));
-                targetNodeIdSelect.disabled = true;
+                _placeholder(targetNodeIdSelect, t('commandForm.select.nameFirst'));
+                _setDisabled(targetNodeIdSelect, true);
             }
         });
         
@@ -2905,7 +3416,11 @@ async function initEditComponentToNodeForm() {
         typeSelect.className = 'admin-select';
         typeSelect.required = typeInput.required;
         typeInput.replaceWith(typeSelect);
-        await QuickSiteAdmin.populateSelect(typeSelect, 'structure-types', [], t('commandForm.select.structureType'));
+        // ⚠ NOT wrapped. structure-types is four fixed documented values
+        // (page / component / menu / footer), the same on every installation —
+        // the same category as the position and page-event enums, which stay
+        // native too. A search box over four items is chrome, not help.
+        await _populateArm(typeSelect, 'structure-types', [], t('commandForm.select.structureType'));
     }
     
     // Convert name input to select
@@ -2914,21 +3429,23 @@ async function initEditComponentToNodeForm() {
         const nameSelect = document.createElement('select');
         nameSelect.name = 'name';
         nameSelect.className = 'admin-select';
-        QSDom.setSelectPlaceholder(nameSelect, t('commandForm.select.typeFirst'));
-        nameSelect.disabled = true;
         nameInput.replaceWith(nameSelect);
+        _makeSearchable(nameSelect, t('commandForm.select.typeFirst'));
+        _placeholder(nameSelect, t('commandForm.select.typeFirst'));
+        _setDisabled(nameSelect, true);
     }
     
-    // Convert targetNodeId input to select
-    const targetNodeIdInput = form.querySelector('[name="targetNodeId"]');
-    if (targetNodeIdInput && targetNodeIdInput.tagName !== 'SELECT') {
-        const targetNodeIdSelect = document.createElement('select');
-        targetNodeIdSelect.name = 'targetNodeId';
-        targetNodeIdSelect.className = 'admin-select';
-        targetNodeIdSelect.required = targetNodeIdInput.required;
-        QSDom.setSelectPlaceholder(targetNodeIdSelect, t('commandForm.select.structureFirst'));
-        targetNodeIdSelect.disabled = true;
-        targetNodeIdInput.replaceWith(targetNodeIdSelect);
+    // Convert nodeId input to select
+    const nodeIdInput = form.querySelector('[name="nodeId"]');
+    if (nodeIdInput && nodeIdInput.tagName !== 'SELECT') {
+        const nodeIdSelect = document.createElement('select');
+        nodeIdSelect.name = 'nodeId';
+        nodeIdSelect.className = 'admin-select';
+        nodeIdSelect.required = nodeIdInput.required;
+        nodeIdInput.replaceWith(nodeIdSelect);
+        _makeSearchable(nodeIdSelect, t('commandForm.select.componentNode'));
+        _placeholder(nodeIdSelect, t('commandForm.select.structureFirst'));
+        _setDisabled(nodeIdSelect, true);
     }
     
     // Find or create data field container
@@ -2947,33 +3464,38 @@ async function initEditComponentToNodeForm() {
     // Set up cascading behavior
     const typeSelect = form.querySelector('[name="type"]');
     const nameSelect = form.querySelector('[name="name"]');
-    const targetNodeIdSelect = form.querySelector('[name="targetNodeId"]');
+    const nodeIdSelect = form.querySelector('[name="nodeId"]');
+
+    // The name field sits under the type field that decides it, and appears
+    // only for the types that have one.
+    _placeNameAfterType(typeSelect, nameSelect);
+    _showNameField(nameSelect, ['page', 'component'].indexOf(typeSelect && typeSelect.value) !== -1);
     
     // Store component nodes data for extracting component names
     let componentNodesData = [];
     
     // Function to load node options - only show component nodes
     async function loadComponentNodes() {
-        if (!targetNodeIdSelect) return;
+        if (!nodeIdSelect) return;
         
         const type = typeSelect?.value;
         const name = nameSelect?.value;
         
         if (!type) {
-            QSDom.setSelectPlaceholder(targetNodeIdSelect, t('commandForm.select.typeFirst'));
-            targetNodeIdSelect.disabled = true;
+            _placeholder(nodeIdSelect, t('commandForm.select.typeFirst'));
+            _setDisabled(nodeIdSelect, true);
             componentNodesData = [];
             return;
         }
         
         if ((type === 'page' || type === 'component') && !name) {
-            QSDom.setSelectPlaceholder(targetNodeIdSelect, t('commandForm.select.nameFirst'));
-            targetNodeIdSelect.disabled = true;
+            _placeholder(nodeIdSelect, t('commandForm.select.nameFirst'));
+            _setDisabled(nodeIdSelect, true);
             componentNodesData = [];
             return;
         }
         
-        targetNodeIdSelect.disabled = false;
+        _setDisabled(nodeIdSelect, false);
         
         const params = (type === 'page' || type === 'component') ? [type, name] : [type];
         
@@ -2982,13 +3504,13 @@ async function initEditComponentToNodeForm() {
             componentNodesData = nodes.filter(n => n.label && n.label.includes('[component:'));
             
             if (componentNodesData.length === 0) {
-                QSDom.setSelectPlaceholder(targetNodeIdSelect, t('commandForm.empty.noComponentNodes'));
+                _placeholder(nodeIdSelect, t('commandForm.empty.noComponentNodes'));
             } else {
-                QSDom.setSelectPlaceholder(targetNodeIdSelect, t('commandForm.select.componentNode'));
-                QuickSiteAdmin.appendOptionsToSelect(targetNodeIdSelect, componentNodesData);
+                _placeholder(nodeIdSelect, t('commandForm.select.componentNode'));
+                _appendOptions(nodeIdSelect, componentNodesData);
             }
         } catch (error) {
-            QSDom.setSelectPlaceholder(targetNodeIdSelect, t('commandForm.errors.loadNodes'));
+            _placeholder(nodeIdSelect, t('commandForm.errors.loadNodes'));
             componentNodesData = [];
         }
         
@@ -3145,21 +3667,22 @@ async function initEditComponentToNodeForm() {
     if (typeSelect && nameSelect) {
         typeSelect.addEventListener('change', async () => {
             const type = typeSelect.value;
-            nameSelect.disabled = false;
+            _setDisabled(nameSelect, false);
+            _showNameField(nameSelect, type === 'page' || type === 'component');
             
             if (type === 'page') {
-                await QuickSiteAdmin.populateSelect(nameSelect, 'pages', [], t('commandForm.select.page'));
+                await _populateArm(nameSelect, 'pages', [], t('commandForm.select.page'));
             } else if (type === 'component') {
-                await QuickSiteAdmin.populateSelect(nameSelect, 'components', [], t('commandForm.select.component'));
+                await _populateArm(nameSelect, 'components', [], t('commandForm.select.component'));
             } else {
-                QSDom.setSelectPlaceholder(nameSelect, t('commandForm.select.notRequiredForType'));
-                nameSelect.disabled = true;
+                _placeholder(nameSelect, t('commandForm.select.notRequiredForType'));
+                _setDisabled(nameSelect, true);
                 await loadComponentNodes();
             }
             
-            if (targetNodeIdSelect && (type === 'page' || type === 'component')) {
-                QSDom.setSelectPlaceholder(targetNodeIdSelect, t('commandForm.select.nameFirst'));
-                targetNodeIdSelect.disabled = true;
+            if (nodeIdSelect && (type === 'page' || type === 'component')) {
+                _placeholder(nodeIdSelect, t('commandForm.select.nameFirst'));
+                _setDisabled(nodeIdSelect, true);
             }
         });
         
@@ -3167,9 +3690,9 @@ async function initEditComponentToNodeForm() {
     }
     
     // When a component node is selected, load its current data and build fields
-    if (targetNodeIdSelect) {
-        targetNodeIdSelect.addEventListener('change', async () => {
-            const nodeId = targetNodeIdSelect.value;
+    if (nodeIdSelect) {
+        nodeIdSelect.addEventListener('change', async () => {
+            const nodeId = nodeIdSelect.value;
             if (nodeId) {
                 await loadCurrentNodeData(nodeId);
             }
@@ -3365,7 +3888,7 @@ async function initSetTranslationKeysForm() {
                         // Add unset keys first (most important - needs translation)
                         if (data.unset && data.unset.length > 0) {
                             const unsetGroup = document.createElement('optgroup');
-                            unsetGroup.label = `🔴 Unset Keys (${data.unset.length}) - Need Translation`;
+                            unsetGroup.label = t('commandForm.keyGroup.unset', { count: data.unset.length });
                             data.unset.forEach(opt => {
                                 const option = document.createElement('option');
                                 option.value = opt.value;
@@ -3379,7 +3902,7 @@ async function initSetTranslationKeysForm() {
                         // Add used keys
                         if (data.used && data.used.length > 0) {
                             const usedGroup = document.createElement('optgroup');
-                            usedGroup.label = `🟢 Used Keys (${data.used.length})`;
+                            usedGroup.label = t('commandForm.keyGroup.used', { count: data.used.length });
                             data.used.forEach(opt => {
                                 const option = document.createElement('option');
                                 option.value = opt.value;
@@ -3392,7 +3915,7 @@ async function initSetTranslationKeysForm() {
                         // Add unused keys
                         if (data.unused && data.unused.length > 0) {
                             const unusedGroup = document.createElement('optgroup');
-                            unusedGroup.label = `🟡 Unused Keys (${data.unused.length})`;
+                            unusedGroup.label = t('commandForm.keyGroup.unused', { count: data.unused.length });
                             data.unused.forEach(opt => {
                                 const option = document.createElement('option');
                                 option.value = opt.value;
@@ -3460,7 +3983,7 @@ async function initSetTranslationKeysForm() {
                 // Clear inputs
                 valueInput.value = '';
                 
-                QuickSiteAdmin.showToast(`Added: ${key}`, 'success');
+                QuickSiteAdmin.showToast(t('commandForm.toast.addedKey', { key: key }), 'success');
             });
             
             // Clear button
@@ -3480,7 +4003,7 @@ async function initSetTranslationKeysForm() {
                     // Add unset keys first
                     if (data.unset && data.unset.length > 0) {
                         const unsetGroup = document.createElement('optgroup');
-                        unsetGroup.label = `🔴 Unset Keys (${data.unset.length}) - Need Translation`;
+                        unsetGroup.label = t('commandForm.keyGroup.unset', { count: data.unset.length });
                         data.unset.forEach(opt => {
                             const option = document.createElement('option');
                             option.value = opt.value;
@@ -3494,7 +4017,7 @@ async function initSetTranslationKeysForm() {
                     // Add used keys
                     if (data.used && data.used.length > 0) {
                         const usedGroup = document.createElement('optgroup');
-                        usedGroup.label = `🟢 Used Keys (${data.used.length})`;
+                        usedGroup.label = t('commandForm.keyGroup.used', { count: data.used.length });
                         data.used.forEach(opt => {
                             const option = document.createElement('option');
                             option.value = opt.value;
@@ -3507,7 +4030,7 @@ async function initSetTranslationKeysForm() {
                     // Add unused keys
                     if (data.unused && data.unused.length > 0) {
                         const unusedGroup = document.createElement('optgroup');
-                        unusedGroup.label = `🟡 Unused Keys (${data.unused.length})`;
+                        unusedGroup.label = t('commandForm.keyGroup.unused', { count: data.unused.length });
                         data.unused.forEach(opt => {
                             const option = document.createElement('option');
                             option.value = opt.value;
@@ -3637,7 +4160,7 @@ async function initDeleteTranslationKeysForm() {
                         // Add Used keys optgroup
                         if (data.used && data.used.length > 0) {
                             const usedGroup = document.createElement('optgroup');
-                            usedGroup.label = `✓ Used Keys (${data.used.length})`;
+                            usedGroup.label = t('commandForm.keyGroup.used', { count: data.used.length });
                             data.used.forEach(opt => {
                                 const option = document.createElement('option');
                                 option.value = opt.value;
@@ -3650,7 +4173,7 @@ async function initDeleteTranslationKeysForm() {
                         // Add Unused keys optgroup
                         if (data.unused && data.unused.length > 0) {
                             const unusedGroup = document.createElement('optgroup');
-                            unusedGroup.label = `⚠ Unused Keys (${data.unused.length})`;
+                            unusedGroup.label = t('commandForm.keyGroup.unused', { count: data.unused.length });
                             data.unused.forEach(opt => {
                                 const option = document.createElement('option');
                                 option.value = opt.value;
@@ -3718,7 +4241,7 @@ async function initDeleteTranslationKeysForm() {
                 });
                 
                 keysTextarea.value = JSON.stringify(currentKeys, null, 2);
-                QuickSiteAdmin.showToast(`Added ${unusedKeys.length} unused keys`, 'success');
+                QuickSiteAdmin.showToast(t('commandForm.toast.addedUnusedKeys', { count: unusedKeys.length }), 'success');
             });
             
             // Clear keys button handler
@@ -3742,7 +4265,7 @@ async function initDeleteTranslationKeysForm() {
                     // Add Used keys optgroup
                     if (data.used && data.used.length > 0) {
                         const usedGroup = document.createElement('optgroup');
-                        usedGroup.label = `✓ Used Keys (${data.used.length})`;
+                        usedGroup.label = t('commandForm.keyGroup.used', { count: data.used.length });
                         data.used.forEach(opt => {
                             const option = document.createElement('option');
                             option.value = opt.value;
@@ -3755,7 +4278,7 @@ async function initDeleteTranslationKeysForm() {
                     // Add Unused keys optgroup
                     if (data.unused && data.unused.length > 0) {
                         const unusedGroup = document.createElement('optgroup');
-                        unusedGroup.label = `⚠ Unused Keys (${data.unused.length})`;
+                        unusedGroup.label = t('commandForm.keyGroup.unused', { count: data.unused.length });
                         data.unused.forEach(opt => {
                             const option = document.createElement('option');
                             option.value = opt.value;

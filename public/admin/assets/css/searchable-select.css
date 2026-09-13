@@ -41,6 +41,21 @@
     border-color: var(--admin-accent);
 }
 
+/*
+ * A cascade level you cannot use yet. The native <select> is hidden, so its
+ * own disabled styling never shows; the trigger carries the state instead.
+ * Additive: nothing disabled the trigger before this rule existed, so it
+ * cannot change how any surface already using the component looks.
+ */
+.qs-searchable-select__trigger:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    background: var(--admin-bg-secondary);
+}
+.qs-searchable-select__trigger:disabled:hover {
+    border-color: var(--admin-border);
+}
+
 .qs-searchable-select__text {
     flex: 1;
     overflow: hidden;

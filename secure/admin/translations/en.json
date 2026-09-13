@@ -528,7 +528,6 @@
     },
     "commandForm": {
         "hint": {
-            "routeSuggest": "Existing routes are suggested, but any route may be typed — including one that does not exist yet.",
             "renameNoExtension": "Enter new name without extension — it is preserved automatically"
         },
         "toast": {
@@ -545,7 +544,13 @@
             "framesCleared": "Frames cleared",
             "selectExistingAnimation": "Please select an existing animation first",
             "selectKey": "Please select a key",
-            "noUnusedKeys": "No unused keys to add"
+            "noUnusedKeys": "No unused keys to add",
+            "addedVariable": "Added: :name",
+            "addedFrame": "Added frame: :key",
+            "nameSet": "Name set: :name",
+            "framesLoaded": "Loaded frames for: :name",
+            "addedKey": "Added: :key",
+            "addedUnusedKeys": "Added :count unused keys"
         },
         "placeholder": {
             "loadingNode": "Loading node content...",
@@ -605,7 +610,17 @@
             "targetRoute": "Select target route...",
             "allCategories": "All categories",
             "allKeyframes": "All keyframes (leave empty)",
-            "keyframe": "Select keyframe..."
+            "keyframe": "Select keyframe...",
+            "structureRoot": "root (the top of the structure)",
+            "jsFunction": "Select function...",
+            "verbsForEvent": "Suggested for :event",
+            "verbsOther": "Other functions",
+            "verbsAll": "All functions",
+            "routeCustom": "Type a route that does not exist yet…",
+            "routeCustomHint": "Create a new route instead of picking an existing one",
+            "routeExisting": "Existing routes",
+            "routeSpecial": "Special pages",
+            "backToPicker": "Back to the list"
         },
         "empty": {
             "noKeys": "No keys found",
@@ -629,12 +644,21 @@
             "selectedOne": ":count file selected for deletion",
             "selectedMany": ":count files selected for deletion",
             "deletingOne": "Deleting :count file...",
-            "deletingMany": "Deleting :count files..."
+            "deletingMany": "Deleting :count files...",
+            "deletedOne": "File deleted!",
+            "deletedMany": ":count files deleted!",
+            "deleteFailed": "Delete failed"
         },
         "uploadAsset": {
             "or": "or",
             "multiFileTip": "Need to upload multiple files? Use the :link page.",
-            "assetManagement": "Assets"
+            "assetManagement": "Assets",
+            "allowedExtensions": "Allowed: :list · Category auto-detected from extension"
+        },
+        "keyGroup": {
+            "unset": "🔴 Unset Keys (:count) - Need Translation",
+            "used": "🟢 Used Keys (:count)",
+            "unused": "🟡 Unused Keys (:count)"
         },
         "editFavicon": {
             "pngOnlyHint": "💡 Only PNG images are supported for favicon. Images marked with ✓ are PNG files."
