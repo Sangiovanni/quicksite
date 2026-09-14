@@ -23,7 +23,10 @@
  *   GET  /admin/self/invitations              membership inbox
  *   GET  /admin/self/proposals                the caller's outgoing proposals
  *   GET  /admin/self/roles                    the fixed role catalogue
+ *   GET  /admin/self/contacts                 people the caller has worked with
  *   POST /admin/self/find-user                {"name": "<display name>"}
+ *   POST /admin/self/add-contact              {"user_id","name"}
+ *   POST /admin/self/remove-contact           {"user_id"}
  *   POST /admin/self/change-password          {"current_password","new_password"}
  *   POST /admin/self/delete                   {"current_password","confirm"}
  *   POST /admin/self/accept-invitation        {"project"}
@@ -81,7 +84,10 @@ const QS_SELF_ROUTE_METHODS = [
     'invitations'        => 'GET',
     'proposals'          => 'GET',
     'roles'              => 'GET',
+    'contacts'           => 'GET',
     'find-user'          => 'POST',
+    'add-contact'        => 'POST',
+    'remove-contact'     => 'POST',
     'change-password'    => 'POST',
     'delete'             => 'POST',
     'accept-invitation'  => 'POST',
@@ -123,6 +129,7 @@ if (!is_array($body)) {
 require_once SECURE_FOLDER_PATH . '/admin/functions/accountSelf.php';
 require_once SECURE_FOLDER_PATH . '/admin/functions/membershipSelf.php';
 require_once SECURE_FOLDER_PATH . '/admin/functions/directory.php';
+require_once SECURE_FOLDER_PATH . '/admin/functions/contacts.php';
 
 switch ($key) {
     // ---- account ------------------------------------------------------
@@ -144,4 +151,14 @@ switch ($key) {
     // ---- directory ----------------------------------------------------
     case 'find-user':          qs_directory_find_user($body)->send();         break;
     case 'roles':              qs_directory_list_roles($tokenInfo)->send();   break;
+
+    // ---- contacts -----------------------------------------------------
+    // The caller's OWN list of people they have already looked up. Never a
+    // directory: 'contacts' takes no parameter at all, and 'add-contact'
+    // stores the pair it is handed without asking the registry whether that
+    // account exists — so no route here can answer a question about somebody
+    // the caller has not already found. See contacts.php.
+    case 'contacts':           qs_contacts_list()->send();                    break;
+    case 'add-contact':        qs_contacts_add($body)->send();                break;
+    case 'remove-contact':     qs_contacts_remove($body)->send();             break;
 }

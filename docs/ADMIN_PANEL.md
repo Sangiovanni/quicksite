@@ -2896,6 +2896,26 @@ site** (below) and **Transfer ownership** (member picker + departing-owner role 
 checkbox + final confirm modal; the page reloads after transfer since the
 caller's role changed).
 
+**People you have worked with** sits above the lookup on both the Invite and the
+Propose form, and is the same list on each: everyone the caller has already
+invited or proposed, offered with a *Use* button that selects them exactly as a
+search match does, and a *Forget* button that drops them. The block is hidden
+entirely until there is somebody on it, so a new account never sees an empty
+panel above the search box. Somebody who is not on the list is still found the
+way they always were — by their exact public name — and succeeding at that, then
+inviting or proposing them, is what puts them on it.
+
+The list is the caller's own and is stored on their account record, read and
+written at `/admin/self/contacts`, `/admin/self/add-contact` and
+`/admin/self/remove-contact` (see COMMAND_API.md — *What is deliberately not a
+command*). It is deliberately **not** a directory and cannot be used as one: it
+holds only the `user_id` and the display name as it read when it was recorded,
+and it is replayed exactly as stored rather than resolved against the
+installation's accounts, so it can only ever show the caller something they
+already found themselves. A name that changes afterwards refreshes the next time
+they look that person up and work with them again; the `user_id` shown beside it
+is what the invitation actually uses, so an out-of-date name never misdirects one.
+
 **Who can see this site** is `setProjectVisibility`, and it is **owner-only** —
 the `project.visibility` category sits at the delete/transfer tier, so an admin
 who runs the project day to day cannot unilaterally expose it. Non-owners are not
@@ -3188,6 +3208,29 @@ What turning it off removes is **discoverability and reach**: your users stop ho
 Withheld: the command index, the per-command form, and the panel's **Commands** navigation entry. `/admin/command` still answers `200` and says the operator turned the console off — deliberately not a `404`, because the page does exist, the gate is not a secret, and a `404` on a routed page sends the next person to debug routing.
 
 Not withheld: **command history**, which is a separate page at `/admin/history` with its own role gate (§9.18). History is a record of what ran, not a way to run anything, and commands run constantly from the panel's own pages whether or not this console exists — switching off the runner must not take the audit trail with it.
+
+#### Two commands are documented here but cannot be run here
+
+`login` and `logoutSession` keep their rows in the index and their forms: the
+page opens, the `help` documentation renders, and every parameter is shown. What
+is closed is the submit, with the reason stated above the fields.
+
+Both hazards belong to *this surface* rather than to the commands. Signing in
+from a page that is itself signed in mints a second session on top of the one the
+panel is holding; ending the session from here ends the one rendering the page,
+signing the operator out mid-action. Against the Management API directly, both
+calls are ordinary and necessary — which is why the rows stay. The console's
+value is being a complete view of the command surface, and a row that has quietly
+gone missing is a worse answer to "does this command exist" than a row that
+explains itself.
+
+`register` is in the same category and **is** still runnable: it returns no
+session and no user id, so neither hazard applies to it, and it gates itself on
+the installation's own registration settings.
+
+⚠ Like the console switch above, this is not a security control. Permissions
+authorise both commands server-side exactly as before, and turning the page off
+or leaving it on changes nothing about either.
 
 #### Changing it takes effect immediately
 

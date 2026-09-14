@@ -219,6 +219,31 @@
     flex: 1;
 }
 
+/* ---- Contacts shortcut, above the lookup on both forms ----
+   Set apart from the search results below it so the two are never read as one
+   list: these are people already known, those are the answer to a query. */
+.members-contacts {
+    margin-bottom: 16px;
+    padding: 12px;
+    border: 1px dashed var(--admin-border);
+    border-radius: 6px;
+}
+.members-contacts__title {
+    margin: 0 0 4px;
+    font-size: 0.95rem;
+    font-weight: 600;
+}
+.members-contacts .admin-hint {
+    margin: 0 0 10px;
+}
+.members-contacts__list {
+    display: flex;
+    flex-direction: column;
+}
+.members-match-row--contact {
+    background: var(--admin-bg-secondary);
+}
+
 /* ---- Invite / propose form rows ---- */
 .members-form-row {
     display: flex;

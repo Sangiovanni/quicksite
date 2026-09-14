@@ -24,6 +24,7 @@
         "no": "No",
         "search": "Search...",
         "noResults": "No results found",
+        "unknownError": "unknown error",
         "required": "Required",
         "optional": "Optional",
         "execute": "Execute",
@@ -273,6 +274,16 @@
             "nameRequired": "Type the exact public name first.",
             "pickRequired": "Search and select a person first."
         },
+        "contacts": {
+            "title": "People you have worked with",
+            "hint": "Everyone you have already invited or proposed, so you do not have to type their exact name again. Someone new still has to be looked up once.",
+            "use": "Use",
+            "forget": "Forget",
+            "forgotten": "Removed from your list",
+            "forgetFailed": "Could not remove that person from your list.",
+            "saveFailed": "They were added to the project, but could not be saved to your list.",
+            "full": "Your list is full, so this person was not added to it."
+        },
         "propose": {
             "title": "Propose a member",
             "hint": "Vouch for someone: an admin or the owner validates your proposal before the person is even told. Your note IS the vouch — make it count.",
@@ -485,6 +496,10 @@
         "executing": "Executing...",
         "responseStatus": "Status",
         "errorLoadingOptions": "Error loading options",
+        "executedMsg": "Command executed successfully.",
+        "failedMsg": "Command failed",
+        "errorPrefix": "Error: ",
+        "downloadedPrefix": "Downloaded: ",
         "confirmDestructive": {
             "title": "Confirm Action",
             "message": "You are about to execute \":command\". This action may make permanent changes. Continue?"
@@ -774,7 +789,13 @@
             "selectPlaceholder": "-- Select --",
             "validationLabel": "Validation:"
         },
-        "noDocumentation": "No additional documentation available."
+        "noDocumentation": "No additional documentation available.",
+        "notExecutable": {
+            "title": "Documented here, run elsewhere",
+            "login": "Signing in from this console would mint a second session on top of the one this panel is already using. The parameters and documentation below are complete \u2014 call it against the Management API instead.",
+            "logoutSession": "Running this from the console would end the session this panel is using and sign you out mid-page. Use Logout in the sidebar instead. The parameters and documentation below are complete.",
+            "registerDisabled": "This installation does not accept self-registration (registration.allow_self_registration is off), so this command answers 403 to every caller \u2014 the console included. The parameters and documentation below are complete, and describe what it does where the setting is on."
+        }
     },
     "history": {
         "title": "Command History",
@@ -1060,6 +1081,10 @@
         "visualEditor": "Visual Editor",
         "preview": "Visual Editor",
         "logout": "Logout",
+        "notLoggedIn": "Not logged in",
+        "unknownUser": "Unknown",
+        "noProject": "no project",
+        "switchProjectFailed": "Could not switch project: ",
         "logoutEverywhere": "Logout everywhere",
         "logoutEverywhereHint": "Signs you out of this browser and ends every other session of your account.",
         "build": "Build",

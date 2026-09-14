@@ -149,6 +149,23 @@ function _renderAlertError(message) {
 }
 
 /**
+ * The banner shown on a command this surface documents but will not run.
+ *
+ * Sits above the parameters rather than replacing them: the fields are part of
+ * the documentation, and a reader comparing this page to the API needs to see
+ * them.
+ *
+ * @param {string} reasonKey  a CONSOLE_NON_EXECUTABLE translation path
+ * @returns {HTMLDivElement}
+ */
+function _renderNotExecutableNotice(reasonKey) {
+    return QSDom.el('div', { class: 'admin-alert admin-alert--warning' }, [
+        QSDom.el('strong', { text: t('commandForm.notExecutable.title') }),
+        _renderHint([t(reasonKey)])
+    ]);
+}
+
+/**
  * The centred placeholder line inside a component-data field area.
  * @param {string} text
  * @param {boolean} [isError]
@@ -350,6 +367,68 @@ const ENUM_VALUES = {
 // lowercase alphanumerics and hyphens, and an event name is validated against a
 // fixed allowlist of on* names.
 const QS_PICK_CUSTOM = '__custom__';
+
+/**
+ * Commands this surface LISTS and DOCUMENTS but does not run, mapped to the
+ * translation path explaining why.
+ *
+ * The rows stay: the console's value is being a COMPLETE view of the API, and a
+ * missing row is a second source of truth about what exists. Both commands still
+ * open, still show their help documentation and their parameters — only the
+ * submit path closes, with the reason on screen.
+ *
+ * Each entry names a hazard THIS surface creates, which is why the list lives in
+ * the panel and not in help.php: `login` here mints a second session on top of
+ * the one the panel is already holding, and `logoutSession` here destroys the
+ * very session rendering the page. Neither is a property of the command — both
+ * are properties of calling it from a page that is itself authenticated. The
+ * same two commands are correct and necessary against the Management API.
+ *
+ * ⚠ NOT a security control. Permissions authorise every command server-side;
+ * this is a guard rail on one client.
+ */
+const CONSOLE_NON_EXECUTABLE = {
+    login:         'commandForm.notExecutable.login',
+    logoutSession: 'commandForm.notExecutable.logoutSession'
+};
+
+/**
+ * Commands a given INSTALLATION cannot run, as opposed to the ones above, which
+ * this SURFACE must not run.
+ *
+ * The distinction matters. login and logoutSession are refused here on every
+ * installation, because the hazard is the console itself. These are refused only
+ * where the operator has switched the feature off — the command is fine, the
+ * installation simply does not offer it, and submitting would earn a 403 and
+ * nothing else.
+ *
+ * Same treatment either way: listed, documented, not submittable, reason on
+ * screen. `enabled` reads a flag command-form.php emits from the server's own
+ * config, so the page never guesses.
+ *
+ * ⚠ Still not a security control, and less so than the map above: the server
+ * refuses these on its own. This only stops the operator discovering it by
+ * filling in a form first.
+ */
+const CONSOLE_DISABLED_BY_CONFIG = {
+    register: {
+        enabled: () => (window.QS_CONSOLE_FLAGS || {}).selfRegistration !== false,
+        reasonKey: 'commandForm.notExecutable.registerDisabled'
+    }
+};
+
+/**
+ * Why this surface will not run `command`, or null when it will.
+ * @param {string} command
+ * @returns {string|null} a translation path for the reason
+ */
+function consoleRefusalKey(command) {
+    if (CONSOLE_NON_EXECUTABLE[command]) {
+        return CONSOLE_NON_EXECUTABLE[command];
+    }
+    const gate = CONSOLE_DISABLED_BY_CONFIG[command];
+    return (gate && !gate.enabled()) ? gate.reasonKey : null;
+}
 
 const FIELD_PICKERS = {
     // --- the route must already exist: a real dropdown ---------------------
@@ -4628,12 +4707,37 @@ function renderCommandForm(doc) {
     } else {
         delete form.dataset.destructive;
     }
-    
+
+    // The two commands this surface documents but does not run. The flag rides
+    // on the form exactly as destructive and binaryResponse do above, and
+    // admin.js reads it in handleCommandSubmit — so a form submitted by any
+    // route (Enter in a text field included) lands in the same refusal as the
+    // disabled button.
+    const notExecutableKey = consoleRefusalKey(COMMAND_NAME);
+    const submitBtn = document.getElementById('submit-btn');
+    if (notExecutableKey) {
+        form.dataset.notExecutable = '1';
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.title = t(notExecutableKey);
+        }
+    } else {
+        delete form.dataset.notExecutable;
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.removeAttribute('title');
+        }
+    }
+
     // Generate form fields
     const params = doc.parameters || {};
     const paramKeys = Object.keys(params);
-    
+
     QSDom.clear(paramsContainer);
+
+    if (notExecutableKey) {
+        paramsContainer.appendChild(_renderNotExecutableNotice(notExecutableKey));
+    }
 
     if (paramKeys.length === 0) {
         paramsContainer.appendChild(

@@ -706,6 +706,10 @@ $langNames = [
                     executing: '<?= __adminJs('commands.executing') ?>',
                     responseStatus: '<?= __adminJs('commands.responseStatus') ?>',
                     errorLoadingOptions: '<?= __adminJs('commands.errorLoadingOptions') ?>',
+                    executedMsg: '<?= __adminJs('commands.executedMsg') ?>',
+                    failedMsg: '<?= __adminJs('commands.failedMsg') ?>',
+                    errorPrefix: '<?= __adminJs('commands.errorPrefix') ?>',
+                    downloadedPrefix: '<?= __adminJs('commands.downloadedPrefix') ?>',
                     confirmDestructive: {
                         title: '<?= __adminJs('commands.confirmDestructive.title') ?>',
                         message: '<?= __adminJs('commands.confirmDestructive.message') ?>'
@@ -726,7 +730,10 @@ $langNames = [
                     dashboard: '<?= __adminJs('nav.dashboard') ?>',
                     commands: '<?= __adminJs('nav.commands') ?>',
                     history: '<?= __adminJs('nav.history') ?>',
-                    settings: '<?= __adminJs('nav.settings') ?>'
+                    settings: '<?= __adminJs('nav.settings') ?>',
+                    notLoggedIn: '<?= __adminJs('nav.notLoggedIn') ?>',
+                    unknownUser: '<?= __adminJs('nav.unknownUser') ?>',
+                    noProject: '<?= __adminJs('nav.noProject') ?>'
                 },
                 <?php if ($isOperator): ?>
                 // Only an operator's page loads update-notice.js, so only an
@@ -827,12 +834,12 @@ $langNames = [
                             window.location.href = window.location.pathname + '?t=' + Date.now();
                         } else {
                             picker.disabled = false;
-                            alert('Could not switch project: ' + ((res && res.data && res.data.message) || 'unknown error'));
+                            alert('<?= __adminJs('nav.switchProjectFailed') ?>' + ((res && res.data && res.data.message) || '<?= __adminJs('common.unknownError') ?>'));
                         }
                     })
                     .catch(function (err) {
                         picker.disabled = false;
-                        alert('Could not switch project: ' + ((err && err.message) || err));
+                        alert('<?= __adminJs('nav.switchProjectFailed') ?>' + ((err && err.message) || err));
                     });
             });
         }

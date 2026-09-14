@@ -9,32 +9,7 @@
  */
 
 // $selectedCommand is already set from command.php
-
-// Load command documentation
-$commandDoc = null;
-$helpPath = SECURE_FOLDER_PATH . '/management/command/help.php';
-
-// We need to fetch the command info - let's create a helper function
-function getCommandDocumentation(string $command): ?array {
-    // We'll fetch from the API
-    $apiUrl = BASE_URL . '/management/help/' . urlencode($command);
-    
-    // Since we're server-side, we can include the help file directly
-    // But it needs the trimParametersManagement context, so let's read from JSON cache if available
-    // For now, we'll use a simplified approach
-    
-    $helpFile = SECURE_FOLDER_PATH . '/management/command/help.php';
-    if (!file_exists($helpFile)) {
-        return null;
-    }
-    
-    // Extract commands array from help.php (this is a bit hacky but works)
-    $content = file_get_contents($helpFile);
-    
-    // We can't easily parse PHP, so let's use a different approach
-    // Check if we have the command in our static mapping
-    return null; // Will be loaded via AJAX
-}
+// The documentation is fetched by command-form.js from the `help` command.
 ?>
 
 <div class="admin-command-form-page"
@@ -124,9 +99,29 @@ $qsCommandFormI18n = [];
 foreach (['commandForm', 'commands', 'common'] as $qsSubtree) {
     $qsCommandFormI18n[$qsSubtree] = AdminTranslation::getInstance()->getRaw($qsSubtree) ?: new stdClass();
 }
+
+// Installation settings that decide whether a listed command could run here AT
+// ALL. Not authorization — permissions do that server-side, per call — but the
+// difference between a command this installation offers and one it is switched
+// off for, which the operator otherwise discovers only from a 403.
+//
+// The row stays listed and documented either way: only the SUBMIT closes, the
+// same treatment login and logoutSession get. A console that hid a command would
+// stop being a complete view of the API and become a second source of truth
+// about what exists.
+// BOTH, and in this order. qs_registration_config() lives in SessionManagement
+// but reads loadAuthConfig(), which lives in AuthManagement — requiring only the
+// first fatals the page wherever the router has not already pulled the second
+// in. members.php requires what it uses for the same reason.
+require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/SessionManagement.php';
+$qsConsoleFlags = [
+    'selfRegistration' => (bool)qs_registration_config()['allow_self_registration'],
+];
 ?>
 <script>
     window.QS_COMMAND_FORM_I18N = <?= json_encode($qsCommandFormI18n, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+    window.QS_CONSOLE_FLAGS = <?= json_encode($qsConsoleFlags, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
 </script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/command-form.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/command-form.js') ?>"></script>
 

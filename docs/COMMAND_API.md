@@ -745,6 +745,7 @@ the method is enforced per route.
 | See your role and what it grants | `GET /admin/self/permissions` |
 | Read the fixed role catalogue | `GET /admin/self/roles` |
 | Look someone up to invite them | `POST /admin/self/find-user` — `{name}` (exact public display name; returns `{user_id, name}` matches, never the private username) |
+| Keep, read or forget the people you have worked with | `GET /admin/self/contacts`, `POST /admin/self/add-contact` — `{user_id, name}`, `POST /admin/self/remove-contact` — `{user_id}` (your own list, recorded when you invite or propose somebody, so you need not type their exact name again) |
 | Read your membership inbox | `GET /admin/self/invitations` — pending invitations, your own join requests, and terminal notices |
 | Read your outgoing proposals | `GET /admin/self/proposals` |
 | Accept or decline an invitation | `POST /admin/self/accept-invitation` / `decline-invitation` — `{project}` |
@@ -782,6 +783,14 @@ behaviour a caller can rely on:
   refused while you solely own a project — the response lists them, and each must
   be handed over with `transferOwnership` or destroyed with `deleteProject` first.
 - **A private login username is never returned by any of them.**
+- **Your contacts are a record of what you found, never a directory.** The list
+  can only ever hold people you have already looked up by their exact public name
+  and then named to a project, and it is read back exactly as it was stored: the
+  reading route takes no parameter, and adding one does not ask the installation
+  whether that account exists. So nothing on the list can tell you anything you
+  did not already know, and neither route can be turned into a way of asking
+  whether an account is real. The display name shown is the one recorded at the
+  time; the `user_id` beside it is what an invitation actually uses.
 
 They leave no entry in the per-project command log — they are not commands, and
 the logger runs only on the command surface. They are not unrecorded, though:

@@ -106,14 +106,14 @@ const QuickSiteAdmin = {
         // member of no project (C8 — e.g. freshly registered): show who they
         // are with a "no project" chip instead.
         if (!this.permissions.loaded || (!this.permissions.role && !this.permissions.tokenName)) {
-            nameEl.textContent = 'Not logged in';
+            nameEl.textContent = this.t('nav.notLoggedIn');
             roleEl.textContent = '';
             roleEl.removeAttribute('data-role');
             return;
         }
 
         // Display token name (shortened if too long)
-        const name = this.permissions.tokenName || 'Unknown';
+        const name = this.permissions.tokenName || this.t('nav.unknownUser');
         nameEl.textContent = name.length > 20 ? name.substring(0, 20) + '...' : name;
         nameEl.title = name;
 
@@ -122,7 +122,7 @@ const QuickSiteAdmin = {
             roleEl.textContent = role;
             roleEl.setAttribute('data-role', role);
         } else {
-            roleEl.textContent = 'no project';
+            roleEl.textContent = this.t('nav.noProject');
             roleEl.removeAttribute('data-role');
         }
     },
@@ -445,7 +445,19 @@ const QuickSiteAdmin = {
         e.preventDefault();
         
         const form = e.target;
-        
+
+        // A command the console lists and documents but does not run from this
+        // surface (command-form.js sets the flag and puts the reason on screen).
+        // The submit button is already disabled; this catches every other way a
+        // form reaches submit. Refused silently — the banner above the fields is
+        // the explanation, and a toast on top of it would only repeat it.
+        //
+        // ⚠ Not a security control. Permissions authorise every command
+        // server-side; this closes one client's submit path, nothing more.
+        if (form.dataset.notExecutable === '1') {
+            return;
+        }
+
         const command = form.dataset.command;
         const method = form.dataset.method || 'POST';
         const submitBtn = form.querySelector('[type="submit"]');
@@ -492,9 +504,9 @@ const QuickSiteAdmin = {
                 
                 // Show toast notification
                 if (result.ok) {
-                    this.showToast('Command executed successfully!', 'success');
+                    this.showToast(this.t('commands.executedMsg'), 'success');
                 } else {
-                    this.showToast(result.data?.message || 'Command failed', 'error');
+                    this.showToast(result.data?.message || this.t('commands.failedMsg'), 'error');
                 }
             } catch (error) {
                 this.displayResponse(responseDiv, {
@@ -502,7 +514,7 @@ const QuickSiteAdmin = {
                     status: 0,
                     data: { error: error.message }
                 });
-                this.showToast('Error: ' + error.message, 'error');
+                this.showToast(this.t('commands.errorPrefix') + error.message, 'error');
             }
             
             submitBtn.disabled = false;
@@ -567,8 +579,8 @@ const QuickSiteAdmin = {
                 if (result.ok) {
                     this.showToast(
                         result.filename
-                            ? 'Downloaded: ' + result.filename
-                            : 'Command executed successfully!',
+                            ? this.t('commands.downloadedPrefix') + result.filename
+                            : this.t('commands.executedMsg'),
                         'success'
                     );
                     
@@ -578,7 +590,7 @@ const QuickSiteAdmin = {
                         detail: { command, data, result: result.data }
                     }));
                 } else {
-                    this.showToast(result.data?.message || 'Command failed', 'error');
+                    this.showToast(result.data?.message || this.t('commands.failedMsg'), 'error');
                 }
             } catch (error) {
                 this.displayResponse(responseDiv, {
@@ -586,7 +598,7 @@ const QuickSiteAdmin = {
                     status: 0,
                     data: { error: error.message }
                 });
-                this.showToast('Error: ' + error.message, 'error');
+                this.showToast(this.t('commands.errorPrefix') + error.message, 'error');
             }
             
             submitBtn.disabled = false;

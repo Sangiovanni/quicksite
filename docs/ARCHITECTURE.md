@@ -246,10 +246,13 @@ An account is one entry in `users.php`, keyed by an opaque user id. A credential
 | `session_generation` | the kill switch. Each session stamps it at login and the server compares it on every request, so raising it by one ends every session of that account at once |
 | `selected_project` | which project this user's panel opens by default — a preference, never an authorization input (§7) |
 | `projects` | a status mirror of "my projects", never authoritative: access always re-reads the project's own `members.json` |
+| `contacts` | people this account has looked up and then named to a project, kept so their exact public name need not be typed again. A private list, not a directory: it holds only `user_id` and the display name as it read at the time, it is never resolved against the registry when read back, and no other account can see it |
 
 Accounts are **self-created only**. `register`, and the `/admin/register` page beside it, creates one when `auth.php` allows self-registration — the default is `false`, so a fresh install accepts no registrations and accounts exist from setup only. Registration is enumeration-safe: a duplicate username is indistinguishable from a success, because login identifiers are private.
 
 Rotating your own password and deleting your own account are **not commands** — the command surface develops a project, and managing the login you sign in with is not that — so both are served by the panel at `/admin/self`. Neither got cheaper in the move: a password change requires the current password, shares the login throttle, and revokes the user's other sessions; a deletion adds an explicit confirmation, ends every session, and detaches the caller from every project they belong to.
+
+Keeping track of who you have worked with is the same kind of thing, and is served the same way: `GET /admin/self/contacts` reads the caller's own list, `POST /admin/self/add-contact` records one, `POST /admin/self/remove-contact` drops one. The reading route takes no parameter and the recording route does not ask the registry whether the account it is handed exists, so neither can answer a question about anybody the caller has not already found for themselves — which is what keeps a convenience from becoming the roster-harvesting surface the exact-match lookup exists to prevent.
 
 Nothing anywhere creates, disables, or deletes an account **for someone else**. A person is parted with per project (`removeMember`, §7) or, at the operator level, by editing `users.php` — `status` and `session_generation` are hand edits with no command behind either.
 

@@ -31,9 +31,15 @@
     var state = {
         roster: [],
         queue: [],
+        contacts: [],                           // this account's own, /admin/self/contacts
         joinPolicy: CFG.joinPolicy || null,     // emitted server-side for admin+
         visibility: CFG.visibility || null,
     };
+
+    // Every setupFindUser instance registers a redraw here, so one contacts
+    // change repaints the invite form and the propose form together instead of
+    // each holding its own stale copy.
+    var contactRenderers = [];
 
     function api(cmd, method, body) {
         var admin = window.QuickSiteAdmin;
@@ -449,6 +455,76 @@
         ]);
     }
 
+    // ============================================================
+    // Contacts — people this account has already looked up
+    //
+    // A shortcut past the typing, never a replacement for the lookup: somebody
+    // who is not already here is still found by their exact public name, the
+    // same way as before.
+    //
+    // ⚠ The list only ever contains people the account holder has already found
+    // and then actually named to a project. Nothing here searches, browses or
+    // resolves an account — the name shown is the one that was stored at the
+    // time, replayed verbatim. See secure/admin/functions/contacts.php for why
+    // that construction, and not a permission check, is what keeps this from
+    // being a directory.
+    // ============================================================
+
+    function selfRequest(route, method, body) {
+        var admin = window.QuickSiteAdmin;
+        if (!admin || typeof admin.accountRequest !== 'function') {
+            return Promise.reject(new Error('QuickSiteAdmin not available'));
+        }
+        return admin.accountRequest(route, method, body);
+    }
+
+    function loadContacts() {
+        return selfRequest('contacts', 'GET').then(function (res) {
+            state.contacts = (res && res.ok && res.data && res.data.data && res.data.data.contacts) || [];
+            contactRenderers.forEach(function (redraw) { redraw(); });
+        });
+    }
+
+    /**
+     * Record one person on the caller's list, after they were successfully
+     * named to a project. Re-adding refreshes the stored display name from the
+     * lookup that just succeeded — the only way a name here is brought up to
+     * date.
+     */
+    function rememberContact(person) {
+        if (!person || !person.user_id) return;
+        selfRequest('add-contact', 'POST', { user_id: person.user_id, name: person.name })
+            .then(function (res) {
+                if (res && res.ok) { loadContacts(); return; }
+                // The membership change already succeeded — this is the list not
+                // being updated, which is worth a word but is not a failure of
+                // what the operator asked for.
+                toast(res && res.status === 409
+                    ? (T.contactsFull || 'members.contacts.full')
+                    : (T.contactSaveFailed || 'members.contacts.saveFailed'), 'warning');
+            });
+    }
+
+    function forgetContact(contact) {
+        selfRequest('remove-contact', 'POST', { user_id: contact.user_id }).then(function (res) {
+            if (res && res.ok) {
+                toast(T.contactForgotten || 'members.contacts.forgotten', 'success');
+                loadContacts();
+            } else {
+                toast(T.contactForgetFailed || 'members.contacts.forgetFailed', 'error');
+            }
+        });
+    }
+
+    function _renderContactRow(contact, onUse, onForget) {
+        return el('div', { class: 'members-match-row members-match-row--contact' }, [
+            el('span', { class: 'members-row__title' }, [el('strong', { text: contact.name })]),
+            el('code', { class: 'members-row__id', text: contact.user_id }),
+            _renderActionBtn(T.contactUse || 'members.contacts.use', ICON_CHECK, 'ghost', function () { onUse(contact); }),
+            _renderActionBtn(T.contactForget || 'members.contacts.forget', ICON_X, 'ghost', function () { onForget(contact); }),
+        ]);
+    }
+
     function _renderPickedRow(match) {
         return el('div', { class: 'members-match-row members-match-row--picked' }, [
             el('span', { class: 'members-row__title' }, [
@@ -467,6 +543,8 @@
         var nameInput = document.getElementById(prefix + '-find-name');
         var findBtn = document.getElementById('btn-' + prefix + '-find');
         var results = document.getElementById(prefix + '-find-results');
+        var contactsBlock = document.getElementById(prefix + '-contacts');
+        var contactsList = document.getElementById(prefix + '-contacts-list');
         var picked = null;
 
         if (!nameInput || !findBtn || !results) return { getPicked: function () { return null; }, reset: function () {} };
@@ -477,6 +555,24 @@
             results.appendChild(_renderPickedRow(match));
             if (sendBtn) sendBtn.disabled = false;
         }
+
+        // The contacts shortcut. Hidden entirely while the list is empty: a new
+        // account has nobody on it, and an empty panel above the search box is
+        // noise on the one page where the search box is the whole point.
+        function renderContacts() {
+            if (!contactsBlock || !contactsList) return;
+            clearNode(contactsList);
+            if (!state.contacts.length) {
+                contactsBlock.hidden = true;
+                return;
+            }
+            contactsBlock.hidden = false;
+            state.contacts.forEach(function (c) {
+                contactsList.appendChild(_renderContactRow(c, pick, forgetContact));
+            });
+        }
+        contactRenderers.push(renderContacts);
+        renderContacts();
 
         function search() {
             var name = nameInput.value.trim();
@@ -543,6 +639,11 @@
             api('inviteMember', 'POST', body).then(function (res) {
                 if (res && res.ok) {
                     toast(T.inviteSentMsg || 'Invitation sent', 'success');
+                    // Recorded on a SUCCESSFUL offer, not on a successful search:
+                    // a contact is somebody you actually brought onto a project,
+                    // which is the person you will want again on the next one. A
+                    // search that went nowhere is a search, not a relationship.
+                    rememberContact(picked);
                     finder.reset();
                     document.getElementById('invite-note').value = '';
                     refreshLists();
@@ -575,6 +676,9 @@
             api('proposeMember', 'POST', { user_id: picked.user_id, role: role, note: note }).then(function (res) {
                 if (res && res.ok) {
                     toast(T.proposeSentMsg || 'Proposal recorded', 'success');
+                    // Same rule as invite above, and it has to be: an admin who
+                    // can only propose would otherwise never build a list.
+                    rememberContact(picked);
                     finder.reset();
                     document.getElementById('propose-note').value = '';
                     refreshLists();
@@ -855,5 +959,8 @@
         setupPolicyToggle();
         setupTransfer();
         refreshLists();
+        // After the two forms have registered their redraws, so one fetch fills
+        // both. Harmless when neither form rendered — the list stays unused.
+        loadContacts();
     });
 })();

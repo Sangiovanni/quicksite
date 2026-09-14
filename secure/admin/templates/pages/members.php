@@ -103,6 +103,12 @@ window.QS_MEMBERS_I18N = <?= json_encode([
     'selected'         => __admin('members.invite.selected', 'Selected'),
     'inviteSentMsg'    => __admin('members.invite.sentMsg', 'Invitation sent'),
     'proposeSentMsg'   => __admin('members.propose.sentMsg', 'Proposal recorded — an admin or the owner must validate it'),
+    'contactUse'        => __admin('members.contacts.use'),
+    'contactForget'     => __admin('members.contacts.forget'),
+    'contactForgotten'  => __admin('members.contacts.forgotten'),
+    'contactForgetFailed' => __admin('members.contacts.forgetFailed'),
+    'contactSaveFailed' => __admin('members.contacts.saveFailed'),
+    'contactsFull'      => __admin('members.contacts.full'),
     'nameRequired'     => __admin('members.invite.nameRequired', 'Type the exact public name first.'),
     'pickRequired'     => __admin('members.invite.pickRequired', 'Search and select a person first.'),
     'vouchRequired'    => __admin('members.propose.vouchRequired', 'The vouch note is required.'),
@@ -189,6 +195,14 @@ window.QS_MEMBERS_I18N = <?= json_encode([
     <div class="admin-card">
         <div class="admin-card__body">
             <p class="admin-hint"><?= __admin('members.invite.hint', 'Look the person up by their EXACT public name, confirm the right account by its id, pick a role below yours, and send. They join only when they accept.') ?></p>
+            <!-- Contacts shortcut. Stays hidden until members.js has a list to
+                 put in it — a new account has nobody, and an empty panel above
+                 the search box helps no one. -->
+            <div class="members-contacts" id="invite-contacts" hidden>
+                <h3 class="members-contacts__title"><?= __admin('members.contacts.title') ?></h3>
+                <p class="admin-hint"><?= __admin('members.contacts.hint') ?></p>
+                <div class="members-contacts__list" id="invite-contacts-list"></div>
+            </div>
             <div class="members-find-row">
                 <div class="admin-form-group members-find-row__name">
                     <label class="admin-label" for="invite-find-name"><?= __admin('members.invite.nameLabel', 'Their public name') ?> <span class="admin-text-danger">*</span></label>
@@ -230,6 +244,11 @@ window.QS_MEMBERS_I18N = <?= json_encode([
             <?php else: ?>
             <p class="admin-hint"><?= __admin('members.propose.hint', 'Vouch for someone: an admin or the owner validates your proposal before the person is even told. Your note IS the vouch — make it count.') ?></p>
             <?php endif; ?>
+            <div class="members-contacts" id="propose-contacts" hidden>
+                <h3 class="members-contacts__title"><?= __admin('members.contacts.title') ?></h3>
+                <p class="admin-hint"><?= __admin('members.contacts.hint') ?></p>
+                <div class="members-contacts__list" id="propose-contacts-list"></div>
+            </div>
             <div class="members-find-row">
                 <div class="admin-form-group members-find-row__name">
                     <label class="admin-label" for="propose-find-name"><?= __admin('members.invite.nameLabel', 'Their public name') ?> <span class="admin-text-danger">*</span></label>
