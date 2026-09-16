@@ -657,7 +657,7 @@ const QuickSiteAdmin = {
     copyResponse(button) {
         const pre = button.closest('.admin-code').querySelector('pre');
         if (pre && window.QuickSiteUtils) {
-            window.QuickSiteUtils.copyToClipboard(pre.textContent, 'Response copied to clipboard!');
+            window.QuickSiteUtils.copyToClipboard(pre.textContent, this.t('commands.responseCopied'));
         }
     },
 
@@ -707,7 +707,7 @@ const QuickSiteAdmin = {
     /**
      * Populate a select element with options (supports optgroups)
      */
-    async populateSelect(selectElement, action, params = [], placeholder = 'Select...') {
+    async populateSelect(selectElement, action, params = [], placeholder = this.t('commands.selectPlaceholder')) {
         if (!selectElement) return;
         
         // Show loading state
@@ -762,13 +762,8 @@ const QuickSiteAdmin = {
     // ============================================
 
     /**
-     * Show a toast notification - delegates to QuickSiteUtils
-     *
-     * ⚠ THE FALLBACK BODY BELOW IS UNREACHABLE. layout.php loads
-     * js/core/utils.js unconditionally and BEFORE admin.js, and there is no
-     * other load path for either file, so window.QuickSiteUtils is always
-     * defined by the time this runs. Its innerHTML was left as it is for the
-     * same reason as the dead methods above — see NOTES/reports/beta12/S3b.md.
+     * Show a toast notification - delegates to QuickSiteUtils, which
+     * layout.php always loads before this file.
      */
     showToast(message, type = 'info', duration = null) {
         return window.QuickSiteUtils.showToast(message, type, duration);
@@ -779,23 +774,11 @@ const QuickSiteAdmin = {
     // ============================================
 
     /**
-     * Show a confirmation dialog - delegates to QuickSiteUtils
-     *
-     * ⚠ THE FALLBACK BODY BELOW IS UNREACHABLE. layout.php loads
-     * js/core/utils.js unconditionally and BEFORE admin.js, and there is no
-     * other load path for either file, so window.QuickSiteUtils is always
-     * defined by the time this runs. Its innerHTML was left as it is for the
-     * same reason as the dead methods above — see NOTES/reports/beta12/S3b.md.
+     * Show a confirmation dialog - delegates to QuickSiteUtils, which
+     * layout.php always loads before this file.
      */
     async confirm(message, options = {}) {
         return window.QuickSiteUtils.confirm(message, options);
-    },
-
-    /**
-     * Confirm destructive action - delegates to QuickSiteUtils
-     */
-    async confirmDelete(itemName) {
-        return window.QuickSiteUtils.confirmDelete(itemName);
     },
 
     // ============================================
@@ -820,24 +803,38 @@ const QuickSiteAdmin = {
         // Add validation indicator
         const statusEl = toolbar.querySelector('.admin-json-editor__status');
 
+        // An empty box is neither valid nor invalid. The live check below
+        // already treats it that way; the two buttons say so plainly instead
+        // of handing '' to JSON.parse and showing the browser's own
+        // "unexpected end of data" error.
+        const reportIfEmpty = () => {
+            if (textarea.value.trim()) return false;
+            this.setJsonStatus(statusEl, this.t('commands.jsonEditor.empty'), 'empty');
+            return true;
+        };
+
         // Format button
         toolbar.querySelector('[data-action="format"]').addEventListener('click', () => {
+            if (reportIfEmpty()) return;
             try {
                 const parsed = JSON.parse(textarea.value);
                 textarea.value = JSON.stringify(parsed, null, 2);
-                this.setJsonStatus(statusEl, 'Valid JSON', 'success');
+                this.setJsonStatus(statusEl, this.t('commands.jsonEditor.valid'), 'success');
             } catch (e) {
-                this.setJsonStatus(statusEl, 'Invalid JSON: ' + e.message, 'error');
+                this.setJsonStatus(statusEl,
+                    String(this.t('commands.jsonEditor.invalid')).replace(':message', e.message), 'error');
             }
         });
 
         // Validate button
         toolbar.querySelector('[data-action="validate"]').addEventListener('click', () => {
+            if (reportIfEmpty()) return;
             try {
                 JSON.parse(textarea.value);
-                this.setJsonStatus(statusEl, 'Valid JSON', 'success');
+                this.setJsonStatus(statusEl, this.t('commands.jsonEditor.valid'), 'success');
             } catch (e) {
-                this.setJsonStatus(statusEl, 'Invalid: ' + e.message, 'error');
+                this.setJsonStatus(statusEl,
+                    String(this.t('commands.jsonEditor.invalidShort')).replace(':message', e.message), 'error');
             }
         });
 

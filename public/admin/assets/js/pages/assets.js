@@ -106,7 +106,7 @@
             const sizes = Object.entries(uploadLimits.effective_human)
                 .map(([cat, human]) => `${cat} ${human}`)
                 .join(' · ');
-            if (sizes) parts.push('Max size — ' + sizes);
+            if (sizes) parts.push(t('media.maxSize', { sizes: sizes }));
         }
 
         hint.textContent = parts.join('  |  ');
@@ -210,19 +210,58 @@
 
     function getAssetUrl(asset) {
         // Build URL from category + filename against the EDITED project's own serving
-        // base (C8 8.1). baseUrl is the site ROOT, which serves the SERVED main — using
-        // it here showed the wrong project's asset, or nothing at all, whenever you were
-        // editing any other project. projectContentBase is the root for the served
-        // project and '/p/<id>' for every other one.
+        // base. Not baseUrl: that is the site ROOT, which serves the SERVED main, so it
+        // points at the wrong project whenever another one is being edited.
+        // projectContentBase is the root for the served project and '/p/<id>' for
+        // every other one.
         const cfg = window.QUICKSITE_CONFIG || {};
         const base = (cfg.projectContentBase || cfg.baseUrl || '').replace(/\/management$/, '');
         return base + '/assets/' + asset.category + '/' + encodeURIComponent(asset.filename);
     }
 
-    function escapeHtml(str) {
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
+    /**
+     * Resolve one admin string by its FULL dot path, from the sub-trees
+     * media.php emits. A path that resolves to nothing returns THE PATH
+     * ITSELF, so an unset string is visible on screen.
+     *
+     * @param {string} path      e.g. 'media.infoCategory'
+     * @param {Object} [params]  :name markers, as PHP's t() does
+     * @returns {string}
+     */
+    function t(path, params) {
+        let node = window.QS_MEDIA_I18N || {};
+        for (const part of String(path).split('.')) {
+            if (node === null || typeof node !== 'object' || !(part in node)) return path;
+            node = node[part];
+        }
+        if (typeof node !== 'string') return path;
+        let value = node;
+        if (params) {
+            for (const name of Object.keys(params)) {
+                value = value.split(':' + name).join(String(params[name]));
+            }
+        }
+        return value;
+    }
+
+    /**
+     * One "<strong>Label:</strong> value" line of the edit area's info block.
+     * @returns {HTMLElement} one <p>
+     */
+    function _setStatus(el, message, color) {
+        QSDom.clear(el);
+        el.appendChild(QSDom.el('span', { style: 'color:' + color, text: message }));
+    }
+
+    /**
+     * One "<strong>Label:</strong> value" line of the edit area's info block.
+     * @returns {HTMLElement} one <p>
+     */
+    function _renderInfoLine(labelKey, value) {
+        return QSDom.el('p', null, [
+            QSDom.el('strong', { text: t(labelKey) }),
+            ' ' + value
+        ]);
     }
 
     // ─── Upload Zone ─────────────────────────────────────────────────────────
@@ -288,7 +327,7 @@
 
             if (value) {
                 if (/^data:/i.test(value)) {
-                    QuickSiteAdmin.showToast('Data URIs not supported \u2014 save the file locally first, then upload it', 'warning');
+                    QuickSiteAdmin.showToast(t('media.dataUriUnsupported'), 'warning');
                 } else if (hasValidExtension(value)) {
                     addToQueue('url', null, value);
                     e.target.value = '';
@@ -314,7 +353,7 @@
                 e.preventDefault();
                 const value = e.target.value.trim();
                 if (value && /^data:/i.test(value)) {
-                    QuickSiteAdmin.showToast('Data URIs not supported \u2014 save the file locally first, then upload it', 'warning');
+                    QuickSiteAdmin.showToast(t('media.dataUriUnsupported'), 'warning');
                 } else if (value && hasValidExtension(value)) {
                     addToQueue('url', null, value);
                     e.target.value = '';
@@ -366,7 +405,7 @@
         const name = type === 'file' ? file.name : extractFilename(url);
         const category = detectCategory(name);
         if (!category) {
-            QuickSiteAdmin.showToast(`Unsupported file type: ${name}`, 'warning');
+            QuickSiteAdmin.showToast(t('media.unsupportedType', { name: name }), 'warning');
             return;
         }
         // S2.5 — refuse an over-sized file HERE, where we can name it, rather
@@ -381,7 +420,10 @@
             const max = limitForCategory(category);
             if (max !== null && file.size > max) {
                 QuickSiteAdmin.showToast(
-                    `${name} is ${formatSize(file.size)} — the limit for ${category} on this server is ${formatSize(max)}.`,
+                    t('media.overLimit', {
+                        name: name, size: formatSize(file.size),
+                        category: category, max: formatSize(max)
+                    }),
                     'warning'
                 );
                 return;
@@ -431,7 +473,7 @@
         btn.type = 'button';
         btn.className = 'asset-queue__remove';
         btn.dataset.remove = String(index);
-        btn.title = 'Remove';
+        btn.title = t('media.remove');
         btn.textContent = '×';   // × — matches the old `&times;` entity
         return btn;
     }
@@ -466,8 +508,8 @@
 
         const meta = document.createElement('div');
         meta.className = 'asset-queue__meta';
-        meta.appendChild(_renderQueueMetaInput('alt', 'Alt text', item.alt, index));
-        meta.appendChild(_renderQueueMetaInput('description', 'Description', item.description, index));
+        meta.appendChild(_renderQueueMetaInput('alt', t('media.altPlaceholder'), item.alt, index));
+        meta.appendChild(_renderQueueMetaInput('description', t('media.descriptionPlaceholder'), item.description, index));
         li.appendChild(meta);
 
         return li;
@@ -485,7 +527,8 @@
         }
 
         container.style.display = '';
-        countEl.textContent = `${uploadQueue.length} file${uploadQueue.length !== 1 ? 's' : ''} ready`;
+        countEl.textContent = t(uploadQueue.length !== 1
+            ? 'media.queueReadyMany' : 'media.queueReadyOne', { count: uploadQueue.length });
         btn.disabled = false;
 
         list.replaceChildren(...uploadQueue.map(_renderQueueItem));
@@ -540,7 +583,7 @@
         const btn = document.getElementById('asset-upload-btn');
         const progressDiv = document.getElementById('asset-upload-progress');
         btn.disabled = true;
-        btn.textContent = 'Uploading...';
+        btn.textContent = t('media.uploading');
         progressDiv.style.display = '';
         progressDiv.innerHTML = '';
 
@@ -552,7 +595,11 @@
             const item = uploadQueue[i];
             const line = document.createElement('div');
             line.className = 'asset-upload-progress__item';
-            line.innerHTML = `<span>${escapeHtml(item.name)}</span><span class="asset-upload-progress__status">Uploading ${i + 1}/${total}...</span>`;
+            line.appendChild(QSDom.el('span', { text: item.name }));
+            line.appendChild(QSDom.el('span', {
+                class: 'asset-upload-progress__status',
+                text: t('media.uploadingProgress', { current: i + 1, total: total })
+            }));
             progressDiv.appendChild(line);
             const statusEl = line.querySelector('.asset-upload-progress__status');
 
@@ -576,7 +623,8 @@
                     statusEl.replaceChildren(_renderUploadStatus('→ ' + item.category + '/ ✓', 'success'));
                 } else {
                     failCount++;
-                    statusEl.replaceChildren(_renderUploadStatus('✗ ' + (result.data?.message || 'Failed'), 'error'));
+                    statusEl.replaceChildren(_renderUploadStatus(t('media.uploadItemFailed', {
+                        message: result.data?.message || t('media.failed') }), 'error'));
                 }
             } catch (error) {
                 failCount++;
@@ -586,17 +634,18 @@
 
         // Summary toast
         if (failCount === 0) {
-            QuickSiteAdmin.showToast(`${successCount} file${successCount !== 1 ? 's' : ''} uploaded`, 'success');
+            QuickSiteAdmin.showToast(t(successCount !== 1
+                ? 'media.uploadedMany' : 'media.uploadedOne', { count: successCount }), 'success');
         } else if (successCount === 0) {
-            QuickSiteAdmin.showToast(`All ${failCount} uploads failed`, 'error');
+            QuickSiteAdmin.showToast(t('media.allUploadsFailed', { count: failCount }), 'error');
         } else {
-            QuickSiteAdmin.showToast(`${successCount} uploaded, ${failCount} failed`, 'warning');
+            QuickSiteAdmin.showToast(t('media.uploadedPartial', { ok: successCount, failed: failCount }), 'warning');
         }
 
         // Clear queue and refresh browser
         uploadQueue = [];
         renderQueue();
-        btn.textContent = 'Upload All';
+        btn.textContent = t('media.uploadAll');
         btn.disabled = true;
         await loadAssets();
     }
@@ -607,7 +656,7 @@
         document.getElementById('asset-tabs')?.addEventListener('click', (e) => {
             const tab = e.target.closest('.asset-tabs__tab');
             if (!tab || tab.id === 'asset-select-mode') return;
-            document.querySelectorAll('.asset-tabs__tab:not(.asset-tabs__select)').forEach(t => t.classList.remove('asset-tabs__tab--active'));
+            document.querySelectorAll('.asset-tabs__tab:not(.asset-tabs__select)').forEach(tab => tab.classList.remove('asset-tabs__tab--active'));
             tab.classList.add('asset-tabs__tab--active');
             activeCategory = tab.dataset.category;
             renderGrid();
@@ -658,11 +707,11 @@
                 empty.style.display = '';
                 if (emptyText) {
                     if (searchQuery) {
-                        emptyText.textContent = `No assets matching '${searchQuery}'.`;
+                        emptyText.textContent = t('media.noMatch', { query: searchQuery });
                     } else if (activeCategory !== 'all') {
-                        emptyText.textContent = `No ${activeCategory} found.`;
+                        emptyText.textContent = t('media.noneInCategory', { category: activeCategory });
                     } else {
-                        emptyText.textContent = 'No assets yet. Drop files above to get started.';
+                        emptyText.textContent = t('media.noneYet');
                     }
                 }
             }
@@ -716,9 +765,7 @@
         const label = document.createElement('label');
         label.className = 'asset-card__favicon';
         const isCurrent = currentFavicon === asset.filename;
-        label.title = isCurrent
-            ? 'This is the site favicon — click to clear it'
-            : 'Use as the site favicon';
+        label.title = t(isCurrent ? 'media.faviconCurrent' : 'media.faviconUse');
         label.classList.toggle('asset-card__favicon--active', isCurrent);
 
         const input = document.createElement('input');
@@ -727,7 +774,7 @@
         input.className = 'asset-card__favicon-input';
         input.checked = isCurrent;
         input.dataset.favicon = asset.filename;
-        input.setAttribute('aria-label', 'Use ' + asset.filename + ' as the site favicon');
+        input.setAttribute('aria-label', t('media.faviconUseAria', { name: asset.filename }));
         label.appendChild(input);
 
         const glyph = document.createElement('span');
@@ -767,14 +814,14 @@
                 const span = document.createElement('span');
                 span.className = 'asset-font-preview';
                 span.style.fontFamily = `'qs-font-${asset.filename}'`;
-                span.textContent = 'AaBbCc';
+                span.textContent = t('media.fontSpecimen');
                 return span;
             }
             case 'audio': {
                 const wrap = document.createElement('div');
                 wrap.className = 'asset-audio-player';
                 wrap.dataset.audioSrc = url;
-                wrap.appendChild(_renderCardButton('asset-audio-player__btn', 'playAudio', asset.filename, 'Play', '▶'));
+                wrap.appendChild(_renderCardButton('asset-audio-player__btn', 'playAudio', asset.filename, t('media.play'), '▶'));
                 const bar = document.createElement('div');
                 bar.className = 'asset-audio-player__bar';
                 const progress = document.createElement('div');
@@ -798,7 +845,7 @@
                 video.preload = 'metadata';
                 video.muted = true;
                 wrap.appendChild(video);
-                wrap.appendChild(_renderCardButton('asset-video-overlay', 'playVideo', asset.filename, 'Play', '▶'));
+                wrap.appendChild(_renderCardButton('asset-video-overlay', 'playVideo', asset.filename, t('media.play'), '▶'));
                 return wrap;
             }
             default: {
@@ -849,9 +896,9 @@
             const actions = document.createElement('div');
             actions.className = 'asset-card__actions';
             actions.appendChild(_renderCardButton(
-                'asset-card__action', 'edit', asset.filename, 'Edit alt/description', '✏️'));
+                'asset-card__action', 'edit', asset.filename, t('media.editMeta'), '✏️'));
             actions.appendChild(_renderCardButton(
-                'asset-card__action asset-card__delete', 'delete', asset.filename, 'Delete', '🗑️'));
+                'asset-card__action asset-card__delete', 'delete', asset.filename, t('common.delete'), '🗑️'));
             wrap.appendChild(actions);
         }
         return wrap;
@@ -879,7 +926,7 @@
             thumb.appendChild(_renderCardButton(
                 'asset-card__star' + (asset.starred ? ' asset-card__star--active' : ''),
                 'star', asset.filename,
-                asset.starred ? 'Unstar (used in AI prompts)' : 'Star for AI prompts',
+                t(asset.starred ? 'media.unstar' : 'media.star'),
                 asset.starred ? '⭐' : '☆'));
             const favicon = _renderFaviconControl(asset);
             if (favicon) thumb.appendChild(favicon);
@@ -1131,14 +1178,14 @@
                     newFilename: newFilename
                 });
                 if (result.ok) {
-                    QuickSiteAdmin.showToast(`Renamed to ${newFilename} ✓`, 'success');
+                    QuickSiteAdmin.showToast(t('media.renamed', { name: newFilename }), 'success');
                     await loadAssets();
                 } else {
-                    QuickSiteAdmin.showToast(result.data?.message || 'Rename failed', 'error');
+                    QuickSiteAdmin.showToast(result.data?.message || t('media.renameFailed'), 'error');
                     cleanup();
                 }
             } catch (error) {
-                QuickSiteAdmin.showToast('Rename failed: ' + error.message, 'error');
+                QuickSiteAdmin.showToast(t('media.renameFailedDetail', { message: error.message }), 'error');
                 cleanup();
             }
         };
@@ -1174,38 +1221,57 @@
         const descInput = document.getElementById('asset-edit-description');
         const status = document.getElementById('asset-edit-status');
 
-        title.textContent = `Edit: ${asset.filename}`;
+        title.textContent = t('media.editTitle', { name: asset.filename });
         altInput.value = asset.alt || '';
         descInput.value = asset.description || '';
         status.textContent = '';
 
         // Preview
         const url = getAssetUrl(asset);
+        QSDom.clear(preview);
         switch (asset.category) {
             case 'images':
-                preview.innerHTML = `<img src="${url}" alt="${escapeHtml(asset.alt || '')}" class="asset-edit-area__image">`;
+                // setAttribute, not an interpolated attribute slot: alt is
+                // author-entered free text, and the escaper this replaced was
+                // the TEXT one, which leaves quotes alone.
+                preview.appendChild(QSDom.el('img', {
+                    src: url, alt: asset.alt || '', class: 'asset-edit-area__image'
+                }));
                 break;
-            case 'font':
+            case 'font': {
                 injectFontFace(asset);
-                preview.innerHTML = `<span class="asset-edit-area__font" style="font-family:'qs-font-${escapeHtml(asset.filename)}'">AaBbCc</span>`;
+                const specimen = QSDom.el('span', {
+                    class: 'asset-edit-area__font', text: t('media.fontSpecimen')
+                });
+                specimen.style.fontFamily = "'qs-font-" + asset.filename + "'";
+                preview.appendChild(specimen);
                 break;
+            }
             case 'audio':
-                preview.innerHTML = `<audio controls src="${url}" style="width:100%"></audio>`;
+                preview.appendChild(QSDom.el('audio', {
+                    controls: '', src: url, style: 'width:100%'
+                }));
                 break;
             case 'videos':
-                preview.innerHTML = `<video controls src="${url}" style="width:100%;max-height:240px"></video>`;
+                preview.appendChild(QSDom.el('video', {
+                    controls: '', src: url, style: 'width:100%;max-height:240px'
+                }));
                 break;
             default:
-                preview.innerHTML = `<span style="font-size:3rem">${getFileIcon(asset.category)}</span>`;
+                preview.appendChild(QSDom.el('span', {
+                    style: 'font-size:3rem', text: getFileIcon(asset.category)
+                }));
         }
 
         // Info
         const dims = (asset.width && asset.height) ? ` · ${asset.width}×${asset.height}` : '';
-        info.innerHTML = `
-            <p><strong>Category:</strong> ${escapeHtml(asset.category)}</p>
-            <p><strong>Size:</strong> ${formatSize(asset.size)}${dims}${asset.mime_type ? ' · ' + escapeHtml(asset.mime_type) : ''}</p>
-            ${asset.modified ? '<p><strong>Modified:</strong> ' + escapeHtml(asset.modified) + '</p>' : ''}
-        `;
+        QSDom.clear(info);
+        info.appendChild(_renderInfoLine('media.infoCategory', asset.category));
+        info.appendChild(_renderInfoLine('media.infoSize',
+            formatSize(asset.size) + dims + (asset.mime_type ? ' · ' + asset.mime_type : '')));
+        if (asset.modified) {
+            info.appendChild(_renderInfoLine('media.infoModified', asset.modified));
+        }
 
         area.style.display = '';
         area.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1232,46 +1298,46 @@
         if (desc !== (editingAsset.description || '')) data.description = desc;
 
         if (Object.keys(data).length === 1) {
-            status.textContent = 'No changes.';
+            status.textContent = t('media.noChanges');
             return;
         }
 
         saveBtn.disabled = true;
-        status.textContent = 'Saving...';
+        status.textContent = t('common.saving');
 
         try {
             const result = await QuickSiteAdmin.apiRequest('editAsset', 'POST', data);
             if (result.ok) {
-                status.innerHTML = '<span style="color:var(--admin-success)">Saved ✓</span>';
-                QuickSiteAdmin.showToast(`${editingAsset.filename} updated ✓`, 'success');
+                _setStatus(status, t('media.saved'), 'var(--admin-success)');
+                QuickSiteAdmin.showToast(t('media.updated', { name: editingAsset.filename }), 'success');
                 await loadAssets();
                 // Keep edit area open with refreshed data
                 const refreshed = flatAssets.find(a => a.filename === editingAsset.filename);
                 if (refreshed) openEditArea(refreshed.filename);
             } else {
-                status.innerHTML = `<span style="color:var(--admin-error)">${result.data?.message || 'Failed'}</span>`;
+                _setStatus(status, result.data?.message || t('media.failed'), 'var(--admin-error)');
             }
         } catch (error) {
-            status.innerHTML = `<span style="color:var(--admin-error)">${error.message}</span>`;
+            _setStatus(status, error.message, 'var(--admin-error)');
         }
         saveBtn.disabled = false;
     }
 
     // ─── Single Delete ───────────────────────────────────────────────────────
     async function deleteSingle(filename) {
-        if (!confirm(`Delete ${filename}?`)) return;
+        if (!confirm(t('media.confirmDeleteOne', { name: filename }))) return;
 
         try {
             const result = await QuickSiteAdmin.apiRequest('deleteAsset', 'POST', { filename });
             if (result.ok || result.status === 204) {
-                QuickSiteAdmin.showToast(`${filename} deleted ✓`, 'success');
+                QuickSiteAdmin.showToast(t('media.deleted', { name: filename }), 'success');
                 if (editingAsset?.filename === filename) closeEditArea();
                 await loadAssets();
             } else {
-                QuickSiteAdmin.showToast(result.data?.message || 'Delete failed', 'error');
+                QuickSiteAdmin.showToast(result.data?.message || t('media.deleteFailed'), 'error');
             }
         } catch (error) {
-            QuickSiteAdmin.showToast('Delete failed: ' + error.message, 'error');
+            QuickSiteAdmin.showToast(t('media.deleteFailedDetail', { message: error.message }), 'error');
         }
     }
 
@@ -1286,7 +1352,7 @@
         if (newStarred) {
             const starredCount = flatAssets.filter(a => a.starred).length;
             if (starredCount >= 15) {
-                QuickSiteAdmin.showToast('Maximum 15 starred assets. Unstar one first.', 'warning');
+                QuickSiteAdmin.showToast(t('media.starLimit'), 'warning');
                 return;
             }
         }
@@ -1300,10 +1366,10 @@
                 asset.starred = newStarred;
                 renderGrid();
             } else {
-                QuickSiteAdmin.showToast(result.data?.message || 'Star toggle failed', 'error');
+                QuickSiteAdmin.showToast(result.data?.message || t('media.starFailed'), 'error');
             }
         } catch (error) {
-            QuickSiteAdmin.showToast('Star toggle failed: ' + error.message, 'error');
+            QuickSiteAdmin.showToast(t('media.starFailedDetail', { message: error.message }), 'error');
         }
     }
 
@@ -1336,16 +1402,16 @@
             });
             if (result.ok) {
                 QuickSiteAdmin.showToast(
-                    clearing ? 'Favicon cleared' : `Favicon set to ${filename}`, 'success');
+                    clearing ? t('media.faviconCleared') : t('media.faviconSet', { name: filename }), 'success');
             } else {
                 currentFavicon = previous;
                 renderGrid();
-                QuickSiteAdmin.showToast(result.data?.message || 'Could not set the favicon', 'error');
+                QuickSiteAdmin.showToast(result.data?.message || t('media.faviconFailed'), 'error');
             }
         } catch (error) {
             currentFavicon = previous;
             renderGrid();
-            QuickSiteAdmin.showToast('Could not set the favicon: ' + error.message, 'error');
+            QuickSiteAdmin.showToast(t('media.faviconFailedDetail', { message: error.message }), 'error');
         }
     }
 
@@ -1360,7 +1426,7 @@
         selectedFiles.clear();
         const btn = document.getElementById('asset-select-mode');
         if (btn) {
-            btn.innerHTML = selectMode ? '&#9745; Select' : '&#9744; Select';
+            btn.textContent = t(selectMode ? 'media.selectOn' : 'media.selectOff');
             btn.classList.toggle('asset-tabs__select--active', selectMode);
         }
         updateBatchBar();
@@ -1376,12 +1442,14 @@
 
         if (selectMode) {
             bar.style.display = '';
-            count.textContent = selectedFiles.size > 0 ? `${selectedFiles.size} selected` : 'None selected';
+            count.textContent = selectedFiles.size > 0
+                ? t('media.selectedCount', { count: selectedFiles.size })
+                : t('media.noneSelected');
             if (deleteBtn) deleteBtn.disabled = selectedFiles.size === 0;
             // Toggle button label
             const visibleAssets = getFilteredAssets();
             const allSelected = visibleAssets.length > 0 && visibleAssets.every(a => selectedFiles.has(a.filename));
-            if (selectAllBtn) selectAllBtn.textContent = allSelected ? 'Deselect All' : 'Select All';
+            if (selectAllBtn) selectAllBtn.textContent = t(allSelected ? 'media.deselectAll' : 'media.selectAll');
         } else {
             bar.style.display = 'none';
         }
@@ -1404,21 +1472,25 @@
     async function deleteSelected() {
         if (selectedFiles.size === 0) return;
         const filenames = Array.from(selectedFiles);
-        if (!confirm(`Delete ${filenames.length} asset${filenames.length !== 1 ? 's' : ''}? This cannot be undone.`)) return;
+        if (!confirm(t(filenames.length !== 1
+            ? 'media.confirmDeleteManyMany'
+            : 'media.confirmDeleteManyOne', { count: filenames.length }))) return;
 
         try {
             const result = await QuickSiteAdmin.apiRequest('deleteAsset', 'POST', { filenames });
             if (result.ok || result.status === 204) {
-                QuickSiteAdmin.showToast(`${filenames.length} file${filenames.length !== 1 ? 's' : ''} deleted ✓`, 'success');
+                QuickSiteAdmin.showToast(t(filenames.length !== 1
+                    ? 'media.deletedManyMany'
+                    : 'media.deletedManyOne', { count: filenames.length }), 'success');
                 selectedFiles.clear();
                 toggleSelectMode();
                 if (editingAsset && filenames.includes(editingAsset.filename)) closeEditArea();
                 await loadAssets();
             } else {
-                QuickSiteAdmin.showToast(result.data?.message || 'Delete failed', 'error');
+                QuickSiteAdmin.showToast(result.data?.message || t('media.deleteFailed'), 'error');
             }
         } catch (error) {
-            QuickSiteAdmin.showToast('Delete failed: ' + error.message, 'error');
+            QuickSiteAdmin.showToast(t('media.deleteFailedDetail', { message: error.message }), 'error');
         }
     }
 

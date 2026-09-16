@@ -253,15 +253,19 @@ Two other cookies exist, both HttpOnly and neither readable by page scripts. `QS
 | PHP file | Injects into | Notable fields |
 |---|---|---|
 | `templates/layout.php` | `window.QUICKSITE_CONFIG` | `apiBase`, `adminBase`, `baseUrl`, `publicSpace`, `currentProject`, `globalCommands`, `defaultLang`, `multilingual`, `translations`, `token` (the per-session token), `apiUrl`, `isOperator` (§9.14) |
-| `templates/pages/settings.php` | extends `QUICKSITE_CONFIG` | `commandUrl`, `aiSettingsUrl`, `quicksiteVersion` |
-| `templates/pages/apis.php` | inline `window.translations` | `apis` namespace |
+| `templates/pages/settings.php` | extends `QUICKSITE_CONFIG` + `window.QS_SETTINGS_I18N` | `baseUrl`, `commandUrl`, `aiSettingsUrl`, `quicksiteVersion`; the `settings` and `common` sub-trees, verbatim |
+| `templates/pages/apis.php` | `window.QS_APIS_I18N` | the `apis` and `common` sub-trees, verbatim |
+| `templates/pages/embed-security.php` | extends `QUICKSITE_CONFIG` + `window.QS_EMBED_SECURITY_I18N` | `baseUrl`; the `embedSecurity` and `common` sub-trees, verbatim |
+| `templates/pages/media.php` | `window.QS_MEDIA_I18N` | the `media` and `common` sub-trees, verbatim |
 | `templates/pages/preview-config.php` | `window.PreviewConfig` | full preview runtime data — routes, components, settings, i18n, token (200+ fields), plus `tagInfo` (`TagRegistry::editorPayload()` — the tag classification, mandatory params, per-tag defaults and translation-key params the editor works from) |
-| `templates/pages/ai/*.php` | `data-precomputed` on `.admin-ai-page` | precomputed components/routes snapshot |
-| `templates/pages/optimize.php` | inline readiness flag | `window.__cssRefinerLibReady` |
+| `templates/pages/ai-connections.php` | `window.QSAC_ASSET_BASE` + `window.QS_AI_CONNECTIONS_I18N` | the asset base the provider logos load from, so they resolve when the panel is not served from the domain root; the `aiConnections` and `common` sub-trees, verbatim |
+| `templates/pages/optimize.php` | `data-lib-ready` on `.optimize-page` + `window.CSSRefiner.t` + `window.QS_OPTIMIZE_I18N` | `data-lib-ready` is `"true"` only when the CSS Refiner library is installed, and `optimize.js` does nothing otherwise; `CSSRefiner.t` is a passthrough that returns its key unchanged; the `optimize` and `common` sub-trees, verbatim |
 | `templates/pages/memberships.php` | `window.QS_MEMBERSHIPS_CONFIG` + `window.QS_MEMBERSHIPS_I18N` | `myUserId` (the caller's own public id — no API response carries it), `editedProject`; JS-facing strings for dynamic rows |
 | `templates/pages/members.php` | `window.QS_MEMBERS_CONFIG` + `window.QS_MEMBERS_I18N` | `project`, `myUserId`, `myRole`, `myRank`, `roleRanks` (from `roles.php` — drives the strictly-below-my-rank pickers), `joinPolicy` + `visibility` (admin/owner only, read server-side from `members.json`), `isOwner` + `siteUrl` (the address a public visibility exposes); JS-facing strings |
 | `templates/pages/account.php` | `window.QS_ACCOUNT_CONFIG` + `window.QS_ACCOUNT_I18N` | `username` (the typed-confirmation target for deletion), `minPasswordLength` (from `auth.php`, the same value the password change enforces), `hasLocalPassword`, `loginUrl`; JS-facing strings |
 | `templates/pages/command-form.php` | `window.QS_COMMAND_FORM_I18N` | the `commandForm`, `commands` and `common` translation sub-trees, emitted **verbatim under their own dot paths** (`AdminTranslation::getRaw()`) rather than copied field by field — the page's JS asks for the same path PHP would. `JSON_HEX_TAG` keeps a translation value from closing the script element. |
+
+A sub-tree emitted **verbatim** is the output of `AdminTranslation::getRaw()`, unchanged, so the page's JS resolves a string by the same dot path PHP would; each such page reads it through its own `t(path, params)`, which substitutes `:name` markers the way PHP's `t()` does and returns **the path itself** when nothing resolves, so an untranslated string shows on screen instead of hiding behind English. `QUICKSITE_CONFIG.translations` in `layout.php` is a hand-listed subset instead; its `common` branch carries the labels `js/core/utils.js` gives its panel-wide confirm dialog and toasts.
 
 `currentProject` is the user's **edited** project (their `selected_project`, §8.0) — the client prepends a `p/<currentProject>/` marker to project-scoped Management calls so the server acts on it; `globalCommands` is the set of commands called without that marker. There is no schema or runtime validation on injected objects, and page-level extensions of `QUICKSITE_CONFIG` can silently overwrite global fields. Treat the injected globals as read-only by convention.
 
@@ -845,7 +849,7 @@ The AI call is browser-direct via `QSAiCall.call(...)` (see `public/admin/assets
 | **Command** (`command.js`) | Permission-filtered command index. An installation can decline to offer the console at all — see §9.17. |
 | **Command form** (`command-form.js`) | Renders a dynamic form for any command from `help` metadata, then executes it. The escape hatch into raw API. Withheld with the rest of the console when the installation turns it off (§9.17). |
 | **History** (`history.js`) | Its own page at `/admin/history` — see §9.18. Browses `getCommandHistory` for the **currently edited project**, exports what is on screen as CSV, and clears the stored trail. The command history is per-project, so switching projects switches the trail. Actions that belong to no project (creating a project, signing out) are recorded server-side but are not shown here; see *Command history storage* in `COMMAND_API.md`. Admin and owner only. |
-| **Settings** (`settings.js`) | User profile, language, theme, AI provider config status. |
+| **Settings** (`settings.js`) | System information, the caller's permissions, admin preferences (keyboard shortcuts, toast duration), AI configuration status. |
 | **My account** (`account.js`) | The caller's own account — change password, sign out everywhere, delete the account. See §9.13. Commands: `logoutSession`. The password change and the deletion are not commands — they go to `/admin/self/change-password` and `/admin/self/delete`. |
 | **APIs** (`apis.js`) | External API registry — see §9.1. Commands: `listApiEndpoints`, `addApi`, `editApi`, `deleteApi`, `getApiEndpoint`, `testApiEndpoint`. |
 | **Assets** (`assets.js`) | Asset browser + uploader — see §9.15. Commands: `listAssets`, `uploadAsset`, `editAsset`, `deleteAsset`, `editFavicon`. |

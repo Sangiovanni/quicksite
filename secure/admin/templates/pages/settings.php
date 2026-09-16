@@ -10,6 +10,13 @@
 $baseUrl = rtrim(BASE_URL, '/');
 $versionFile = dirname(ADMIN_ASSET_ROOT) . '/VERSION';
 $version = file_exists($versionFile) ? trim(file_get_contents($versionFile)) : 'unknown';
+
+// The sub-trees settings.js renders from, verbatim and under the same dot
+// paths PHP uses, so the JS asks for the path PHP would.
+$qsSettingsI18n = [];
+foreach (['settings', 'common'] as $qsSubtree) {
+    $qsSettingsI18n[$qsSubtree] = AdminTranslation::getInstance()->getRaw($qsSubtree) ?: new stdClass();
+}
 ?>
 
 <script>
@@ -19,6 +26,7 @@ window.QUICKSITE_CONFIG.baseUrl = '<?= $baseUrl ?>/management';
 window.QUICKSITE_CONFIG.commandUrl = '<?= $router->getBaseUrl() ?>/command';
 window.QUICKSITE_CONFIG.aiSettingsUrl = '<?= $router->url('ai-settings') ?>';
 window.QUICKSITE_CONFIG.quicksiteVersion = '<?= htmlspecialchars($version, ENT_QUOTES) ?>';
+window.QS_SETTINGS_I18N = <?= json_encode($qsSettingsI18n, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
 </script>
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/settings.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/settings.js') ?>"></script>
 
@@ -54,13 +62,13 @@ window.QUICKSITE_CONFIG.quicksiteVersion = '<?= htmlspecialchars($version, ENT_Q
                 <svg class="admin-card__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
                 </svg>
-                Your Permissions
+                <?= __admin('settings.yourPermissions') ?>
             </h2>
         </div>
         <div class="admin-card__body">
             <div id="permissions-info" class="admin-loading">
                 <span class="admin-spinner"></span>
-                Loading permissions...
+                <?= __admin('settings.loadingPermissions') ?>
             </div>
         </div>
     </div>
@@ -84,7 +92,7 @@ window.QUICKSITE_CONFIG.quicksiteVersion = '<?= htmlspecialchars($version, ENT_Q
                 <label class="admin-toggle">
                     <input type="checkbox" id="pref-shortcuts" checked>
                     <span class="admin-toggle__slider"></span>
-                    <span class="admin-toggle__label">Enable keyboard shortcuts</span>
+                    <span class="admin-toggle__label"><?= __admin('settings.pref.enableShortcuts') ?></span>
                 </label>
             </div>
             <p class="admin-hint">Press <kbd>?</kbd> to view all shortcuts</p>
@@ -93,15 +101,15 @@ window.QUICKSITE_CONFIG.quicksiteVersion = '<?= htmlspecialchars($version, ENT_Q
         <div class="admin-form-group">
             <label class="admin-label"><?= __admin('settings.toastDuration') ?></label>
             <select id="pref-toast-duration" class="admin-select" style="max-width: 200px;">
-                <option value="2000">2 seconds</option>
-                <option value="4000" selected>4 seconds</option>
-                <option value="6000">6 seconds</option>
-                <option value="0">Don't auto-hide</option>
+                <option value="2000"><?= __admin('settings.pref.duration.2s') ?></option>
+                <option value="4000" selected><?= __admin('settings.pref.duration.4s') ?></option>
+                <option value="6000"><?= __admin('settings.pref.duration.6s') ?></option>
+                <option value="0"><?= __admin('settings.pref.duration.noHide') ?></option>
             </select>
         </div>
         
         <button type="button" class="admin-btn admin-btn--primary" onclick="savePreferences()">
-            Save Preferences
+            <?= __admin('settings.savePreferences') ?>
         </button>
     </div>
 </div>
@@ -115,31 +123,31 @@ window.QUICKSITE_CONFIG.quicksiteVersion = '<?= htmlspecialchars($version, ENT_Q
                 <circle cx="7.5" cy="14.5" r="1.5"/>
                 <circle cx="16.5" cy="14.5" r="1.5"/>
             </svg>
-            AI Configuration
+            <?= __admin('settings.ai.title') ?>
         </h2>
         <a href="<?= $router->url('ai-settings') ?>" class="admin-btn admin-btn--small admin-btn--secondary">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                 <circle cx="12" cy="12" r="3"/>
                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9"/>
             </svg>
-            Manage Keys
+            <?= __admin('settings.ai.manageKeys') ?>
         </a>
     </div>
     <div class="admin-card__body">
         <div id="ai-config-status">
             <div class="admin-loading">
                 <span class="admin-spinner"></span>
-                Loading AI status...
+                <?= __admin('settings.ai.loadingStatus') ?>
             </div>
         </div>
         
         <div class="admin-form-group" style="margin-top: var(--space-md); padding-top: var(--space-md); border-top: 1px solid var(--color-border);">
-            <label class="admin-label">Automation Options</label>
-            <p class="admin-hint" style="margin-bottom: var(--space-sm);">These settings apply when using AI specs.</p>
+            <label class="admin-label"><?= __admin('settings.ai.automationOptions') ?></label>
+            <p class="admin-hint" style="margin-bottom: var(--space-sm);"><?= __admin('settings.ai.automationHint') ?></p>
             
             <div class="admin-checkbox-group">
                 <input type="checkbox" id="ai-auto-execute" class="admin-checkbox" onchange="updateAiAutomation('autoExecute', this.checked)">
-                <label for="ai-auto-execute" class="admin-checkbox-label">Auto-execute commands after the AI response is parsed <span style="color: var(--admin-warning);">(use with caution)</span></label>
+                <label for="ai-auto-execute" class="admin-checkbox-label"><?= __admin('settings.ai.autoExecuteLabel') ?> <span style="color: var(--admin-warning);"><?= __admin('settings.ai.autoExecuteCaution') ?></span></label>
             </div>
         </div>
     </div>

@@ -9,8 +9,18 @@
  */
 
 $baseUrl = rtrim(BASE_URL, '/');
+
+// The sub-trees apis.js renders from, verbatim and under the same dot paths
+// PHP uses, so the JS asks for the path PHP would.
+$qsApisI18n = [];
+foreach (['apis', 'common'] as $qsSubtree) {
+    $qsApisI18n[$qsSubtree] = AdminTranslation::getInstance()->getRaw($qsSubtree) ?: new stdClass();
+}
 ?>
 
+<script>
+window.QS_APIS_I18N = <?= json_encode($qsApisI18n, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+</script>
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/api-import/openapi-converter.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/api-import/openapi-converter.js') ?>"></script>
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/apis.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/apis.js') ?>"></script>
 
@@ -137,7 +147,7 @@ $baseUrl = rtrim(BASE_URL, '/');
                 <div class="admin-form-group">
                     <label class="admin-label" for="api-name"><?= __admin('apis.form.name') ?> *</label>
                     <input type="text" class="admin-input" id="api-name" name="name" required
-                           placeholder="Main Backend API">
+                           placeholder="<?= __admin('apis.form.namePlaceholder') ?>">
                 </div>
                 
                 <div class="admin-form-group">
@@ -150,7 +160,7 @@ $baseUrl = rtrim(BASE_URL, '/');
                 <div class="admin-form-group">
                     <label class="admin-label" for="api-description"><?= __admin('apis.form.description') ?></label>
                     <textarea class="admin-input" id="api-description" name="description" rows="2"
-                              placeholder="Optional description..."></textarea>
+                              placeholder="<?= __admin('apis.form.descriptionPlaceholder') ?>"></textarea>
                 </div>
                 
                 <fieldset class="admin-fieldset">

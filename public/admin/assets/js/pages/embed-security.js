@@ -1,9 +1,16 @@
 /**
  * Embed Security Settings Page JavaScript
- * 
+ *
  * Manages embed sandbox rules via the QuickSite API.
  * Config format: { "tags": { "iframe": { "domain": "sandbox" }, "video": {...} }, "default": "" }
- * 
+ *
+ * Strings come from window.QS_EMBED_SECURITY_I18N, emitted by
+ * embed-security.php: the `embedSecurity` and `common` translation sub-trees
+ * under the same dot paths PHP uses. Read it through t(), never directly.
+ *
+ * DOM is built with createElement + textContent through QSDom and named
+ * _render* helpers, per the CLAUDE.md HTML-in-JS hygiene rule.
+ *
  * @version 4.0.0
  */
 
@@ -11,6 +18,32 @@
     'use strict';
 
     const config = window.QUICKSITE_CONFIG || {};
+
+    /**
+     * Resolve one admin string by its FULL dot path; a path that resolves to
+     * nothing returns THE PATH ITSELF, so an unset string is visible on
+     * screen rather than hidden behind an English fallback.
+     *
+     * @param {string} path      e.g. 'embedSecurity.noRules'
+     * @param {Object} [params]  :name markers, as PHP's t() does
+     * @returns {string}
+     */
+    function t(path, params) {
+        let node = window.QS_EMBED_SECURITY_I18N || {};
+        for (const part of String(path).split('.')) {
+            if (node === null || typeof node !== 'object' || !(part in node)) return path;
+            node = node[part];
+        }
+        if (typeof node !== 'string') return path;
+        let value = node;
+        if (params) {
+            for (const name of Object.keys(params)) {
+                value = value.split(':' + name).join(String(params[name]));
+            }
+        }
+        return value;
+    }
+
     const VALID_PERMISSIONS = [
         'allow-scripts',
         'allow-same-origin',
@@ -33,7 +66,7 @@
     async function loadConfig() {
         const res = await QuickSiteAdmin.apiRequest('getIframeSandbox', 'GET');
         if (!res.ok) {
-            showError(document.getElementById('rules-container'), res.data?.error || 'Failed to load config');
+            showError(document.getElementById('rules-container'), res.data?.error || t('embedSecurity.errors.loadFailed'));
             return null;
         }
         return res.data?.data || res.data;
@@ -55,52 +88,93 @@
             }
         }
 
+        QSDom.clear(container);
+
         if (allRules.length === 0) {
-            container.innerHTML = '<p class="admin-muted">No rules configured yet. All embeds will use the default policy.</p>';
+            container.appendChild(QSDom.el('p', {
+                class: 'admin-muted', text: t('embedSecurity.noRules')
+            }));
             return;
         }
 
-        container.innerHTML = allRules.map(({ tag, domain, sandbox }) => {
-            const perms = sandbox
-                ? sandbox.split(' ').map(p => '<code>' + escapeHtml(p) + '</code>').join(' ')
-                : '<span class="admin-muted">Block everything</span>';
+        allRules.forEach(rule => container.appendChild(_renderRuleCard(rule)));
+    }
 
-            return `
-                <div class="admin-card admin-card--nested" style="margin-bottom: var(--space-sm);">
-                    <div class="admin-card__body" style="display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-md);">
-                        <div style="flex: 1; min-width: 0;">
-                            <div style="margin-bottom: var(--space-xs); display: flex; align-items: center; gap: var(--space-xs);">
-                                <code style="background: var(--admin-bg-tertiary); padding: 2px 6px; border-radius: 3px; font-size: 0.85em;">&lt;${escapeHtml(tag)}&gt;</code>
-                                <strong>${escapeHtml(domain)}</strong>
-                            </div>
-                            <div>
-                                ${perms}
-                            </div>
-                        </div>
-                        <div style="display: flex; gap: var(--space-xs); flex-shrink: 0;">
-                            <button type="button" class="admin-btn admin-btn--small admin-btn--secondary" onclick="EmbedSecurity.editRule('${escapeAttr(tag)}','${escapeAttr(domain)}')" title="Edit rule">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                                </svg>
-                            </button>
-                            <button type="button" class="admin-btn admin-btn--small admin-btn--danger" onclick="EmbedSecurity.deleteRule('${escapeAttr(tag)}','${escapeAttr(domain)}')" title="Delete rule">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                                    <polyline points="3 6 5 6 21 6"/>
-                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                                </svg>
-                            </button>
-                        </div>
-                    </div>
-                </div>`;
-        }).join('');
+    /**
+     * One sandbox rule's card, with its edit and delete buttons already bound.
+     *
+     * The buttons carry closures rather than an inline onclick built from the
+     * tag and domain, so no value is ever spliced into markup: that is what
+     * retired this page's own escapeAttr(), which escaped for a JS string
+     * inside an attribute and left &, < and > alone.
+     *
+     * @param {{tag: string, domain: string, sandbox: string}} rule
+     * @returns {HTMLElement}
+     */
+    function _renderRuleCard({ tag, domain, sandbox }) {
+        const permsBox = QSDom.el('div');
+        if (sandbox) {
+            sandbox.split(' ').forEach((p, i) => {
+                if (i) permsBox.appendChild(document.createTextNode(' '));
+                permsBox.appendChild(QSDom.el('code', { text: p }));
+            });
+        } else {
+            permsBox.appendChild(QSDom.el('span', {
+                class: 'admin-muted', text: t('embedSecurity.blockEverything')
+            }));
+        }
+
+        return QSDom.el('div', {
+            class: 'admin-card admin-card--nested',
+            style: 'margin-bottom: var(--space-sm);'
+        }, [
+            QSDom.el('div', {
+                class: 'admin-card__body',
+                style: 'display: flex; justify-content: space-between; align-items: flex-start; gap: var(--space-md);'
+            }, [
+                QSDom.el('div', { style: 'flex: 1; min-width: 0;' }, [
+                    QSDom.el('div', {
+                        style: 'margin-bottom: var(--space-xs); display: flex; align-items: center; gap: var(--space-xs);'
+                    }, [
+                        QSDom.el('code', {
+                            style: 'background: var(--admin-bg-tertiary); padding: 2px 6px; border-radius: 3px; font-size: 0.85em;',
+                            text: '<' + tag + '>'
+                        }),
+                        QSDom.el('strong', { text: domain })
+                    ]),
+                    permsBox
+                ]),
+                QSDom.el('div', {
+                    style: 'display: flex; gap: var(--space-xs); flex-shrink: 0;'
+                }, [
+                    _renderIconButton('secondary', QuickSiteUtils.ICON_PATHS.edit,
+                        t('embedSecurity.editRuleTitle'), () => editRule(tag, domain)),
+                    _renderIconButton('danger', QuickSiteUtils.ICON_PATHS.trash,
+                        t('embedSecurity.deleteRuleTitle'), () => deleteRule(tag, domain))
+                ])
+            ])
+        ]);
+    }
+
+    /** One small icon-only button. @returns {HTMLElement} */
+    function _renderIconButton(variant, iconPath, title, onClick) {
+        return QSDom.el('button', {
+            type: 'button',
+            class: 'admin-btn admin-btn--small admin-btn--' + variant,
+            title: title,
+            onclick: onClick
+        }, [QSDom.iconEl(iconPath, 14)]);
     }
 
     function renderTagSelector() {
         const sel = document.getElementById('rule-tag');
-        sel.innerHTML = validTags.map(t =>
-            `<option value="${escapeAttr(t)}">&lt;${escapeHtml(t)}&gt;</option>`
-        ).join('');
+        QSDom.clear(sel);
+        validTags.forEach(tag => {
+            const opt = document.createElement('option');
+            opt.value = tag;
+            opt.textContent = '<' + tag + '>';
+            sel.appendChild(opt);
+        });
     }
 
     function renderDefaultPolicy(data) {
@@ -115,7 +189,7 @@
         if (val) {
             const opt = document.createElement('option');
             opt.value = val;
-            opt.textContent = val + ' (custom)';
+            opt.textContent = t('embedSecurity.customPolicy', { value: val });
             sel.appendChild(opt);
             sel.value = val;
         }
@@ -128,19 +202,24 @@
             'allow-popups-to-escape-sandbox'
         ];
         const container = document.getElementById('never-allowed-list');
-        container.innerHTML = '<ul style="margin: 0; padding-left: var(--space-lg);">' +
-            list.map(p => '<li><code>' + escapeHtml(p) + '</code></li>').join('') +
-            '</ul>';
+        const ul = QSDom.el('ul', { style: 'margin: 0; padding-left: var(--space-lg);' });
+        list.forEach(p => ul.appendChild(QSDom.el('li', null, [QSDom.el('code', { text: p })])));
+        QSDom.clear(container);
+        container.appendChild(ul);
     }
 
     function renderPermissionCheckboxes() {
         const container = document.getElementById('permission-checkboxes');
-        container.innerHTML = VALID_PERMISSIONS.map(p => `
-            <div class="admin-checkbox-group">
-                <input type="checkbox" id="perm-${p}" value="${p}" class="admin-checkbox">
-                <label for="perm-${p}" class="admin-checkbox-label"><code>${escapeHtml(p)}</code></label>
-            </div>
-        `).join('');
+        QSDom.clear(container);
+        VALID_PERMISSIONS.forEach(p => {
+            container.appendChild(QSDom.el('div', { class: 'admin-checkbox-group' }, [
+                QSDom.el('input', {
+                    type: 'checkbox', id: 'perm-' + p, value: p, class: 'admin-checkbox'
+                }),
+                QSDom.el('label', { for: 'perm-' + p, class: 'admin-checkbox-label' },
+                    [QSDom.el('code', { text: p })])
+            ]));
+        });
     }
 
     // ── Modal ────────────────────────────────────────────────
@@ -183,12 +262,12 @@
         const domain = domainInput.value.trim().toLowerCase();
 
         if (!tag) {
-            QuickSiteAdmin.showToast('Please select a tag', 'error');
+            QuickSiteAdmin.showToast(t('embedSecurity.validation.selectTag'), 'error');
             return;
         }
 
         if (!domain) {
-            QuickSiteAdmin.showToast('Please enter a domain', 'error');
+            QuickSiteAdmin.showToast(t('embedSecurity.validation.enterDomain'), 'error');
             domainInput.focus();
             return;
         }
@@ -201,25 +280,25 @@
 
         const res = await QuickSiteAdmin.apiRequest('setIframeSandbox', 'POST', { tag, domain, sandbox });
         if (!res.ok) {
-            QuickSiteAdmin.showToast(res.data?.error || res.data?.message || 'Failed to save rule', 'error');
+            QuickSiteAdmin.showToast(res.data?.error || res.data?.message || t('embedSecurity.errors.saveFailed'), 'error');
             return;
         }
 
-        QuickSiteAdmin.showToast('Rule saved successfully', 'success');
+        QuickSiteAdmin.showToast(t('embedSecurity.toast.ruleSaved'), 'success');
         closeModal();
         await refresh();
     }
 
     async function deleteRule(tag, domain) {
-        if (!confirm('Delete sandbox rule for <' + tag + '> "' + domain + '"?')) return;
+        if (!confirm(t('embedSecurity.confirmDelete', { tag: tag, domain: domain }))) return;
 
         const res = await QuickSiteAdmin.apiRequest('removeIframeSandbox', 'POST', { tag, domain });
         if (!res.ok) {
-            QuickSiteAdmin.showToast(res.data?.error || res.data?.message || 'Failed to delete rule', 'error');
+            QuickSiteAdmin.showToast(res.data?.error || res.data?.message || t('embedSecurity.errors.deleteFailed'), 'error');
             return;
         }
 
-        QuickSiteAdmin.showToast('Rule removed', 'success');
+        QuickSiteAdmin.showToast(t('embedSecurity.toast.ruleRemoved'), 'success');
         await refresh();
     }
 
@@ -227,39 +306,30 @@
         const val = document.getElementById('default-policy').value;
         const res = await QuickSiteAdmin.apiRequest('setIframeSandbox', 'POST', { default: val });
         if (!res.ok) {
-            QuickSiteAdmin.showToast(res.data?.error || res.data?.message || 'Failed to save default', 'error');
+            QuickSiteAdmin.showToast(res.data?.error || res.data?.message || t('embedSecurity.errors.saveDefaultFailed'), 'error');
             return;
         }
-        QuickSiteAdmin.showToast('Default policy saved', 'success');
+        QuickSiteAdmin.showToast(t('embedSecurity.toast.defaultSaved'), 'success');
     }
 
     function editRule(tag, domain) {
         editingTag = tag;
         editingDomain = domain;
         const tagRules = currentTags[tag] || {};
-        openModal('Edit Sandbox Rule', tag, domain, tagRules[domain] || '');
+        openModal(t('embedSecurity.editSandboxRule'), tag, domain, tagRules[domain] || '');
     }
 
     function addRule() {
         editingTag = null;
         editingDomain = null;
-        openModal('Add Sandbox Rule', null, null, null);
+        openModal(t('embedSecurity.addSandboxRule'), null, null, null);
     }
 
     // ── Helpers ──────────────────────────────────────────────
 
-    function escapeHtml(str) {
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
-    }
-
-    function escapeAttr(str) {
-        return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-    }
-
     function showError(container, msg) {
-        container.innerHTML = '<p class="admin-error">' + escapeHtml(msg) + '</p>';
+        QSDom.clear(container);
+        container.appendChild(QSDom.el('p', { class: 'admin-error', text: msg }));
     }
 
     // ── Init ─────────────────────────────────────────────────
@@ -289,9 +359,6 @@
 
         await refresh();
     }
-
-    // Expose for inline onclick handlers
-    window.EmbedSecurity = { editRule, deleteRule };
 
     document.addEventListener('DOMContentLoaded', init);
 })();

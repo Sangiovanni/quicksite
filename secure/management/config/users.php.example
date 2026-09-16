@@ -74,8 +74,7 @@
 //   - set 'password_hash' to a real hash:
 //       php -r "echo password_hash('your-password', PASSWORD_DEFAULT);"
 // Until password_hash is a real hash the entry cannot log in at all: null means
-// "externally managed account" (see the field notes above), and the admin panel
-// keeps showing a security warning while any 'CHANGE_ME' id exists.
+// "externally managed account" (see the field notes above).
 return [
     'users' => [
         'usr_CHANGE_ME_default' => [

@@ -303,7 +303,7 @@
             headerTitle.style.cssText = 'font-weight: 500; color: #333;';
             
             this.closeBtn = document.createElement('button');
-            this.closeBtn.innerHTML = '&times;';
+            this.closeBtn.textContent = '×';
             this.closeBtn.style.cssText = `
                 background: none;
                 border: none;
@@ -337,10 +337,14 @@
             `;
             
             // SV area overlays
-            this.svArea.innerHTML = `
-                <div class="qs-cp-sv-white" style="position:absolute;inset:0;background:linear-gradient(to right,#fff,transparent);border-radius:4px;"></div>
-                <div class="qs-cp-sv-black" style="position:absolute;inset:0;background:linear-gradient(to top,#000,transparent);border-radius:4px;"></div>
-            `;
+            this.svArea.appendChild(QSDom.el('div', {
+                class: 'qs-cp-sv-white',
+                style: 'position:absolute;inset:0;background:linear-gradient(to right,#fff,transparent);border-radius:4px;'
+            }));
+            this.svArea.appendChild(QSDom.el('div', {
+                class: 'qs-cp-sv-black',
+                style: 'position:absolute;inset:0;background:linear-gradient(to top,#000,transparent);border-radius:4px;'
+            }));
             
             // SV cursor
             this.svCursor = document.createElement('div');

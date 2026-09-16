@@ -151,13 +151,6 @@ code,
     margin: 0 auto;
 }
 
-.admin-security-warning__icon {
-    width: 18px;
-    height: 18px;
-    flex-shrink: 0;
-    color: #e65100;
-}
-
 .admin-security-warning__link {
     color: #1565c0;
     text-decoration: underline;
@@ -191,10 +184,6 @@ code,
     background: #e8f1fb;
     border-bottom-color: #90caf9;
     color: #14395e;
-}
-
-.admin-security-warning--info .admin-security-warning__icon {
-    color: #1565c0;
 }
 
 .admin-security-warning--info .admin-security-warning__dismiss {

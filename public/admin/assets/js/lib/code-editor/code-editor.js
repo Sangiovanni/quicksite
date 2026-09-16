@@ -52,7 +52,7 @@
         highlight.className = 'qs-code-editor__highlight';
         highlight.setAttribute('aria-hidden', 'true');
 
-        // Search overlay (A3 slice 3). Sits between the tokenized highlight
+        // Search overlay. Sits between the tokenized highlight
         // layer and the textarea. Its text is transparent — only the match
         // spans paint a visible background, so all matches appear as
         // highlights over the tokenised text below.
@@ -129,27 +129,31 @@
                 searchOverlay.innerHTML = '';
                 return;
             }
-            var out = [];
+            var frag = document.createDocumentFragment();
             var i = 0;
             var len = _value.length;
             var m = 0;
             while (i < len && m < matches.length) {
                 var match = matches[m];
                 if (i < match.start) {
-                    out.push(escapeHtml(_value.slice(i, match.start)));
+                    frag.appendChild(document.createTextNode(_value.slice(i, match.start)));
                     i = match.start;
                     continue;
                 }
-                var cls = 'qs-search-match' + (m === currentIdx ? ' qs-search-match--current' : '');
-                out.push('<span class="' + cls + '">' + escapeHtml(_value.slice(match.start, match.end)) + '</span>');
+                var span = document.createElement('span');
+                span.className = 'qs-search-match' + (m === currentIdx ? ' qs-search-match--current' : '');
+                span.textContent = _value.slice(match.start, match.end);
+                frag.appendChild(span);
                 i = match.end;
                 m++;
             }
-            if (i < len) out.push(escapeHtml(_value.slice(i)));
+            if (i < len) frag.appendChild(document.createTextNode(_value.slice(i)));
             // Trailing space matches the highlight layer's safeguard so
             // the overlay's height matches the tokenised pre when the value
             // ends in '\n'.
-            searchOverlay.innerHTML = out.join('') + ' ';
+            frag.appendChild(document.createTextNode(' '));
+            searchOverlay.textContent = '';
+            searchOverlay.appendChild(frag);
         }
 
         // ── Line offsets (cached) for jumpToLine + scrollMatchIntoView ──
@@ -256,7 +260,7 @@
                 mount.innerHTML = '';
                 mount.classList.remove('qs-code-editor');
             },
-            // ── Search (A3 slice 3) ──
+            // ── Search ──
             // setMatches paints the overlay; clearMatches removes it.
             // matches: array of { start, end } char offsets; currentIdx is
             // the 0-based index of the currently-emphasised match (or -1).
@@ -293,7 +297,7 @@
                 syncScroll();
                 return true;
             },
-            // Slice 3 exposure points (search / jump-to-line)
+            // Exposure points for search and jump-to-line
             getTextarea:  function () { return textarea; },
             getHighlight: function () { return highlight; },
             getGutter:    function () { return gutter; }

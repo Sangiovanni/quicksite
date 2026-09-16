@@ -8,11 +8,19 @@
  */
 
 $baseUrl = rtrim(BASE_URL, '/');
+
+// The sub-trees embed-security.js renders from, verbatim and under the same
+// dot paths PHP uses, so the JS asks for the path PHP would.
+$qsEmbedSecurityI18n = [];
+foreach (['embedSecurity', 'common'] as $qsSubtree) {
+    $qsEmbedSecurityI18n[$qsSubtree] = AdminTranslation::getInstance()->getRaw($qsSubtree) ?: new stdClass();
+}
 ?>
 
 <script>
 window.QUICKSITE_CONFIG = window.QUICKSITE_CONFIG || {};
 window.QUICKSITE_CONFIG.baseUrl = '<?= $baseUrl ?>/management';
+window.QS_EMBED_SECURITY_I18N = <?= json_encode($qsEmbedSecurityI18n, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
 </script>
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/embed-security.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/embed-security.js') ?>"></script>
 
@@ -30,24 +38,24 @@ window.QUICKSITE_CONFIG.baseUrl = '<?= $baseUrl ?>/management';
                 <line x1="3" y1="9" x2="21" y2="9"/>
                 <line x1="9" y1="21" x2="9" y2="9"/>
             </svg>
-            Embed Sandbox Rules
+            <?= __admin('embedSecurity.sandboxRules') ?>
         </h2>
         <button type="button" class="admin-btn admin-btn--small admin-btn--primary" id="btn-add-rule">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                 <line x1="12" y1="5" x2="12" y2="19"/>
                 <line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
-            Add Rule
+            <?= __admin('embedSecurity.addRule') ?>
         </button>
     </div>
     <div class="admin-card__body">
         <p class="admin-hint" style="margin-bottom: var(--space-md);">
-            When an embed tag (iframe, video, audio) is added to a page, its content is sandboxed by default. Add rules below to grant specific permissions to trusted domains.
+            <?= __admin('embedSecurity.intro') ?>
         </p>
         <div id="rules-container">
             <div class="admin-loading">
                 <span class="admin-spinner"></span>
-                Loading rules...
+                <?= __admin('embedSecurity.loadingRules') ?>
             </div>
         </div>
     </div>
@@ -60,24 +68,24 @@ window.QUICKSITE_CONFIG.baseUrl = '<?= $baseUrl ?>/management';
             <svg class="admin-card__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
             </svg>
-            Default Policy
+            <?= __admin('embedSecurity.defaultPolicy') ?>
         </h2>
     </div>
     <div class="admin-card__body">
         <p class="admin-hint" style="margin-bottom: var(--space-md);">
-            This policy applies to iframes whose domain does not match any rule above.
+            <?= __admin('embedSecurity.defaultPolicyHint') ?>
         </p>
         <div class="admin-form-group">
-            <label class="admin-label" for="default-policy">Unmatched domains</label>
+            <label class="admin-label" for="default-policy"><?= __admin('embedSecurity.unmatchedDomains') ?></label>
             <select id="default-policy" class="admin-select" style="max-width: 350px;">
-                <option value="">Block everything (recommended)</option>
-                <option value="allow-scripts">Allow scripts only</option>
-                <option value="allow-scripts allow-same-origin">Allow scripts + same-origin</option>
+                <option value=""><?= __admin('embedSecurity.blockEverythingRecommended') ?></option>
+                <option value="allow-scripts"><?= __admin('embedSecurity.allowScriptsOnly') ?></option>
+                <option value="allow-scripts allow-same-origin"><?= __admin('embedSecurity.allowScriptsSameOrigin') ?></option>
             </select>
-            <p class="admin-hint">Empty sandbox ("Block everything") prevents all scripts and interactions.</p>
+            <p class="admin-hint"><?= __admin('embedSecurity.emptySandboxHint') ?></p>
         </div>
         <button type="button" class="admin-btn admin-btn--primary" id="btn-save-default">
-            Save Default
+            <?= __admin('embedSecurity.saveDefault') ?>
         </button>
     </div>
 </div>
@@ -90,12 +98,12 @@ window.QUICKSITE_CONFIG.baseUrl = '<?= $baseUrl ?>/management';
                 <circle cx="12" cy="12" r="10"/>
                 <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
             </svg>
-            Never Allowed
+            <?= __admin('embedSecurity.neverAllowed') ?>
         </h2>
     </div>
     <div class="admin-card__body">
         <p class="admin-hint" style="margin-bottom: var(--space-md);">
-            These permissions are always stripped by the system, regardless of any rule configuration. This prevents embedded content from hijacking the parent page.
+            <?= __admin('embedSecurity.neverAllowedHint') ?>
         </p>
         <div id="never-allowed-list"></div>
     </div>
@@ -106,30 +114,30 @@ window.QUICKSITE_CONFIG.baseUrl = '<?= $baseUrl ?>/management';
     <div class="admin-modal__backdrop" data-close-modal></div>
     <div class="admin-modal__content" style="max-width: 520px;">
         <div class="admin-modal__header">
-            <h3 class="admin-modal__title" id="rule-modal-title">Add Sandbox Rule</h3>
+            <h3 class="admin-modal__title" id="rule-modal-title"><?= __admin('embedSecurity.addSandboxRule') ?></h3>
             <button type="button" class="admin-modal__close" data-close-modal>&times;</button>
         </div>
         <div class="admin-modal__body">
             <div class="admin-form-group">
-                <label class="admin-label" for="rule-tag">Tag</label>
+                <label class="admin-label" for="rule-tag"><?= __admin('embedSecurity.tagLabel') ?></label>
                 <select id="rule-tag" class="admin-select">
                     <!-- Populated dynamically from valid_tags -->
                 </select>
-                <p class="admin-hint">Select the HTML embed tag this rule applies to.</p>
+                <p class="admin-hint"><?= __admin('embedSecurity.tagHint') ?></p>
             </div>
             <div class="admin-form-group">
-                <label class="admin-label" for="rule-domain">Domain</label>
-                <input type="text" id="rule-domain" class="admin-input" placeholder="youtube.com" style="font-family: monospace;" />
-                <p class="admin-hint">Enter a full domain name. Subdomains are automatically included (youtube.com also matches www.youtube.com).</p>
+                <label class="admin-label" for="rule-domain"><?= __admin('embedSecurity.domainLabel') ?></label>
+                <input type="text" id="rule-domain" class="admin-input" placeholder="<?= __admin('embedSecurity.domainPlaceholder') ?>" style="font-family: monospace;" />
+                <p class="admin-hint"><?= __admin('embedSecurity.domainHint') ?></p>
             </div>
             <div class="admin-form-group">
-                <label class="admin-label">Sandbox permissions</label>
+                <label class="admin-label"><?= __admin('embedSecurity.sandboxPermissions') ?></label>
                 <div id="permission-checkboxes" style="display: grid; gap: var(--space-xs);"></div>
             </div>
         </div>
         <div class="admin-modal__footer">
-            <button type="button" class="admin-btn admin-btn--secondary" data-close-modal>Cancel</button>
-            <button type="button" class="admin-btn admin-btn--primary" id="btn-save-rule">Save Rule</button>
+            <button type="button" class="admin-btn admin-btn--secondary" data-close-modal><?= __admin('common.cancel') ?></button>
+            <button type="button" class="admin-btn admin-btn--primary" id="btn-save-rule"><?= __admin('embedSecurity.saveRule') ?></button>
         </div>
     </div>
 </div>

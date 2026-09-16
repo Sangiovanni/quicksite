@@ -1,22 +1,55 @@
 /**
  * Settings Page JavaScript
- * 
- * Handles loading and displaying system info, config, routes, languages, 
+ *
+ * Handles loading and displaying system info, config, routes, languages,
  * preferences, permissions, and AI configuration status.
- * 
+ *
+ * Strings come from window.QS_SETTINGS_I18N, emitted by settings.php: the
+ * `settings` and `common` translation sub-trees under the same dot paths PHP
+ * uses. Read it through t() below, never directly.
+ *
+ * DOM is built with createElement + textContent through QSDom and named
+ * _render* helpers, per the CLAUDE.md HTML-in-JS hygiene rule.
+ *
  * @version 1.0.0
  */
 
 (function() {
     'use strict';
-    
+
     // Get config from PHP
     const config = window.QUICKSITE_CONFIG || {};
     const baseUrl = config.baseUrl || '';
     const commandUrl = config.commandUrl || '';
     const aiSettingsUrl = config.aiSettingsUrl || '';
-    const translations = config.translations || {};
-    
+
+    /**
+     * Resolve one admin string by its FULL dot path.
+     *
+     * A path that resolves to nothing returns THE PATH ITSELF, so an
+     * untranslated string is visible on screen and findable by a scan
+     * instead of being hidden behind an English fallback.
+     *
+     * @param {string} path       e.g. 'settings.ai.configured'
+     * @param {Object} [params]   :name markers to substitute, as PHP's t() does
+     * @returns {string}
+     */
+    function t(path, params) {
+        let node = window.QS_SETTINGS_I18N || {};
+        for (const part of String(path).split('.')) {
+            if (node === null || typeof node !== 'object' || !(part in node)) return path;
+            node = node[part];
+        }
+        if (typeof node !== 'string') return path;
+        let value = node;
+        if (params) {
+            for (const name of Object.keys(params)) {
+                value = value.split(':' + name).join(String(params[name]));
+            }
+        }
+        return value;
+    }
+
     // AI Storage Keys
     const AI_STORAGE_KEYS = {
         keysV2: QuickSiteStorageKeys.aiKeysV2,
@@ -24,19 +57,75 @@
         persist: QuickSiteStorageKeys.aiPersist,
         autoExecute: QuickSiteStorageKeys.aiAutoExecute
     };
-    
-    // Shared template helpers
-    function renderDefinitionList(items) {
-        return `<dl class="admin-definition-list">${items.map(([label, value]) =>
-            `<dt>${label}</dt><dd>${value}</dd>`).join('')}</dl>`;
+
+    // ========================================================================
+    // Render helpers — each returns ONE Element (CLAUDE.md, ruling 8)
+    // ========================================================================
+
+    /**
+     * A <dl> of label/value rows.
+     * @param {Array<[string, Node|string]>} items  value may be a node or text
+     * @returns {HTMLElement}
+     */
+    function _renderDefinitionList(items) {
+        const dl = QSDom.el('dl', { class: 'admin-definition-list' });
+        items.forEach(([label, value]) => {
+            dl.appendChild(QSDom.el('dt', { text: label }));
+            dl.appendChild(QSDom.el('dd', null, [
+                typeof value === 'string' ? document.createTextNode(value) : value
+            ]));
+        });
+        return dl;
     }
+
+    /** A coloured badge. @returns {HTMLElement} */
+    function _renderBadge(text, variant) {
+        return QSDom.el('span', { class: 'admin-badge admin-badge--' + variant, text: text });
+    }
+
+    /**
+     * The collapsible list of commands a non-superadmin may run.
+     * @param {Array<string>} commands
+     * @returns {HTMLElement} one <details>
+     */
+    function _renderCommandList(commands) {
+        const chips = QSDom.el('div', {
+            style: 'display: flex; flex-wrap: wrap; gap: var(--space-xs);'
+        });
+        commands.forEach(cmd => {
+            chips.appendChild(QSDom.el('code', {
+                style: 'font-size: var(--font-size-xs);',
+                text: cmd
+            }));
+        });
+        return QSDom.el('details', { style: 'margin-top: var(--space-md);' }, [
+            QSDom.el('summary', {
+                class: 'admin-text-muted',
+                style: 'cursor: pointer;',
+                text: t('settings.permissions.viewAccessible')
+            }),
+            QSDom.el('div', {
+                style: 'margin-top: var(--space-sm); max-height: 200px; overflow-y: auto;'
+            }, [chips])
+        ]);
+    }
+
+    /** Replace a container's contents with one element. */
+    function _replace(container, element) {
+        QSDom.clear(container);
+        container.appendChild(element);
+    }
+
     function showError(container, error) {
-        container.innerHTML = `<p class="admin-text-error">Error: ${error.message}</p>`;
+        _replace(container, QSDom.el('p', {
+            class: 'admin-text-error',
+            text: t('settings.errors.generic', { message: error.message })
+        }));
     }
     function showMuted(container, text) {
-        container.innerHTML = `<p class="admin-text-muted">${text}</p>`;
+        _replace(container, QSDom.el('p', { class: 'admin-text-muted', text: text }));
     }
-    
+
     /**
      * Initialize the settings page
      */
@@ -71,23 +160,33 @@
                 const providerCount = Object.keys(providers).length;
                 const defaultName = providers[defaultProvider]?.name || defaultProvider;
                 
-                container.innerHTML = renderDefinitionList([
-                    ['Status', '<span class="admin-badge admin-badge--success">Configured</span>'],
-                    ['Providers', `${providerCount} provider${providerCount > 1 ? 's' : ''} configured`],
-                    ['Default Provider', defaultName],
-                    ['Storage', persist ? 'Persistent (localStorage)' : 'Session only (cleared on tab close)']
-                ]);
+                _replace(container, _renderDefinitionList([
+                    [t('settings.ai.status'), _renderBadge(t('settings.ai.configured'), 'success')],
+                    [t('settings.ai.providers'), t(providerCount > 1
+                        ? 'settings.ai.providersCount'
+                        : 'settings.ai.providersCountOne', { count: providerCount })],
+                    [t('settings.ai.defaultProvider'), defaultName],
+                    [t('settings.ai.storage'), persist
+                        ? t('settings.ai.storagePersistent')
+                        : t('settings.ai.storageSession')]
+                ]));
             } catch (e) {
-                container.innerHTML = '<p class="admin-text-muted">No AI providers configured</p>';
+                showMuted(container, t('settings.ai.noneConfigured'));
             }
         } else {
-            container.innerHTML = `
-                <p class="admin-text-muted">No AI providers configured.</p>
-                <a href="${aiSettingsUrl}" class="admin-btn admin-btn--primary" style="margin-top: var(--space-sm);">
-                    ${QuickSiteUtils.iconPlus(16)}
-                    Add API Key
-                </a>
-            `;
+            QSDom.clear(container);
+            container.appendChild(QSDom.el('p', {
+                class: 'admin-text-muted',
+                text: t('settings.ai.noneConfigured')
+            }));
+            container.appendChild(QSDom.el('a', {
+                href: aiSettingsUrl,
+                class: 'admin-btn admin-btn--primary',
+                style: 'margin-top: var(--space-sm);'
+            }, [
+                QSDom.iconEl(QuickSiteUtils.ICON_PATHS.plus, 16),
+                ' ' + t('settings.ai.addApiKey')
+            ]));
         }
     }
     
@@ -97,7 +196,9 @@
     window.updateAiAutomation = function(setting, value) {
         if (setting !== 'autoExecute') return;
         localStorage.setItem(AI_STORAGE_KEYS.autoExecute, value);
-        QuickSiteAdmin.showToast(`Auto-execute ${value ? 'enabled' : 'disabled'}`, 'success');
+        QuickSiteAdmin.showToast(t(value
+            ? 'settings.ai.autoExecuteEnabled'
+            : 'settings.ai.autoExecuteDisabled'), 'success');
     };
     
     /**
@@ -124,32 +225,32 @@
                 else if (role === 'editor') badgeClass = 'info';
                 else badgeClass = 'muted';
                 
-                // Role descriptions
-                const roleDescriptions = {
-                    '*': 'Full system access including token and role management',
-                    'admin': 'Full access except token and role management',
-                    'developer': 'Build, deploy, and full content editing',
-                    'designer': 'Style editing plus content management',
-                    'editor': 'Content editing including structure, translations, assets',
-                    'viewer': 'Read-only access to view content and settings'
+                // Role descriptions, by the role name the API returns
+                const ROLE_KEYS = {
+                    '*': 'settings.permissions.role.all',
+                    'admin': 'settings.permissions.role.admin',
+                    'developer': 'settings.permissions.role.developer',
+                    'designer': 'settings.permissions.role.designer',
+                    'editor': 'settings.permissions.role.editor',
+                    'viewer': 'settings.permissions.role.viewer'
                 };
-                
-                container.innerHTML = renderDefinitionList([
-                    ['Your Role', `<span class="admin-badge admin-badge--${badgeClass}">${isSuperAdmin ? '⭐ Superadmin' : role}</span>`],
-                    ['Access Level', roleDescriptions[role] || 'Custom role'],
-                    ['Available Commands', isSuperAdmin ? `All (${commandCount} commands)` : commandCount + ' commands']
-                ]) + (!isSuperAdmin ? `
-                    <details style="margin-top: var(--space-md);">
-                        <summary class="admin-text-muted" style="cursor: pointer;">View your accessible commands</summary>
-                        <div style="margin-top: var(--space-sm); max-height: 200px; overflow-y: auto;">
-                            <div style="display: flex; flex-wrap: wrap; gap: var(--space-xs);">
-                                ${data.commands.map(cmd => `<code style="font-size: var(--font-size-xs);">${cmd}</code>`).join('')}
-                            </div>
-                        </div>
-                    </details>
-                    ` : '');
+
+                QSDom.clear(container);
+                container.appendChild(_renderDefinitionList([
+                    [t('settings.permissions.yourRole'), _renderBadge(
+                        isSuperAdmin ? t('settings.permissions.superadmin') : role, badgeClass)],
+                    [t('settings.permissions.accessLevel'), ROLE_KEYS[role]
+                        ? t(ROLE_KEYS[role])
+                        : t('settings.permissions.customRole')],
+                    [t('settings.permissions.availableCommands'), isSuperAdmin
+                        ? t('settings.permissions.allCommands', { count: commandCount })
+                        : t('settings.permissions.commandCount', { count: commandCount })]
+                ]));
+                if (!isSuperAdmin) {
+                    container.appendChild(_renderCommandList(data.commands || []));
+                }
             } else {
-                showMuted(container, 'Could not load permissions');
+                showMuted(container, t('settings.errors.permissionsFailed'));
             }
         } catch (error) {
             showError(container, error);
@@ -172,14 +273,14 @@
                 const totalCommands = info.total || Object.keys(info.commands || {}).length || 0;
                 const realBaseUrl = info.base_url || baseUrl;
                 
-                container.innerHTML = renderDefinitionList([
-                    ['Version', `<code>${version}</code>`],
-                    ['Total Commands', totalCommands],
-                    ['Base URL', `<code>${realBaseUrl}</code>`],
-                    ['Server Time', new Date().toLocaleString()]
-                ]);
+                _replace(container, _renderDefinitionList([
+                    [t('settings.sysInfo.version'), QSDom.el('code', { text: version })],
+                    [t('settings.sysInfo.totalCommands'), String(totalCommands)],
+                    [t('settings.sysInfo.baseUrl'), QSDom.el('code', { text: realBaseUrl })],
+                    [t('settings.sysInfo.serverTime'), new Date().toLocaleString()]
+                ]));
             } else {
-                showMuted(container, 'Could not load system info');
+                showMuted(container, t('settings.errors.sysInfoFailed'));
             }
         } catch (error) {
             showError(container, error);
@@ -215,7 +316,7 @@
         QuickSiteUtils.setPref('toastDuration',
             document.getElementById('pref-toast-duration')?.value || '4000');
 
-        QuickSiteAdmin.showToast('Preferences saved', 'success');
+        QuickSiteAdmin.showToast(t('settings.toast.preferencesSaved'), 'success');
     };
     
     // Initialize on DOM ready

@@ -16,6 +16,54 @@
 
     const STORAGE = window.QuickSiteStorageKeys;
 
+    /**
+     * Resolve one admin string by its FULL dot path, from the sub-trees
+     * ai-connections.php emits. A path that resolves to nothing returns THE
+     * PATH ITSELF, so an unset string is visible on screen.
+     *
+     * @param {string} path      e.g. 'aiConnections.empty'
+     * @param {Object} [params]  :name markers, as PHP's t() does
+     * @returns {string}
+     */
+    function t(path, params) {
+        let node = window.QS_AI_CONNECTIONS_I18N || {};
+        for (const part of String(path).split('.')) {
+            if (node === null || typeof node !== 'object' || !(part in node)) return path;
+            node = node[part];
+        }
+        if (typeof node !== 'string') return path;
+        let value = node;
+        if (params) {
+            for (const name of Object.keys(params)) {
+                value = value.split(':' + name).join(String(params[name]));
+            }
+        }
+        return value;
+    }
+
+    /**
+     * A provider logo, falling back to an emoji when the SVG is missing.
+     *
+     * The markup this replaces carried the fallback as an inline onerror that
+     * built a <span> from a JS string inside an HTML attribute inside a
+     * template literal — three nested quoting contexts, guarded by one text
+     * escaper. A listener needs none of them.
+     *
+     * @returns {HTMLElement} the <img>, which swaps itself for a <span>
+     */
+    function _renderLogo(logoId, emojiFallback, imgClass, emojiClass) {
+        const img = QSDom.el('img', {
+            src: window.QSAC_ASSET_BASE + '/images/providers/' + logoId + '.svg',
+            alt: ''
+        });
+        if (imgClass) img.className = imgClass;
+        img.addEventListener('error', function () {
+            const span = QSDom.el('span', { class: emojiClass, text: emojiFallback });
+            if (img.parentNode) img.parentNode.replaceChild(span, img);
+        });
+        return img;
+    }
+
     let current = null;            // wizard working draft (Connection partial)
     let probeAbort = null;
     let probeDebounce = null;
@@ -43,35 +91,49 @@
         if (!root) return;
         const store = window.QSConnectionsStore.loadStore();
         const conns = store.connections || [];
+        QSDom.clear(root);
         if (conns.length === 0) {
-            root.innerHTML = `
-                <div class="admin-empty-state" style="padding: var(--space-lg) 0; text-align:center;">
-                    <p class="admin-text-muted">No AI connection yet.</p>
-                    <button type="button" class="admin-btn admin-btn--primary" id="qsac-empty-add">+ Add your first connection</button>
-                </div>`;
-            const btn = document.getElementById('qsac-empty-add');
-            if (btn) btn.addEventListener('click', openWizard);
+            const addBtn = QSDom.el('button', {
+                type: 'button',
+                class: 'admin-btn admin-btn--primary',
+                id: 'qsac-empty-add',
+                text: t('aiConnections.emptyAdd'),
+                onclick: function () { openWizard(); }
+            });
+            root.appendChild(QSDom.el('div', {
+                class: 'admin-empty-state',
+                style: 'padding: var(--space-lg) 0; text-align:center;'
+            }, [
+                QSDom.el('p', { class: 'admin-text-muted', text: t('aiConnections.empty') }),
+                addBtn
+            ]));
             return;
         }
-        root.innerHTML = conns.map((c) => renderCard(c, store.defaultConnectionId === c.id)).join('');
+        conns.forEach((c) => {
+            root.appendChild(renderCard(c, store.defaultConnectionId === c.id));
+        });
 
         root.querySelectorAll('[data-qsac-action]').forEach((el) => {
             el.addEventListener('click', onCardAction);
         });
     }
 
+    /** One connection card. @returns {HTMLElement} */
     function renderCard(c, isDefault) {
         const star = isDefault ? '⭐' : '☆';
         const status = c.lastStatus;
-        const dot = statusDot(status);
         const label = c.providerType === 'openai-compatible' && c.baseUrl
             ? c.baseUrl
             : (window.QSProviderCatalog.get(c.providerType) || {}).name || c.providerType;
         const keyHint = c.key
-            ? '<span class="qsac-key-hint">' + maskKey(c.key) + '</span>'
-            : '<span class="qsac-key-hint qsac-key-hint--none">no key</span>';
+            ? QSDom.el('span', { class: 'qsac-key-hint', text: maskKey(c.key) })
+            : QSDom.el('span', {
+                class: 'qsac-key-hint qsac-key-hint--none',
+                text: t('aiConnections.noKey')
+            });
         const modelCount = (c.enabledModels || c.models || []).length;
-        const streamingTag = c.streaming ? 'streaming on' : 'streaming off';
+        const streamingTag = t(c.streaming
+            ? 'aiConnections.streamingOn' : 'aiConnections.streamingOff');
 
         // Pick a logo: cloud → providerType id; local → preset id (if known)
         // or 'custom' for openai-compatible without a preset.
@@ -83,48 +145,86 @@
             ? (logoId === 'ollama' ? '🦙' : logoId === 'lm-studio' ? '🎛️' : '⚙️')
             : emojiFor(c.providerType);
 
-        return `
-            <div class="qsac-card" data-conn-id="${esc(c.id)}">
-                <div class="qsac-card__head">
-                    <span class="qsac-card__logo" aria-hidden="true">
-                        <img src="/admin/assets/images/providers/${esc(logoId)}.svg" alt=""
-                             onerror="this.outerHTML='<span class=&quot;qsac-card__logo-emoji&quot;>${esc(emoji)}</span>'">
-                    </span>
-                    <span class="qsac-star" data-qsac-action="default" title="Set as default">${star}</span>
-                    <span class="qsac-name">${esc(c.name)}</span>
-                    <span class="qsac-status" data-qsac-action="test" title="Click to test now">${dot}</span>
-                </div>
-                <div class="qsac-card__meta">
-                    <span class="qsac-type qsac-type--${esc(c.type)}">${c.type === 'local' ? 'Local' : 'Cloud'}</span>
-                    <span> · ${esc(label)}</span>
-                    <span> · ${keyHint}</span>
-                    <span> · ${modelCount} model${modelCount === 1 ? '' : 's'}</span>
-                    <span> · ${streamingTag}</span>
-                </div>
-                <div class="qsac-card__actions">
-                    <button type="button" class="admin-btn admin-btn--secondary admin-btn--small" data-qsac-action="edit">Edit</button>
-                    <button type="button" class="admin-btn admin-btn--secondary admin-btn--small" data-qsac-action="default">Set default</button>
-                    <button type="button" class="admin-btn admin-btn--secondary admin-btn--small admin-btn--danger" data-qsac-action="delete">Delete</button>
-                </div>
-            </div>`;
+        return QSDom.el('div', { class: 'qsac-card', dataset: { connId: c.id } }, [
+            QSDom.el('div', { class: 'qsac-card__head' }, [
+                QSDom.el('span', { class: 'qsac-card__logo', 'aria-hidden': 'true' },
+                    [_renderLogo(logoId, emoji, '', 'qsac-card__logo-emoji')]),
+                QSDom.el('span', {
+                    class: 'qsac-star',
+                    'data-qsac-action': 'default',
+                    title: t('aiConnections.setDefaultTitle'),
+                    text: star
+                }),
+                QSDom.el('span', { class: 'qsac-name', text: c.name }),
+                QSDom.el('span', {
+                    class: 'qsac-status',
+                    'data-qsac-action': 'test',
+                    title: t('aiConnections.testTitle')
+                }, [statusDot(status)])
+            ]),
+            QSDom.el('div', { class: 'qsac-card__meta' }, [
+                QSDom.el('span', {
+                    class: 'qsac-type qsac-type--' + c.type,
+                    text: t(c.type === 'local' ? 'aiConnections.typeLocal' : 'aiConnections.typeCloud')
+                }),
+                QSDom.el('span', { text: ' · ' + label }),
+                QSDom.el('span', null, [' · ', keyHint]),
+                QSDom.el('span', {
+                    text: ' · ' + t(modelCount === 1
+                        ? 'aiConnections.modelCountOne'
+                        : 'aiConnections.modelCountMany', { count: modelCount })
+                }),
+                QSDom.el('span', { text: ' · ' + streamingTag })
+            ]),
+            QSDom.el('div', { class: 'qsac-card__actions' }, [
+                _renderCardAction('edit', t('aiConnections.edit')),
+                _renderCardAction('default', t('aiConnections.setDefault')),
+                _renderCardAction('delete', t('aiConnections.delete'), 'admin-btn--danger')
+            ])
+        ]);
     }
 
+    /** One card action button. @returns {HTMLElement} */
+    function _renderCardAction(action, label, extraClass) {
+        return QSDom.el('button', {
+            type: 'button',
+            class: 'admin-btn admin-btn--secondary admin-btn--small'
+                + (extraClass ? ' ' + extraClass : ''),
+            'data-qsac-action': action,
+            text: label
+        });
+    }
+
+    /** The connection's status dot. @returns {HTMLElement} */
     function statusDot(status) {
-        if (!status) return '<span class="qsac-dot qsac-dot--unknown" title="Never tested">◌</span>';
+        if (!status) {
+            return QSDom.el('span', {
+                class: 'qsac-dot qsac-dot--unknown',
+                title: t('aiConnections.neverTested'),
+                text: '◌'
+            });
+        }
         const ageMs = Date.now() - (status.at || 0);
         if (status.ok) {
             const cls = ageMs < 5 * 60 * 1000 ? 'qsac-dot--ok' : 'qsac-dot--stale';
-            const ago = formatAgo(ageMs);
-            return `<span class="qsac-dot ${cls}" title="OK (${ago})">●</span>`;
+            return QSDom.el('span', {
+                class: 'qsac-dot ' + cls,
+                title: t('aiConnections.statusOk', { ago: formatAgo(ageMs) }),
+                text: '●'
+            });
         }
-        return `<span class="qsac-dot qsac-dot--err" title="${esc(status.message || 'Failed')}">●</span>`;
+        return QSDom.el('span', {
+            class: 'qsac-dot qsac-dot--err',
+            title: status.message || t('aiConnections.statusFailed'),
+            text: '●'
+        });
     }
 
     function formatAgo(ms) {
-        if (ms < 1000) return 'just now';
-        if (ms < 60_000) return Math.round(ms / 1000) + 's ago';
-        if (ms < 3_600_000) return Math.round(ms / 60_000) + 'm ago';
-        return Math.round(ms / 3_600_000) + 'h ago';
+        if (ms < 1000) return t('aiConnections.justNow');
+        if (ms < 60_000) return t('aiConnections.secondsAgo', { count: Math.round(ms / 1000) });
+        if (ms < 3_600_000) return t('aiConnections.minutesAgo', { count: Math.round(ms / 60_000) });
+        return t('aiConnections.hoursAgo', { count: Math.round(ms / 3_600_000) });
     }
 
     function maskKey(key) {
@@ -146,7 +246,7 @@
             window.QSConnectionsStore.setDefault(id);
             renderList();
         } else if (action === 'delete') {
-            if (!window.confirm(`Delete connection "${conn.name}"?`)) return;
+            if (!window.confirm(t('aiConnections.confirmDelete', { name: conn.name }))) return;
             window.QSConnectionsStore.removeConnection(id);
             renderList();
         } else if (action === 'edit') {
@@ -157,8 +257,13 @@
     }
 
     async function inlineTest(conn) {
-        const card = document.querySelector(`.qsac-card[data-conn-id="${conn.id}"] .qsac-status`);
-        if (card) card.innerHTML = '<span class="qsac-dot qsac-dot--unknown">⏳</span>';
+        const card = document.querySelector(`.qsac-card[data-conn-id="${CSS.escape(conn.id)}"] .qsac-status`);
+        if (card) {
+            QSDom.clear(card);
+            card.appendChild(QSDom.el('span', {
+                class: 'qsac-dot qsac-dot--unknown', text: '⏳'
+            }));
+        }
         try {
             const r = await window.QSAiCall.test(conn);
             window.QSConnectionsStore.recordStatus(conn.id, { ok: r.ok, message: r.message });
@@ -212,7 +317,9 @@
         lastProbe = null;
         const modal = document.getElementById('qsac-modal');
         if (modal) modal.style.display = 'block';
-        document.getElementById('qsac-modal-title').textContent = existing ? 'Edit connection' : 'Add a connection';
+        document.getElementById('qsac-modal-title').textContent = t(existing
+            ? 'aiConnections.editConnection'
+            : 'aiConnections.modalTitle');
         if (existing) renderWizardForm();
         else renderWizardKindPicker();
     }
@@ -244,50 +351,62 @@
 
         const presets = (window.QSLocalPresets && window.QSLocalPresets.list()) || [];
 
-        body.innerHTML = `
-            <p>What kind of AI do you want to connect?</p>
+        const cloudRow = QSDom.el('div', { class: 'qsac-kinds' });
+        cloudKinds.forEach((k) => cloudRow.appendChild(kindTile({
+            kind: 'cloud', data: { provider: k.id },
+            logoId: k.id, name: k.name,
+            sub: t('aiConnections.kindsCloud'), emojiFallback: k.icon
+        })));
 
-            <h4 class="qsac-kinds-heading">Cloud · BYOK</h4>
-            <div class="qsac-kinds">
-                ${cloudKinds.map((k) => kindTile({
-                    kind: 'cloud', dataAttr: `data-provider="${esc(k.id)}"`,
-                    logoId: k.id, name: k.name, sub: 'Cloud · BYOK', emojiFallback: k.icon
-                })).join('')}
-            </div>
+        const localRow = QSDom.el('div', { class: 'qsac-kinds' });
+        presets.forEach((p) => localRow.appendChild(kindTile({
+            kind: 'local', data: { preset: p.id },
+            logoId: p.id, name: p.name,
+            sub: t('aiConnections.typeLocal'), emojiFallback: p.icon
+        })));
+        localRow.appendChild(kindTile({
+            kind: 'custom', data: null,
+            logoId: 'custom', name: t('aiConnections.kindCustom'),
+            sub: t('aiConnections.kindCustomSub'), emojiFallback: '⚙️'
+        }));
 
-            <h4 class="qsac-kinds-heading">Local · runs on your machine</h4>
-            <div class="qsac-kinds">
-                ${presets.map((p) => kindTile({
-                    kind: 'local', dataAttr: `data-preset="${esc(p.id)}"`,
-                    logoId: p.id, name: p.name, sub: 'Local', emojiFallback: p.icon
-                })).join('')}
-                ${kindTile({
-                    kind: 'custom', dataAttr: '',
-                    logoId: 'custom', name: 'Custom', sub: 'OpenAI-compatible endpoint', emojiFallback: '⚙️'
-                })}
-            </div>`;
+        QSDom.clear(body);
+        body.appendChild(QSDom.el('p', { text: t('aiConnections.kindQuestion') }));
+        body.appendChild(QSDom.el('h4', {
+            class: 'qsac-kinds-heading', text: t('aiConnections.kindsCloud')
+        }));
+        body.appendChild(cloudRow);
+        body.appendChild(QSDom.el('h4', {
+            class: 'qsac-kinds-heading', text: t('aiConnections.kindsLocal')
+        }));
+        body.appendChild(localRow);
 
-        footer.innerHTML = `<button type="button" class="admin-btn admin-btn--secondary" data-qsac-close>Cancel</button>`;
-        footer.querySelector('[data-qsac-close]').addEventListener('click', closeWizard);
+        QSDom.clear(footer);
+        footer.appendChild(QSDom.el('button', {
+            type: 'button',
+            class: 'admin-btn admin-btn--secondary',
+            'data-qsac-close': '',
+            text: t('common.cancel'),
+            onclick: closeWizard
+        }));
         body.querySelectorAll('[data-kind]').forEach((b) => b.addEventListener('click', onKindPick));
     }
 
-    function kindTile({ kind, dataAttr, logoId, name, sub, emojiFallback }) {
-        // <img> with onerror swap to emoji span — keeps the page working if a
-        // logo file is missing or 404s.
-        const safeName = esc(name);
-        const safeEmoji = esc(emojiFallback);
-        const safeLogo = esc(logoId);
-        return `
-            <button type="button" class="qsac-kind" data-kind="${esc(kind)}" ${dataAttr}>
-                <span class="qsac-kind__icon">
-                    <img src="/admin/assets/images/providers/${safeLogo}.svg" alt=""
-                         class="qsac-kind__logo"
-                         onerror="this.outerHTML='<span class=&quot;qsac-kind__emoji&quot;>${safeEmoji}</span>'">
-                </span>
-                <span class="qsac-kind__label">${safeName}</span>
-                <span class="qsac-kind__sub">${esc(sub)}</span>
-            </button>`;
+    /**
+     * One pickable "kind" tile in the wizard's first step.
+     * @returns {HTMLElement} one <button>
+     */
+    function kindTile({ kind, data, logoId, name, sub, emojiFallback }) {
+        const btn = QSDom.el('button', {
+            type: 'button', class: 'qsac-kind', 'data-kind': kind
+        }, [
+            QSDom.el('span', { class: 'qsac-kind__icon' },
+                [_renderLogo(logoId, emojiFallback, 'qsac-kind__logo', 'qsac-kind__emoji')]),
+            QSDom.el('span', { class: 'qsac-kind__label', text: name }),
+            QSDom.el('span', { class: 'qsac-kind__sub', text: sub })
+        ]);
+        if (data) Object.assign(btn.dataset, data);
+        return btn;
     }
 
     // Emoji fallbacks per provider id (used only if the SVG is missing).
@@ -336,7 +455,7 @@
             current = {
                 type: 'local',
                 providerType: 'openai-compatible',
-                name: 'Custom',
+                name: t('aiConnections.kindCustom'),
                 baseUrl: 'http://localhost:8000/v1',
                 streaming: true
             };
@@ -351,45 +470,106 @@
         const cat = window.QSProviderCatalog.get(current.providerType);
         const keyUrl = cat ? cat.keyUrl : null;
 
-        body.innerHTML = `
-            <div class="admin-form-group">
-                <label class="admin-label" for="qsac-name">Name</label>
-                <input type="text" id="qsac-name" class="admin-input" value="${esc(current.name || '')}" placeholder="My ${esc(cat ? cat.name : 'connection')}">
-            </div>
-            ${isLocal ? `
-            <div class="admin-form-group">
-                <label class="admin-label" for="qsac-baseurl">Base URL</label>
-                <input type="text" id="qsac-baseurl" class="admin-input admin-input--monospace" value="${esc(current.baseUrl || '')}" placeholder="http://localhost:11434/v1">
-                <p class="admin-hint">OpenAI-compatible chat-completions root (without <code>/chat/completions</code>).</p>
-            </div>` : ''}
-            <div class="admin-form-group">
-                <label class="admin-label" for="qsac-key">API key${isLocal ? ' (optional)' : ''}</label>
-                <div class="admin-input-group">
-                    <input type="password" id="qsac-key" class="admin-input admin-input--monospace" autocomplete="off" spellcheck="false" value="${esc(current.key || '')}" placeholder="${isLocal ? '(leave empty if not required)' : 'paste key'}">
-                    <button type="button" class="admin-btn admin-btn--icon" id="qsac-key-toggle" title="Show / hide">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
-                        </svg>
-                    </button>
-                </div>
-                ${keyUrl ? `<p class="admin-hint">Get a key → <a href="${esc(keyUrl)}" target="_blank" rel="noopener">${esc(keyUrl)}</a></p>` : ''}
-            </div>
-            <div class="admin-form-group">
-                <label class="admin-checkbox">
-                    <input type="checkbox" id="qsac-streaming" ${current.streaming !== false ? 'checked' : ''}>
-                    <span class="admin-checkbox__label">Streaming (recommended)</span>
-                </label>
-            </div>
-            <div id="qsac-probe" class="qsac-probe qsac-probe--idle">
-                <div class="qsac-probe__msg">Enter ${isLocal ? 'a base URL' : 'an API key'} to test the connection.</div>
-            </div>
-            ${isLocal && current._preset ? renderLocalCorsHint(current._preset) : ''}
-        `;
+        QSDom.clear(body);
 
-        footer.innerHTML = `
-            <button type="button" class="admin-btn admin-btn--secondary" id="qsac-back">${current._editing ? 'Cancel' : '← Back'}</button>
-            <button type="button" class="admin-btn admin-btn--primary" id="qsac-save" disabled>${current._editing ? 'Save changes' : 'Add connection'}</button>
-        `;
+        body.appendChild(QSDom.el('div', { class: 'admin-form-group' }, [
+            QSDom.el('label', {
+                class: 'admin-label', for: 'qsac-name', text: t('aiConnections.nameLabel')
+            }),
+            QSDom.el('input', {
+                type: 'text', id: 'qsac-name', class: 'admin-input',
+                value: current.name || '',
+                placeholder: t('aiConnections.namePlaceholder', {
+                    provider: cat ? cat.name : t('aiConnections.nameFallback')
+                })
+            })
+        ]));
+
+        if (isLocal) {
+            body.appendChild(QSDom.el('div', { class: 'admin-form-group' }, [
+                QSDom.el('label', {
+                    class: 'admin-label', for: 'qsac-baseurl',
+                    text: t('aiConnections.baseUrlLabel')
+                }),
+                QSDom.el('input', {
+                    type: 'text', id: 'qsac-baseurl',
+                    class: 'admin-input admin-input--monospace',
+                    value: current.baseUrl || '',
+                    placeholder: 'http://localhost:11434/v1'
+                }),
+                _renderPathHint('aiConnections.baseUrlHint', '/chat/completions')
+            ]));
+        }
+
+        const keyGroup = QSDom.el('div', { class: 'admin-form-group' }, [
+            QSDom.el('label', {
+                class: 'admin-label', for: 'qsac-key',
+                text: t(isLocal ? 'aiConnections.apiKeyLabelOptional' : 'aiConnections.apiKeyLabel')
+            }),
+            QSDom.el('div', { class: 'admin-input-group' }, [
+                QSDom.el('input', {
+                    type: 'password', id: 'qsac-key',
+                    class: 'admin-input admin-input--monospace',
+                    autocomplete: 'off', spellcheck: 'false',
+                    value: current.key || '',
+                    placeholder: t(isLocal
+                        ? 'aiConnections.keyPlaceholderLocal'
+                        : 'aiConnections.keyPlaceholderCloud')
+                }),
+                QSDom.el('button', {
+                    type: 'button', class: 'admin-btn admin-btn--icon',
+                    id: 'qsac-key-toggle', title: t('aiConnections.keyToggleTitle')
+                }, [QSDom.iconEl(QuickSiteUtils.ICON_PATHS.eye, 18)])
+            ])
+        ]);
+        if (keyUrl) {
+            keyGroup.appendChild(QSDom.el('p', { class: 'admin-hint' }, [
+                t('aiConnections.getKeyPrefix') + ' ',
+                QSDom.el('a', {
+                    href: keyUrl, target: '_blank', rel: 'noopener', text: keyUrl
+                })
+            ]));
+        }
+        body.appendChild(keyGroup);
+
+        const streamingCb = QSDom.el('input', { type: 'checkbox', id: 'qsac-streaming' });
+        streamingCb.checked = current.streaming !== false;
+        body.appendChild(QSDom.el('div', { class: 'admin-form-group' }, [
+            QSDom.el('label', { class: 'admin-checkbox' }, [
+                streamingCb,
+                QSDom.el('span', {
+                    class: 'admin-checkbox__label', text: t('aiConnections.streamingLabel')
+                })
+            ])
+        ]));
+
+        body.appendChild(QSDom.el('div', {
+            id: 'qsac-probe', class: 'qsac-probe qsac-probe--idle'
+        }, [
+            QSDom.el('div', {
+                class: 'qsac-probe__msg',
+                text: t(isLocal ? 'aiConnections.probeIdleLocal' : 'aiConnections.probeIdleCloud')
+            })
+        ]));
+
+        if (isLocal && current._preset) {
+            const hint = renderLocalCorsHint(current._preset);
+            if (hint) body.appendChild(hint);
+        }
+
+        QSDom.clear(footer);
+        footer.appendChild(QSDom.el('button', {
+            type: 'button', class: 'admin-btn admin-btn--secondary', id: 'qsac-back',
+            text: current._editing ? t('common.cancel') : t('aiConnections.back')
+        }));
+        const saveBtn = QSDom.el('button', {
+            type: 'button', class: 'admin-btn admin-btn--primary', id: 'qsac-save',
+            text: current._editing
+                ? t('aiConnections.saveChanges')
+                : t('aiConnections.addConnectionBtn')
+        });
+        saveBtn.disabled = true;
+        footer.appendChild(saveBtn);
         document.getElementById('qsac-back').addEventListener('click', () => {
             if (current._editing) closeWizard(); else renderWizardKindPicker();
         });
@@ -411,22 +591,42 @@
         if (baseEl) baseEl.addEventListener('input', () => { current.baseUrl = baseEl.value.trim(); scheduleProbe(); refreshSaveBtn(); });
         streamEl.addEventListener('change', () => { current.streaming = streamEl.checked; });
 
-        // Trigger initial probe if we already have what we need (edit mode).
-        if (current._editing) scheduleProbe(0);
+        // Probe at once whenever the form opens already holding what a probe
+        // needs: an edited connection, or a local preset whose base URL is
+        // pre-filled. Otherwise the model list stays empty until the field is
+        // edited, because only an input event schedules a probe.
+        if (current.type === 'local' ? current.baseUrl : current.key) scheduleProbe(0);
         refreshSaveBtn();
     }
 
+    /** The CORS advice for a local preset. @returns {HTMLElement|null} */
     function renderLocalCorsHint(presetId) {
         const preset = window.QSLocalPresets.get(presetId);
-        if (!preset || !preset.corsHint) return '';
+        if (!preset || !preset.corsHint) return null;
         const os = detectOS();
         const ins = preset.corsHint.instructions || {};
         const text = ins[os] || ins.all || ins.linux || '';
-        return `
-            <details class="qsac-cors-hint">
-                <summary>⚠️ ${esc(preset.corsHint.summary)} — show fix</summary>
-                <pre class="qsac-cors-cmd">${esc(text)}</pre>
-            </details>`;
+        return QSDom.el('details', { class: 'qsac-cors-hint' }, [
+            QSDom.el('summary', {
+                text: t('aiConnections.corsSummary', { summary: preset.corsHint.summary })
+            }),
+            QSDom.el('pre', { class: 'qsac-cors-cmd', text: text })
+        ]);
+    }
+
+    /**
+     * A hint sentence whose :path marker becomes a <code> element — the
+     * whole-sentence-key convention, so a translator gets one string rather
+     * than three fragments.
+     * @returns {HTMLElement} one <p class="admin-hint">
+     */
+    function _renderPathHint(key, code) {
+        const parts = t(key).split(':path');
+        return QSDom.el('p', { class: 'admin-hint' }, [
+            parts[0],
+            QSDom.el('code', { text: code }),
+            parts.slice(1).join(':path')
+        ]);
     }
 
     function detectOS() {
@@ -458,7 +658,9 @@
         if (probeAbort) probeAbort.abort();
         probeAbort = new AbortController();
 
-        setProbeUI('busy', current.type === 'local' ? 'Probing endpoint…' : 'Testing key…');
+        setProbeUI('busy', t(current.type === 'local'
+            ? 'aiConnections.probeLocal'
+            : 'aiConnections.probeCloud'));
         try {
             const r = await window.QSAiCall.test(current, probeAbort.signal);
             lastProbe = r;
@@ -468,14 +670,22 @@
                     if (!current.enabledModels || !current.enabledModels.length) current.enabledModels = r.models.slice();
                     if (!current.defaultModel) current.defaultModel = r.models[0];
                 }
-                setProbeUI('ok', `✅ Connected. ${r.models.length} model${r.models.length === 1 ? '' : 's'} found.`);
+                setProbeUI('ok', t(r.models.length === 1
+                    ? 'aiConnections.probeOkOne'
+                    : 'aiConnections.probeOkMany', { count: r.models.length }));
                 renderModelPicker(r.models);
             } else {
-                setProbeUI('err', `❌ ${r.message || 'Failed'}` + (r.category ? ` [${r.category}]` : ''));
+                setProbeUI('err', r.category
+                    ? t('aiConnections.probeErrCategory', {
+                        message: r.message || t('aiConnections.failed'),
+                        category: r.category })
+                    : t('aiConnections.probeErr', {
+                        message: r.message || t('aiConnections.failed') }));
             }
         } catch (e) {
             if (e && e.name === 'AbortError') return;
-            setProbeUI('err', '❌ ' + (e.message || 'Test failed'));
+            setProbeUI('err', t('aiConnections.probeErr', {
+                message: e.message || t('aiConnections.testFailed') }));
         }
     }
 
@@ -483,33 +693,54 @@
         const el = document.getElementById('qsac-probe');
         if (!el) return;
         el.className = 'qsac-probe qsac-probe--' + state;
-        el.innerHTML = `<div class="qsac-probe__msg">${esc(msg)}</div><div id="qsac-probe-models"></div>`;
+        QSDom.clear(el);
+        el.appendChild(QSDom.el('div', { class: 'qsac-probe__msg', text: msg }));
+        el.appendChild(QSDom.el('div', { id: 'qsac-probe-models' }));
     }
 
     function renderModelPicker(models) {
         const slot = document.getElementById('qsac-probe-models');
         if (!slot || !models || !models.length) return;
         const enabled = new Set(current.enabledModels || models);
-        slot.innerHTML = `
-            <div class="qsac-models">
-                <div class="qsac-models__head">
-                    <span>Enabled models</span>
-                    <span><a href="#" data-qsac-models="all">all</a> · <a href="#" data-qsac-models="none">none</a></span>
-                </div>
-                <div class="qsac-models__list">
-                    ${models.map((m) => `
-                        <label class="qsac-model">
-                            <input type="checkbox" data-model="${esc(m)}" ${enabled.has(m) ? 'checked' : ''}>
-                            <span>${esc(m)}</span>
-                        </label>`).join('')}
-                </div>
-                <div class="qsac-models__default">
-                    Default model:
-                    <select id="qsac-default-model">
-                        ${models.map((m) => `<option value="${esc(m)}" ${m === current.defaultModel ? 'selected' : ''}>${esc(m)}</option>`).join('')}
-                    </select>
-                </div>
-            </div>`;
+
+        const list = QSDom.el('div', { class: 'qsac-models__list' });
+        models.forEach((m) => {
+            const cb = QSDom.el('input', { type: 'checkbox', dataset: { model: m } });
+            cb.checked = enabled.has(m);
+            list.appendChild(QSDom.el('label', { class: 'qsac-model' }, [
+                cb, QSDom.el('span', { text: m })
+            ]));
+        });
+
+        const select = QSDom.el('select', { id: 'qsac-default-model' });
+        models.forEach((m) => {
+            const opt = document.createElement('option');
+            opt.value = m;
+            opt.textContent = m;
+            if (m === current.defaultModel) opt.selected = true;
+            select.appendChild(opt);
+        });
+
+        QSDom.clear(slot);
+        slot.appendChild(QSDom.el('div', { class: 'qsac-models' }, [
+            QSDom.el('div', { class: 'qsac-models__head' }, [
+                QSDom.el('span', { text: t('aiConnections.enabledModels') }),
+                QSDom.el('span', null, [
+                    QSDom.el('a', {
+                        href: '#', 'data-qsac-models': 'all', text: t('aiConnections.selectAll')
+                    }),
+                    ' · ',
+                    QSDom.el('a', {
+                        href: '#', 'data-qsac-models': 'none', text: t('aiConnections.selectNone')
+                    })
+                ])
+            ]),
+            list,
+            QSDom.el('div', { class: 'qsac-models__default' }, [
+                t('aiConnections.defaultModel') + ' ',
+                select
+            ])
+        ]));
         slot.querySelectorAll('[data-model]').forEach((cb) => {
             cb.addEventListener('change', () => {
                 const set = new Set(current.enabledModels || []);
@@ -553,11 +784,4 @@
         renderList();
     }
 
-    // ---------- utils ----------
-
-    function esc(s) {
-        return String(s == null ? '' : s)
-            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-    }
 })();

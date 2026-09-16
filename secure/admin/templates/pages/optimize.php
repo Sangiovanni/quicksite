@@ -30,6 +30,13 @@ $libFiles = [
 ];
 
 $libReady = file_exists($libPath . '/css-parser.js');
+
+// The sub-trees optimize.js renders from, verbatim and under the same dot
+// paths PHP uses, so the JS asks for the path PHP would.
+$qsOptimizeI18n = [];
+foreach (['optimize', 'common'] as $qsSubtree) {
+    $qsOptimizeI18n[$qsSubtree] = AdminTranslation::getInstance()->getRaw($qsSubtree) ?: new stdClass();
+}
 ?>
 
 <?php if ($libReady): ?>
@@ -46,6 +53,9 @@ $libReady = file_exists($libPath . '/css-parser.js');
     <?php endforeach; ?>
 <?php endif; ?>
 
+<script>
+window.QS_OPTIMIZE_I18N = <?= json_encode($qsOptimizeI18n, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+</script>
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/optimize.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/optimize.js') ?>"></script>
 
 <div class="optimize-page" data-lib-ready="<?= $libReady ? 'true' : 'false' ?>">

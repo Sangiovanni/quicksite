@@ -55,13 +55,12 @@ $currentProject = $isLoginPage ? null : $router->getCurrentProject();   // the p
 // cookie's path is '/'. Nothing extra is emitted here.
 $myProjectIds = [];
 // Does THIS account see operator notices? (secure/management/config/operator.php,
-// written at first run — §2.6.) A DISPLAY PREFERENCE AND NOTHING ELSE: it gates
+// written at first run.) A DISPLAY PREFERENCE AND NOTHING ELSE: it gates
 // whether the update banner renders, and no other decision anywhere reads it.
-// The update check keeps the permissions it always had (any authenticated caller),
-// so this neither grants nor withholds any capability — which is what stops it
-// becoming the installation-wide principal beta.10 deliberately removed. beta.11 S6
-// moved it off the command surface to /admin/api's update-check arm; that changed
-// where it lives, not who may call it.
+// The update check (/admin/api's update-check arm) answers any authenticated
+// caller, so this neither grants nor withholds any capability — which is what
+// keeps it from becoming an installation-wide principal, a role the authority
+// model does not have.
 // DEFAULT-ON-ABSENT: qs_operator_ids() reads a missing or malformed file as
 // "nobody", never "everybody".
 $isOperator = false;
@@ -271,7 +270,7 @@ $langNames = [
                 <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                 </svg>
-                <span>Assets</span>
+                <span><?= __admin('nav.assets') ?></span>
             </a>
             
             <!-- Sitemap - Top-level tab -->
@@ -284,15 +283,14 @@ $langNames = [
                 <span><?= __admin('nav.sitemap') ?></span>
             </a>
 
-            <!-- Authentication - Top-level tab (beta.9 A1 Slice 8) -->
-            <!-- Future home for magic-link config, role management, etc.; today links straight to the OAuth providers page since it's the only auth surface so far. -->
+            <!-- Authentication - Top-level tab. Links to the OAuth providers page, the panel's only authentication surface. -->
             <a href="<?= $router->url('oauth-providers') ?>"
                class="admin-nav__link<?= $currentPage === 'oauth-providers' ? ' admin-nav__link--active' : '' ?>"
                data-requires-command="listOAuthProviders">
                 <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
                 </svg>
-                <span>Authentication</span>
+                <span><?= __admin('nav.authentication') ?></span>
             </a>
 
             <!-- Members Group (C8 8.3c) — My Memberships (any authenticated user) + Project Members
@@ -342,7 +340,7 @@ $langNames = [
                     <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/>
                     </svg>
-                    <span>Compliance</span>
+                    <span><?= __admin('nav.compliance') ?></span>
                     <svg class="admin-nav__group-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="6 9 12 15 18 9"/>
                     </svg>
@@ -354,7 +352,7 @@ $langNames = [
                         <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/>
                         </svg>
-                        <span>Storage</span>
+                        <span><?= __admin('nav.storage') ?></span>
                     </a>
                     <a href="<?= $router->url('privacy') ?>"
                        class="admin-nav__link<?= $currentPage === 'privacy' ? ' admin-nav__link--active' : '' ?>"
@@ -362,7 +360,7 @@ $langNames = [
                         <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/><path d="M9 12l2 2 4-4"/>
                         </svg>
-                        <span>Privacy</span>
+                        <span><?= __admin('nav.privacy') ?></span>
                     </a>
                 </div>
             </div>
@@ -522,57 +520,9 @@ $langNames = [
         </div>
     </header>
     <?php endif; ?>
-    
-    <?php
-    // ================================================================
-    // Security warning: detect the shipped default/placeholder ACCOUNT
-    // (C5b — credentials are users.php email+password now; the example
-    // registry ships a 'usr_CHANGE_ME…' user with a documented default
-    // password). Shows as long as any such account exists.
-    // ================================================================
-    $hasDefaultAccount = false;
-    $usingDefaultAccount = false;
-    if (!$isLoginPage) {
-        require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
-        $__warnAuth = qs_session_auth();
-        $__warnUserId = !empty($__warnAuth['valid']) ? ($__warnAuth['userId'] ?? null) : null;
-        foreach (loadUsersConfig()['users'] ?? [] as $__uid => $__u) {
-            if (is_string($__uid) && stripos($__uid, 'CHANGE_ME') !== false) {
-                $hasDefaultAccount = true;
-                if ($__uid === $__warnUserId) {
-                    $usingDefaultAccount = true;
-                }
-            }
-        }
-    }
-    ?>
-    <?php if (!$isLoginPage && $hasDefaultAccount): ?>
-    <div class="admin-security-warning" id="security-warning">
-        <div class="admin-security-warning__content">
-            <svg class="admin-security-warning__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0-3.42 0z"/>
-                <line x1="12" y1="9" x2="12" y2="13"/>
-                <line x1="12" y1="17" x2="12.01" y2="17"/>
-            </svg>
-            <span>
-                <?php if ($usingDefaultAccount): ?>
-                <strong>Security:</strong> You are signed in as the shipped default account
-                (its password is public). Edit <code>secure/management/config/users.php</code>:
-                set a fresh <code>password_hash</code> (<code>php -r "echo password_hash('new-password', PASSWORD_DEFAULT);"</code>)
-                and replace the <code>usr_CHANGE_ME…</code> id before deploying.
-                <?php else: ?>
-                <strong>Security:</strong> The shipped default account (<code>usr_CHANGE_ME…</code>)
-                still exists in <code>users.php</code>. Remove it or change its password
-                before deploying to production.
-                <?php endif; ?>
-            </span>
-            <button type="button" class="admin-security-warning__dismiss" onclick="document.getElementById('security-warning').remove()" aria-label="Dismiss">&times;</button>
-        </div>
-    </div>
-    <?php endif; ?>
 
     <?php if ($isOperator): ?>
-    <!-- Operator update notice (§2.6). Rendered EMPTY and filled by
+    <!-- Operator update notice. Rendered EMPTY and filled by
          js/core/update-notice.js, which is loaded only on this branch: checking
          for an update is a live network call to GitHub, and doing it inline
          would make every panel page wait on a third party. An account that is
@@ -637,7 +587,7 @@ $langNames = [
             // Operator notices — a DISPLAY flag, never an authorization input.
             // No version is emitted here: the notice gets both versions from the
             // update-check arm's own response, and putting the engine version into
-            // every account's page is the fingerprinting §2.6 objects to.
+            // every account's page would let any account fingerprint the install.
             isOperator: <?= $isOperator ? 'true' : 'false' ?>,
             defaultLang: '<?= CONFIG['LANGUAGE_DEFAULT'] ?? 'en' ?>',
             multilingual: <?= (CONFIG['MULTILINGUAL_SUPPORT'] ?? false) ? 'true' : 'false' ?>,
@@ -650,7 +600,14 @@ $langNames = [
                     execute: '<?= __adminJs('common.execute') ?>',
                     copy: '<?= __adminJs('common.copy') ?>',
                     close: '<?= __adminJs('common.close') ?>',
-                    validate: '<?= __adminJs('common.validate') ?>'
+                    validate: '<?= __adminJs('common.validate') ?>',
+                    // The confirm dialog and the clipboard toast in
+                    // js/core/utils.js are panel-wide chrome, so their default
+                    // labels ship on every page like admin.js's do.
+                    cancel: '<?= __adminJs('common.cancel') ?>',
+                    confirm: '<?= __adminJs('common.confirm') ?>',
+                    confirmAction: '<?= __adminJs('common.confirmAction') ?>',
+                    copyFailed: '<?= __adminJs('common.copyFailed') ?>'
                 },
                 dashboard: {
                     columns: {
@@ -710,12 +667,18 @@ $langNames = [
                     failedMsg: '<?= __adminJs('commands.failedMsg') ?>',
                     errorPrefix: '<?= __adminJs('commands.errorPrefix') ?>',
                     downloadedPrefix: '<?= __adminJs('commands.downloadedPrefix') ?>',
+                    responseCopied: '<?= __adminJs('commands.responseCopied') ?>',
+                    selectPlaceholder: '<?= __adminJs('commands.selectPlaceholder') ?>',
                     confirmDestructive: {
                         title: '<?= __adminJs('commands.confirmDestructive.title') ?>',
                         message: '<?= __adminJs('commands.confirmDestructive.message') ?>'
                     },
                     jsonEditor: {
-                        format: '<?= __adminJs('commands.jsonEditor.format') ?>'
+                        format: '<?= __adminJs('commands.jsonEditor.format') ?>',
+                        valid: '<?= __adminJs('commands.jsonEditor.valid') ?>',
+                        invalid: '<?= __adminJs('commands.jsonEditor.invalid') ?>',
+                        invalidShort: '<?= __adminJs('commands.jsonEditor.invalidShort') ?>',
+                        empty: '<?= __adminJs('commands.jsonEditor.empty') ?>'
                     }
                 },
                 shortcuts: {
@@ -798,7 +761,7 @@ $langNames = [
     <script src="<?= $versionedAsset('/admin.js') ?>"></script>
 
     <?php if ($isOperator): ?>
-    <!-- Operator update notice (§2.6) — emitted ONLY for an account named in
+    <!-- Operator update notice — emitted ONLY for an account named in
          operator.php, so a non-operator never downloads it at all. After
          js/core/api.js, which is where QuickSiteAPI.fetchHelper comes from. -->
     <script src="<?= $versionedAsset('/js/core/update-notice.js') ?>"></script>

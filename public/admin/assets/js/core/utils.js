@@ -172,16 +172,50 @@ window.QuickSiteUtils = (function() {
     // Toast Notifications
     // ============================================
 
-    const TOAST_ICONS = {
-        success: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
-        error: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
-        warning: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
-        info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>'
+    /**
+     * The two toast icons that exist only here, as INNER <svg> markup — the
+     * shape ICON_PATHS uses and QSDom.iconEl consumes. `warning` and `info`
+     * are not repeated: toastIconMarkup() reads them from ICON_PATHS.
+     */
+    const TOAST_ICONS_OWN = {
+        success: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
+        error: '<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>'
     };
 
     /**
+     * Inner markup for a toast type. Resolved when a toast is shown rather
+     * than at module evaluation, because ICON_PATHS is declared further down
+     * this file and a const cannot be read before its declaration runs.
+     * Anything unrecognised falls back to the info icon, as it always has.
+     */
+    function toastIconMarkup(type) {
+        if (TOAST_ICONS_OWN[type]) return TOAST_ICONS_OWN[type];
+        if (type === 'warning') return ICON_PATHS.warning;
+        return ICON_PATHS.info;
+    }
+
+    /**
+     * One string from the `common` sub-tree layout.php mirrors into
+     * QUICKSITE_CONFIG, for the panel-wide chrome built in this file.
+     *
+     * A name that resolves to nothing returns the FULL dot path. An unset
+     * string has to be visible on screen and findable by a scan, which an
+     * English fallback here would hide.
+     *
+     * @param {string} name  a leaf of `common`, e.g. 'cancel'
+     * @returns {string}
+     */
+    function tCommon(name) {
+        const value = (window.QUICKSITE_CONFIG
+            && window.QUICKSITE_CONFIG.translations
+            && window.QUICKSITE_CONFIG.translations.common
+            || {})[name];
+        return typeof value === 'string' && value !== '' ? value : 'common.' + name;
+    }
+
+    /**
      * Show a toast notification
-     * 
+     *
      * @param {string} message - Message to display
      * @param {string} [type='info'] - Toast type: success, error, warning, info
      * @param {number|null} [duration=null] - Duration in ms (null = use preference)
@@ -208,12 +242,18 @@ window.QuickSiteUtils = (function() {
         // Create toast element
         const toast = document.createElement('div');
         toast.className = `admin-toast admin-toast--${type}`;
-        
-        toast.innerHTML = `
-            <span class="admin-toast__icon">${TOAST_ICONS[type] || TOAST_ICONS.info}</span>
-            <span class="admin-toast__message">${escapeHtml(message)}</span>
-            <button class="admin-toast__close" onclick="this.parentElement.remove()">×</button>
-        `;
+
+        const icon = QSDom.el('span', { class: 'admin-toast__icon' });
+        // size 0: the toast icon is sized by CSS, as the markup here always was.
+        const iconSvg = QSDom.iconEl(toastIconMarkup(type), 0);
+        if (iconSvg) icon.appendChild(iconSvg);
+        toast.appendChild(icon);
+        toast.appendChild(QSDom.el('span', { class: 'admin-toast__message', text: message }));
+        toast.appendChild(QSDom.el('button', {
+            class: 'admin-toast__close',
+            text: '×',
+            onclick: function () { toast.remove(); }
+        }));
 
         container.appendChild(toast);
 
@@ -262,27 +302,32 @@ window.QuickSiteUtils = (function() {
             
             const modal = document.createElement('div');
             modal.className = 'admin-modal-dialog admin-modal-dialog--confirm';
-            modal.innerHTML = `
-                <div class="admin-modal-dialog__content">
-                    <div class="admin-modal-dialog__icon admin-modal-dialog__icon--${options.type || 'warning'}">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                            <line x1="12" y1="9" x2="12" y2="13"/>
-                            <line x1="12" y1="17" x2="12.01" y2="17"/>
-                        </svg>
-                    </div>
-                    <h3 class="admin-modal-dialog__title">${options.title || 'Confirm Action'}</h3>
-                    <p class="admin-modal-dialog__message">${escapeHtml(message)}</p>
-                    <div class="admin-modal-dialog__actions">
-                        <button class="admin-btn admin-btn--secondary admin-modal-dialog__cancel">
-                            ${options.cancelText || 'Cancel'}
-                        </button>
-                        <button class="admin-btn admin-btn--${options.confirmClass || 'primary'} admin-modal-dialog__confirm">
-                            ${options.confirmText || 'Confirm'}
-                        </button>
-                    </div>
-                </div>
-            `;
+            const iconBox = QSDom.el('div', {
+                class: 'admin-modal-dialog__icon admin-modal-dialog__icon--' + (options.type || 'warning')
+            });
+            // size 0: sized by CSS, as this dialog's inline <svg> always was.
+            const warnIcon = QSDom.iconEl(ICON_PATHS.warning, 0);
+            if (warnIcon) iconBox.appendChild(warnIcon);
+
+            modal.appendChild(QSDom.el('div', { class: 'admin-modal-dialog__content' }, [
+                iconBox,
+                QSDom.el('h3', {
+                    class: 'admin-modal-dialog__title',
+                    text: options.title || tCommon('confirmAction')
+                }),
+                QSDom.el('p', { class: 'admin-modal-dialog__message', text: message }),
+                QSDom.el('div', { class: 'admin-modal-dialog__actions' }, [
+                    QSDom.el('button', {
+                        class: 'admin-btn admin-btn--secondary admin-modal-dialog__cancel',
+                        text: options.cancelText || tCommon('cancel')
+                    }),
+                    QSDom.el('button', {
+                        class: 'admin-btn admin-btn--' + (options.confirmClass || 'primary')
+                            + ' admin-modal-dialog__confirm',
+                        text: options.confirmText || tCommon('confirm')
+                    })
+                ])
+            ]));
 
             overlay.appendChild(modal);
             document.body.appendChild(overlay);
@@ -310,21 +355,6 @@ window.QuickSiteUtils = (function() {
                 }
             };
             document.addEventListener('keydown', escHandler);
-        });
-    }
-
-    /**
-     * Shorthand for delete confirmation
-     * 
-     * @param {string} itemName - Name of item being deleted
-     * @returns {Promise<boolean>} True if confirmed
-     */
-    async function confirmDelete(itemName) {
-        return confirm(`Are you sure you want to delete "${itemName}"? This action cannot be undone.`, {
-            title: 'Confirm Deletion',
-            type: 'danger',
-            confirmText: 'Delete',
-            confirmClass: 'danger'
         });
     }
 
@@ -375,7 +405,7 @@ window.QuickSiteUtils = (function() {
             showToast(successMessage, 'success', 2000);
             return true;
         } else {
-            showToast('Failed to copy to clipboard', 'error');
+            showToast(tCommon('copyFailed'), 'error');
             return false;
         }
     }
@@ -476,62 +506,6 @@ window.QuickSiteUtils = (function() {
         return `<span class="admin-spinner"${size ? ` style="width:${size}px;height:${size}px;"` : ''}></span>`;
     }
 
-    /**
-     * Render a loading indicator with optional label text
-     * @param {string} text - Label shown beside the spinner
-     * @returns {string} HTML string for a loading block
-     */
-    function htmlLoading(text) {
-        return `<div class="admin-loading">${htmlSpinner()} ${text}</div>`;
-    }
-
-    /**
-     * Render an HTTP method badge (GET, POST, PUT, DELETE, …)
-     * @param {string} method - HTTP method string
-     * @returns {string} HTML string for a styled method badge
-     */
-    function htmlMethodBadge(method) {
-        return `<span class="badge badge--${escapeHtml(method.toLowerCase())}">${escapeHtml(method)}</span>`;
-    }
-
-    /**
-     * Render a generic status badge
-     * @param {string} text - Badge label
-     * @param {string} [type='default'] - Visual variant class suffix (e.g. 'success', 'danger')
-     * @returns {string} HTML string for the badge
-     */
-    function htmlStatusBadge(text, type) {
-        return `<span class="admin-badge admin-badge--${type || 'default'}">${escapeHtml(text)}</span>`;
-    }
-
-    /**
-     * Render an inline alert message box
-     * @param {string} message - Alert text
-     * @param {string} [type='error'] - Visual variant class suffix (e.g. 'error', 'warning', 'info')
-     * @returns {string} HTML string for the alert
-     */
-    function htmlAlert(message, type) {
-        return `<div class="admin-alert admin-alert--${type || 'error'}">${escapeHtml(message)}</div>`;
-    }
-
-    /**
-     * Render an empty-state placeholder block
-     * @param {string|null} icon - SVG icon HTML or null to omit
-     * @param {string|null} title - Heading text or null to omit
-     * @param {string|null} desc - Description text or null to omit
-     * @param {boolean} [compact=false] - Use compact layout variant
-     * @returns {string} HTML string for the empty-state element
-     */
-    function htmlEmptyState(icon, title, desc, compact) {
-        const cls = compact ? 'admin-empty admin-empty--compact' : 'admin-empty';
-        let html = `<div class="${cls}">`;
-        if (icon) html += `<div class="admin-empty__icon">${icon}</div>`;
-        if (title) html += `<h3 class="admin-empty__title">${escapeHtml(title)}</h3>`;
-        if (desc) html += `<p class="admin-empty__desc">${escapeHtml(desc)}</p>`;
-        html += '</div>';
-        return html;
-    }
-
     // ============================================
     // Initialize on Load
     // ============================================
@@ -565,7 +539,6 @@ window.QuickSiteUtils = (function() {
         
         // Confirmation Dialogs
         confirm,
-        confirmDelete,
         
         // Clipboard
         copyToClipboard,
@@ -606,12 +579,7 @@ window.QuickSiteUtils = (function() {
         iconEyeOff,
 
         // HTML Fragment Helpers
-        htmlSpinner,
-        htmlLoading,
-        htmlMethodBadge,
-        htmlStatusBadge,
-        htmlAlert,
-        htmlEmptyState
+        htmlSpinner
     };
 
 })();

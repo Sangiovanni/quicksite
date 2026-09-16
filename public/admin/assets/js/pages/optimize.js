@@ -23,16 +23,37 @@
     // Analyzers that carry a review-only warning (not auto-applied)
     const REVIEW_ONLY = new Set(['near-duplicates', 'fuzzy-values']);
 
-    // Human-readable labels (populated from i18n data attributes if available)
-    const ANALYZER_LABELS = {
-        'empty-rules':     'Empty Rules',
-        'color-normalize': 'Color Normalize',
-        'duplicates':      'Duplicates',
-        'media-queries':   'Media Queries',
-        'fuzzy-values':    'Fuzzy Values',
-        'near-duplicates': 'Near-duplicates',
-        'design-tokens':   'Design Tokens',
-    };
+    /**
+     * Resolve one admin string by its FULL dot path, from the sub-trees
+     * optimize.php emits. A path that resolves to nothing returns THE PATH
+     * ITSELF, so an unset string shows on screen instead of English.
+     *
+     * @param {string} path      e.g. 'optimize.cssRefiner.selectAll'
+     * @param {Object} [params]  :name markers, as PHP's t() does
+     * @returns {string}
+     */
+    function t(path, params) {
+        let node = window.QS_OPTIMIZE_I18N || {};
+        for (const part of String(path).split('.')) {
+            if (node === null || typeof node !== 'object' || !(part in node)) return path;
+            node = node[part];
+        }
+        if (typeof node !== 'string') return path;
+        let value = node;
+        if (params) {
+            for (const name of Object.keys(params)) {
+                value = value.split(':' + name).join(String(params[name]));
+            }
+        }
+        return value;
+    }
+
+    /** Human-readable label for an analyzer id. */
+    function analyzerLabel(analyzerId) {
+        const key = 'optimize.cssRefiner.analyzers.' + analyzerId;
+        const label = t(key);
+        return label === key ? analyzerId : label;
+    }
 
     // ── State ────────────────────────────────────────────────────────────────
 
@@ -93,28 +114,28 @@
 
     async function loadStyles() {
         const res = await QuickSiteAPI.request('getStyles', 'GET');
-        if (!res.ok) throw new Error('getStyles failed: ' + (res.data?.error || res.status));
+        if (!res.ok) throw new Error(t('optimize.cssRefiner.errGetStyles', { error: res.data?.error || res.status }));
         const content = res.data?.data?.content;
-        if (!content && content !== '') throw new Error('getStyles returned no content');
+        if (!content && content !== '') throw new Error(t('optimize.cssRefiner.errGetStylesEmpty'));
         return content;
     }
 
     async function saveStyles(css) {
         const res = await QuickSiteAPI.request('editStyles', 'POST', { content: css });
-        if (!res.ok) throw new Error('editStyles failed: ' + (res.data?.error || res.status));
+        if (!res.ok) throw new Error(t('optimize.cssRefiner.errEditStyles', { error: res.data?.error || res.status }));
         return res.data;
     }
 
     async function saveRootVariable(name, value) {
         const res = await QuickSiteAPI.request('setRootVariables', 'POST', { variables: { [name]: value } });
-        if (!res.ok) throw new Error('setRootVariables failed for ' + name + ': ' + (res.data?.error || res.status));
+        if (!res.ok) throw new Error(t('optimize.cssRefiner.errSetRootVariables', { name: name, error: res.data?.error || res.status }));
         return res.data;
     }
 
     // ── Analysis ──────────────────────────────────────────────────────────────
 
     async function runFullAnalysis() {
-        setStatus('loading', 'Analyzing…');
+        setStatus('loading', t('optimize.cssRefiner.statusAnalyzing'));
         _btnAnalyze.disabled = true;
         _btnAutoRefine.disabled = true;
 
@@ -123,10 +144,12 @@
             _workingCss = _rawCss;
             _results = analyze(_workingCss, null);
             renderResults(_results);
-            setStatus('ok', `${totalSuggestions(_results)} suggestions`);
+            setStatus('ok', t('optimize.cssRefiner.statusSuggestions',
+                { count: totalSuggestions(_results) }));
             _btnReset.style.display = '';
         } catch (err) {
-            setStatus('error', 'Analysis failed: ' + err.message);
+            setStatus('error', t('optimize.cssRefiner.statusAnalysisFailed',
+                { message: err.message }));
             console.error('[Optimize]', err);
         } finally {
             _btnAnalyze.disabled = false;
@@ -168,7 +191,7 @@
     // ── Auto-Refine Safe ──────────────────────────────────────────────────────
 
     async function runAutoRefine() {
-        setStatus('loading', 'Preparing…');
+        setStatus('loading', t('optimize.cssRefiner.statusPreparing'));
         _btnAnalyze.disabled = true;
         _btnAutoRefine.disabled = true;
 
@@ -178,14 +201,14 @@
             const safeResults = analyze(_workingCss, SAFE_ANALYZERS);
 
             if (totalSuggestions(safeResults) === 0) {
-                setStatus('ok', 'No safe changes needed — CSS looks clean!');
+                setStatus('ok', t('optimize.cssRefiner.statusNoSafeChanges'));
                 return;
             }
 
             _autoRefinePending = safeResults;
             showAutoRefineModal(safeResults);
         } catch (err) {
-            setStatus('error', 'Failed: ' + err.message);
+            setStatus('error', t('optimize.cssRefiner.statusFailed', { message: err.message }));
         } finally {
             _btnAnalyze.disabled = false;
             _btnAutoRefine.disabled = false;
@@ -197,7 +220,7 @@
         const pendingResults = _autoRefinePending;
         _modal.style.display = 'none';
         _autoRefinePending = null;
-        setStatus('loading', 'Applying…');
+        setStatus('loading', t('optimize.cssRefiner.statusApplying'));
 
         try {
             const applicableSuggestions = pendingResults
@@ -206,9 +229,11 @@
             const { edits: allEdits, dropped } = collectNonOverlappingEdits(applicableSuggestions);
 
             if (!allEdits.length) {
-                setStatus('ok', 'No safe non-overlapping changes were available to apply.');
+                setStatus('ok', t('optimize.cssRefiner.statusNoNonOverlapping'));
                 if (dropped > 0) {
-                    showToast(`${dropped} conflicting change${dropped !== 1 ? 's were' : ' was'} skipped.`, 'warning');
+                    showToast(t(dropped !== 1
+                        ? 'optimize.cssRefiner.toastSkippedMany'
+                        : 'optimize.cssRefiner.toastSkippedOne', { count: dropped }), 'warning');
                 }
                 return;
             }
@@ -222,14 +247,18 @@
             _results = analyze(_workingCss, null);
             renderResults(_results);
             const remaining = totalSuggestions(_results);
-            setStatus('ok', `Applied. ${remaining} suggestion${remaining !== 1 ? 's' : ''} remaining.`);
+            setStatus('ok', t(remaining !== 1
+                ? 'optimize.cssRefiner.statusAppliedMany'
+                : 'optimize.cssRefiner.statusAppliedOne', { count: remaining }));
             if (dropped > 0) {
-                showToast(`${dropped} conflicting safe change${dropped !== 1 ? 's were' : ' was'} skipped.`, 'warning');
+                showToast(t(dropped !== 1
+                        ? 'optimize.cssRefiner.toastSkippedSafeMany'
+                        : 'optimize.cssRefiner.toastSkippedSafeOne', { count: dropped }), 'warning');
             }
-            showToast('Auto-Refine applied successfully.', 'success');
+            showToast(t('optimize.cssRefiner.toastAutoApplied'), 'success');
         } catch (err) {
-            setStatus('error', 'Apply failed: ' + err.message);
-            showToast('Failed to apply: ' + err.message, 'error');
+            setStatus('error', t('optimize.cssRefiner.statusApplyFailed', { message: err.message }));
+            showToast(t('optimize.cssRefiner.toastApplyFailed', { message: err.message }), 'error');
         }
     }
 
@@ -242,7 +271,7 @@
         const tokenSuggestions = checked.filter(s => s._analyzerId === 'design-tokens');
         const editSuggestions = checked.filter(s => Array.isArray(s.edits) && s.edits.length > 0);
 
-        setStatus('loading', 'Applying…');
+        setStatus('loading', t('optimize.cssRefiner.statusApplying'));
         _btnApplySelected.disabled = true;
 
         try {
@@ -250,7 +279,7 @@
             if (editSuggestions.length) {
                 const { edits: allEdits, dropped } = collectNonOverlappingEdits(editSuggestions);
                 if (!allEdits.length && dropped > 0) {
-                    throw new Error('All selected edits conflicted with each other.');
+                    throw new Error(t('optimize.cssRefiner.statusAllConflicted'));
                 }
 
                 const newCss = CSSRefiner.Utils.applyEdits(_workingCss, allEdits);
@@ -259,7 +288,9 @@
                 _rawCss = _workingCss;
 
                 if (dropped > 0) {
-                    showToast(`${dropped} conflicting change${dropped !== 1 ? 's were' : ' was'} skipped.`, 'warning');
+                    showToast(t(dropped !== 1
+                        ? 'optimize.cssRefiner.toastSkippedMany'
+                        : 'optimize.cssRefiner.toastSkippedOne', { count: dropped }), 'warning');
                 }
             }
 
@@ -283,11 +314,13 @@
             _results = analyze(_workingCss, null);
             renderResults(_results);
             const remaining = totalSuggestions(_results);
-            setStatus('ok', `Applied. ${remaining} suggestion${remaining !== 1 ? 's' : ''} remaining.`);
-            showToast('Changes applied successfully.', 'success');
+            setStatus('ok', t(remaining !== 1
+                ? 'optimize.cssRefiner.statusAppliedMany'
+                : 'optimize.cssRefiner.statusAppliedOne', { count: remaining }));
+            showToast(t('optimize.cssRefiner.toastApplied'), 'success');
         } catch (err) {
-            setStatus('error', 'Apply failed: ' + err.message);
-            showToast('Failed to apply: ' + err.message, 'error');
+            setStatus('error', t('optimize.cssRefiner.statusApplyFailed', { message: err.message }));
+            showToast(t('optimize.cssRefiner.toastApplyFailed', { message: err.message }), 'error');
         } finally {
             _btnApplySelected.disabled = false;
         }
@@ -310,13 +343,13 @@
     // ── Render ────────────────────────────────────────────────────────────────
 
     function renderResults(results) {
-        _resultsEl.innerHTML = '';
+        QSDom.clear(_resultsEl);
         _emptyEl.style.display = 'none';
 
         const hasAny = results.some(r => r.suggestions.length > 0);
         if (!hasAny) {
             _emptyEl.style.display = '';
-            _emptyEl.querySelector('p').textContent = 'No issues found — CSS looks clean!';
+            _emptyEl.querySelector('p').textContent = t('optimize.cssRefiner.noIssues');
             _resultsEl.style.display = 'none';
             hideApplyBar();
             return;
@@ -335,7 +368,7 @@
 
     function buildAnalyzerSection(analyzerId, suggestions) {
         const isReviewOnly = REVIEW_ONLY.has(analyzerId);
-        const label = ANALYZER_LABELS[analyzerId] || analyzerId;
+        const label = analyzerLabel(analyzerId);
 
         const section = document.createElement('div');
         section.className = 'optimize-analyzer-section';
@@ -344,20 +377,37 @@
         // Section header
         const header = document.createElement('div');
         header.className = 'optimize-analyzer-header';
-        header.innerHTML = `
-            <button type="button" class="optimize-analyzer-toggle" aria-expanded="true">
-                <svg class="optimize-analyzer-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                    <polyline points="6 9 12 15 18 9"/>
-                </svg>
-                <span class="optimize-analyzer-label">${escHtml(label)}</span>
-                <span class="optimize-analyzer-count">(${suggestions.length})</span>
-                ${isReviewOnly ? '<span class="optimize-analyzer-badge optimize-analyzer-badge--warn">review</span>' : ''}
-            </button>
-            <div class="optimize-analyzer-actions">
-                <button type="button" class="admin-btn admin-btn--small admin-btn--ghost optimize-btn-select-all" data-analyzer="${escHtml(analyzerId)}">Select All</button>
-                <button type="button" class="admin-btn admin-btn--small admin-btn--ghost optimize-btn-skip-all" data-analyzer="${escHtml(analyzerId)}">Skip All</button>
-            </div>
-        `;
+        const arrow = QSDom.iconEl(QuickSiteUtils.ICON_PATHS.chevronDown, 16, 'optimize-analyzer-arrow');
+        header.appendChild(QSDom.el('button', {
+            type: 'button',
+            class: 'optimize-analyzer-toggle',
+            'aria-expanded': 'true'
+        }, [
+            arrow,
+            QSDom.el('span', { class: 'optimize-analyzer-label', text: label }),
+            QSDom.el('span', {
+                class: 'optimize-analyzer-count',
+                text: '(' + suggestions.length + ')'
+            }),
+            isReviewOnly ? QSDom.el('span', {
+                class: 'optimize-analyzer-badge optimize-analyzer-badge--warn',
+                text: t('optimize.cssRefiner.reviewBadge')
+            }) : null
+        ]));
+        header.appendChild(QSDom.el('div', { class: 'optimize-analyzer-actions' }, [
+            QSDom.el('button', {
+                type: 'button',
+                class: 'admin-btn admin-btn--small admin-btn--ghost optimize-btn-select-all',
+                'data-analyzer': analyzerId,
+                text: t('optimize.cssRefiner.selectAll')
+            }),
+            QSDom.el('button', {
+                type: 'button',
+                class: 'admin-btn admin-btn--small admin-btn--ghost optimize-btn-skip-all',
+                'data-analyzer': analyzerId,
+                text: t('optimize.cssRefiner.skipAll')
+            })
+        ]));
 
         const list = document.createElement('div');
         list.className = 'optimize-suggestion-list';
@@ -394,15 +444,26 @@
         item.dataset.analyzerId = analyzerId;
         item.dataset.suggestionId = s.id;
 
-        item.innerHTML = `
-            <label class="optimize-suggestion__label">
-                <input type="checkbox" class="optimize-suggestion__check" ${s.checked ? 'checked' : ''}>
-                <span class="optimize-suggestion__desc">${escHtml(s.description || s.id)}</span>
-            </label>
-            <button type="button" class="admin-btn admin-btn--small admin-btn--ghost optimize-btn-diff">diff</button>
-            <div class="optimize-suggestion__diff" style="display:none"></div>
-            ${isDesignToken ? buildDesignTokenInput(s) : ''}
-        `;
+        const check = QSDom.el('input', {
+            type: 'checkbox', class: 'optimize-suggestion__check'
+        });
+        check.checked = !!s.checked;
+        item.appendChild(QSDom.el('label', { class: 'optimize-suggestion__label' }, [
+            check,
+            QSDom.el('span', {
+                class: 'optimize-suggestion__desc',
+                text: s.description || s.id
+            })
+        ]));
+        item.appendChild(QSDom.el('button', {
+            type: 'button',
+            class: 'admin-btn admin-btn--small admin-btn--ghost optimize-btn-diff',
+            text: t('optimize.cssRefiner.diff')
+        }));
+        item.appendChild(QSDom.el('div', {
+            class: 'optimize-suggestion__diff', style: 'display:none'
+        }));
+        if (isDesignToken) item.appendChild(_renderDesignTokenRow(s));
 
         // Diff toggle
         const diffBtn = item.querySelector('.optimize-btn-diff');
@@ -425,18 +486,18 @@
                 const value = nameInput?.dataset?.rawValue;
                 if (!name || !value) return;
                 writeBtn.disabled = true;
-                writeBtn.textContent = '…';
+                writeBtn.textContent = t('optimize.cssRefiner.writing');
                 try {
                     await saveRootVariable(name, value);
                     _workingCss = await loadStyles();
                     _rawCss = _workingCss;
-                    writeBtn.textContent = 'Written!';
+                    writeBtn.textContent = t('optimize.cssRefiner.written');
                     writeBtn.classList.add('admin-btn--success');
-                    showToast(`${name} written to :root`, 'success');
+                    showToast(t('optimize.cssRefiner.tokenWritten', { name: name }), 'success');
                 } catch (err) {
                     writeBtn.disabled = false;
-                    writeBtn.textContent = 'Write to :root';
-                    showToast('Failed: ' + err.message, 'error');
+                    writeBtn.textContent = t('optimize.cssRefiner.writeToRoot');
+                    showToast(t('optimize.cssRefiner.writeFailed', { message: err.message }), 'error');
                 }
             });
         }
@@ -447,20 +508,32 @@
         return item;
     }
 
-    function buildDesignTokenInput(s) {
+    /**
+     * The "write this value to :root as a variable" row of a design-token
+     * suggestion.
+     * @returns {HTMLElement} one .optimize-design-token-row
+     */
+    function _renderDesignTokenRow(s) {
         // suggestedValue = '--color-primary', _rootDecl = '--color-primary: #3a7bd5;'
         const varName = s.suggestedValue || '--token-' + s.id;
         // Extract the raw value from _rootDecl: '--varname: value;' -> 'value'
         const rawValue = s._rootDecl ? s._rootDecl.replace(/^[^:]+:\s*/, '').replace(/;$/, '').trim() : '';
-        return `
-            <div class="optimize-design-token-row">
-                <code class="optimize-design-token-value">${escHtml(rawValue)}</code>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-                <input type="text" class="admin-input optimize-design-token-name" value="${escHtml(varName)}" placeholder="--variable-name"
-                       data-raw-value="${escHtml(rawValue)}">
-                <button type="button" class="admin-btn admin-btn--small admin-btn--secondary optimize-btn-write-token">Write to :root</button>
-            </div>
-        `;
+        return QSDom.el('div', { class: 'optimize-design-token-row' }, [
+            QSDom.el('code', { class: 'optimize-design-token-value', text: rawValue }),
+            QSDom.iconEl(QuickSiteUtils.ICON_PATHS.arrowRight, 14),
+            QSDom.el('input', {
+                type: 'text',
+                class: 'admin-input optimize-design-token-name',
+                value: varName,
+                placeholder: t('optimize.cssRefiner.tokenNamePlaceholder'),
+                dataset: { rawValue: rawValue }
+            }),
+            QSDom.el('button', {
+                type: 'button',
+                class: 'admin-btn admin-btn--small admin-btn--secondary optimize-btn-write-token',
+                text: t('optimize.cssRefiner.writeToRoot')
+            })
+        ]);
     }
 
     // ── Apply bar ─────────────────────────────────────────────────────────────
@@ -468,9 +541,11 @@
     function updateApplyBar() {
         const count = $$('.optimize-suggestion__check:checked', _resultsEl).length;
         if (count > 0) {
-            _selectedCountEl.textContent = `${count} change${count !== 1 ? 's' : ''} selected`;
+            _selectedCountEl.textContent = t(count !== 1
+                ? 'optimize.cssRefiner.selectedMany'
+                : 'optimize.cssRefiner.selectedOne', { count: count });
             _applyBar.style.display = '';
-            _btnApplySelected.textContent = `Apply Selected (${count})`;
+            _btnApplySelected.textContent = t('optimize.cssRefiner.applySelectedCount', { count: count });
         } else {
             hideApplyBar();
         }
@@ -483,17 +558,20 @@
     // ── Modal ─────────────────────────────────────────────────────────────────
 
     function showAutoRefineModal(results) {
-        _modalBody.innerHTML = '';
+        QSDom.clear(_modalBody);
         let total = 0;
         results.forEach(({ analyzerId, suggestions }) => {
             if (!suggestions.length) return;
-            const row = document.createElement('div');
-            row.className = 'optimize-modal-row';
-            row.innerHTML = `<strong>${suggestions.length}</strong>&nbsp;${escHtml(ANALYZER_LABELS[analyzerId] || analyzerId)} changes`;
+            const row = QSDom.el('div', { class: 'optimize-modal-row' }, [
+                QSDom.el('strong', { text: String(suggestions.length) }),
+                ' ' + t('optimize.cssRefiner.modalRow', { label: analyzerLabel(analyzerId) })
+            ]);
             _modalBody.appendChild(row);
             total += suggestions.length;
         });
-        _modalConfirm.textContent = `Apply ${total} change${total !== 1 ? 's' : ''}`;
+        _modalConfirm.textContent = t(total !== 1
+            ? 'optimize.cssRefiner.applyTotalMany'
+            : 'optimize.cssRefiner.applyTotalOne', { count: total });
         _modal.style.display = '';
         setStatus('', '');
     }
@@ -551,10 +629,10 @@
         _results = [];
         _rawCss = '';
         _workingCss = '';
-        _resultsEl.innerHTML = '';
+        QSDom.clear(_resultsEl);
         _resultsEl.style.display = 'none';
         _emptyEl.style.display = '';
-        _emptyEl.querySelector('p').textContent = 'Click Analyze to scan your CSS.';
+        _emptyEl.querySelector('p').textContent = t('optimize.cssRefiner.emptyState');
         _btnReset.style.display = 'none';
         hideApplyBar();
         setStatus('', '');
@@ -572,14 +650,6 @@
         } else if (window.showAdminToast) {
             window.showAdminToast(msg, type);
         }
-    }
-
-    function escHtml(str) {
-        return String(str)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;');
     }
 
     // ── Boot ──────────────────────────────────────────────────────────────────

@@ -1,12 +1,46 @@
 /**
  * API Registry Page JavaScript
  * Manages external API definitions and endpoints for the QuickSite admin interface.
- * 
+ *
+ * Strings come from window.QS_APIS_I18N, emitted by apis.php: the `apis` and
+ * `common` translation sub-trees under the same dot paths PHP uses. Read it
+ * through t() below, never directly.
+ *
+ * DOM is built with createElement + textContent through QSDom and named
+ * _render* helpers, per the CLAUDE.md HTML-in-JS hygiene rule.
+ *
  * @version 1.0.0
  */
 
 (function() {
     'use strict';
+
+    /**
+     * Resolve one admin string by its FULL dot path.
+     *
+     * A path that resolves to nothing returns THE PATH ITSELF, so an unset
+     * string is visible on screen and findable by a scan instead of being
+     * hidden behind an English fallback.
+     *
+     * @param {string} path      e.g. 'apis.form.paramName'
+     * @param {Object} [params]  :name markers to substitute, as PHP's t() does
+     * @returns {string}
+     */
+    function t(path, params) {
+        let node = window.QS_APIS_I18N || {};
+        for (const part of String(path).split('.')) {
+            if (node === null || typeof node !== 'object' || !(part in node)) return path;
+            node = node[part];
+        }
+        if (typeof node !== 'string') return path;
+        let value = node;
+        if (params) {
+            for (const name of Object.keys(params)) {
+                value = value.split(':' + name).join(String(params[name]));
+            }
+        }
+        return value;
+    }
 
     // State
     let apisData = {};
@@ -134,11 +168,11 @@
                 updateStats(apisData, totalEndpoints);
                 renderApisList(apisData);
             } else {
-                showToast(response.data?.message || 'Failed to load APIs', 'error');
+                showToast(response.data?.message || t('apis.toast.loadFailed'), 'error');
             }
         } catch (error) {
             console.error('Failed to load APIs:', error);
-            showToast('Failed to load APIs: ' + error.message, 'error');
+            showToast(t('apis.toast.loadFailedDetail', { message: error.message }), 'error');
         } finally {
             showLoading(false);
         }
@@ -194,8 +228,7 @@
         document.getElementById('apis-empty').style.display = 'none';
         container.style.display = 'block';
 
-        const html = apiIds.map(apiId => renderApiCard(apiId, apis[apiId])).join('');
-        container.innerHTML = html;
+        apiIds.forEach(apiId => container.appendChild(renderApiCard(apiId, apis[apiId])));
 
         // Bind card events
         container.querySelectorAll('.api-card__header').forEach(header => {
@@ -222,91 +255,157 @@
         });
     }
 
+    /**
+     * One API's card: header, optional auth-token row, endpoint table.
+     *
+     * Every data-* attribute here is set with setAttribute rather than spliced
+     * into markup. That is what retires the 14 sites where the TEXT escaper
+     * stood in an ATTRIBUTE slot: escapeHtml deliberately leaves quotes alone
+     * (core/utils.js says so), so `data-api="${escapeHtml(id)}"` would break
+     * the attribute on a value carrying a quote. There is no escaper to pick
+     * wrongly once the value goes through setAttribute.
+     *
+     * @returns {HTMLElement} one .api-card
+     */
     function renderApiCard(apiId, api) {
         const endpoints = api.endpoints || [];
-        const authBadge = api.auth?.type && api.auth.type !== 'none' 
-            ? `<span class="admin-badge admin-badge--info">${api.auth.type}</span>` 
-            : '';
-        
-        const endpointsHtml = endpoints.length > 0 
-            ? endpoints.map(ep => renderEndpointRow(apiId, ep)).join('')
-            : `<tr><td colspan="5" class="admin-text-muted" style="text-align: center; padding: var(--space-md);">
-                    ${window.translations?.apis?.noEndpoints || 'No endpoints defined'}
-               </td></tr>`;
+        const hasAuth = !!(api.auth?.type && api.auth.type !== 'none');
 
-        return `
-            <div class="admin-card api-card" data-api-id="${escapeHtml(apiId)}">
-                <div class="api-card__header" style="cursor: pointer; display: flex; align-items: center; justify-content: space-between;">
-                    <div style="display: flex; align-items: center; gap: var(--space-sm);">
-                        ${QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.chevronRight, 20, 'api-card__chevron')}
-                        <div>
-                            <h3 style="margin: 0; display: flex; align-items: center; gap: var(--space-xs);">
-                                ${escapeHtml(api.name || apiId)}
-                                ${authBadge}
-                            </h3>
-                            <p class="admin-text-muted" style="margin: 0; font-size: var(--font-sm);">
-                                <code>${escapeHtml(apiId)}</code> · ${escapeHtml(api.baseUrl)}
-                                · ${endpoints.length} endpoint${endpoints.length !== 1 ? 's' : ''}
-                            </p>
-                        </div>
-                    </div>
-                    <div style="display: flex; gap: var(--space-xs);">
-                        <button type="button" class="admin-btn admin-btn--sm admin-btn--ghost" 
-                                data-action="add-endpoint" data-api="${escapeHtml(apiId)}" title="Add Endpoint">
-                            ${QuickSiteUtils.iconPlus(16)}
-                        </button>
-                        <button type="button" class="admin-btn admin-btn--sm admin-btn--ghost" 
-                                data-action="edit-api" data-api="${escapeHtml(apiId)}" title="Edit API">
-                            ${QuickSiteUtils.iconEdit(16)}
-                        </button>
-                        <button type="button" class="admin-btn admin-btn--sm admin-btn--ghost admin-btn--danger-hover" 
-                                data-action="delete-api" data-api="${escapeHtml(apiId)}" title="Delete API">
-                            ${QuickSiteUtils.iconTrash(16)}
-                        </button>
-                    </div>
-                </div>
-                <div class="api-card__body" style="display: none;">
-                    ${api.description ? `<p class="admin-text-muted" style="margin-bottom: var(--space-md);">${escapeHtml(api.description)}</p>` : ''}
-                    
-                    <!-- Auth Token Section -->
-                    ${api.auth?.type && api.auth.type !== 'none' ? `
-                    <div class="api-auth-token" style="margin-bottom: var(--space-md); padding: var(--space-sm); background: var(--bg-secondary); border-radius: var(--radius-md); display: flex; align-items: center; gap: var(--space-sm);">
-                        <label style="font-weight: 500; white-space: nowrap;">🔑 Auth Token:</label>
-                        <div style="flex: 1; display: flex; gap: var(--space-xs);">
-                            <input type="password" class="admin-input admin-input--sm api-auth-token__input" 
-                                   data-api="${escapeHtml(apiId)}"
-                                   value="${escapeHtml(loadAuthToken(apiId))}"
-                                   placeholder="Enter your ${api.auth.type} token"
-                                   style="flex: 1;">
-                            <button type="button" class="admin-btn admin-btn--sm admin-btn--ghost api-auth-token__toggle" 
-                                    data-api="${escapeHtml(apiId)}" title="Show/Hide">
-                                ${QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.eye, 16, 'icon-eye')}
-                                ${QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.eyeOff, 16, 'icon-eye-off', 'style="display: none;"')}
-                            </button>
-                            <button type="button" class="admin-btn admin-btn--sm admin-btn--ghost api-auth-token__save" 
-                                    data-api="${escapeHtml(apiId)}" title="Save token">
-                                ${QuickSiteUtils.iconSave(16)}
-                            </button>
-                        </div>
-                    </div>
-                    ` : ''}
-                    
-                    <table class="admin-table admin-table--striped">
-                        <thead>
-                            <tr>
-                                <th style="width: 80px;">Method</th>
-                                <th>Endpoint</th>
-                                <th>Path</th>
-                                <th style="width: 120px;">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${endpointsHtml}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        `;
+        const tbody = QSDom.el('tbody');
+        if (endpoints.length > 0) {
+            endpoints.forEach(ep => tbody.appendChild(renderEndpointRow(apiId, ep)));
+        } else {
+            tbody.appendChild(QSDom.el('tr', null, [
+                QSDom.el('td', {
+                    colspan: '5',
+                    class: 'admin-text-muted',
+                    style: 'text-align: center; padding: var(--space-md);',
+                    text: t('apis.noEndpoints')
+                })
+            ]));
+        }
+
+        const heading = QSDom.el('h3', {
+            style: 'margin: 0; display: flex; align-items: center; gap: var(--space-xs);'
+        }, [api.name || apiId]);
+        if (hasAuth) {
+            heading.appendChild(QSDom.el('span', {
+                class: 'admin-badge admin-badge--info', text: api.auth.type
+            }));
+        }
+
+        const body = QSDom.el('div', { class: 'api-card__body', style: 'display: none;' });
+        if (api.description) {
+            body.appendChild(QSDom.el('p', {
+                class: 'admin-text-muted',
+                style: 'margin-bottom: var(--space-md);',
+                text: api.description
+            }));
+        }
+        if (hasAuth) body.appendChild(_renderAuthTokenRow(apiId, api.auth.type));
+        body.appendChild(QSDom.el('table', { class: 'admin-table admin-table--striped' }, [
+            QSDom.el('thead', null, [
+                QSDom.el('tr', null, [
+                    QSDom.el('th', { style: 'width: 80px;', text: t('apis.form.method') }),
+                    QSDom.el('th', { text: t('apis.columns.endpoint') }),
+                    QSDom.el('th', { text: t('apis.form.path') }),
+                    QSDom.el('th', { style: 'width: 120px;', text: t('apis.columns.actions') })
+                ])
+            ]),
+            tbody
+        ]));
+
+        return QSDom.el('div', {
+            class: 'admin-card api-card',
+            dataset: { apiId: apiId }
+        }, [
+            QSDom.el('div', {
+                class: 'api-card__header',
+                style: 'cursor: pointer; display: flex; align-items: center; justify-content: space-between;'
+            }, [
+                QSDom.el('div', {
+                    style: 'display: flex; align-items: center; gap: var(--space-sm);'
+                }, [
+                    QSDom.iconEl(QuickSiteUtils.ICON_PATHS.chevronRight, 20, 'api-card__chevron'),
+                    QSDom.el('div', null, [
+                        heading,
+                        QSDom.el('p', {
+                            class: 'admin-text-muted',
+                            style: 'margin: 0; font-size: var(--font-sm);'
+                        }, [
+                            QSDom.el('code', { text: apiId }),
+                            ' · ' + api.baseUrl + ' · ' + t(endpoints.length !== 1
+                                ? 'apis.endpointCountMany'
+                                : 'apis.endpointCountOne', { count: endpoints.length })
+                        ])
+                    ])
+                ]),
+                QSDom.el('div', { style: 'display: flex; gap: var(--space-xs);' }, [
+                    _renderApiAction('add-endpoint', apiId, t('apis.addEndpoint'),
+                        QuickSiteUtils.ICON_PATHS.plus),
+                    _renderApiAction('edit-api', apiId, t('apis.editApi'),
+                        QuickSiteUtils.ICON_PATHS.edit),
+                    _renderApiAction('delete-api', apiId, t('apis.deleteApi'),
+                        QuickSiteUtils.ICON_PATHS.trash, 'admin-btn--danger-hover')
+                ])
+            ]),
+            body
+        ]);
+    }
+
+    /** One card-header action button. @returns {HTMLElement} */
+    function _renderApiAction(action, apiId, title, iconPath, extraClass) {
+        return QSDom.el('button', {
+            type: 'button',
+            class: 'admin-btn admin-btn--sm admin-btn--ghost'
+                + (extraClass ? ' ' + extraClass : ''),
+            'data-action': action,
+            'data-api': apiId,
+            title: title
+        }, [QSDom.iconEl(iconPath, 16)]);
+    }
+
+    /**
+     * The saved-token row shown on an API that declares authentication.
+     * @returns {HTMLElement} one .api-auth-token
+     */
+    function _renderAuthTokenRow(apiId, authType) {
+        const eyeOff = QSDom.iconEl(QuickSiteUtils.ICON_PATHS.eyeOff, 16, 'icon-eye-off');
+        if (eyeOff) eyeOff.style.display = 'none';
+        return QSDom.el('div', {
+            class: 'api-auth-token',
+            style: 'margin-bottom: var(--space-md); padding: var(--space-sm); background: var(--bg-secondary); border-radius: var(--radius-md); display: flex; align-items: center; gap: var(--space-sm);'
+        }, [
+            QSDom.el('label', {
+                style: 'font-weight: 500; white-space: nowrap;',
+                text: t('apis.authTokenLabel')
+            }),
+            QSDom.el('div', { style: 'flex: 1; display: flex; gap: var(--space-xs);' }, [
+                QSDom.el('input', {
+                    type: 'password',
+                    class: 'admin-input admin-input--sm api-auth-token__input',
+                    'data-api': apiId,
+                    value: loadAuthToken(apiId),
+                    placeholder: t('apis.authTokenPlaceholder', { type: authType }),
+                    style: 'flex: 1;'
+                }),
+                QSDom.el('button', {
+                    type: 'button',
+                    class: 'admin-btn admin-btn--sm admin-btn--ghost api-auth-token__toggle',
+                    'data-api': apiId,
+                    title: t('apis.test.showHide')
+                }, [
+                    QSDom.iconEl(QuickSiteUtils.ICON_PATHS.eye, 16, 'icon-eye'),
+                    eyeOff
+                ]),
+                QSDom.el('button', {
+                    type: 'button',
+                    class: 'admin-btn admin-btn--sm admin-btn--ghost api-auth-token__save',
+                    'data-api': apiId,
+                    title: t('apis.test.saveToken')
+                }, [QSDom.iconEl(QuickSiteUtils.ICON_PATHS.save, 16)])
+            ])
+        ]);
     }
 
     function renderEndpointRow(apiId, endpoint) {
@@ -324,47 +423,66 @@
         const apiAuthType = api?.auth?.type || 'none';
         const endpointAuth = endpoint.auth || 'none'; // undefined = public
         
-        let authBadge = '';
-        if (endpointAuth === 'none') {
-            // Public - no badge needed
-        } else if (endpointAuth === 'required') {
+        let authLabel = null;
+        if (endpointAuth === 'required') {
             // Explicitly requires auth
-            const authLabel = apiAuthType !== 'none' ? apiAuthType : 'required';
-            authBadge = `<span class="admin-badge admin-badge--info" title="Auth: ${authLabel}" style="font-size: 0.7em;">🔐 ${authLabel}</span>`;
+            authLabel = apiAuthType !== 'none' ? apiAuthType : 'required';
         } else if (endpointAuth === 'inherit' && apiAuthType !== 'none') {
             // Inherits from API (and API has auth)
-            authBadge = `<span class="admin-badge admin-badge--info" title="Auth: ${apiAuthType}" style="font-size: 0.7em;">🔐 ${apiAuthType}</span>`;
+            authLabel = apiAuthType;
         }
+        // endpointAuth === 'none' is public: no badge.
 
-        return `
-            <tr>
-                <td><span class="admin-badge ${methodClass}">${endpoint.method}</span></td>
-                <td>
-                    <code>${escapeHtml(endpoint.id)}</code> ${authBadge}
-                    <br><small class="admin-text-muted">${escapeHtml(endpoint.name || '')}</small>
-                </td>
-                <td><code>${escapeHtml(endpoint.path)}</code></td>
-                <td>
-                    <div style="display: flex; gap: var(--space-xs);">
-                        <button type="button" class="admin-btn admin-btn--xs admin-btn--ghost" 
-                                data-action="test-endpoint" data-api="${escapeHtml(apiId)}" data-endpoint="${escapeHtml(endpoint.id)}" 
-                                title="Test">
-                            ${QuickSiteUtils.iconPlay(14)}
-                        </button>
-                        <button type="button" class="admin-btn admin-btn--xs admin-btn--ghost" 
-                                data-action="edit-endpoint" data-api="${escapeHtml(apiId)}" data-endpoint="${escapeHtml(endpoint.id)}" 
-                                title="Edit">
-                            ${QuickSiteUtils.iconEdit()}
-                        </button>
-                        <button type="button" class="admin-btn admin-btn--xs admin-btn--ghost admin-btn--danger-hover" 
-                                data-action="delete-endpoint" data-api="${escapeHtml(apiId)}" data-endpoint="${escapeHtml(endpoint.id)}" 
-                                title="Delete">
-                            ${QuickSiteUtils.iconTrash()}
-                        </button>
-                    </div>
-                </td>
-            </tr>
-        `;
+        const idCell = QSDom.el('td', null, [
+            QSDom.el('code', { text: endpoint.id }),
+            ' '
+        ]);
+        if (authLabel) {
+            idCell.appendChild(QSDom.el('span', {
+                class: 'admin-badge admin-badge--info',
+                title: t('apis.authBadgeTitle', { type: authLabel }),
+                style: 'font-size: 0.7em;',
+                text: '🔐 ' + authLabel
+            }));
+        }
+        idCell.appendChild(QSDom.el('br'));
+        idCell.appendChild(QSDom.el('small', {
+            class: 'admin-text-muted', text: endpoint.name || ''
+        }));
+
+        return QSDom.el('tr', null, [
+            QSDom.el('td', null, [
+                QSDom.el('span', {
+                    class: 'admin-badge ' + methodClass, text: endpoint.method
+                })
+            ]),
+            idCell,
+            QSDom.el('td', null, [QSDom.el('code', { text: endpoint.path })]),
+            QSDom.el('td', null, [
+                QSDom.el('div', { style: 'display: flex; gap: var(--space-xs);' }, [
+                    _renderEndpointAction('test-endpoint', apiId, endpoint.id,
+                        t('apis.actions.test'), QuickSiteUtils.ICON_PATHS.play, 14),
+                    _renderEndpointAction('edit-endpoint', apiId, endpoint.id,
+                        t('common.edit'), QuickSiteUtils.ICON_PATHS.edit, 14),
+                    _renderEndpointAction('delete-endpoint', apiId, endpoint.id,
+                        t('common.delete'), QuickSiteUtils.ICON_PATHS.trash, 14,
+                        'admin-btn--danger-hover')
+                ])
+            ])
+        ]);
+    }
+
+    /** One endpoint-row action button. @returns {HTMLElement} */
+    function _renderEndpointAction(action, apiId, endpointId, title, iconPath, size, extraClass) {
+        return QSDom.el('button', {
+            type: 'button',
+            class: 'admin-btn admin-btn--xs admin-btn--ghost'
+                + (extraClass ? ' ' + extraClass : ''),
+            'data-action': action,
+            'data-api': apiId,
+            'data-endpoint': endpointId,
+            title: title
+        }, [QSDom.iconEl(iconPath, size)]);
     }
 
     // =========================================================================
@@ -414,7 +532,7 @@
 
         if (mode === 'edit' && apiId && apisData[apiId]) {
             const api = apisData[apiId];
-            title.textContent = window.translations?.apis?.editApi || 'Edit API';
+            title.textContent = t('apis.editApi');
             document.getElementById('api-id').value = apiId;
             document.getElementById('api-name').value = api.name || '';
             document.getElementById('api-base-url').value = api.baseUrl || '';
@@ -443,7 +561,7 @@
             // existing config is visible at a glance on edit.
             document.getElementById('auth-refresh-group').open = !!api.auth?.refreshEndpoint;
         } else {
-            title.textContent = window.translations?.apis?.addApi || 'Add API';
+            title.textContent = t('apis.addApi');
             populateRefreshEndpointDropdown('');
             document.getElementById('auth-refresh-group').open = false;
         }
@@ -487,7 +605,7 @@
         const select = document.getElementById('api-refresh-endpoint');
         if (!select) return;
 
-        const noneText = window.translations?.apis?.form?.refreshNone || '(none — no refresh configured)';
+        const noneText = t('apis.form.refreshNone');
         // Drop existing dynamic options but keep the empty default.
         while (select.firstChild) select.removeChild(select.firstChild);
         const placeholder = document.createElement('option');
@@ -538,24 +656,24 @@
      */
     function _validateSchemaShape(schema, label) {
         if (schema === null || typeof schema !== 'object' || Array.isArray(schema)) {
-            return label + ' must be a JSON object — e.g. { "type": "object", "properties": {...} }.';
+            return t('apis.schema.mustBeObject', { label: label });
         }
         // Double-wrap detection: the user pasted the outer container.
         if (!schema.type && (schema.responseSchema || schema.requestSchema)) {
             const wrapKey = schema.responseSchema ? 'responseSchema' : 'requestSchema';
-            return label + ' looks double-wrapped — paste only the inner schema (the value of "' + wrapKey + '"), not the whole envelope.';
+            return t('apis.schema.doubleWrapped', { label: label, wrapKey: wrapKey });
         }
         if (!schema.type) {
-            return label + ' must have a top-level "type" field (e.g. "object", "array", "string").';
+            return t('apis.schema.needsType', { label: label });
         }
         const typeIsValid = typeof schema.type === 'string' || Array.isArray(schema.type);
         if (!typeIsValid) {
-            return label + '\'s "type" must be a string or array of strings.';
+            return t('apis.schema.typeShape', { label: label });
         }
         const isObjectType = schema.type === 'object'
             || (Array.isArray(schema.type) && schema.type.indexOf('object') !== -1);
         if (isObjectType && (!schema.properties || typeof schema.properties !== 'object' || Array.isArray(schema.properties))) {
-            return label + ' is type "object" but missing a "properties" object. Add "properties": {} even if empty.';
+            return t('apis.schema.needsProperties', { label: label });
         }
         return null;
     }
@@ -596,12 +714,12 @@
             const anyRefresh = rEndpoint || rKey || rBody || rPath || rRefreshPath;
             if (anyRefresh) {
                 const missing = [];
-                if (!rEndpoint) missing.push('endpoint');
-                if (!rKey) missing.push('storage key');
-                if (!rBody) missing.push('body field');
-                if (!rPath) missing.push('response token path');
+                if (!rEndpoint) missing.push(t('apis.refreshMissing.endpoint'));
+                if (!rKey) missing.push(t('apis.refreshMissing.storageKey'));
+                if (!rBody) missing.push(t('apis.refreshMissing.bodyField'));
+                if (!rPath) missing.push(t('apis.refreshMissing.tokenPath'));
                 if (missing.length) {
-                    showToast('Refresh config incomplete. Missing: ' + missing.join(', '), 'error');
+                    showToast(t('apis.toast.refreshIncomplete', { list: missing.join(', ') }), 'error');
                     return;
                 }
                 auth.refreshEndpoint = rEndpoint;
@@ -640,15 +758,15 @@
             }
 
             if (response.ok) {
-                showToast(response.data?.message || 'API saved successfully', 'success');
+                showToast(response.data?.message || t('apis.toast.apiSaved'), 'success');
                 closeModal(document.getElementById('modal-api'));
                 loadApis();
             } else {
-                showToast(response.data?.message || 'Failed to save API', 'error');
+                showToast(response.data?.message || t('apis.toast.apiSaveFailed'), 'error');
             }
         } catch (error) {
             console.error('Failed to save API:', error);
-            showToast('Failed to save API: ' + error.message, 'error');
+            showToast(t('apis.toast.apiSaveFailedDetail', { message: error.message }), 'error');
         }
     }
 
@@ -674,29 +792,23 @@
 
         // Clear parameter rows; populated either from existing endpoint or left empty.
         const paramRows = document.getElementById('endpoint-params-rows');
-        if (paramRows) paramRows.innerHTML = '';
+        if (paramRows) QSDom.clear(paramRows);
 
         if (mode === 'edit' && endpointId && apisData[apiId]) {
             const endpoint = (apisData[apiId].endpoints || []).find(ep => ep.id === endpointId);
             if (endpoint) {
-                title.textContent = window.translations?.apis?.editEndpoint || 'Edit Endpoint';
+                title.textContent = t('apis.editEndpoint');
                 document.getElementById('endpoint-id').value = endpoint.id;
                 document.getElementById('endpoint-method').value = endpoint.method;
                 document.getElementById('endpoint-name').value = endpoint.name || '';
                 document.getElementById('endpoint-path').value = endpoint.path;
                 document.getElementById('endpoint-description').value = endpoint.description || '';
-                // beta.8 Track A4 — explicit callableFrom value, or empty for auto-derive
+                // An explicit callableFrom value, or empty for auto-derive.
                 document.getElementById('endpoint-callable-from').value = endpoint.callableFrom || '';
-                // Beta.8 A2 Slice 4 follow-up: an absent auth field is
-                // semantically "inherit from API" (that's how serverFetch
-                // + the existing manager normalizer interpret it). Pre-
-                // this-fix the picker loaded missing auth as 'none' which
-                // was misleading — author saw 'none' but the endpoint
-                // actually inherited the parent API's auth at runtime.
-                // Default to 'inherit' now; author can explicitly switch
-                // to 'none' for endpoints that should be truly public,
-                // and the save path persists 'none' literally instead of
-                // collapsing it to an absent field.
+                // An absent auth field means "inherit from API" -- that is how
+                // serverFetch and the manager normaliser read it -- so the
+                // picker shows 'inherit' for it. 'none' is saved literally, so
+                // an endpoint set to public stays public.
                 document.getElementById('endpoint-auth').value = endpoint.auth || 'inherit';
                 document.getElementById('endpoint-request-schema').value =
                     endpoint.requestSchema ? JSON.stringify(endpoint.requestSchema, null, 2) : '';
@@ -706,10 +818,10 @@
                 (endpoint.parameters || []).forEach(p => addParamRow(p));
             }
         } else {
-            title.textContent = window.translations?.apis?.addEndpoint || 'Add Endpoint';
+            title.textContent = t('apis.addEndpoint');
             // Default to 'inherit' for new endpoints when API has auth
             document.getElementById('endpoint-auth').value = 'inherit';
-            // beta.8 Track A4 — new endpoints default to auto-derive
+            // New endpoints default to auto-derive.
             document.getElementById('endpoint-callable-from').value = '';
         }
 
@@ -761,24 +873,46 @@
     function addParamRow(existing) {
         const rows = document.getElementById('endpoint-params-rows');
         if (!rows) return;
-        const row = document.createElement('div');
-        row.className = 'apis-param-row';
-        row.innerHTML = `
-            <input type="text"
-                   class="admin-input apis-param-row__name"
-                   placeholder="${ (window.translations?.apis?.paramName) || 'name' }"
-                   value="${ existing?.name ? escapeAttr(existing.name) : '' }">
-            <select class="admin-input apis-param-row__type">
-                ${PARAM_TYPES.map(t =>
-                    `<option value="${t}"${existing?.type === t ? ' selected' : ''}>${t}</option>`
-                ).join('')}
-            </select>
-            <label class="apis-param-row__required" title="${ (window.translations?.apis?.paramRequired) || 'required' }">
-                <input type="checkbox" class="apis-param-row__required-input"${existing?.required ? ' checked' : ''}>
-                <span>${ (window.translations?.apis?.paramRequired) || 'required' }</span>
-            </label>
-            <button type="button" class="admin-btn admin-btn--ghost admin-btn--xs apis-param-row__delete" title="${ (window.translations?.common?.delete) || 'Remove' }" aria-label="${ (window.translations?.common?.delete) || 'Remove' }">&times;</button>
-        `;
+        const row = QSDom.el('div', { class: 'apis-param-row' });
+
+        const typeSelect = QSDom.el('select', { class: 'admin-input apis-param-row__type' });
+        PARAM_TYPES.forEach(type => {
+            const opt = document.createElement('option');
+            opt.value = type;
+            opt.textContent = type;
+            if (existing?.type === type) opt.selected = true;
+            typeSelect.appendChild(opt);
+        });
+
+        const requiredInput = QSDom.el('input', {
+            type: 'checkbox', class: 'apis-param-row__required-input'
+        });
+        requiredInput.checked = !!existing?.required;
+
+        const requiredLabel = t('apis.form.paramRequired');
+        const removeLabel = t('common.delete');
+
+        row.appendChild(QSDom.el('input', {
+            type: 'text',
+            class: 'admin-input apis-param-row__name',
+            placeholder: t('apis.form.paramName'),
+            value: existing?.name || ''
+        }));
+        row.appendChild(typeSelect);
+        row.appendChild(QSDom.el('label', {
+            class: 'apis-param-row__required', title: requiredLabel
+        }, [
+            requiredInput,
+            QSDom.el('span', { text: requiredLabel })
+        ]));
+        row.appendChild(QSDom.el('button', {
+            type: 'button',
+            class: 'admin-btn admin-btn--ghost admin-btn--xs apis-param-row__delete',
+            title: removeLabel,
+            'aria-label': removeLabel,
+            text: '×'
+        }));
+
         rows.appendChild(row);
     }
 
@@ -811,10 +945,6 @@
         return out;
     }
 
-    function escapeAttr(s) {
-        return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-    }
-
     async function handleEndpointSubmit(e) {
         e.preventDefault();
         
@@ -841,14 +971,14 @@
             const reqSchemaText = document.getElementById('endpoint-request-schema').value.trim();
             if (reqSchemaText) {
                 requestSchema = JSON.parse(reqSchemaText);
-                const shapeErr = _validateSchemaShape(requestSchema, 'Request schema');
+                const shapeErr = _validateSchemaShape(requestSchema, t('apis.schema.request'));
                 if (shapeErr) {
                     showToast(shapeErr, 'error');
                     return;
                 }
             }
         } catch (err) {
-            showToast('Invalid request schema JSON', 'error');
+            showToast(t('apis.toast.invalidRequestSchema'), 'error');
             return;
         }
 
@@ -856,14 +986,14 @@
             const resSchemaText = document.getElementById('endpoint-response-schema').value.trim();
             if (resSchemaText) {
                 responseSchema = JSON.parse(resSchemaText);
-                const shapeErr = _validateSchemaShape(responseSchema, 'Response schema');
+                const shapeErr = _validateSchemaShape(responseSchema, t('apis.schema.response'));
                 if (shapeErr) {
                     showToast(shapeErr, 'error');
                     return;
                 }
             }
         } catch (err) {
-            showToast('Invalid response schema JSON', 'error');
+            showToast(t('apis.toast.invalidResponseSchema'), 'error');
             return;
         }
 
@@ -924,15 +1054,15 @@
             const response = await QuickSiteAdmin.apiRequest('editApi', 'POST', params);
 
             if (response.ok) {
-                showToast(response.data?.message || 'Endpoint saved successfully', 'success');
+                showToast(response.data?.message || t('apis.toast.endpointSaved'), 'success');
                 closeModal(document.getElementById('modal-endpoint'));
                 loadApis();
             } else {
-                showToast(response.data?.message || 'Failed to save endpoint', 'error');
+                showToast(response.data?.message || t('apis.toast.endpointSaveFailed'), 'error');
             }
         } catch (error) {
             console.error('Failed to save endpoint:', error);
-            showToast('Failed to save endpoint: ' + error.message, 'error');
+            showToast(t('apis.toast.endpointSaveFailedDetail', { message: error.message }), 'error');
         }
     }
 
@@ -943,9 +1073,12 @@
     function promptDeleteApi(apiId) {
         const api = apisData[apiId];
         const endpointCount = (api?.endpoints || []).length;
-        const message = `Are you sure you want to delete the API "${api?.name || apiId}"? ${
-            endpointCount > 0 ? `This will also delete ${endpointCount} endpoint${endpointCount !== 1 ? 's' : ''}.` : ''
-        }`;
+        let message = t('apis.confirm.deleteApi', { name: api?.name || apiId });
+        if (endpointCount > 0) {
+            message += ' ' + t(endpointCount !== 1
+                ? 'apis.confirm.deleteApiEndpointsMany'
+                : 'apis.confirm.deleteApiEndpointsOne', { count: endpointCount });
+        }
         
         pendingDelete = { type: 'api', apiId: apiId };
         document.getElementById('confirm-delete-message').textContent = message;
@@ -955,7 +1088,7 @@
     function promptDeleteEndpoint(apiId, endpointId) {
         const api = apisData[apiId];
         const endpoint = (api?.endpoints || []).find(ep => ep.id === endpointId);
-        const message = `Are you sure you want to delete the endpoint "${endpoint?.name || endpointId}"?`;
+        const message = t('apis.confirm.deleteEndpoint', { name: endpoint?.name || endpointId });
         
         pendingDelete = { type: 'endpoint', apiId: apiId, endpointId: endpointId };
         document.getElementById('confirm-delete-message').textContent = message;
@@ -977,15 +1110,15 @@
             }
 
             if (response.ok) {
-                showToast(response.data?.message || 'Deleted successfully', 'success');
+                showToast(response.data?.message || t('apis.toast.deleted'), 'success');
                 closeModal(document.getElementById('modal-confirm-delete'));
                 await loadApis();
             } else {
-                showToast(response.data?.message || 'Failed to delete', 'error');
+                showToast(response.data?.message || t('apis.toast.deleteFailed'), 'error');
             }
         } catch (error) {
             console.error('Failed to delete:', error);
-            showToast('Failed to delete: ' + error.message, 'error');
+            showToast(t('apis.toast.deleteFailedDetail', { message: error.message }), 'error');
         }
         
         pendingDelete = null;
@@ -1000,7 +1133,7 @@
         const endpoint = (api?.endpoints || []).find(ep => ep.id === endpointId);
         
         if (!api || !endpoint) {
-            showToast('Endpoint not found', 'error');
+            showToast(t('apis.toast.endpointNotFound'), 'error');
             return;
         }
 
@@ -1022,10 +1155,16 @@
         
         // Show request info
         const fullUrl = api.baseUrl.replace(/\/$/, '') + endpoint.path;
-        document.getElementById('test-request-info').innerHTML = `
-            <strong>${endpoint.method}</strong> ${escapeHtml(fullUrl)}
-            ${effectiveAuth ? `<br><small>Auth: ${effectiveAuth}</small>` : ''}
-        `;
+        const requestInfo = document.getElementById('test-request-info');
+        QSDom.clear(requestInfo);
+        requestInfo.appendChild(QSDom.el('strong', { text: endpoint.method }));
+        requestInfo.appendChild(document.createTextNode(' ' + fullUrl));
+        if (effectiveAuth) {
+            requestInfo.appendChild(QSDom.el('br'));
+            requestInfo.appendChild(QSDom.el('small', {
+                text: t('apis.authBadgeTitle', { type: effectiveAuth })
+            }));
+        }
 
         // Show/hide body/query based on method
         const hasBody = ['POST', 'PUT', 'PATCH'].includes(endpoint.method);
@@ -1051,9 +1190,11 @@
         }
         
         // Reset response
-        document.getElementById('test-response-status').innerHTML = '';
+        QSDom.clear(document.getElementById('test-response-status'));
         document.getElementById('test-response-time').textContent = '';
-        document.getElementById('test-response-body').innerHTML = '<span class="admin-text-muted">Run test to see response</span>';
+        _setResponseBody(QSDom.el('span', {
+            class: 'admin-text-muted', text: t('apis.test.noResponse')
+        }));
 
         openModal(document.getElementById('modal-test'));
     }
@@ -1092,24 +1233,43 @@
         const declared = {};
         (endpoint.parameters || []).forEach(p => { if (p && p.name) declared[p.name] = p; });
 
-        const heading = window.translations?.apis?.pathParameters || 'Path parameters';
-        let html = `<h4 class="apis-test-section-title">${escapeHtml(heading)}</h4>`;
-        html += '<div class="admin-test-params">';
+        const group = QSDom.el('div', { class: 'admin-test-params' });
         for (const name of placeholders) {
             const def = declared[name] || {};
             const type = def.type || 'string';
-            const required = !!def.required;
             const fieldId = `test-pathparam-${name}`;
-            const requiredMark = required ? ' <span class="admin-text-danger">*</span>' : '';
             const inputType = (type === 'integer' || type === 'number') ? 'number' : 'text';
-            const step = type === 'integer' ? ' step="1"' : (type === 'number' ? ' step="any"' : '');
-            html += `<div class="admin-form-group admin-form-group--compact">`;
-            html += `<label class="admin-label" for="${fieldId}">:${escapeHtml(name)} <small class="admin-text-muted">(${escapeHtml(type)})</small>${requiredMark}</label>`;
-            html += `<input type="${inputType}"${step} class="admin-input admin-input--sm" id="${fieldId}" data-path-param="${escapeHtml(name)}">`;
-            html += `</div>`;
+
+            const label = QSDom.el('label', {
+                class: 'admin-label', for: fieldId
+            }, [
+                ':' + name + ' ',
+                QSDom.el('small', { class: 'admin-text-muted', text: '(' + type + ')' })
+            ]);
+            if (def.required) {
+                label.appendChild(document.createTextNode(' '));
+                label.appendChild(QSDom.el('span', { class: 'admin-text-danger', text: '*' }));
+            }
+
+            const input = QSDom.el('input', {
+                type: inputType,
+                class: 'admin-input admin-input--sm',
+                id: fieldId,
+                'data-path-param': name
+            });
+            if (type === 'integer') input.setAttribute('step', '1');
+            else if (type === 'number') input.setAttribute('step', 'any');
+
+            group.appendChild(QSDom.el('div', {
+                class: 'admin-form-group admin-form-group--compact'
+            }, [label, input]));
         }
-        html += '</div>';
-        container.innerHTML = html;
+
+        QSDom.clear(container);
+        container.appendChild(QSDom.el('h4', {
+            class: 'apis-test-section-title', text: t('apis.form.pathParameters')
+        }));
+        container.appendChild(group);
         container.style.display = '';
     }
 
@@ -1137,68 +1297,109 @@
         const schema = endpoint.requestSchema;
         
         if (!schema || !schema.properties || Object.keys(schema.properties).length === 0) {
-            container.innerHTML = '<p class="admin-text-muted admin-hint">No parameters defined in schema</p>';
+            QSDom.clear(container);
+            container.appendChild(QSDom.el('p', {
+                class: 'admin-text-muted admin-hint', text: t('apis.test.noSchemaParams')
+            }));
             return;
         }
-        
+
         const required = schema.required || [];
-        const isGetMethod = endpoint.method === 'GET';
-        
-        let html = `<div class="admin-test-params">`;
-        
+        const group = QSDom.el('div', { class: 'admin-test-params' });
+
         for (const [fieldName, fieldDef] of Object.entries(schema.properties)) {
             const isRequired = required.includes(fieldName);
             const fieldType = fieldDef.type || 'string';
             const fieldId = `test-param-${fieldName}`;
-            
-            html += `<div class="admin-form-group admin-form-group--compact">`;
-            html += `<label class="admin-label" for="${fieldId}">${escapeHtml(fieldName)}`;
-            if (isRequired) html += ` <span class="admin-text-danger">*</span>`;
-            html += `</label>`;
-            
+
+            const label = QSDom.el('label', {
+                class: 'admin-label', for: fieldId, text: fieldName
+            });
+            if (isRequired) {
+                label.appendChild(document.createTextNode(' '));
+                label.appendChild(QSDom.el('span', { class: 'admin-text-danger', text: '*' }));
+            }
+
+            const wrapper = QSDom.el('div', {
+                class: 'admin-form-group admin-form-group--compact'
+            }, [label]);
+
             // Generate field based on type
             if (fieldDef.enum && fieldDef.enum.length > 0) {
                 // Enum → Select
-                html += `<select class="admin-input admin-input--sm" id="${fieldId}" data-field="${fieldName}" data-type="${fieldType}">`;
-                if (!isRequired) html += `<option value="">-- Select --</option>`;
-                for (const opt of fieldDef.enum) {
-                    const selected = opt === fieldDef.default ? ' selected' : '';
-                    html += `<option value="${escapeHtml(opt)}"${selected}>${escapeHtml(opt)}</option>`;
+                const select = QSDom.el('select', {
+                    class: 'admin-input admin-input--sm', id: fieldId,
+                    'data-field': fieldName, 'data-type': fieldType
+                });
+                if (!isRequired) {
+                    QSDom.setSelectPlaceholder(select, t('apis.test.selectPlaceholder'));
                 }
-                html += `</select>`;
+                for (const opt of fieldDef.enum) {
+                    const option = document.createElement('option');
+                    option.value = opt;
+                    option.textContent = opt;
+                    if (opt === fieldDef.default) option.selected = true;
+                    select.appendChild(option);
+                }
+                wrapper.appendChild(select);
             } else if (fieldType === 'boolean') {
                 // Boolean → Checkbox
-                const checked = fieldDef.default === true ? ' checked' : '';
-                html += `<label class="admin-checkbox">`;
-                html += `<input type="checkbox" id="${fieldId}" data-field="${fieldName}" data-type="boolean"${checked}>`;
-                html += `<span>Yes</span></label>`;
+                const cb = QSDom.el('input', {
+                    type: 'checkbox', id: fieldId,
+                    'data-field': fieldName, 'data-type': 'boolean'
+                });
+                cb.checked = fieldDef.default === true;
+                wrapper.appendChild(QSDom.el('label', { class: 'admin-checkbox' }, [
+                    cb, QSDom.el('span', { text: t('common.yes') })
+                ]));
             } else if (fieldType === 'integer' || fieldType === 'number') {
                 // Number → Number input
-                const min = fieldDef.minimum !== undefined ? ` min="${fieldDef.minimum}"` : '';
-                const max = fieldDef.maximum !== undefined ? ` max="${fieldDef.maximum}"` : '';
-                const defVal = fieldDef.default !== undefined ? fieldDef.default : '';
-                html += `<input type="number" class="admin-input admin-input--sm" id="${fieldId}" data-field="${fieldName}" data-type="${fieldType}" value="${defVal}"${min}${max} step="${fieldType === 'integer' ? '1' : 'any'}">`;
+                const input = QSDom.el('input', {
+                    type: 'number', class: 'admin-input admin-input--sm', id: fieldId,
+                    'data-field': fieldName, 'data-type': fieldType,
+                    value: fieldDef.default !== undefined ? fieldDef.default : '',
+                    step: fieldType === 'integer' ? '1' : 'any'
+                });
+                if (fieldDef.minimum !== undefined) input.setAttribute('min', fieldDef.minimum);
+                if (fieldDef.maximum !== undefined) input.setAttribute('max', fieldDef.maximum);
+                wrapper.appendChild(input);
             } else if (fieldType === 'array') {
-                // Array → Textarea (comma-separated or JSON)
-                html += `<input type="text" class="admin-input admin-input--sm" id="${fieldId}" data-field="${fieldName}" data-type="array" placeholder="value1, value2, value3">`;
-                html += `<p class="admin-hint">Comma-separated values</p>`;
+                // Array → one comma-separated input
+                wrapper.appendChild(QSDom.el('input', {
+                    type: 'text', class: 'admin-input admin-input--sm', id: fieldId,
+                    'data-field': fieldName, 'data-type': 'array',
+                    placeholder: t('apis.test.arrayPlaceholder')
+                }));
+                wrapper.appendChild(QSDom.el('p', {
+                    class: 'admin-hint', text: t('apis.test.arrayHint')
+                }));
             } else {
                 // String → Input if short (maxLength < 255), textarea otherwise
                 const maxLen = fieldDef.maxLength;
-                const placeholder = fieldDef.format ? `Format: ${fieldDef.format}` : '';
+                const placeholder = fieldDef.format
+                    ? t('apis.test.formatPlaceholder', { format: fieldDef.format })
+                    : '';
                 if (maxLen && maxLen < 255) {
-                    html += `<input type="text" class="admin-input admin-input--sm" id="${fieldId}" data-field="${fieldName}" data-type="string" placeholder="${placeholder}" maxlength="${maxLen}">`;
+                    wrapper.appendChild(QSDom.el('input', {
+                        type: 'text', class: 'admin-input admin-input--sm', id: fieldId,
+                        'data-field': fieldName, 'data-type': 'string',
+                        placeholder: placeholder, maxlength: maxLen
+                    }));
                 } else {
-                    html += `<textarea class="admin-input admin-input--sm" id="${fieldId}" data-field="${fieldName}" data-type="string" rows="3" placeholder="${placeholder}"></textarea>`;
+                    wrapper.appendChild(QSDom.el('textarea', {
+                        class: 'admin-input admin-input--sm', id: fieldId,
+                        'data-field': fieldName, 'data-type': 'string',
+                        rows: '3', placeholder: placeholder
+                    }));
                 }
             }
-            
-            html += `</div>`;
+
+            group.appendChild(wrapper);
         }
-        
-        html += `</div>`;
-        container.innerHTML = html;
-        
+
+        QSDom.clear(container);
+        container.appendChild(group);
+
         // Add event listeners to sync with raw JSON
         container.querySelectorAll('[data-field]').forEach(field => {
             const eventType = field.type === 'checkbox' ? 'change' : 'input';
@@ -1312,9 +1513,9 @@
                 delete tokens[apiId];
             }
             localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, JSON.stringify(tokens));
-            showToast(token ? 'Token saved' : 'Token cleared', 'success');
+            showToast(t(token ? 'apis.toast.tokenSaved' : 'apis.toast.tokenCleared'), 'success');
         } catch (e) {
-            showToast('Failed to save token', 'error');
+            showToast(t('apis.toast.tokenSaveFailed'), 'error');
         }
     }
 
@@ -1346,7 +1547,7 @@
             try {
                 body = JSON.parse(bodyText);
             } catch (err) {
-                showToast('Invalid JSON in request body', 'error');
+                showToast(t('apis.toast.invalidBodyJson'), 'error');
                 return;
             }
         }
@@ -1358,17 +1559,18 @@
             try {
                 queryParams = JSON.parse(queryText);
             } catch (err) {
-                showToast('Invalid JSON in query params', 'error');
+                showToast(t('apis.toast.invalidQueryJson'), 'error');
                 return;
             }
         }
 
-        btn.disabled = true;
-        btn.innerHTML = QuickSiteUtils.htmlSpinner() + ' Testing...';
-        
-        document.getElementById('test-response-status').innerHTML = '';
-        document.getElementById('test-response-time').textContent = 'Executing...';
-        document.getElementById('test-response-body').innerHTML = '<span class="admin-text-muted">Waiting for response...</span>';
+        QSDom.setButtonBusy(btn, t('apis.test.testing'));
+
+        QSDom.clear(document.getElementById('test-response-status'));
+        document.getElementById('test-response-time').textContent = t('apis.test.executing');
+        _setResponseBody(QSDom.el('span', {
+            class: 'admin-text-muted', text: t('apis.test.waiting')
+        }));
 
         // Collect :placeholder values for path substitution
         const pathParams = collectTestPathParams();
@@ -1392,44 +1594,103 @@
                     ? 'admin-badge--success' 
                     : 'admin-badge--danger';
                 
-                document.getElementById('test-response-status').innerHTML = 
-                    `<span class="admin-badge ${statusClass}">${statusCode || 'N/A'}</span>`;
-                document.getElementById('test-response-time').textContent = 
+                _setResponseStatus(String(statusCode || t('apis.test.noStatus')), statusClass);
+                document.getElementById('test-response-time').textContent =
                     testResult.timing?.duration_ms ? `${testResult.timing.duration_ms}ms` : '';
-                
+
                 // Format response body
-                let bodyHtml = '';
                 const responseBody = testResult.response?.body;
                 if (responseBody !== undefined && responseBody !== null && responseBody !== '') {
+                    let text;
                     try {
                         const parsed = typeof responseBody === 'string' ? JSON.parse(responseBody) : responseBody;
-                        bodyHtml = `<pre>${escapeHtml(JSON.stringify(parsed, null, 2))}</pre>`;
+                        text = JSON.stringify(parsed, null, 2);
                     } catch {
-                        bodyHtml = `<pre>${escapeHtml(String(responseBody))}</pre>`;
+                        text = String(responseBody);
                     }
+                    _setResponseBody(QSDom.el('pre', { text: text }));
                 } else {
-                    bodyHtml = '<span class="admin-text-muted">Empty response</span>';
+                    _setResponseBody(QSDom.el('span', {
+                        class: 'admin-text-muted', text: t('apis.test.emptyResponse')
+                    }));
                 }
-                document.getElementById('test-response-body').innerHTML = bodyHtml;
             } else {
-                document.getElementById('test-response-status').innerHTML = 
-                    `<span class="admin-badge admin-badge--danger">Error</span>`;
-                document.getElementById('test-response-body').innerHTML = 
-                    `<pre class="admin-text-danger">${escapeHtml(response.data?.message || 'Request failed')}</pre>`;
+                _setResponseStatus(t('apis.test.errorBadge'), 'admin-badge--danger');
+                _setResponseBody(QSDom.el('pre', {
+                    class: 'admin-text-danger',
+                    text: response.data?.message || t('apis.test.requestFailed')
+                }));
             }
         } catch (error) {
             console.error('Test failed:', error);
-            document.getElementById('test-response-status').innerHTML = 
-                `<span class="admin-badge admin-badge--danger">Error</span>`;
-            document.getElementById('test-response-body').innerHTML = 
-                `<pre class="admin-text-danger">${escapeHtml(error.message)}</pre>`;
+            _setResponseStatus(t('apis.test.errorBadge'), 'admin-badge--danger');
+            _setResponseBody(QSDom.el('pre', {
+                class: 'admin-text-danger', text: error.message
+            }));
         } finally {
             btn.disabled = false;
-            btn.innerHTML = `
-                ${QuickSiteUtils.iconPlay(16)}
-                Run Test
-            `;
+            QSDom.clear(btn);
+            btn.appendChild(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.play, 16));
+            btn.appendChild(document.createTextNode(' ' + t('apis.test.run')));
         }
+    }
+
+    /**
+     * A whole-sentence key whose :name markers become real nodes.
+     *
+     * One key per sentence, not one per fragment: a translator needs the whole
+     * sentence to order it correctly, and the markup that carried the link or
+     * the <code> spans is supplied here instead of inside the string. Markers
+     * are matched longest-first so :public cannot eat :publicPath.
+     *
+     * @param {string} key            a translation path
+     * @param {Object} parts          markerName -> Node
+     * @returns {DocumentFragment}
+     */
+    function _renderMarked(key, parts) {
+        const names = Object.keys(parts).sort((a, b) => b.length - a.length);
+        const frag = document.createDocumentFragment();
+        let rest = t(key);
+        while (rest) {
+            let best = null;
+            for (const name of names) {
+                const at = rest.indexOf(':' + name);
+                if (at !== -1 && (best === null || at < best.at)) best = { at, name };
+            }
+            if (!best) break;
+            if (best.at > 0) frag.appendChild(document.createTextNode(rest.slice(0, best.at)));
+            frag.appendChild(parts[best.name].cloneNode(true));
+            rest = rest.slice(best.at + best.name.length + 1);
+        }
+        if (rest) frag.appendChild(document.createTextNode(rest));
+        return frag;
+    }
+
+    /** Show one node in the import modal's error box. */
+    function _setImportError(node) {
+        const errBox = document.getElementById('import-parse-error');
+        if (!errBox) return;
+        QSDom.clear(errBox);
+        errBox.appendChild(node);
+        errBox.style.display = '';
+    }
+
+    /** Replace the test modal's response body with one element. */
+    function _setResponseBody(element) {
+        const box = document.getElementById('test-response-body');
+        if (!box) return;
+        QSDom.clear(box);
+        box.appendChild(element);
+    }
+
+    /** Replace the test modal's status badge. */
+    function _setResponseStatus(text, badgeClass) {
+        const box = document.getElementById('test-response-status');
+        if (!box) return;
+        QSDom.clear(box);
+        box.appendChild(QSDom.el('span', {
+            class: 'admin-badge ' + badgeClass, text: text
+        }));
     }
 
     // =========================================================================
@@ -1454,8 +1715,8 @@
         document.getElementById('btn-import-back').style.display = isPaste ? 'none' : '';
         document.getElementById('btn-import-confirm').style.display = isPaste ? 'none' : '';
         document.getElementById('import-title').textContent = isPaste
-            ? (window.translations?.apis?.importJson || 'Import APIs from JSON')
-            : (window.translations?.apis?.importModal?.previewTitle || 'Preview & confirm');
+            ? t('apis.importJson')
+            : t('apis.importModal.previewTitle');
         // Clear inline error
         const errBox = document.getElementById('import-parse-error');
         if (errBox) { errBox.style.display = 'none'; errBox.textContent = ''; }
@@ -1702,7 +1963,7 @@
             if (p.host === 'self' || p.host === 'third-party') {
                 hostSet[a.baseUrl] = true;
                 if (hostKinds[a.baseUrl] && hostKinds[a.baseUrl] !== p.host) {
-                    flags.push('Host "' + a.baseUrl + '" is classified both ways across APIs — the last import wins.');
+                    flags.push(t('apis.importModal.flagHostBothWays', { host: a.baseUrl }));
                 }
                 hostKinds[a.baseUrl] = p.host;
             }
@@ -1712,7 +1973,8 @@
                 const epId = ep.id || ep.name || ep.path;
                 for (const field of Object.keys(f)) {
                     if (labels[f[field]]) mappings++;
-                    else flags.push('Endpoint "' + apiId + '/' + epId + '" field "' + field + '" → label "' + f[field] + '" not in this API\'s collects — will be skipped.');
+                    else flags.push(t('apis.importModal.flagFieldUnknown', {
+                        endpoint: apiId + '/' + epId, field: field, label: f[field] }));
                 }
             }
         }
@@ -1732,28 +1994,30 @@
         const totalEndpoints = apiIds.reduce(
             (n, id) => n + ((apis[id].endpoints && apis[id].endpoints.length) || 0), 0);
         const existing = apiIds.filter(id => apisData[id]);
-        const fmtLabel = format === 'ours' ? 'native'
+        const fmtLabel = format === 'ours' ? t('apis.importModal.formatNative')
             : format === 'testapi-filemanager' ? 'test.api file-manager'
             : format === 'openapi-3' ? 'OpenAPI 3.x'
-            : 'unknown';
+            : t('apis.importModal.formatUnknown');
 
         const root = document.createElement('div');
         root.className = 'apis-import-summary';
 
         const line = document.createElement('p');
         line.className = 'apis-import-summary__line';
-        line.appendChild(document.createTextNode('Detected format: '));
+        line.appendChild(document.createTextNode(t('apis.importModal.detectedFormat') + ' '));
         const strong = document.createElement('strong');
         strong.textContent = fmtLabel;
         line.appendChild(strong);
-        line.appendChild(document.createTextNode(
-            '. Will create ' + apiIds.length + ' API' + (apiIds.length === 1 ? '' : 's') +
-            ', ' + totalEndpoints + ' endpoint' + (totalEndpoints === 1 ? '' : 's') + '.'
-        ));
+        line.appendChild(document.createTextNode(t('apis.importModal.summaryCreate', {
+            apis: t(apiIds.length === 1 ? 'apis.apiCountOne' : 'apis.apiCountMany',
+                { count: apiIds.length }),
+            endpoints: t(totalEndpoints === 1 ? 'apis.endpointCountOne' : 'apis.endpointCountMany',
+                { count: totalEndpoints })
+        })));
         if (existing.length > 0) {
-            line.appendChild(document.createTextNode(
-                ' Replaces ' + existing.length + ' existing: ' + existing.join(', ') + '.'
-            ));
+            line.appendChild(document.createTextNode(t('apis.importModal.summaryReplaces', {
+                count: existing.length, list: existing.join(', ')
+            })));
         }
         root.appendChild(line);
 
@@ -1762,11 +2026,15 @@
         if (priv.datums || priv.hosts || priv.mappings || priv.flags.length) {
             const pLine = document.createElement('p');
             pLine.className = 'apis-import-summary__line';
-            pLine.appendChild(document.createTextNode(
-                'Privacy: will create ' + priv.datums + ' data-collected, classify ' +
-                priv.hosts + ' host' + (priv.hosts === 1 ? '' : 's') + ', map ' +
-                priv.mappings + ' field' + (priv.mappings === 1 ? '' : 's') + '.'
-            ));
+            pLine.appendChild(document.createTextNode(t('apis.importModal.privacySummary', {
+                datums: priv.datums,
+                hosts: t(priv.hosts === 1
+                    ? 'apis.importModal.hostCountOne'
+                    : 'apis.importModal.hostCountMany', { count: priv.hosts }),
+                fields: t(priv.mappings === 1
+                    ? 'apis.importModal.fieldCountOne'
+                    : 'apis.importModal.fieldCountMany', { count: priv.mappings })
+            })));
             root.appendChild(pLine);
         }
 
@@ -1816,7 +2084,7 @@
         if (apiIds.length === 0) {
             const empty = document.createElement('p');
             empty.className = 'admin-text-muted';
-            empty.textContent = 'No APIs to import.';
+            empty.textContent = t('apis.importModal.noApis');
             host.appendChild(empty);
             return;
         }
@@ -1904,7 +2172,7 @@
             note.className = 'admin-text-muted';
             note.style.margin = '0';
             note.style.fontSize = 'var(--font-sm)';
-            note.textContent = 'No endpoints in this API.';
+            note.textContent = t('apis.importModal.noEndpointsInApi');
             section.appendChild(note);
             refreshState();
             return section;
@@ -1971,13 +2239,15 @@
         authEl.style.fontSize = '0.7em';
         const epAuth = endpoint.auth || 'inherit';
         if (epAuth === 'none') {
-            authEl.textContent = 'public';
+            authEl.textContent = t('apis.importModal.authPublic');
         } else if (epAuth === 'required') {
-            authEl.textContent = '🔐 required';
-            authEl.title = 'Operation declares a security scheme different from the API auth — refine after import.';
+            authEl.textContent = t('apis.importModal.authRequired');
+            authEl.title = t('apis.importModal.authMismatch');
         } else {
             // inherit
-            authEl.textContent = apiAuthType === 'none' ? 'inherit' : ('🔐 inherit (' + apiAuthType + ')');
+            authEl.textContent = apiAuthType === 'none'
+                ? t('apis.importModal.authInherit')
+                : t('apis.importModal.authInheritFrom', { type: apiAuthType });
         }
         li.appendChild(authEl);
 
@@ -1985,16 +2255,16 @@
             const reqBadge = document.createElement('span');
             reqBadge.className = 'admin-badge admin-badge--info';
             reqBadge.style.fontSize = '0.7em';
-            reqBadge.title = 'Has request schema';
-            reqBadge.textContent = 'req';
+            reqBadge.title = t('apis.importModal.hasRequestSchema');
+            reqBadge.textContent = t('apis.importModal.badgeReq');
             li.appendChild(reqBadge);
         }
         if (endpoint.responseSchema) {
             const respBadge = document.createElement('span');
             respBadge.className = 'admin-badge admin-badge--info';
             respBadge.style.fontSize = '0.7em';
-            respBadge.title = 'Has response schema';
-            respBadge.textContent = 'resp';
+            respBadge.title = t('apis.importModal.hasResponseSchema');
+            respBadge.textContent = t('apis.importModal.badgeResp');
             li.appendChild(respBadge);
         }
 
@@ -2105,35 +2375,39 @@
         const errBox = document.getElementById('import-parse-error');
         const raw = document.getElementById('import-json').value.trim();
         if (!raw) {
-            errBox.textContent = 'Paste JSON first (or use one of the example buttons).';
+            errBox.textContent = t('apis.importModal.pasteFirst');
             errBox.style.display = '';
             return;
         }
         let data;
         try { data = JSON.parse(raw); }
         catch (err) {
-            errBox.textContent = 'Invalid JSON: ' + err.message;
+            errBox.textContent = t('apis.importModal.invalidJson', { message: err.message });
             errBox.style.display = '';
             return;
         }
         const fmt = detectImportFormat(data);
         if (fmt === 'swagger-2') {
-            errBox.innerHTML = 'Swagger 2.0 detected — not yet supported. ' +
-                'Convert your spec to OpenAPI 3.x first ' +
-                '(e.g. <a href="https://converter.swagger.io" target="_blank" rel="noopener">converter.swagger.io</a>).';
-            errBox.style.display = '';
+            _setImportError(_renderMarked('apis.importModal.swagger2', {
+                link: QSDom.el('a', {
+                    href: 'https://converter.swagger.io',
+                    target: '_blank', rel: 'noopener', text: 'converter.swagger.io'
+                })
+            }));
             return;
         }
         if (fmt === 'unknown') {
-            errBox.innerHTML = 'Unrecognised format. Expected <code>{"apis": {...}}</code>, ' +
-                'OpenAPI 3.x (<code>openapi: "3.x.x"</code>), ' +
-                'or test.api file-manager (<code>endpoints.public</code> / <code>endpoints.secured</code>).';
-            errBox.style.display = '';
+            _setImportError(_renderMarked('apis.importModal.unknownFormat', {
+                shape: QSDom.el('code', { text: '{"apis": {...}}' }),
+                openapi: QSDom.el('code', { text: 'openapi: "3.x.x"' }),
+                publicPath: QSDom.el('code', { text: 'endpoints.public' }),
+                securedPath: QSDom.el('code', { text: 'endpoints.secured' })
+            }));
             return;
         }
         const result = convertImportPayload(data, fmt);
         if (!result || !result.converted) {
-            errBox.textContent = 'Converter returned no APIs.';
+            errBox.textContent = t('apis.importModal.converterEmpty');
             errBox.style.display = '';
             return;
         }
@@ -2210,11 +2484,11 @@
             let parsed;
             try { parsed = JSON.parse(previewText); }
             catch (err) {
-                showToast('Preview JSON is invalid: ' + err.message, 'error');
+                showToast(t('apis.toast.previewInvalid', { message: err.message }), 'error');
                 return;
             }
             if (!parsed || typeof parsed !== 'object' || !parsed.apis || typeof parsed.apis !== 'object') {
-                showToast('Preview JSON must have a top-level "apis" object', 'error');
+                showToast(t('apis.toast.previewNoApis'), 'error');
                 return;
             }
             toImport = parsed;
@@ -2235,13 +2509,13 @@
         const filtered = _filterApisByTreeSelection(toImport);
         const apis = filtered.apis;
         if (Object.keys(apis).length === 0) {
-            showToast('Nothing selected — check at least one endpoint to import.', 'error');
+            showToast(t('apis.toast.nothingSelected'), 'error');
             return;
         }
         for (const apiId of Object.keys(apis)) {
             const u = (apis[apiId] && apis[apiId].baseUrl) || '';
             if (!/^https?:\/\//i.test(u)) {
-                showToast('Base URL for "' + apiId + '" must start with http:// or https:// — set it in the form above the JSON preview.', 'error');
+                showToast(t('apis.toast.baseUrlInvalid', { api: apiId }), 'error');
                 return;
             }
         }
@@ -2249,7 +2523,7 @@
         const btn = document.getElementById('btn-import-confirm');
         btn.disabled = true;
         const origLabel = btn.textContent;
-        btn.textContent = 'Importing…';
+        btn.textContent = t('apis.importModal.importing');
 
         let imported = 0;
         let errors = 0;
@@ -2295,9 +2569,9 @@
         await loadApis();
 
         if (errors === 0) {
-            showToast(`Imported ${imported} API(s) successfully`, 'success');
+            showToast(t('apis.toast.importedOk', { count: imported }), 'success');
         } else {
-            showToast(`Imported ${imported} API(s) with ${errors} error(s)`, 'warning');
+            showToast(t('apis.toast.importedWithErrors', { count: imported, errors: errors }), 'warning');
         }
     }
 
@@ -2316,7 +2590,7 @@
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
         
-        showToast('APIs exported successfully', 'success');
+        showToast(t('apis.toast.exported'), 'success');
     }
 
     // =========================================================================
@@ -2336,13 +2610,6 @@
     // =========================================================================
     // Utilities
     // =========================================================================
-
-    function escapeHtml(str) {
-        if (!str) return '';
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
-    }
 
     /**
      * Convert JSON Schema to example object
@@ -2443,7 +2710,7 @@
         const statusId = textareaId === 'endpoint-request-schema' ? 'request-schema-status' : 'response-schema-status';
         validateJsonField(textarea, statusId);
         
-        showToast('Template inserted', 'success');
+        showToast(t('apis.toast.templateInserted'), 'success');
     }
 
     // =========================================================================
@@ -2468,12 +2735,12 @@
         
         try {
             JSON.parse(value);
-            statusEl.textContent = '✓ Valid JSON';
+            statusEl.textContent = t('apis.schema.validJson');
             statusEl.className = 'admin-schema-editor__status admin-schema-editor__status--valid';
             editorEl?.classList.remove('admin-schema-editor--invalid');
             return true;
         } catch (e) {
-            statusEl.textContent = '✗ Invalid JSON';
+            statusEl.textContent = t('apis.schema.invalidJson');
             statusEl.className = 'admin-schema-editor__status admin-schema-editor__status--invalid';
             editorEl?.classList.add('admin-schema-editor--invalid');
             return false;
@@ -2498,9 +2765,9 @@
             const statusId = textareaId === 'endpoint-request-schema' ? 'request-schema-status' : 'response-schema-status';
             validateJsonField(textarea, statusId);
             
-            showToast('JSON formatted', 'success');
+            showToast(t('apis.toast.jsonFormatted'), 'success');
         } catch (e) {
-            showToast('Cannot format: invalid JSON', 'error');
+            showToast(t('apis.toast.cannotFormat'), 'error');
         }
     }
 
