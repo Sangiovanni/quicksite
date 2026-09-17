@@ -1,38 +1,56 @@
 <?php
-require_once __DIR__ . '/../functions/jsonIo.php'; // qs_json_write only — this class is applied at render time, in a build too // qs_json_write
+require_once __DIR__ . '/../functions/jsonIo.php';        // read-only here, but kept for parity with the runtime bundle
+require_once __DIR__ . '/../functions/requestRuntime.php'; // qs_request_host() — the install's own host (own-host guard)
 
 /**
- * IframeSandbox — Centralized iframe sandbox permission manager
+ * IframeSandbox — the embed sandbox policy, applied at render time.
  *
- * Single source of truth for iframe sandbox attributes.
- * Called by JsonToHtmlRenderer, addNode, editNode, and API commands.
+ * Single source of truth for the `sandbox` attribute the engine forces onto
+ * every <iframe>. Called by JsonToHtmlRenderer (preview / live view) and by the
+ * compiled pages a build emits (JsonToPhpCompiler writes a call to
+ * getSandboxAttribute()). addNode / editNode / addComplexElement / editStructure
+ * use the sanitizers below to strip an author-supplied sandbox attribute.
  *
- * Config stored per-project at: data/iframe_sandbox.json
- * Format:
+ * ── WHERE THE POLICY LIVES ─────────────────────────────────────────────────
+ * INSTALL-WIDE, set at deployment, in one file for the whole installation:
+ *
+ *     <secure>/management/config/embed-policy.json
+ *
+ * It is set only by whoever deploys QuickSite and cannot be changed from the
+ * panel. That is the point: the panel and every project are served from ONE
+ * origin and share one localStorage namespace, so a policy a project owner or
+ * admin could edit would let them grant an iframe allow-scripts +
+ * allow-same-origin pointing back at our own origin — which switches the sandbox
+ * off for a frame that can then read every project's storage and act on /admin/.
+ * A per-project, panel-writable policy cannot be trusted with that, so the policy
+ * is install-wide. getIframeSandbox still READS it (an agent needs to know which
+ * hosts embed cleanly); nothing writes it at runtime.
+ *
+ * A BUILT SITE carries a copy, bundled by build.php at <secure>/data/embed-policy.json,
+ * and resolves it there — the install's config folder is not present in a build.
+ *
+ * ── FILE SHAPE ─────────────────────────────────────────────────────────────
  *   {
- *     "tags": {
- *       "iframe": {
- *         "youtube.com": "allow-scripts allow-same-origin",
- *         "youtu.be": "allow-scripts allow-same-origin"
- *       }
- *     },
- *     "default": ""
+ *     "default": ["<token>", ...],          // unmatched hosts; [] = strictest
+ *     "hosts":   [ { "name": "<host>", "parameters": ["<token>", ...] }, ... ]
  *   }
+ * Only <iframe> is governed. Any other top-level key (e.g. "_comment") is
+ * ignored, which is what lets the .example document its own format.
  *
- * Domain matching:
- *   hostname === domain  OR  hostname ends with ".{domain}"
- *   (CSP-style — "youtube.com" matches www.youtube.com but NOT fakeyoutube.com)
+ * Domain matching (CSP-style): hostname === name OR hostname ends with ".{name}".
+ * "youtube.com" matches www.youtube.com but not fakeyoutube.com.
  *
- * Never-allowed permissions (always stripped):
- *   - allow-top-navigation
- *   - allow-top-navigation-by-user-activation
- *   - allow-popups-to-escape-sandbox
+ * ── GUARD RAILS (hold even against the deployer) ────────────────────────────
+ *   - NEVER_ALLOWED tokens are always stripped.
+ *   - allow-scripts + allow-same-origin is never emitted TOGETHER for a
+ *     same-origin or relative src (that pair is what re-enables our origin).
+ *   - a hosts[] entry naming this install's own host is dropped at load.
  */
 class IframeSandbox
 {
     /**
-     * Permissions that are ALWAYS stripped regardless of config.
-     * These allow iframe content to redirect or escape the parent page.
+     * Permissions ALWAYS stripped: they let framed content redirect or escape
+     * the top page regardless of what else is granted.
      */
     const NEVER_ALLOWED = [
         'allow-top-navigation',
@@ -41,7 +59,8 @@ class IframeSandbox
     ];
 
     /**
-     * All valid sandbox permission tokens (for UI checkboxes and validation).
+     * Every valid sandbox token (used by getIframeSandbox for the read-only
+     * panel view; the policy file may only name these).
      */
     const VALID_PERMISSIONS = [
         'allow-scripts',
@@ -56,7 +75,10 @@ class IframeSandbox
     ];
 
     /**
-     * Tags that can embed external content and support sandbox rules.
+     * Tags whose author-supplied `sandbox` attribute the write-side sanitizers
+     * strip. Only <iframe> is actually policed at render time; <video>/<audio>
+     * are here so a stray sandbox attribute on them is dropped too (it is inert
+     * on those elements, so this is tidiness, not a control).
      */
     const VALID_EMBED_TAGS = [
         'iframe',
@@ -64,25 +86,59 @@ class IframeSandbox
         'audio',
     ];
 
-    /** @var array|null Cached config (loaded once per request) */
+    /** @var array|null Normalised config, cached per request. */
     private static ?array $config = null;
 
-    /** @var string|null Cached project path */
+    /** @var string|null Resolved config path, cached per request. */
     private static ?string $configPath = null;
 
     /**
-     * Get the config file path for the current project.
+     * The install-wide policy file — or, inside a built site, the copy the build
+     * bundled beside its other runtime data.
+     *
+     * Install vs build is decided STRUCTURALLY: an install carries the engine's
+     * management/config directory; a build ships only the request-time runtime
+     * plus its data, so that directory is absent and the policy lives in data/.
+     * ⚠ This must NOT key off a request-scoped signal such as QS_SITE_BOOT: the
+     * build command defines that constant on the INSTALL to read a built site's
+     * qs-site.php (qs_site_verify_servable), which would then resolve an install
+     * request to the build path and silently fall back to the strictest sandbox.
+     * The directory on disk cannot be redefined mid-request, so it is safe.
      */
     private static function getConfigPath(): string
     {
         if (self::$configPath === null) {
-            self::$configPath = PROJECT_PATH . '/data/iframe_sandbox.json';
+            $installConfigDir = SECURE_FOLDER_PATH . '/management/config';
+            if (is_dir($installConfigDir)) {
+                self::$configPath = $installConfigDir . '/embed-policy.json';
+            } else {
+                self::$configPath = SECURE_FOLDER_PATH . '/data/embed-policy.json';
+            }
         }
         return self::$configPath;
     }
 
     /**
-     * Load the iframe sandbox config. Cached per request.
+     * The strictest fallback: no host rules, empty default (block everything).
+     * Returned whenever the file is absent or unreadable.
+     */
+    private static function emptyConfig(): array
+    {
+        return ['default' => '', 'hosts' => []];
+    }
+
+    /**
+     * Load and NORMALISE the policy. Cached per request.
+     *
+     * The stored shape is arrays of tokens; the internal shape this returns is
+     * space-joined strings, because a sandbox attribute value is a string and
+     * every consumer below wants it that way:
+     *
+     *     ['default' => 'tok tok', 'hosts' => [['name' => 'h', 'sandbox' => 'tok tok'], ...]]
+     *
+     * NEVER_ALLOWED tokens are stripped here, and a hosts[] entry whose name is
+     * this install's own host is dropped here (with a log line) — both so no
+     * later reader has to remember to.
      */
     public static function loadConfig(): array
     {
@@ -91,117 +147,113 @@ class IframeSandbox
         }
 
         $path = self::getConfigPath();
-        if (!file_exists($path)) {
-            self::$config = ['tags' => array_fill_keys(self::VALID_EMBED_TAGS, []), 'default' => ''];
+        if (!is_file($path)) {
+            self::$config = self::emptyConfig();
             return self::$config;
         }
 
-        $content = file_get_contents($path);
-        $decoded = json_decode($content, true);
-
+        $decoded = json_decode((string) file_get_contents($path), true);
         if (!is_array($decoded)) {
-            self::$config = ['tags' => array_fill_keys(self::VALID_EMBED_TAGS, []), 'default' => ''];
+            self::$config = self::emptyConfig();
             return self::$config;
         }
 
-        $tags = $decoded['tags'] ?? [];
-        if (!is_array($tags)) {
-            $tags = [];
+        // default — an array of tokens; a space-separated string is also accepted.
+        $default = $decoded['default'] ?? [];
+        if (is_array($default)) {
+            $default = implode(' ', array_filter($default, 'is_string'));
+        } elseif (!is_string($default)) {
+            $default = '';
+        }
+        $default = self::stripNeverAllowed($default);
+
+        $ownHost = self::ownHost();
+
+        $hosts = [];
+        foreach (($decoded['hosts'] ?? []) as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+            $name = isset($entry['name']) && is_string($entry['name'])
+                ? strtolower(trim($entry['name']))
+                : '';
+            if ($name === '') {
+                continue;
+            }
+            // Own-host guard: a rule for this install's own host would grant a
+            // same-origin frame whatever it lists — refuse it here, and say so.
+            if ($ownHost !== null && self::matchesDomain($ownHost, $name)) {
+                error_log("IframeSandbox: ignoring embed-policy host '{$name}' — it names this install's own host, which cannot be granted embed permissions (same-origin escape).");
+                continue;
+            }
+            $params = $entry['parameters'] ?? [];
+            $params = is_array($params) ? implode(' ', array_filter($params, 'is_string')) : '';
+            $hosts[] = ['name' => $name, 'sandbox' => self::stripNeverAllowed($params)];
         }
 
-        // Preserve all valid tag rules
-        $normalizedTags = [];
-        foreach (self::VALID_EMBED_TAGS as $tag) {
-            $rules = $tags[$tag] ?? [];
-            $normalizedTags[$tag] = is_array($rules) ? $rules : [];
-        }
-
-        self::$config = [
-            'tags' => $normalizedTags,
-            'default' => $decoded['default'] ?? '',
-        ];
+        self::$config = ['default' => $default, 'hosts' => $hosts];
         return self::$config;
     }
 
     /**
-     * Force reload config (after a write operation).
+     * This install's own host, or null when it cannot be known reliably.
+     *
+     * ⚠ There is no single "install host" in general: behind a proxy, or on a
+     * deployment answering several hostnames, the honest answer is per request.
+     * qs_request_host() is the engine's ONE host source — validated, and pinned
+     * to the deployer's canonical value when QS_TRUSTED_HOSTS is set — so the
+     * own-host guard is exact on a pinned deployment and best-effort (the
+     * current request's host) otherwise. It is a guard rail, not a boundary; the
+     * boundary is that the pair is never emitted for a same-origin src at all.
      */
-    public static function clearCache(): void
+    private static function ownHost(): ?string
     {
-        self::$config = null;
-        self::$configPath = null;
+        if (!function_exists('qs_request_host')) {
+            return null;
+        }
+        $host = strtolower(qs_request_host());
+        // Strip an optional :port — policy host names never carry one.
+        $colon = strrpos($host, ':');
+        if ($colon !== false && strpos($host, ']') === false) {
+            $host = substr($host, 0, $colon);
+        }
+        return $host !== '' ? $host : null;
     }
 
     /**
-     * Save config to the project's data file.
-     */
-    public static function saveConfig(array $config): bool
-    {
-        $path = self::getConfigPath();
-
-        // Ensure data dir exists
-        $dir = dirname($path);
-        if (!is_dir($dir)) {
-            mkdir($dir, 0755, true);
-        }
-
-        // Sanitize before save: strip never-allowed from all tag rules and default
-        $tags = $config['tags'] ?? [];
-        foreach ($tags as $tag => $rules) {
-            if (!is_array($rules)) continue;
-            $cleanRules = [];
-            foreach ($rules as $domain => $sandbox) {
-                $cleanRules[$domain] = self::stripNeverAllowed(is_string($sandbox) ? $sandbox : '');
-            }
-            $tags[$tag] = $cleanRules;
-        }
-        $config['tags'] = $tags;
-        $config['default'] = self::stripNeverAllowed($config['default'] ?? '');
-
-        $result = qs_json_write($path, $config, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES, LOCK_EX);
-
-        // Clear cache so next read picks up the new data
-        self::clearCache();
-
-        return $result;
-    }
-
-    /**
-     * Get the sandbox attribute value for a given iframe src URL.
+     * The sandbox attribute VALUE for a given iframe src. The main entry point
+     * for the renderer and the compiled pages.
      *
-     * This is the main entry point for renderers and commands.
-     *
-     * @param string $src The iframe src URL
-     * @return string The sandbox attribute value (empty string = block everything)
+     * @param string $src The authored iframe src.
+     * @return string Space-separated tokens; '' means bare sandbox (block all).
      */
     public static function getSandboxValue(string $src): string
     {
+        $config = self::loadConfig();
+        $default = $config['default'];
+
         $hostname = self::extractHostname($src);
-        if ($hostname === null) {
-            // Can't parse URL — use strictest sandbox
-            return '';
+
+        // No host means a relative / scheme-less src (evil.xml, assets/x,
+        // /p/other/page): it resolves against OUR origin. So does an absolute
+        // src naming our own host. Either way it is same-origin — apply the
+        // default policy but never the allow-scripts + allow-same-origin pair,
+        // which for a same-origin frame is exactly script access to this origin.
+        if ($hostname === null || self::isOwnHost($hostname)) {
+            return self::stripSameOriginEscape($default);
         }
 
-        $config = self::loadConfig();
-
-        // Check iframe rules — domain map lookup
-        $iframeRules = $config['tags']['iframe'] ?? [];
-        foreach ($iframeRules as $domain => $sandbox) {
-            if (self::matchesDomain($hostname, $domain)) {
-                return self::stripNeverAllowed(is_string($sandbox) ? $sandbox : '');
+        foreach ($config['hosts'] as $host) {
+            if (self::matchesDomain($hostname, $host['name'])) {
+                return $host['sandbox'];
             }
         }
 
-        // No match — return default (typically empty = block all)
-        return self::stripNeverAllowed($config['default'] ?? '');
+        return $default;
     }
 
     /**
-     * Build the full sandbox attribute string for an HTML tag.
-     * Returns the entire attribute: sandbox="..." or sandbox="" (bare).
-     *
-     * @param string $src The iframe src URL
-     * @return string The sandbox="..." attribute to insert in HTML
+     * The whole attribute: sandbox="..." (or bare sandbox="" to block all).
      */
     public static function getSandboxAttribute(string $src): string
     {
@@ -213,220 +265,120 @@ class IframeSandbox
     }
 
     /**
-     * Extract hostname from a URL.
+     * Extract the lowercase host from a URL, or null when the src names no host.
      *
-     * @param string $url
-     * @return string|null Lowercase hostname, or null if unparseable
+     * ⚠ It must NOT prepend a scheme. A value with no scheme and no leading //
+     * ("evil.xml", "youtube.com/embed", "/p/other/page") is a RELATIVE URL —
+     * the browser resolves it against the current page's origin, so it is
+     * same-origin, and reporting no host is what lets getSandboxValue treat it
+     * as such. Prepending https:// and reading the first path segment as a host
+     * would mistake "youtube.com/embed" for a cross-origin frame at youtube.com
+     * and "evil.xml" for a frame at host "evil.xml" — a same-origin frame handed
+     * a cross-origin host's policy.
      */
     public static function extractHostname(string $url): ?string
     {
-        // Ensure a scheme exists for parse_url to work
-        if (!preg_match('#^[a-zA-Z][a-zA-Z0-9+.-]*://#', $url)) {
-            $url = 'https://' . $url;
-        }
-
-        $parsed = parse_url($url);
-        if (!isset($parsed['host'])) {
+        $parsed = parse_url(trim($url));
+        if (!is_array($parsed) || !isset($parsed['host']) || $parsed['host'] === '') {
             return null;
         }
-
         return strtolower($parsed['host']);
     }
 
     /**
-     * Check if a hostname matches a domain pattern.
-     *
-     * CSP-style matching:
-     *   hostname === domain         → exact match
-     *   hostname ends with .domain  → subdomain match
-     *
-     * Examples:
-     *   matchesDomain("youtube.com", "youtube.com")        → true
-     *   matchesDomain("www.youtube.com", "youtube.com")    → true
-     *   matchesDomain("m.youtube.com", "youtube.com")      → true
-     *   matchesDomain("fakeyoutube.com", "youtube.com")    → false
-     *   matchesDomain("attackonyoutube.com", "youtube.com") → false
-     *
-     * @param string $hostname The actual hostname from the URL
-     * @param string $domain The domain pattern from the rule
-     * @return bool
+     * Is this hostname this install's own host? (belt to loadConfig's braces)
+     */
+    private static function isOwnHost(string $hostname): bool
+    {
+        $own = self::ownHost();
+        return $own !== null && self::matchesDomain($hostname, $own);
+    }
+
+    /**
+     * CSP-style domain match: hostname === name, or hostname ends with ".{name}".
+     * "youtube.com" matches www.youtube.com and m.youtube.com, not fakeyoutube.com.
      */
     public static function matchesDomain(string $hostname, string $domain): bool
     {
         $hostname = strtolower(trim($hostname));
         $domain = strtolower(trim($domain));
-
         if ($hostname === '' || $domain === '') {
             return false;
         }
-
-        // Exact match
         if ($hostname === $domain) {
             return true;
         }
-
-        // Subdomain match: hostname must end with ".{domain}"
-        $suffix = '.' . $domain;
-        return str_ends_with($hostname, $suffix);
+        return str_ends_with($hostname, '.' . $domain);
     }
 
     /**
-     * Remove never-allowed permissions from a sandbox string.
-     *
-     * @param string $sandbox Space-separated permission tokens
-     * @return string Sanitized sandbox string
+     * Remove never-allowed tokens (and blanks) from a space-separated string.
      */
     public static function stripNeverAllowed(string $sandbox): string
     {
         if ($sandbox === '') {
             return '';
         }
-
         $tokens = preg_split('/\s+/', trim($sandbox));
-        $filtered = array_filter($tokens, function (string $token) {
+        $filtered = array_filter($tokens, static function (string $token): bool {
             return $token !== '' && !in_array($token, self::NEVER_ALLOWED, true);
         });
-
         return implode(' ', $filtered);
     }
 
     /**
-     * Validate a sandbox permission string.
-     * Returns array of invalid tokens, or empty array if all valid.
-     *
-     * @param string $sandbox Space-separated permission tokens
-     * @return array Invalid tokens found
+     * For a same-origin or relative src, break the allow-scripts +
+     * allow-same-origin pair: that combination gives a same-origin frame script
+     * access to THIS origin's DOM and storage. allow-same-origin is the token
+     * dropped — a frame kept out of our origin can still run its own scripts in
+     * an opaque origin, which is the least-restrictive safe answer — while
+     * allow-scripts alone (no same-origin) stays, since it cannot reach us.
      */
-    public static function validatePermissions(string $sandbox): array
+    public static function stripSameOriginEscape(string $sandbox): string
     {
-        if (trim($sandbox) === '') {
-            return [];
+        if ($sandbox === '') {
+            return '';
         }
-
         $tokens = preg_split('/\s+/', trim($sandbox));
-        $invalid = [];
-        $allKnown = array_merge(self::VALID_PERMISSIONS, self::NEVER_ALLOWED);
-
-        foreach ($tokens as $token) {
-            if ($token !== '' && !in_array($token, $allKnown, true)) {
-                $invalid[] = $token;
-            }
+        $hasScripts = in_array('allow-scripts', $tokens, true);
+        $hasSameOrigin = in_array('allow-same-origin', $tokens, true);
+        if ($hasScripts && $hasSameOrigin) {
+            $tokens = array_filter($tokens, static fn(string $t): bool => $t !== '' && $t !== 'allow-same-origin');
+        } else {
+            $tokens = array_filter($tokens, static fn(string $t): bool => $t !== '');
         }
-
-        return $invalid;
+        return implode(' ', $tokens);
     }
 
-    /**
-     * Check if a tag name is a valid embeddable tag.
-     *
-     * @param string $tag
-     * @return bool
-     */
-    public static function isValidTag(string $tag): bool
-    {
-        return in_array(strtolower(trim($tag)), self::VALID_EMBED_TAGS, true);
-    }
+    // ── Node param sanitisation (write side) ─────────────────────────────────
 
     /**
-     * Validate a domain string (basic check).
-     * Rejects empty, only dots, contains /, :, etc.
+     * Strip a user-supplied `sandbox` from an embed node's params — the system
+     * decides the sandbox at render time, authors cannot set it.
      *
-     * @param string $domain
-     * @return bool
-     */
-    public static function isValidDomain(string $domain): bool
-    {
-        $domain = trim($domain);
-        if ($domain === '') {
-            return false;
-        }
-
-        // Must look like a domain (letters, digits, dots, hyphens)
-        // No paths, no ports, no schemes
-        return (bool) preg_match('/^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+$/', $domain);
-    }
-
-    /**
-     * Validate a full config array structure.
-     *
-     * @param array $config
-     * @return array Errors found (empty = valid)
-     */
-    public static function validateConfig(array $config): array
-    {
-        $errors = [];
-
-        if (!isset($config['tags']) || !is_array($config['tags'])) {
-            $errors[] = 'Missing or invalid "tags" object';
-            return $errors;
-        }
-
-        $iframeRules = $config['tags']['iframe'] ?? [];
-        if (!is_array($iframeRules)) {
-            $errors[] = '"tags.iframe" must be an object';
-            return $errors;
-        }
-
-        foreach ($iframeRules as $domain => $sandbox) {
-            if (!is_string($domain) || !self::isValidDomain($domain)) {
-                $errors[] = "Invalid domain key: '{$domain}'";
-            }
-            if (!is_string($sandbox)) {
-                $errors[] = "Rule '{$domain}': sandbox must be a string";
-                continue;
-            }
-            $invalid = self::validatePermissions($sandbox);
-            if (!empty($invalid)) {
-                $errors[] = "Rule '{$domain}': unknown permissions: " . implode(', ', $invalid);
-            }
-        }
-
-        if (isset($config['default'])) {
-            $invalid = self::validatePermissions($config['default']);
-            if (!empty($invalid)) {
-                $errors[] = "Default: unknown permissions: " . implode(', ', $invalid);
-            }
-        }
-
-        return $errors;
-    }
-
-    // ── Node Param Sanitization ──────────────────────────────
-
-    /**
-     * Strip the sandbox attribute from node params if the tag is an embed tag.
-     * The system enforces sandbox at render time — users cannot set it manually.
-     *
-     * @param string $tag The HTML tag name
-     * @param array $params The node params (modified in place by reference)
-     * @return bool True if a sandbox param was stripped
+     * @return bool True if a sandbox param was removed.
      */
     public static function sanitizeNodeParams(string $tag, array &$params): bool
     {
         if (!in_array(strtolower($tag), self::VALID_EMBED_TAGS, true)) {
             return false;
         }
-
         if (array_key_exists('sandbox', $params)) {
             unset($params['sandbox']);
             return true;
         }
-
         return false;
     }
 
     /**
-     * Recursively strip sandbox attributes from all embed tag nodes in a structure tree.
-     * Used by editStructure which receives an entire node tree.
+     * Recursively strip sandbox attributes from every embed node in a structure
+     * tree (editStructure hands over a whole tree).
      *
-     * @param array &$structure The structure array (modified in place)
-     * @return int Number of sandbox params stripped
+     * @return int Number of sandbox params stripped.
      */
     public static function sanitizeStructure(array &$structure): int
     {
         $count = 0;
-
-        // Handle array of nodes (page/menu/footer)
         if (isset($structure[0]) || empty($structure)) {
             foreach ($structure as &$node) {
                 if (is_array($node)) {
@@ -435,31 +387,23 @@ class IframeSandbox
             }
             unset($node);
         } else {
-            // Single node (component root)
             $count += self::sanitizeNode($structure);
         }
-
         return $count;
     }
 
     /**
-     * Recursively sanitize a single node and its children.
-     *
-     * @param array &$node
-     * @return int
+     * Sanitise one node and its children.
      */
     private static function sanitizeNode(array &$node): int
     {
         $count = 0;
         $tag = $node['tag'] ?? null;
-
         if ($tag && isset($node['params']) && is_array($node['params'])) {
             if (self::sanitizeNodeParams($tag, $node['params'])) {
                 $count++;
             }
         }
-
-        // Recurse into children
         if (isset($node['children']) && is_array($node['children'])) {
             foreach ($node['children'] as &$child) {
                 if (is_array($child)) {
@@ -468,7 +412,6 @@ class IframeSandbox
             }
             unset($child);
         }
-
         return $count;
     }
 }

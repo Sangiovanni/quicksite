@@ -210,14 +210,15 @@ function getCommandCategories(): array {
             'icon' => 'puzzle',
             'commands' => ['listSnippets', 'getSnippet', 'createSnippet', 'deleteSnippet', 'duplicateSnippet', 'insertSnippet', 'injectSnippetCss']
         ],
-        // Per-project embed policy (data/iframe_sandbox.json). The label is the
-        // one the panel already uses for this feature — nav.embedSecurity, the
-        // /admin/embed-security page — so the console section and the nav entry
-        // read as the same thing rather than as two names for one concept.
+        // Install-wide embed policy. Only the READ survives: the policy is set at
+        // deployment and no command writes it, so the console lists just the read.
+        // The label is the one the panel already uses for this feature —
+        // nav.embedSecurity, the /admin/embed-security page — so the console
+        // section and the nav entry read as the same thing.
         'embed_security' => [
             'label' => 'Embed Security',
             'icon' => 'shield',
-            'commands' => ['getIframeSandbox', 'setIframeSandbox', 'removeIframeSandbox']
+            'commands' => ['getIframeSandbox']
         ],
         'documentation' => [
             'label' => 'Documentation',

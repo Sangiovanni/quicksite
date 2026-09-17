@@ -202,6 +202,37 @@ maybe_place_landing_page() {
 }
 
 # ==========================================================
+# Embed policy — the install-wide iframe sandbox rules
+# ==========================================================
+# One file for the whole installation (embed-policy.json) decides which hosts an
+# <iframe> in ANY project may embed with extra sandbox permissions. It is set at
+# deployment and the panel only READS it — no user, owner or admin can widen it,
+# which is the whole reason it is here rather than per project.
+#
+# Created from the shipped .example the first time setup runs, and NEVER
+# overwritten afterwards, so a deployer's own edits are safe (same rule as
+# auth.php / roles.php, which the engine copies from their .example on first
+# load). An absent file means the strictest sandbox — every embed blocked — so
+# the .example ships the YouTube default (the host projects most commonly embed).
+ensure_embed_policy() {
+    local cfg_dir; cfg_dir="$(CONFIG_DIR)"
+    local live="$cfg_dir/embed-policy.json"
+    local example="$cfg_dir/embed-policy.json.example"
+
+    [ -d "$cfg_dir" ] || return 0
+    [ -f "$live" ] && return 0            # never touch an existing policy
+    [ -f "$example" ] || return 0
+
+    if cp "$example" "$live"; then
+        echo ""
+        echo -e "  ${GREEN}✓${NC} Created the install-wide embed policy"
+        echo -e "    ${DIM}Which hosts an <iframe> may embed lives in${NC}"
+        echo -e "    ${DIM}$SECURE_FOLDER_NAME/management/config/embed-policy.json — edit that file to${NC}"
+        echo -e "    ${DIM}allow more hosts. The admin panel only shows it, read-only.${NC}"
+    fi
+}
+
+# ==========================================================
 # Current-state readers (shown on the menu, so nothing is guessed)
 # ==========================================================
 
@@ -1238,6 +1269,7 @@ show_menu() {
 
 show_header
 maybe_place_landing_page
+ensure_embed_policy
 save_conf
 
 # A public folder name given on the command line pre-answers item 1.

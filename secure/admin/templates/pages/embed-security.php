@@ -1,20 +1,20 @@
 <?php
 /**
- * Embed Security Settings Page
- * 
- * Manages iframe sandbox rules — domain allowlists and permission levels.
- * 
- * @version 1.0.0
+ * Embed Security page — READ-ONLY view of the install-wide embed policy.
+ *
+ * The policy is set at deployment (<secure>/management/config/embed-policy.json)
+ * and cannot be changed from the panel; this page shows what is in force so an
+ * author whose embed is sandboxed can see why and who to ask. All rendering is
+ * driven by embed-security.js from getIframeSandbox.
+ *
+ * @version 2.0.0
  */
 
 $baseUrl = rtrim(BASE_URL, '/');
 
-// The sub-trees embed-security.js renders from, verbatim and under the same
-// dot paths PHP uses, so the JS asks for the path PHP would.
-$qsEmbedSecurityI18n = [];
-foreach (['embedSecurity', 'common'] as $qsSubtree) {
-    $qsEmbedSecurityI18n[$qsSubtree] = AdminTranslation::getInstance()->getRaw($qsSubtree) ?: new stdClass();
-}
+// The embedSecurity sub-tree, verbatim and under the same dot paths PHP uses,
+// so the JS asks for the path PHP would.
+$qsEmbedSecurityI18n = ['embedSecurity' => AdminTranslation::getInstance()->getRaw('embedSecurity') ?: new stdClass()];
 ?>
 
 <script>
@@ -29,8 +29,17 @@ window.QS_EMBED_SECURITY_I18N = <?= json_encode($qsEmbedSecurityI18n, JSON_HEX_T
     <p class="admin-subtitle"><?= __admin('embedSecurity.subtitle') ?></p>
 </div>
 
-<!-- Iframe Sandbox Rules -->
-<div class="admin-card">
+<!-- Read-only notice: where the policy lives and who can change it -->
+<div class="admin-card admin-card--info">
+    <div class="admin-card__body">
+        <p><strong><?= __admin('embedSecurity.readonlyNotice') ?></strong></p>
+        <p class="admin-hint"><?= str_replace(':path', '<code>' . htmlspecialchars('<secure>/management/config/embed-policy.json', ENT_QUOTES, 'UTF-8') . '</code>', __admin('embedSecurity.policyLocation')) ?></p>
+        <p class="admin-hint"><?= __admin('embedSecurity.howToChange') ?></p>
+    </div>
+</div>
+
+<!-- Allowed hosts -->
+<div class="admin-card" style="margin-top: var(--space-lg);">
     <div class="admin-card__header">
         <h2 class="admin-card__title">
             <svg class="admin-card__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -40,13 +49,6 @@ window.QS_EMBED_SECURITY_I18N = <?= json_encode($qsEmbedSecurityI18n, JSON_HEX_T
             </svg>
             <?= __admin('embedSecurity.sandboxRules') ?>
         </h2>
-        <button type="button" class="admin-btn admin-btn--small admin-btn--primary" id="btn-add-rule">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                <line x1="12" y1="5" x2="12" y2="19"/>
-                <line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-            <?= __admin('embedSecurity.addRule') ?>
-        </button>
     </div>
     <div class="admin-card__body">
         <p class="admin-hint" style="margin-bottom: var(--space-md);">
@@ -75,18 +77,8 @@ window.QS_EMBED_SECURITY_I18N = <?= json_encode($qsEmbedSecurityI18n, JSON_HEX_T
         <p class="admin-hint" style="margin-bottom: var(--space-md);">
             <?= __admin('embedSecurity.defaultPolicyHint') ?>
         </p>
-        <div class="admin-form-group">
-            <label class="admin-label" for="default-policy"><?= __admin('embedSecurity.unmatchedDomains') ?></label>
-            <select id="default-policy" class="admin-select" style="max-width: 350px;">
-                <option value=""><?= __admin('embedSecurity.blockEverythingRecommended') ?></option>
-                <option value="allow-scripts"><?= __admin('embedSecurity.allowScriptsOnly') ?></option>
-                <option value="allow-scripts allow-same-origin"><?= __admin('embedSecurity.allowScriptsSameOrigin') ?></option>
-            </select>
-            <p class="admin-hint"><?= __admin('embedSecurity.emptySandboxHint') ?></p>
-        </div>
-        <button type="button" class="admin-btn admin-btn--primary" id="btn-save-default">
-            <?= __admin('embedSecurity.saveDefault') ?>
-        </button>
+        <div id="default-policy-value"></div>
+        <p class="admin-hint"><?= __admin('embedSecurity.emptySandboxHint') ?></p>
     </div>
 </div>
 
@@ -106,38 +98,5 @@ window.QS_EMBED_SECURITY_I18N = <?= json_encode($qsEmbedSecurityI18n, JSON_HEX_T
             <?= __admin('embedSecurity.neverAllowedHint') ?>
         </p>
         <div id="never-allowed-list"></div>
-    </div>
-</div>
-
-<!-- Add/Edit Rule Modal -->
-<div class="admin-modal" id="rule-modal" style="display: none;">
-    <div class="admin-modal__backdrop" data-close-modal></div>
-    <div class="admin-modal__content" style="max-width: 520px;">
-        <div class="admin-modal__header">
-            <h3 class="admin-modal__title" id="rule-modal-title"><?= __admin('embedSecurity.addSandboxRule') ?></h3>
-            <button type="button" class="admin-modal__close" data-close-modal>&times;</button>
-        </div>
-        <div class="admin-modal__body">
-            <div class="admin-form-group">
-                <label class="admin-label" for="rule-tag"><?= __admin('embedSecurity.tagLabel') ?></label>
-                <select id="rule-tag" class="admin-select">
-                    <!-- Populated dynamically from valid_tags -->
-                </select>
-                <p class="admin-hint"><?= __admin('embedSecurity.tagHint') ?></p>
-            </div>
-            <div class="admin-form-group">
-                <label class="admin-label" for="rule-domain"><?= __admin('embedSecurity.domainLabel') ?></label>
-                <input type="text" id="rule-domain" class="admin-input" placeholder="<?= __admin('embedSecurity.domainPlaceholder') ?>" style="font-family: monospace;" />
-                <p class="admin-hint"><?= __admin('embedSecurity.domainHint') ?></p>
-            </div>
-            <div class="admin-form-group">
-                <label class="admin-label"><?= __admin('embedSecurity.sandboxPermissions') ?></label>
-                <div id="permission-checkboxes" style="display: grid; gap: var(--space-xs);"></div>
-            </div>
-        </div>
-        <div class="admin-modal__footer">
-            <button type="button" class="admin-btn admin-btn--secondary" data-close-modal><?= __admin('common.cancel') ?></button>
-            <button type="button" class="admin-btn admin-btn--primary" id="btn-save-rule"><?= __admin('embedSecurity.saveRule') ?></button>
-        </div>
     </div>
 </div>

@@ -452,8 +452,32 @@ function qs_sb_send_file(string $file): void {
     header('Accept-Ranges: bytes');
     header('ETag: ' . $etag);
     header('Last-Modified: ' . gmdate('D, d M Y H:i:s', $mtime) . ' GMT');
-    // SVG can carry script — force download-style handling defensively (never inline-exec).
-    if ($ext === 'svg') {
+    // A file served from a project's public/ shares this install's ORIGIN with
+    // the panel and every other project, so a served document that runs script
+    // runs it on that shared origin — able to read every project's localStorage
+    // and act on /admin/ with a signed-in visitor's cookie. `.svg`
+    // (image/svg+xml) carries script, and `.xml` (application/xml) can hold an
+    // XHTML/SVG <script> a browser runs when the file is opened as a document.
+    // Rather than enumerate the script-capable types (which rots), the rule is
+    // inverted: everything gets the sandbox CSP EXCEPT the types that provably
+    // cannot run web script on this origin. That is INERT MEDIA (images, fonts,
+    // audio, video), and `.pdf` — whose JavaScript executes inside the viewer's
+    // isolated API, never as web script with DOM/storage/fetch access, so the CSP
+    // buys nothing there and a sandbox directive breaks some built-in PDF
+    // viewers. The header on a passive subresource (a .css/.js a page loads) is
+    // not enforced against the loading document, so applying it to those is
+    // harmless.
+    static $sandboxExemptExts = [
+        // images
+        'png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'avif',
+        // fonts
+        'woff', 'woff2', 'ttf', 'otf', 'eot',
+        // audio / video
+        'mp4', 'webm', 'ogg', 'mp3', 'wav',
+        // document viewer runs its own isolated JS, not web script (see above)
+        'pdf',
+    ];
+    if (!in_array($ext, $sandboxExemptExts, true)) {
         header('Content-Security-Policy: default-src \'none\'; style-src \'unsafe-inline\'; sandbox');
     }
 

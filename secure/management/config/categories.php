@@ -148,12 +148,6 @@ return [
         'commands' => ['addOAuthProvider', 'editOAuthProvider', 'deleteOAuthProvider'],
     ],
 
-    // Iframe sandbox control (embed security). admin+.
-    'iframe.manage' => [
-        'scope' => 'project',
-        'commands' => ['setIframeSandbox', 'removeIframeSandbox'],
-    ],
-
     // Full-data dumps + zip-slip surface (backup/export/import/clone). admin+.
     'project.data' => [
         'scope' => 'project',

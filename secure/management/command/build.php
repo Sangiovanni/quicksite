@@ -653,7 +653,13 @@ if (MULTILINGUAL_SUPPORT) {
 //   aliases.json          alias resolution, before routing
 //   route-resolvers.json  which resolvers a route fires
 //   api-endpoints.json    what `@api/endpoint` resolves to
-//   iframe_sandbox.json   the per-domain sandbox policy
+//   oauth-presets.json    the OAuth provider presets
+//
+// ⚠ The iframe sandbox policy is NOT in this loop. It is install-wide, so it is
+// bundled separately below — from the INSTALL's config, never from the project,
+// which does not carry it. That copy must NOT be a best-effort `continue` like
+// this loop: a build that shipped no policy would fall back to the strictest
+// sandbox and silently break every allowed embed in the built site.
 //
 // Everything else under data/ stays behind on purpose: page-events and
 // state-stores are compiled INTO the pages, privacy/assets metadata feed the
@@ -662,7 +668,6 @@ $runtimeDataFiles = [
     'aliases.json',
     'route-resolvers.json',
     'api-endpoints.json',
-    'iframe_sandbox.json',
     'oauth-presets.json',
 ];
 $dataDir = $buildFullPath . '/' . $buildSecureName . '/data';
@@ -684,6 +689,39 @@ foreach ($runtimeDataFiles as $dataFile) {
                 ->withData(['reason' => $copyError])
         );
     }
+}
+
+// The embed sandbox policy, bundled from the INSTALL (not the project).
+//
+// A built site reads its policy at <secure>/data/embed-policy.json (IframeSandbox
+// resolves the bundled copy inside a build). The source is the install's live
+// embed-policy.json, or, when a deployer has not created one, the tracked
+// .example (which ships the YouTube default). One of the two ALWAYS exists, so —
+// unlike the best-effort loop above — this never ships a build with no policy. A
+// build that carried none would fall back to the strictest sandbox and break
+// every allowed embed in the deployed site with no error anywhere.
+$embedPolicySource = SECURE_FOLDER_PATH . '/management/config/embed-policy.json';
+if (!is_file($embedPolicySource)) {
+    $embedPolicySource = SECURE_FOLDER_PATH . '/management/config/embed-policy.json.example';
+}
+if (!is_file($embedPolicySource)) {
+    abort_build(
+        ApiResponse::create(500, 'server.file_not_found')
+            ->withMessage('Embed policy is missing: neither embed-policy.json nor its .example is present, so the build would ship no sandbox rules and every embed would break')
+    );
+}
+if (!is_dir($dataDir) && !mkdir($dataDir, 0755, true)) {
+    abort_build(
+        ApiResponse::create(500, 'server.directory_create_failed')
+            ->withMessage("Failed to create the build's data directory")
+    );
+}
+if (($copyError = qs_safe_copy($embedPolicySource, $dataDir . '/embed-policy.json', 'build')) !== null) {
+    abort_build(
+        ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage('Failed to copy the embed policy into the build')
+            ->withData(['reason' => $copyError])
+    );
 }
 
 // OAuth client secrets — copied, but SEPARATELY from the rest, because copying

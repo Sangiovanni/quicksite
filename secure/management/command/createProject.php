@@ -137,9 +137,6 @@ function __command_createProject(array $params = [], array $urlParams = []): Api
     
     // Create empty assets_metadata.json
     file_put_contents($projectPath . '/data/assets_metadata.json', '{}', LOCK_EX);
-    
-    // Create default iframe sandbox config (empty = strictest)
-    qs_json_write($projectPath . '/data/iframe_sandbox.json', ['tags' => ['iframe' => (object)[]], 'default' => ''], JSON_PRETTY_PRINT, LOCK_EX);
 
     // Create default translation file
     $defaultTranslations = createDefaultTranslations($siteName);

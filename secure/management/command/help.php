@@ -6600,7 +6600,7 @@ $GLOBALS['__help_commands'] = [
     ],
 
     'getIframeSandbox' => [
-        'description' => 'Returns the embed sandbox configuration for the project in the URL marker. Shows tag-based rules (tag → domain → sandbox permissions) and the default sandbox policy.',
+        'description' => 'Read the INSTALL-WIDE embed sandbox policy that governs every project\'s <iframe> elements. Returns the allowlisted hosts with the sandbox tokens each is granted, the default policy applied to unlisted hosts, and the tokens that are always allowed or never allowed.',
         'method' => 'GET',
         'parameters' => [],
         'example_get' => 'GET /management/p/<projectId>/getIframeSandbox',
@@ -6608,80 +6608,16 @@ $GLOBALS['__help_commands'] = [
             'status' => 200,
             'code' => 'operation.success',
             'data' => [
-                'tags' => [
-                    'iframe' => [
-                        'youtube.com' => 'allow-scripts allow-same-origin',
-                        'youtu.be' => 'allow-scripts allow-same-origin'
-                    ],
-                    'video' => (object)[],
-                    'audio' => (object)[]
+                'default' => [],
+                'hosts' => [
+                    ['name' => 'example.com', 'parameters' => ['allow-scripts', 'allow-same-origin']]
                 ],
-                'default' => '',
                 'valid_permissions' => ['allow-scripts', 'allow-same-origin', 'allow-forms', '...'],
-                'never_allowed' => ['allow-top-navigation', 'allow-top-navigation-by-user-activation', 'allow-popups-to-escape-sandbox'],
-                'valid_tags' => ['iframe', 'video', 'audio']
+                'never_allowed' => ['allow-top-navigation', 'allow-top-navigation-by-user-activation', 'allow-popups-to-escape-sandbox']
             ]
         ],
         'error_responses' => [],
-        'notes' => 'Empty default ("") means bare sandbox — blocks everything. Rules are organized by tag (iframe, video, audio) then by domain. Domain matching is CSP-style: hostname must equal the domain or end with .{domain}.'
-    ],
-    
-    'setIframeSandbox' => [
-        'description' => 'Add or update an embed sandbox rule for a tag + domain, or change the default sandbox policy. Admin only.',
-        'method' => 'POST',
-        'parameters' => [
-            'tag' => '(string, required for rules) The embed tag: "iframe", "video", or "audio".',
-            'domain' => '(string, required for rules) The domain to add/update, e.g. "youtube.com". Duplicate tag+domain combos overwrite the existing rule.',
-            'sandbox' => '(string) Space-separated sandbox permissions, e.g. "allow-scripts allow-same-origin". Empty string = block all.',
-            'default' => '(string, alternative) If provided without tag/domain, updates the default sandbox policy instead.'
-        ],
-        'example_post' => 'POST /management/p/<projectId>/setIframeSandbox with body: {"tag": "iframe", "domain": "youtube.com", "sandbox": "allow-scripts allow-same-origin"} - or, to change the default policy instead of a rule: {"default": "allow-scripts"}',
-        'success_response' => [
-            'status' => 200,
-            'code' => 'operation.success',
-            'message' => 'Sandbox rule added',
-            'data' => [
-                'tag' => 'iframe',
-                'domain' => 'youtube.com',
-                'sandbox' => 'allow-scripts allow-same-origin',
-                'action' => 'added',
-                'never_allowed_stripped' => null
-            ]
-        ],
-        'error_responses' => [
-            '400.validation.required' => 'Missing tag or domain',
-            '400.validation.invalid_value' => 'Invalid tag, domain, or unknown permission',
-            '500.api.error.write_failed' => 'Failed to save iframe sandbox config.'
-        ],
-        'notes' => 'Valid embed tags: iframe, video, audio. Never-allowed permissions are always stripped silently. Subdomains are automatically covered: "youtube.com" matches www.youtube.com, m.youtube.com, etc.'
-    ],
-    
-    'removeIframeSandbox' => [
-        'description' => 'Remove an embed sandbox rule by tag + domain. Admin only.',
-        'method' => 'POST',
-        'parameters' => [
-            'tag' => '(string) The embed tag: "iframe", "video", or "audio".',
-            'domain' => '(string) The domain to remove from the tag\'s rules.'
-        ],
-        'example_post' => 'POST /management/p/<projectId>/removeIframeSandbox with body: {"tag": "iframe", "domain": "youtube.com"}',
-        'success_response' => [
-            'status' => 200,
-            'code' => 'operation.success',
-            'message' => 'Sandbox rule removed',
-            'data' => [
-                'tag' => 'iframe',
-                'domain' => 'youtube.com',
-                'removed_sandbox' => 'allow-scripts allow-same-origin',
-                'remaining_rules' => 2
-            ]
-        ],
-        'error_responses' => [
-            '400.validation.required' => 'Must provide tag and domain',
-            '400.validation.invalid_value' => 'Invalid embed tag',
-            '404.operation.not_found' => 'No rule found for tag+domain',
-            '500.api.error.write_failed' => 'Failed to save iframe sandbox config.'
-        ],
-        'notes' => 'Removes the sandbox rule for the specified tag and domain.'
+        'notes' => 'Read-only, and the same on every project marker: the policy is INSTALL-WIDE and set at deployment (in the deployment\'s embed policy config file), not per project. No command or panel control changes it. An empty default ([]) is the bare sandbox — it blocks everything. hosts is an array of {name, parameters}; domain matching is CSP-style, so the iframe src host must equal a name or end with .{name} (example.com above is illustrative, not this install\'s policy). Only <iframe> is governed.'
     ],
 ];
 

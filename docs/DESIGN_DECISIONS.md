@@ -11066,3 +11066,57 @@ cannot read).
 **Source**: `secure/management/command/help.php` (`__help_command_scopes`,
 `__help_with_scope`). Behaviour: [COMMAND_API.md](COMMAND_API.md) (*Endpoint*,
 *Self-documenting*).
+
+
+### The embed sandbox policy is install-wide and deploy-time (locked 2026-09-16)
+
+**Decision**: the iframe embed sandbox policy left the projects. It used to live
+per project at `data/iframe_sandbox.json`, writable through the panel by any
+project owner or admin; it is now a single install-wide file set at deployment,
+`<secure>/management/config/embed-policy.json`, shaped as
+`{ "default": [<tokens>], "hosts": [ { "name": "<host>", "parameters": [<tokens>] } ] }`.
+The panel keeps only a READ: `getIframeSandbox` stays and `/admin/embed-security`
+became a read-only view that says where the policy is set; `setIframeSandbox` and
+`removeIframeSandbox` — the whole `iframe.manage` category — were removed. A build
+bundles the install policy at `<secure>/data/embed-policy.json` so a built site
+keeps the installation's rules. Guard rails hold even against the deployer:
+`allow-scripts` + `allow-same-origin` is never emitted together for a same-origin
+or relative `src`, a host entry naming the install's own host is dropped at load,
+and the never-allowed tokens stay stripped. Separately, the `/p/<id>/` static
+passthrough now sends the sandbox CSP on every non-media served type (`.xml`
+included), not only `.svg`.
+
+**Reasoning**: the panel and every project are served from ONE origin and share
+one `localStorage`, kept apart only by a key prefix — a naming convention, not
+access control. Any script that runs on the origin can read every project's
+visitor storage and act on `/admin/` with a signed-in visitor's cookie. Two
+things let someone who controls a project run script on that shared origin: the
+panel offered an iframe both `allow-scripts` and `allow-same-origin`, which for a
+frame pointing back at our own origin switches the sandbox off; and `.xml` was
+served as `application/xml` with no CSP while being on the import allowlist, so an
+XHTML `<script>` inside an imported `.xml` would run when the file was opened at
+its author-linkable URL. Sangio: *"I can't give free access to this to any user
+that can claim to be owner and admin."* Moving the policy to deployment removes
+write access from everyone below the deployer while keeping the read — the console
+exists to give an agent a complete view of the API, and an agent that cannot see
+which hosts embed cleanly builds iframes that get silently sandboxed. The hazard
+was WRITE access, not the read.
+
+**Alternatives considered**: keeping the policy per project but capping it with
+operator-set ceilings (rejected — it still hands the dangerous pair to anyone who
+can claim owner or admin of any project, the exact trust that was declined);
+removing the read as well as the writes (rejected — the read discloses nothing an
+attacker gains from, and it is what lets an AI author embeddable iframes without
+tripping the sandbox); per-project ORIGINS — serving each project from its own
+subdomain, which is the only real boundary for multi-tenant content on one host
+(deferred to after 1.0, because it is an infrastructure change rather than a
+panel one).
+
+**Source**: Sangio's ruling, design round 2026-09-16.
+`secure/src/classes/IframeSandbox.php` (reads the install file; the guard rails),
+`secure/management/config/embed-policy.json.example` (the shape and the shipped
+YouTube default projects effectively had), `secure/management/command/build.php`
+(bundles the policy into a build), `secure/src/functions/surfaceB.php` (the
+passthrough CSP). Behaviour: [COMMAND_API.md](COMMAND_API.md) (`getIframeSandbox`),
+[ADMIN_PANEL.md](ADMIN_PANEL.md) (Embed security page),
+[ARCHITECTURE.md](ARCHITECTURE.md) (§8.1).

@@ -39,9 +39,9 @@
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
         </svg>
         <span class="preview-iframe-warning__text">
-            This page contains embedded iframes. If an embed appears empty, its domain may need to be allowed in Embed Security settings.
+            <?= __admin('preview.iframeWarningText') ?>
         </span>
-        <a href="<?= $router->url('embed-security') ?>" class="preview-iframe-warning__link">Configure &rarr;</a>
+        <a href="<?= $router->url('embed-security') ?>" class="preview-iframe-warning__link"><?= __admin('preview.iframeWarningLink') ?> &rarr;</a>
         <button type="button" class="preview-iframe-warning__close" id="preview-iframe-warning-close" title="Dismiss">&times;</button>
     </div>
 

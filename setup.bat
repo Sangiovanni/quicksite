@@ -84,6 +84,7 @@ echo        QuickSite Setup (Windows)
 echo ========================================
 
 call :maybe_place_landing_page
+call :maybe_create_embed_policy
 call :save_conf
 
 REM A public folder name given on the command line pre-answers item 1.
@@ -454,6 +455,34 @@ echo   + Added a placeholder page at the web root
 echo     The root serves nothing by default, so it would answer 403.
 echo     Delete or replace !PUBLIC_FOLDER_NAME!\index.html when you put
 echo     your own site there - nothing depends on it.
+goto :eof
+
+REM ==========================================================
+REM Embed policy - the install-wide iframe sandbox rules
+REM ==========================================================
+REM One file for the whole installation (embed-policy.json) decides which hosts
+REM an iframe in ANY project may embed with extra sandbox permissions. It is set
+REM at deployment and the panel only READS it - no user, owner or admin can
+REM widen it, which is the whole reason it is here rather than per project.
+REM
+REM Created from the shipped .example the first time setup runs, and NEVER
+REM overwritten afterwards, so a deployer's own edits are safe (same rule as
+REM auth.php / roles.php). An absent file means the strictest sandbox - every
+REM embed blocked - so the .example ships the YouTube default (a common host).
+:maybe_create_embed_policy
+set "QS_EMBED_DIR=!SECURE_DIR!\management\config"
+if not exist "!QS_EMBED_DIR!" goto :eof
+set "QS_EMBED_LIVE=!QS_EMBED_DIR!\embed-policy.json"
+set "QS_EMBED_EX=!QS_EMBED_DIR!\embed-policy.json.example"
+if exist "!QS_EMBED_LIVE!" goto :eof
+if not exist "!QS_EMBED_EX!" goto :eof
+copy /y "!QS_EMBED_EX!" "!QS_EMBED_LIVE!" >nul 2>&1
+if errorlevel 1 goto :eof
+echo.
+echo   + Created the install-wide embed policy
+echo     Which hosts an iframe may embed lives in
+echo     !SECURE_FOLDER_NAME!\management\config\embed-policy.json - edit that file
+echo     to allow more hosts. The admin panel only shows it, read-only.
 goto :eof
 
 REM Where init.php lives right now (it moves with the URL space).

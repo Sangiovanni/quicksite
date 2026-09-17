@@ -39,7 +39,8 @@ quicksite/
 │   │   │   ├── deploy-roots.php  # deployBuild allowed target roots (gitignored; default SERVER_ROOT only)
 │   │   │   ├── quota.php         # Per-account storage ceiling and upload rate (gitignored; optional, ABSENT MEANS NO LIMIT)
 │   │   │   ├── console.php       # Is the /admin/command console offered here (optional; ABSENT MEANS OFFERED)
-│   │   │   └── import-policy.php # Archive import + publish allowlists and archive size limits (gitignored; optional, built-in defaults apply without it)
+│   │   │   ├── import-policy.php # Archive import + publish allowlists and archive size limits (gitignored; optional, built-in defaults apply without it)
+│   │   │   └── embed-policy.json # Install-wide iframe embed sandbox policy — which hosts a project's <iframe> may embed (gitignored; created from .example by setup, then by hand)
 │   │   └── routes.php            # Command whitelist
 │   ├── admin/                    # Admin panel backend
 │   │   ├── AdminRouter.php       # Admin routing and page rendering

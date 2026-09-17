@@ -139,7 +139,7 @@ The work that succeeded is real and is not rolled back. `errors` names every mem
 
 ## Command catalogue
 
-The 153 commands group into the categories below. Use `GET /management/help` for the full per-command spec.
+The 151 commands group into the categories below. Use `GET /management/help` for the full per-command spec.
 
 > **AI is browser-direct (BYOK).** There is no `callAi` / `testAiKey` / `detectProvider` / `listAiProviders` server command — the admin panel calls AI providers directly from the browser using credentials stored in `aiConnectionsV3` (localStorage). The Management API only handles workflow specs and command execution.
 
@@ -174,7 +174,7 @@ Each row enumerates the commands in that category — comma-separated — follow
 | **Privacy** | `getPrivacyStatus`, `setCollectedDatum`, `deleteCollectedDatum`, `setPrivacyDescLang`, `setPrivacyMapping`, `setPrivacyHost`, `setPrivacyCookieSection`, `generatePrivacyPolicy`, `deletePrivacyPolicy` — the data-**sharing** half of compliance (what the site sends to APIs + sign-in providers), a per-project registry (`data/privacy.json`) reconciled against a scan of the API registry. `getPrivacyStatus` returns the registry joined with the scan — outbound `(endpoint, field)` atoms from declared `parameters` + `requestSchema`, coverage (unmapped atoms / body endpoints with no schema / unclassified hosts), and OAuth/magic-link auto-seed. Author "data collected" entries (`setCollectedDatum` / `deleteCollectedDatum`, prose keyed in `translate/`; `setPrivacyDescLang` moves the language), map atoms to them (`setPrivacyMapping`), classify each API host as your server or a third party (`setPrivacyHost`), then `generatePrivacyPolicy` writes a deterministic page (collect table + per-third-party sharing + OAuth + cookie cross-link + disclaimer); `setPrivacyCookieSection` chooses whether the page links / hints / omits the cookie policy; `deletePrivacyPolicy` removes it. See [ADMIN_PANEL.md §9.11](ADMIN_PANEL.md). |
 | **State stores** | `getStateStores`, `setStateStores` — per-page named client state bound to one API endpoint; fields with direction (request/response/both), init source, and response path. Gives interactions memory (pagination, search, filters, infinite scroll). |
 | **Server-side data resolvers** | `setRouteResolver`, `cleanResolverCache` — per-route declaration that fires a server-side fetch BEFORE template render and exposes the response as template variables (SEO/AEO/first-paint payoff). `setRouteResolver` is idempotent six-shape (set / clear / patch / append / remove single slot). File-based cache with TTL + auth-cacheable gating; manual invalidation via `cleanResolverCache`. Read via `getSiteMap` (per-route subset under `routeResolvers`). See [ADMIN_PANEL.md §9.7](ADMIN_PANEL.md). |
-| **System** | `getCommandHistory`, `clearCommandHistory`, `getSizeInfo`, `getIframeSandbox`, `setIframeSandbox`, `removeIframeSandbox` — engine-level state (audit log of executed commands, project size info, iframe sandbox config for the visual editor). The command history is **per project**: both commands act only on the project named by the URL marker, and there is no installation-wide view. See *Command history storage* below. |
+| **System** | `getCommandHistory`, `clearCommandHistory`, `getSizeInfo`, `getIframeSandbox` — engine-level state (audit log of executed commands, project size info, and a read of the install-wide iframe embed policy). `getIframeSandbox` is read-only and returns the same install policy for every project marker; the policy is set at deployment, not through a command. The command history is **per project**: both commands act only on the project named by the URL marker, and there is no installation-wide view. See *Command history storage* below. |
 
 ## Snippet tiers
 
@@ -548,7 +548,7 @@ curl -b jar -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: applicat
 ## Internals
 
 - Command handlers live in `<secure>/management/command/<command>.php`, one file per command.
-- The whitelist of valid commands is `<secure>/management/routes.php` (153 entries — this file is the single source of truth for which commands exist).
+- The whitelist of valid commands is `<secure>/management/routes.php` (151 entries — this file is the single source of truth for which commands exist).
 - Shared helpers live in `<secure>/src/functions/utilsManagement.php` (e.g., `varExportNested()`, `SPECIAL_PAGES`, role helpers).
 - An unknown command answers `404` with code `route.not_found` and echoes back the name that was requested, so a typo is diagnosable. It does **not** enumerate the commands that do exist — `help` is where the catalogue lives, and it is a deliberate decision to publish it there rather than from every mistyped call.
 - Internal callers (visual editor data gathering, workflow steps) bypass the HTTP layer and invoke commands through `<secure>/src/classes/CommandRunner.php`. CommandRunner carries a **hardcoded read-only allowlist** of 25 commands it will execute internally — reads and audits, mostly `get*` / `list*` but also `help` and the `analyze*` / `validate*` / `checkStructureMulti` inspectors. Membership and other mutating commands are not on it.
