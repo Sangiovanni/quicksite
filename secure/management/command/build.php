@@ -710,6 +710,22 @@ if (!is_file($embedPolicySource)) {
             ->withMessage('Embed policy is missing: neither embed-policy.json nor its .example is present, so the build would ship no sandbox rules and every embed would break')
     );
 }
+// The source must PARSE before it is copied. IframeSandbox falls back to the
+// strictest sandbox on a policy it cannot decode, so copying a malformed source
+// would ship a build in which every allowed embed is silently blocked —
+// fail-closed, and noticed only when a video is blank on the deployed site.
+// Abort and name the file instead: a deployer whose policy is broken has to be
+// told, not handed a default they did not choose.
+$embedPolicyRaw = file_get_contents($embedPolicySource);
+if ($embedPolicyRaw === false || !is_array(json_decode($embedPolicyRaw, true))) {
+    abort_build(
+        ApiResponse::create(500, 'server.invalid_json')
+            ->withMessage('Embed policy is not valid JSON: <secure>/management/config/'
+                . basename($embedPolicySource)
+                . ' could not be decoded, so the build would ship a policy its runtime cannot read and every embed in the deployed site would fall to the strictest sandbox. Fix that file, then build again.')
+            ->withData(['reason' => json_last_error_msg()])
+    );
+}
 if (!is_dir($dataDir) && !mkdir($dataDir, 0755, true)) {
     abort_build(
         ApiResponse::create(500, 'server.directory_create_failed')

@@ -11120,3 +11120,54 @@ YouTube default projects effectively had), `secure/management/command/build.php`
 passthrough CSP). Behaviour: [COMMAND_API.md](COMMAND_API.md) (`getIframeSandbox`),
 [ADMIN_PANEL.md](ADMIN_PANEL.md) (Embed security page),
 [ARCHITECTURE.md](ARCHITECTURE.md) (§8.1).
+
+
+### An iframe with a `srcdoc` is sandboxed as the same-origin document it is (locked 2026-09-17)
+
+**Decision**: when an `<iframe>` node carries a `srcdoc`, its sandbox is computed
+from the policy's `default` with the `allow-scripts` + `allow-same-origin` pair
+broken — never from the host rule its `src` matches. Both render paths go through
+one entry point, `IframeSandbox::getSandboxAttributeFor($src, $hasSrcdoc)`: the
+renderer that serves `/p/<projectId>/` and the compiler that writes a built
+site's pages. `srcdoc` stays an authored attribute and still renders; it simply
+never receives `allow-same-origin`. Four smaller rules were settled in the same
+change: a `src` carrying userinfo reports no host, so it takes the same-origin
+branch; the own-host guard strips a port that follows the closing bracket of an
+IPv6 literal; a policy token outside the valid sandbox permissions is dropped
+with a log line naming it; `allow-top-navigation-to-custom-protocols` joined the
+always-stripped tokens; and a build refuses to start when the policy file does
+not parse, instead of shipping a policy its runtime cannot read.
+
+**Reasoning**: an entry above states that *an `iframe` with `srcdoc` has no host
+to match a sandbox rule against, so it always receives the strictest
+`sandbox=""`*. That holds for a frame whose only content source is `srcdoc`, and
+fails when `src` is present too, because the sandbox was computed from `src`
+alone. So `src="https://www.youtube.com/embed/x"` together with
+`srcdoc="<script>…</script>"` matched the shipped YouTube grant and emitted
+`allow-scripts allow-same-origin` around a document the browser renders as
+`about:srcdoc` — which inherits the embedder's origin AND its CSP, and that CSP
+allows inline script. The frame read as correctly sandboxed in the markup while
+running script on the origin the panel and every project share. `srcdoc` wins
+over `src` in a browser: the host named in `src` is never fetched, so its rule
+describes a document that does not load, and matching it hands our own origin
+whatever that host was trusted with. Deciding on the `srcdoc` instead is not a
+new rule — it is what makes the recorded one true.
+
+**Alternatives considered**: stripping `srcdoc` from iframes altogether, the way
+an author-supplied `sandbox` is stripped (rejected — that deletes a working
+feature with no message to the author, whose page then loses content for reasons
+nothing explains; a srcdoc frame is legitimate, it just cannot be trusted with
+this origin). Fixing the write side only (rejected — a write-side strip cannot
+clean structures already stored or arriving through `importProject`, and the
+render paths are what serve them). Keeping the host rule when a `src` is present
+and falling back only for a bare `srcdoc` (rejected — that is the defect
+restated: the `src` host is precisely the thing that does not load).
+
+**Source**: Sangio's ruling, 2026-09-17, on the independent security review of
+the install-wide embed policy in beta.12.
+`secure/src/classes/IframeSandbox.php` (`getSandboxAttributeFor`,
+`extractHostname`, `ownHost`, the token ceiling),
+`secure/src/classes/JsonToHtmlRenderer.php` and
+`secure/src/classes/JsonToPhpCompiler.php` (both render paths call the one
+entry), `secure/management/command/build.php` (the policy must parse before a
+build bundles it). Behaviour: [ARCHITECTURE.md](ARCHITECTURE.md) (§8.1).

@@ -8,8 +8,9 @@ require_once __DIR__ . '/../functions/requestRuntime.php'; // qs_request_host() 
  * Single source of truth for the `sandbox` attribute the engine forces onto
  * every <iframe>. Called by JsonToHtmlRenderer (preview / live view) and by the
  * compiled pages a build emits (JsonToPhpCompiler writes a call to
- * getSandboxAttribute()). addNode / editNode / addComplexElement / editStructure
- * use the sanitizers below to strip an author-supplied sandbox attribute.
+ * getSandboxAttributeFor()). addNode / editNode / addComplexElement /
+ * editStructure use the sanitizers below to strip an author-supplied sandbox
+ * attribute.
  *
  * ── WHERE THE POLICY LIVES ─────────────────────────────────────────────────
  * INSTALL-WIDE, set at deployment, in one file for the whole installation:
@@ -42,9 +43,12 @@ require_once __DIR__ . '/../functions/requestRuntime.php'; // qs_request_host() 
  *
  * ── GUARD RAILS (hold even against the deployer) ────────────────────────────
  *   - NEVER_ALLOWED tokens are always stripped.
+ *   - a token outside VALID_PERMISSIONS is dropped at load, with a log line.
  *   - allow-scripts + allow-same-origin is never emitted TOGETHER for a
  *     same-origin or relative src (that pair is what re-enables our origin).
  *   - a hosts[] entry naming this install's own host is dropped at load.
+ *   - an iframe carrying a `srcdoc` is judged as the same-origin document it
+ *     is, never by the host its `src` names (getSandboxAttributeFor).
  */
 class IframeSandbox
 {
@@ -55,12 +59,14 @@ class IframeSandbox
     const NEVER_ALLOWED = [
         'allow-top-navigation',
         'allow-top-navigation-by-user-activation',
+        'allow-top-navigation-to-custom-protocols',
         'allow-popups-to-escape-sandbox',
     ];
 
     /**
-     * Every valid sandbox token (used by getIframeSandbox for the read-only
-     * panel view; the policy file may only name these).
+     * Every token the sandbox attribute defines. A policy may name only these:
+     * loadConfig() drops anything else and logs it, and getIframeSandbox returns
+     * the list so the read-only panel view can show what is namable.
      */
     const VALID_PERMISSIONS = [
         'allow-scripts',
@@ -136,9 +142,10 @@ class IframeSandbox
      *
      *     ['default' => 'tok tok', 'hosts' => [['name' => 'h', 'sandbox' => 'tok tok'], ...]]
      *
-     * NEVER_ALLOWED tokens are stripped here, and a hosts[] entry whose name is
-     * this install's own host is dropped here (with a log line) — both so no
-     * later reader has to remember to.
+     * NEVER_ALLOWED tokens are stripped here, tokens outside VALID_PERMISSIONS
+     * are dropped here (with a log line), and a hosts[] entry whose name is this
+     * install's own host is dropped here (with a log line) — all so no later
+     * reader has to remember to.
      */
     public static function loadConfig(): array
     {
@@ -165,7 +172,7 @@ class IframeSandbox
         } elseif (!is_string($default)) {
             $default = '';
         }
-        $default = self::stripNeverAllowed($default);
+        $default = self::keepValidPermissions(self::stripNeverAllowed($default), 'the default policy');
 
         $ownHost = self::ownHost();
 
@@ -188,7 +195,8 @@ class IframeSandbox
             }
             $params = $entry['parameters'] ?? [];
             $params = is_array($params) ? implode(' ', array_filter($params, 'is_string')) : '';
-            $hosts[] = ['name' => $name, 'sandbox' => self::stripNeverAllowed($params)];
+            $sandbox = self::keepValidPermissions(self::stripNeverAllowed($params), "host '{$name}'");
+            $hosts[] = ['name' => $name, 'sandbox' => $sandbox];
         }
 
         self::$config = ['default' => $default, 'hosts' => $hosts];
@@ -212,9 +220,16 @@ class IframeSandbox
             return null;
         }
         $host = strtolower(qs_request_host());
-        // Strip an optional :port — policy host names never carry one.
+        // Strip an optional :port — policy host names never carry one. A
+        // bracketed IPv6 literal carries colons INSIDE the brackets, so only a
+        // colon that comes after the closing ']' separates a port: "[::1]:8080"
+        // becomes "[::1]" and a bare "[::1]" is left whole. Cutting at the last
+        // colon regardless would truncate a bare literal; not cutting at all
+        // would leave an install served on an IPv6 literal and a non-default
+        // port with an own host no policy entry can equal, blinding the guard.
+        $bracket = strrpos($host, ']');
         $colon = strrpos($host, ':');
-        if ($colon !== false && strpos($host, ']') === false) {
+        if ($colon !== false && ($bracket === false || $colon > $bracket)) {
             $host = substr($host, 0, $colon);
         }
         return $host !== '' ? $host : null;
@@ -257,7 +272,43 @@ class IframeSandbox
      */
     public static function getSandboxAttribute(string $src): string
     {
-        $value = self::getSandboxValue($src);
+        return self::formatAttribute(self::getSandboxValue($src));
+    }
+
+    /**
+     * The attribute for an iframe node, given its src AND whether the same node
+     * carries a `srcdoc`. This is what the renderer and the compiled pages call.
+     *
+     * `srcdoc` WINS over `src` in the browser: the frame shows the srcdoc markup
+     * as an about:srcdoc document that inherits the embedder's origin and CSP,
+     * and the host named in `src` is never fetched. So the host's policy entry
+     * describes a document that does not load, and granting it would hand OUR
+     * OWN origin whatever that host was trusted with — with allow-scripts plus
+     * allow-same-origin, script running on the origin the panel and every
+     * project share, past a sandbox that looks correct in the markup.
+     *
+     * A srcdoc frame therefore takes the DEFAULT policy with the same-origin
+     * pair broken, exactly like a relative src: it has no host of its own, so no
+     * host rule can describe it. srcdoc keeps working as an authored feature; it
+     * simply never receives allow-same-origin.
+     *
+     * @param string $src       The authored iframe src ('' when there is none).
+     * @param bool   $hasSrcdoc Whether the node carries a srcdoc attribute.
+     */
+    public static function getSandboxAttributeFor(string $src, bool $hasSrcdoc): string
+    {
+        if (!$hasSrcdoc) {
+            return self::getSandboxAttribute($src);
+        }
+        return self::formatAttribute(self::stripSameOriginEscape(self::loadConfig()['default']));
+    }
+
+    /**
+     * Wrap a token string as the attribute itself. '' means a bare sandbox="",
+     * which blocks everything.
+     */
+    private static function formatAttribute(string $value): string
+    {
         if ($value === '') {
             return 'sandbox=""';
         }
@@ -275,11 +326,21 @@ class IframeSandbox
      * would mistake "youtube.com/embed" for a cross-origin frame at youtube.com
      * and "evil.xml" for a frame at host "evil.xml" — a same-origin frame handed
      * a cross-origin host's policy.
+     *
+     * ⚠ A src carrying USERINFO also reports no host. parse_url and a browser
+     * read such a value differently: a browser treats "\" as "/" in a special
+     * scheme, so "https://ours\@youtube.com/x" loads OUR host and parse_url
+     * reports youtube.com with user "ours\". Userinfo in an embed src is never
+     * legitimate, and null is the safe reading of a value whose real host is in
+     * doubt — it routes the src to the same-origin branch.
      */
     public static function extractHostname(string $url): ?string
     {
         $parsed = parse_url(trim($url));
         if (!is_array($parsed) || !isset($parsed['host']) || $parsed['host'] === '') {
+            return null;
+        }
+        if (isset($parsed['user']) || isset($parsed['pass'])) {
             return null;
         }
         return strtolower($parsed['host']);
@@ -324,6 +385,44 @@ class IframeSandbox
             return $token !== '' && !in_array($token, self::NEVER_ALLOWED, true);
         });
         return implode(' ', $filtered);
+    }
+
+    /**
+     * Keep only the tokens the sandbox attribute defines (VALID_PERMISSIONS).
+     *
+     * A dropped token is LOGGED, naming it and where it was written. The list is
+     * QuickSite's snapshot of the sandbox tokens, so a deployer writing a token
+     * from a newer spec loses it here — and silence would leave them debugging an
+     * embed that never gets the permission they granted. NEVER_ALLOWED tokens are
+     * removed before this runs, so they are not reported as unrecognised: the
+     * policy file documents them as always stripped, whatever a deployer writes.
+     *
+     * @param string $sandbox Space-separated tokens.
+     * @param string $where   Where they were written, for the log line.
+     */
+    private static function keepValidPermissions(string $sandbox, string $where): string
+    {
+        if ($sandbox === '') {
+            return '';
+        }
+        $kept = [];
+        $dropped = [];
+        foreach (preg_split('/\s+/', trim($sandbox)) as $token) {
+            if ($token === '') {
+                continue;
+            }
+            if (in_array($token, self::VALID_PERMISSIONS, true)) {
+                $kept[] = $token;
+            } else {
+                $dropped[] = $token;
+            }
+        }
+        if ($dropped !== []) {
+            error_log("IframeSandbox: dropping embed-policy token(s) '" . implode("', '", $dropped)
+                . "' from {$where} — not among the sandbox permissions QuickSite recognises, so they are"
+                . ' not emitted. A token valid in a newer sandbox specification needs QuickSite to learn it first.');
+        }
+        return implode(' ', $kept);
     }
 
     /**

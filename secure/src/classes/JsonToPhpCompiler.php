@@ -469,9 +469,19 @@ class JsonToPhpCompiler {
         if ($isIframe) {
             $this->needsIframeSandbox = true;
             $iframeSrc = '';
+            // A `srcdoc` supplies the frame's document itself, so the host named
+            // in `src` is never fetched and the sandbox must be decided on the
+            // srcdoc — which inherits the deployed site's own origin — rather
+            // than on the src. Only the BOOLEAN is baked into the compiled page:
+            // the srcdoc string itself stays an ordinary attribute, out of the
+            // PHP literal.
+            $hasSrcdoc = false;
             foreach ($params as $attrName => $attrValue) {
-                if (strtolower($attrName) === 'src' && is_string($attrValue)) {
+                $lowerName = strtolower((string) $attrName);
+                if ($lowerName === 'src' && is_string($attrValue)) {
                     $iframeSrc = $attrValue;
+                } elseif ($lowerName === 'srcdoc') {
+                    $hasSrcdoc = true;
                 }
             }
             foreach (array_keys($params) as $attrName) {
@@ -479,8 +489,8 @@ class JsonToPhpCompiler {
                     unset($params[$attrName]);
                 }
             }
-            $iframeSandboxExpr = '" . IframeSandbox::getSandboxAttribute('
-                . var_export($iframeSrc, true) . ') . "';
+            $iframeSandboxExpr = '" . IframeSandbox::getSandboxAttributeFor('
+                . var_export($iframeSrc, true) . ', ' . var_export($hasSrcdoc, true) . ') . "';
         }
         
         $output = '';

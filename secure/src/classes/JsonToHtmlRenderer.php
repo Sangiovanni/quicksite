@@ -746,7 +746,24 @@ class JsonToHtmlRenderer {
         // SECURITY: Enforce iframe sandbox attribute
         if (strtolower($tag) === 'iframe') {
             $iframeSrc = $params['src'] ?? '';
-            $html .= ' ' . IframeSandbox::getSandboxAttribute($iframeSrc);
+            // A `srcdoc` supplies the frame's document itself, so the host named
+            // in `src` is never fetched and its policy entry describes nothing
+            // that loads — while the srcdoc document inherits THIS origin. The
+            // sandbox has to be decided on that, not on the src, so pass the
+            // fact along: IframeSandbox judges a srcdoc frame as same-origin.
+            // The name is matched case-insensitively, as the sandbox strip above
+            // is, because HTML attribute names are case-insensitive and the
+            // stored JSON keeps whatever case the author wrote.
+            $hasSrcdoc = false;
+            if (is_array($params)) {
+                foreach (array_keys($params) as $attrName) {
+                    if (strtolower((string) $attrName) === 'srcdoc') {
+                        $hasSrcdoc = true;
+                        break;
+                    }
+                }
+            }
+            $html .= ' ' . IframeSandbox::getSandboxAttributeFor($iframeSrc, $hasSrcdoc);
         }
 
         if ($isVoid) {
