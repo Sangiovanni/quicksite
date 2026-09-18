@@ -21,6 +21,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_js
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -93,6 +94,14 @@ function __command_cloneProject(array $params = [], array $urlParams = []): ApiR
             ->withData(['existing_path' => SECURE_FOLDER_NAME . '/projects/' . $newName]);
     }
     
+    // Every structure the clone would carry — pages, components, menu, footer,
+    // consent layer, snippets — is checked before the target exists: a refused
+    // clone creates nothing.
+    $unsafeStructureParam = qs_first_unsafe_param_in_tree($sourcePath);
+    if ($unsafeStructureParam !== null) {
+        return qs_unsafe_structure_param_response($unsafeStructureParam);
+    }
+
     // Recursive copy, excluding backups/
     $excludeDirs = ['backups'];
     

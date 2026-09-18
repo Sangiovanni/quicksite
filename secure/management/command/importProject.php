@@ -28,6 +28,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/filePolicy.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/uploadLimits.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/quota.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 
 // Allowed keys in config.json import (security: whitelist only)
 const IMPORT_ALLOWED_CONFIG_KEYS = [
@@ -264,6 +265,15 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
             ]);
     }
     
+    // Every structure the archive would bring in is checked before the project
+    // directory exists: one unsafe attribute refuses the whole import, and a
+    // refused import creates nothing.
+    $unsafeStructureParam = importFirstUnsafeStructureParam($zip, $projectFolder['prefix']);
+    if ($unsafeStructureParam !== null) {
+        $zip->close();
+        return qs_unsafe_structure_param_response($unsafeStructureParam);
+    }
+
     // Create project directory structure
     if (!mkdir($projectPath, 0755, true)) {
         $zip->close();
@@ -738,6 +748,49 @@ function importFirstInvalidComponentReference(string $relativePath, string $cont
     $structure = $isSnippet ? ($data['structure'] ?? null) : $data;
 
     return qs_first_invalid_component_reference($structure);
+}
+
+/**
+ * The attribute gate's pass over the archive — the twin of the two predicates
+ * above, over the same entries (templates/model/json/** and snippets/**, matched
+ * case-insensitively), with one difference that is the point of it: those two
+ * skip an entry and import the rest, while an unsafe attribute refuses the
+ * WHOLE archive. It runs before the project directory is created, so nothing
+ * of a refused import reaches the disk.
+ *
+ * @return array|null the first failure, with `file` naming the archive entry
+ */
+function importFirstUnsafeStructureParam(ZipArchive $zip, string $prefix): ?array {
+    $prefixLen = strlen($prefix);
+    for ($i = 0; $i < $zip->numFiles; $i++) {
+        $name = $zip->getNameIndex($i);
+        if ($name === false || substr($name, -1) === '/') {
+            continue;
+        }
+        if ($prefix !== '' && strpos($name, $prefix) !== 0) {
+            continue;
+        }
+        $relativePath = str_replace('\\', '/', substr($name, $prefixLen));
+        $lower = strtolower($relativePath);
+        if (substr($lower, -5) !== '.json') {
+            continue;
+        }
+        $isModelJson = strpos($lower, 'templates/model/json/') === 0;
+        $isSnippet   = strpos($lower, 'snippets/') === 0;
+        if (!$isModelJson && !$isSnippet) {
+            continue;
+        }
+        $data = json_decode((string) $zip->getFromIndex($i), true);
+        if (!is_array($data)) {
+            continue;
+        }
+        $failure = qs_first_unsafe_structure_param($isSnippet ? ($data['structure'] ?? null) : $data);
+        if ($failure !== null) {
+            $failure['file'] = $relativePath;
+            return $failure;
+        }
+    }
+    return null;
 }
 
 /**

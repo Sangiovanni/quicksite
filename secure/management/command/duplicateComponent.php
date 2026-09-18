@@ -13,6 +13,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_js
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 
 /**
  * Command function for duplicateComponent
@@ -97,6 +98,12 @@ function __command_duplicateComponent(array $params = [], array $urlParams = [])
             ->withData(['error' => json_last_error_msg()]);
     }
     
+    // The copy is a new structure file, so it is checked like any other write.
+    $unsafeStructureParam = qs_first_unsafe_structure_param($structure);
+    if ($unsafeStructureParam !== null) {
+        return qs_unsafe_structure_param_response($unsafeStructureParam);
+    }
+
     // Write to new file (re-encode to ensure consistent formatting)
     if (!qs_json_write($newFile, $structure, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) {
         return ApiResponse::create(500, 'server.file_write_failed')

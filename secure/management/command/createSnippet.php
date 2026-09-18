@@ -27,6 +27,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/SnippetManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_first_unrenderable_tag
+require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -104,6 +105,13 @@ function __command_createSnippet(array $params = [], array $urlParams = []): Api
             ->withErrors([qs_component_reference_error('structure', $badRef)]);
     }
     
+    // And the attribute gate every structure writer applies: the author hears
+    // about a bad attribute now, not when the snippet is inserted into a page.
+    $unsafeStructureParam = qs_first_unsafe_structure_param($structure);
+    if ($unsafeStructureParam !== null) {
+        return qs_unsafe_structure_param_response($unsafeStructureParam);
+    }
+
     // (project already bound to the authorized marker above)
     
     // Check if snippet ID already exists in the project or in the caller's own

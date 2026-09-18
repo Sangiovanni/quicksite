@@ -234,8 +234,10 @@ class RegexPatterns
             'examples' => ['div', 'span', 'my-component', 'h1']
         ],
         
+        // `D` is load-bearing: without it `$` also matches before a final
+        // newline, so `src\n` would pass while a browser reads it as `src`.
         'html_attribute_name' => [
-            'pattern' => '/^[a-z0-9_:-]+$/i',
+            'pattern' => '/^[a-z0-9_:-]+$/iD',
             'description' => 'Valid HTML attribute name',
             'examples' => ['class', 'data-id', 'aria-label', 'xml:lang']
         ],

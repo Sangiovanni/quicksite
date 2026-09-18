@@ -21,6 +21,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/SnippetManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -116,6 +117,12 @@ function __command_duplicateSnippet(array $params = [], array $urlParams = []): 
         $newSnippet['css'] = $cssResult['css'];
     }
     
+    // The copy is a new stored structure, so it is checked like any other write.
+    $unsafeStructureParam = qs_first_unsafe_structure_param($newSnippet['structure']);
+    if ($unsafeStructureParam !== null) {
+        return qs_unsafe_structure_param_response($unsafeStructureParam);
+    }
+
     // Save new snippet
     $result = saveProjectSnippet($newSnippet, $projectName);
     

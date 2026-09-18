@@ -7,6 +7,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/reservedStorageKeys.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/componentPolicy.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 
 /**
  * addComponentToNode - Add a component instance to a structure
@@ -395,6 +396,14 @@ function __command_addComponentToNode(array $params = [], array $urlParams = [])
     }
     
     $updatedStructure = $result['structure'];
+
+    // The whole structure about to be written — checked before the
+    // translation entries below, so a refused insert writes nothing at all.
+    $unsafeStructureParam = qs_first_unsafe_structure_param($updatedStructure);
+    if ($unsafeStructureParam !== null) {
+        return qs_unsafe_structure_param_response($unsafeStructureParam);
+    }
+
     // Create translation entries for generated textKeys
     $translationsCreated = [];
     if (!empty($generatedTextKeys)) {

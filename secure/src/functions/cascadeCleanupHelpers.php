@@ -18,6 +18,7 @@ if (!defined('SECURE_FOLDER_PATH')) {
 }
 
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 
 // =============================================================================
 // PAGE EVENTS CLEANUP
@@ -280,17 +281,22 @@ function renameInteractionsForApiEndpoint(string $apiId, string $fromId, string 
  * flat and subdir layouts, menu, footer) and run $process($filePath, $context)
  * on each. Centralises the file set walked by the clean and rename cascades.
  *
- * @param callable $process    fn(string $filePath, string $context): ?array  (change records or null)
+ * @param callable $process    fn(string $filePath, string $context): ?array  (change records,
+ *                             ['refused' => failure] when the write gate refused the file, or null)
  * @param string   $recordsKey Key under which to collect the change records
- * @return array { modifiedFiles: string[], <recordsKey>: array[] }
+ * @return array { modifiedFiles: string[], <recordsKey>: array[], refusedFiles: array[] }
  */
 function _eachStructureFile(callable $process, string $recordsKey): array {
-    $results = ['modifiedFiles' => [], $recordsKey => []];
+    $results = ['modifiedFiles' => [], $recordsKey => [], 'refusedFiles' => []];
     $jsonBase = PROJECT_PATH . '/templates/model/json';
 
     $apply = function (string $file, string $context) use (&$results, $process, $recordsKey) {
         if (!file_exists($file)) return;
         $records = $process($file, $context);
+        if (isset($records['refused'])) {
+            $results['refusedFiles'][] = ['file' => $context] + $records['refused'];
+            return;
+        }
         if ($records) {
             $results['modifiedFiles'][] = $file;
             $results[$recordsKey] = array_merge($results[$recordsKey], $records);
@@ -335,7 +341,8 @@ function _eachStructureFile(callable $process, string $recordsKey): array {
  * value, or null to leave it untouched. A resulting empty string removes the
  * event attribute entirely.
  *
- * @return array|null Change records (each merged with context + event), or null if unchanged
+ * @return array|null Change records (each merged with context + event), ['refused' => failure]
+ *                    when the write gate refuses the rewritten tree, or null if unchanged
  */
 function _transformInteractionFile(string $filePath, callable $valueTransform, string $context): ?array {
     $content = @file_get_contents($filePath);
@@ -349,6 +356,14 @@ function _transformInteractionFile(string $filePath, callable $valueTransform, s
     _walkNodesTransform($structure, _getAllEventAttributeNames(), $valueTransform, $context, $records, $modified);
 
     if ($modified) {
+        // The write gate every structure writer applies. A file whose rewritten
+        // tree it refuses is left exactly as it was and reported: the cascade
+        // is cleanup after a change that has already been made, so one refused
+        // file must not stop the others.
+        $unsafeStructureParam = qs_first_unsafe_structure_param($structure);
+        if ($unsafeStructureParam !== null) {
+            return ['refused' => $unsafeStructureParam];
+        }
         qs_json_write($filePath, $structure, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES, LOCK_EX);
         return $records;
     }

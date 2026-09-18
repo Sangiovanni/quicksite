@@ -423,6 +423,12 @@ function __command_addNode(array $params = [], array $urlParams = []): ApiRespon
             ->withErrors([['field' => 'structure', 'reason' => 'exceeds max depth of 50']]);
     }
 
+    // The whole structure this command is about to write, every node of it.
+    $unsafeStructureParam = qs_first_unsafe_structure_param($structure);
+    if ($unsafeStructureParam !== null) {
+        return qs_unsafe_structure_param_response($unsafeStructureParam);
+    }
+
     // Write back
     if (!qs_json_write($json_file, $structure, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES, LOCK_EX)) {
         return ApiResponse::create(500, 'server.file_write_failed')

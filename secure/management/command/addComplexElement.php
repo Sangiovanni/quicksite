@@ -32,6 +32,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/ComplexElementBuilder.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/reservedStorageKeys.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 
 // We're about to `require_once addNode.php` only to reuse its
 // `insertNodeIntoStructure_addNode()` helper. addNode.php has a bottom
@@ -347,6 +348,13 @@ function __command_addComplexElement(array $params = [], array $urlParams = []):
         return ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage('Structure too deeply nested (max 50 levels)')
             ->withErrors([['field' => 'structure', 'reason' => 'exceeds max depth of 50']]);
+    }
+
+    // The whole structure about to be written: the builder's subtree carries
+    // values taken from `config`, and the page around it is written too.
+    $unsafeStructureParam = qs_first_unsafe_structure_param($insertResult['structure']);
+    if ($unsafeStructureParam !== null) {
+        return qs_unsafe_structure_param_response($unsafeStructureParam);
     }
 
     // ----- Write back -----

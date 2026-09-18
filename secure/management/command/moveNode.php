@@ -3,6 +3,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/NodeNavigator.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 
 /**
  * moveNode - Moves a node from one position to another within a structure
@@ -241,6 +242,12 @@ function __command_moveNode(array $params = [], array $urlParams = []): ApiRespo
         return ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage("Structure too deeply nested (max 50 levels)")
             ->withErrors([['field' => 'structure', 'reason' => 'exceeds max depth of 50']]);
+    }
+
+    // The whole structure about to be written, every node of it.
+    $unsafeStructureParam = qs_first_unsafe_structure_param($structure);
+    if ($unsafeStructureParam !== null) {
+        return qs_unsafe_structure_param_response($unsafeStructureParam);
     }
 
     // Write back to file

@@ -15,6 +15,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/NodeNavigator.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 
 // Include shared interaction helpers (constants, parseCallSyntax, generateCallSyntax, etc.)
 require_once SECURE_FOLDER_PATH . '/src/functions/interactionHelpers.php';
@@ -208,6 +209,12 @@ function __command_addInteraction(array $params = [], array $urlParams = []): Ap
     // ==========================================================================
     
     $updatedStructure = $updateResult['structure'];
+
+    // The whole structure about to be written, every node of it.
+    $unsafeStructureParam = qs_first_unsafe_structure_param($updatedStructure);
+    if ($unsafeStructureParam !== null) {
+        return qs_unsafe_structure_param_response($unsafeStructureParam);
+    }
 
     if (!qs_json_write($jsonFile, $updatedStructure, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES, LOCK_EX)) {
         return ApiResponse::create(500, 'server.file_write_failed')

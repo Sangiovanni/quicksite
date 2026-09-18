@@ -7,6 +7,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/JsonToHtmlRenderer.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/componentPolicy.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 
 /**
  * editComponentToNode - Edit a component instance's data bindings
@@ -313,6 +314,12 @@ function __command_editComponentToNode(array $params = [], array $urlParams = []
         return ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage("Structure too deeply nested (max 50 levels)")
             ->withErrors([['field' => 'structure', 'reason' => 'exceeds max depth of 50']]);
+    }
+
+    // The whole structure about to be written, every node of it.
+    $unsafeStructureParam = qs_first_unsafe_structure_param($updatedStructure);
+    if ($unsafeStructureParam !== null) {
+        return qs_unsafe_structure_param_response($unsafeStructureParam);
     }
 
     // Save structure

@@ -656,6 +656,13 @@ if ($nodeId !== null) {
         }
     }
     
+    // The whole structure about to be written, not only the node that
+    // arrived: the checks above saw the request, this sees the page.
+    $unsafeStructureParam = qs_first_unsafe_structure_param($structure);
+    if ($unsafeStructureParam !== null) {
+        qs_unsafe_structure_param_response($unsafeStructureParam)->send();
+    }
+
     // Encode and write
     $json_content = json_encode($structure, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     if ($json_content === false) {
@@ -703,6 +710,12 @@ if (is_array($structure)) {
     } else {
         normalizeStructureTextNodes($structure);
     }
+}
+
+// The whole structure about to be written, every node of it.
+$unsafeStructureParam = qs_first_unsafe_structure_param($structure);
+if ($unsafeStructureParam !== null) {
+    qs_unsafe_structure_param_response($unsafeStructureParam)->send();
 }
 
 // Encode structure to JSON

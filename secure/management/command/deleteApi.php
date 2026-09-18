@@ -51,15 +51,24 @@ function __command_deleteApi(array $params = [], array $urlParams = []): ApiResp
     $pageEventsCleanup = cleanPageEventsForApiEndpoint($apiId);
     $interactionsCleanup = cleanInteractionsForApiEndpoint($apiId);
     
+    // A structure file the write gate refused keeps its reference; say so.
+    $message = "API '$apiId' deleted successfully";
+    if (!empty($interactionsCleanup['refusedFiles'])) {
+        $message .= ' — ' . count($interactionsCleanup['refusedFiles'])
+            . ' structure file(s) were left unchanged because an attribute in them fails the write check'
+            . ' (see cascadeCleanup.refusedFiles)';
+    }
+
     return ApiResponse::create(200, 'operation.success')
-        ->withMessage("API '$apiId' deleted successfully")
+        ->withMessage($message)
         ->withData([
             'apiId' => $result['apiId'],
             'deletedEndpoints' => $result['deletedEndpoints'],
             'cascadeCleanup' => [
                 'pageEventsRemoved' => count($pageEventsCleanup['removedCalls']),
                 'interactionsRemoved' => count($interactionsCleanup['removedInteractions']),
-                'modifiedFiles' => $interactionsCleanup['modifiedFiles']
+                'modifiedFiles' => $interactionsCleanup['modifiedFiles'],
+                'refusedFiles' => $interactionsCleanup['refusedFiles']
             ]
         ]);
 }

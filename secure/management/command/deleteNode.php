@@ -3,6 +3,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/NodeNavigator.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 
 /**
  * Translatable attributes that may contain translation keys
@@ -259,6 +260,14 @@ function __command_deleteNode(array $params = [], array $urlParams = []): ApiRes
     }
     $structure = $removeResult['structure'];
     
+    // The whole structure about to be written. Checked on the RESULT, so
+    // deleting the one node that fails is always accepted — that is how an
+    // author clears a refusal.
+    $unsafeStructureParam = qs_first_unsafe_structure_param($structure);
+    if ($unsafeStructureParam !== null) {
+        return qs_unsafe_structure_param_response($unsafeStructureParam);
+    }
+
     // Write back to file
     $json_content = json_encode($structure, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     if ($json_content === false) {

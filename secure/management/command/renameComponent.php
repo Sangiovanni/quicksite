@@ -17,6 +17,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_js
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 
 /**
  * Recursively update component references in a structure
@@ -126,6 +127,64 @@ function getAllPageFilesForRename(string $dir, string $prefix = ''): array {
 }
 
 /**
+ * Check, before anything is renamed, every structure file the rename will
+ * write: the component file itself, which moves, and each file whose
+ * references it rewrites — the same menu, footer, pages and components the
+ * command visits below. All or nothing: a rename refused half-way would leave
+ * pages naming a component that no longer exists under that name.
+ *
+ * A file is checked as it stands. Renaming a reference touches no attribute,
+ * so the tree that would be written passes exactly when this one does.
+ *
+ * @return array|null the first failure, with `file` relative to the model directory
+ */
+function renameComponentFirstUnsafeParam(string $jsonDir, string $oldName, string $newName): ?array {
+    $componentsDir = $jsonDir . '/components';
+
+    $moved = json_decode((string) @file_get_contents($componentsDir . '/' . $oldName . '.json'), true);
+    $failure = qs_first_unsafe_structure_param($moved);
+    if ($failure !== null) {
+        $failure['file'] = 'components/' . $oldName . '.json';
+        return $failure;
+    }
+
+    $targets = ['menu.json' => $jsonDir . '/menu.json', 'footer.json' => $jsonDir . '/footer.json'];
+    foreach (getAllPageFilesForRename($jsonDir . '/pages') as $pageInfo) {
+        $targets['pages/' . $pageInfo['name'] . '.json'] = $pageInfo['file'];
+    }
+    foreach (glob($componentsDir . '/*.json') ?: [] as $file) {
+        if (basename($file, '.json') !== $oldName) {
+            $targets['components/' . basename($file)] = $file;
+        }
+    }
+
+    foreach ($targets as $label => $file) {
+        if (!file_exists($file)) {
+            continue;
+        }
+        $structure = json_decode((string) @file_get_contents($file), true);
+        if (!is_array($structure)) {
+            continue;
+        }
+        $count = 0;
+        $nodes = (isset($structure['tag']) || isset($structure['component']) || isset($structure['textKey']))
+            ? [$structure] : $structure;
+        foreach ($nodes as $node) {
+            updateComponentReferences($node, $oldName, $newName, $count);
+        }
+        if ($count === 0) {
+            continue; // not written by this rename
+        }
+        $failure = qs_first_unsafe_structure_param($structure);
+        if ($failure !== null) {
+            $failure['file'] = $label;
+            return $failure;
+        }
+    }
+    return null;
+}
+
+/**
  * Command function for renameComponent
  * 
  * @param array $params Body parameters: oldName, newName
@@ -184,6 +243,11 @@ function __command_renameComponent(array $params = [], array $urlParams = []): A
             ->withData(['component' => $newName]);
     }
     
+    $unsafeStructureParam = renameComponentFirstUnsafeParam(PROJECT_PATH . '/templates/model/json', $oldName, $newName);
+    if ($unsafeStructureParam !== null) {
+        return qs_unsafe_structure_param_response($unsafeStructureParam);
+    }
+
     // Rename the file first
     if (!rename($oldFile, $newFile)) {
         return ApiResponse::create(500, 'server.file_rename_failed')

@@ -27,6 +27,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/storageHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/consentHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/consentLayerHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/translationHelpers.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 
 $params = $trimParametersManagement->params();
 
@@ -54,6 +55,13 @@ if (storageMigrateInlineDescriptions($registry)) {
 }
 $items = $registry['items'];
 $structure = buildCookiePolicyStructure($items, consentOAuthLinks());
+
+// The page carries values the author set elsewhere, so it is checked before
+// any route or page is written.
+$unsafeStructureParam = qs_first_unsafe_structure_param($structure);
+if ($unsafeStructureParam !== null) {
+    qs_unsafe_structure_param_response($unsafeStructureParam)->send();
+}
 
 $routes = defined('ROUTES') && is_array(ROUTES) ? ROUTES : [];
 $overwritten = policyRouteExists($segments, $routes);

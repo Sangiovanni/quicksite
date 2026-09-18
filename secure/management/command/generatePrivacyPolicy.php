@@ -26,6 +26,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/policyPageHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/privacyScanHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/privacyPageHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/translationHelpers.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 
 $params = $trimParametersManagement->params();
 
@@ -76,6 +77,13 @@ $cookieExists = (is_string($cookieRoute) && trim($cookieRoute, '/') !== '') ? co
 $cookieMode = ($reg['cookieSection'] === 'omit') ? 'omit' : ($cookieExists ? 'link' : 'hint');
 
 $structure = buildPrivacyPolicyStructure($collected, $sharing, consentOAuthLinks(), ['mode' => $cookieMode, 'route' => $cookieRoute]);
+
+// The page carries values the author set elsewhere — a third party's privacy
+// link among them — so it is checked before any route or page is written.
+$unsafeStructureParam = qs_first_unsafe_structure_param($structure);
+if ($unsafeStructureParam !== null) {
+    qs_unsafe_structure_param_response($unsafeStructureParam)->send();
+}
 
 // ---- Overwrite confirm + route create + leaf write ------------------------
 $routes = defined('ROUTES') && is_array(ROUTES) ? ROUTES : [];

@@ -11171,3 +11171,90 @@ the install-wide embed policy in beta.12.
 `secure/src/classes/JsonToPhpCompiler.php` (both render paths call the one
 entry), `secure/management/command/build.php` (the policy must parse before a
 build bundles it). Behaviour: [ARCHITECTURE.md](ARCHITECTURE.md) (§8.1).
+
+
+### Every command that writes a structure checks the whole of it, and refuses (locked 2026-09-18)
+
+**Decision**: before any command writes a structure file — a page, the menu, the
+footer, a component, the consent layer — or a stored snippet, it runs one
+verifier over the whole structure it is about to write, and refuses the write if
+any node fails. The verifier, `qs_first_unsafe_structure_param()`, walks every
+node a render can reach: both stored shapes, `children`, a component instance's
+own `params`, and the `slots` that NodeNavigator addresses. On each node, in
+attribute order, it applies the existing per-node rule (`firstUnsafeParam`: the
+attribute-name charset, raw `on*` handlers, disallowed URL schemes) plus one new
+rule: no attribute name twice on a node, in any mix of letter case. A refusal is
+`400 validation.unsafe_param` naming the node, the attribute and, from a command
+that writes several files, the file. Nothing is written: import, restore and
+clone check every structure they would bring in before creating or touching
+anything, and a component rename checks every file it would rewrite before it
+renames. Two cases differ, by design. The API cascade — deleting or renaming an
+API endpoint rewrites the pages that call it — runs after the API change has
+already been made, so a page it would refuse is left untouched and reported
+rather than blocking that change. The engine's constant seeds — a new project's
+first pages, menu and footer, a new route's empty page — carry nothing from a
+request or a stored file, so they take no runtime check.
+
+One smaller rule was settled in the same change: the attribute-name rule is
+anchored at the true end of the name. Its pattern ended in `$`, which in PCRE also
+matches before a final newline, so `src` followed by a newline passed the name
+check while a browser reads it as `src`.
+
+**Reasoning**: the render side already enforced every attribute rule on every
+structure, however it arrived, so a page was safe; what it could not do was tell
+the author. The write-side check ran in three commands — `addNode`, `editNode`
+and `editStructure` — while every other command that writes a structure file,
+the ones that copy whole trees in included, checked nothing. There is no shared
+structure writer to hang a gate on, so each writer calls the verifier itself, on
+exactly what it is about to write.
+
+The duplicate-name rule exists because HTML attribute names are case-insensitive
+and a browser keeps the first of two duplicates. `{src, SRC}` on one iframe is one
+attribute to the browser, and a sandbox computed from the other value described a
+frame that never loads — the escape closed on the render side the same week by
+making both render paths read the first `src`. Refusing the pair on write removes
+the ambiguity from stored data. The collision is detected on folded names, but
+nothing is stored folded: SVG's `viewBox` means something only in that case, and
+every API client reads a structure back as it was written. The trailing-newline
+rule is the same escape one layer down: a name `src` plus newline, placed before a
+real `src`, was sandboxed from the second while the browser loaded the first.
+
+The check reads the RESULT, not the request, so it also sees nodes the request
+never touched: an edit anywhere on a page that already holds a failing node is
+refused, and the refusal names that node. Deleting or fixing the named node is
+always accepted, because the result then passes — that is the way out, and it is
+why checking the whole structure cannot lock a page. It reaches the commands that
+only move or copy stored nodes as well, which the tag and component-reference
+gates deliberately skip, because before 1.0 there is no legacy data for a new
+rule to strand: every stored structure is development data.
+
+A component instance's `data` is not walked. The renderer binds only scalar values
+from it into the component's own strings and never renders a non-scalar, so it
+holds no node. A bad value that reaches an attribute that way remains the render
+gate's catch: the write side would have to compose the page with the component's
+file to see it.
+
+**Alternatives considered**: strip and report — drop the offending attributes and
+write the rest (rejected: it existed only to keep old stored data and old archives
+importable, and there is none; it also stores something other than what the author
+sent). Render side only, the previous state (rejected: safe but silent — the
+author learns nothing, and stored data carries the ambiguity into every export and
+backup). Lowercasing every attribute name on write, so duplicates merge (rejected:
+it silently rewrites every stored structure, changes what API clients read back,
+and breaks SVG, whose camelCase attributes a browser ignores in lower case). One
+shared structure writer that every command goes through (rejected for this change:
+each command builds and writes its files its own way, so that is a restructuring
+of every writer; the verifier is the shared part, and each writer adds one call).
+A runtime check on the constant seeds as well (rejected: it could never fire, and
+in `createProject` a refusal part-way would leave a half-made project). Walking a
+component instance's `data` as if it held nodes (rejected: it holds none, so that
+walk would check something no render path emits).
+
+**Source**: Sangio's ruling, 2026-09-18, after the duplicate-`src` escape of the
+same week; the verifier's reach and the treatment of snippets, seeds, the API
+cascade and component renames were settled in the same design round.
+`secure/src/functions/nodeParamPolicy.php` (`qs_first_unsafe_structure_param`,
+`qs_first_unsafe_param_in_tree`, `qs_unsafe_structure_param_response`),
+`secure/src/functions/cascadeCleanupHelpers.php` (the API cascade),
+`secure/src/classes/RegexPatterns.php` (`html_attribute_name`), and every command
+that writes a structure file. Behaviour: [ARCHITECTURE.md](ARCHITECTURE.md) (§8).

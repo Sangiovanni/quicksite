@@ -24,6 +24,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/consentHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/consentLayerHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/translationHelpers.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 
 // The policy route is owned by generateCookiePolicy / deleteCookiePolicy (set
 // only when a page actually exists). Here we just read it for the banner link
@@ -39,6 +40,16 @@ $categories = consentDeclaredCategories();
 // 1. Build + write the two structure files.
 $banner = buildConsentBannerStructure($policyRoute);
 $popup  = buildConsentPopupStructure($categories);
+
+// Both files are checked before either is written, so a refusal leaves the
+// layer exactly as it was.
+foreach (['consent-banner.json' => $banner, 'consent-popup.json' => $popup] as $layerFile => $layerTree) {
+    $unsafeStructureParam = qs_first_unsafe_structure_param($layerTree);
+    if ($unsafeStructureParam !== null) {
+        $unsafeStructureParam['file'] = $layerFile;
+        qs_unsafe_structure_param_response($unsafeStructureParam)->send();
+    }
+}
 
 $dir = dirname(consentBannerPath());
 if (!is_dir($dir)) {

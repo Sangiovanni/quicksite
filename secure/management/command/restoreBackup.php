@@ -18,6 +18,7 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 
 /**
  * Recursively copy a directory
@@ -145,6 +146,14 @@ function __command_restoreBackup(array $params = [], array $urlParams = []): Api
     if (!is_dir($backupPath)) {
         return ApiResponse::create(404, 'backup.not_found')
             ->withMessage('Backup not found: ' . $backupName);
+    }
+
+    // Every structure the restore would bring back is checked before anything
+    // is touched, the optional pre-restore backup included: a refused restore
+    // leaves the project exactly as it was.
+    $unsafeStructureParam = qs_first_unsafe_param_in_tree($backupPath);
+    if ($unsafeStructureParam !== null) {
+        return qs_unsafe_structure_param_response($unsafeStructureParam);
     }
 
     // Check if user wants a pre-restore backup (default: false)

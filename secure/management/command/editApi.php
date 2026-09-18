@@ -142,7 +142,8 @@ function __command_editApi(array $params = [], array $urlParams = []): ApiRespon
         $cascadeCleanup = [
             'pageEventsRemoved' => count($pageEventsCleanup['removedCalls']),
             'interactionsRemoved' => count($interactionsCleanup['removedInteractions']),
-            'modifiedFiles' => $interactionsCleanup['modifiedFiles']
+            'modifiedFiles' => $interactionsCleanup['modifiedFiles'],
+            'refusedFiles' => $interactionsCleanup['refusedFiles']
         ];
     }
 
@@ -161,7 +162,8 @@ function __command_editApi(array $params = [], array $urlParams = []): ApiRespon
             'to' => $to,
             'pageEventsUpdated' => count($pageEventsRename['renamedCalls']),
             'interactionsUpdated' => count($interactionsRename['renamedInteractions']),
-            'modifiedFiles' => $interactionsRename['modifiedFiles']
+            'modifiedFiles' => $interactionsRename['modifiedFiles'],
+            'refusedFiles' => $interactionsRename['refusedFiles']
         ];
     }
     
@@ -195,6 +197,13 @@ function __command_editApi(array $params = [], array $urlParams = []): ApiRespon
     if (!empty($countKeyWarnings)) {
         $message .= ' — ' . count($countKeyWarnings)
             . ' count-sentence translation key(s) do not resolve in every language';
+    }
+    // A structure file the write gate refused keeps its old reference; say so.
+    $refusedFiles = array_merge($cascadeCleanup['refusedFiles'] ?? [], $cascadeRename['refusedFiles'] ?? []);
+    if (!empty($refusedFiles)) {
+        $message .= ' — ' . count($refusedFiles)
+            . ' structure file(s) were left unchanged because an attribute in them fails the write check'
+            . ' (see cascadeCleanup / cascadeRename refusedFiles)';
     }
 
     return ApiResponse::create(200, 'operation.success')

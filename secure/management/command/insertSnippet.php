@@ -27,6 +27,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/SnippetManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/componentPolicy.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 
 /**
  * Generate a unique text key prefix based on structure type and name
@@ -553,6 +554,13 @@ function __command_insertSnippet(array $params = [], array $urlParams = []): Api
         return ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage('Structure too deeply nested (max 50 levels)')
             ->withErrors([['field' => 'structure', 'reason' => 'exceeds max depth of 50']]);
+    }
+
+    // The whole structure about to be written: the snippet's tree and the page
+    // it lands in.
+    $unsafeStructureParam = qs_first_unsafe_structure_param($structure);
+    if ($unsafeStructureParam !== null) {
+        return qs_unsafe_structure_param_response($unsafeStructureParam);
     }
 
     // Save structure

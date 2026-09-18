@@ -18,6 +18,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/JsonToHtmlRenderer.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 
 /**
  * Translatable attributes that need new keys when duplicating
@@ -339,6 +340,12 @@ function __command_duplicateNode(array $params = [], array $urlParams = []): Api
                 ->withErrors([['field' => 'structure', 'reason' => 'exceeds max depth of 50']]);
         }
 
+        // The whole structure about to be written, every node of it.
+        $unsafeStructureParam = qs_first_unsafe_structure_param($structure);
+        if ($unsafeStructureParam !== null) {
+            return qs_unsafe_structure_param_response($unsafeStructureParam);
+        }
+
         // Write back
         $json_content = json_encode($structure, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         if ($json_content === false) {
@@ -412,6 +419,12 @@ function __command_duplicateNode(array $params = [], array $urlParams = []): Api
         return ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage("Structure too deeply nested (max 50 levels)")
             ->withErrors([['field' => 'structure', 'reason' => 'exceeds max depth of 50']]);
+    }
+
+    // The whole structure about to be written, every node of it.
+    $unsafeStructureParam = qs_first_unsafe_structure_param($insertResult['structure']);
+    if ($unsafeStructureParam !== null) {
+        return qs_unsafe_structure_param_response($unsafeStructureParam);
     }
 
     // Write back to file
