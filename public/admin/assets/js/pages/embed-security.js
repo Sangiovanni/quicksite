@@ -115,11 +115,11 @@
     }
 
     function renderNeverAllowed(data) {
-        const list = data.never_allowed || [
-            'allow-top-navigation',
-            'allow-top-navigation-by-user-activation',
-            'allow-popups-to-escape-sandbox'
-        ];
+        // The tokens are the server's IframeSandbox::NEVER_ALLOWED, sent with
+        // every read. Keeping a copy here would be a second definition of a list
+        // only the engine can change, and it would go stale the moment that list
+        // grows. An absent key renders an empty list, which is honest.
+        const list = data.never_allowed || [];
         const container = document.getElementById('never-allowed-list');
         const ul = QSDom.el('ul', { style: 'margin: 0; padding-left: var(--space-lg);' });
         list.forEach(p => ul.appendChild(QSDom.el('li', null, [QSDom.el('code', { text: p })])));

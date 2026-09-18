@@ -43,9 +43,9 @@ class JsonToHtmlRenderer {
 
     /**
      * The base every relative URL this render emits composes against — resolved
-     * ONCE, at construction, from the request context (S2.8). Read by
-     * processUrl() and the 404 branch of the language switcher, so the two can
-     * no longer disagree. It is deliberately NOT exposed to authors as a
+     * ONCE, at construction, from the request context. Read by
+     * processUrl() and the 404 branch of the language switcher, so the two
+     * cannot disagree. It is deliberately NOT exposed to authors as a
      * placeholder: a value that is already based, pasted in front of a path
      * that processUrl() will base again, produces a doubled URL.
      */
@@ -68,9 +68,9 @@ class JsonToHtmlRenderer {
         $this->context = $context;
         $this->componentsPath = PROJECT_PATH . '/templates/model/json/components/';
 
-        // S2.8 — where THIS project is served, resolved for whichever request
+        // Where THIS project is served, resolved for whichever request
         // is doing the rendering. A surface-B render and a /management/
-        // fragment render of the same node now compose against one value.
+        // fragment render of the same node compose against one value.
         $this->publicBase = qs_render_public_base();
 
         // S2.8 — and against one LANGUAGE. processUrl() prefixes non-asset URLs
@@ -440,11 +440,11 @@ class JsonToHtmlRenderer {
                 $this->currentComponentNode = $prevComponentNode;
                 error_log("Component not found: {$componentName}");
                 // ESCAPED, not raw: nothing validates a component REFERENCE on
-                // write, so a name carrying `-->` used to close this comment
+                // write, so a raw name carrying `-->` would close this comment
                 // and inject the rest as live markup into the preview. The
-                // compiler's twin of this diagnostic had the same shape and the
-                // same hole (beta.11 S3.10b). The name stays visible — it is
-                // what tells the author WHICH component is missing.
+                // compiler's twin of this diagnostic has the same shape and
+                // faces the same hole. The name stays visible —
+                // it is what tells the author WHICH component is missing.
                 return '<!-- Component not found: '
                      . htmlspecialchars((string) $componentName, ENT_QUOTES | ENT_HTML5, 'UTF-8') . ' -->';
             }
@@ -745,21 +745,43 @@ class JsonToHtmlRenderer {
 
         // SECURITY: Enforce iframe sandbox attribute
         if (strtolower($tag) === 'iframe') {
-            $iframeSrc = $params['src'] ?? '';
+            // The sandbox is decided from the src the BROWSER loads: the FIRST
+            // attribute whose name is `src`, in emission order. HTML attribute
+            // names are case-insensitive, so `src` and `SRC` are the same
+            // attribute — and when a tag carries the same attribute twice the
+            // browser keeps the first and ignores the rest. Computing from any
+            // other one would sandbox a frame the browser never loads: with
+            // `src` first and `SRC` second, the browser loads the first while a
+            // last-wins reading would grant the second host's policy to it.
+            //
+            // ⚠ Whatever the first src's VALUE. The browser does not skip a
+            // non-string src to reach a later one — it keeps the first `src` it
+            // sees, and a boolean or empty value simply loads an empty frame on
+            // THIS origin. So a non-string first src counts as '' (the
+            // same-origin branch) and the search stops there; a later `SRC` can
+            // never override it.
+            //
+            // ⚠ THIS SELECTION RULE AND JsonToPhpCompiler'S MUST STAY IDENTICAL.
+            // The two writers serve the same node on different surfaces, so any
+            // difference between them is one page sandboxed two ways — strict in
+            // preview, granted in a build, or the reverse.
+            //
             // A `srcdoc` supplies the frame's document itself, so the host named
             // in `src` is never fetched and its policy entry describes nothing
             // that loads — while the srcdoc document inherits THIS origin. The
             // sandbox has to be decided on that, not on the src, so pass the
             // fact along: IframeSandbox judges a srcdoc frame as same-origin.
-            // The name is matched case-insensitively, as the sandbox strip above
-            // is, because HTML attribute names are case-insensitive and the
-            // stored JSON keeps whatever case the author wrote.
+            $iframeSrc = '';
+            $srcFound = false;
             $hasSrcdoc = false;
             if (is_array($params)) {
-                foreach (array_keys($params) as $attrName) {
-                    if (strtolower((string) $attrName) === 'srcdoc') {
+                foreach ($params as $attrName => $attrValue) {
+                    $lowerName = strtolower((string) $attrName);
+                    if ($lowerName === 'src' && !$srcFound) {
+                        $iframeSrc = is_string($attrValue) ? $attrValue : '';
+                        $srcFound = true;
+                    } elseif ($lowerName === 'srcdoc') {
                         $hasSrcdoc = true;
-                        break;
                     }
                 }
             }
@@ -856,14 +878,13 @@ class JsonToHtmlRenderer {
             return '';
         }
 
-        // An ARRAY is not a value an attribute can carry. The conditional form
-        // ({"condition": …, "value": …}) was the only array shape either surface
-        // understood, and nothing in the engine has ever produced one — no
+        // An ARRAY is not a value an attribute can carry. No array shape is a
+        // supported attribute value, and nothing in the engine produces one — no
         // command writes it, no project authors it, and the visual editor has no
-        // control for it. Dropping the whole class rather than the one shape
-        // keeps the two surfaces from disagreeing about the rest: the compiler
-        // emitted htmlspecialchars(array(…)), which is a TypeError at REQUEST
-        // time, so a built page carrying any array attribute answered 200 with a
+        // control for it. Dropping the whole class keeps the two surfaces from
+        // disagreeing about any one shape, and matters most in a build:
+        // compiled, an array becomes htmlspecialchars(array(…)), a TypeError at
+        // REQUEST time, so a built page carrying one would answer 200 with a
         // fatal in the body and the rest of the page missing.
         if (is_array($value)) {
             error_log("Attribute '{$name}': array values are not supported — attribute dropped");
@@ -910,13 +931,13 @@ class JsonToHtmlRenderer {
         // ── SUBSTITUTION FIRST, POLICY SECOND ─────────────────────────────
         //
         // ⚠ THE ORDER HERE IS A SECURITY PROPERTY, not tidiness. UrlPolicy has
-        // to inspect the value the browser will actually receive. When
-        // substitution ran AFTER sanitisation, a route param could inject a
+        // to inspect the value the browser will actually receive. Were
+        // substitution to run AFTER sanitisation, a route param could inject a
         // scheme past it: xlink:href="{{param:slug}}" served from
-        // /products/javascript:alert(1) emitted the raw value, while the same
-        // literal authored directly is refused. Path-rewritten attributes
-        // happened to survive because the base was prefixed in front of the
-        // injected value — luck, not design.
+        // /products/javascript:alert(1) would emit the raw value, while the same
+        // literal authored directly is refused. Path-rewritten attributes would
+        // survive only because the base is prefixed in front of the injected
+        // value — luck, not design.
         //
         // Within the substitutions, PARAMS GO LAST: a param is the one
         // visitor-controlled input, so nothing it introduces is re-scanned.
@@ -988,15 +1009,15 @@ class JsonToHtmlRenderer {
             return $this->componentCache[$componentName];
         }
 
-        // SECURITY (beta.11 S3.10c): the reference used to be concatenated
-        // straight into this path, so `../` walked out of the components
-        // directory and read any .json the process could reach — another
-        // project's included. Where the out-of-jail target was component-shaped
-        // its full content rendered into the preview. The shared resolver
-        // refuses anything that is not a bare component name and confirms the
-        // file it returns really sits inside this project's components
-        // directory. The compiler asks the SAME resolver, so both surfaces
-        // agree on what a component reference is.
+        // SECURITY: the reference is never concatenated
+        // straight into this path — `../` would walk out of the components
+        // directory and read any .json the process can reach, another
+        // project's included, and where the out-of-jail target is
+        // component-shaped its full content would render into the preview. The
+        // shared resolver refuses anything that is not a bare component name
+        // and confirms the file it returns really sits inside this project's
+        // components directory. The compiler asks the SAME resolver, so both
+        // surfaces agree on what a component reference is.
         $componentPath = qs_resolve_component_path($componentName, $this->componentsPath);
 
         if ($componentPath === null) {
@@ -1211,9 +1232,9 @@ class JsonToHtmlRenderer {
         // Check if current page is valid (not 404)
         if ($trimParams->page() === '404') {
             // Invalid route - redirect to home in target language
-            // C15 15.4 (R1): compose against the render-scoped public base.
-            // S2.8: that base is now resolved for every render context, not
-            // only surface B (see the constructor).
+            // Compose against the render-scoped public base.
+            // That base is resolved for every render context — surface B
+            // and /management/ fragments alike (see the constructor).
             $url = $this->publicBase;
             if (defined('MULTILINGUAL_SUPPORT') && MULTILINGUAL_SUPPORT) {
                 $url .= $targetLang . '/';
@@ -1232,8 +1253,8 @@ class JsonToHtmlRenderer {
      */
     private function getSystemPlaceholders(): array {
         // One source, shared with compiled pages (runtimePlaceholders.php).
-        // Both surfaces used to derive these separately and had drifted on
-        // how the language prefix is stripped.
+        // Two derivations would drift — how the language prefix is stripped is
+        // exactly the kind of detail two copies get differently.
         return qs_system_placeholders([
             'lang'  => $this->context['lang'] ?? null,
             'route' => $this->context['page'] ?? null,
@@ -1293,10 +1314,10 @@ class JsonToHtmlRenderer {
         }
         
         // Ensure trailing slash if URL is just a language code. The codes are the
-        // PROJECT's own, not a fixed pair: a site that speaks es/de has to get the
-        // same treatment en/fr used to get for free. Empty on a mono-language
-        // project, where a URL that looks like a language code is an ordinary
-        // route and must not gain a slash.
+        // PROJECT's own, not a fixed pair: a site that speaks es/de gets the same
+        // treatment as one that speaks en/fr. Empty on a mono-language project,
+        // where a URL that looks like a language code is an ordinary route and
+        // must not gain a slash.
         $langCodes = qs_project_languages();
         if (!empty($langCodes)) {
             $langOnly = '/^(' . implode('|', array_map(static fn($l) => preg_quote((string) $l, '/'), $langCodes)) . ')$/i';

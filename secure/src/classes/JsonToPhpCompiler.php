@@ -27,14 +27,6 @@ class JsonToPhpCompiler {
     private bool $needsIframeSandbox = false;
 
     /**
-     * The system placeholders a compiled page defines as variables.
-     *
-     * Mirrors JsonToHtmlRenderer::getSystemPlaceholders()'s map — the two
-     * writers must recognise the same set or the same page says different
-     * things in preview and in production. Every entry REPORTS a value; none
-     * composes a URL, which is why there is no `__base_url` here.
-     */
-    /**
      * Attributes where an EMPTY value is a statement, not an omission.
      *
      * Mirrors JsonToHtmlRenderer::EMPTY_MEANINGFUL_ATTRIBUTES — `alt=""` marks
@@ -46,13 +38,22 @@ class JsonToPhpCompiler {
     /**
      * Attributes whose value is translated when it looks like a translation key.
      *
-     * Mirrors the renderer's list. The compiler had no such branch at all, so a
-     * built page shipped the raw key (`alt="parity.altKey"`) where preview
-     * showed the translated text.
+     * Mirrors the renderer's list. An attribute translated in preview and left
+     * as its raw key in a build (`alt="parity.altKey"`) is one page saying two
+     * different things, so both writers resolve the same set.
      */
     private const TRANSLATABLE_ATTRIBUTES = [
         'placeholder', 'title', 'alt', 'aria-label', 'aria-placeholder', 'aria-description',
     ];
+
+    /**
+     * The system placeholders a compiled page defines as variables.
+     *
+     * Mirrors JsonToHtmlRenderer::getSystemPlaceholders()'s map — the two
+     * writers must recognise the same set or the same page says different
+     * things in preview and in production. Every entry REPORTS a value; none
+     * composes a URL, which is why there is no `__base_url` here.
+     */
     private const SYSTEM_PLACEHOLDERS = [
         '__current_page',
         '__lang',
@@ -92,14 +93,15 @@ class JsonToPhpCompiler {
         
         // Generate title from translation using page title parameter.
         //
-        // SECURITY (beta.11 S3.10b): the key used to be INTERPOLATED into a
-        // single-quoted PHP literal, so a title carrying `'` closed the literal
-        // and the rest became executable PHP. Route names are gated on write
-        // (addRoute allows only lowercase alphanumerics, hyphens and `:param`
-        // segments), so nothing stored today reaches it — but the compiler was
-        // trusting a validator two files away rather than emitting a literal it
-        // controls. var_export is what every other key in this file already
-        // uses; see compileTextNode.
+        // SECURITY: the key goes through var_export, never
+        // INTERPOLATED into a single-quoted PHP literal — interpolated, a title
+        // carrying `'` would close the literal and make the rest executable
+        // PHP. Route names are gated on write (addRoute allows only lowercase
+        // alphanumerics, hyphens and `:param` segments), so nothing stored
+        // reaches it; leaning on that alone would mean trusting a validator two
+        // files away rather than emitting a literal the compiler controls.
+        // var_export is what every other key in this file uses; see
+        // compileTextNode.
         $output .= "// Get page title from translation\n";
         $output .= "\$pageTitle = \$translator->translate("
                  . var_export('page.titles.' . $pageTitle, true) . ");\n\n";
@@ -225,8 +227,8 @@ class JsonToPhpCompiler {
     /**
      * The require line a compiled structure needs for its iframes, or ''.
      *
-     * Emitted only when compiling found an <iframe>: IframeSandbox is 470
-     * lines, and a page with no iframe should not parse it on every request.
+     * Emitted only when compiling found an <iframe>: IframeSandbox is a sizable
+     * class, and a page with no iframe should not parse it on every request.
      */
     private function iframeSandboxRequire(): string {
         return $this->needsIframeSandbox
@@ -240,12 +242,12 @@ class JsonToPhpCompiler {
     private function generateSystemVariables(): string {
         // ⚠ ASKED AT REQUEST TIME, FROM THE SOURCE THE RENDERER USES.
         //
-        // This used to GENERATE the derivation into every page: a regex to strip
-        // the URL space, another to strip the language prefix built by
-        // interpolating CONFIG's language list, and a hardcoded `(en|fr)`
-        // fallback for when CONFIG was absent. Three ways to get the same answer
-        // slightly wrong, none of them the way the renderer got it — so a built
-        // page and a preview could disagree about what page they were on.
+        // The derivation is NOT generated into each page. A per-page copy — a
+        // regex to strip the URL space, another to strip a language prefix
+        // built by interpolating CONFIG's language list, a hardcoded `(en|fr)`
+        // fallback for when CONFIG is absent — is three ways to get the same
+        // answer slightly wrong, none of them the way the renderer gets it, and
+        // a built page and a preview would disagree about what page they are on.
         //
         // projectLanguage.php travels into a build, so the language question has
         // one answer on both surfaces and there is nothing left to interpolate.
@@ -386,10 +388,10 @@ class JsonToPhpCompiler {
         $textKey = $node['textKey'];
         $prefix = $echo ? 'echo ' : '$content .= ';
 
-        // __LIT__ is the renderer's second literal prefix, and the compiler
-        // did not know it: a __LIT__ node fell through to the translation
-        // branch, so a built page rendered
-        // `{translation missing: __LIT__…}` where preview showed the text.
+        // __LIT__ is the renderer's second literal prefix, so the compiler
+        // honours it too: a __LIT__ node routed to the translation branch
+        // would build a page reading `{translation missing: __LIT__…}` where
+        // preview shows the text.
         if (strpos($textKey, '__RAW__') === 0 || strpos($textKey, '__LIT__') === 0) {
             // Raw text. A literal is fully known here, so the substitution call
             // is emitted ONLY when the text actually carries a placeholder —
@@ -438,10 +440,10 @@ class JsonToPhpCompiler {
     private function compileTagNode(array $node, bool $echo = false): string {
         $tag = $node['tag'] ?? '';
 
-        // SECURITY (beta.10 F-h): the compiler previously emitted ANY tag, so a
-        // stored blocked <script>/<style> shipped to the build even though the
-        // renderer drops it. Enforce the SAME gate as the renderer here so
-        // preview and deploy agree (name well-formed + not blocked + allowed).
+        // SECURITY: the SAME gate as the renderer (name
+        // well-formed + not blocked + allowed), so preview and deploy agree.
+        // Without it, a stored blocked <script>/<style> would ship to the build
+        // even though the renderer drops it.
         if (!TagRegistry::isRenderable($tag)) {
             error_log("Compiler skipped non-renderable tag: {$tag}");
             return '';
@@ -452,34 +454,49 @@ class JsonToPhpCompiler {
         $prefix = $echo ? 'echo ' : '$content .= ';
 
         // SECURITY — the iframe sandbox policy, enforced exactly as the live
-        // renderer enforces it. It used to hold at /p/<id>/ and vanish in a
-        // build: the compiler had no notion of it, so a per-domain policy the
-        // author configured simply stopped existing in production.
+        // renderer enforces it. A build is a deployment of the same pages, so
+        // which surface serves an embed must not decide what it is allowed to
+        // do; a policy that held at /p/<id>/ and lapsed in production would be
+        // a policy only the preview obeys.
         //
         // An author-supplied `sandbox` is dropped rather than merged — the
         // system decides this attribute, and letting page JSON widen it would
         // make the policy advisory.
         //
         // The ATTRIBUTE is computed at request time even though the src is
-        // known now, because the POLICY is project data that can change without
-        // the page changing. The argument is the raw authored src, which is
-        // exactly what the renderer passes.
+        // known now, because the POLICY is INSTALL-WIDE configuration that can
+        // change without the page changing: a deployer who edits the embed
+        // policy must not have to rebuild every site before it is obeyed. The
+        // argument is the raw authored src, which is exactly what the renderer
+        // passes — see the matching selection rule there.
         $isIframe = strtolower($tag) === 'iframe';
         $iframeSandboxExpr = '';
         if ($isIframe) {
             $this->needsIframeSandbox = true;
-            $iframeSrc = '';
+            // The sandbox is decided from the src the BROWSER loads: the FIRST
+            // attribute whose name is `src`, in emission order — the one a
+            // browser keeps when a tag carries `src` and `SRC` both, discarding
+            // the rest. Whatever the first src's VALUE: a non-string src is not
+            // skipped to reach a later one, because the browser does not skip it
+            // either — it counts as '' (the same-origin branch) and the search
+            // stops there. This mirrors JsonToHtmlRenderer exactly; the two
+            // selection rules MUST stay identical, or one node is sandboxed two
+            // ways across preview and a build.
+            //
             // A `srcdoc` supplies the frame's document itself, so the host named
             // in `src` is never fetched and the sandbox must be decided on the
             // srcdoc — which inherits the deployed site's own origin — rather
             // than on the src. Only the BOOLEAN is baked into the compiled page:
             // the srcdoc string itself stays an ordinary attribute, out of the
             // PHP literal.
+            $iframeSrc = '';
+            $srcFound = false;
             $hasSrcdoc = false;
             foreach ($params as $attrName => $attrValue) {
                 $lowerName = strtolower((string) $attrName);
-                if ($lowerName === 'src' && is_string($attrValue)) {
-                    $iframeSrc = $attrValue;
+                if ($lowerName === 'src' && !$srcFound) {
+                    $iframeSrc = is_string($attrValue) ? $attrValue : '';
+                    $srcFound = true;
                 } elseif ($lowerName === 'srcdoc') {
                     $hasSrcdoc = true;
                 }
@@ -511,14 +528,14 @@ class JsonToPhpCompiler {
             foreach ($params as $attrName => $attrValue) {
                 // ── THE NAME, BEFORE ANYTHING ELSE ────────────────────────
                 //
-                // SECURITY (beta.11 S3.10b): the name is emitted VERBATIM into
+                // SECURITY: the name is emitted VERBATIM into
                 // a double-quoted PHP string literal on every branch below, so
-                // a name carrying `"` closed that literal and made the rest of
-                // it executable PHP in the compiled page — dormant in the
+                // a name carrying `"` would close that literal and make the rest
+                // of it executable PHP in the compiled page — dormant in the
                 // artifact, and running the moment the built site served the
-                // route. The renderer has always refused these names
-                // (renderAttribute), so preview and production disagreed and
-                // production was the weaker one.
+                // route. The renderer refuses these names (renderAttribute); a
+                // compiler that accepted them would make production the weaker
+                // of the two surfaces.
                 //
                 // Same gate, same outcome, one definition: a malformed name is
                 // DROPPED, exactly as the tag gate above drops a non-renderable
@@ -535,12 +552,13 @@ class JsonToPhpCompiler {
                 // ── VALUE SHAPES ──────────────────────────────────────────
                 // The renderer decides these at render time; the compiler knows
                 // the authored value now, so it decides them here. Same rules,
-                // same outcomes — they used to differ on every one of them.
+                // same outcomes — each one below is a place the two surfaces
+                // would otherwise disagree.
 
-                // An ARRAY is not a value an attribute can carry. This used to
-                // compile to htmlspecialchars(array(…)), a TypeError at REQUEST
-                // time: the built page answered 200 with a fatal in the body and
-                // everything after the offending tag missing.
+                // An ARRAY is not a value an attribute can carry. Compiled, it
+                // would become htmlspecialchars(array(…)), a TypeError at REQUEST
+                // time: the built page would answer 200 with a fatal in the body
+                // and everything after the offending tag missing.
                 if (is_array($attrValue)) {
                     error_log("Compiler: attribute '{$attrName}' has an array value — attribute dropped");
                     continue;
@@ -548,8 +566,8 @@ class JsonToPhpCompiler {
 
                 // A boolean attribute is present or absent, never `="1"` or
                 // `=""`. `controls=""` in particular is read by HTML as TRUE,
-                // so the compiled form of `false` said the opposite of what was
-                // authored.
+                // so compiling `false` to an empty value would say the opposite
+                // of what was authored.
                 if (is_bool($attrValue)) {
                     if ($attrValue) {
                         $output .= ' ' . $attrName;
@@ -582,7 +600,7 @@ class JsonToPhpCompiler {
                 
                 // Scheme safety applies to ANY URL sink (namespace-aware, e.g.
                 // xlink:href); BASE_URL/language rewriting only to the classic
-                // set (unchanged behaviour).
+                // rewritable set (UrlPolicy::REWRITABLE_URL_ATTRIBUTES).
                 $isUrlAttr    = UrlPolicy::isUrlAttribute($attrName);
                 $needsRewrite = UrlPolicy::isRewritableUrlAttribute($attrName);
                 
@@ -612,8 +630,8 @@ class JsonToPhpCompiler {
                              . '), ENT_QUOTES | ENT_HTML5, \'UTF-8\') . "\\"';
                 } else {
                     // A literal prefix marks "use this verbatim, do not translate".
-                    // The renderer strips both; the compiler stripped neither, so
-                    // a built page shipped the marker to the visitor.
+                    // The renderer strips both prefixes, so the compiler does too —
+                    // left in, the marker would ship to the visitor in a built page.
                     if (is_string($attrValue)
                         && (strpos($attrValue, '__RAW__') === 0 || strpos($attrValue, '__LIT__') === 0)) {
                         $attrValue = substr($attrValue, 7);
@@ -625,14 +643,14 @@ class JsonToPhpCompiler {
                     // covers the non-rewritable sinks (xlink:href, …) too.
                     if (is_string($attrValue) && $this->hasRuntimePlaceholder($attrValue)) {
                         // {{param:}} / {{resolved:}} carry REQUEST-time values, so
-                        // the substitution is a call, not a fold. Neither surface
-                        // used to do this in an attribute at all — a visitor was
-                        // served data-slug="{{param:slug}}" verbatim.
+                        // the substitution is a call, not a fold. Both surfaces
+                        // substitute inside attributes; without it a visitor
+                        // would be served data-slug="{{param:slug}}" verbatim.
                         //
                         // ⚠ THE POLICY MUST SEE THE SUBSTITUTED VALUE. Sanitising
-                        // the literal placeholder and substituting afterwards lets
-                        // a route param inject a scheme past the check — the same
-                        // hole the renderer had. So UrlPolicy::sanitize wraps the
+                        // the literal placeholder and substituting afterwards would
+                        // let a route param inject a scheme past the check — on
+                        // either surface. So UrlPolicy::sanitize wraps the
                         // substitution at RUNTIME rather than folding at compile
                         // time, and processUrl composes on top of the safe value.
                         $expr = 'qs_apply_runtime_placeholders(' . var_export($attrValue, true) . ', $__routeParams)';
@@ -698,11 +716,11 @@ class JsonToPhpCompiler {
             return "// Missing component name\n";
         }
 
-        // SECURITY (beta.11 S3.10b): the four diagnostics below used to
+        // SECURITY: the four diagnostics below never
         // INTERPOLATE the component name into the generated `//` comment. A
-        // name carrying a newline ended the comment and put the remainder of
-        // the name into the compiled page as executable PHP — the same class of
-        // hole as the attribute name above, through a line that looks inert.
+        // name carrying a newline would end the comment and put the remainder
+        // of the name into the compiled page as executable PHP — the same class
+        // of hole as the attribute name above, through a line that looks inert.
         // Nothing validates a component REFERENCE on write (editStructure
         // checks tags and params, never `component`), so the name arrives
         // unconstrained.
@@ -712,11 +730,11 @@ class JsonToPhpCompiler {
         // sends its own refusals. The generated comment says what happened
         // without echoing author data into code.
         //
-        // SECURITY (beta.11 S3.10c): the reference used to be concatenated
-        // straight into this path, so `../` walked out of the components
-        // directory and read any .json the process could reach. Where the
-        // out-of-jail target was component-shaped, its content COMPILED INTO
-        // THE BUILT SITE. The shared resolver - the same one
+        // SECURITY: the reference is never concatenated
+        // straight into this path — `../` would walk out of the components
+        // directory and read any .json the process can reach, and where the
+        // out-of-jail target is component-shaped, its content would COMPILE
+        // INTO THE BUILT SITE. The shared resolver - the same one
         // JsonToHtmlRenderer::loadComponent asks - decides that a reference is
         // a bare component name and that the file it names really sits inside
         // this project's components directory.
@@ -766,9 +784,10 @@ class JsonToPhpCompiler {
     private function processComponentTemplate($template, array $data) {
         if (is_string($template)) {
             // The slot rule lives in componentPolicy.php beside the rule for
-            // the reference itself. This method used to be the one spelling
-            // that omitted the optional `$` prefix, so a component written
-            // `{{$label}}` bound in a preview and shipped unbound in a build.
+            // the reference itself, so this method binds a slot exactly as the
+            // renderer does — a spelling of its own that missed the optional `$`
+            // prefix would bind `{{$label}}` in a preview and ship it unbound in
+            // a build.
             return qs_resolve_component_placeholders($template, $data);
         }
         
