@@ -4349,7 +4349,8 @@ $GLOBALS['__help_commands'] = [
         ],
         'notes' => [
             'An archive is untrusted input. Entries are accepted against an extension ALLOWLIST and each one is checked so its content matches what its name claims (magic bytes for binary formats, valid JSON for .json, no PHP open tag for text, sanitisation for SVG).',
-            'A refused entry is skipped and listed in security.skipped_disallowed with the reason; the rest of the archive still imports. Entries refusing to stay inside the project are listed in security.skipped_unsafe.',
+            'A refused entry is skipped and listed in security.skipped_disallowed with the reason; the rest of the archive still imports — except a structure file, which refuses the whole archive (next note). Entries refusing to stay inside the project are listed in security.skipped_unsafe.',
+            'A structure file — any .json file under templates/model/json/ or snippets/ — is checked before the project is created: it must be readable, parse as a JSON array or object, pass the content check, and carry no unsafe attribute, blocked tag or invalid component reference. The first one that fails refuses the WHOLE archive with 400 and nothing is created, because importing the rest would leave a route whose page is missing.',
             'Archive resource limits are enforced from the ZIP headers before anything is extracted: entry count, total and per-entry uncompressed size, and per-entry compression ratio. Exceeding any of them returns 413 and writes nothing.',
             'The permitted extensions and the limits can be changed by copying <secure>/management/config/import-policy.php.example to import-policy.php.',
             'PHP is never imported. config.php and routes.php are rebuilt from the archive JSON, and any members.json in the archive is discarded — the importer becomes the sole owner.',
@@ -4362,6 +4363,7 @@ $GLOBALS['__help_commands'] = [
             '400.upload.failed' => 'File upload failed',
             '400.validation.invalid_zip' => 'Invalid or corrupted ZIP',
             '400.validation.invalid_structure' => 'ZIP missing required project files',
+            '400.validation.unsafe_param' => 'A structure file in the archive failed a check, so the whole archive is refused and nothing is created. errors[0].file names the entry and errors[0].reason the check: invalid_json (cannot be read, does not parse, or is not a JSON array or object), disallowed_content (the content check refused it), unsafe_value (an unsafe attribute — errors[0].node and errors[0].attribute name it), blocked_tag or invalid_component_reference (errors[0].value names the tag or reference).',
             '409.resource.already_exists' => 'A project with that id already exists',
             '400.validation.incomplete_project' => 'Imported project is incomplete.',
             '400.validation.invalid_format' => 'Invalid project name format.',

@@ -265,13 +265,17 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
             ]);
     }
     
-    // Every structure the archive would bring in is checked before the project
-    // directory exists: one unsafe attribute refuses the whole import, and a
-    // refused import creates nothing.
-    $unsafeStructureParam = importFirstUnsafeStructureParam($zip, $projectFolder['prefix']);
-    if ($unsafeStructureParam !== null) {
+    // Every structure the archive would bring in — pages, components, menu,
+    // footer, snippets — is checked before the project directory exists, and the
+    // first one that fails refuses the WHOLE import: a file that cannot be read,
+    // does not parse, or is refused by the archive content check, and one that
+    // carries an unsafe attribute, a blocked tag or an invalid component
+    // reference. Importing the rest would ship a project with a hole in it — the
+    // dropped page's route survives and 404s. A refused import creates nothing.
+    $structureFailure = importFirstStructureFailure($zip, $projectFolder['prefix']);
+    if ($structureFailure !== null) {
         $zip->close();
-        return qs_unsafe_structure_param_response($unsafeStructureParam);
+        return qs_unsafe_structure_param_response($structureFailure);
     }
 
     // Create project directory structure
@@ -385,9 +389,11 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
             // Entries refused by the zip-slip containment guard (path escape attempts).
             'skipped_unsafe_paths' => count($stats['skipped_unsafe']),
             'skipped_unsafe' => $stats['skipped_unsafe'],
-            // Entries refused by the extension allowlist or by content validation
-            // (C11 11.0). Reported rather than fatal: one stray file must not
-            // block an otherwise legitimate import, but it must never be silent.
+            // Entries refused by the extension allowlist or by content validation.
+            // Reported rather than fatal: one stray file must not block an
+            // otherwise legitimate import, but it must never be silent. A
+            // structure file is never listed here — importFirstStructureFailure()
+            // refuses the whole archive for it instead.
             'skipped_disallowed_files' => count($stats['skipped_disallowed']),
             'skipped_disallowed' => $stats['skipped_disallowed'],
             'membership' => 'archive members.json discarded; importer set as sole owner'
@@ -634,41 +640,43 @@ function extractProjectFromZipSecure(ZipArchive $zip, string $prefix, string $de
             return ['success' => false, 'error' => "Failed to read file from ZIP: $relativePath"];
         }
 
-        // SECURITY (C11 11.0) — the name must not lie about the content. An
-        // allowed extension is necessary but not sufficient: '.png' holding
-        // PHP source passes any extension check ever written. SVG comes back
-        // sanitised, so write what the validator returns, not the raw bytes.
+        // SECURITY — the name must not lie about the content. An allowed
+        // extension is necessary but not sufficient: '.png' holding PHP source
+        // passes any extension check ever written. SVG comes back sanitised, so
+        // write what the validator returns, not the raw bytes. A refused entry is
+        // skipped and reported while the rest imports — unless it holds
+        // structure, which fails the whole import (the second layer, below).
         $verdict = qs_import_validate_content($relativePath, $content);
         if (!$verdict['ok']) {
+            if (importStructureKind($relativePath) !== null) {
+                return ['success' => false, 'error' => "$relativePath: {$verdict['reason']}"];
+            }
             $stats['skipped_disallowed'][] = $relativePath . ' (' . $verdict['reason'] . ')';
             continue;
         }
         $content = $verdict['content'];
 
-        // SECURITY (beta.10 C13 13.6b, F-C13-21) — TAG GATE for archive-borne
-        // structure. Every gate above constrains an entry's PATH, EXTENSION or
-        // CONTENT SHAPE; none of them looks at a tag NAME inside a well-formed
-        // page JSON, so an archive could put a node the renderer refuses
-        // ('script', or anything off the allowlist) straight into stored data.
-        // Same shared policy the write-side writers use — one helper, one answer.
+        // SECURITY — the structure gates' SECOND LAYER. Every gate above
+        // constrains an entry's PATH, EXTENSION or CONTENT SHAPE; none of them
+        // looks at a tag name or a component reference inside a well-formed
+        // structure, which is how an archive would put a node the renderer
+        // refuses ('script', or anything off the allowlist) or a reference that
+        // walks out of the components directory straight into stored data. The
+        // same shared policies the write-side writers use — one helper, one answer.
         //
-        // Refused PER ENTRY, not per archive: an extension refusal and a
-        // content-shape refusal already skip the entry and report it while the
-        // rest imports, and a new whole-archive failure mode would be both
-        // inconsistent with that contract and harsher than it.
+        // importFirstStructureFailure() ran the content check and both of these
+        // over the same entries before the project directory existed, and refused
+        // the WHOLE archive on any failure — so an archive that got this far
+        // passes them, and a failure here means that gate is broken. The answer
+        // is then the gate's own: the import fails whole and is rolled back.
+        // Skipping the entry instead would ship a project with a hole in it.
         $badTag = importFirstUnrenderableTag($relativePath, $content);
         if ($badTag !== null) {
-            $stats['skipped_disallowed'][] = $relativePath . ' (blocked tag: ' . $badTag . ')';
-            continue;
+            return ['success' => false, 'error' => "$relativePath: blocked tag '$badTag'"];
         }
-
-        // The component-reference half of the same site predicate (beta.11
-        // S3.10c). An imported archive is the one path that brings a whole
-        // structure tree from outside this install.
         $badRef = importFirstInvalidComponentReference($relativePath, $content);
         if ($badRef !== null) {
-            $stats['skipped_disallowed'][] = $relativePath . ' (invalid component reference: ' . $badRef . ')';
-            continue;
+            return ['success' => false, 'error' => "$relativePath: invalid component reference '$badRef'"];
         }
 
         if (file_put_contents($destFilePath, $content) === false) {
@@ -683,84 +691,105 @@ function extractProjectFromZipSecure(ZipArchive $zip, string $prefix, string $de
 }
 
 /**
- * The tag gate's SITE predicate: given an archive entry, return the first tag the
- * render/compile layers would refuse, or null when this entry carries no
- * renderable structure at all.
+ * Which archive entries hold STRUCTURE — the one definition the structure gate,
+ * the two site predicates below and the extraction share, so they can never
+ * disagree about which entries they check.
  *
- * Deliberately narrow. `qs_first_unrenderable_tag()` walks a node tree by
- * following `children` and trips on a `tag` key — which is exactly right for a
- * page/component/menu/footer tree, and exactly WRONG for the author's own data.
- * A `data/items.json` holding `[{"tag":"newsletter",...}]` is legitimate content,
- * not markup, and gating it would silently drop a file the site depends on. So
- * the walk runs only where structure actually lives:
+ * Deliberately narrow. A structure walk follows `children` and trips on a `tag`
+ * or a `component` key — which is exactly right for a page/component/menu/footer
+ * tree, and exactly WRONG for the author's own data. A `data/items.json` holding
+ * `[{"tag":"newsletter",...}]` is legitimate content, not markup, and gating it
+ * would refuse a file the site depends on. So only the places structure actually
+ * lives count:
  *   - templates/model/json/**  — pages, components, menu.json, footer.json;
  *     the file IS the tree.
  *   - snippets/**              — a snippet wraps its tree under `structure`, and
- *     insertSnippet copies that tree into a page (the same chain 13.5 closed on
- *     the createSnippet side).
+ *     insertSnippet copies that tree into a page.
  * Paths are matched case-insensitively: NTFS resolves 'Templates/' and
  * 'templates/' to one directory, so a case variant must not slip the gate.
  *
- * @return string|null the offending tag, or null when the entry is clean/irrelevant
+ * @param string $relativePath the entry's path inside the project folder, `/`-separated
+ * @return string|null 'model' or 'snippet', or null when the entry holds no structure
  */
-function importFirstUnrenderableTag(string $relativePath, string $content): ?string {
+function importStructureKind(string $relativePath): ?string {
     $lower = strtolower($relativePath);
     if (substr($lower, -5) !== '.json') {
         return null;
     }
-    $isModelJson = strpos($lower, 'templates/model/json/') === 0;
-    $isSnippet   = strpos($lower, 'snippets/') === 0;
-    if (!$isModelJson && !$isSnippet) {
+    if (strpos($lower, 'templates/model/json/') === 0) {
+        return 'model';
+    }
+    if (strpos($lower, 'snippets/') === 0) {
+        return 'snippet';
+    }
+    return null;
+}
+
+/**
+ * The tag gate's SITE predicate: given an archive entry, return the first tag the
+ * render/compile layers would refuse, or null when this entry carries no
+ * renderable structure at all (see importStructureKind() for which entries do).
+ *
+ * @return string|null the offending tag, or null when the entry is clean/irrelevant
+ */
+function importFirstUnrenderableTag(string $relativePath, string $content): ?string {
+    $kind = importStructureKind($relativePath);
+    if ($kind === null) {
         return null;
     }
     $data = json_decode($content, true);
     if (!is_array($data)) {
         return null;
     }
-    $structure = $isSnippet ? ($data['structure'] ?? null) : $data;
+    $structure = $kind === 'snippet' ? ($data['structure'] ?? null) : $data;
 
     return qs_first_unrenderable_tag($structure);
 }
 
 /**
  * The component-reference gate's SITE predicate — the exact twin of
- * importFirstUnrenderableTag() above, narrowed to the same paths for the same
- * reason: only templates/model/json/** and snippets/** hold structure, and the
- * author's own data files may legitimately contain a `component` key that means
- * something else entirely.
+ * importFirstUnrenderableTag() above, over the same entries: the author's own
+ * data files may legitimately contain a `component` key that means something
+ * else entirely.
  *
  * @return string|null the offending reference, or null when the entry is clean
  */
 function importFirstInvalidComponentReference(string $relativePath, string $content): ?string {
-    $lower = strtolower($relativePath);
-    if (substr($lower, -5) !== '.json') {
-        return null;
-    }
-    $isModelJson = strpos($lower, 'templates/model/json/') === 0;
-    $isSnippet   = strpos($lower, 'snippets/') === 0;
-    if (!$isModelJson && !$isSnippet) {
+    $kind = importStructureKind($relativePath);
+    if ($kind === null) {
         return null;
     }
     $data = json_decode($content, true);
     if (!is_array($data)) {
         return null;
     }
-    $structure = $isSnippet ? ($data['structure'] ?? null) : $data;
+    $structure = $kind === 'snippet' ? ($data['structure'] ?? null) : $data;
 
     return qs_first_invalid_component_reference($structure);
 }
 
 /**
- * The attribute gate's pass over the archive — the twin of the two predicates
- * above, over the same entries (templates/model/json/** and snippets/**, matched
- * case-insensitively), with one difference that is the point of it: those two
- * skip an entry and import the rest, while an unsafe attribute refuses the
- * WHOLE archive. It runs before the project directory is created, so nothing
- * of a refused import reaches the disk.
+ * The archive's STRUCTURE GATE: every entry that holds structure is checked
+ * before the project directory is created, and the first one that fails refuses
+ * the WHOLE archive. A project imported with one page dropped keeps that page's
+ * route, and the route 404s; a refused import leaves nothing on disk.
  *
- * @return array|null the first failure, with `file` naming the archive entry
+ * Per entry, the first of:
+ *   1. `invalid_json` — the entry cannot be read, does not parse, or does not
+ *      decode to a JSON array or object; no render path could read it either;
+ *   2. `disallowed_content` — the archive content check the extraction applies
+ *      to every entry refuses it (a PHP opening tag inside a text value, say);
+ *   3. `unsafe_value` — an attribute the write gate refuses, naming the node and
+ *      the attribute;
+ *   4. `blocked_tag` — a tag the renderer refuses;
+ *   5. `invalid_component_reference` — a reference the resolver refuses.
+ * Every other entry keeps the extraction's per-entry rule: a disallowed asset, a
+ * hidden path or an unsafe path is skipped and reported while the rest imports.
+ *
+ * @return array|null the first failure, for qs_unsafe_structure_param_response():
+ *                    `file` names the entry and `reason` the check it failed
  */
-function importFirstUnsafeStructureParam(ZipArchive $zip, string $prefix): ?array {
+function importFirstStructureFailure(ZipArchive $zip, string $prefix): ?array {
     $prefixLen = strlen($prefix);
     for ($i = 0; $i < $zip->numFiles; $i++) {
         $name = $zip->getNameIndex($i);
@@ -771,23 +800,49 @@ function importFirstUnsafeStructureParam(ZipArchive $zip, string $prefix): ?arra
             continue;
         }
         $relativePath = str_replace('\\', '/', substr($name, $prefixLen));
-        $lower = strtolower($relativePath);
-        if (substr($lower, -5) !== '.json') {
+        $kind = importStructureKind($relativePath);
+        if ($kind === null) {
             continue;
         }
-        $isModelJson = strpos($lower, 'templates/model/json/') === 0;
-        $isSnippet   = strpos($lower, 'snippets/') === 0;
-        if (!$isModelJson && !$isSnippet) {
-            continue;
+
+        $content = $zip->getFromIndex($i);
+        if ($content === false) {
+            return ['file' => $relativePath, 'reason' => 'invalid_json',
+                    'message' => 'The entry cannot be read from the archive (it is damaged or encrypted).'];
         }
-        $data = json_decode((string) $zip->getFromIndex($i), true);
+        $data = json_decode($content, true);
         if (!is_array($data)) {
-            continue;
+            $message = 'Not a structure: the file must hold a JSON array or object.';
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                $message = 'Not valid JSON (' . json_last_error_msg() . ').';
+                // A byte-order mark is invisible in an editor, so "Syntax error"
+                // on JSON that looks right says nothing useful. Named only when it
+                // is the one thing wrong: without it the rest must decode.
+                if (strncmp($content, "\xEF\xBB\xBF", 3) === 0 && is_array(json_decode(substr($content, 3), true))) {
+                    $message = 'Not valid JSON: the file starts with a byte-order mark (BOM). Save it as UTF-8 without a BOM.';
+                }
+            }
+            return ['file' => $relativePath, 'reason' => 'invalid_json', 'message' => $message];
         }
-        $failure = qs_first_unsafe_structure_param($isSnippet ? ($data['structure'] ?? null) : $data);
+        $verdict = qs_import_validate_content($relativePath, $content);
+        if (!$verdict['ok']) {
+            return ['file' => $relativePath, 'reason' => 'disallowed_content',
+                    'message' => ucfirst($verdict['reason']) . '.'];
+        }
+
+        $failure = qs_first_unsafe_structure_param($kind === 'snippet' ? ($data['structure'] ?? null) : $data);
         if ($failure !== null) {
-            $failure['file'] = $relativePath;
-            return $failure;
+            return $failure + ['file' => $relativePath, 'reason' => 'unsafe_value'];
+        }
+        $badTag = importFirstUnrenderableTag($relativePath, $content);
+        if ($badTag !== null) {
+            return ['file' => $relativePath, 'reason' => 'blocked_tag', 'value' => $badTag,
+                    'message' => "Tag '{$badTag}' is not allowed (security restriction)."];
+        }
+        $badRef = importFirstInvalidComponentReference($relativePath, $content);
+        if ($badRef !== null) {
+            return ['file' => $relativePath, 'reason' => 'invalid_component_reference', 'value' => $badRef,
+                    'message' => "Component reference '{$badRef}' is not allowed (security restriction)."];
         }
     }
     return null;

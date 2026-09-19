@@ -11258,3 +11258,53 @@ cascade and component renames were settled in the same design round.
 `secure/src/functions/cascadeCleanupHelpers.php` (the API cascade),
 `secure/src/classes/RegexPatterns.php` (`html_attribute_name`), and every command
 that writes a structure file. Behaviour: [ARCHITECTURE.md](ARCHITECTURE.md) (§8).
+
+
+### An import refuses a broken structure whole, never a project with a hole in it (locked 2026-09-18)
+
+**Decision**: `importProject` checks every structure file an archive would bring
+in — any `.json` file under `templates/model/json/` or `snippets/` — before the project
+directory exists, and the first one that fails refuses the whole archive; nothing
+is created. A structure file fails when it cannot be read or does not parse as a
+JSON array or object, when the archive content check refuses it (a PHP opening tag
+inside a text value, say), or when it carries an unsafe attribute, a blocked tag or
+an invalid component reference. Every refusal answers the same way,
+`400 validation.unsafe_param`, with `errors[0].file` naming the entry and
+`errors[0].reason` the check it failed: one response renderer, shared with every
+other command that writes a structure, and no new code per reason. An entry that
+holds no structure — an asset, a data file, a translation — keeps the per-entry
+rule: it is skipped and reported, and the rest imports. The
+content, tag and reference checks run a second time as each entry is extracted.
+They cannot fail there for an archive the first pass accepted; if one ever does,
+the import fails whole and is rolled back rather than skipping the entry.
+
+**Reasoning**: every gate over an archive entry used to skip that entry and import
+the rest. For a stray asset that is the right answer; for a page it is not. The
+route survives, the page does not, and the editor answers 404 with nothing to say
+why — an import that reported success had shipped a project with a hole in it. A
+hand-edited page with one stray comma was enough. A structure file is not noise
+the way a stray asset is: it is the site, so a structure file that cannot be
+imported means the archive cannot be imported, and the useful answer is which file
+and why, before anything is written. The check runs where the attribute check
+already refused, before the project directory is created, so a refusal leaves
+nothing behind. A clean re-import of a real export never trips it; only a corrupt
+or tampered structure does, and before 1.0 there are no older archives to keep
+importable.
+
+**Alternatives considered**: skip the entry and report it (rejected: the previous
+behaviour, which imports a project whose routes point at pages that are not there,
+behind a report that is easy to miss inside a success). Refuse the whole archive on
+any disallowed entry, a stray asset included (rejected for now: one unwanted file
+is not site corruption, and refusing a whole site over it is a harsher, separate
+policy; adopting it means the first pass also runs the path, extension and content
+checks on every entry, not only on structure files). A response code per reason
+(rejected: it is one kind of answer, and `reason` already tells a caller which
+check failed). Leaving the second-layer checks at extraction as skip-entry
+(rejected: a backstop that produces the very hole it backs up is not a backstop).
+
+**Source**: Sangio's rulings, 2026-09-18, after a hand-edited export imported with
+a page missing. `secure/management/command/importProject.php`
+(`importFirstStructureFailure`, `importStructureKind`, and the extraction's second
+layer), `secure/src/functions/nodeParamPolicy.php`
+(`qs_unsafe_structure_param_response`, which now also answers a failure that names
+no node). Behaviour: [COMMAND_API.md](COMMAND_API.md) (*Archive import limits*).

@@ -170,10 +170,13 @@ window.QuickSiteAPI = (function() {
     }
 
     // Defensive mirror of categories.php scope==='global' — used ONLY if the page
-    // failed to emit QUICKSITE_CONFIG.globalCommands, so the panel can still
-    // authenticate + list/create projects. The emitted set is authoritative.
+    // failed to emit QUICKSITE_CONFIG.globalCommands. The emitted set is
+    // authoritative. This copy must still name EVERY global command: one it
+    // misses is treated as project-scoped, so it gets a project marker, or is
+    // refused client-side when no project is selected.
     const FALLBACK_GLOBAL_COMMANDS = [
-        'help', 'listProjects', 'createProject'
+        'help', 'login', 'logoutSession', 'register',
+        'listProjects', 'createProject', 'importProject'
     ];
 
     function globalCommandSet() {
@@ -874,9 +877,9 @@ window.QuickSiteAPI = (function() {
         // (/admin/self) — not commands either. See accountRequest.
         accountRequest,
 
-        // For the few places that must hand-roll a fetch (importProject is
-        // GLOBAL, so upload()'s marker path does not fit it). Exported so they
-        // do not hand-roll the body reading too — that is where the assumption
+        // For a caller that hand-rolls its own fetch (the dashboard's Export,
+        // which reads a ZIP stream rather than an envelope). Exported so it does
+        // not hand-roll the body reading too — that is where the assumption
         // "an HTTP answer is JSON" keeps coming back.
         readResponseBody
     };

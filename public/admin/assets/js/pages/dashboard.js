@@ -511,7 +511,7 @@
     // the two are DIFFERENT drawings (this is the tabbed folder, the catalogue's
     // is the square-cornered one), so switching would quietly change the icon
     // in the project-manager rows. Unifying them is a design call, not a
-    // refactor — flagged in NOTES/reports/beta12/S3b.md rather than taken here.
+    // refactor.
     function _folderIcon(size) {
         return QSDom.svgIcon('M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z', size || 18);
     }
@@ -1104,6 +1104,31 @@
     // Project Manager Events
     // ========================================================================
 
+    /**
+     * A typed project name, made into an id: lowercase letters, digits, `-` and
+     * `_`, anything else becoming `-`. The one rule New Project, Clone and Import
+     * share; the server still validates what it receives.
+     */
+    function normalizeProjectName(value) {
+        return String(value || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+    }
+
+    /**
+     * The name Import suggests for an archive: its file name without `.zip`, a
+     * browser's duplicate-download marker (` (1)`), and the `_export_<date>_<time>`
+     * suffix exportProject names every archive with. So
+     * `test2_export_20260918_101500.zip` suggests `test2` — the project it was
+     * exported from, which is also the name the server itself would use. A file
+     * named any other way is suggested whole.
+     */
+    function importNameFromFile(fileName) {
+        const base = String(fileName || '')
+            .replace(/\.zip$/i, '')
+            .replace(/\s*\(\d+\)$/, '')
+            .replace(/_export_\d{8}_\d{6}$/, '');
+        return normalizeProjectName(base);
+    }
+
     function setupProjectManagerEvents() {
         const proj = t('dashboard.projects', {});
         const common = t('common', {});
@@ -1166,7 +1191,7 @@
         document.getElementById('btn-confirm-clone').addEventListener('click', async function() {
             const nameInput = document.getElementById('clone-project-name');
             const activateCheckbox = document.getElementById('clone-project-activate');
-            const name = nameInput.value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+            const name = normalizeProjectName(nameInput.value);
             
             if (!name) {
                 QuickSiteAdmin.showToast(proj.nameRequired || 'Project name is required', 'error');
@@ -1211,7 +1236,7 @@
         document.getElementById('btn-confirm-create').addEventListener('click', async function() {
             const nameInput = document.getElementById('create-project-name');
             const activateCheckbox = document.getElementById('create-project-activate');
-            const name = nameInput.value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+            const name = normalizeProjectName(nameInput.value);
             
             if (!name) {
                 QuickSiteAdmin.showToast(proj.nameRequired || 'Project name is required', 'error');
@@ -1301,54 +1326,65 @@
             this.textContent = originalText;
         });
         
-        // Import project
+        // Import project: choose the archive, then name the project it becomes.
+        // The name is pre-filled from the archive's file name (importNameFromFile);
+        // the server still validates it and refuses an id already in use (409), so
+        // on any refusal the modal stays open to try another name with the same file.
+        let importFile = null;
+
         document.getElementById('btn-import-project').addEventListener('click', function() {
             document.getElementById('import-file-input').click();
         });
-        
-        document.getElementById('import-file-input').addEventListener('change', async function() {
+
+        document.getElementById('import-file-input').addEventListener('change', function() {
             if (!this.files || !this.files[0]) return;
-            
-            const file = this.files[0];
-            const formData = new FormData();
-            formData.append('file', file);
+            importFile = this.files[0];
+            // Cleared now, so choosing the same archive again still fires `change`.
+            this.value = '';
 
-            try {
-                QuickSiteAdmin.showToast(proj.importing || 'Importing project...', 'info');
+            const nameInput = document.getElementById('import-project-name');
+            document.getElementById('import-file-name').textContent = importFile.name;
+            nameInput.value = importNameFromFile(importFile.name);
+            document.getElementById('modal-import-project').style.display = 'flex';
+            nameInput.focus();
+            nameInput.select();
+        });
 
-                // importProject is GLOBAL (create-from-archive) — no project
-                // marker — so it cannot go through QuickSiteAPI.upload(), which
-                // builds a marker path. Hand-rolled here, but it must not
-                // hand-roll the body reading: an archive is the biggest upload
-                // QuickSite accepts, so it is the likeliest to be refused by the
-                // web server in front of PHP with an HTML error page.
-                // response.json() threw on that and the catch below reported
-                // "Failed to import project", hiding a size limit behind a
-                // generic failure.
-                const response = await fetch(window.QUICKSITE_CONFIG.apiBase + '/importProject', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': 'Bearer ' + QuickSiteAdmin.getToken()
-                    },
-                    body: formData
-                });
-
-                const result = (await window.QuickSiteAPI.readResponseBody(response)) || {};
-
-                if (response.ok) {
-                    QuickSiteAdmin.showToast(result.message || proj.imported || 'Project imported successfully', 'success');
-                    // Full reload: a new project changes the header picker, the nav
-                    // permission set and the storage totals — not just this card.
-                    this.value = '';
-                    window.location.href = window.location.pathname + '?t=' + Date.now();
-                    return;
-                }
-                QuickSiteAdmin.showToast(result.message || 'Failed to import project', 'error');
-            } catch (error) {
-                QuickSiteAdmin.showToast('Failed to import project', 'error');
+        document.getElementById('btn-confirm-import').addEventListener('click', async function() {
+            if (!importFile) return;
+            const name = normalizeProjectName(document.getElementById('import-project-name').value);
+            if (!name) {
+                QuickSiteAdmin.showToast(proj.nameRequired || 'Project name is required', 'error');
+                return;
             }
 
-            this.value = '';
+            const formData = new FormData();
+            formData.append('file', importFile);
+            formData.append('name', name);
+
+            const originalText = QSDom.setButtonBusy(this, proj.importing || 'Importing project...');
+            // importProject is a GLOBAL command, so upload() sends it to the global
+            // endpoint with no project marker. It reads the body without assuming
+            // JSON: an archive is the biggest upload QuickSite accepts, so it is the
+            // likeliest to be refused by the web server in front of PHP with an
+            // HTML error page, and that refusal must reach the toast as a size
+            // limit rather than as a parse error.
+            let result = null;
+            try {
+                result = await QuickSiteAPI.upload('importProject', formData);
+            } catch (error) {
+                console.error('Import error:', error);
+            }
+            if (result && result.ok) {
+                QuickSiteAdmin.showToast(result.data?.message || proj.imported || 'Project imported successfully', 'success');
+                // Full reload: a new project changes the header picker, the nav
+                // permission set and the storage totals — not just this card.
+                window.location.href = window.location.pathname + '?t=' + Date.now();
+                return;
+            }
+            QuickSiteAdmin.showToast(result?.data?.message || 'Failed to import project', 'error');
+            this.disabled = false;
+            this.textContent = originalText;
         });
         
         // Backup project

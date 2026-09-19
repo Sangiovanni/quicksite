@@ -451,7 +451,7 @@ if (isset($_GET['denied'])): ?>
             <div class="admin-form-group">
                 <label class="admin-label"><?= __admin('dashboard.projects.nameLabel') ?></label>
                 <input type="text" id="create-project-name" class="admin-input" placeholder="my-new-site" pattern="[a-z0-9_\-]+" />
-                <small class="admin-help"><?= __admin('dashboard.projects.nameHelp') ?></small>
+                <small class="admin-hint"><?= __admin('dashboard.projects.nameHelp') ?></small>
             </div>
             <div class="admin-form-group">
                 <label class="admin-checkbox">
@@ -482,7 +482,7 @@ if (isset($_GET['denied'])): ?>
             <div class="admin-form-group">
                 <label class="admin-label"><?= __admin('dashboard.projects.cloneNameLabel') ?></label>
                 <input type="text" id="clone-project-name" class="admin-input" placeholder="my-project-copy" pattern="[a-z0-9_\-]+" />
-                <small class="admin-help"><?= __admin('dashboard.projects.nameHelp') ?></small>
+                <small class="admin-hint"><?= __admin('dashboard.projects.nameHelp') ?></small>
             </div>
             <div class="admin-form-group">
                 <label class="admin-checkbox">
@@ -500,6 +500,32 @@ if (isset($_GET['denied'])): ?>
                 </svg>
                 <?= __admin('dashboard.projects.cloneBtn') ?>
             </button>
+        </div>
+    </div>
+</div>
+
+<!-- Import Project Modal — opened once an archive is chosen; the name is
+     pre-filled from the archive's file name by dashboard.js. -->
+<div id="modal-import-project" class="admin-modal" style="display: none;">
+    <div class="admin-modal__backdrop"></div>
+    <div class="admin-modal__content">
+        <div class="admin-modal__header">
+            <h3 class="admin-modal__title"><?= __admin('dashboard.projects.importTitle') ?></h3>
+            <button type="button" class="admin-modal__close" data-close-modal>×</button>
+        </div>
+        <div class="admin-modal__body">
+            <p style="margin-bottom: var(--space-md);">
+                <?= __admin('dashboard.projects.importFrom') ?>: <strong id="import-file-name"></strong>
+            </p>
+            <div class="admin-form-group">
+                <label class="admin-label" for="import-project-name"><?= __admin('dashboard.projects.nameLabel') ?></label>
+                <input type="text" id="import-project-name" class="admin-input" pattern="[a-z0-9_\-]+" />
+                <small class="admin-hint"><?= __admin('dashboard.projects.importNameHelp') ?></small>
+            </div>
+        </div>
+        <div class="admin-modal__footer">
+            <button type="button" class="admin-btn admin-btn--ghost" data-close-modal><?= __admin('common.cancel') ?></button>
+            <button type="button" id="btn-confirm-import" class="admin-btn admin-btn--primary"><?= __admin('dashboard.projects.importBtn') ?></button>
         </div>
     </div>
 </div>

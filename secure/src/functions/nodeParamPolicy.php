@@ -270,23 +270,34 @@ if (!function_exists('qs_unsafe_structure_param_response')) {
      * firstUnsafeParam failure with, plus WHERE — the node, the attribute and,
      * from a command that writes several files, the file.
      *
-     * @param array $failure what the verifier returned; `file` is optional
+     * An import also answers here for every other way a structure file in an
+     * archive can fail, so an archive refusal always has this one shape: a file
+     * that cannot be read, does not parse, or is refused by the archive content
+     * check, and a blocked tag or an invalid component reference. Those name no
+     * node or attribute, so both are optional; `reason` says which check failed
+     * (default `unsafe_value`, the attribute gate's), and `value` carries the
+     * offending tag or reference.
+     *
+     * @param array $failure what the verifier returned; `file`, `reason` and
+     *                       `value` are optional, and so are `node` and
+     *                       `attribute` when no single attribute is at fault
      */
     function qs_unsafe_structure_param_response(array $failure): ApiResponse {
-        $where = isset($failure['file'])
-            ? "{$failure['file']}, node {$failure['node']}"
-            : "Node {$failure['node']}";
+        $where = $failure['file'] ?? null;
+        if (isset($failure['node'])) {
+            $where = $where === null ? "Node {$failure['node']}" : "{$where}, node {$failure['node']}";
+        }
         $error = [
-            'field'     => 'structure',
-            'reason'    => 'unsafe_value',
-            'node'      => $failure['node'],
-            'attribute' => $failure['attribute'],
+            'field'  => 'structure',
+            'reason' => $failure['reason'] ?? 'unsafe_value',
         ];
-        if (isset($failure['file'])) {
-            $error['file'] = $failure['file'];
+        foreach (['node', 'attribute', 'value', 'file'] as $key) {
+            if (isset($failure[$key])) {
+                $error[$key] = $failure[$key];
+            }
         }
         return ApiResponse::create(400, 'validation.unsafe_param')
-            ->withMessage("{$where}: {$failure['message']}")
+            ->withMessage($where === null ? $failure['message'] : "{$where}: {$failure['message']}")
             ->withErrors([$error]);
     }
 }
