@@ -70,6 +70,11 @@
         "privacyNote": "By checking 'Keep me signed in', you consent to a persistent authentication cookie on this device.",
         "registerLink": "No account yet? Create one",
         "registerSuccess": "Account created — sign in with your username and password",
+        "registered": {
+            "title": "Account created",
+            "intro": "Your username was created for you:",
+            "warning": "Your username is private and you sign in with it. Save it now: once you sign in, it is never shown again."
+        },
         "help": {
             "title": "No account?",
             "text": "Accounts are created by an administrator (or the platform hosting this site). If you lost your password, ask your administrator to reset it.",
@@ -78,20 +83,20 @@
     },
     "register": {
         "title": "Create your account",
-        "subtitle": "Choose a public name, a username and a password",
+        "subtitle": "Choose a public name and a password",
         "nameLabel": "Public name",
         "namePlaceholder": "Your name (visible to other users)",
-        "nameHint": "How other users see and find you. Must be different from your username.",
-        "usernameLabel": "Username",
-        "usernamePlaceholder": "your-username",
-        "usernameHint": "3–32 characters: lowercase letters, numbers, dashes or underscores. This is your private sign-in identifier — other users know you by your public name.",
-        "usernameSuggested": "One has been suggested for you. Keep it or type your own — write it down either way, you sign in with it.",
+        "nameHint": "How other users see and find you.",
         "passwordLabel": "Password",
         "passwordHint": "At least :min characters — length matters more than symbols.",
+        "passwordConfirmLabel": "Repeat the password",
+        "passwordMismatch": "The two passwords do not match — type the same password in both fields.",
+        "usernameNotice": {
+            "title": "You do not choose a username",
+            "body": "One is created for you when you submit, and you sign in with it. It is private: the next page shows it until you sign in, and it is never shown again after that — save it there."
+        },
         "submit": "Create account",
         "backToLogin": "Already have an account? Sign in",
-        "invalidUsername": "This username is not valid — use 3–32 characters: lowercase letters, numbers, dashes or underscores",
-        "nameEqualsUsername": "Your public name must be different from your username (your username stays private)",
         "passwordTooShort": "Password is too short — at least :min characters",
         "missingFields": "The form arrived incomplete — hard-refresh this page (Ctrl+F5) and try again",
         "throttled": "Too many attempts — try again in :seconds seconds",
@@ -906,8 +911,6 @@
         "identity": {
             "title": "Identity",
             "name": "Display name",
-            "username": "Username",
-            "usernameHint": "private — used only to sign in",
             "userId": "Account id",
             "role": "Role on the project you are editing"
         },

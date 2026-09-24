@@ -19,22 +19,25 @@
 $loginError = null;
 $loginRetryAfter = 0;
 
-// One-shot "account created" banner, set by the register page and by the
-// first-run page (C8/C14) — neither logs you in, both send you here.
+// The username the register page or the first-run page just created — neither
+// logs you in, both send you here, and this page pre-fills it (see
+// QS_REGISTER_FLASH for the two notes and how long each lasts).
 //
-// The flash carries the USERNAME that was just registered, so this page can
-// pre-fill it. A duplicate username reports success exactly like a real
-// creation (the private login identifier must not be probeable), which leaves
-// one bad path: mistype the password while registering and you are told the
-// account was created, cannot sign in, and re-registering does nothing. Filling
-// the field in makes the next attempt a normal failed login against a name you
-// can see. Nothing is disclosed — it is the value this browser just submitted.
-// Older sessions may still hold `true` from before this carried a string, so
-// the value is only used when it is a non-empty string (default-on-absent).
-$flashValue = $_SESSION['qs_register_flash'] ?? null;
-$registerFlash = !empty($flashValue);
-$registeredUsername = is_string($flashValue) ? $flashValue : '';
-unset($_SESSION['qs_register_flash']);
+// Registration's is NOT consumed here. The server chose that username and this
+// is the only place the person can read it, so it stays on screen, with the
+// warning to save it, through reloads and failed attempts until a sign-in
+// succeeds — qs_session_establish() drops it then. First-run's is shown once:
+// the operator typed that one.
+$assignedUsername = $_SESSION[QS_REGISTER_FLASH] ?? '';
+$assignedUsername = is_string($assignedUsername) ? $assignedUsername : '';
+$setupUsername = $_SESSION[QS_SETUP_FLASH] ?? '';
+$setupUsername = is_string($setupUsername) ? $setupUsername : '';
+// Guarded: a visitor with no session has no $_SESSION at all, and on PHP 8.0 an
+// unset() of an offset on it raises an "undefined variable" warning.
+if (isset($_SESSION[QS_SETUP_FLASH])) {
+    unset($_SESSION[QS_SETUP_FLASH]);
+}
+$flashUsername = $assignedUsername !== '' ? $assignedUsername : $setupUsername;
 
 // An install with no accounts never reaches this page: the router sends every
 // admin URL to the first-run page while the registry is empty (C14).
@@ -82,7 +85,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     <div class="admin-card">
         <div class="admin-card__body">
-            <?php if ($registerFlash): ?>
+            <?php if ($assignedUsername !== ''): ?>
+            <?php /* One box, because the name and the instruction to save it are one
+                     message: splitting them read as two unrelated notices. */ ?>
+            <div class="admin-alert admin-alert--success">
+                <strong><?= __admin('login.registered.title') ?></strong>
+                <p><?= __admin('login.registered.intro') ?></p>
+                <p class="admin-alert__highlight"><code><?= adminAttr($assignedUsername) ?></code></p>
+                <p class="admin-alert__note">
+                    <svg class="admin-alert__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                        <line x1="12" y1="9" x2="12" y2="13"/>
+                        <line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                    <span><?= __admin('login.registered.warning') ?></span>
+                </p>
+            </div>
+            <?php elseif ($setupUsername !== ''): ?>
             <div class="admin-alert admin-alert--success"><?= __admin('login.registerSuccess') ?></div>
             <?php endif; ?>
 
@@ -111,8 +130,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         class="admin-input"
                         placeholder="<?= adminAttr(__admin('login.usernamePlaceholder')) ?>"
                         <?php /* A submitted value wins (a failed login keeps what was typed);
-                                 otherwise the just-registered username, if there is one. */ ?>
-                        value="<?= adminAttr((string)($_POST['username'] ?? $registeredUsername)) ?>"
+                                 otherwise the just-created username, if there is one. */ ?>
+                        value="<?= adminAttr((string)($_POST['username'] ?? $flashUsername)) ?>"
                         autocomplete="username"
                         autocapitalize="none"
                         spellcheck="false"

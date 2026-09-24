@@ -60,6 +60,21 @@
 const QS_SESSION_COOKIE = 'QSSESSID';
 
 /**
+ * The two notes the admin panel's account-creating forms leave in the visitor's
+ * session for the login page. Each holds a username, and both end at the next
+ * sign-in (qs_session_establish). They differ in what the login page does with
+ * them before that:
+ *
+ *   QS_REGISTER_FLASH — the username self-registration ASSIGNED. The person never
+ *     chose it, so the login page shows it on every visit until a sign-in
+ *     succeeds: a reload or a mistyped password must not lose the only copy.
+ *   QS_SETUP_FLASH — the username the first-run page created. The operator typed
+ *     it, so the login page shows it once.
+ */
+const QS_REGISTER_FLASH = 'qs_register_flash';
+const QS_SETUP_FLASH    = 'qs_setup_flash';
+
+/**
  * Session knobs from auth.php (all optional, safe defaults).
  *
  * idle_ttl     — seconds of inactivity after which a session stops being
@@ -287,6 +302,13 @@ function qs_session_extract(array $data): ?array {
 function qs_session_establish(string $userId, int $generation, bool $remember): string {
     qs_session_boot(true);
     session_regenerate_id(true); // fresh id on privilege change; old file deleted
+
+    // A sign-in ends the login page's notes (see QS_REGISTER_FLASH), whichever
+    // door it comes through — the panel form or the `login` command. Regenerating
+    // the id carries $_SESSION over, so without this a signed-in session would
+    // keep a username it no longer needs, and would show it again on the login
+    // page if it later idled out instead of being signed out.
+    unset($_SESSION[QS_REGISTER_FLASH], $_SESSION[QS_SETUP_FLASH]);
 
     $token = bin2hex(random_bytes(32));
     $_SESSION['qs_uid']      = $userId;
@@ -854,7 +876,7 @@ function qs_registration_throttle_check(array $cfg): int {
 
 /**
  * Record a registration ATTEMPT against the caller's IP (fixed minute window).
- * Every attempt counts — failed, duplicate, or successful.
+ * Every attempt counts, whether or not it creates an account.
  */
 function qs_registration_throttle_attempt(): void {
     $key = qs_throttle_hash(qs_client_ip());
@@ -870,8 +892,8 @@ function qs_registration_throttle_attempt(): void {
 
 /**
  * Record a SUCCESSFUL registration against the install-wide hourly cap.
- * Only real creations count — a duplicate-username attempt must not let an
- * attacker fill the global window and lock legitimate users out.
+ * Only real creations count — a burst of failed attempts must not fill the
+ * global window and lock legitimate users out.
  */
 function qs_registration_record_success(): void {
     qs_registration_throttle_mutate(function (array &$data) {

@@ -1,18 +1,17 @@
 <?php
 /**
- * Admin Self-Registration Page (C8)
+ * Admin Self-Registration Page
  *
  * Renders ONLY while auth.php `registration.allow_self_registration` is true
  * (the router redirects to login otherwise; the underlying gate also enforces
  * the flag + flood controls on every POST). The form POSTs to this page and
  * goes through the SAME shared registration gate as the public `register`
- * command. On success the user is sent to the login page with a one-shot
- * "account created" banner — no auto-login (the login page is the single
- * session-establishing point).
+ * command. It asks for a public name and the password, twice — nothing else:
+ * the server assigns the username, and the form says so before it is submitted.
  *
- * A duplicate USERNAME shows the same success path as a real creation (the
- * username is the private login identifier — no account-existence oracle);
- * the person simply discovers at sign-in.
+ * On success the user is sent to the login page, which shows the assigned
+ * username until a sign-in succeeds — no auto-login (the login page is the
+ * single session-establishing point).
  */
 
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
@@ -22,11 +21,6 @@ $registerRetryAfter = 0;
 $registerMinLength = 0;
 $passwordMinLength = qs_registration_config()['min_password_length'];
 
-// Offered when the field would otherwise be empty — same helper and same
-// reasoning as the first-run form (qs_suggest_username): random, never derived
-// from the display name, and never overwriting a value the visitor typed.
-$usernameSuggestion = qs_suggest_username();
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // CSRF gate FIRST — a forged cross-site POST must not be able to mint an
     // account in the visitor's name, nor spend the registration flood budget.
@@ -34,10 +28,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $registerError = 'csrf';
     } else {
         $name = (string)($_POST['name'] ?? '');
-        $username = (string)($_POST['username'] ?? '');
         $password = (string)($_POST['password'] ?? '');
+        $passwordConfirm = (string)($_POST['password_confirm'] ?? '');
 
-        $result = $router->attemptRegister($name, $username, $password);
+        $result = $router->attemptRegister($name, $password, $passwordConfirm);
         if ($result === null) {
             $router->redirect('login');
         }
@@ -49,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $registerMinLength = (int)substr($result, strlen('password_too_short:'));
         } else {
             // 'registration_disabled' | 'registration_closed' | 'missing_fields'
-            // | 'invalid_username' | 'name_equals_username' | 'server'
+            // | 'password_mismatch' | 'setup_required' | 'server'
             $registerError = $result;
         }
     }
@@ -79,10 +73,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="admin-alert admin-alert--error"><?= __admin('register.throttled', ['seconds' => $registerRetryAfter]) ?></div>
             <?php elseif ($registerError === 'password_too_short'): ?>
             <div class="admin-alert admin-alert--error"><?= __admin('register.passwordTooShort', ['min' => $registerMinLength]) ?></div>
-            <?php elseif ($registerError === 'invalid_username'): ?>
-            <div class="admin-alert admin-alert--error"><?= __admin('register.invalidUsername') ?></div>
-            <?php elseif ($registerError === 'name_equals_username'): ?>
-            <div class="admin-alert admin-alert--error"><?= __admin('register.nameEqualsUsername') ?></div>
+            <?php elseif ($registerError === 'password_mismatch'): ?>
+            <div class="admin-alert admin-alert--error"><?= __admin('register.passwordMismatch') ?></div>
             <?php elseif ($registerError === 'registration_closed'): ?>
             <div class="admin-alert admin-alert--error"><?= __admin('register.closed') ?></div>
             <?php elseif ($registerError === 'registration_disabled'): ?>
@@ -113,41 +105,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <p class="admin-hint"><?= __admin('register.nameHint') ?></p>
                 </div>
 
+                <?php /* The password twice: typed once, a slip would only surface at the
+                         first sign-in. Both fields share this markup and the toggle
+                         script below. */
+                $passwordFields = [
+                    ['id' => 'password',         'label' => __admin('register.passwordLabel'),        'hint' => __admin('register.passwordHint', ['min' => $passwordMinLength])],
+                    ['id' => 'password_confirm', 'label' => __admin('register.passwordConfirmLabel'), 'hint' => null],
+                ];
+                foreach ($passwordFields as $field): ?>
                 <div class="admin-form-group">
-                    <label class="admin-label admin-label--required" for="username">
-                        <?= __admin('register.usernameLabel') ?>
-                    </label>
-                    <input
-                        type="text"
-                        id="username"
-                        name="username"
-                        class="admin-input"
-                        placeholder="<?= adminAttr(__admin('register.usernamePlaceholder')) ?>"
-                        <?php /* POSTed value wins — a rejected submission hands back what was
-                                 typed, not a fresh suggestion nobody saw. */ ?>
-                        value="<?= adminAttr(($_POST['username'] ?? '') !== '' ? (string)$_POST['username'] : $usernameSuggestion) ?>"
-                        maxlength="32"
-                        <?php /* Escaped '-' — see setup.php: the `v` flag makes an unescaped one
-                                 invalidate the pattern, and an invalid pattern is ignored. */ ?>
-                        pattern="[a-zA-Z0-9_\-]{3,32}"
-                        autocomplete="username"
-                        autocapitalize="none"
-                        spellcheck="false"
-                        required
-                    >
-                    <p class="admin-hint"><?= __admin('register.usernameHint') ?></p>
-                    <p class="admin-hint"><?= __admin('register.usernameSuggested', 'One has been suggested for you. Keep it or type your own — write it down either way, you sign in with it.') ?></p>
-                </div>
-
-                <div class="admin-form-group">
-                    <label class="admin-label admin-label--required" for="password">
-                        <?= __admin('register.passwordLabel') ?>
+                    <label class="admin-label admin-label--required" for="<?= $field['id'] ?>">
+                        <?= $field['label'] ?>
                     </label>
                     <div style="position: relative;">
                         <input
                             type="password"
-                            id="password"
-                            name="password"
+                            id="<?= $field['id'] ?>"
+                            name="<?= $field['id'] ?>"
                             class="admin-input"
                             style="padding-right: 2.75rem;"
                             autocomplete="new-password"
@@ -155,16 +129,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         >
                         <button
                             type="button"
-                            id="password-toggle"
+                            data-password-toggle="<?= $field['id'] ?>"
                             aria-label="<?= adminAttr(__admin('login.showPassword')) ?>"
                             title="<?= adminAttr(__admin('login.showPassword')) ?>"
                             style="position: absolute; top: 50%; right: 0.5rem; transform: translateY(-50%); background: none; border: none; padding: 0.25rem; cursor: pointer; color: inherit; opacity: 0.65; line-height: 0;"
                         >
-                            <svg id="password-eye" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <svg data-eye="show" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
                                 <circle cx="12" cy="12" r="3"/>
                             </svg>
-                            <svg id="password-eye-off" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+                            <svg data-eye="hide" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
                                 <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
                                 <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
                                 <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/>
@@ -172,7 +146,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             </svg>
                         </button>
                     </div>
-                    <p class="admin-hint"><?= __admin('register.passwordHint', ['min' => $passwordMinLength]) ?></p>
+                    <?php if ($field['hint'] !== null): ?>
+                    <p class="admin-hint"><?= $field['hint'] ?></p>
+                    <?php endif; ?>
+                </div>
+                <?php endforeach; ?>
+
+                <?php /* Before the button, so it is read before the account exists: the
+                         username is not asked for here, and the next page is where it is
+                         shown. */ ?>
+                <div class="admin-alert admin-alert--warning">
+                    <strong><?= __admin('register.usernameNotice.title') ?></strong>
+                    <p><?= __admin('register.usernameNotice.body') ?></p>
                 </div>
 
                 <button type="submit" class="admin-btn admin-btn--primary admin-btn--lg admin-btn--block">
@@ -188,25 +173,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </div>
 
 <script>
-// Password visibility toggle — same behaviour as the login page.
+// Password visibility toggles — same behaviour as the login page, one per field:
+// each button names the input it reveals.
 (function () {
-    var input = document.getElementById('password');
-    var btn = document.getElementById('password-toggle');
-    var eye = document.getElementById('password-eye');
-    var eyeOff = document.getElementById('password-eye-off');
-    if (!input || !btn) return;
     var labels = {
         show: <?= json_encode(__admin('login.showPassword')) ?>,
         hide: <?= json_encode(__admin('login.hidePassword')) ?>
     };
-    btn.addEventListener('click', function () {
-        var reveal = input.type === 'password';
-        input.type = reveal ? 'text' : 'password';
-        eye.style.display = reveal ? 'none' : '';
-        eyeOff.style.display = reveal ? '' : 'none';
-        btn.setAttribute('aria-label', reveal ? labels.hide : labels.show);
-        btn.setAttribute('title', reveal ? labels.hide : labels.show);
-        input.focus();
+    document.querySelectorAll('[data-password-toggle]').forEach(function (btn) {
+        var input = document.getElementById(btn.getAttribute('data-password-toggle'));
+        var eye = btn.querySelector('[data-eye="show"]');
+        var eyeOff = btn.querySelector('[data-eye="hide"]');
+        if (!input || !eye || !eyeOff) return;
+        btn.addEventListener('click', function () {
+            var reveal = input.type === 'password';
+            input.type = reveal ? 'text' : 'password';
+            eye.style.display = reveal ? 'none' : '';
+            eyeOff.style.display = reveal ? '' : 'none';
+            btn.setAttribute('aria-label', reveal ? labels.hide : labels.show);
+            btn.setAttribute('title', reveal ? labels.hide : labels.show);
+            input.focus();
+        });
     });
 })();
 </script>

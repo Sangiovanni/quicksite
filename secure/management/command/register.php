@@ -1,19 +1,19 @@
 <?php
 /**
- * register Command (C8; username identity 8.0b)
+ * register Command
  *
  * Self-registration: creates a user account from a public display name + a
- * private username + password. PUBLIC + self-gating (listed in the
+ * password. The caller does not choose the private username — the server assigns
+ * one and returns it in this response, which is the only place it is handed out
+ * before the account's first sign-in. PUBLIC + self-gating (listed in the
  * dispatcher's $PUBLIC_COMMANDS) — the command enforces the auth.php
  * `registration.allow_self_registration` flag SERVER-SIDE (default: disabled)
  * plus the registration flood controls (per-IP rate, install-wide hourly cap,
  * absolute account cap).
  *
- * Enumeration safety: the username is the PRIVATE login identifier, so a
- * duplicate username returns the SAME success response as a real creation
- * (nothing is created, the bcrypt cost is still burned) — no account-existence
- * oracle. No session and no user id are returned; the new user signs in
- * through `login`.
+ * No session and no user id are returned; the new user signs in through `login`
+ * with the username this response names. A `username` sent in the body is
+ * ignored, like any other parameter this command does not take.
  *
  * This command CANNOT create the first account on an install. While the user
  * registry is empty, the shared mint path requires the first-run setup token
@@ -23,10 +23,7 @@
  * @method POST
  * @route /management/register
  * @auth none (self-gating via the registration flag)
- * @param string $name     Public display name (how other users identify you;
- *                         must differ from the private username)
- * @param string $username Private login identifier (unique; 3–32 chars,
- *                         lowercase letters / digits / '-' / '_')
+ * @param string $name     Public display name (how other users identify you)
  * @param string $password Plain password (min length from auth.php
  *                         registration.min_password_length, default 12)
  * @return ApiResponse
@@ -40,10 +37,9 @@ require_once SECURE_FOLDER_PATH . '/src/functions/securityLog.php';
 
 function __command_register(array $params = [], array $urlParams = []): ApiResponse {
     $name = (string)($params['name'] ?? '');
-    $username = (string)($params['username'] ?? '');
     $password = (string)($params['password'] ?? '');
 
-    $attempt = qs_auth_attempt_register($name, $username, $password);
+    $attempt = qs_auth_attempt_register($name, $password);
 
     if (!$attempt['ok']) {
         switch ($attempt['error']) {
@@ -66,16 +62,8 @@ function __command_register(array $params = [], array $urlParams = []): ApiRespo
                     ->withData(['retry_after' => $attempt['retry_after'] ?? 60]);
             case 'missing_fields':
                 return ApiResponse::create(400, 'validation.required')
-                    ->withMessage('name, username and password are required')
-                    ->withData(['required' => ['name', 'username', 'password']]);
-            case 'invalid_username':
-                return ApiResponse::create(400, 'validation.invalid_format')
-                    ->withMessage('Invalid username')
-                    ->withErrors(['username' => 'Use 3-32 characters: lowercase letters, digits, dash or underscore']);
-            case 'name_equals_username':
-                return ApiResponse::create(400, 'validation.invalid_format')
-                    ->withMessage('Your public name must be different from your username')
-                    ->withErrors(['name' => 'Must differ from your username (the username is private)']);
+                    ->withMessage('name and password are required')
+                    ->withData(['required' => ['name', 'password']]);
             case 'password_too_short':
                 return ApiResponse::create(400, 'validation.invalid_format')
                     ->withMessage('Password is too short')
@@ -87,26 +75,22 @@ function __command_register(array $params = [], array $urlParams = []): ApiRespo
         }
     }
 
-    // Recorded ONLY when an account was really created. The response above is
-    // deliberately identical either way, so a duplicate username must leave no
-    // trace here either — a log entry per attempt would rebuild, on disk, the
-    // account-existence oracle the uniform response exists to deny. The log is
-    // server-side and never reaches the caller, but an operator reading two
-    // entries where one account exists would be reading a wrong trail.
-    if (!empty($attempt['created'])) {
-        qs_security_log(
-            QS_SEC_ACCOUNT_CREATED,
-            ['via' => 'self_registration'],
-            isset($attempt['userId']) ? (string)$attempt['userId'] : null
-        );
-    }
+    // One entry per account created, naming the account by its id. Never the
+    // username: it is the private half of a credential, and this trail is read
+    // by whoever holds the server's filesystem, not by the account's owner.
+    qs_security_log(
+        QS_SEC_ACCOUNT_CREATED,
+        ['via' => 'self_registration'],
+        (string)$attempt['userId']
+    );
 
-    // UNIFORM success — identical whether the account was created or the
-    // username already belonged to someone (attempt['created'] must never
-    // leak here).
+    // The caller learns the username here and nowhere else until the account
+    // first signs in, so the message says so.
+    $username = (string)$attempt['username'];
     return ApiResponse::create(200, 'operation.success')
-        ->withMessage('Account registered — you can now sign in')
-        ->withData(['registered' => true]);
+        ->withMessage('Account registered. Your username is ' . $username
+            . ' — you sign in with it. It is private: save it now, because nothing gives it out again until you have signed in.')
+        ->withData(['registered' => true, 'username' => $username]);
 }
 
 // Execute via HTTP (not internal call)

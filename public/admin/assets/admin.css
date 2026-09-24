@@ -5424,6 +5424,35 @@ kbd {
     flex-shrink: 0;
 }
 
+/* The one value in an alert the reader has to take away (the username the
+   server just assigned): larger, so it is where the eye lands first and it is
+   easy to copy exactly. */
+.admin-alert__highlight code {
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-bold);
+    letter-spacing: 0.02em;
+}
+
+/* A line inside an alert that must not be skimmed past: an amber warning icon
+   beside bold text in the page's own text colour, set off by a rule. Contrast
+   carries the weight, not a second hue — red inside a green alert is the pair
+   colour-blind readers separate worst, and red reads as a failure when nothing
+   failed. */
+.admin-alert__note {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-sm);
+    margin: var(--space-md) 0 0;
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--admin-border);
+    color: var(--admin-text);
+    font-weight: var(--font-weight-bold);
+}
+
+.admin-alert__note .admin-alert__icon {
+    color: var(--admin-warning);
+}
+
 /* =============================================================================
    CODE & JSON DISPLAY
    ============================================================================= */

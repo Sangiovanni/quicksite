@@ -293,9 +293,9 @@ class AdminRouter {
 
         $attempt = qs_auth_attempt_setup($name, $username, $password, $token);
         if ($attempt['ok']) {
-            // Carry the username so the login page can pre-fill it — see
-            // attemptRegister() below for why that matters.
-            $_SESSION['qs_register_flash'] = strtolower(trim($username));
+            // Carries the username the operator just chose, so the login page
+            // can pre-fill it. Shown once (see QS_SETUP_FLASH).
+            $_SESSION[QS_SETUP_FLASH] = strtolower(trim($username));
             return null;
         }
         if ($attempt['error'] === 'throttled') {
@@ -308,41 +308,39 @@ class AdminRouter {
     }
 
     /**
-     * Attempt a self-registration (C8) — the register page's entry into the
-     * ONE shared gate (qs_auth_attempt_register, also behind the public
-     * `register` command). On success a one-shot session flash is set for the
-     * login page's "account created" banner. A duplicate username reports
-     * success exactly like the command (login identifiers are private — no
-     * account oracle).
+     * Attempt a self-registration — the register page's entry into the ONE
+     * shared gate (qs_auth_attempt_register, also behind the public `register`
+     * command). The server assigns the username; on success it is left in this
+     * browser's session for the login page, which shows it with a warning to
+     * save it until a sign-in succeeds (QS_REGISTER_FLASH). No auto-login: the
+     * login page stays the single session-establishing point.
+     *
+     * The form asks for the password twice; the two must match before the gate is
+     * even asked, so a slip costs no registration budget. The public `register`
+     * command takes it once — the repeat is this form's own safeguard.
      *
      * @return string|null null on success, else an error key:
      *                     'registration_disabled' | 'registration_closed' |
-     *                     'missing_fields' | 'invalid_username' |
-     *                     'name_equals_username' | 'password_too_short:<min>' |
-     *                     'throttled:<seconds>' | 'server'
+     *                     'setup_required' | 'missing_fields' | 'password_mismatch' |
+     *                     'password_too_short:<min>' | 'throttled:<seconds>' | 'server'
      */
-    public function attemptRegister(string $name, string $username, string $password): ?string {
+    public function attemptRegister(string $name, string $password, string $passwordConfirm): ?string {
         require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
-        qs_session_boot(true); // the one-shot flash below rides the same session
+        qs_session_boot(true); // the flash below rides the same session
 
-        if (trim($name) === '' || trim($username) === '' || $password === '') {
+        if (trim($name) === '' || $password === '' || $passwordConfirm === '') {
             return 'missing_fields';
         }
+        if ($password !== $passwordConfirm) {
+            return 'password_mismatch';
+        }
 
-        $attempt = qs_auth_attempt_register($name, $username, $password);
+        $attempt = qs_auth_attempt_register($name, $password);
         if ($attempt['ok']) {
-            // The flash carries the USERNAME, not just a boolean, so the login
-            // page can pre-fill it.
-            //
-            // This matters because a duplicate username reports success exactly
-            // like a real creation — deliberately, so the private login
-            // identifier cannot be probed. The cost is a dead end: mistype your
-            // password while registering, and you get "account created", cannot
-            // sign in, and re-registering silently does nothing. Pre-filling
-            // turns that into an ordinary failed login against a name you can
-            // see, which is diagnosable. It discloses nothing: the value is the
-            // one this browser just typed into the form on this page.
-            $_SESSION['qs_register_flash'] = strtolower(trim($username));
+            // The person never chose this username and has not seen it yet, so
+            // the only copy they can reach is this one. It goes into the session
+            // and nowhere else — not the redirect URL, not a cookie of its own.
+            $_SESSION[QS_REGISTER_FLASH] = $attempt['username'];
             return null;
         }
         if ($attempt['error'] === 'throttled') {

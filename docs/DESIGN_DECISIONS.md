@@ -4417,7 +4417,7 @@ explainable; fuzzy rules reject names users legitimately want).
 **Source**: `secure/src/functions/AuthManagement.php` (`qs_user_create`, and
 the shared registration gate). Behaviour: [ARCHITECTURE.md §3](ARCHITECTURE.md).
 
-### Registration answers identically for a duplicate and a success — because the username is private (locked 2026-07-12)
+### Registration answers identically for a duplicate and a success — because the username is private (locked 2026-07-12) (superseded 2026-09-19)
 
 **Decision**: Public registration returns a byte-identical `200` whether the
 requested username was free or already taken, with the work equalised so timing
@@ -11308,3 +11308,103 @@ a page missing. `secure/management/command/importProject.php`
 layer), `secure/src/functions/nodeParamPolicy.php`
 (`qs_unsafe_structure_param_response`, which now also answers a failure that names
 no node). Behaviour: [COMMAND_API.md](COMMAND_API.md) (*Archive import limits*).
+
+
+### The server assigns the private username, and gives it once to the person registering (locked 2026-09-19)
+
+**Supersedes**: *Registration answers identically for a duplicate and a success —
+because the username is private* (locked 2026-07-12). Its last rule stands:
+registration still never signs the new account in.
+
+**Decision**: nobody registering chooses a username. `register` takes a display
+name and a password; the server draws the username with the generator the
+first-run form already offers — two lowercase letters, an underscore, six digits —
+draws again when the drawn name is taken or equals the display name, and fails
+closed, creating nothing, if five draws in a row collide. The response returns the
+username in `data.username` with a message telling the caller to save it: the one
+place a command hands it out before the account first signs in. A `username` sent
+in the body is ignored.
+
+On the admin panel the register form asks for a public name and the password,
+twice, and says before it is submitted that the username will be assigned. The
+login page then shows the assigned username, pre-filled, in one box with the
+warning to save it, on every visit until a sign-in succeeds; the sign-in drops it
+from the session. After that nothing in the panel shows it again: My account lists
+the public name, the account id and the role, and when the owner deletes the
+account they type the username and the server checks it, together with the
+password, rather than the page holding a copy to compare against. The first-run
+form is unchanged: the operator still chooses the first account's username from an
+editable suggestion, and the login page shows it once.
+
+Four earlier entries are amended rather than superseded. *Identity is a private
+username; the email field is removed* says the username is never returned by any
+command. `register` now returns it, once, to the caller that created the account —
+beside `login`, which already returned it to a caller who had just signed in with
+it. The rest of that entry holds: private, unique, immutable, the same shape.
+*A suggested username is fully random, never derived from the display name* still
+describes the generator and the first-run form; on the registration form the
+suggestion became an assignment. *Account deletion ships on the account page,
+behind a typed confirmation* still asks for the username, but the server checks it
+now, because the page no longer holds it. *Account deletion is self-service, hard,
+and refused while you solely own a project* — a deletion needs the username as well
+as the current password, and a wrong one of either is refused the same way.
+
+**Reasoning**: the uniform success answered a taken username exactly like a real
+creation, so a private identifier could not be probed — and it left a dead end.
+Somebody who picked a name that was already taken was told the account existed,
+could not sign in, because the account was somebody else's, and registering again
+silently did nothing. Answering honestly would reopen the probe; the only way to
+have neither the probe nor the dead end is for nobody to choose. When the server
+chooses, there is no taken name to report or to hide: a collision happens on a
+name the caller never sees, and costs one more draw.
+
+What remains is getting the name to the person, once, without it leaking anywhere
+else. The response carries it to the caller that registered. The panel keeps it in
+that browser's own session — never in a URL, a cookie of its own, or a log — and
+shows it until the first successful sign-in rather than for a single page view,
+because the person never typed it: a reload or a mistyped password must not lose
+the only copy. The password is asked for twice for a related reason: a slip would
+otherwise surface only at that first sign-in, attached to a username the person
+never chose. The cost is stated rather than hidden: until that sign-in, anyone
+using the same browser can read the username on the login page.
+
+After it, the username is shown nowhere. My account used to display it, which put
+half of a credential on a page that opens for whoever holds the session — a browser
+left signed in, a stolen cookie — and since the login throttle is keyed on the
+username, reading it was also enough to lock the owner out. The deletion's typed
+confirmation had compared the username against a copy held in the page, shown even
+as the field's placeholder; the server compares it now, alongside the password, and
+never says which of the two was wrong, so the endpoint cannot confirm a password
+guess for someone who holds a session but not the username. The cost, again stated:
+somebody who loses the username cannot look it up while signed in, and cannot
+delete the account without it.
+
+An account whose sessions are minted by an embedding platform never passes
+through registration, so none of this reaches it — see *The forward-compatibility
+seam for external identity is a configurable token source, not a field* above.
+
+**Alternatives considered**: an honest `409` for a taken name (rejected — an
+oracle on a private identifier, which is what the superseded entry existed to
+prevent). Keep the choice with the uniform success (rejected — that is the dead
+end). Show the assigned username exactly once (rejected — a reload loses the only
+copy, and nothing can show it again without the sign-in it is needed for). Derive
+it from the display name (rejected for the reason the generator's own entry gives:
+anyone who knows the public name could guess it). Keep the username on My account
+for an owner who forgets it (rejected — the page opens for any holder of the
+session). Confirm a deletion by typing the display name (rejected — anyone can read
+a public name; the username is the string only the owner has in mind). Drop the
+typed step (rejected — an irreversible act keeps the friction the deletion entry
+chose for it).
+
+**Source**: Sangio's rulings, 2026-09-19, after the silent registration failure was
+traced to the uniform-success rule, and after his review of the result.
+`secure/src/functions/AuthManagement.php` (`qs_auth_attempt_register`,
+`qs_suggest_username`, `qs_user_create`), `secure/src/functions/SessionManagement.php`
+(`qs_session_establish`, `QS_REGISTER_FLASH`), `secure/management/command/register.php`,
+`secure/admin/AdminRouter.php` (`attemptRegister`),
+`secure/admin/templates/pages/register.php`, `secure/admin/templates/pages/login.php`,
+`secure/admin/templates/pages/account.php`, `public/admin/assets/js/pages/account.js`,
+`secure/admin/functions/accountSelf.php` (`qs_account_delete`). Behaviour:
+[ARCHITECTURE.md §3](ARCHITECTURE.md), [COMMAND_API.md](COMMAND_API.md)
+(*Authentication*, *What is deliberately not a command*),
+[ADMIN_PANEL.md](ADMIN_PANEL.md) (§1, §9.13).

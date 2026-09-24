@@ -2557,20 +2557,14 @@ $GLOBALS['__help_commands'] = [
     ],
 
     'register' => [
-        'description' => 'Self-registration: creates a user account from a public name + a private username + password. PUBLIC + self-gating - the command enforces the auth.php registration.allow_self_registration flag server-side (default: DISABLED) plus flood controls (per-IP rate, install-wide hourly cap, absolute account cap). A duplicate username returns the SAME success response as a real creation (login identifiers are private - no account-existence oracle); sign in afterwards with the login command.',
+        'description' => 'Self-registration: creates a user account from a public name + a password. The caller does not choose the private username: the server assigns one and returns it in the response (data.username) - the only place it is handed out before the account first signs in, so save it. PUBLIC + self-gating - the command enforces the auth.php registration.allow_self_registration flag server-side (default: DISABLED) plus flood controls (per-IP rate, install-wide hourly cap, absolute account cap). Sign in afterwards with the login command, using the assigned username.',
         'method' => 'POST',
         'parameters' => [
             'name' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Public display name (max 200 characters - how other users identify you; must differ from the private username)',
+                'description' => 'Public display name (max 200 characters - how other users identify you)',
                 'example' => 'Your Name'
-            ],
-            'username' => [
-                'required' => true,
-                'type' => 'string',
-                'description' => 'Private login identifier - unique; 3-32 characters, lowercase letters/digits/dash/underscore',
-                'example' => 'your-username'
             ],
             'password' => [
                 'required' => true,
@@ -2580,13 +2574,14 @@ $GLOBALS['__help_commands'] = [
                 'example' => '************'
             ]
         ],
-        'example_post' => 'POST /management/register with body: {"name": "Your Name", "username": "your-username", "password": "************"}',
+        'example_post' => 'POST /management/register with body: {"name": "Your Name", "password": "************"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
-            'message' => 'Account registered - you can now sign in',
+            'message' => 'Account registered. Your username is qk_483927 — you sign in with it. It is private: save it now, because nothing gives it out again until you have signed in.',
             'data' => [
-                'registered' => true
+                'registered' => true,
+                'username' => 'qk_483927'
             ]
         ],
         'error_responses' => [
@@ -2594,11 +2589,11 @@ $GLOBALS['__help_commands'] = [
             '403.auth.registration_closed' => 'Registration is closed - the account limit (registration.max_users) is reached',
             '403.auth.setup_required' => 'The installation has no accounts at all. Registration cannot create the first one - open /admin/ and use the first-run page, which requires the setup token written to <secure>/management/config/setup-token.txt',
             '429.auth.throttled' => 'Too many registration attempts - retry_after gives the wait in seconds (per-IP rate or install-wide hourly cap)',
-            '400.validation.required' => 'name, username and password are required',
-            '400.validation.invalid_format' => 'Invalid username (3-32 chars: lowercase letters, digits, dash, underscore); OR the public name equals the username (they must differ - the username is private); OR password shorter than the configured minimum (data.min_length)',
-            '500.server.registration_failed' => 'Could not register the account'
+            '400.validation.required' => 'name and password are required',
+            '400.validation.invalid_format' => 'Password shorter than the configured minimum (data.min_length)',
+            '500.server.registration_failed' => 'Could not register the account - nothing was created (a storage failure, or every username drawn for it was already taken); safe to retry'
         ],
-        'notes' => 'No session and no user id are returned - the new account signs in through the login command. The success response is identical whether the account was created or the username already existed; if the username belonged to someone else, the subsequent login simply fails - pick another username and register again. Flood-control knobs live in auth.php authentication.registration (throttle.per_ip_per_minute, throttle.global_per_hour, max_users; 0 disables a limit). This command can never create the FIRST account on an install: while the user registry is empty the shared mint path requires the first-run setup token, which registration does not carry, so the answer is 403 auth.setup_required regardless of the allow_self_registration flag.'
+        'notes' => 'The username is assigned, never chosen: two letters, an underscore and six digits, drawn at random - not derived from the name - and unique. It is the private login identifier, and this response, to the caller that registered, is the only place it is handed out before the account first signs in; a username sent in the body is ignored. No session and no user id are returned - the new account signs in through the login command. Flood-control knobs live in auth.php authentication.registration (throttle.per_ip_per_minute, throttle.global_per_hour, max_users; 0 disables a limit). This command can never create the FIRST account on an install: while the user registry is empty the shared mint path requires the first-run setup token, which registration does not carry, so the answer is 403 auth.setup_required regardless of the allow_self_registration flag.'
     ],
 
 

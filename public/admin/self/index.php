@@ -28,7 +28,7 @@
  *   POST /admin/self/add-contact              {"user_id","name"}
  *   POST /admin/self/remove-contact           {"user_id"}
  *   POST /admin/self/change-password          {"current_password","new_password"}
- *   POST /admin/self/delete                   {"current_password","confirm"}
+ *   POST /admin/self/delete                   {"current_password","username","confirm"}
  *   POST /admin/self/accept-invitation        {"project"}
  *   POST /admin/self/decline-invitation       {"project"}
  *   POST /admin/self/leave-project            {"project"}

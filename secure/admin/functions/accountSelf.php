@@ -133,6 +133,15 @@ function qs_account_change_password(array $params): ApiResponse {
  * Requires the current password (a stolen access token must not be enough to
  * erase an account) on the same throttle as login, plus an explicit confirm.
  *
+ * AND THE USERNAME, typed by the owner and checked HERE. It is the deletion's
+ * typed confirmation — the one string only the owner has in mind — and the page
+ * no longer holds it (My account never shows the private username), so the page
+ * cannot check it and the server does. It is checked together with the password
+ * and a wrong one of either is refused identically, after the bcrypt has run:
+ * this endpoint never says which half was wrong, so it cannot confirm a password
+ * guess for someone who holds a session but not the username. Both count against
+ * the login throttle, keyed on the account itself.
+ *
  * SOLE OWNERSHIP IS REFUSED. Deleting a project's only owner leaves it
  * unownable AND undeletable forever: transferOwnership requires the caller to
  * BE the in-lock owner, and project.delete / project.ownership are owner-only,
@@ -145,17 +154,25 @@ function qs_account_change_password(array $params): ApiResponse {
  * session family. The authority record dies only once the footprint is clean,
  * and a cascade failure aborts BEFORE the account is touched.
  *
- * @param array $params current_password, confirm
+ * @param array $params current_password, username, confirm
  * @return ApiResponse
  */
 function qs_account_delete(array $params): ApiResponse {
     $current = (string)($params['current_password'] ?? '');
+    $typed   = strtolower(trim((string)($params['username'] ?? '')));
     $confirm = filter_var($params['confirm'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
+    $missing = [];
     if ($current === '') {
+        $missing['current_password'] = 'Required field';
+    }
+    if ($typed === '') {
+        $missing['username'] = 'Required field';
+    }
+    if ($missing !== []) {
         return ApiResponse::create(400, 'validation.required')
-            ->withMessage('current_password is required')
-            ->withErrors(['current_password' => 'Required field']);
+            ->withMessage('current_password and username are required')
+            ->withErrors($missing);
     }
     if (!$confirm) {
         return ApiResponse::create(400, 'validation.confirmation_required')
@@ -189,10 +206,16 @@ function qs_account_delete(array $params): ApiResponse {
             ->withMessage('Too many failed attempts — try again later')
             ->withData(['retry_after' => $wait]);
     }
-    if (!password_verify($current, $hash)) {
+    // Both halves are evaluated before either decides, and answered as one (see
+    // the docblock). An account without a username has nothing to type, so it
+    // can never match — it fails closed rather than skipping the check.
+    $passwordOk = password_verify($current, $hash);
+    $stored     = strtolower(trim((string)($user['username'] ?? '')));
+    $usernameOk = $stored !== '' && hash_equals($stored, $typed);
+    if (!$passwordOk || !$usernameOk) {
         qs_login_throttle_fail($throttleKey);
         return ApiResponse::create(401, 'auth.invalid_credentials')
-            ->withMessage('Current password is incorrect');
+            ->withMessage('The current password or the username is incorrect');
     }
     qs_login_throttle_clear($throttleKey);
 

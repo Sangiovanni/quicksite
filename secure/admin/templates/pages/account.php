@@ -1,6 +1,6 @@
 <?php
 /**
- * My Account page (beta.11 S1.3).
+ * My Account page.
  *
  * The self-service surface for the SIGNED-IN account itself — the one thing
  * the panel had no page for. Every command it drives is global-scope
@@ -13,11 +13,18 @@
  *                              generation counter; this one survives)
  *   logoutSession {everywhere} — ends every session including this one
  *   delete the account         — irreversible, behind the current password
- *                              AND a typed confirmation
+ *                              AND the username, typed and checked by the server
  *
  * Only the middle one is a command. The password change and the deletion are
- * account self-service, served by /admin/self since beta.11 S6 — the command
- * surface is a CLI for DEVELOPING a project, and neither of those is that.
+ * account self-service, served by /admin/self — the command surface is a CLI for
+ * DEVELOPING a project, and neither of those is that.
+ *
+ * THE USERNAME IS NOT ON THIS PAGE — not shown, not in the page's script config,
+ * not as a placeholder. It is the private half of the sign-in, and this page opens
+ * for whoever holds the session: a browser left signed in, a stolen cookie. Knowing
+ * it would hand them half a credential, and the login throttle is keyed on it, so
+ * it would also let them lock the owner out. The deletion asks the owner to type it
+ * and the server checks it (qs_account_delete).
  *
  * Lean PHP shell: identity, section shells and form skeletons live here; every
  * dynamic row, result and confirm modal is built by account.js with
@@ -32,7 +39,6 @@ $__auth     = qs_session_auth();
 $__user     = !empty($__auth['valid']) ? ($__auth['user'] ?? []) : [];
 $__userId   = (string)($__auth['userId'] ?? '');
 $__name     = (string)($__user['name'] ?? '');
-$__username = (string)($__user['username'] ?? '');
 $__role     = $router->getTokenRole();     // role on the EDITED project, may be null
 $__project  = (string)($router->getCurrentProject() ?? '');
 
@@ -49,7 +55,6 @@ $__minPasswordLength = qs_registration_config()['min_password_length'];
 
 <script>
 window.QS_ACCOUNT_CONFIG = {
-    username: <?= json_encode($__username) ?>,
     minPasswordLength: <?= (int)$__minPasswordLength ?>,
     hasLocalPassword: <?= $__hasLocalPassword ? 'true' : 'false' ?>,
     loginUrl: <?= json_encode($router->url('login')) ?>
@@ -90,9 +95,8 @@ window.QS_ACCOUNT_I18N = <?= json_encode([
     <p class="admin-page-header__subtitle"><?= __admin('account.subtitle', 'Your password, your sessions and your account itself. Nothing here touches other people.') ?></p>
 </div>
 
-<!-- Identity — read-only. Rendered server-side from the session: the panel
-     already knows who you are, and there is no command that returns your own
-     username (it is the PRIVATE login identifier). -->
+<!-- Identity — read-only, rendered server-side from the session: the public
+     name, the account id and the role. Never the username (see the header). -->
 <section class="admin-section">
     <h2 class="admin-section__title"><?= __admin('account.identity.title', 'Identity') ?></h2>
     <div class="admin-card">
@@ -101,12 +105,6 @@ window.QS_ACCOUNT_I18N = <?= json_encode([
                 <div class="account-identity__row">
                     <dt class="account-identity__label"><?= __admin('account.identity.name', 'Display name') ?></dt>
                     <dd class="account-identity__value"><?= adminEscape($__name) ?></dd>
-                </div>
-                <div class="account-identity__row">
-                    <dt class="account-identity__label"><?= __admin('account.identity.username', 'Username') ?></dt>
-                    <dd class="account-identity__value"><code><?= adminEscape($__username) ?></code>
-                        <span class="admin-hint"><?= __admin('account.identity.usernameHint', 'private — used only to sign in') ?></span>
-                    </dd>
                 </div>
                 <div class="account-identity__row">
                     <dt class="account-identity__label"><?= __admin('account.identity.userId', 'Account id') ?></dt>
@@ -192,8 +190,7 @@ window.QS_ACCOUNT_I18N = <?= json_encode([
                     <label class="admin-label admin-label--required" for="account-delete-typed">
                         <?= __admin('account.delete.typedLabel', 'Type your username to confirm') ?>
                     </label>
-                    <input type="text" id="account-delete-typed" class="admin-input" autocomplete="off" autocapitalize="none" spellcheck="false"
-                           placeholder="<?= adminAttr($__username) ?>">
+                    <input type="text" id="account-delete-typed" class="admin-input" autocomplete="off" autocapitalize="none" spellcheck="false">
                 </div>
             </div>
             <div id="account-delete-blockers"></div>

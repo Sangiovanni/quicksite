@@ -232,10 +232,12 @@
                 toast(T.deleteNeedsPassword || 'Enter your current password.', 'warning');
                 return;
             }
-            // The typed confirmation is deliberately the USERNAME: it is the one
-            // string only this account's owner has in mind, and it cannot be
-            // clicked through the way a checkbox can.
-            if (typed === '' || typed !== (CFG.username || '')) {
+            // The typed confirmation is the USERNAME — the one string only this
+            // account's owner has in mind, and one that cannot be clicked through
+            // the way a checkbox can. The page does not hold it, so this only
+            // checks something was typed: the server compares it, together with
+            // the password, and a wrong one of either is refused the same way.
+            if (typed === '') {
                 toast(T.deleteNeedsTyped || 'Type your username exactly to confirm.', 'warning');
                 return;
             }
@@ -245,7 +247,7 @@
                 [el('p', { text: T.deleteBody || '' })],
                 T.deleteBtn || 'Delete my account', true,
                 function (close) {
-                    account('delete', { current_password: password, confirm: true }).then(function (res) {
+                    account('delete', { current_password: password, username: typed, confirm: true }).then(function (res) {
                         close();
                         if (res && res.ok) {
                             toast(T.deleteDone || 'Your account has been deleted.', 'success');

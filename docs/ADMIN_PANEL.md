@@ -26,7 +26,7 @@ public/admin/assets/js/lib/css-refiner/      → CSS analysis library
                                                (consumed by optimize.js)
 ```
 
-Three pages sit outside the authenticated shell: `/admin/login` (username + password form; POSTs to itself, verified through the shared server-side login gate), `/admin/register` (self-registration form — exists **only** while `auth.php` `registration.allow_self_registration` is true, otherwise it redirects to login; the login page shows a "create one" link under the same condition), and `/admin/setup` (the first-run page). A successful registration redirects to the login page with a one-shot "account created" banner — registering never logs you in by itself. All three are plain server-rendered forms with no admin JS beyond a password-visibility toggle, and are served with `Cache-Control: no-store`.
+Three pages sit outside the authenticated shell: `/admin/login` (username + password form; POSTs to itself, verified through the shared server-side login gate), `/admin/register` (self-registration form: a public name and the password, typed twice — the server assigns the username, and the form says so before it is submitted; the page exists **only** while `auth.php` `registration.allow_self_registration` is true, otherwise it redirects to login; the login page shows a "create one" link under the same condition), and `/admin/setup` (the first-run page). A successful registration redirects to the login page, which shows the assigned username — pre-filled, in one box with a warning that it is private, must be saved now, and is never shown again once you sign in — on every visit in that browser until a sign-in succeeds, and that sign-in drops it; registering never logs you in by itself. Creating the first account on `/admin/setup` shows a one-shot "account created" banner instead. All three are plain server-rendered forms with no admin JS beyond a password-visibility toggle, and are served with `Cache-Control: no-store`.
 
 **First run.** QuickSite ships no account, so while the user registry is empty every admin URL renders `/admin/setup` instead. The page asks for a **setup token** along with a display name, username and password. The token is 64 hex characters that the engine writes to `secure/management/config/setup-token.txt` on the page's first render — reading that file is the authorisation, which is why creating the first account needs neither a command line nor a shipped default password. It is written once and never regenerated, compared with a constant-time check, and destroyed the moment it is used. Attempts are rate-limited per caller with the same backoff as the login form, and any bad token — wrong, absent, or already used — is refused identically.
 
@@ -262,7 +262,7 @@ Two other cookies exist, both HttpOnly and neither readable by page scripts. `QS
 | `templates/pages/optimize.php` | `data-lib-ready` on `.optimize-page` + `window.CSSRefiner.t` + `window.QS_OPTIMIZE_I18N` | `data-lib-ready` is `"true"` only when the CSS Refiner library is installed, and `optimize.js` does nothing otherwise; `CSSRefiner.t` is a passthrough that returns its key unchanged; the `optimize` and `common` sub-trees, verbatim |
 | `templates/pages/memberships.php` | `window.QS_MEMBERSHIPS_CONFIG` + `window.QS_MEMBERSHIPS_I18N` | `myUserId` (the caller's own public id — no API response carries it), `editedProject`; JS-facing strings for dynamic rows |
 | `templates/pages/members.php` | `window.QS_MEMBERS_CONFIG` + `window.QS_MEMBERS_I18N` | `project`, `myUserId`, `myRole`, `myRank`, `roleRanks` (from `roles.php` — drives the strictly-below-my-rank pickers), `joinPolicy` + `visibility` (admin/owner only, read server-side from `members.json`), `isOwner` + `siteUrl` (the address a public visibility exposes); JS-facing strings |
-| `templates/pages/account.php` | `window.QS_ACCOUNT_CONFIG` + `window.QS_ACCOUNT_I18N` | `username` (the typed-confirmation target for deletion), `minPasswordLength` (from `auth.php`, the same value the password change enforces), `hasLocalPassword`, `loginUrl`; JS-facing strings |
+| `templates/pages/account.php` | `window.QS_ACCOUNT_CONFIG` + `window.QS_ACCOUNT_I18N` | `minPasswordLength` (from `auth.php`, the same value the password change enforces), `hasLocalPassword`, `loginUrl`; JS-facing strings. Never the username — the deletion's typed confirmation is checked by the server (§9.13) |
 | `templates/pages/command-form.php` | `window.QS_COMMAND_FORM_I18N` | the `commandForm`, `commands` and `common` translation sub-trees, emitted **verbatim under their own dot paths** (`AdminTranslation::getRaw()`) rather than copied field by field — the page's JS asks for the same path PHP would. `JSON_HEX_TAG` keeps a translation value from closing the script element. |
 
 A sub-tree emitted **verbatim** is the output of `AdminTranslation::getRaw()`, unchanged, so the page's JS resolves a string by the same dot path PHP would; each such page reads it through its own `t(path, params)`, which substitutes `:name` markers the way PHP's `t()` does and returns **the path itself** when nothing resolves, so an untranslated string shows on screen instead of hiding behind English. `QUICKSITE_CONFIG.translations` in `layout.php` is a hand-listed subset instead; its `common` branch carries the labels `js/core/utils.js` gives its panel-wide confirm dialog and toasts.
@@ -2957,9 +2957,13 @@ the page is open to **every authenticated user** — including one who belongs t
 no project — and carries no role gate.
 
 **Identity** is read-only and rendered server-side from the session: display
-name, username, account id, and the caller's role on the project they are
-editing. The username appears here and nowhere else in the panel — it is the
-private login identifier, and no API response returns it.
+name, account id, and the caller's role on the project they are editing. The
+username is deliberately absent — from the page, its script config and every
+placeholder. It is the private half of the sign-in, and this page opens for
+whoever holds the session: a browser left signed in or a stolen cookie would
+otherwise learn half a credential, and the login throttle is keyed on it. After
+the login page that shows a newly assigned username until the first sign-in,
+nothing in the panel displays it.
 
 **Change password** (`POST /admin/self/change-password`) asks for the current password and the new
 one twice, and enforces `auth.php`'s `min_password_length` client-side before the
@@ -2975,8 +2979,11 @@ the kill switch is a single generation counter on the user record, not an index
 (ARCHITECTURE.md §3).
 
 **Delete my account** (`POST /admin/self/delete`) is irreversible and gated twice — the
-current password, plus typing your username exactly (a string only the account's
-owner has in mind, and one that cannot be clicked through). The command refuses
+current password, plus typing your username (a string only the account's owner has
+in mind, and one that cannot be clicked through). The page does not hold the
+username, so the server checks it together with the password: a wrong one of
+either is refused the same way, `401 auth.invalid_credentials`, on the login
+throttle, so the page never reveals which half was wrong. The command refuses
 while the caller is the sole owner of any project, since that would leave the
 project unownable and undeletable; the page lists the blocking projects by name
 and member count so the next step is obvious. An externally-managed account (no

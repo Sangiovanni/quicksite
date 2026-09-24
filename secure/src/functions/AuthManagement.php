@@ -914,8 +914,10 @@ function qs_valid_username(string $username): bool {
 }
 
 /**
- * A username to OFFER on an account-creation form. A suggestion, never an
- * imposition — every caller renders it into an editable field.
+ * A username for a new account. Two callers use it two ways: the first-run page
+ * OFFERS it in an editable field (the operator may keep it or type their own),
+ * and self-registration ASSIGNS it (qs_auth_attempt_register) — nobody registering
+ * chooses a username at all.
  *
  * FULLY RANDOM, DELIBERATELY NOT DERIVED FROM THE DISPLAY NAME. The username is
  * the PRIVATE login identifier (see qs_valid_username above): nobody else is
@@ -926,7 +928,7 @@ function qs_valid_username(string $username): bool {
  *
  * SHAPE: two lowercase letters, an underscore, six digits (`qk_483927`).
  * Nine characters, inside the 3–32 rule, and made only of characters the rule
- * allows, so what is offered always validates. Letters-then-digits reads as a
+ * allows, so what it returns always validates. Letters-then-digits reads as a
  * name rather than a hash, which matters because a human has to be able to see
  * it on one screen and type it on another. ~676 million combinations — not a
  * secret (the password is the secret), just not guessable from a display name.
@@ -1062,17 +1064,17 @@ function qs_users_mutate(callable $fn) {
 }
 
 /**
- * Mint a NEW user account — THE single identity-creation path (C8; the
- * identity mirror of the login gate): the public `register` command and the
- * admin register page both come through here. Username uniqueness and the
- * account cap are checked INSIDE the users.php write lock (no TOCTOU).
+ * Mint a NEW user account — THE single identity-creation path (the identity
+ * mirror of the login gate): the registration gate (the public `register`
+ * command and the admin register page) and the first-run page all come through
+ * here. Username uniqueness and the account cap are checked INSIDE the users.php
+ * write lock (no TOCTOU) — which is what lets registration draw a username and
+ * simply draw again when the one it drew is taken.
  *
- * The bcrypt hash is computed BEFORE the lock (it costs ~100ms — must not
- * hold the write lock) and UNCONDITIONALLY — so the duplicate-username path
- * burns the same time as a real creation (anti-enumeration timing, the same
- * discipline as qs_auth_attempt_login's dummy verify).
+ * The bcrypt hash is computed BEFORE the lock: it costs ~100ms, and the write
+ * lock must not be held that long.
  *
- * THE FIRST ACCOUNT NEEDS A SETUP TOKEN (C14). While the registry is EMPTY,
+ * THE FIRST ACCOUNT NEEDS A SETUP TOKEN. While the registry is EMPTY,
  * creating a user requires the install's first-run token (setupToken.php) —
  * proof that the caller can read a file under secure/. Enforced HERE, at the
  * single mint path, for the same reason name_equals_username is: every creation
@@ -1087,7 +1089,7 @@ function qs_users_mutate(callable $fn) {
  * @param int         $maxUsers   0 = unlimited; refused as 'full' under the lock
  * @param string|null $setupToken required while the registry is empty; must be
  *                                null once an account exists (bootstrap is over)
- * @return array {ok:true, userId:string}
+ * @return array {ok:true, userId:string, username:string} — username as stored
  *             | {ok:false, error:'invalid_username'|'name_equals_username'
  *                |'duplicate'|'full'|'store'|'setup_token'|'setup_complete'}
  */
@@ -1101,10 +1103,10 @@ function qs_user_create(string $name, string $username, ?string $password, int $
     // Privacy: the username is the PRIVATE login identifier; the public display
     // name is shown to other users. Forbid them being equal (case-insensitive)
     // so the public surface can never directly reveal a valid login identifier.
-    // Enforced HERE at the single mint path so every creation route inherits it
-    // (this also backstops the register gate against a control-char evasion:
-    // the name is compared AFTER control-strip). Broader "username never appears
-    // in any output visible to others" is a C10 audit item.
+    // Enforced HERE at the single mint path so every creation route inherits it.
+    // For registration this is the only check — the gate draws another username
+    // when it fires. For the first-run page it backstops the gate's own check
+    // against a control-char evasion: the name is compared AFTER control-strip.
     if (strtolower($name) === $username) {
         return ['ok' => false, 'error' => 'name_equals_username'];
     }
@@ -1163,7 +1165,7 @@ function qs_user_create(string $name, string $username, ?string $password, int $
         if ($bootstrap) {
             qs_setup_token_consume();
         }
-        return ['ok' => true, 'userId' => $userId];
+        return ['ok' => true, 'userId' => $userId, 'username' => $username];
     }
     return ['ok' => false, 'error' => $error ?? 'store'];
 }
@@ -1263,50 +1265,59 @@ function qs_auth_attempt_setup(string $name, string $username, string $password,
 }
 
 /**
- * THE registration gate (C8) — shared by the public `register` command and
- * the admin register page (the qs_auth_attempt_login pattern): ONE
- * flag-check + flood-control + creation path.
+ * How many usernames one registration may draw before it gives up. A convention,
+ * not a setting: qs_suggest_username() has ~676 million names, so even a second
+ * draw is rare, and the bound exists so the loop provably ends. Reaching it fails
+ * closed — nothing is created.
+ */
+const QS_REGISTER_USERNAME_DRAWS = 5;
+
+/**
+ * THE registration gate — shared by the public `register` command and the admin
+ * register page (the qs_auth_attempt_login pattern): ONE flag-check +
+ * flood-control + creation path.
  *
- * Enumeration safety: a duplicate USERNAME reports ok:true EXACTLY like a
- * real creation ('created' is for the caller's own logic only and must never
- * reach the HTTP response or the page), and the bcrypt cost is burned on
- * both paths (qs_user_create). The username is the PRIVATE login identifier
- * (C8 8.0b) — it must not be enumerable pre-auth. Every other refusal
- * (disabled / closed / throttled / validation) is independent of whether the
- * username exists.
+ * NOBODY CHOOSES THE USERNAME. This gate draws one (qs_suggest_username) and
+ * mints the account through qs_user_create(), which checks that it is free under
+ * the users.php write lock. A drawn name that is taken — or that happens to
+ * equal the display name — is drawn again, up to QS_REGISTER_USERNAME_DRAWS
+ * times; running out fails closed as 'server'. So a caller supplies no
+ * identifier to probe, and a collision happens on a name the caller never sees:
+ * there is no taken username to report, or to hide. A taken name costs one more
+ * bcrypt (qs_user_create hashes before it takes its lock), so a collision shows
+ * as time — which says only that some name nobody asked for was taken.
  *
- * Self-registration NEVER bootstraps an install (C14). It passes no setup
- * token, so on an EMPTY registry the mint path refuses it and this gate reports
+ * The stored username comes back in the result, because the person registering
+ * needs it to sign in and has no other way to learn it. It is the PRIVATE login
+ * identifier: a caller hands it to that person — the command's response, the
+ * panel's own pre-sign-in session — and to nothing else: never a URL, a log, or
+ * a cookie of its own.
+ *
+ * Flood control counts the REGISTRATION, not the draws: one attempt against the
+ * caller's IP whatever happens next, and one against the install-wide hourly cap
+ * only when an account was really created.
+ *
+ * Self-registration NEVER bootstraps an install. It passes no setup token, so on
+ * an EMPTY registry the mint path refuses it and this gate reports
  * 'setup_required' — the first account is created only through the first-run
  * page, whose authorisation is a file under secure/. That keeps
  * allow_self_registration meaning exactly what it says ("the public register
  * endpoint is open") and leaves ONE unauthenticated account-creating surface
  * during bootstrap instead of two.
  *
- * @return array {ok:true, created:bool, userId:?string}
+ * @return array {ok:true, userId:string, username:string}
  *             | {ok:false, error:'registration_disabled'|'registration_closed'
- *                |'setup_required'|'missing_fields'|'invalid_username'
- *                |'name_equals_username'|'password_too_short'|'throttled'
- *                |'server', retry_after?:int, min_length?:int}
+ *                |'setup_required'|'missing_fields'|'password_too_short'
+ *                |'throttled'|'server', retry_after?:int, min_length?:int}
  */
-function qs_auth_attempt_register(string $name, string $username, string $password): array {
+function qs_auth_attempt_register(string $name, string $password): array {
     $cfg = qs_registration_config();
     if (!$cfg['allow_self_registration']) {
         return ['ok' => false, 'error' => 'registration_disabled'];
     }
     $name = trim($name);
-    $username = strtolower(trim($username));
-    if ($name === '' || $username === '' || $password === '') {
+    if ($name === '' || $password === '') {
         return ['ok' => false, 'error' => 'missing_fields'];
-    }
-    if (!qs_valid_username($username)) {
-        return ['ok' => false, 'error' => 'invalid_username'];
-    }
-    // The public name must differ from the private username (see qs_user_create).
-    // Checked here BEFORE the throttle so a bad submission costs no budget; the
-    // mint path re-checks after control-strip as the authoritative backstop.
-    if (strtolower($name) === $username) {
-        return ['ok' => false, 'error' => 'name_equals_username'];
     }
     if (mb_strlen($password) < $cfg['min_password_length']) {
         return ['ok' => false, 'error' => 'password_too_short', 'min_length' => $cfg['min_password_length']];
@@ -1316,30 +1327,26 @@ function qs_auth_attempt_register(string $name, string $username, string $passwo
     if ($wait > 0) {
         return ['ok' => false, 'error' => 'throttled', 'retry_after' => $wait];
     }
-    qs_registration_throttle_attempt(); // every attempt counts against the IP
+    qs_registration_throttle_attempt(); // once per registration, however many draws
 
-    $created = qs_user_create($name, $username, $password, $cfg['max_users']);
-    if ($created['ok']) {
-        qs_registration_record_success(); // only real creations fill the global cap
-        return ['ok' => true, 'created' => true, 'userId' => $created['userId']];
-    }
-    if ($created['error'] === 'duplicate') {
-        // Uniform success — no account-existence oracle.
-        return ['ok' => true, 'created' => false, 'userId' => null];
-    }
-    if ($created['error'] === 'full') {
-        return ['ok' => false, 'error' => 'registration_closed'];
-    }
-    if ($created['error'] === 'setup_token') {
-        // Empty registry: this install has not been bootstrapped yet, and
-        // registration is not the way to do it (see the note above).
-        return ['ok' => false, 'error' => 'setup_required'];
-    }
-    if ($created['error'] === 'invalid_username') {
-        return ['ok' => false, 'error' => 'invalid_username'];
-    }
-    if ($created['error'] === 'name_equals_username') {
-        return ['ok' => false, 'error' => 'name_equals_username'];
+    for ($draw = 0; $draw < QS_REGISTER_USERNAME_DRAWS; $draw++) {
+        $created = qs_user_create($name, qs_suggest_username(), $password, $cfg['max_users']);
+        if ($created['ok']) {
+            qs_registration_record_success(); // only real creations fill the global cap
+            return ['ok' => true, 'userId' => $created['userId'], 'username' => $created['username']];
+        }
+        if ($created['error'] === 'duplicate' || $created['error'] === 'name_equals_username') {
+            continue; // this name cannot be the new account's — draw another
+        }
+        if ($created['error'] === 'full') {
+            return ['ok' => false, 'error' => 'registration_closed'];
+        }
+        if ($created['error'] === 'setup_token') {
+            // Empty registry: this install has not been bootstrapped yet, and
+            // registration is not the way to do it (see the note above).
+            return ['ok' => false, 'error' => 'setup_required'];
+        }
+        return ['ok' => false, 'error' => 'server'];
     }
     return ['ok' => false, 'error' => 'server'];
 }
