@@ -11544,3 +11544,84 @@ server-assigned username during beta.12. `secure/src/functions/AuthManagement.ph
 `secure/admin/templates/pages/setup.php`. Behaviour:
 [COMMAND_API.md](COMMAND_API.md) (*Authentication*, *The security trail*),
 [ARCHITECTURE.md §3](ARCHITECTURE.md), [ADMIN_PANEL.md](ADMIN_PANEL.md) (§1, §9.13).
+
+### Every validator ends at the true end of the string, and the pattern catalogue holds only patterns something calls (locked 2026-09-25)
+
+**Amends**: *Translation key validation — permissive helper, no character whitelist*
+(locked 2026-06-22). Its decision stands. It kept the unused `translation_key_simple`
+pattern for backward compatibility and deferred removing it as a wider sweep; this is
+that sweep, and the pattern is gone.
+
+**Decision**: the shared validation patterns in `RegexPatterns` follow four rules, and
+the class header now states them for anyone adding one.
+
+- **A validator ends at the true end of the string.** Every pattern anchored at both
+  ends carries the `D` modifier. Without it the end anchor also matches just before a
+  final newline, so a node id followed by a newline passed — which is what a URL
+  segment ending in `%0A` decodes to — and `getStructure` answered with node 0. The
+  attribute-name pattern already had the modifier; the other fourteen live validators
+  gain it. The one detector, the stylesheet-variable check that searches a value for
+  braces, angle brackets, `javascript:` or `expression(`, has no end anchor and is
+  unchanged: its whitespace class widens what it refuses.
+- **Whitespace is named, never "any whitespace".** A language display name takes a
+  plain space. The generic class also matched a vertical tab and, in a Unicode
+  pattern, every Unicode space and line separator — so a no-break space or a line
+  separator could sit in a name, rendering as a space or a line break that is not
+  one. CSS text — a keyframe selector list, a media query — takes CSS whitespace
+  (space, tab, line feed, carriage return, form feed) between tokens and nowhere else.
+- **Media queries are one language.** Both media patterns use one character set —
+  letters, digits and `- _ ( ) : , . / < > = + *` — with whitespace only between
+  tokens. The single-feature pattern loses the three alternatives that accepted
+  `screen`, `print` or `all` followed by a space and anything at all, and its
+  parenthesised form takes the same set. Range syntax (`width >= 600px`) and ratios
+  (`16/9`) now pass in a query of several features, where they were refused before.
+- **The catalogue holds only patterns something calls.** Twenty-five are removed: 24
+  that no code called — two of them, `token_name` and `translation_key`, only shared
+  their name with a data field — and `route_name_simple`, called only from a
+  `String.php` helper that nothing called. The four methods nothing called go with
+  them (`get`, `getInfo`, `listPatterns`, `matchWithCapture`), and so do the three
+  uncalled checkers in `String.php` and the require only they needed. A pattern is
+  added together with its caller.
+
+**Reasoning**: no legitimate input ends in a newline, so a validator that accepts one
+only passes the value on for every consumer to survive. The one place that was
+exploitable — an attribute name followed by a newline, which a browser reads as the
+bare name — was closed on its own; the rest are closed together rather than each when
+it turns out to be reachable. Measured on the install before the change, every real
+value keeps its verdict: 2,350 node ids, route segments, language codes and names,
+component references, asset and build names, 87 stylesheet variable values, every
+media query and keyframe key in the stylesheets, and 60 inputs from the command logs.
+None of them holds a tab or a line break.
+
+CSS keeps its line breaks because the engine hands them out. The stylesheet parser
+trims a keyframe selector list or a media query only at its ends, so one written over
+several lines comes back with its line breaks; the console's *Load Existing Frames*
+sends frame keys back as they came, and an API caller can do the same with a media
+query. Refusing them would leave an animation or a media block written that way
+readable but not editable.
+
+A pattern nothing calls is not a safety net. It is untested code that reads like a
+rule, and whoever calls it later inherits whatever it gets wrong. That is why the two
+path patterns kept for a future path rule went as well: that rule is written with its
+caller and its tests when the caller exists.
+
+**Alternatives considered**: add the modifier only where a hole is proven (rejected —
+that is how the attribute-name hole stood, and the modifier costs nothing on a value
+no legitimate input has). A plain space in the CSS patterns too (rejected — it refuses
+values the engine itself returns). Keep "any whitespace" there (rejected — a vertical
+tab is not CSS whitespace, and whitespace allowed anywhere lets a trailing newline in
+as an ordinary character). Keep the media prefix alternatives as prefix tests
+(rejected — `screen` followed by anything passed a validator in name only). Replace
+the two media patterns with one (not taken — the command calls both, and now that they
+accept the same language, dropping the redundant call is a change to the command, not
+the class). Keep the unused patterns and harden them for future callers (rejected —
+see above). Add the modifier to the anchored validators outside the class in the same
+change (not taken — they also run on values read from files, where a trailing newline
+can be the file's own, so each needs its consumer read first).
+
+**Source**: Sangio's rulings, 2026-09-25 — a pattern nothing uses is dead and removed;
+the whitespace-by-design patterns are hardened — and, the same day, his answers on the
+two patterns only a field name kept alive, the `String.php` helpers, the media rule
+and CSS whitespace. `secure/src/classes/RegexPatterns.php`,
+`secure/src/functions/String.php`; the consumers whose accepted values changed are
+`secure/management/command/addLang.php`, `setKeyframes.php` and `setStyleRule.php`.

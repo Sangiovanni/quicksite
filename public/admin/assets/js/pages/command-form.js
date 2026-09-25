@@ -363,9 +363,10 @@ const ENUM_VALUES = {
 };
 
 // The sentinel value a pick-or-type field's "type your own" entry carries.
-// Nothing it stands in for can collide with it: RegexPatterns::route_name is
-// lowercase alphanumerics and hyphens, and an event name is validated against a
-// fixed allowlist of on* names.
+// Nothing it stands in for can collide with it: addRoute takes a literal route
+// segment only as lowercase letters, digits and hyphens, and a parameter segment
+// only after a ':', and an event name is validated against a fixed allowlist of
+// on* names.
 const QS_PICK_CUSTOM = '__custom__';
 
 /**
