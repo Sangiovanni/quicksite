@@ -205,22 +205,28 @@ class AdminRouter {
      * establishing the session. $remember gives the session cookie a lifetime
      * so it survives a browser restart.
      *
+     * Recorded in the security trail exactly as the `login` command records it
+     * (qs_security_log_signin): a success names the account, a refusal records
+     * only a keyed digest of the username typed.
+     *
      * @return string|null null on success, else an error key:
      *                     'invalid_credentials' | 'missing_fields' | 'throttled:<seconds>'
      */
     public function attemptLogin(string $username, string $password, bool $remember = false): ?string {
         require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+        require_once SECURE_FOLDER_PATH . '/src/functions/securityLog.php';
 
         // Distinguish an empty submission (stale cached form, autofill mishap)
         // from wrong credentials — a real diagnostic for the user, and empty
         // probes are not brute force. The management `login` command 400s the
-        // same case with validation.required.
+        // same case with validation.required, and neither records it.
         if (trim($username) === '' || $password === '') {
             return 'missing_fields';
         }
 
         $attempt = qs_auth_attempt_login($username, $password);
         if (!$attempt['ok']) {
+            qs_security_log_signin($attempt, $username);
             if ($attempt['error'] === 'throttled') {
                 return 'throttled:' . (int)($attempt['retry_after'] ?? 60);
             }
@@ -229,6 +235,7 @@ class AdminRouter {
 
         $user = $attempt['user'];
         qs_session_establish((string)$user['id'], qs_user_generation($user), $remember);
+        qs_security_log_signin($attempt, $username, $remember);
         return null;
     }
 
@@ -273,28 +280,49 @@ class AdminRouter {
     }
 
     /**
-     * Attempt the FIRST-RUN account creation (C14) — the page's entry into the
+     * Attempt the FIRST-RUN account creation — the page's entry into the
      * shared bootstrap gate (qs_auth_attempt_setup). Authorisation is the setup
      * token the deployer reads off disk; the flag governing public
      * self-registration is deliberately not consulted (creating the first
      * account is an installation step, and must work on a default install).
      *
-     * On success a one-shot flash is set for the login page's banner. No
-     * auto-login: the login page stays the single session-establishing point.
+     * On success a one-shot flash is set for the login page's banner, in a
+     * session id regenerated for it, and the creation is recorded in the
+     * security trail as `account.created` — the event the `register` command
+     * writes. No auto-login: the login page stays the single session-establishing
+     * point.
+     *
+     * The form asks for the password twice; the two must match before the gate is
+     * even asked, so a slip costs no throttle budget — the same safeguard as the
+     * register form's.
      *
      * @return string|null null on success, else an error key:
-     *                     'setup_complete' | 'missing_fields' | 'invalid_token' |
-     *                     'invalid_username' | 'name_equals_username' |
+     *                     'setup_complete' | 'missing_fields' | 'password_mismatch' |
+     *                     'invalid_token' | 'invalid_username' | 'name_equals_username' |
      *                     'password_too_short:<min>' | 'throttled:<seconds>' | 'server'
      */
-    public function attemptSetup(string $name, string $username, string $password, string $token): ?string {
+    public function attemptSetup(string $name, string $username, string $password, string $passwordConfirm, string $token): ?string {
         require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+        require_once SECURE_FOLDER_PATH . '/src/functions/securityLog.php';
         qs_session_boot(true); // the one-shot flash below rides the same session
+
+        if ($password === '' || $passwordConfirm === '') {
+            return 'missing_fields';
+        }
+        if ($password !== $passwordConfirm) {
+            return 'password_mismatch';
+        }
 
         $attempt = qs_auth_attempt_setup($name, $username, $password, $token);
         if ($attempt['ok']) {
+            qs_security_log(QS_SEC_ACCOUNT_CREATED, ['via' => 'first_run'], (string)$attempt['userId']);
             // Carries the username the operator just chose, so the login page
-            // can pre-fill it. Shown once (see QS_SETUP_FLASH).
+            // can pre-fill it. Shown once (see QS_SETUP_FLASH). Written into a
+            // fresh id: whatever id this browser arrived with, nobody else can
+            // hold the one the note lives in.
+            if (session_status() === PHP_SESSION_ACTIVE) {
+                session_regenerate_id(true);
+            }
             $_SESSION[QS_SETUP_FLASH] = strtolower(trim($username));
             return null;
         }
@@ -312,8 +340,12 @@ class AdminRouter {
      * shared gate (qs_auth_attempt_register, also behind the public `register`
      * command). The server assigns the username; on success it is left in this
      * browser's session for the login page, which shows it with a warning to
-     * save it until a sign-in succeeds (QS_REGISTER_FLASH). No auto-login: the
-     * login page stays the single session-establishing point.
+     * save it until a sign-in succeeds in this browser, for QS_REGISTER_FLASH_TTL
+     * at most (QS_REGISTER_FLASH). The id is regenerated before the note is
+     * written, so it lands in a session no one else has ever held — not one a
+     * visitor was handed by somebody else. No auto-login: the login page stays
+     * the single session-establishing point. The creation is recorded in the
+     * security trail as the `register` command records it.
      *
      * The form asks for the password twice; the two must match before the gate is
      * even asked, so a slip costs no registration budget. The public `register`
@@ -326,6 +358,7 @@ class AdminRouter {
      */
     public function attemptRegister(string $name, string $password, string $passwordConfirm): ?string {
         require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+        require_once SECURE_FOLDER_PATH . '/src/functions/securityLog.php';
         qs_session_boot(true); // the flash below rides the same session
 
         if (trim($name) === '' || $password === '' || $passwordConfirm === '') {
@@ -337,10 +370,17 @@ class AdminRouter {
 
         $attempt = qs_auth_attempt_register($name, $password);
         if ($attempt['ok']) {
+            // Naming the account by id, never by username — as the command does.
+            qs_security_log(QS_SEC_ACCOUNT_CREATED, ['via' => 'self_registration'], (string)$attempt['userId']);
             // The person never chose this username and has not seen it yet, so
             // the only copy they can reach is this one. It goes into the session
-            // and nowhere else — not the redirect URL, not a cookie of its own.
-            $_SESSION[QS_REGISTER_FLASH] = $attempt['username'];
+            // and nowhere else — not the redirect URL, not a cookie of its own —
+            // and into a session id minted here, not whichever id the browser
+            // arrived with: one planted by someone else would let them read it.
+            if (session_status() === PHP_SESSION_ACTIVE) {
+                session_regenerate_id(true);
+            }
+            qs_register_note_set($attempt['username']);
             return null;
         }
         if ($attempt['error'] === 'throttled') {
@@ -612,15 +652,27 @@ class AdminRouter {
      * Stale cookies from the retired token model (`qs_refresh`, `qs_preview`,
      * `admin_token`) are expired here as one-time upgrade hygiene: they carried
      * credentials, and a browser holding one should not keep it.
+     *
+     * Recorded in the security trail as `auth.signout`, with the payload the
+     * `logoutSession` command writes, while the caller's identity is still
+     * resolved — before the session is destroyed.
      */
     public function clearToken(bool $everywhere = false): void {
         require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+        require_once SECURE_FOLDER_PATH . '/src/functions/securityLog.php';
 
-        if ($everywhere) {
-            $auth = qs_session_auth();
-            if (!empty($auth['valid'])) {
-                qs_user_bump_generation((string)$auth['userId']);
-            }
+        $auth = qs_session_auth();
+        $othersEnded = false;
+        if ($everywhere && !empty($auth['valid'])) {
+            $othersEnded = qs_user_bump_generation((string)$auth['userId']) !== null;
+        }
+        if (!empty($auth['valid'])) {
+            qs_security_log(
+                QS_SEC_SIGNOUT,
+                ['everywhere' => $everywhere, 'other_sessions_ended' => $othersEnded],
+                (string)$auth['userId'],
+                $auth['user']['name'] ?? null
+            );
         }
 
         qs_session_destroy();

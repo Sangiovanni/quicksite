@@ -105,6 +105,12 @@ secure/management/config/upload-throttle.json
 # destroyed the moment it is used. Per-install and secret by construction:
 # reading it IS the authorisation, so it must never be committed.
 secure/management/config/setup-token.txt
+
+# The security trail's key - the HMAC key of the digest a failed sign-in records
+# in place of the username typed. Written by the engine on first use, never
+# regenerated, per-install and secret: with it, the digests in a copied log can
+# be tested against guesses. The trailing * covers any backup or sidecar of it.
+secure/management/config/security-trail-key.txt*
 secure/management/config/*.json.lock
 secure/management/config/*.tmp*
 

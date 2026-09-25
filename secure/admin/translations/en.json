@@ -73,7 +73,7 @@
         "registered": {
             "title": "Account created",
             "intro": "Your username was created for you:",
-            "warning": "Your username is private and you sign in with it. Save it now: once you sign in, it is never shown again."
+            "warning": "Your username is private and you sign in with it. Save it now: this page shows it until you sign in on this browser, for :hours hours at most, and never again after that."
         },
         "help": {
             "title": "No account?",
@@ -93,7 +93,7 @@
         "passwordMismatch": "The two passwords do not match — type the same password in both fields.",
         "usernameNotice": {
             "title": "You do not choose a username",
-            "body": "One is created for you when you submit, and you sign in with it. It is private: the next page shows it until you sign in, and it is never shown again after that — save it there."
+            "body": "One is created for you when you submit, and you sign in with it. It is private: the next page shows it until you sign in on this browser, for :hours hours at most, and it is never shown again after that — save it there."
         },
         "submit": "Create account",
         "backToLogin": "Already have an account? Sign in",
@@ -125,6 +125,8 @@
         "usernameSuggested": "One has been suggested for you. Keep it or type your own — write it down either way, you sign in with it.",
         "passwordLabel": "Password",
         "passwordHint": "At least :min characters — length matters more than symbols.",
+        "passwordConfirmLabel": "Repeat the password",
+        "passwordMismatch": "The two passwords do not match — type the same password in both fields.",
         "submit": "Create account",
         "invalidToken": "That setup token is not valid. Open the file named below and copy the whole line.",
         "invalidUsername": "This username is not valid — use 3–32 characters: letters, numbers, dashes or underscores",

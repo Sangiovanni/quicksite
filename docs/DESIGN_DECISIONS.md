@@ -11408,3 +11408,139 @@ traced to the uniform-success rule, and after his review of the result.
 [ARCHITECTURE.md §3](ARCHITECTURE.md), [COMMAND_API.md](COMMAND_API.md)
 (*Authentication*, *What is deliberately not a command*),
 [ADMIN_PANEL.md](ADMIN_PANEL.md) (§1, §9.13).
+
+### A sign-in costs the same for any name, throttles count before they admit, the username note ends at 24 hours, and the panel writes the security trail (locked 2026-09-25)
+
+**Amends**: *The server assigns the private username, and gives it once to the person
+registering* (locked 2026-09-19). Its decision stands; the statements of it that no
+longer hold are corrected below rather than rewritten there.
+
+**Decision**: five changes to the authentication code under the server-assigned
+username, made together.
+
+- **One password cost.** Every password hash is bcrypt at cost 12 — PHP 8.4's own
+  default, named in the code as a convention rather than left to `PASSWORD_DEFAULT`.
+  The login gate's answer to an unknown username verifies against a dummy built at
+  that same cost, and a successful sign-in re-hashes a stored hash made at any other
+  cost or algorithm, so an account hashed elsewhere converges at its next sign-in.
+  The re-hash changes nothing else on the record, the session generation included,
+  and yields to a password change that lands in between.
+- **Throttles count before they admit.** The login throttle — sign-in through either
+  door, the first-run page, and My account's password change and deletion — admits
+  an attempt and counts it in one locked step, before anything is verified; a
+  success clears the count. On the first-run page an incomplete form is answered
+  before the throttle and a token that verifies clears the count, so only a wrong
+  token is counted as a guess. Registration does the same as sign-in: one locked
+  step counts the attempt against the caller's address and reserves a place in the
+  hourly cap, which is handed back if no account is created. A refusal writes
+  nothing, and no read of either store happens outside its lock.
+- **The assigned-username note ends after 24 hours.** The note records when it was
+  written, and the login page drops it once it is 24 hours old, as well as at a
+  sign-in in that browser; no visit moves that clock. Both account-creating forms
+  write their note into a session id regenerated for it, and the session id is
+  accepted from the cookie only (`use_only_cookies` and `use_trans_sid` are pinned
+  beside `use_strict_mode`). The first-run note stays one-shot, and the first-run form
+  now asks for the password twice, as the register form does, compared before its
+  gate.
+- **The security trail covers the panel.** The panel's sign-in, sign-out,
+  registration and first-run creation write the events the `login`, `logoutSession`
+  and `register` commands write, with the same payloads. A failed sign-in, through
+  either door, records no username: it records an HMAC-SHA256 of the name typed,
+  keyed with a per-install secret the engine writes on first use to
+  `<secure>/management/config/security-trail-key.txt` — gitignored, never
+  regenerated, never in a log or a response. Without a usable key, the refusal is
+  recorded with no identifier at all.
+- **`login` no longer returns the username.** Its response names the account by id
+  and display name.
+
+Corrected statements of the 2026-09-19 entry:
+
+- *"on every visit until a sign-in succeeds; the sign-in drops it from the session"* —
+  only a sign-in in that browser drops it, and it also ends 24 hours after the
+  registration that wrote it.
+- *"beside `login`, which already returned it to a caller who had just signed in with
+  it"* — `login` no longer returns it. `register`'s response is the one place a
+  command hands the username out, which is also the one exception left to *Identity
+  is a private username; the email field is removed*.
+- *"since the login throttle is keyed on the username, reading it was also enough to
+  lock the owner out"* — whoever holds a session can lock the owner out without it:
+  failed password changes and deletions on My account count against the same
+  throttle. Keeping the username off the page withholds half a credential; it is not
+  what prevents a lock-out.
+- *"the endpoint cannot confirm a password guess for someone who holds a session but
+  not the username"* — true of the deletion endpoint only. The password change
+  answers a wrong current password as such, on the same throttle.
+- *"until that sign-in, anyone using the same browser can read the username on the
+  login page"* — for 24 hours at most, and never through a session id somebody else
+  chose.
+
+**Reasoning**: the login gate burns an unknown username's time on a dummy hash so
+that a real username and an unknown one take equally long. That holds only while the
+dummy and the stored hashes share a cost, and `PASSWORD_DEFAULT` promises none: PHP
+8.4 raised it from 10 to 12, and on 8.4 a real username was refused about 130 ms
+slower than an unknown one — one request told them apart, and the throttle, keyed on
+the name typed, does nothing to slow probing across names. Pinning the cost fixes
+every new hash; building the dummy from the constant means it cannot drift; and
+because accounts hashed under another cost exist (made on another PHP version, or by
+hand), no single dummy matches them all — the re-hash on sign-in is what brings them
+in line.
+
+A throttle that reads the count, checks the password and only then records the
+failure lets through every attempt that arrives while the others are still checking:
+six simultaneous guesses were six verifications, on both interpreters, and after
+each lapse of the lock a guesser with K connections got K guesses instead of one. The
+registration limits had the same shape. Counted under the store's lock before the
+check, each attempt sees the ones before it, so a burst gets what is left and no
+more. The refusal is read under the lock too, for a reason measured on Windows: a
+process reading the store outside the lock holds the file open, a rename cannot
+replace an open file there, and the writer's swap fails — against one looping reader,
+most swaps did — so the attempt it counted is lost and the next one is admitted.
+
+The note's only clock was its session file's date, which every visit to the login
+page renewed. A sign-in in another browser left it showing, so it could outlive any
+reason for it indefinitely, and a session id planted in the browser before
+registration (a sibling subdomain, or a network attacker on plain HTTP) read it; on a
+host that accepts ids from the URL, a plain link did. A clock of its own ends the
+first, and a fresh id per note and cookie-only ids end the others. Twenty-four hours
+covers coming back to the login page later the same day.
+
+The panel is where people sign in, so password guessing through the login form left
+no trace in the trail an operator reads after an incident. And the command's failure
+record kept what was typed — a real username, or a password typed into the username
+field, in clear, in a file that travels further than `users.php` does. A keyed digest
+keeps what the record is for, repeated failures against one name, without the value;
+a plain hash would not do, because the names come from small enough spaces to be
+enumerated.
+
+`login`'s caller has just proved it knows the username, and nothing read the field.
+
+**Alternatives considered**: the cost as an `auth.php` setting (rejected — a
+convention, like the registration's draw bound; changing it is a code change).
+Keeping `PASSWORD_DEFAULT` and deriving the dummy from it (rejected — accounts hashed
+under two PHP versions still differ). Hashing a fresh dummy on each request (rejected
+— it doubles the unknown name's cost, the same leak the other way round). A dummy
+written out as a literal (rejected — it drifts from the constant). One lock held
+across the whole sign-in (rejected — every sign-in would wait on another's bcrypt).
+A lock-free path for refusals (rejected — measured above). Handing back only the
+successful attempt rather than clearing the count (rejected — a legitimate user would
+carry earlier typos for a day). A one-hour note (rejected — too short to come back
+to). A limit read off the session file's date (rejected — every visit renews it).
+Scoping the trail's documentation to the command surface instead (rejected — the
+panel is where the sign-ins are). An unkeyed hash of the name, or no identifier at
+all (rejected — reversible, and useless for correlation, respectively).
+
+**Source**: Sangio's rulings, 2026-09-25, after an independent security review of the
+server-assigned username during beta.12. `secure/src/functions/AuthManagement.php`
+(`QS_PASSWORD_BCRYPT_COST`, `qs_password_hash`, `qs_password_dummy_hash`,
+`qs_password_rehash`, `qs_auth_attempt_login`, `qs_auth_attempt_setup`,
+`qs_auth_attempt_register`), `secure/src/functions/SessionManagement.php`
+(`qs_login_throttle_admit`, `qs_registration_throttle_admit`,
+`qs_registration_throttle_release`, `qs_register_note`, `QS_REGISTER_FLASH_TTL`,
+`qs_session_boot`), `secure/src/functions/securityLog.php`
+(`qs_security_log_signin`, `qs_security_username_digest`),
+`secure/admin/AdminRouter.php` (`attemptLogin`, `attemptRegister`, `attemptSetup`,
+`clearToken`), `secure/admin/functions/accountSelf.php`,
+`secure/management/command/login.php`, `secure/management/command/register.php`,
+`secure/admin/templates/pages/setup.php`. Behaviour:
+[COMMAND_API.md](COMMAND_API.md) (*Authentication*, *The security trail*),
+[ARCHITECTURE.md §3](ARCHITECTURE.md), [ADMIN_PANEL.md](ADMIN_PANEL.md) (§1, §9.13).

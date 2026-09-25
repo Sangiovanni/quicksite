@@ -1,6 +1,6 @@
 <?php
 /**
- * Admin First-Run Page (C14)
+ * Admin First-Run Page
  *
  * Renders ONLY while the user registry is empty (the router sends every admin
  * URL here in that state, and redirects away the moment an account exists).
@@ -61,9 +61,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $name = (string)($_POST['name'] ?? '');
         $username = (string)($_POST['username'] ?? '');
         $password = (string)($_POST['password'] ?? '');
+        $passwordConfirm = (string)($_POST['password_confirm'] ?? '');
         $token = (string)($_POST['setup_token'] ?? '');
 
-        $result = $router->attemptSetup($name, $username, $password, $token);
+        $result = $router->attemptSetup($name, $username, $password, $passwordConfirm, $token);
         if ($result === null) {
             // Created. No auto-login — the login page stays the single
             // session-establishing point (it shows the "account created" banner).
@@ -76,8 +77,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $setupError = 'password_too_short';
             $setupMinLength = (int)substr($result, strlen('password_too_short:'));
         } else {
-            // 'invalid_token' | 'missing_fields' | 'invalid_username'
-            // | 'name_equals_username' | 'setup_complete' | 'server'
+            // 'invalid_token' | 'missing_fields' | 'password_mismatch'
+            // | 'invalid_username' | 'name_equals_username' | 'setup_complete' | 'server'
             $setupError = $result;
         }
     }
@@ -121,6 +122,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="admin-alert admin-alert--error"><?= __admin('setup.invalidToken', 'That setup token is not valid. Open the file named below and copy the whole line.') ?></div>
             <?php elseif ($setupError === 'password_too_short'): ?>
             <div class="admin-alert admin-alert--error"><?= __admin('setup.passwordTooShort', ['min' => $setupMinLength]) ?></div>
+            <?php elseif ($setupError === 'password_mismatch'): ?>
+            <div class="admin-alert admin-alert--error"><?= __admin('setup.passwordMismatch') ?></div>
             <?php elseif ($setupError === 'invalid_username'): ?>
             <div class="admin-alert admin-alert--error"><?= __admin('setup.invalidUsername', 'Use 3-32 characters: lowercase letters, digits, dash or underscore.') ?></div>
             <?php elseif ($setupError === 'name_equals_username'): ?>
@@ -206,15 +209,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <p class="admin-hint"><?= __admin('setup.usernameSuggested', 'One has been suggested for you. Keep it or type your own — write it down either way, you sign in with it.') ?></p>
                 </div>
 
+                <?php /* The password twice, as on the register form: typed once, a slip
+                         would only surface at the first sign-in. The router compares the
+                         two before the gate, so a mismatch costs no throttle budget. Both
+                         fields share this markup and the toggle script below. */
+                $passwordFields = [
+                    ['id' => 'password',         'label' => __admin('setup.passwordLabel', 'Password'), 'hint' => __admin('setup.passwordHint', ['min' => $passwordMinLength])],
+                    ['id' => 'password_confirm', 'label' => __admin('setup.passwordConfirmLabel'),      'hint' => null],
+                ];
+                foreach ($passwordFields as $field): ?>
                 <div class="admin-form-group">
-                    <label class="admin-label admin-label--required" for="password">
-                        <?= __admin('setup.passwordLabel', 'Password') ?>
+                    <label class="admin-label admin-label--required" for="<?= $field['id'] ?>">
+                        <?= $field['label'] ?>
                     </label>
                     <div style="position: relative;">
                         <input
                             type="password"
-                            id="password"
-                            name="password"
+                            id="<?= $field['id'] ?>"
+                            name="<?= $field['id'] ?>"
                             class="admin-input"
                             style="padding-right: 2.75rem;"
                             autocomplete="new-password"
@@ -222,16 +234,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         >
                         <button
                             type="button"
-                            id="password-toggle"
+                            data-password-toggle="<?= $field['id'] ?>"
                             aria-label="<?= adminAttr(__admin('login.showPassword')) ?>"
                             title="<?= adminAttr(__admin('login.showPassword')) ?>"
                             style="position: absolute; top: 50%; right: 0.5rem; transform: translateY(-50%); background: none; border: none; padding: 0.25rem; cursor: pointer; color: inherit; opacity: 0.65; line-height: 0;"
                         >
-                            <svg id="password-eye" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <svg data-eye="show" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                 <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
                                 <circle cx="12" cy="12" r="3"/>
                             </svg>
-                            <svg id="password-eye-off" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+                            <svg data-eye="hide" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
                                 <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
                                 <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
                                 <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/>
@@ -239,8 +251,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             </svg>
                         </button>
                     </div>
-                    <p class="admin-hint"><?= __admin('setup.passwordHint', ['min' => $passwordMinLength]) ?></p>
+                    <?php if ($field['hint'] !== null): ?>
+                    <p class="admin-hint"><?= $field['hint'] ?></p>
+                    <?php endif; ?>
                 </div>
+                <?php endforeach; ?>
 
                 <button type="submit" class="admin-btn admin-btn--primary admin-btn--lg admin-btn--block">
                     <?= __admin('setup.submit', 'Create account') ?>
@@ -256,25 +271,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </div>
 
 <script>
-// Password visibility toggle — same behaviour as the login page.
+// Password visibility toggles — same behaviour as the login page, one per field:
+// each button names the input it reveals.
 (function () {
-    var input = document.getElementById('password');
-    var btn = document.getElementById('password-toggle');
-    var eye = document.getElementById('password-eye');
-    var eyeOff = document.getElementById('password-eye-off');
-    if (!input || !btn) return;
     var labels = {
         show: <?= json_encode(__admin('login.showPassword')) ?>,
         hide: <?= json_encode(__admin('login.hidePassword')) ?>
     };
-    btn.addEventListener('click', function () {
-        var reveal = input.type === 'password';
-        input.type = reveal ? 'text' : 'password';
-        eye.style.display = reveal ? 'none' : '';
-        eyeOff.style.display = reveal ? '' : 'none';
-        btn.setAttribute('aria-label', reveal ? labels.hide : labels.show);
-        btn.setAttribute('title', reveal ? labels.hide : labels.show);
-        input.focus();
+    document.querySelectorAll('[data-password-toggle]').forEach(function (btn) {
+        var input = document.getElementById(btn.getAttribute('data-password-toggle'));
+        var eye = btn.querySelector('[data-eye="show"]');
+        var eyeOff = btn.querySelector('[data-eye="hide"]');
+        if (!input || !eye || !eyeOff) return;
+        btn.addEventListener('click', function () {
+            var reveal = input.type === 'password';
+            input.type = reveal ? 'text' : 'password';
+            eye.style.display = reveal ? 'none' : '';
+            eyeOff.style.display = reveal ? '' : 'none';
+            btn.setAttribute('aria-label', reveal ? labels.hide : labels.show);
+            btn.setAttribute('title', reveal ? labels.hide : labels.show);
+            input.focus();
+        });
     });
 })();
 </script>

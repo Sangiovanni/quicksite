@@ -22,9 +22,10 @@
  * THE USERNAME IS NOT ON THIS PAGE — not shown, not in the page's script config,
  * not as a placeholder. It is the private half of the sign-in, and this page opens
  * for whoever holds the session: a browser left signed in, a stolen cookie. Knowing
- * it would hand them half a credential, and the login throttle is keyed on it, so
- * it would also let them lock the owner out. The deletion asks the owner to type it
- * and the server checks it (qs_account_delete).
+ * it would hand them half a credential. (Hiding it is not what stops them locking
+ * the owner out: failed password changes and deletions on this page count against
+ * the owner's login throttle, username or not.) The deletion asks the owner to type
+ * it and the server checks it (qs_account_delete).
  *
  * Lean PHP shell: identity, section shells and form skeletons live here; every
  * dynamic row, result and confirm modal is built by account.js with

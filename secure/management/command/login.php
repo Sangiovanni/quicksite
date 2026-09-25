@@ -15,7 +15,10 @@
  * Refusals are uniform (unknown username, wrong password, passwordless/
  * externally managed account, disabled user all yield the same 401) — no
  * account oracle. Brute force is throttled per username (5 free attempts,
- * doubling cooldown).
+ * doubling cooldown), each attempt counted before it is checked.
+ *
+ * The response names the account by id and display name. It never repeats the
+ * username: the caller just proved it knows it.
  *
  * @method POST
  * @route /management/login
@@ -46,15 +49,10 @@ function __command_login(array $params = [], array $urlParams = []): ApiResponse
     $attempt = qs_auth_attempt_login($username, $password);
 
     if (!$attempt['ok']) {
-        // The username that was tried, never what was tried with it. The refusal
-        // stays uniform to the caller — this record is for the operator, and the
-        // distinction between "unknown username" and "wrong password" is
-        // deliberately absent here too, because the attempt does not resolve to
-        // an account and inventing one would put an oracle in the log.
-        qs_security_log(QS_SEC_SIGNIN_FAILURE, [
-            'username' => $username,
-            'reason'   => $attempt['error'] === 'throttled' ? 'throttled' : 'invalid_credentials',
-        ]);
+        // A keyed digest of the username that was tried, never the name and
+        // never what was tried with it — the same record the panel's form writes
+        // (qs_security_log_signin). The refusal stays uniform to the caller.
+        qs_security_log_signin($attempt, $username);
 
         if ($attempt['error'] === 'throttled') {
             return ApiResponse::create(429, 'auth.throttled')
@@ -75,12 +73,7 @@ function __command_login(array $params = [], array $urlParams = []): ApiResponse
     // The session token is NOT recorded — it is the credential this call just
     // minted. `remember` is, because a long-lived session is the thing an
     // operator reading this trail would want to know was created.
-    qs_security_log(
-        QS_SEC_SIGNIN_SUCCESS,
-        ['remember' => !empty($params['remember'])],
-        (string)$user['id'],
-        $user['name'] ?? null
-    );
+    qs_security_log_signin($attempt, $username, !empty($params['remember']));
 
     return ApiResponse::create(200, 'operation.success')
         ->withMessage('Logged in')
@@ -90,7 +83,6 @@ function __command_login(array $params = [], array $urlParams = []): ApiResponse
             'user' => [
                 'id'               => $user['id'],
                 'name'             => $user['name'] ?? '',
-                'username'         => $user['username'] ?? null,
                 'selected_project' => $user['selected_project'] ?? null,
             ],
         ]);

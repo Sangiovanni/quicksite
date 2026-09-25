@@ -2515,7 +2515,6 @@ $GLOBALS['__help_commands'] = [
                 'user' => [
                     'id' => 'usr_...',
                     'name' => 'Your Name',
-                    'username' => 'your-username',
                     'selected_project' => 'quicksite'
                 ]
             ]
@@ -2525,7 +2524,7 @@ $GLOBALS['__help_commands'] = [
             '401.auth.invalid_credentials' => 'Invalid username or password (uniform for unknown username, wrong password, externally managed or disabled account - no account oracle)',
             '429.auth.throttled' => 'Too many failed attempts - retry_after gives the wait in seconds'
         ],
-        'notes' => 'A command-line client needs a cookie jar (curl -c jar -b jar) as well as the Authorization header: the token authorizes nothing without the session cookie it belongs to, which is what keeps a cookie-authenticated API safe from cross-site request forgery. Session lifetimes are configured in auth.php (authentication.session: idle_ttl / remember_ttl). Users with password_hash null are externally managed and cannot log in here.'
+        'notes' => 'A command-line client needs a cookie jar (curl -c jar -b jar) as well as the Authorization header: the token authorizes nothing without the session cookie it belongs to, which is what keeps a cookie-authenticated API safe from cross-site request forgery. The response names the account by id and display name (data.user) and never repeats the username - the private login identifier the caller just used. Failed attempts are throttled per username (5 free, then a doubling cooldown); each attempt is counted before it is checked, so simultaneous attempts get no more than what is left. Session lifetimes are configured in auth.php (authentication.session: idle_ttl / remember_ttl). Users with password_hash null are externally managed and cannot log in here.'
     ],
 
     'logoutSession' => [
@@ -2557,7 +2556,7 @@ $GLOBALS['__help_commands'] = [
     ],
 
     'register' => [
-        'description' => 'Self-registration: creates a user account from a public name + a password. The caller does not choose the private username: the server assigns one and returns it in the response (data.username) - the only place it is handed out before the account first signs in, so save it. PUBLIC + self-gating - the command enforces the auth.php registration.allow_self_registration flag server-side (default: DISABLED) plus flood controls (per-IP rate, install-wide hourly cap, absolute account cap). Sign in afterwards with the login command, using the assigned username.',
+        'description' => 'Self-registration: creates a user account from a public name + a password. The caller does not choose the private username: the server assigns one and returns it in the response (data.username) - the only place it is ever handed out, so save it. PUBLIC + self-gating - the command enforces the auth.php registration.allow_self_registration flag server-side (default: DISABLED) plus flood controls (per-IP rate, install-wide hourly cap, absolute account cap). Sign in afterwards with the login command, using the assigned username.',
         'method' => 'POST',
         'parameters' => [
             'name' => [
@@ -2578,7 +2577,7 @@ $GLOBALS['__help_commands'] = [
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
-            'message' => 'Account registered. Your username is qk_483927 — you sign in with it. It is private: save it now, because nothing gives it out again until you have signed in.',
+            'message' => 'Account registered. Your username is qk_483927 — you sign in with it. It is private: save it now, because nothing gives it out again.',
             'data' => [
                 'registered' => true,
                 'username' => 'qk_483927'
@@ -2587,13 +2586,13 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '403.auth.registration_disabled' => 'Self-registration is disabled on this installation (auth.php registration.allow_self_registration)',
             '403.auth.registration_closed' => 'Registration is closed - the account limit (registration.max_users) is reached',
-            '403.auth.setup_required' => 'The installation has no accounts at all. Registration cannot create the first one - open /admin/ and use the first-run page, which requires the setup token written to <secure>/management/config/setup-token.txt',
+            '403.auth.setup_required' => 'The installation has no accounts at all, and self-registration is on. Registration cannot create the first one - open /admin/ and use the first-run page, which requires the setup token written to <secure>/management/config/setup-token.txt. While self-registration is off, an empty installation answers 403 auth.registration_disabled instead',
             '429.auth.throttled' => 'Too many registration attempts - retry_after gives the wait in seconds (per-IP rate or install-wide hourly cap)',
             '400.validation.required' => 'name and password are required',
             '400.validation.invalid_format' => 'Password shorter than the configured minimum (data.min_length)',
             '500.server.registration_failed' => 'Could not register the account - nothing was created (a storage failure, or every username drawn for it was already taken); safe to retry'
         ],
-        'notes' => 'The username is assigned, never chosen: two letters, an underscore and six digits, drawn at random - not derived from the name - and unique. It is the private login identifier, and this response, to the caller that registered, is the only place it is handed out before the account first signs in; a username sent in the body is ignored. No session and no user id are returned - the new account signs in through the login command. Flood-control knobs live in auth.php authentication.registration (throttle.per_ip_per_minute, throttle.global_per_hour, max_users; 0 disables a limit). This command can never create the FIRST account on an install: while the user registry is empty the shared mint path requires the first-run setup token, which registration does not carry, so the answer is 403 auth.setup_required regardless of the allow_self_registration flag.'
+        'notes' => 'The username is assigned, never chosen: two letters, an underscore and six digits, drawn at random - not derived from the name - and unique. It is the private login identifier, and this response, to the caller that registered, is the only place any command hands it out - login does not repeat it; a username sent in the body is ignored. No session and no user id are returned - the new account signs in through the login command. Flood-control knobs live in auth.php authentication.registration (throttle.per_ip_per_minute, throttle.global_per_hour, max_users; 0 disables a limit); each registration is counted before it runs, so simultaneous registrations get no more than what is left. This command can never create the FIRST account on an install: while the user registry is empty the shared mint path requires the first-run setup token, which registration does not carry, so the answer is 403 auth.registration_disabled while allow_self_registration is off and 403 auth.setup_required while it is on - nothing is created either way.'
     ],
 
 

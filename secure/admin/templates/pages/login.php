@@ -26,10 +26,12 @@ $loginRetryAfter = 0;
 // Registration's is NOT consumed here. The server chose that username and this
 // is the only place the person can read it, so it stays on screen, with the
 // warning to save it, through reloads and failed attempts until a sign-in
-// succeeds — qs_session_establish() drops it then. First-run's is shown once:
-// the operator typed that one.
-$assignedUsername = $_SESSION[QS_REGISTER_FLASH] ?? '';
-$assignedUsername = is_string($assignedUsername) ? $assignedUsername : '';
+// succeeds in this browser — qs_session_establish() drops it then — or until it
+// is QS_REGISTER_FLASH_TTL old, whichever comes first: qs_register_note() drops
+// it then, and no visit here moves that clock. First-run's is shown once: the
+// operator typed that one.
+$assignedUsername = qs_register_note();
+$registerNoteHours = intdiv(QS_REGISTER_FLASH_TTL, 3600);
 $setupUsername = $_SESSION[QS_SETUP_FLASH] ?? '';
 $setupUsername = is_string($setupUsername) ? $setupUsername : '';
 // Guarded: a visitor with no session has no $_SESSION at all, and on PHP 8.0 an
@@ -40,7 +42,7 @@ if (isset($_SESSION[QS_SETUP_FLASH])) {
 $flashUsername = $assignedUsername !== '' ? $assignedUsername : $setupUsername;
 
 // An install with no accounts never reaches this page: the router sends every
-// admin URL to the first-run page while the registry is empty (C14).
+// admin URL to the first-run page while the registry is empty.
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // CSRF gate FIRST — before the credentials are even looked at. A forged
@@ -98,7 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <line x1="12" y1="9" x2="12" y2="13"/>
                         <line x1="12" y1="17" x2="12.01" y2="17"/>
                     </svg>
-                    <span><?= __admin('login.registered.warning') ?></span>
+                    <span><?= __admin('login.registered.warning', ['hours' => $registerNoteHours]) ?></span>
                 </p>
             </div>
             <?php elseif ($setupUsername !== ''): ?>

@@ -34,8 +34,9 @@ require_once SECURE_FOLDER_PATH . '/src/functions/securityLog.php';
  *
  * Requires the CURRENT password — a stolen access token alone must not be
  * enough to take the account over — and is throttled per user with the login
- * backoff, so a stolen token cannot become a password brute-force oracle
- * either.
+ * backoff. It does answer a wrong current password as such, so whoever holds a
+ * session can test password guesses here, but only at the login throttle's rate
+ * and on the account's own count: five failures lock its sign-in too.
  *
  * On success every OTHER session family of the user is revoked (containment: a
  * password change is the "I suspect theft" action); the session performing the
@@ -75,9 +76,10 @@ function qs_account_change_password(array $params): ApiResponse {
             ->withData(['min_length' => $minLength]);
     }
 
-    // Same brute-force backoff as login, keyed on the same credential target.
+    // Same brute-force backoff as login, keyed on the same credential target:
+    // admitted and counted before the check, cleared by a success.
     $throttleKey = is_string($user['username'] ?? null) && $user['username'] !== '' ? $user['username'] : $userId;
-    $wait = qs_login_throttle_check($throttleKey);
+    $wait = qs_login_throttle_admit($throttleKey);
     if ($wait > 0) {
         return ApiResponse::create(429, 'auth.throttled')
             ->withMessage('Too many failed attempts — try again later')
@@ -85,13 +87,12 @@ function qs_account_change_password(array $params): ApiResponse {
     }
 
     if (!password_verify($current, $hash)) {
-        qs_login_throttle_fail($throttleKey);
         return ApiResponse::create(401, 'auth.invalid_credentials')
             ->withMessage('Current password is incorrect');
     }
     qs_login_throttle_clear($throttleKey);
 
-    $newHash = password_hash($new, PASSWORD_DEFAULT);
+    $newHash = qs_password_hash($new);
     $written = qs_users_mutate(function (array &$cfg) use ($userId, $newHash) {
         if (!isset($cfg['users'][$userId])) {
             return false;
@@ -139,8 +140,10 @@ function qs_account_change_password(array $params): ApiResponse {
  * cannot check it and the server does. It is checked together with the password
  * and a wrong one of either is refused identically, after the bcrypt has run:
  * this endpoint never says which half was wrong, so it cannot confirm a password
- * guess for someone who holds a session but not the username. Both count against
- * the login throttle, keyed on the account itself.
+ * guess for someone who holds a session but not the username. That is a
+ * property of this endpoint only — the password change above answers a wrong
+ * current password as such, on the same throttle. Both count against the login
+ * throttle, keyed on the account itself.
  *
  * SOLE OWNERSHIP IS REFUSED. Deleting a project's only owner leaves it
  * unownable AND undeletable forever: transferOwnership requires the caller to
@@ -198,9 +201,10 @@ function qs_account_delete(array $params): ApiResponse {
             ->withMessage('This account has no local password (externally managed)');
     }
 
-    // Same brute-force backoff as login / the password change, keyed the same way.
+    // Same brute-force backoff as login / the password change, keyed the same way:
+    // admitted and counted before the check, cleared by a success.
     $throttleKey = is_string($user['username'] ?? null) && $user['username'] !== '' ? $user['username'] : $userId;
-    $wait = qs_login_throttle_check($throttleKey);
+    $wait = qs_login_throttle_admit($throttleKey);
     if ($wait > 0) {
         return ApiResponse::create(429, 'auth.throttled')
             ->withMessage('Too many failed attempts — try again later')
@@ -213,7 +217,6 @@ function qs_account_delete(array $params): ApiResponse {
     $stored     = strtolower(trim((string)($user['username'] ?? '')));
     $usernameOk = $stored !== '' && hash_equals($stored, $typed);
     if (!$passwordOk || !$usernameOk) {
-        qs_login_throttle_fail($throttleKey);
         return ApiResponse::create(401, 'auth.invalid_credentials')
             ->withMessage('The current password or the username is incorrect');
     }

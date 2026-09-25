@@ -4,15 +4,18 @@
  *
  * WHAT THIS IS FOR, AND WHY IT IS NOT THE COMMAND LOG.
  *
- * Signing in, failing to sign in, signing out, changing a password, deleting an
- * account and joining or leaving a project were recorded NOWHERE. Two structural
- * reasons, neither of which the command log can fix:
+ * Signing in, failing to sign in, signing out, creating an account, changing a
+ * password, deleting an account and joining or leaving a project are events the
+ * command log cannot record. Three structural reasons:
  *
  *   1. `login` and `register` answer BEFORE the dispatcher installs its logging
  *      callback — they are public commands that exit early, so no callback of
  *      any kind has been registered when they respond.
- *   2. Account and membership self-service stopped being commands: they are
- *      served from /admin/self, which never touches the command dispatcher.
+ *   2. Account and membership self-service are not commands: they are served
+ *      from /admin/self, which never touches the command dispatcher.
+ *   3. The admin panel's own forms — sign-in, sign-out, registration, the
+ *      first-run page — are not commands either. AdminRouter writes their
+ *      records, with the same events and payloads as the commands write.
  *
  * These are also not commands in the sense the command log means. They belong to
  * an ACCOUNT and an INSTALLATION, not to a project, so the per-project trail has
@@ -37,8 +40,11 @@
  *     session id. Every detail payload goes through the same deny-by-default
  *     redaction the command log uses (qs_log_redact_secrets), so a caller that
  *     hands this function a body containing a password gets `[redacted]` rather
- *     than a leak. A failed sign-in records the username that was tried, which
- *     is the point of the record, and never what was tried with it.
+ *     than a leak. A failed sign-in records neither what was tried nor the
+ *     username it was tried with, but a keyed digest of that username
+ *     (qs_security_username_digest): the username is half of a credential, and
+ *     whatever was typed into its field — sometimes a password — is to be
+ *     treated as one.
  *   - **A logging failure never breaks authentication.** Every path returns a
  *     bool and none throws. If the disk is full, the sign-in still succeeds or
  *     fails on its own merits.
@@ -133,4 +139,121 @@ function qs_security_log(
         error_log('QuickSite securityLog: could not record ' . $event . ' (' . $e->getMessage() . ')');
         return false;
     }
+}
+
+/**
+ * Record how a sign-in attempt ended — the one payload both doors write: the
+ * `login` command and the admin panel's login form.
+ *
+ *   success → auth.signin_success, naming the account, and whether a "remember
+ *             me" session was created (never the session token);
+ *   refusal → auth.signin_failure, naming no account — the attempt does not
+ *             resolve to one, and inventing one would put an oracle in the trail
+ *             — with the keyed digest of the username that was typed and whether
+ *             the refusal was the throttle.
+ *
+ * @param array $attempt qs_auth_attempt_login()'s result
+ * @return bool          True when the entry was written. Never throws.
+ */
+function qs_security_log_signin(array $attempt, string $typedUsername, bool $remember = false): bool {
+    if (!empty($attempt['ok'])) {
+        $user = is_array($attempt['user'] ?? null) ? $attempt['user'] : [];
+        return qs_security_log(
+            QS_SEC_SIGNIN_SUCCESS,
+            ['remember' => $remember],
+            (string)($user['id'] ?? ''),
+            $user['name'] ?? null
+        );
+    }
+    return qs_security_log(QS_SEC_SIGNIN_FAILURE, [
+        'username_digest' => qs_security_username_digest($typedUsername),
+        'reason'          => ($attempt['error'] ?? '') === 'throttled' ? 'throttled' : 'invalid_credentials',
+    ]);
+}
+
+/**
+ * THE TRAIL'S KEY — for the digest a failed sign-in records in place of the
+ * username that was typed.
+ *
+ * Keyed, not a plain hash: the usernames this install assigns come from about
+ * 676 million possibilities and chosen ones from far fewer, so a plain hash of
+ * either could be reversed by trying them all. Keyed, the digest can only be
+ * recomputed by whoever also holds this file, which stays in the config
+ * directory while log files travel (backups, aggregation). Two failures against
+ * one name still carry one digest, which is what the record is for.
+ *
+ * Minted the setupToken.php way: random bytes, written on first use with the
+ * atomic create-if-absent fopen, then only ever read. Never regenerated — a new
+ * key would stop every earlier digest matching its name. Gitignored, never
+ * logged, never part of any response.
+ */
+const QS_SECURITY_KEY_BYTES = 32;
+
+function qs_security_key_path(): string {
+    return SECURE_FOLDER_PATH . '/management/config/security-trail-key.txt';
+}
+
+/**
+ * The trail's key as raw bytes, minted if this is its first use; null when it
+ * can be neither read nor written.
+ */
+function qs_security_key(): ?string {
+    $path = qs_security_key_path();
+    $read = static function () use ($path): ?string {
+        $raw = is_file($path) ? @file_get_contents($path) : false;
+        $hex = is_string($raw) ? trim($raw) : '';
+        return preg_match('/^[0-9a-f]{' . (QS_SECURITY_KEY_BYTES * 2) . '}$/', $hex) === 1 ? hex2bin($hex) : null;
+    };
+
+    $key = $read();
+    if ($key !== null) {
+        return $key;
+    }
+    $handle = @fopen($path, 'x'); // atomic: fails if the file already exists
+    if ($handle === false) {
+        // Either a concurrent first use won the race (retry the read — it may
+        // still be mid-write) or this directory is not writable.
+        for ($i = 0; $i < 3; $i++) {
+            usleep(20000);
+            clearstatcache(true, $path);
+            $key = $read();
+            if ($key !== null) {
+                return $key;
+            }
+        }
+        return null;
+    }
+    $key = random_bytes(QS_SECURITY_KEY_BYTES);
+    $written = @fwrite($handle, bin2hex($key) . "\n");
+    @fclose($handle);
+    if ($written === false || $written === 0) {
+        @unlink($path);
+        return null;
+    }
+    // Owner-only. A no-op on Windows, where ACLs govern instead — the file's real
+    // protection is living under secure/, not its mode bits.
+    @chmod($path, 0600);
+    return $key;
+}
+
+/**
+ * What a failed sign-in records instead of the username typed: an HMAC-SHA256
+ * of it, keyed with the trail's key, taken of the name as the login gate reads
+ * it (trimmed, lower-cased) so that "Bob" and " bob " are one name here as they
+ * are there.
+ *
+ * Null when the key is unavailable, and then no identifier is recorded at all —
+ * never the name in clear, and never an unkeyed hash of it. Never throws.
+ */
+function qs_security_username_digest(string $typed): ?string {
+    try {
+        $key = qs_security_key();
+    } catch (Throwable $e) {
+        $key = null;
+    }
+    if ($key === null) {
+        error_log('QuickSite securityLog: the trail key could not be read or created, so a failed sign-in is recorded without its username digest');
+        return null;
+    }
+    return hash_hmac('sha256', strtolower(trim($typed)), $key);
 }

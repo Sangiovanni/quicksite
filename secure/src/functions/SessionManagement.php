@@ -62,17 +62,33 @@ const QS_SESSION_COOKIE = 'QSSESSID';
 /**
  * The two notes the admin panel's account-creating forms leave in the visitor's
  * session for the login page. Each holds a username, and both end at the next
- * sign-in (qs_session_establish). They differ in what the login page does with
- * them before that:
+ * sign-in in that browser (qs_session_establish). They differ in what the login
+ * page does with them before that:
  *
  *   QS_REGISTER_FLASH — the username self-registration ASSIGNED. The person never
  *     chose it, so the login page shows it on every visit until a sign-in
- *     succeeds: a reload or a mistyped password must not lose the only copy.
+ *     succeeds: a reload or a mistyped password must not lose the only copy. It
+ *     also ends QS_REGISTER_FLASH_TTL after it was written, on a clock of its own
+ *     (QS_REGISTER_FLASH_AT, the time it was written): a sign-in made in another
+ *     browser cannot leave it showing indefinitely, and no visit makes it last
+ *     longer. See qs_register_note().
  *   QS_SETUP_FLASH — the username the first-run page created. The operator typed
  *     it, so the login page shows it once.
+ *
+ * Both are written into a session id minted for the purpose — the forms
+ * regenerate the id first — so no id that anyone held before can read one.
  */
-const QS_REGISTER_FLASH = 'qs_register_flash';
-const QS_SETUP_FLASH    = 'qs_setup_flash';
+const QS_REGISTER_FLASH    = 'qs_register_flash';
+const QS_REGISTER_FLASH_AT = 'qs_register_flash_at';
+const QS_SETUP_FLASH       = 'qs_setup_flash';
+
+/**
+ * How long the assigned-username note lives after the registration that wrote
+ * it: 24 hours. A convention, not a setting — long enough to come back to the
+ * login page later the same day, short enough that a browser someone walked away
+ * from stops showing it.
+ */
+const QS_REGISTER_FLASH_TTL = 86400;
 
 /**
  * Session knobs from auth.php (all optional, safe defaults).
@@ -180,6 +196,12 @@ function qs_session_boot(bool $forWrite): bool {
     // check below is what actually expires a session.
     ini_set('session.gc_maxlifetime', (string)max($knobs['idle_ttl'], $knobs['remember_ttl']));
     ini_set('session.use_strict_mode', '1'); // never adopt a caller-invented id
+    // The id travels in the cookie and nowhere else — pinned rather than taken
+    // from php.ini. A host that accepted ids from the URL would let a plain link
+    // hand a visitor a session its sender holds, and the sender would then read
+    // whatever the panel writes into it (the login page's notes, for one).
+    ini_set('session.use_only_cookies', '1');
+    ini_set('session.use_trans_sid', '0');
     session_name(QS_SESSION_COOKIE);
     session_set_cookie_params(qs_session_cookie_params(0));
 
@@ -304,11 +326,12 @@ function qs_session_establish(string $userId, int $generation, bool $remember): 
     session_regenerate_id(true); // fresh id on privilege change; old file deleted
 
     // A sign-in ends the login page's notes (see QS_REGISTER_FLASH), whichever
-    // door it comes through — the panel form or the `login` command. Regenerating
-    // the id carries $_SESSION over, so without this a signed-in session would
-    // keep a username it no longer needs, and would show it again on the login
-    // page if it later idled out instead of being signed out.
-    unset($_SESSION[QS_REGISTER_FLASH], $_SESSION[QS_SETUP_FLASH]);
+    // door it comes through — the panel form or the `login` command — as long as
+    // it carries this browser's session. Regenerating the id carries $_SESSION
+    // over, so without this a signed-in session would keep a username it no
+    // longer needs, and would show it again on the login page if it later idled
+    // out instead of being signed out.
+    unset($_SESSION[QS_REGISTER_FLASH], $_SESSION[QS_REGISTER_FLASH_AT], $_SESSION[QS_SETUP_FLASH]);
 
     $token = bin2hex(random_bytes(32));
     $_SESSION['qs_uid']      = $userId;
@@ -340,6 +363,42 @@ function qs_session_establish(string $userId, int $generation, bool $remember): 
     qs_session_sweep_maybe();
 
     return $token;
+}
+
+/**
+ * Leave the username self-registration assigned for this browser's login page,
+ * with the time it was written — the note's own clock (see QS_REGISTER_FLASH).
+ * The caller holds a write session whose id it has just regenerated.
+ */
+function qs_register_note_set(string $username): void {
+    $_SESSION[QS_REGISTER_FLASH]    = $username;
+    $_SESSION[QS_REGISTER_FLASH_AT] = time();
+}
+
+/**
+ * The username self-registration left for the login page, or '' when there is
+ * none to show.
+ *
+ * A note older than QS_REGISTER_FLASH_TTL is dropped here instead of shown, and
+ * so is one without a readable time — a note of unknown age is not shown. Its
+ * clock is the time written beside it, which nothing but a new registration
+ * rewrites: visiting the login page, however often, does not make it last
+ * longer. (The session FILE is re-dated by every visit that opens it for
+ * writing; only the store's sweep reads that date.)
+ */
+function qs_register_note(): string {
+    $username = $_SESSION[QS_REGISTER_FLASH] ?? null;
+    $written  = $_SESSION[QS_REGISTER_FLASH_AT] ?? null;
+    if (is_string($username) && $username !== ''
+        && is_int($written) && time() - $written <= QS_REGISTER_FLASH_TTL) {
+        return $username;
+    }
+    // Guarded: a visitor with no session has no $_SESSION at all, and on PHP 8.0
+    // an unset() of an offset on it raises an "undefined variable" warning.
+    if (isset($_SESSION[QS_REGISTER_FLASH]) || isset($_SESSION[QS_REGISTER_FLASH_AT])) {
+        unset($_SESSION[QS_REGISTER_FLASH], $_SESSION[QS_REGISTER_FLASH_AT]);
+    }
+    return '';
 }
 
 /**
@@ -658,10 +717,13 @@ function qs_session_sweep_maybe(): void {
 // ============================================================================
 // Login throttle (brute-force backoff) — a small state file with flock +
 // temp/rename discipline. Keyed by sha256 of the lowercased login identifier
-// (the USERNAME): the raw identifier never sits in the state file.
+// (the USERNAME): the raw identifier never sits in the state file. A plain
+// digest, so it hides a name from a glance, not from enumeration — the file's
+// reader is whoever can already read users.php.
 //
 // Independent of the session model: this is what makes password guessing
-// expensive, and it is consulted before any credential is checked.
+// expensive, and every attempt is admitted through it before any credential is
+// checked.
 // ============================================================================
 
 /** Hash a throttle key. Keys are identifiers and IPs — never stored in clear. */
@@ -674,24 +736,17 @@ function qs_login_throttle_path(): string {
 }
 
 /**
- * Seconds the caller must still wait before another attempt for this login
- * identifier (0 = go ahead). Read-only.
- */
-function qs_login_throttle_check(string $identifier): int {
-    $path = qs_login_throttle_path();
-    $data = is_file($path) ? json_decode((string)@file_get_contents($path), true) : null;
-    if (!is_array($data)) {
-        return 0;
-    }
-    $entry = $data[qs_throttle_hash(strtolower($identifier))] ?? null;
-    if (!is_array($entry)) {
-        return 0;
-    }
-    return max(0, (int)($entry['until'] ?? 0) - time());
-}
-
-/**
- * Shared mutate for the throttle file. $fn(array &$data): mixed.
+ * Shared mutate for the throttle file. $fn(array &$data): mixed — return false
+ * to leave the file untouched (nothing to record).
+ *
+ * EVERY READ OF THIS STORE HAPPENS HERE, under its lock, refusals included. A
+ * reader outside the lock holds the file open while a writer swaps it, and on
+ * Windows a rename cannot replace a file another process has open: the swap
+ * fails, the attempt it was counting goes unrecorded, and the next attempt is
+ * admitted as if it had never happened — which is how a burst gets through.
+ * (Measured on both interpreters: against one process looping on reads, most
+ * swaps fail; with no outside reader, none.) A swap that still fails — an
+ * antivirus scan holding the file — is retried once, as the users.php writer's is.
  */
 function qs_login_throttle_mutate(callable $fn) {
     $path = qs_login_throttle_path();
@@ -706,6 +761,9 @@ function qs_login_throttle_mutate(callable $fn) {
             $data = [];
         }
         $result = $fn($data);
+        if ($result === false) {
+            return false;
+        }
         // prune entries idle for a day
         $cutoff = time() - 86400;
         foreach ($data as $key => $entry) {
@@ -716,14 +774,21 @@ function qs_login_throttle_mutate(callable $fn) {
         $tmp = $path . '.tmp' . getmypid();
         // Encode checked separately from the write: `false . ''` writes an EMPTY
         // file and file_put_contents returns 0, not false, so a check on the
-        // write alone lets a failed encode truncate the store (C11 11.3). This
-        // file holds only hashed keys and integers, so nothing unrepresentable
-        // can reach it today — checked because a throttle store that silently
-        // emptied itself would disable brute-force protection without a trace.
+        // write alone lets a failed encode truncate the store. This file holds
+        // only hashed keys and integers, so nothing unrepresentable can reach it
+        // today — checked because a throttle store that silently emptied itself
+        // would disable brute-force protection without a trace.
         $json = json_encode($data, JSON_PRETTY_PRINT);
-        if ($json === false || file_put_contents($tmp, $json) === false || !@rename($tmp, $path)) {
+        if ($json === false || file_put_contents($tmp, $json) === false) {
             @unlink($tmp);
             return false;
+        }
+        if (!@rename($tmp, $path)) {
+            usleep(50000);
+            if (!@rename($tmp, $path)) {
+                @unlink($tmp);
+                return false;
+            }
         }
         return $result;
     } finally {
@@ -733,25 +798,51 @@ function qs_login_throttle_mutate(callable $fn) {
 }
 
 /**
- * Record a failed attempt: 5 free tries, then a doubling cooldown
- * (30s, 60s, 120s, … capped at 1h).
+ * Admit one attempt for this login identifier, counting it — in ONE locked
+ * step, before any credential is checked. Returns 0 when the attempt may go
+ * ahead (it is already counted as a failure), or the seconds the caller must
+ * still wait (nothing counted).
+ *
+ * 5 free attempts, then a doubling cooldown (30s, 60s, 120s, … capped at 1h),
+ * started by the attempt that crosses the line — which is itself admitted.
+ *
+ * WHY COUNT FIRST. A throttle that reads the count, checks the password, and
+ * only then records the failure lets through every request that arrives while
+ * the others are still checking: K simultaneous guesses are K verifications,
+ * whatever the count said. Counted under the store's lock before anything is
+ * verified, each attempt sees the ones admitted before it, so a burst gets the
+ * attempts that remain and no more. A success gives its attempt back — and
+ * every earlier one — through qs_login_throttle_clear().
+ *
+ * A refusal is decided under the same lock and writes nothing (see
+ * qs_login_throttle_mutate for why no read of this store may happen outside
+ * it). A store that cannot be read or written admits the attempt: a broken
+ * throttle file must not lock every account out.
  */
-function qs_login_throttle_fail(string $identifier): void {
-    $key = qs_throttle_hash(strtolower($identifier));
-    qs_login_throttle_mutate(function (array &$data) use ($key) {
-        $now = time();
-        $fails = (int)(($data[$key]['fails'] ?? 0)) + 1;
-        $entry = ['fails' => $fails, 'last' => $now, 'until' => 0];
-        if ($fails >= 5) {
-            $entry['until'] = $now + min(3600, 30 * (2 ** ($fails - 5)));
+function qs_login_throttle_admit(string $identifier): int {
+    $key  = qs_throttle_hash(strtolower($identifier));
+    $wait = 0; // set inside the lock; the mutate's own return is not needed
+    qs_login_throttle_mutate(function (array &$data) use ($key, &$wait) {
+        $now   = time();
+        $entry = is_array($data[$key] ?? null) ? $data[$key] : [];
+        $wait  = max(0, (int)($entry['until'] ?? 0) - $now);
+        if ($wait > 0) {
+            return false; // refused: nothing to record
         }
-        $data[$key] = $entry;
+        $fails = (int)($entry['fails'] ?? 0) + 1;
+        $data[$key] = [
+            'fails' => $fails,
+            'last'  => $now,
+            'until' => $fails >= 5 ? $now + min(3600, 30 * (2 ** ($fails - 5))) : 0,
+        ];
         return true;
     });
+    return $wait;
 }
 
 /**
- * Successful login clears the identifier's counter.
+ * A successful attempt clears the identifier's counter: its own admitted
+ * attempt and every failure before it.
  */
 function qs_login_throttle_clear(string $identifier): void {
     $key = qs_throttle_hash(strtolower($identifier));
@@ -803,8 +894,14 @@ function qs_registration_throttle_path(): string {
 }
 
 /**
- * Shared mutate for the registration-throttle file. $fn(array &$data): mixed.
+ * Shared mutate for the registration-throttle file. $fn(array &$data): mixed —
+ * return false to leave the file untouched (nothing to record).
  * Shape: ['ips' => [sha256(ip) => {minute, count, last}], 'global' => {hour, count}]
+ * — `global.count` is this hour's successful registrations plus the ones still
+ * in flight (see qs_registration_throttle_admit).
+ *
+ * Every read of this store happens here, under its lock, and a failed swap is
+ * retried once — both for the reason qs_login_throttle_mutate gives.
  */
 function qs_registration_throttle_mutate(callable $fn) {
     $path = qs_registration_throttle_path();
@@ -821,6 +918,9 @@ function qs_registration_throttle_mutate(callable $fn) {
         $data['ips'] = is_array($data['ips'] ?? null) ? $data['ips'] : [];
         $data['global'] = is_array($data['global'] ?? null) ? $data['global'] : [];
         $result = $fn($data);
+        if ($result === false) {
+            return false;
+        }
         // prune IP entries idle for an hour (their minute window is long over)
         $cutoff = time() - 3600;
         foreach ($data['ips'] as $key => $entry) {
@@ -832,9 +932,16 @@ function qs_registration_throttle_mutate(callable $fn) {
         // Encode checked before the write — see qs_login_throttle_mutate above.
         // Hashed IP keys and integers only, so unreachable; consistent anyway.
         $json = json_encode($data, JSON_PRETTY_PRINT);
-        if ($json === false || file_put_contents($tmp, $json) === false || !@rename($tmp, $path)) {
+        if ($json === false || file_put_contents($tmp, $json) === false) {
             @unlink($tmp);
             return false;
+        }
+        if (!@rename($tmp, $path)) {
+            usleep(50000);
+            if (!@rename($tmp, $path)) {
+                @unlink($tmp);
+                return false;
+            }
         }
         return $result;
     } finally {
@@ -844,62 +951,72 @@ function qs_registration_throttle_mutate(callable $fn) {
 }
 
 /**
- * Seconds the caller must wait before another registration attempt
- * (0 = go ahead). Read-only. Checks the per-IP minute window, then the
- * install-wide hourly cap of SUCCESSFUL registrations.
+ * Admit one registration, counting it — in ONE locked step, for the reason
+ * qs_login_throttle_admit gives: a check that only reads, followed by writes
+ * made later, lets every simultaneous request through. Returns 0 when admitted,
+ * or the seconds the caller must wait (nothing counted). Checks the per-IP
+ * minute window, then the install-wide hourly cap.
+ *
+ * Admitting does two things. It counts the attempt against the caller's IP —
+ * every attempt counts, whether or not it creates an account. And it RESERVES a
+ * place in the hourly cap, which counts successful registrations only: a
+ * registration that ends without creating an account hands its place back
+ * (qs_registration_throttle_release), so a burst of failed attempts never fills
+ * the hour for everyone else, while registrations still in flight already hold
+ * theirs. $hour receives the window the place was reserved in (null when
+ * nothing was).
+ *
+ * A refusal is decided under the store's lock and writes nothing, and a store
+ * that cannot be read or written admits — both as in qs_login_throttle_admit.
  */
-function qs_registration_throttle_check(array $cfg): int {
-    $path = qs_registration_throttle_path();
-    $data = is_file($path) ? json_decode((string)@file_get_contents($path), true) : null;
-    if (!is_array($data)) {
-        return 0;
-    }
-    $now = time();
-    if ($cfg['per_ip_per_minute'] > 0) {
-        $entry = $data['ips'][qs_throttle_hash(qs_client_ip())] ?? null;
-        if (is_array($entry)
-            && (int)($entry['minute'] ?? -1) === intdiv($now, 60)
-            && (int)($entry['count'] ?? 0) >= $cfg['per_ip_per_minute']) {
-            return 60 - ($now % 60);
+function qs_registration_throttle_admit(array $cfg, ?int &$hour = null): int {
+    $hour  = null;
+    $ipKey = qs_throttle_hash(qs_client_ip());
+    $wait  = 0; // set inside the lock
+    $written = qs_registration_throttle_mutate(function (array &$data) use ($cfg, $ipKey, &$wait, &$hour) {
+        $now       = time();
+        $minute    = intdiv($now, 60);
+        $thisHour  = intdiv($now, 3600);
+        $ip        = $data['ips'][$ipKey] ?? null;
+        $ipCount   = (is_array($ip) && (int)($ip['minute'] ?? -1) === $minute) ? (int)($ip['count'] ?? 0) : 0;
+        $hourCount = ((int)($data['global']['hour'] ?? -1) === $thisHour) ? (int)($data['global']['count'] ?? 0) : 0;
+        if ($cfg['per_ip_per_minute'] > 0 && $ipCount >= $cfg['per_ip_per_minute']) {
+            $wait = 60 - ($now % 60);
+            return false; // refused: nothing to record
         }
-    }
-    if ($cfg['global_per_hour'] > 0) {
-        $global = $data['global'] ?? null;
-        if (is_array($global)
-            && (int)($global['hour'] ?? -1) === intdiv($now, 3600)
-            && (int)($global['count'] ?? 0) >= $cfg['global_per_hour']) {
-            return 3600 - ($now % 3600);
+        if ($cfg['global_per_hour'] > 0 && $hourCount >= $cfg['global_per_hour']) {
+            $wait = 3600 - ($now % 3600);
+            return false;
         }
-    }
-    return 0;
-}
-
-/**
- * Record a registration ATTEMPT against the caller's IP (fixed minute window).
- * Every attempt counts, whether or not it creates an account.
- */
-function qs_registration_throttle_attempt(): void {
-    $key = qs_throttle_hash(qs_client_ip());
-    qs_registration_throttle_mutate(function (array &$data) use ($key) {
-        $now = time();
-        $minute = intdiv($now, 60);
-        $entry = $data['ips'][$key] ?? null;
-        $count = (is_array($entry) && (int)($entry['minute'] ?? -1) === $minute) ? (int)($entry['count'] ?? 0) : 0;
-        $data['ips'][$key] = ['minute' => $minute, 'count' => $count + 1, 'last' => $now];
+        $data['ips'][$ipKey] = ['minute' => $minute, 'count' => $ipCount + 1, 'last' => $now];
+        $data['global']      = ['hour' => $thisHour, 'count' => $hourCount + 1];
+        $hour = $thisHour;
         return true;
     });
+    if ($written !== true) {
+        // Refused, or admitted without the store being written: either way no
+        // place is on disk, so there is none to hand back — releasing one here
+        // would take back a real registration's.
+        $hour = null;
+    }
+    return $wait;
 }
 
 /**
- * Record a SUCCESSFUL registration against the install-wide hourly cap.
- * Only real creations count — a burst of failed attempts must not fill the
- * global window and lock legitimate users out.
+ * Hand back the hourly place qs_registration_throttle_admit reserved, because
+ * the registration created no account. A place reserved in an hour that has
+ * since turned is left alone: that window is over, and the new one never held
+ * it. The IP count is not handed back — every attempt counts.
  */
-function qs_registration_record_success(): void {
-    qs_registration_throttle_mutate(function (array &$data) {
-        $hour = intdiv(time(), 3600);
-        $count = ((int)($data['global']['hour'] ?? -1) === $hour) ? (int)($data['global']['count'] ?? 0) : 0;
-        $data['global'] = ['hour' => $hour, 'count' => $count + 1];
+function qs_registration_throttle_release(?int $hour): void {
+    if ($hour === null) {
+        return;
+    }
+    qs_registration_throttle_mutate(function (array &$data) use ($hour) {
+        if ((int)($data['global']['hour'] ?? -1) !== $hour || (int)($data['global']['count'] ?? 0) <= 0) {
+            return false; // that window is over, or holds nothing to hand back
+        }
+        $data['global']['count'] = (int)$data['global']['count'] - 1;
         return true;
     });
 }

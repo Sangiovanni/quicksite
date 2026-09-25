@@ -10,8 +10,9 @@
  * the server assigns the username, and the form says so before it is submitted.
  *
  * On success the user is sent to the login page, which shows the assigned
- * username until a sign-in succeeds — no auto-login (the login page is the
- * single session-establishing point).
+ * username until a sign-in succeeds in this browser, for QS_REGISTER_FLASH_TTL
+ * at most — no auto-login (the login page is the single session-establishing
+ * point).
  */
 
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
@@ -157,7 +158,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                          shown. */ ?>
                 <div class="admin-alert admin-alert--warning">
                     <strong><?= __admin('register.usernameNotice.title') ?></strong>
-                    <p><?= __admin('register.usernameNotice.body') ?></p>
+                    <p><?= __admin('register.usernameNotice.body', ['hours' => intdiv(QS_REGISTER_FLASH_TTL, 3600)]) ?></p>
                 </div>
 
                 <button type="submit" class="admin-btn admin-btn--primary admin-btn--lg admin-btn--block">

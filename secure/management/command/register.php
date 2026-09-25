@@ -4,12 +4,11 @@
  *
  * Self-registration: creates a user account from a public display name + a
  * password. The caller does not choose the private username — the server assigns
- * one and returns it in this response, which is the only place it is handed out
- * before the account's first sign-in. PUBLIC + self-gating (listed in the
- * dispatcher's $PUBLIC_COMMANDS) — the command enforces the auth.php
- * `registration.allow_self_registration` flag SERVER-SIDE (default: disabled)
- * plus the registration flood controls (per-IP rate, install-wide hourly cap,
- * absolute account cap).
+ * one and returns it in this response, the only place any command hands it out.
+ * PUBLIC + self-gating (listed in the dispatcher's $PUBLIC_COMMANDS) — the
+ * command enforces the auth.php `registration.allow_self_registration` flag
+ * SERVER-SIDE (default: disabled) plus the registration flood controls (per-IP
+ * rate, install-wide hourly cap, absolute account cap).
  *
  * No session and no user id are returned; the new user signs in through `login`
  * with the username this response names. A `username` sent in the body is
@@ -17,8 +16,9 @@
  *
  * This command CANNOT create the first account on an install. While the user
  * registry is empty, the shared mint path requires the first-run setup token
- * (which this command never supplies) and the response is
- * `auth.setup_required` — see the first-run page at /admin/.
+ * (which this command never supplies), so the response is `auth.setup_required`
+ * — or, while self-registration is off, the flag's own `auth.registration_disabled`,
+ * which answers first. See the first-run page at /admin/.
  *
  * @method POST
  * @route /management/register
@@ -84,12 +84,12 @@ function __command_register(array $params = [], array $urlParams = []): ApiRespo
         (string)$attempt['userId']
     );
 
-    // The caller learns the username here and nowhere else until the account
-    // first signs in, so the message says so.
+    // The caller learns the username here and nowhere else, ever — `login` does
+    // not repeat it — so the message says so.
     $username = (string)$attempt['username'];
     return ApiResponse::create(200, 'operation.success')
         ->withMessage('Account registered. Your username is ' . $username
-            . ' — you sign in with it. It is private: save it now, because nothing gives it out again until you have signed in.')
+            . ' — you sign in with it. It is private: save it now, because nothing gives it out again.')
         ->withData(['registered' => true, 'username' => $username]);
 }
 

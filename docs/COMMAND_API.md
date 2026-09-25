@@ -67,7 +67,7 @@ The `help` endpoint is publicly accessible, takes no token, and is the contract 
 - Session lifetimes (`idle_ttl` — inactivity before a session stops being accepted, slid forward as the caller works; `remember_ttl` — how long a "remember me" cookie survives a browser restart; `sweep_divisor` — the 1-in-N chance that a login also tidies the session store, 0 to never) and the registration policy (`allow_self_registration`, `min_password_length`, `max_users`, `throttle.per_ip_per_minute`, `throttle.global_per_hour` — 0 disables a limit) live in `<secure>/management/config/auth.php` (gitignored, auto-created from `.example`). Sessions are PHP's own, written under `<secure>/tmp/sessions` rather than the shared system path so another application on the same host cannot garbage-collect them out from under a working user. QuickSite tidies that directory itself, on its own idle rule — after a login on the die above, or on demand with `php <secure>/cli/session-sweep.php` (add `--dry-run` to see what would go). It is a script and not a command because clearing the session store is installation-wide, and every permission here is per project.
 - Presenting a `QSSESSID` that names no session gets no session: the call is answered as an anonymous one and no new cookie is set. A client that discards cookies therefore has to log in again rather than being handed a fresh empty session on every request.
 - Authorization is **per project**: a user's role comes from the target project's `config/members.json`. The six fixed roles (`viewer` … `owner`) are defined by trust-coherent command **categories** in `categories.php`; `roles.php` grants each role a `rank` and its categories, expanded to a per-command allowlist at load time. There is no superadmin and no custom roles.
-- There is **no default account and no default password**. While no account exists, every admin URL shows a first-run page that creates the first one. It asks for a **setup token**, which the engine writes to `<secure>/management/config/setup-token.txt` — being able to read that file is the authorisation, so no command line is needed. The token is destroyed on use and the page disappears permanently once an account exists. The requirement is enforced at the shared account-creation path, not in the page: while the registry is empty, `register` cannot create an account either (403 `auth.setup_required`), whatever `allow_self_registration` says. To bootstrap by hand instead, copy `users.php.example` to `users.php` and follow the instructions in that file.
+- There is **no default account and no default password**. While no account exists, every admin URL shows a first-run page that creates the first one. It asks for a **setup token**, which the engine writes to `<secure>/management/config/setup-token.txt` — being able to read that file is the authorisation, so no command line is needed. The token is destroyed on use and the page disappears permanently once an account exists. The requirement is enforced at the shared account-creation path, not in the page: while the registry is empty, `register` cannot create an account either — it answers 403 `auth.registration_disabled` while `allow_self_registration` is off, and 403 `auth.setup_required` while it is on. To bootstrap by hand instead, copy `users.php.example` to `users.php` and follow the instructions in that file.
 
 ## Response shape
 
@@ -695,7 +695,9 @@ failing to sign in, signing out, creating an account, changing a password,
 deleting an account, and joining or leaving a project. Two of those cannot reach
 the command log even in principle — `login` and `register` answer before the
 dispatcher installs its logging callback — and the rest are served from
-`/admin/self`, which is not the command surface at all.
+`/admin/self`, which is not the command surface at all. The admin panel's own
+sign-in, sign-out, registration and first-run forms are not commands either, and
+each writes the same event, with the same detail, as the command it stands beside.
 
 They are written to an installation-wide trail of their own:
 
@@ -706,10 +708,10 @@ They are written to an installation-wide trail of their own:
 | Event | Written when |
 |---|---|
 | `auth.signin_success` | A sign-in succeeded. Records whether a "remember me" session was created; never the session token. |
-| `auth.signin_failure` | A sign-in was refused. Records the username that was tried and whether the refusal was the throttle — never the password, and never whether the username exists. |
+| `auth.signin_failure` | A sign-in was refused. Records a keyed digest of the username that was tried — never the username itself, so a password typed into that field never reaches the file either — and whether the refusal was the throttle; never the password, and never whether the username exists. |
 | `auth.signout` | A session was ended, and whether every other session of the account went with it. |
 | `auth.unauthenticated_request` | A call arrived at the API without a usable session. Records the command that was reached for, which is unvalidated — it is what the caller typed. |
-| `account.created` | Self-registration created an account. |
+| `account.created` | An account was created. `via` says how: `self_registration` (the `register` command or the register page) or `first_run` (the first-run page). |
 | `account.password_changed` | A password was changed through the panel. |
 | `account.deleted` | An account was deleted. Written before the record is gone, so it is the only remaining trace that it existed. |
 | `membership.changed` | An invitation was accepted or declined, or a member left a project. Asking to join, withdrawing a request and dismissing a notice grant nothing and are not recorded. |
@@ -721,6 +723,13 @@ redaction the command log applies, so a password, a token or a session id cannot
 reach the file even if a caller submits one. A record that cannot be written
 never fails the request it describes: the sign-in still succeeds or fails on its
 own merits, and the failure to log goes to the server error log.
+
+The digest a refused sign-in records is an HMAC keyed with a per-install secret,
+`<secure>/management/config/security-trail-key.txt`, which the engine writes the
+first time it needs it and never regenerates; it is gitignored like the other
+secrets beside it. Repeated failures against one name share one digest, but nobody
+without that file can test a guess against it — so keep it out of wherever the
+trail's files are copied.
 
 **No command reads this trail**, and none is planned. It is installation-wide,
 and authority in QuickSite is per project — no role could be entitled to it. The
