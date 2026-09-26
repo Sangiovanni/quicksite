@@ -11625,3 +11625,109 @@ two patterns only a field name kept alive, the `String.php` helpers, the media r
 and CSS whitespace. `secure/src/classes/RegexPatterns.php`,
 `secure/src/functions/String.php`; the consumers whose accepted values changed are
 `secure/management/command/addLang.php`, `setKeyframes.php` and `setStyleRule.php`.
+
+### An export carries the project's snippets; every file the site reads refuses a broken archive whole, and may show a PHP opening tag (locked 2026-09-25)
+
+**Amends**: *An import refuses a broken structure whole, never a project with a hole
+in it* (locked 2026-09-18), *What may be imported and what may be published are
+allowlists, not blocklists* (locked 2026-07-30), and *The PHP-block rule is
+class-dependent, because the pattern is noise in binary* (locked 2026-08-23). Their
+decisions stand; what moves is stated below rather than rewritten there.
+
+**Decision**: five changes to how a project travels between installations, made
+together.
+
+- **An export carries the project's own snippets.** `exportProject` adds the
+  project's `snippets/` folder, JSON only, beside its structures, translations and
+  data. The import already accepted snippets and checks each one as a structure. A
+  personal snippet belongs to its author, not to the project, and does not travel.
+- **Every entry in the project folder must have a clean relative name**, or the
+  whole archive is refused before any project is created: not absolute, no NUL byte,
+  and no segment that is empty, `.` or `..`, or ends in a dot or a space. The answer is
+  `400 validation.unsafe_param` with the reason `unsafe_path`. That includes a name
+  that walks out of the project with `..`, which used to be skipped while the rest
+  imported.
+- **Every file the site reads refuses the whole archive when it cannot be used**,
+  not only a structure file. Those files are `config.json` and `routes.json` at the
+  project root, from which the import rebuilds the project's settings and routes;
+  every `.json` file under `config/`, `translate/` and `data/`; and every structure
+  file. Each must be readable, decode to a JSON array or object and pass the content
+  check, and a failure answers the way a structure failure does, `invalid_json` or
+  `disallowed_content`. The attribute, tag and component-reference checks stay with
+  structure files. Files under `public/` — what a web server serves — and files the
+  site never reads keep the per-entry rule: skipped, reported, and the rest imports.
+- **A file at a hidden path is not one the site reads**, under the structure folders
+  too. The import never writes a hidden path, so nothing there is read and its
+  content is not checked: it is skipped and reported like any hidden path. The
+  2026-09-18 entry's "any `.json` file under `templates/model/json/` or `snippets/`"
+  no longer includes it.
+- **The files the site reads are exempt from the rule that text may not open a PHP
+  block.** A page, snippet, translation, data file or setting may show `<?php` in its
+  text. Every other text file keeps the rule, everything under `public/` included.
+  An exempt file must still parse, and the content check's file-type detection still
+  runs on it.
+
+**Reasoning**: the round trip is the test of an export — what goes out must come
+back. Snippets did not. The editor's Save as Snippet writes to the project by
+default, so every export lost them, and an import that accepted snippets never
+received one.
+
+The import checks an entry by its name and writes it where the filesystem resolves
+that name. The two disagree when one place has several spellings:
+`templates//model/json/…` is the real page path on every system, and on Windows
+`templates./…` can be too, yet neither spelling starts with `templates/model/json/`.
+A crafted archive could therefore store a page past every structure check, or have a
+malformed one silently skipped — the hole the 2026-09-18 entry closed, reopened by
+spelling. Refusing every name but the one clean spelling closes it without teaching
+the import how each filesystem resolves names, and an export never writes another
+shape, so the rule costs an export nothing. Refusing the archive, rather than
+skipping the entry, keeps the promise that an import brings the whole site or
+nothing. One spelling stays open, on Windows alone: an NTFS short-name alias such as
+`TEMPLA~1` still resolves to the real folder. Closing it would take Windows-specific
+machinery, and the renderer still refuses a tag smuggled that way.
+
+A broken translation or routes file is the same hole as a broken page. A skipped
+translation leaves a whole language showing raw keys; a skipped `routes.json` left
+the project with a single route, and a skipped `config.json` replaced its name and
+languages with the defaults, behind a response that reported success. Those files are
+the site as much as its pages are. A file at a hidden path is the opposite case: the
+site never reads it, so checking it could only refuse an archive over tooling
+leftovers.
+
+The rule against a PHP opening tag in text exists for files a web server may serve,
+where the tag could execute on a host that runs PHP for more than `.php` files. The
+files the site reads are never served — a web server reaches only a project's
+`public/` — and their values reach PHP only as data. That was verified before the
+exemption, on every path where project JSON becomes PHP source: the import rebuilds
+`config.php` and `routes.php` with `var_export`, the page wrapper is a fixed template
+that takes nothing from the page, and a build compiles pages, menus, footers,
+components, page events and state stores into string literals, or into tag and
+attribute names restricted to letters, digits and a few punctuation marks. An archive
+in which every value held `?>`, `<?php`, quotes, `$`, comment markers and a heredoc
+opener was imported and built, and every generated file had the same token structure
+as the same archive with plain words in those places. Meanwhile the editor accepts
+`<?php` in an attribute value, so the rule made a page about PHP code exportable but
+never importable again.
+
+**Alternatives considered**: skip an entry whose name is not clean and import the rest
+(rejected — a page spelled that way still goes missing, only reported). Resolve each
+name the way the filesystem would and check the result (rejected — it needs
+per-system knowledge of how names resolve, Windows' trailing dots and short names
+among it; a rule on the string needs none). Widen the whole-archive rule to
+every refused entry, a stray asset included (still rejected, as on 2026-09-18: one
+unwanted file is not site corruption). Keep checking JSON at hidden paths (rejected —
+see above). Exempt every JSON file outside `public/` from the tag rule (rejected — the
+exemption follows the files the site reads, whose paths into PHP were verified; a file
+nothing reads gains nothing from it). Refuse `<?php` in the editor instead (rejected —
+a page that shows PHP code is legitimate content, escaped wherever it is rendered). A
+response code per reason (rejected, as before: `reason` says which check failed).
+
+**Source**: Sangio's rulings, 2026-09-25 — the exemption and the whole-archive rule for
+every file the site reads, then his answers the same day on unclean names, hidden
+paths and the root `config.json` and `routes.json`.
+`secure/management/command/exportProject.php`,
+`secure/management/command/importProject.php` (`importEntryRelativePath`,
+`importEntryNameRefusal`, `importStructureKind`, `importIsSiteData`,
+`importFirstStructureFailure`), `secure/src/functions/filePolicy.php`
+(`qs_import_validate_content`). Behaviour: [COMMAND_API.md](COMMAND_API.md)
+(*Export / Import*, *Archive import limits*).

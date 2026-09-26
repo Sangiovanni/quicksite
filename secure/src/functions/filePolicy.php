@@ -425,10 +425,19 @@ function qs_policy_has_php_open_tag(string $content): bool
  *
  * What is enforceable, and what each class actually gets:
  *
- *   TEXT class   — may never open a PHP block, full stop. The pattern is
- *                  exact here: the long form, the echo shorthand and the bare
- *                  short tag all execute on a server with short_open_tag, and
- *                  finfo reports only the first as text/x-php.
+ *   TEXT class   — may never open a PHP block. The pattern is exact here: the
+ *                  long form, the echo shorthand and the bare short tag all
+ *                  execute on a server with short_open_tag, and finfo reports
+ *                  only the first as text/x-php. The one exemption is JSON the
+ *                  caller has established is NEVER SERVED ($neverServed) — a
+ *                  project's own data, which no web server reaches and which the
+ *                  engine writes into generated PHP only as string literals. In
+ *                  it a PHP opening tag is text a page shows (a site about PHP),
+ *                  and refusing it would make such a project exportable but never
+ *                  importable again. It must still parse, and detection (rule 2)
+ *                  still runs: valid JSON cannot begin with a tag, and finfo was
+ *                  measured to report it as application/json with a tag at
+ *                  every offset tried, on PHP 8.0 and on 8.4.
  *   BINARY class — must satisfy its signature (if one is known), must not be
  *                  detected as text, and — if it DOES look like it opens a PHP
  *                  block — must additionally be detected as a named binary
@@ -445,9 +454,13 @@ function qs_policy_has_php_open_tag(string $content): bool
  * the file is served as the image it is. Refusing it would mean refusing real
  * user content, which is the worse failure.
  *
+ * @param bool $neverServed true when the caller has established that the entry is
+ *                          JSON no web server serves — importProject's site data
+ *                          (importIsSiteData()). It lifts the PHP-block rule for
+ *                          that JSON and nothing else.
  * @return array{ok:bool, reason:string, content:string}
  */
-function qs_import_validate_content(string $path, string $content): array
+function qs_import_validate_content(string $path, string $content, bool $neverServed = false): array
 {
     $ext  = qs_policy_extension($path);
     $deny = static fn(string $why): array => ['ok' => false, 'reason' => $why, 'content' => ''];
@@ -516,8 +529,9 @@ function qs_import_validate_content(string $path, string $content): array
         }
     }
 
-    // 3. The PHP-block rule, per class (see the note above this function).
-    if (qs_policy_has_php_open_tag($content)) {
+    // 3. The PHP-block rule, per class (see the note above this function), and
+    //    not for never-served JSON — the text class's one exemption.
+    if (qs_policy_has_php_open_tag($content) && !($neverServed && $ext === 'json')) {
         if ($isText) {
             return $deny("content opens a PHP block but is named .{$ext}");
         }

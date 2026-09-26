@@ -10,6 +10,7 @@
  * - routes.json (from routes.php)
  * - config/*.json (project settings: route-layout, etc.)
  * - templates/model/json/ (JSON structures only)
+ * - snippets/ (the project's own snippets)
  * - translate/*.json
  * - data/*.json
  * - public/assets/, public/style/
@@ -139,19 +140,28 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
             addDirectoryToZip($zip, $jsonModelPath, $projectName . '/templates/model/json', $stats);
         }
         
-        // 5. Export translate/*.json
+        // 5. Export snippets/ — the project's own snippets, the tier the editor's
+        // Save as Snippet writes to by default. Without them an export → import
+        // round trip loses them. (A personal snippet belongs to its author, not
+        // to the project, and never travels.)
+        $snippetsPath = $projectPath . '/snippets';
+        if (is_dir($snippetsPath)) {
+            addJsonFilesOnly($zip, $snippetsPath, $projectName . '/snippets', $stats);
+        }
+        
+        // 6. Export translate/*.json
         $translatePath = $projectPath . '/translate';
         if (is_dir($translatePath)) {
             addJsonFilesOnly($zip, $translatePath, $projectName . '/translate', $stats);
         }
         
-        // 6. Export data/*.json
+        // 7. Export data/*.json
         $dataPath = $projectPath . '/data';
         if (is_dir($dataPath)) {
             addJsonFilesOnly($zip, $dataPath, $projectName . '/data', $stats);
         }
         
-        // 7. Export public/ (assets only, no PHP)
+        // 8. Export public/ (assets only, no PHP)
         if ($includePublic) {
             $publicPath = $projectPath . '/public';
             if (is_dir($publicPath)) {
@@ -159,7 +169,7 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
             }
         }
         
-        // 8. Add metadata file
+        // 9. Add metadata file
         $metadata = createExportMetadata($projectName, $projectPath, $stats);
         $zip->addFromString($projectName . '/export_info.json', json_encode($metadata, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         $stats['files']++;

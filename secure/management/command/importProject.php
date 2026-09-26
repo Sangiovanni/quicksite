@@ -6,7 +6,7 @@
  * PHP files in the ZIP are IGNORED - all PHP is rebuilt from JSON structures.
  * 
  * Security measures:
- * - PHP files in ZIP are skipped (logged as warnings)
+ * - PHP files in ZIP are refused by the extension allowlist (listed in the response)
  * - config.php rebuilt from validated config.json
  * - routes.php rebuilt from validated routes.json
  * - Page PHP wrappers rebuilt from JSON using JsonToHtmlRenderer (dev mode)
@@ -265,17 +265,20 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
             ]);
     }
     
-    // Every structure the archive would bring in — pages, components, menu,
-    // footer, snippets — is checked before the project directory exists, and the
-    // first one that fails refuses the WHOLE import: a file that cannot be read,
-    // does not parse, or is refused by the archive content check, and one that
-    // carries an unsafe attribute, a blocked tag or an invalid component
-    // reference. Importing the rest would ship a project with a hole in it — the
-    // dropped page's route survives and 404s. A refused import creates nothing.
-    $structureFailure = importFirstStructureFailure($zip, $projectFolder['prefix']);
-    if ($structureFailure !== null) {
+    // Every entry's name, and every file the site is read from — pages,
+    // components, menu, footer, snippets, settings, routes, translations, data —
+    // is checked before the project directory exists, and the first one that
+    // fails refuses the WHOLE import: a name that is not a clean relative path, a
+    // file that cannot be read, does not parse, or is refused by the archive
+    // content check, and a structure that carries an unsafe attribute, a blocked
+    // tag or an invalid component reference. Importing the rest would ship a
+    // project with a hole in it — a dropped page's route survives and 404s, a
+    // dropped translation leaves a language showing raw keys. A refused import
+    // creates nothing.
+    $archiveFailure = importFirstStructureFailure($zip, $projectFolder['prefix']);
+    if ($archiveFailure !== null) {
         $zip->close();
-        return qs_unsafe_structure_param_response($structureFailure);
+        return qs_unsafe_structure_param_response($archiveFailure);
     }
 
     // Create project directory structure
@@ -386,14 +389,17 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
         'security' => [
             'format' => 'v2.0-secure',
             'php_rebuilt_from_json' => true,
-            // Entries refused by the zip-slip containment guard (path escape attempts).
+            // Entries whose folder the filesystem would not create (a reserved
+            // device name on Windows, say). An entry whose NAME escapes the
+            // project, or is not a clean relative path, never gets this far:
+            // importFirstStructureFailure() refuses the whole archive for it.
             'skipped_unsafe_paths' => count($stats['skipped_unsafe']),
             'skipped_unsafe' => $stats['skipped_unsafe'],
-            // Entries refused by the extension allowlist or by content validation.
-            // Reported rather than fatal: one stray file must not block an
-            // otherwise legitimate import, but it must never be silent. A
-            // structure file is never listed here — importFirstStructureFailure()
-            // refuses the whole archive for it instead.
+            // Entries refused by the hidden-path rule, the extension allowlist or
+            // content validation. Reported rather than fatal: one stray file must
+            // not block an otherwise legitimate import, but it must never be
+            // silent. A file the site reads is never listed here —
+            // importFirstStructureFailure() refuses the whole archive for it instead.
             'skipped_disallowed_files' => count($stats['skipped_disallowed']),
             'skipped_disallowed' => $stats['skipped_disallowed'],
             'membership' => 'archive members.json discarded; importer set as sole owner'
@@ -549,55 +555,42 @@ function findProjectFolderInZip(ZipArchive $zip): ?array {
  * Extract project from ZIP (secure: skip PHP files)
  */
 function extractProjectFromZipSecure(ZipArchive $zip, string $prefix, string $destPath, array &$stats): array {
-    $prefixLen = strlen($prefix);
-    
     for ($i = 0; $i < $zip->numFiles; $i++) {
         $name = $zip->getNameIndex($i);
-        
-        // Skip if not in our prefix
-        if ($prefix !== '' && strpos($name, $prefix) !== 0) {
+        $relativePath = $name === false ? null : importEntryRelativePath($name, $prefix);
+        if ($relativePath === null) {
             continue;
         }
-        
-        // Get relative path within project
-        $relativePath = substr($name, $prefixLen);
-        
-        // Skip empty or root
-        if (empty($relativePath) || $relativePath === '/') {
-            continue;
+        $isDirectory = substr($name, -1) === '/';
+
+        // SECURITY — the entry name is fully attacker-controlled, and it is about
+        // to become a filesystem path: 'proj/../../../evil.json' would resolve
+        // OUTSIDE the new project directory, and 'templates//model/…' would land on
+        // a real page under a spelling no check recognises. The extension filter
+        // below does NOT stop either — a .json written to the wrong place is still
+        // an escape. importFirstStructureFailure() refused every name that is not a
+        // clean relative path before the project directory existed, so one here
+        // means that gate is broken; the import then fails whole, like the other
+        // second layers below.
+        $nameRefusal = importEntryNameRefusal($relativePath, $isDirectory);
+        if ($nameRefusal !== null) {
+            return ['success' => false, 'error' => "$relativePath: $nameRefusal"];
         }
-        
+
         // Skip export_info.json (metadata file)
         if ($relativePath === 'export_info.json') {
             continue;
         }
 
-        // SECURITY (C8 8.4) — ZIP-SLIP containment. The entry name is fully
-        // attacker-controlled: an entry like 'proj/../../../evil.json' would resolve
-        // OUTSIDE the new project directory and let an archive plant or overwrite a
-        // file anywhere the process can write (another project's data, a config
-        // file...). The extension filter below does NOT stop this — a .json or .css
-        // written to the wrong place is still an escape. Reject anything that is not
-        // a clean, relative, non-escaping path BEFORE it is used to build a path.
-        $relativePath = str_replace('\\', '/', $relativePath);
-        if (strpos($relativePath, "\0") !== false                 // null-byte truncation
-            || $relativePath[0] === '/'                            // absolute (posix)
-            || preg_match('#^[a-zA-Z]:#', $relativePath)           // absolute (windows drive)
-            || preg_match('#(^|/)\.\.(/|$)#', $relativePath)       // any '..' segment
-        ) {
-            $stats['skipped_unsafe'][] = $relativePath;
-            continue;
-        }
-
         $destFilePath = $destPath . '/' . $relativePath;
+        $siteData = importIsSiteData($relativePath);
 
         // If directory (ends with /)
-        if (substr($name, -1) === '/') {
-            // A directory name that the OS refuses (reserved device names, a
-            // segment of only dots, invalid characters) is the archive's
-            // problem, not the import's. Skip and report it the same way an
-            // unsafe path is reported — it must not abort the whole import,
-            // which used to roll the project back with a 500.
+        if ($isDirectory) {
+            // A directory name that the OS refuses (a reserved device name,
+            // invalid characters) is the archive's problem, not the import's.
+            // Skip and report it under skipped_unsafe rather than failing the
+            // whole import over one folder.
             if (!is_dir($destFilePath) && !@mkdir($destFilePath, 0755, true) && !is_dir($destFilePath)) {
                 $stats['skipped_unsafe'][] = $relativePath . ' (unusable directory name)';
                 continue;
@@ -622,7 +615,12 @@ function extractProjectFromZipSecure(ZipArchive $zip, string $prefix, string $de
         // explicitly permitted is refused, so a spelling nobody predicted
         // ('.phtm', 'web.config') and a case variant of one that was
         // ('.HTACCESS') are both refused by default rather than by enumeration.
+        // A file the site reads was already held to it by the gate, so a refusal
+        // here fails whole, like every other second layer.
         if (!qs_import_allows_extension($relativePath)) {
+            if ($siteData) {
+                return ['success' => false, 'error' => "$relativePath: the import policy does not allow this file type"];
+            }
             $stats['skipped_disallowed'][] = $relativePath;
             continue;
         }
@@ -644,11 +642,14 @@ function extractProjectFromZipSecure(ZipArchive $zip, string $prefix, string $de
         // extension is necessary but not sufficient: '.png' holding PHP source
         // passes any extension check ever written. SVG comes back sanitised, so
         // write what the validator returns, not the raw bytes. A refused entry is
-        // skipped and reported while the rest imports — unless it holds
-        // structure, which fails the whole import (the second layer, below).
-        $verdict = qs_import_validate_content($relativePath, $content);
+        // skipped and reported while the rest imports — unless it is a file the
+        // site reads, which the gate checked the same way: a refusal of one here
+        // fails the whole import (the second layer). Those files are also the only
+        // entries the check treats as never served, which exempts their text from
+        // the PHP-opening-tag rule — see importIsSiteData().
+        $verdict = qs_import_validate_content($relativePath, $content, $siteData);
         if (!$verdict['ok']) {
-            if (importStructureKind($relativePath) !== null) {
+            if ($siteData) {
                 return ['success' => false, 'error' => "$relativePath: {$verdict['reason']}"];
             }
             $stats['skipped_disallowed'][] = $relativePath . ' (' . $verdict['reason'] . ')';
@@ -691,29 +692,98 @@ function extractProjectFromZipSecure(ZipArchive $zip, string $prefix, string $de
 }
 
 /**
- * Which archive entries hold STRUCTURE — the one definition the structure gate,
+ * An archive entry's path inside the project folder, `/`-separated — the one
+ * derivation the archive gate and the extraction share, so they judge the same
+ * string — or null for an entry the import does not extract: one outside the
+ * project folder, and the project folder's own directory entry.
+ *
+ * @param string $name   the entry's name in the archive
+ * @param string $prefix the project folder's name plus `/`, or '' for an archive
+ *                       whose project sits at its root
+ */
+function importEntryRelativePath(string $name, string $prefix): ?string {
+    if ($prefix !== '' && strpos($name, $prefix) !== 0) {
+        return null;
+    }
+    $relativePath = str_replace('\\', '/', substr($name, strlen($prefix)));
+    return $relativePath === '' ? null : $relativePath;
+}
+
+/**
+ * Why an archive entry's name is not a clean relative path, or null when it is.
+ *
+ * Every check an import makes reads the entry's NAME — a page is a `.json` under
+ * `templates/model/json/` — while the extraction writes it at `<project>/<name>`
+ * and lets the filesystem resolve that. The two agree only when the name has one
+ * spelling. `templates//model/json/…` and `templates/./model/json/…` land on the
+ * real page path on every OS, and on Windows `templates./…` can too — a trailing
+ * dot or space is not part of a Windows folder name. None of them starts with
+ * `templates/model/json/`, so a check that reads the name would pass a page it
+ * never looked at, or skip one the site needs. `..` walks out of the project. So a
+ * clean name is relative (no leading slash, no drive letter), holds no NUL byte,
+ * and is made of segments that are neither empty, `.` nor `..`, and do not end in
+ * a dot or a space. exportProject never writes another shape — every name it
+ * carries is one the engine chose or validated — so a name that fails comes from
+ * an archive built some other way, and the whole archive is refused for it.
+ *
+ * @param string $relativePath the entry's path inside the project folder (importEntryRelativePath())
+ * @param bool   $isDirectory  a directory entry, whose name ends in the one `/` the format gives it
+ * @return string|null the refusal message, or null for a clean name
+ */
+function importEntryNameRefusal(string $relativePath, bool $isDirectory): ?string {
+    if (strpos($relativePath, "\0") !== false) {
+        return 'Not a clean path: it contains a NUL byte.';
+    }
+    if ($isDirectory && substr($relativePath, -1) === '/') {
+        $relativePath = substr($relativePath, 0, -1);
+    }
+    if ($relativePath !== '' && ($relativePath[0] === '/' || preg_match('#^[a-zA-Z]:#', $relativePath))) {
+        return 'Not a clean path: it is absolute.';
+    }
+    foreach (explode('/', $relativePath) as $segment) {
+        if ($segment === '') {
+            return 'Not a clean path: it has an empty segment (two slashes in a row).';
+        }
+        if ($segment === '.' || $segment === '..') {
+            return "Not a clean path: it has a '.' or '..' segment.";
+        }
+        $last = substr($segment, -1);
+        if ($last === '.' || $last === ' ') {
+            return 'Not a clean path: a segment ends in a dot or a space.';
+        }
+    }
+    return null;
+}
+
+/**
+ * Which archive entries hold STRUCTURE — the one definition the archive gate,
  * the two site predicates below and the extraction share, so they can never
- * disagree about which entries they check.
+ * disagree about which entries they walk.
  *
  * Deliberately narrow. A structure walk follows `children` and trips on a `tag`
  * or a `component` key — which is exactly right for a page/component/menu/footer
  * tree, and exactly WRONG for the author's own data. A `data/items.json` holding
  * `[{"tag":"newsletter",...}]` is legitimate content, not markup, and gating it
- * would refuse a file the site depends on. So only the places structure actually
- * lives count:
- *   - templates/model/json/**  — pages, components, menu.json, footer.json;
+ * would refuse a file the site depends on. So an entry holds structure only when
+ * it is a `.json` file in one of the two places structure lives:
+ *   - templates/model/json/  — pages, components, menu.json, footer.json;
  *     the file IS the tree.
- *   - snippets/**              — a snippet wraps its tree under `structure`, and
+ *   - snippets/              — a snippet wraps its tree under `structure`, and
  *     insertSnippet copies that tree into a page.
+ * and not at a hidden path: the extraction never writes one (see
+ * qs_policy_has_hidden_segment()), so nothing there is ever read as structure,
+ * and a tooling leftover such as a `._about.json` is skipped like any other.
  * Paths are matched case-insensitively: NTFS resolves 'Templates/' and
- * 'templates/' to one directory, so a case variant must not slip the gate.
+ * 'templates/' to one directory, so a case variant must not slip the gate. The
+ * name is a clean one by the time this is asked (importEntryNameRefusal()), so
+ * its spelling is the place it lands.
  *
  * @param string $relativePath the entry's path inside the project folder, `/`-separated
  * @return string|null 'model' or 'snippet', or null when the entry holds no structure
  */
 function importStructureKind(string $relativePath): ?string {
     $lower = strtolower($relativePath);
-    if (substr($lower, -5) !== '.json') {
+    if (substr($lower, -5) !== '.json' || qs_policy_has_hidden_segment($relativePath)) {
         return null;
     }
     if (strpos($lower, 'templates/model/json/') === 0) {
@@ -723,6 +793,50 @@ function importStructureKind(string $relativePath): ?string {
         return 'snippet';
     }
     return null;
+}
+
+/**
+ * Is this entry one of the JSON files the site is read from — the project's own
+ * data? The one definition the archive gate, the extraction and the content
+ * check's never-served exemption share.
+ *
+ * Every structure file (importStructureKind()), and every other `.json` file the
+ * project is read from:
+ *   - config.json and routes.json at the project root — the import rebuilds
+ *     config.php and routes.php from them;
+ *   - config/   — per-project settings (route layout, sitemap, …);
+ *   - translate/ — every language's text;
+ *   - data/     — aliases, API endpoints, asset metadata and the rest.
+ * Not at a hidden path, for the reason importStructureKind() gives.
+ *
+ * Two rules follow from being one of them. A file the site reads that cannot be
+ * read or used refuses the whole archive, because importing the rest ships a
+ * project with a hole in it: a route whose page is missing, a language showing
+ * raw keys, settings and routes silently replaced by the defaults. And none of
+ * them is ever served — a web server reaches only a project's `public/` — so the
+ * content check lets their text show a PHP opening tag: every path from these
+ * files into generated PHP (`config.php`, `routes.php`, a build's compiled pages)
+ * writes values as string literals, never as code.
+ *
+ * @param string $relativePath the entry's path inside the project folder, `/`-separated
+ */
+function importIsSiteData(string $relativePath): bool {
+    if (importStructureKind($relativePath) !== null) {
+        return true;
+    }
+    $lower = strtolower($relativePath);
+    if (substr($lower, -5) !== '.json' || qs_policy_has_hidden_segment($relativePath)) {
+        return false;
+    }
+    if ($lower === 'config.json' || $lower === 'routes.json') {
+        return true;
+    }
+    foreach (['config/', 'translate/', 'data/'] as $folder) {
+        if (strpos($lower, $folder) === 0) {
+            return true;
+        }
+    }
+    return false;
 }
 
 /**
@@ -769,41 +883,47 @@ function importFirstInvalidComponentReference(string $relativePath, string $cont
 }
 
 /**
- * The archive's STRUCTURE GATE: every entry that holds structure is checked
- * before the project directory is created, and the first one that fails refuses
- * the WHOLE archive. A project imported with one page dropped keeps that page's
- * route, and the route 404s; a refused import leaves nothing on disk.
+ * The ARCHIVE GATE: every entry the import would extract is checked before the
+ * project directory is created, and the first one that fails refuses the WHOLE
+ * archive. A project imported with one page dropped keeps that page's route, and
+ * the route 404s; a refused import leaves nothing on disk.
  *
- * Per entry, the first of:
+ * Every entry's name must be a clean relative path — `unsafe_path` otherwise
+ * (importEntryNameRefusal()), because only a clean name lands where its spelling
+ * says. Then every file the site reads (importIsSiteData()) is checked, per entry
+ * the first of:
  *   1. `invalid_json` — the entry cannot be read, does not parse, or does not
- *      decode to a JSON array or object; no render path could read it either;
- *   2. `disallowed_content` — the archive content check the extraction applies
- *      to every entry refuses it (a PHP opening tag inside a text value, say);
+ *      decode to a JSON array or object; the site could not read it either;
+ *   2. `disallowed_content` — the import policy's extension allowlist or the
+ *      archive content check refuses it, as it would at extraction;
+ * and a structure file (importStructureKind()) also the first of:
  *   3. `unsafe_value` — an attribute the write gate refuses, naming the node and
  *      the attribute;
  *   4. `blocked_tag` — a tag the renderer refuses;
  *   5. `invalid_component_reference` — a reference the resolver refuses.
- * Every other entry keeps the extraction's per-entry rule: a disallowed asset, a
- * hidden path or an unsafe path is skipped and reported while the rest imports.
+ * Every other entry keeps the extraction's per-entry rule: an asset, a stray file
+ * or anything at a hidden path is skipped and reported when refused, while the
+ * rest imports.
  *
  * @return array|null the first failure, for qs_unsafe_structure_param_response():
  *                    `file` names the entry and `reason` the check it failed
  */
 function importFirstStructureFailure(ZipArchive $zip, string $prefix): ?array {
-    $prefixLen = strlen($prefix);
     for ($i = 0; $i < $zip->numFiles; $i++) {
         $name = $zip->getNameIndex($i);
-        if ($name === false || substr($name, -1) === '/') {
+        $relativePath = $name === false ? null : importEntryRelativePath($name, $prefix);
+        if ($relativePath === null) {
             continue;
         }
-        if ($prefix !== '' && strpos($name, $prefix) !== 0) {
+        $isDirectory = substr($name, -1) === '/';
+        $nameRefusal = importEntryNameRefusal($relativePath, $isDirectory);
+        if ($nameRefusal !== null) {
+            return ['file' => $relativePath, 'reason' => 'unsafe_path', 'message' => $nameRefusal];
+        }
+        if ($isDirectory || !importIsSiteData($relativePath)) {
             continue;
         }
-        $relativePath = str_replace('\\', '/', substr($name, $prefixLen));
         $kind = importStructureKind($relativePath);
-        if ($kind === null) {
-            continue;
-        }
 
         $content = $zip->getFromIndex($i);
         if ($content === false) {
@@ -812,7 +932,9 @@ function importFirstStructureFailure(ZipArchive $zip, string $prefix): ?array {
         }
         $data = json_decode($content, true);
         if (!is_array($data)) {
-            $message = 'Not a structure: the file must hold a JSON array or object.';
+            $message = $kind !== null
+                ? 'Not a structure: the file must hold a JSON array or object.'
+                : 'The file must hold a JSON array or object.';
             if (json_last_error() !== JSON_ERROR_NONE) {
                 $message = 'Not valid JSON (' . json_last_error_msg() . ').';
                 // A byte-order mark is invisible in an editor, so "Syntax error"
@@ -824,10 +946,17 @@ function importFirstStructureFailure(ZipArchive $zip, string $prefix): ?array {
             }
             return ['file' => $relativePath, 'reason' => 'invalid_json', 'message' => $message];
         }
-        $verdict = qs_import_validate_content($relativePath, $content);
+        if (!qs_import_allows_extension($relativePath)) {
+            return ['file' => $relativePath, 'reason' => 'disallowed_content',
+                    'message' => 'The import policy does not allow this file type.'];
+        }
+        $verdict = qs_import_validate_content($relativePath, $content, true);
         if (!$verdict['ok']) {
             return ['file' => $relativePath, 'reason' => 'disallowed_content',
                     'message' => ucfirst($verdict['reason']) . '.'];
+        }
+        if ($kind === null) {
+            continue;
         }
 
         $failure = qs_first_unsafe_structure_param($kind === 'snippet' ? ($data['structure'] ?? null) : $data);
@@ -1000,6 +1129,13 @@ function rebuildPageWrappers(string $jsonDir, string $phpDir, array &$stats, str
                 return $result;
             }
         } elseif (pathinfo($item, PATHINFO_EXTENSION) === 'json') {
+            // Inside a route's folder, <route>.json is that folder's own page, and
+            // the directory branch one level up has already written its wrapper.
+            // Any other .json here is a page stored flat — `pages/<route>.json`,
+            // which resolvePageJsonPath() also reads.
+            if ($prefix !== '' && $item === basename($jsonDir) . '.json') {
+                continue;
+            }
             $routeName = pathinfo($item, PATHINFO_FILENAME);
             $currentRoute = $prefix ? $prefix . '/' . $routeName : $routeName;
             
