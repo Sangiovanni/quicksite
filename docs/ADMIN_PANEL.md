@@ -2302,6 +2302,12 @@ window.QS_RESOLVED_BY_INDEX = {
   PHP-side `$r0` / `$r1` namespace for client-side code that wants
   explicit per-resolver addressing.
 
+Both blocks — like every inline `window.QS_*` block the runtime handoff
+writes — carry `<` and `>` as `\u003C` and `\u003E`, so the page source shows
+the escapes. JavaScript reads the values unchanged — a field holding
+markup reads back as the same string — and no value can end the
+`<script>` element it travels in.
+
 Editor mode skips both — emulation drives the preview's resolved
 values, not the production resolver.
 

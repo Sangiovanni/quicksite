@@ -121,8 +121,9 @@ if (isset($_GET['_component']) && isset($_GET['_editor']) && $_GET['_editor'] ==
         <?= $componentHtml ?>
     </div>
     <?php // Storage-namespace handoff (see PageManagement::render) — the component
-          // preview shares the project's origin, so it must share its key prefix. ?>
-    <script>window.QS_PROJECT=<?= json_encode(defined('PROJECT_NAME') ? PROJECT_NAME : 'default', JSON_UNESCAPED_SLASHES) ?>;</script>
+          // preview shares the project's origin, so it must share its key prefix.
+          require_once SECURE_FOLDER_PATH . '/src/functions/runtimeHandoff.php'; ?>
+    <script>window.QS_PROJECT=<?= qs_inline_script_json(defined('PROJECT_NAME') ? PROJECT_NAME : 'default') ?>;</script>
     <script src="<?= QS_PUBLIC_BASE ?>scripts/qs.js"></script>
 </body>
 </html><?php

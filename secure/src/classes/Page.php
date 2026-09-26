@@ -34,6 +34,10 @@ class Page {
         $stylePath = (defined('PUBLIC_CONTENT_PATH') ? PUBLIC_CONTENT_PATH : dirname(__DIR__, 3) . '/' . (defined('PUBLIC_FOLDER_NAME') ? PUBLIC_FOLDER_NAME : 'public')) . '/style/style.css';
         $cssVersion = file_exists($stylePath) ? filemtime($stylePath) : time();
 
+        // The inline-script encoder (the theme script below) and the runtime
+        // handoff (the end of the body) both live here.
+        require_once SECURE_FOLDER_PATH . '/src/functions/runtimeHandoff.php';
+
         // ── Theme resolution ──────────────────────────────────────────────
         $themeEnabled  = defined('THEME_MODE_ENABLED') && THEME_MODE_ENABLED;
         $themeDefault  = defined('THEME_DEFAULT') ? THEME_DEFAULT : 'light';
@@ -49,7 +53,7 @@ class Page {
         if ($themeEnabled && ($toggleEnabled || $themeDefault === 'system')) {
             $js = '(function(){try{';
             if ($toggleEnabled) {
-                $js .= 'var s=localStorage.getItem("qs-theme-' . $projectKey . '");';
+                $js .= 'var s=localStorage.getItem(' . qs_inline_script_json('qs-theme-' . $projectKey) . ');';
                 $js .= 'if(s==="dark"||s==="light"){document.documentElement.setAttribute("data-theme",s);return;}';
             }
             if ($themeDefault === 'system') {
@@ -125,7 +129,6 @@ class Page {
     // Emitted through the SHARED writer, which the live /p/<projectId>/ render
     // also uses. A built page used to emit its own shorter version of this run
     // and silently lost the consent map and both resolver blocks.
-    require_once SECURE_FOLDER_PATH . '/src/functions/runtimeHandoff.php';
     require_once SECURE_FOLDER_PATH . '/src/functions/resolverRegistry.php';
     require_once SECURE_FOLDER_PATH . '/src/functions/apiRegistry.php';
 

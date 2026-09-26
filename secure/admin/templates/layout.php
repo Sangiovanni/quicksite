@@ -8,6 +8,9 @@
  * @version 1.7.0
  */
 
+// qs_inline_script_json(), the encoder for a value in an inline script.
+require_once SECURE_FOLDER_PATH . '/src/functions/runtimeHandoff.php';
+
 // Base URL (needed early for asset helper)
 $baseUrl = rtrim(BASE_URL, '/');
 
@@ -589,7 +592,9 @@ $langNames = [
             // update-check arm's own response, and putting the engine version into
             // every account's page would let any account fingerprint the install.
             isOperator: <?= $isOperator ? 'true' : 'false' ?>,
-            defaultLang: '<?= CONFIG['LANGUAGE_DEFAULT'] ?? 'en' ?>',
+            // The edited project's own value is project DATA, so it is written
+            // the way every data value in an inline script is.
+            defaultLang: <?= qs_inline_script_json((string) (CONFIG['LANGUAGE_DEFAULT'] ?? 'en')) ?>,
             multilingual: <?= (CONFIG['MULTILINGUAL_SUPPORT'] ?? false) ? 'true' : 'false' ?>,
             translations: {
                 common: {

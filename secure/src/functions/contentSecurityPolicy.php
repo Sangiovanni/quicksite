@@ -47,12 +47,23 @@
  * that: a built site that reverted to a bare `'self'` would re-break in
  * production exactly what was just fixed in development.
  *
- * `'unsafe-inline'` in script-src is required TODAY by the engine's own output
- * (the theme toggle, the state-store hydration, compiled page-event handlers),
- * not by anything an author wrote — `script` is a blocked tag, so a project
- * cannot ship JavaScript of its own. It reduces what script-src is worth; it
- * does not reduce what object-src, base-uri and frame-ancestors are worth, and
- * those cost nothing.
+ * `'unsafe-inline'` in script-src is required by the engine's own output (the
+ * theme scripts, the runtime handoff's data blocks, compiled page-event
+ * handlers), not by anything an author wrote. Two rules keep that output the
+ * engine's own:
+ *
+ *   CODE  `script` is a blocked tag, and an `on*` attribute or a page event
+ *         takes only the {{call:…}} syntax, so a project cannot ship
+ *         JavaScript of its own.
+ *   DATA  every value the engine writes into an inline script is encoded so
+ *         that no `<` from it reaches the element — qs_inline_script_json()
+ *         (runtimeHandoff.php) for a value, CallTransformer's complete
+ *         single-quoted literal for a call argument. A value can then neither
+ *         end the element nor switch the HTML tokenizer's state, and it reads
+ *         back as exactly itself.
+ *
+ * It reduces what script-src is worth; it does not reduce what object-src,
+ * base-uri and frame-ancestors are worth, and those cost nothing.
  *
  * NOT SET, deliberately: `form-action`. A form posting to an external endpoint
  * is something an author can legitimately build, and neither surface restricts

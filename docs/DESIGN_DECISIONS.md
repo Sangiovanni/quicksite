@@ -11731,3 +11731,92 @@ paths and the root `config.json` and `routes.json`.
 `importFirstStructureFailure`), `secure/src/functions/filePolicy.php`
 (`qs_import_validate_content`). Behaviour: [COMMAND_API.md](COMMAND_API.md)
 (*Export / Import*, *Archive import limits*).
+
+### A data value written into an inline script cannot end or change the script (locked 2026-09-26)
+
+**Amends**: *One Content-Security-Policy, drawn by what a resource can do* (locked
+2026-08-28). Its decision stands. It justified `'unsafe-inline'` in `script-src` by
+the engine's output being the engine's own — a project ships no JavaScript of its own.
+That held for code, and did not hold for data; this entry makes it hold for data by
+construction.
+
+**Decision**: two rules, one for each way the engine writes a value into an inline
+script, and neither changes what JavaScript reads.
+
+- **A data value goes through one encoder**, `qs_inline_script_json()` in
+  `runtimeHandoff.php`: `json_encode()` with `JSON_HEX_TAG`, so `<` and `>` are
+  written `\u003C` and `\u003E`, and no `<` from a value reaches the element. Every
+  writer of a page's inline scripts uses it — the runtime handoff's blocks
+  (`QS_PROJECT`, `QS_CONSENT`, `QS_COUNT_STRINGS`, `QS_STATE_STORES`, `QS_RESOLVED`,
+  `QS_RESOLVED_BY_INDEX`), the project key in both theme scripts and in the theme
+  toggle, and the component preview's `QS_PROJECT` — and so do the two values in the
+  admin panel's own config blocks that were written without it: `defaultLang`, the
+  edited project's default language, and `tagInfo`. `JSON_UNESCAPED_SLASHES` stays,
+  so a page whose values hold neither `<` nor `>` is byte-identical.
+- **A call argument is a complete single-quoted literal.** `CallTransformer` writes
+  every `{{call:…}}` argument — page events on both surfaces, and `on*` attributes —
+  escaping the backslash and the quote as before, and now also the line terminators
+  (line feed, carriage return, U+2028, U+2029), `<` as `\x3C`, and NUL as `\x00`.
+  Single quotes stay, because `isValidHandler()` reads only those, and it accepts
+  every handler it accepted before.
+- **JavaScript reads the same values.** A value it already read intact reads the
+  same. The values it could not read — a call argument holding a line break, which
+  broke the handler, or a NUL, which the HTML parser replaced — now arrive as written.
+- **A build carries the handoff it was built with.** A build copies
+  `runtimeHandoff.php` and `Page.php`, and compiles page events into its pages, so an
+  existing build keeps the old encoding until it is rebuilt.
+
+**Reasoning**: the HTML tokenizer reads a script element before JavaScript does, and
+knows nothing of JavaScript strings: it ends the element at the first end tag it
+meets, whatever quoting surrounds it, and a comment opener switches it into states
+where the real end tag no longer counts. Six handoff blocks wrote their values with
+`JSON_UNESCAPED_SLASHES`, which turns off the one escape that stood between a value and
+an end tag, and without `JSON_HEX_TAG`; a call argument escaped only the backslash and
+the quote. So a state store, a translation, a consent storage key or a page-event
+argument — each writable by an editor, each able to arrive in an imported archive — or
+the data a server-side resolver fetched from an external API, could end the element
+early and have the rest of the value read as page markup: on every page of a built
+site, and on the `/p/` view outside the visual editor, which is served from the
+panel's own origin. The panel's
+`defaultLang` wrote an imported project's default language into a literal with no
+encoding at all, and the import keeps that value as the archive sends it.
+
+The fix sits where the value is written, not where it comes from. The sources are
+open-ended — every command that writes a store, a translation, a storage item or an
+event, every import, every external API — and a check at each would have to be
+complete and stay complete, while the writers of inline scripts are few and all
+known. `JSON_HEX_TAG` changes nothing JavaScript reads, so the rule costs no
+compatibility. Measured on both supported PHP versions: every page of every project on
+the install, rendered live, and compiled and served by a real build, is byte-identical
+before and after, and a fixture carrying every encoded character differs only by
+those characters, escaped.
+
+A line break in a call argument was a correctness bug before it was a security one: a
+raw line terminator inside a single-quoted literal is a syntax error, so the handler —
+for page events, the page's whole events script — stopped working without a word.
+
+**Alternatives considered**: validate the sources instead, refusing `<` in stores,
+translations, storage keys and arguments (rejected — a translation holding `<` is
+legitimate content, a resolver's data is not the engine's to refuse, and a gap in any
+one validator is a gap in the rule). Escape only the end-tag sequence, or restore the
+default `\/` escape (rejected — a comment opener needs no slash, and "no `<` from a
+value" is simpler to state and to test). Add `JSON_HEX_AMP`, `JSON_HEX_APOS` and
+`JSON_HEX_QUOT` too (rejected — they matter inside an attribute, not in script data,
+and would change the bytes of every page holding an ampersand or a quote). Write the
+call literal as JSON or in double quotes (rejected — `isValidHandler()` reads single
+quotes only, and JSON would rewrite every non-ASCII character in every handler). Give
+the encoder a file of its own (rejected — a build already copies `runtimeHandoff.php`
+and a built page calls the encoder at request time; a new file would have to join the
+build's copy list). Replace `'unsafe-inline'` with a nonce or a hash (not taken here —
+it changes how every surface and every build emits its scripts, and would not stop a
+value from ending the element it sits in).
+
+**Source**: a measurement made while reviewing the archive round trip during beta.12,
+ruled by Sangio 2026-09-26 as its own engine change, with the panel's `defaultLang`
+added the same day. `secure/src/functions/runtimeHandoff.php`
+(`qs_inline_script_json`), `secure/src/classes/CallTransformer.php`
+(`jsSingleQuoted`), `secure/src/classes/Page.php`,
+`secure/src/classes/PageManagement.php`, `public/p/index.php`,
+`secure/admin/templates/layout.php`,
+`secure/admin/templates/pages/preview-config.php`,
+`secure/src/functions/contentSecurityPolicy.php`.

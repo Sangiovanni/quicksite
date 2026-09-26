@@ -16,9 +16,9 @@ require_once __DIR__ . '/Translator.php';
  *   - F-e: isValidHandler() uses a structural, quote-and-paren-aware scan, so a
  *     legitimate selector arg containing ')' (e.g. QS.hide('input:not(.x)'))
  *     validates instead of being dropped by the old /QS\.[a-zA-Z]+\([^)]*\)/.
- *   - F-a residual: buildCallJs() escapes '\' BEFORE "'", so a trailing
- *     backslash can't turn the closing quote into an escaped one (no more
- *     broken-JS handlers emitted-and-accepted).
+ *   - buildCallJs() writes every argument as a complete single-quoted literal
+ *     (jsSingleQuoted()): valid whatever the value holds, and no "<" from the
+ *     value reaches the page.
  */
 class CallTransformer
 {
@@ -124,11 +124,45 @@ class CallTransformer
 
         $quoted = array_map(function ($arg) use ($jsKeywords) {
             if (in_array($arg, $jsKeywords, true)) return $arg;
-            // F-a residual fix: escape '\' BEFORE "'" so a trailing backslash
-            // can't escape the closing quote.
-            return "'" . str_replace(['\\', "'"], ['\\\\', "\\'"], $arg) . "'";
+            return self::jsSingleQuoted($arg);
         }, $args);
         return "QS.{$fn}(" . implode(', ', $quoted) . ")";
+    }
+
+    /**
+     * One argument as a complete single-quoted JavaScript literal: whatever
+     * $value holds, the literal is valid, reads back as exactly $value, and
+     * carries no "<" into the page.
+     *
+     * Single quotes, because isValidHandler()'s scanner understands only those.
+     * What is escaped, and why:
+     *   \  '              the literal's own escape and delimiter
+     *   LF CR U+2028 U+2029
+     *                     line terminators: a raw one ends the literal early, a
+     *                     syntax error that takes the whole handler — or the
+     *                     whole page-events script — down with it
+     *   <                 as \x3C: the call lands inside a <script> element (page
+     *                     events) or an attribute, and a "<" from a value could
+     *                     end the element or switch the HTML tokenizer's state
+     *   NUL               as \x00: the HTML parser replaces a raw one with U+FFFD,
+     *                     so the literal would no longer hold the value
+     * strtr() makes one pass and never rescans what it wrote, so no escape can
+     * be escaped again. The escapes for line terminators, "<" and NUL are a
+     * backslash and ASCII letters and digits: htmlspecialchars() leaves them
+     * alone, so an attribute reads them exactly as a script element does.
+     */
+    private static function jsSingleQuoted(string $value): string
+    {
+        return "'" . strtr($value, [
+            '\\'       => '\\\\',
+            "'"        => "\\'",
+            "\n"       => '\\n',
+            "\r"       => '\\r',
+            "\u{2028}" => '\\u2028',
+            "\u{2029}" => '\\u2029',
+            '<'        => '\\x3C',
+            "\0"       => '\\x00',
+        ]) . "'";
     }
 
     private static function getTranslatablePositionalIndices(string $fn): array

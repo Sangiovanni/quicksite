@@ -36,7 +36,54 @@
  * the current route, a compiled page already has that route's stores baked in.
  * What must never differ is the order and the content, and that is what lives
  * here.
+ *
+ * ⚠ EVERY VALUE IN AN INLINE SCRIPT GOES THROUGH qs_inline_script_json(), here
+ * and in every other file that writes one. See that function for why.
  */
+
+if (!function_exists('qs_inline_script_json')) {
+    /**
+     * A data value, as the JavaScript expression that reads it, for writing
+     * inside an inline `<script>` element.
+     *
+     * The HTML tokenizer reads a script element's content before JavaScript
+     * does, and it knows nothing of JavaScript strings: it ends the element at
+     * the first end tag it meets, and a `<!--` switches it into states where
+     * the real end tag no longer counts. A `<` taken from a value can do either,
+     * whatever quoting surrounds it. So the rule is that the element's content
+     * holds no `<` from a value at all:
+     *
+     *   JSON_HEX_TAG            writes `<` and `>` as \u003C and \u003E, which
+     *                           JavaScript reads as the same characters. This is
+     *                           the flag the rule rests on.
+     *   JSON_UNESCAPED_SLASHES  kept. The `\/` it switches off only existed to
+     *                           break an end tag, which the flag above already
+     *                           makes impossible; keeping it leaves every page
+     *                           whose values hold no `<` or `>` byte-identical.
+     *   unicode left escaped    (no JSON_UNESCAPED_UNICODE) — as before, so every
+     *                           non-ASCII character, U+2028 and U+2029 included,
+     *                           is written \uXXXX.
+     *   no HEX_AMP/APOS/QUOT    those matter inside an HTML attribute; script
+     *                           data has no character references and no
+     *                           attribute quotes to break.
+     *
+     * One function for every writer, so the rule has no exceptions: the runtime
+     * handoff's blocks below, both theme scripts (Page.php, PageManagement.php),
+     * the component preview (public/p/index.php) and the admin panel's own config
+     * blocks. It lives HERE because a build copies this file and a built page
+     * calls it at request time; a file of its own would have to join the build's
+     * copy list too.
+     *
+     * A value json_encode() cannot encode (invalid UTF-8) gives '', as it did
+     * when each writer called json_encode() itself.
+     *
+     * @param mixed $value Any JSON-encodable value.
+     */
+    function qs_inline_script_json(mixed $value): string
+    {
+        return (string) json_encode($value, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG);
+    }
+}
 
 if (!function_exists('qs_runtime_handoff')) {
     /**
@@ -76,7 +123,7 @@ if (!function_exists('qs_runtime_handoff')) {
         //    the path carries no id at all, so anything derived from
         //    location.pathname would give development and production different
         //    key prefixes for the same site.
-        $out .= '<script>window.QS_PROJECT=' . json_encode($projectKey, JSON_UNESCAPED_SLASHES) . ';</script>';
+        $out .= '<script>window.QS_PROJECT=' . qs_inline_script_json($projectKey) . ';</script>';
 
         // 3. The library.
         $out .= '<script src="' . $base . 'scripts/qs.js"></script>';
@@ -113,13 +160,13 @@ if (!function_exists('qs_runtime_handoff')) {
         // other per-request value in this run.
         $countStrings = is_array($ctx['countStrings'] ?? null) ? $ctx['countStrings'] : [];
         if (!empty($countStrings)) {
-            $out .= '<script>window.QS_COUNT_STRINGS=' . json_encode($countStrings, JSON_UNESCAPED_SLASHES) . ';</script>';
+            $out .= '<script>window.QS_COUNT_STRINGS=' . qs_inline_script_json($countStrings) . ';</script>';
         }
 
         // 7. This route's state stores.
         $stateStores = is_array($ctx['stateStores'] ?? null) ? $ctx['stateStores'] : [];
         if (!empty($stateStores)) {
-            $out .= '<script>window.QS_STATE_STORES=' . json_encode($stateStores, JSON_UNESCAPED_SLASHES) . ';</script>';
+            $out .= '<script>window.QS_STATE_STORES=' . qs_inline_script_json($stateStores) . ';</script>';
         }
 
         // 8 + 9. Resolver handoff.
@@ -206,7 +253,7 @@ if (!function_exists('qs_resolved_hydration_scripts')) {
                 }
             }
             if (!empty($byStore)) {
-                $out .= '<script>window.QS_RESOLVED=' . json_encode($byStore, JSON_UNESCAPED_SLASHES) . ';</script>';
+                $out .= '<script>window.QS_RESOLVED=' . qs_inline_script_json($byStore) . ';</script>';
             }
         }
 
@@ -220,7 +267,7 @@ if (!function_exists('qs_resolved_hydration_scripts')) {
             }
         }
         if (!empty($byIndex)) {
-            $out .= '<script>window.QS_RESOLVED_BY_INDEX=' . json_encode($byIndex, JSON_UNESCAPED_SLASHES) . ';</script>';
+            $out .= '<script>window.QS_RESOLVED_BY_INDEX=' . qs_inline_script_json($byIndex) . ';</script>';
         }
 
         return $out;
@@ -237,9 +284,8 @@ if (!function_exists('qs_theme_toggle_script')) {
      */
     function qs_theme_toggle_script(string $projectKey): string
     {
-        $key = 'qs-theme-' . $projectKey;
         $js  = '(function(){';
-        $js .= 'var key="' . $key . '";';
+        $js .= 'var key=' . qs_inline_script_json('qs-theme-' . $projectKey) . ';';
         $js .= 'function apply(t){document.documentElement.setAttribute("data-theme",t);try{localStorage.setItem(key,t);}catch(e){}}';
         $js .= 'function sync(t){document.querySelectorAll("[data-theme-toggle]").forEach(function(b){';
         $js .= 'var icon=b.querySelector(".theme-switch-icon");';
@@ -277,6 +323,6 @@ if (!function_exists('qs_theme_toggle_script')) {
 if (!function_exists('qs_consent_hydration_script')) {
 function qs_consent_hydration_script(array $payload): string
 {
-    return '<script>window.QS_CONSENT=' . json_encode($payload, JSON_UNESCAPED_SLASHES) . ';</script>';
+    return '<script>window.QS_CONSENT=' . qs_inline_script_json($payload) . ';</script>';
 }
 }
