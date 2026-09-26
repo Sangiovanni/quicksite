@@ -47,7 +47,7 @@ function __command_deleteOAuthProvider(array $params = [], array $urlParams = []
     }
 
     $id = $params['id'] ?? null;
-    if (!is_string($id) || $id === '' || !preg_match('/^[a-z][a-z0-9-]*$/', $id)) {
+    if (!is_string($id) || $id === '' || !preg_match('/^[a-z][a-z0-9-]*$/D', $id)) {
         return ApiResponse::create(400, 'validation.failed')
             ->withMessage('id is required and must match /^[a-z][a-z0-9-]*$/')
             ->withErrors([['field' => 'id', 'reason' => 'invalid_format']]);

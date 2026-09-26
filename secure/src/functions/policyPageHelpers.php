@@ -26,7 +26,7 @@ function policyValidateRoute(string $route): array {
         return ['route' => $route, 'segments' => [], 'error' => ['code' => 'route.invalid', 'message' => 'Route must have between 1 and 5 segments']];
     }
     foreach ($segments as $seg) {
-        if (!preg_match('/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/', $seg)) {
+        if (!preg_match('/^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/D', $seg)) {
             return ['route' => $route, 'segments' => [], 'error' => ['code' => 'route.invalid_segment', 'message' => "Invalid route segment '$seg'. Use lowercase letters, numbers and hyphens (no path parameters)."]];
         }
     }

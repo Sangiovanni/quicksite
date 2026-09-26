@@ -152,7 +152,7 @@ function __command_importStructureTranslations(array $params = [], array $urlPar
     }
 
     // structureId must match the HTML-id format we stamp on Table builds.
-    if (!preg_match('/^[a-zA-Z][a-zA-Z0-9_-]*$/', $structureId)) {
+    if (!preg_match('/^[a-zA-Z][a-zA-Z0-9_-]*$/D', $structureId)) {
         return ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage("Invalid structureId '$structureId' — must start with a letter and use letters, digits, hyphens, underscores.")
             ->withErrors([['field' => 'structureId', 'value' => $structureId]]);

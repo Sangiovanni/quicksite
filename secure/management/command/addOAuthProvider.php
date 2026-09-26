@@ -110,7 +110,7 @@ function __addOAuthProvider_validate(array $params): array {
     }
 
     $id = $params['id'] ?? null;
-    if (!is_string($id) || $id === '' || !preg_match('/^[a-z][a-z0-9-]*$/', $id)) {
+    if (!is_string($id) || $id === '' || !preg_match('/^[a-z][a-z0-9-]*$/D', $id)) {
         $errors[] = ['field' => 'id', 'reason' => 'invalid_format', 'hint' => 'Provider id must start with a lowercase letter and contain only lowercase letters, digits, and hyphens (e.g., "google", "mycorp-sso").'];
     } elseif ($id !== '' && $id[0] === '_') {
         $errors[] = ['field' => 'id', 'reason' => 'reserved', 'hint' => 'Ids starting with "_" are reserved for documentation entries (_schema, _comment).'];

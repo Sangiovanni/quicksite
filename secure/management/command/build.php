@@ -58,7 +58,7 @@ if (!empty($buildCustomName)) {
             ->withErrors([['field' => 'name', 'max_length' => 100, 'actual_length' => strlen($buildCustomName)]])
             ->send();
     }
-    if (!preg_match('/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/', $buildCustomName)) {
+    if (!preg_match('/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/D', $buildCustomName)) {
         ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage('name must contain only letters, numbers, hyphens, underscores and dots (must start with alphanumeric)')
             ->withErrors([['field' => 'name', 'value' => $buildCustomName, 'allowed' => 'a-z, A-Z, 0-9, -, _, . (start with alphanumeric)']])

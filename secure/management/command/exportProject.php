@@ -31,15 +31,19 @@ require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/errorHygiene.php'; // qs_safe_error_message
 
-// Allowed keys in config.json export (security: no arbitrary PHP execution)
+// Allowed keys in config.json export (security: no arbitrary PHP execution).
+// Every setting a command writes, and the list importProject takes back — a key
+// missing here is a setting lost on a round trip.
 const EXPORT_ALLOWED_CONFIG_KEYS = [
     'SITE_NAME',
     'LANGUAGES_SUPPORTED',
     'LANGUAGE_DEFAULT',
     'LANGUAGES_NAME',
     'MULTILINGUAL_SUPPORT',
-    'TITLE',
-    'FAVICON'
+    'THEME_MODE_ENABLED',
+    'THEME_DEFAULT',
+    'THEME_USER_TOGGLE_ENABLED',
+    'FAVICON_PATH'
 ];
 
 /**

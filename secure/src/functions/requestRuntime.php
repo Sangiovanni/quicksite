@@ -45,12 +45,12 @@ if (!function_exists('qs_request_host')) {
                 return false;
             }
             // Bracketed IPv6 literal, optional port: [::1] / [::1]:8443
-            if (preg_match('/^\[[0-9A-Fa-f:.]+\](:\d{1,5})?$/', $host) === 1) {
+            if (preg_match('/^\[[0-9A-Fa-f:.]+\](:\d{1,5})?$/D', $host) === 1) {
                 return true;
             }
             // RFC-1123 labels (letters/digits/hyphen, dot-separated), optional port.
             return preg_match(
-                '/^[A-Za-z0-9]([A-Za-z0-9-]{0,62}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,62}[A-Za-z0-9])?)*(:\d{1,5})?$/',
+                '/^[A-Za-z0-9]([A-Za-z0-9-]{0,62}[A-Za-z0-9])?(\.[A-Za-z0-9]([A-Za-z0-9-]{0,62}[A-Za-z0-9])?)*(:\d{1,5})?$/D',
                 $host
             ) === 1;
         };

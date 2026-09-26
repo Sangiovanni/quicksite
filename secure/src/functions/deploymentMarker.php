@@ -78,9 +78,8 @@ function qs_deployment_marker_read(string $path): ?array
  * Is this URL space safe to write into an nginx `location` line?
  *
  * The space reaches a web-server configuration file, so the charset is checked
- * at the sink rather than trusted from the record. `is_valid_relative_path()`
- * guards the FILESYSTEM meaning of a space at build time and permits characters
- * — a brace, a newline — that would close a `location` block early. Nothing
+ * at the sink rather than trusted from the record, which is a file on disk. A
+ * brace or a newline would close a `location` block early, and nothing
  * legitimate needs them: a URL space is path segments.
  */
 function qs_space_is_config_safe(string $space): bool
@@ -88,7 +87,7 @@ function qs_space_is_config_safe(string $space): bool
     if ($space === '') {
         return true;
     }
-    return (bool) preg_match('/^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/', $space)
+    return (bool) preg_match('/^[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/D', $space)
         && strpos($space, '..') === false;
 }
 

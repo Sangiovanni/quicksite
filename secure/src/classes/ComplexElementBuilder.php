@@ -97,7 +97,7 @@ abstract class ComplexElementBuilder {
      * hyphens, underscores.
      */
     protected static function validateHtmlId(string $id, string $fieldName = 'id'): void {
-        if (!preg_match('/^[a-zA-Z][a-zA-Z0-9_-]*$/', $id)) {
+        if (!preg_match('/^[a-zA-Z][a-zA-Z0-9_-]*$/D', $id)) {
             throw new ComplexElementBuilderException(
                 "Invalid HTML id for '$fieldName': '$id' (must start with a letter and contain only letters, digits, hyphens, underscores)"
             );

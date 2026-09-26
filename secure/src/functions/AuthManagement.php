@@ -886,7 +886,7 @@ function validateBearerToken(?string $authHeader): array {
     }
 
     // Check Bearer format
-    if (!preg_match('/^Bearer\s+(.+)$/i', $authHeader, $matches)) {
+    if (!preg_match('/^Bearer\s+(.+)$/iD', $authHeader, $matches)) {
         return $refuse('Invalid Authorization header format. Use: Bearer <token>');
     }
 
@@ -910,7 +910,7 @@ function validateBearerToken(?string $authHeader): array {
  * users. Public identity = the display `name` + the opaque user id.
  */
 function qs_valid_username(string $username): bool {
-    return preg_match('/^[a-z0-9_-]{3,32}$/', $username) === 1;
+    return preg_match('/^[a-z0-9_-]{3,32}$/D', $username) === 1;
 }
 
 /**
@@ -1592,7 +1592,7 @@ function handleCors(?string $origin): bool {
     
     // Development mode: allow any localhost
     if ($corsConfig['development_mode'] ?? false) {
-        if (preg_match('/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/', $origin)) {
+        if (preg_match('/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/D', $origin)) {
             $isAllowed = true;
         }
     }

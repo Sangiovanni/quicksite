@@ -210,7 +210,7 @@ class ApiEndpointManager {
      */
     public function addApi(string $apiId, string $name, string $baseUrl, array $auth = [], string $description = ''): array {
         // Validate apiId format (alphanumeric, dashes, underscores)
-        if (!preg_match('/^[a-z0-9][a-z0-9\-_]*$/i', $apiId)) {
+        if (!preg_match('/^[a-z0-9][a-z0-9\-_]*$/iD', $apiId)) {
             return [
                 'success' => false,
                 'error' => 'Invalid API ID format. Use alphanumeric characters, dashes, and underscores. Must start with alphanumeric.'
@@ -452,7 +452,7 @@ class ApiEndpointManager {
             if (!$fromId || !$toId) {
                 return ['success' => false, 'error' => 'renameEndpoint requires "from" and "to"'];
             }
-            if (!preg_match('/^[a-z0-9][a-z0-9\-_]*$/i', $toId)) {
+            if (!preg_match('/^[a-z0-9][a-z0-9\-_]*$/iD', $toId)) {
                 return ['success' => false, 'error' => 'Invalid endpoint ID format. Use alphanumeric, dashes, underscores.'];
             }
             if ($toId !== $fromId) {
@@ -685,8 +685,8 @@ class ApiEndpointManager {
             // A header name is echoed verbatim into a request header, so it is
             // held to RFC 7230's token grammar — a name carrying CR, LF or a
             // colon is a header-splitting payload, not a typo.
-            if (!is_string($from) || !preg_match('/^cookie:[^\s;,=]+$/', $from)
-                || !is_string($to) || !preg_match('/^header:[A-Za-z0-9!#$%&\'*+.^_`|~-]+$/', $to)) {
+            if (!is_string($from) || !preg_match('/^cookie:[^\s;,=]+$/D', $from)
+                || !is_string($to) || !preg_match('/^header:[A-Za-z0-9!#$%&\'*+.^_`|~-]+$/D', $to)) {
                 return [
                     'valid' => false,
                     'error' => 'Invalid csrf config. Use: {"from": "cookie:XSRF-TOKEN", "to": "header:X-XSRF-TOKEN"}'
@@ -714,7 +714,7 @@ class ApiEndpointManager {
                     'error' => 'Refresh config requires all of: ' . implode(', ', $refreshKeys) . '. Missing: ' . implode(', ', $missing)
                 ];
             }
-            if (!preg_match('/^@[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+$/', $auth['refreshEndpoint'])) {
+            if (!preg_match('/^@[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+$/D', $auth['refreshEndpoint'])) {
                 return [
                     'valid' => false,
                     'error' => "Invalid refreshEndpoint format. Use: @apiId/endpointId"
@@ -790,7 +790,7 @@ class ApiEndpointManager {
             return ['valid' => false, 'error' => 'Endpoint ID is required'];
         }
         
-        if (!preg_match('/^[a-z0-9][a-z0-9\-_]*$/i', $endpoint['id'])) {
+        if (!preg_match('/^[a-z0-9][a-z0-9\-_]*$/iD', $endpoint['id'])) {
             return [
                 'valid' => false,
                 'error' => 'Invalid endpoint ID format. Use alphanumeric, dashes, underscores.'
@@ -874,7 +874,7 @@ class ApiEndpointManager {
                 if (!is_string($name) || $name === '') {
                     return ['valid' => false, 'error' => "Parameter at index $idx is missing 'name'"];
                 }
-                if (!preg_match('/^[a-zA-Z][a-zA-Z0-9_]*$/', $name)) {
+                if (!preg_match('/^[a-zA-Z][a-zA-Z0-9_]*$/D', $name)) {
                     return [
                         'valid' => false,
                         'error' => "Invalid parameter name '$name'. Use letters, digits, underscores; must start with a letter."

@@ -262,7 +262,7 @@ if (!function_exists('qs_resolved_hydration_scripts')) {
         foreach ($resolvedVars as $key => $val) {
             // `rN` keys only, so a flat variable an author happened to name `r1`
             // stays out of the namespaced bucket.
-            if (is_string($key) && preg_match('/^r\d+$/', $key) && is_array($val)) {
+            if (is_string($key) && preg_match('/^r\d+$/D', $key) && is_array($val)) {
                 $byIndex[$key] = $val;
             }
         }

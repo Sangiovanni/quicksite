@@ -169,10 +169,10 @@ function __editOAuthProvider_validate(array $params): array {
     }
 
     $id = $params['id'];
-    if (!is_string($id) || $id === '' || !preg_match('/^[a-z][a-z0-9-]*$/', $id)) {
+    if (!is_string($id) || $id === '' || !preg_match('/^[a-z][a-z0-9-]*$/D', $id)) {
         $errors[] = ['field' => 'id', 'reason' => 'invalid_format'];
     }
-    if (isset($params['newId']) && $params['newId'] !== '' && !preg_match('/^[a-z][a-z0-9-]*$/', (string) $params['newId'])) {
+    if (isset($params['newId']) && $params['newId'] !== '' && !preg_match('/^[a-z][a-z0-9-]*$/D', (string) $params['newId'])) {
         $errors[] = ['field' => 'newId', 'reason' => 'invalid_format'];
     }
 

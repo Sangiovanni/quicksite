@@ -70,7 +70,7 @@ function __command_addInteraction(array $params = [], array $urlParams = []): Ap
     }
     
     // Validate function name (alphanumeric + underscore)
-    if (!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $function)) {
+    if (!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/D', $function)) {
         return ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage('Invalid function name format')
             ->withErrors([['field' => 'function', 'value' => $function, 'hint' => 'Must be valid JS function name']]);

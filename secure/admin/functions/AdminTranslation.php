@@ -138,7 +138,7 @@ class AdminTranslation {
      * this only decides whether the name is allowed to become a path at all.
      */
     private function isValidLanguage(string $lang): bool {
-        if (preg_match('/^[A-Za-z0-9-]{1,32}$/', $lang) !== 1) {
+        if (preg_match('/^[A-Za-z0-9-]{1,32}$/D', $lang) !== 1) {
             return false;
         }
         $file = SECURE_FOLDER_PATH . '/admin/translations/' . $lang . '.json';

@@ -152,7 +152,7 @@ function qs_session_file_path(string $id): ?string {
  * base64-ish ids.
  */
 function qs_session_id_shape_ok(string $id): bool {
-    return preg_match('/^[A-Za-z0-9,-]{16,128}$/', $id) === 1;
+    return preg_match('/^[A-Za-z0-9,-]{16,128}$/D', $id) === 1;
 }
 
 /**

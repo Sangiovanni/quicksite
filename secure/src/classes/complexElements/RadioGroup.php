@@ -55,7 +55,7 @@ class RadioGroupBuilder extends ComplexElementBuilder {
         self::requireField($config, 'legendKey');
 
         $name = (string)$config['name'];
-        if (!preg_match('/^[a-zA-Z][a-zA-Z0-9_-]*$/', $name)) {
+        if (!preg_match('/^[a-zA-Z][a-zA-Z0-9_-]*$/D', $name)) {
             throw new ComplexElementBuilderException(
                 "Invalid radio group name '$name'. Use letters, digits, hyphens, underscores; must start with a letter."
             );

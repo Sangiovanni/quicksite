@@ -21,6 +21,7 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 
 /**
@@ -42,7 +43,7 @@ function __command_createProject(array $params = [], array $urlParams = []): Api
     }
     
     // Validate project name format
-    if (!preg_match('/^[a-zA-Z][a-zA-Z0-9_-]{0,49}$/', $projectName)) {
+    if (!preg_match('/^[a-zA-Z][a-zA-Z0-9_-]{0,49}$/D', $projectName)) {
         return ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage('Invalid project name format')
             ->withErrors(['name' => 'Must start with letter, contain only alphanumeric/dash/underscore, max 50 chars']);
@@ -65,11 +66,13 @@ function __command_createProject(array $params = [], array $urlParams = []): Api
     $defaultLang = trim($params['language'] ?? 'en');
     $switchTo = filter_var($params['switch_to'] ?? false, FILTER_VALIDATE_BOOLEAN);
     
-    // Validate language code
-    if (!preg_match('/^[a-z]{2}(-[A-Z]{2})?$/', $defaultLang)) {
+    // Validate language code — the rule addLang, deleteLang and setDefaultLang
+    // use, so the project's first language can later be deleted or made default
+    // by name.
+    if (!RegexPatterns::match('language_code', $defaultLang)) {
         return ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage('Invalid language code format')
-            ->withErrors(['language' => 'Use ISO format: en, fr, de, en-US, etc.']);
+            ->withErrors(['language' => 'Use 2-3 lowercase letters (ISO 639): en, fr, de, zho']);
     }
     
     // Check project doesn't already exist

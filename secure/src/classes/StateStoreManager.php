@@ -67,7 +67,7 @@ class StateStoreManager {
      */
     public function setForRoute(string $route, array $stores): array {
         foreach ($stores as $storeId => $def) {
-            if (!preg_match('/^[a-zA-Z][\w-]*$/', (string) $storeId)) {
+            if (!preg_match('/^[a-zA-Z][\w-]*$/D', (string) $storeId)) {
                 return ['success' => false, 'error' => "Invalid store id: '$storeId'"];
             }
             $validation = $this->validateStore($def);
@@ -103,7 +103,7 @@ class StateStoreManager {
             return ['valid' => false, 'error' => 'store must be an object'];
         }
         $endpoint = $def['endpoint'] ?? '';
-        if (!is_string($endpoint) || !preg_match('#^@[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+$#', $endpoint)) {
+        if (!is_string($endpoint) || !preg_match('#^@[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+$#D', $endpoint)) {
             return ['valid' => false, 'error' => 'endpoint must be "@apiId/endpointId"'];
         }
         $fields = $def['fields'] ?? null;
@@ -111,7 +111,7 @@ class StateStoreManager {
             return ['valid' => false, 'error' => 'at least one field is required'];
         }
         foreach ($fields as $name => $f) {
-            if (!preg_match('/^[a-zA-Z_][\w-]*$/', (string) $name)) {
+            if (!preg_match('/^[a-zA-Z_][\w-]*$/D', (string) $name)) {
                 return ['valid' => false, 'error' => "invalid field name '$name'"];
             }
             if (!is_array($f)) {

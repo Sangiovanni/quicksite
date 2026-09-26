@@ -57,7 +57,7 @@ class OAuthButtonBuilder extends ComplexElementBuilder {
         self::requireField($config, 'labelKey');
 
         $provider = (string) $config['provider'];
-        if (!preg_match('/^[a-z][a-z0-9-]*$/', $provider)) {
+        if (!preg_match('/^[a-z][a-z0-9-]*$/D', $provider)) {
             throw new ComplexElementBuilderException(
                 "OAuth provider id must be lowercase letters / digits / hyphens "
                 . "(matches the oauth-presets.json key shape). Got: '$provider'"

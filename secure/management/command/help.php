@@ -1346,7 +1346,7 @@ $GLOBALS['__help_commands'] = [
                 'type' => 'string',
                 'description' => 'Language display name. Auto-generated if not provided (e.g., "fr" → "French").',
                 'example' => 'Español',
-                'validation' => 'Any string',
+                'validation' => '1-100 bytes of letters with their combining marks, spaces, hyphens, apostrophes and dots, so a native name such as हिन्दी is accepted',
                 'default' => 'Auto-generated from language code'
             ]
         ],
@@ -3619,7 +3619,7 @@ $GLOBALS['__help_commands'] = [
                 'type' => 'string',
                 'description' => 'Default language code',
                 'default' => 'en',
-                'validation' => 'ISO format: en, fr, de, en-US, etc.'
+                'validation' => '2-3 lowercase letters (ISO 639-1 or 639-2), the rule addLang, deleteLang and setDefaultLang use: en, fr, de, zho'
             ],
             'switch_to' => [
                 'required' => false,
@@ -4294,7 +4294,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.zip_error' => 'The archive failed to finalise',
             '500.server.move_failed' => 'save=true, but the archive could not be written into the exports folder'
         ],
-        'notes' => 'Project-scoped: the exported project is the one in the URL marker; a name/project in the request is optional and must match. Export format v2.0-secure - PHP files are NOT included, they are rebuilt from JSON on import. The archive carries the project\'s settings and routes as config.json and routes.json, config/*.json except members.json, its page, component, menu and footer structures, its own snippets, its translations and data, and - unless include_public=false - public/assets and public/style. It never carries builds, backups or earlier exports. Saved exports live in that project\'s own folder (<secure>/projects/<id>/exports/), are auto-cleaned (keeps the last 5), and are reachable only through their own project\'s marker via downloadExport.'
+        'notes' => 'Project-scoped: the exported project is the one in the URL marker; a name/project in the request is optional and must match. Export format v2.0-secure - PHP files are NOT included, they are rebuilt from JSON on import. The archive carries every setting a command writes (site name, languages and their display names, multilingual mode, theme mode, favicon) and the routes as config.json and routes.json, config/*.json except members.json, its page, component, menu and footer structures, its own snippets, its translations and data, and - unless include_public=false - public/assets and public/style. It never carries builds, backups or earlier exports. Saved exports live in that project\'s own folder (<secure>/projects/<id>/exports/), are auto-cleaned (keeps the last 5), and are reachable only through their own project\'s marker via downloadExport.'
     ],
     
     'importProject' => [
@@ -4345,7 +4345,7 @@ $GLOBALS['__help_commands'] = [
             'An archive is untrusted input. Entries are accepted against an extension ALLOWLIST and each one is checked so its content matches what its name claims (magic bytes for binary formats, valid JSON for .json, no PHP opening tag in a text file a web server could serve, sanitisation for SVG).',
             'A refused entry is skipped and listed in security.skipped_disallowed with the reason, and the rest of the archive still imports — except an entry whose name is not a clean path and a file the site reads, which refuse the whole archive (next notes). security.skipped_unsafe lists entries whose folder the filesystem would not create.',
             'Every entry in the project folder must have a clean relative path as its name: not absolute, no empty segment (two slashes in a row), no . or .. segment, no segment ending in a dot or a space. One that does not refuses the WHOLE archive with 400 and nothing is created, because another spelling of a path can land on a real file without being recognised as it. Entries outside the project folder are ignored.',
-            'The files the site reads are checked before the project is created: config.json and routes.json at the project root, any .json file under config/, translate/ or data/, and every structure file — any .json file under templates/model/json/ or snippets/. Each must be readable, parse as a JSON array or object and pass the content check, and a structure file must also carry no unsafe attribute, blocked tag or invalid component reference. The first one that fails refuses the WHOLE archive with 400 and nothing is created, because importing the rest would leave a route whose page is missing, a language showing raw keys, or settings and routes replaced by the defaults. A file at a hidden path is not one of them: the import never writes a hidden path.',
+            'The files the site reads are checked before the project is created: config.json and routes.json at the project root, any .json file under config/, translate/ or data/, and every structure file — any .json file under templates/model/json/ or snippets/. Each must be readable, parse as a JSON array or object and pass the content check, and a structure file must also carry no unsafe attribute, blocked tag or invalid component reference. Every setting in config.json must be a value the command that writes it would accept: a language code is 2-3 lowercase letters, the default language is one of the listed ones, a display name follows addLang\'s rule, the flags are true or false, the theme default is light, dark or system, and the favicon is an image under /assets/images/ with a favicon extension. The first one that fails refuses the WHOLE archive with 400 and nothing is created, because importing the rest would leave a route whose page is missing, a language showing raw keys, or settings and routes replaced by the defaults. A file at a hidden path is not one of them: the import never writes a hidden path.',
             'The files the site reads may show a PHP opening tag in their text — a page that displays PHP code, say. No web server serves them, and the engine writes their values into generated PHP only as string literals. Every other text file keeps the rule.',
             'Archive resource limits are enforced from the ZIP headers before anything is extracted: entry count, total and per-entry uncompressed size, and per-entry compression ratio. Exceeding any of them returns 413 and writes nothing.',
             'The permitted extensions and the limits can be changed by copying <secure>/management/config/import-policy.php.example to import-policy.php.',
@@ -4359,7 +4359,7 @@ $GLOBALS['__help_commands'] = [
             '400.upload.failed' => 'File upload failed',
             '400.validation.invalid_zip' => 'Invalid or corrupted ZIP',
             '400.validation.invalid_structure' => 'ZIP missing required project files',
-            '400.validation.unsafe_param' => 'An entry in the archive failed a check that refuses the whole archive, so nothing is created. errors[0].file names the entry and errors[0].reason the check: unsafe_path (the name is not a clean relative path), invalid_json (cannot be read, does not parse, or is not a JSON array or object), disallowed_content (the import policy or the content check refused it), unsafe_value (an unsafe attribute — errors[0].node and errors[0].attribute name it), blocked_tag or invalid_component_reference (errors[0].value names the tag or reference).',
+            '400.validation.unsafe_param' => 'An entry in the archive failed a check that refuses the whole archive, so nothing is created. errors[0].file names the entry and errors[0].reason the check: unsafe_path (the name is not a clean relative path), invalid_json (cannot be read, does not parse, or is not a JSON array or object), disallowed_content (the import policy or the content check refused it), invalid_setting (a setting in config.json the command that writes it would refuse — errors[0].value names the setting), unsafe_value (an unsafe attribute — errors[0].node and errors[0].attribute name it), blocked_tag or invalid_component_reference (errors[0].value names the tag or reference).',
             '409.resource.already_exists' => 'A project with that id already exists',
             '400.validation.incomplete_project' => 'Imported project is incomplete.',
             '400.validation.invalid_format' => 'Invalid project name format.',

@@ -91,10 +91,13 @@ class RegexPatterns
         
         // === HUMAN-READABLE TEXT (Unicode support) ===
         
+        // A combining mark (a vowel sign, a virama) belongs to the letter before
+        // it: many scripts spell their own names with them (हिन्दी, தமிழ், বাংলা),
+        // and a name made only of marks is not a name.
         'language_name' => [
-            'pattern' => '/^[\p{L} \-\'\.]+$/uD',
-            'description' => 'Language display name (any letters, spaces, hyphens, apostrophes, dots)',
-            'examples' => ['English', 'Français', 'Español', 'Русский', '日本語', "Kreyòl ayisyen"]
+            'pattern' => '/^(?:\p{L}\p{M}*|[ \-\'\.])+$/uD',
+            'description' => 'Language display name (letters with their combining marks, spaces, hyphens, apostrophes, dots)',
+            'examples' => ['English', 'Français', 'Español', 'Русский', '日本語', "Kreyòl ayisyen", 'हिन्दी']
         ],
         
         // === STRUCTURED DATA ===

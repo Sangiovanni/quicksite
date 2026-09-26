@@ -621,7 +621,7 @@ class JsonToPhpCompiler {
                     }
                 } elseif (is_string($attrValue) && in_array($attrName, self::TRANSLATABLE_ATTRIBUTES, true)
                           && strpos($attrValue, '__RAW__') !== 0 && strpos($attrValue, '__LIT__') !== 0
-                          && preg_match('/^[a-z0-9_]+(\.[a-z0-9_]+)+$/i', $attrValue)) {
+                          && preg_match('/^[a-z0-9_]+(\.[a-z0-9_]+)+$/iD', $attrValue)) {
                     // A translation KEY in a translatable attribute. Emitted as a
                     // runtime lookup for the same reason a text node is: which
                     // translation file answers depends on the request's language.

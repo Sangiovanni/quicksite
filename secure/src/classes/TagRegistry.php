@@ -261,7 +261,7 @@ class TagRegistry
      */
     public static function isRenderable(string $tag): bool
     {
-        return (bool) preg_match('/^[a-z0-9-]+$/i', $tag)
+        return (bool) preg_match('/^[a-z0-9-]+$/iD', $tag)
             && !self::isBlocked($tag)
             && self::isAllowed($tag);
     }

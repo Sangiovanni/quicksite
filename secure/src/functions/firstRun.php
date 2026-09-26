@@ -148,7 +148,7 @@ function qs_first_run_write_operator(string $userId): bool {
     if (is_file($path)) {
         return true;
     }
-    if ($userId === '' || preg_match('/^[A-Za-z0-9_-]+$/', $userId) !== 1) {
+    if ($userId === '' || preg_match('/^[A-Za-z0-9_-]+$/D', $userId) !== 1) {
         // The id is minted by qs_user_create() as 'usr_' + hex, so this cannot
         // trigger today. Checked anyway: the value is interpolated into a PHP
         // literal, and "cannot happen" is not a property this file can assert
@@ -195,7 +195,7 @@ function qs_first_run_unowned_projects(): array {
         $id = basename($dir);
         // Same id shape the /p/ surface enforces — a directory it could never
         // serve is not a project, whatever else it may be.
-        if (preg_match('/^[A-Za-z0-9_-]{1,64}$/', $id) !== 1) {
+        if (preg_match('/^[A-Za-z0-9_-]{1,64}$/D', $id) !== 1) {
             continue;
         }
         if (is_file($dir . '/config/members.json')) {

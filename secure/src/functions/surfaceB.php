@@ -67,7 +67,7 @@ const QS_SB_STREAM_CHUNK = 262144; // 256 KiB
 
 /** F1 id shape (replicated so this can run pre-init without PathManagement). */
 function qs_sb_valid_id(string $id): bool {
-    return $id !== '' && preg_match('/^[A-Za-z0-9_-]{1,64}$/', $id) === 1;
+    return $id !== '' && preg_match('/^[A-Za-z0-9_-]{1,64}$/D', $id) === 1;
 }
 
 /**

@@ -75,8 +75,8 @@ $segments = array_values($segments);
 // existence check is routePathExists() below — segment validation just
 // guards against path-injection / weird characters.
 foreach ($segments as $segment) {
-    $isLiteral = (bool) preg_match('/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/', $segment);
-    $isParam   = (bool) preg_match('/^:[a-zA-Z_][a-zA-Z0-9_]*$/', $segment);
+    $isLiteral = (bool) preg_match('/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/D', $segment);
+    $isParam   = (bool) preg_match('/^:[a-zA-Z_][a-zA-Z0-9_]*$/D', $segment);
     if (!$isLiteral && !$isParam) {
         ApiResponse::create(400, 'route.invalid_segment')
             ->withMessage("Invalid segment '$segment'")

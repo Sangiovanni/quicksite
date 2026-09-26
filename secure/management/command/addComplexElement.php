@@ -75,7 +75,7 @@ function __addComplexElement_loadBuilders(): array {
             try {
                 $instance = new $cls();
                 $kind = $instance->kind();
-                if (!preg_match('/^[a-z][a-z0-9-]*$/', $kind)) {
+                if (!preg_match('/^[a-z][a-z0-9-]*$/D', $kind)) {
                     error_log("[addComplexElement] Builder $cls returned invalid kind: '$kind'");
                     continue;
                 }
@@ -154,7 +154,7 @@ function __command_addComplexElement(array $params = [], array $urlParams = []):
     $targetNodeId = $params['targetNodeId'];
     $position = $params['position'] ?? 'after';
 
-    if (!preg_match('/^[a-z][a-z0-9-]*$/', $kind)) {
+    if (!preg_match('/^[a-z][a-z0-9-]*$/D', $kind)) {
         return ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage("Invalid kind '$kind'. Use lowercase + hyphens.");
     }

@@ -29,16 +29,21 @@ require_once SECURE_FOLDER_PATH . '/src/functions/filePolicy.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/uploadLimits.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/quota.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 
-// Allowed keys in config.json import (security: whitelist only)
+// Allowed keys in config.json import (security: whitelist only). Every one is a
+// setting a command writes — the list exportProject exports — and its value is
+// checked against that command's rule (importFirstInvalidSetting()).
 const IMPORT_ALLOWED_CONFIG_KEYS = [
     'SITE_NAME',
     'LANGUAGES_SUPPORTED',
     'LANGUAGE_DEFAULT',
     'LANGUAGES_NAME',
     'MULTILINGUAL_SUPPORT',
-    'TITLE',
-    'FAVICON'
+    'THEME_MODE_ENABLED',
+    'THEME_DEFAULT',
+    'THEME_USER_TOGGLE_ENABLED',
+    'FAVICON_PATH'
 ];
 
 // The extension gate is an ALLOWLIST in filePolicy.php, not a blocklist here.
@@ -229,7 +234,7 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
     $projectName = !empty($newName) ? $newName : $projectFolder['name'];
     
     // Validate project name
-    if (!preg_match('/^[a-zA-Z][a-zA-Z0-9_-]{0,49}$/', $projectName)) {
+    if (!preg_match('/^[a-zA-Z][a-zA-Z0-9_-]{0,49}$/D', $projectName)) {
         $zip->close();
         return ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage('Invalid project name format')
@@ -883,6 +888,98 @@ function importFirstInvalidComponentReference(string $relativePath, string $cont
 }
 
 /**
+ * The first setting in an archive's config.json that the command writing it
+ * would refuse, or null when every one is valid. config.php is rebuilt from these
+ * values and the router, the translator and every language command read them — a
+ * language code becomes part of a translation file's path — so a value no command
+ * could have written refuses the whole archive.
+ *
+ * Each rule is its writer's:
+ *   - SITE_NAME — createProject (at most 200 characters, control characters
+ *     removed) and cloneProject;
+ *   - LANGUAGES_SUPPORTED — createProject, addLang and deleteLang: a list of
+ *     distinct language codes that is never empty;
+ *   - LANGUAGE_DEFAULT — createProject and setDefaultLang: a code on that list;
+ *   - LANGUAGES_NAME — createProject, addLang and setMultilingual: a display name
+ *     of at most 100 bytes for a listed code;
+ *   - MULTILINGUAL_SUPPORT — setMultilingual; THEME_MODE_ENABLED, THEME_DEFAULT
+ *     and THEME_USER_TOGGLE_ENABLED — setThemeMode;
+ *   - FAVICON_PATH — editFavicon, and editAsset when it renames the favicon.
+ * A setting that is absent (or null) is not checked: the rebuild gives it its
+ * default, and the language list's default is the one LANGUAGE_DEFAULT is then
+ * checked against.
+ *
+ * @return array|null ['key' => the setting, 'message' => the rule it breaks]
+ */
+function importFirstInvalidSetting(array $config): ?array {
+    $isCode = static function ($v): bool {
+        return is_string($v) && RegexPatterns::match('language_code', $v);
+    };
+    $codeRule = RegexPatterns::getDescription('language_code');
+
+    if (isset($config['SITE_NAME'])) {
+        $name = $config['SITE_NAME'];
+        if (!is_string($name) || mb_strlen($name, 'UTF-8') > 200 || preg_match('/[\x00-\x1F\x7F]/', $name)) {
+            return ['key' => 'SITE_NAME', 'message' => 'SITE_NAME must be text of at most 200 characters, with no control characters.'];
+        }
+    }
+
+    $languages = ['en'];
+    if (isset($config['LANGUAGES_SUPPORTED'])) {
+        $list = $config['LANGUAGES_SUPPORTED'];
+        if (!is_array($list) || $list === [] || array_values($list) !== $list
+            || count(array_filter($list, $isCode)) !== count($list)
+            || count(array_unique($list)) !== count($list)) {
+            return ['key' => 'LANGUAGES_SUPPORTED', 'message' => "LANGUAGES_SUPPORTED must be a list of distinct language codes ({$codeRule}), not empty."];
+        }
+        $languages = $list;
+    }
+
+    if (isset($config['LANGUAGE_DEFAULT'])
+        && (!$isCode($config['LANGUAGE_DEFAULT']) || !in_array($config['LANGUAGE_DEFAULT'], $languages, true))) {
+        return ['key' => 'LANGUAGE_DEFAULT', 'message' => "LANGUAGE_DEFAULT must be a language code ({$codeRule}) listed in LANGUAGES_SUPPORTED."];
+    }
+
+    if (isset($config['LANGUAGES_NAME'])) {
+        $names = $config['LANGUAGES_NAME'];
+        $valid = is_array($names);
+        foreach ($valid ? $names : [] as $code => $label) {
+            if (!is_string($code) || !in_array($code, $languages, true) || !is_string($label)
+                || $label === '' || strlen($label) > 100 || !RegexPatterns::match('language_name', $label)) {
+                $valid = false;
+                break;
+            }
+        }
+        if (!$valid) {
+            return ['key' => 'LANGUAGES_NAME', 'message' => 'LANGUAGES_NAME must give each listed language code a display name of at most 100 bytes ('
+                . RegexPatterns::getDescription('language_name') . ').'];
+        }
+    }
+
+    foreach (['MULTILINGUAL_SUPPORT', 'THEME_MODE_ENABLED', 'THEME_USER_TOGGLE_ENABLED'] as $key) {
+        if (isset($config[$key]) && !is_bool($config[$key])) {
+            return ['key' => $key, 'message' => "{$key} must be true or false."];
+        }
+    }
+    if (isset($config['THEME_DEFAULT']) && !in_array($config['THEME_DEFAULT'], ['light', 'dark', 'system'], true)) {
+        return ['key' => 'THEME_DEFAULT', 'message' => 'THEME_DEFAULT must be light, dark or system.'];
+    }
+
+    if (isset($config['FAVICON_PATH'])) {
+        $prefix = '/assets/images/';
+        $path = $config['FAVICON_PATH'];
+        $file = is_string($path) && strpos($path, $prefix) === 0 ? substr($path, strlen($prefix)) : '';
+        if ($file === '' || strlen($file) > 100 || !RegexPatterns::match('file_name_with_ext', $file)
+            || !in_array(strtolower(pathinfo($file, PATHINFO_EXTENSION)), qs_favicon_extensions(), true)) {
+            return ['key' => 'FAVICON_PATH', 'message' => "FAVICON_PATH must be {$prefix} followed by a file name with a favicon extension ("
+                . implode(', ', qs_favicon_extensions()) . ').'];
+        }
+    }
+
+    return null;
+}
+
+/**
  * The ARCHIVE GATE: every entry the import would extract is checked before the
  * project directory is created, and the first one that fails refuses the WHOLE
  * archive. A project imported with one page dropped keeps that page's route, and
@@ -896,6 +993,8 @@ function importFirstInvalidComponentReference(string $relativePath, string $cont
  *      decode to a JSON array or object; the site could not read it either;
  *   2. `disallowed_content` — the import policy's extension allowlist or the
  *      archive content check refuses it, as it would at extraction;
+ * and the root config.json also `invalid_setting` — a setting the command that
+ * writes it would refuse (importFirstInvalidSetting()), named in `value`;
  * and a structure file (importStructureKind()) also the first of:
  *   3. `unsafe_value` — an attribute the write gate refuses, naming the node and
  *      the attribute;
@@ -954,6 +1053,13 @@ function importFirstStructureFailure(ZipArchive $zip, string $prefix): ?array {
         if (!$verdict['ok']) {
             return ['file' => $relativePath, 'reason' => 'disallowed_content',
                     'message' => ucfirst($verdict['reason']) . '.'];
+        }
+        if (strtolower($relativePath) === 'config.json') {
+            $badSetting = importFirstInvalidSetting($data);
+            if ($badSetting !== null) {
+                return ['file' => $relativePath, 'reason' => 'invalid_setting', 'value' => $badSetting['key'],
+                        'message' => $badSetting['message']];
+            }
         }
         if ($kind === null) {
             continue;

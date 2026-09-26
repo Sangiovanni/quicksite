@@ -56,7 +56,7 @@ function __command_addPageEvent(array $params = [], array $urlParams = []): ApiR
     }
     
     // Validate function name
-    if (!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $function)) {
+    if (!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/D', $function)) {
         return ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage('Invalid function name format');
     }

@@ -424,7 +424,7 @@ function validateResolverConfig(array $config, ?ApiEndpointManager $apiManager =
             ];
         } elseif (!$providerMissing) {
             $provider = $config['provider'];
-            $isPlaceholder = (bool) preg_match('/^\{:\w+\}$/', $provider);
+            $isPlaceholder = (bool) preg_match('/^\{:\w+\}$/D', $provider);
             if (!$isPlaceholder) {
                 // Literal provider — must exist either in the per-project
                 // oauth-presets.json OR the admin catalogue. Slice 2.5
@@ -576,7 +576,7 @@ function validateResolverConfig(array $config, ?ApiEndpointManager $apiManager =
                 // `content-type` are common). Special chars (quotes,
                 // spaces, dots, etc.) break URL encoding semantics or
                 // create JSON-escape oddness — block them.
-                if (!preg_match('/^[a-zA-Z_][a-zA-Z0-9_\-]*$/', $name)) {
+                if (!preg_match('/^[a-zA-Z_][a-zA-Z0-9_\-]*$/D', $name)) {
                     $errors[] = [
                         'field'  => 'resolver.inputs',
                         'reason' => 'invalid_name_chars',
@@ -653,7 +653,7 @@ function validateResolverConfig(array $config, ?ApiEndpointManager $apiManager =
                 // underscores only, must start with letter or underscore.
                 // Hyphens are NOT allowed here (would break PHP var
                 // syntax) even though they're allowed in input names.
-                if (!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $name)) {
+                if (!preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/D', $name)) {
                     $errors[] = [
                         'field'  => 'resolver.expose',
                         'reason' => 'invalid_name_chars',

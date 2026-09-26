@@ -6,8 +6,12 @@ function is_valid_relative_path(string $path, int $max_length = 255, int $max_de
     if ($path === '') {
         return $allow_empty;
     }
-    // 1. Basic cleaning and normalization
-    $normalized_path = trim($path);
+    // 1. Whitespace at either end is refused, not trimmed: the caller uses the
+    //    value it passed, so the value checked has to be that value.
+    if ($path !== trim($path)) {
+        return false;
+    }
+    $normalized_path = $path;
     
     // Convert all backslashes (common in Windows input) to forward slashes
     $normalized_path = str_replace('\\', '/', $normalized_path);
@@ -52,7 +56,7 @@ function is_valid_relative_path(string $path, int $max_length = 255, int $max_de
     // D. Check for invalid characters using a regular expression
     // Only allows: letters, numbers, hyphens, underscores, dots
     // Format: segment or segment/segment/segment...
-    $valid_path_regex = '/^[a-zA-Z0-9_\.\-]+([\/][a-zA-Z0-9_\.\-]+)*$/';
+    $valid_path_regex = '/^[a-zA-Z0-9_\.\-]+([\/][a-zA-Z0-9_\.\-]+)*$/D';
     if (!preg_match($valid_path_regex, $normalized_path)) {
         return false;
     }
@@ -84,7 +88,7 @@ function is_valid_relative_path(string $path, int $max_length = 255, int $max_de
  */
 function is_valid_project_name(string $name): bool
 {
-    return (bool) preg_match('/^[a-zA-Z][a-zA-Z0-9_-]{0,49}$/', $name);
+    return (bool) preg_match('/^[a-zA-Z][a-zA-Z0-9_-]{0,49}$/D', $name);
 }
 
 /**
@@ -101,7 +105,7 @@ function is_valid_backup_name(string $name): bool
     if (strpos($name, '..') !== false) {
         return false;
     }
-    return (bool) preg_match('/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/', $name);
+    return (bool) preg_match('/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/D', $name);
 }
 
 

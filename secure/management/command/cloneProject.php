@@ -60,7 +60,7 @@ function __command_cloneProject(array $params = [], array $urlParams = []): ApiR
     }
     
     // Validate project name format
-    if (!preg_match('/^[a-zA-Z][a-zA-Z0-9_-]{0,49}$/', $newName)) {
+    if (!preg_match('/^[a-zA-Z][a-zA-Z0-9_-]{0,49}$/D', $newName)) {
         return ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage('Invalid project name format')
             ->withErrors(['name' => 'Must start with letter, contain only alphanumeric/dash/underscore, max 50 chars']);

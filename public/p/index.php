@@ -63,7 +63,7 @@ if (isset($_GET['_component']) && isset($_GET['_editor']) && $_GET['_editor'] ==
             $parsed = json_decode($decoded, true);
             if (is_array($parsed)) {
                 foreach ($parsed as $key => $value) {
-                    if (is_string($key) && is_string($value) && strlen($value) < 500 && preg_match('/^[\w-]+$/', $key)) {
+                    if (is_string($key) && is_string($value) && strlen($value) < 500 && preg_match('/^[\w-]+$/D', $key)) {
                         $emulateOverrides[$key] = $value;
                     }
                 }

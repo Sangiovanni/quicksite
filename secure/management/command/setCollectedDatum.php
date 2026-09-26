@@ -30,7 +30,7 @@ if (!is_string($id) || trim($id) === '') {
         ->send();
 }
 $id = trim($id);
-if (!preg_match('/^[a-z0-9][a-z0-9_-]*$/i', $id)) {
+if (!preg_match('/^[a-z0-9][a-z0-9_-]*$/iD', $id)) {
     ApiResponse::create(400, 'validation.invalid')
         ->withMessage("Invalid id '$id'. Use letters, numbers, hyphens and underscores (no spaces).")
         ->withErrors([['field' => 'id', 'reason' => 'invalid_format']])

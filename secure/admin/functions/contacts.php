@@ -84,7 +84,7 @@ const QS_CONTACT_NAME_MAX = 200;
  * @return bool
  */
 function qs_contact_id_is_well_formed($userId): bool {
-    return is_string($userId) && preg_match('/^usr_[a-f0-9]{32}$/', $userId) === 1;
+    return is_string($userId) && preg_match('/^usr_[a-f0-9]{32}$/D', $userId) === 1;
 }
 
 /**

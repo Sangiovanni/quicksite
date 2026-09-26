@@ -164,9 +164,9 @@ class NodeNavigator {
         }
         
         // Validate format: should be numbers separated by dots, optionally with "slots.name" segments
-        if (!preg_match('/^[0-9]+(\.(slots\.[a-zA-Z0-9_-]+\.)?[0-9]+)*$/', $nodeId)) {
+        if (!preg_match('/^[0-9]+(\.(slots\.[a-zA-Z0-9_-]+\.)?[0-9]+)*$/D', $nodeId)) {
             // Check for simpler format without slots
-            if (!preg_match('/^[0-9]+(\.[0-9]+)*$/', $nodeId)) {
+            if (!preg_match('/^[0-9]+(\.[0-9]+)*$/D', $nodeId)) {
                 return null;
             }
         }

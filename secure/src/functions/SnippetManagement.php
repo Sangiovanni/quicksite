@@ -110,7 +110,7 @@ function getPersonalSnippetsPath(?string $userId = null): ?string {
     // rather than sanitising: this string is concatenated into a filesystem
     // path, and an allowlist is the only form of that check that cannot be
     // out-thought (C3/C11).
-    if (!is_string($userId) || preg_match('/^usr_[a-f0-9]{32}$/', $userId) !== 1) {
+    if (!is_string($userId) || preg_match('/^usr_[a-f0-9]{32}$/D', $userId) !== 1) {
         return null;
     }
 

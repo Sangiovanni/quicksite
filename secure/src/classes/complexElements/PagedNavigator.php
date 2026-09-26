@@ -60,7 +60,7 @@ class PagedNavigatorBuilder extends ComplexElementBuilder {
         // ---- storeId (required) --------------------------------------
         self::requireField($config, 'storeId');
         $storeId = (string)$config['storeId'];
-        if (!preg_match('/^[a-zA-Z][\w-]*$/', $storeId)) {
+        if (!preg_match('/^[a-zA-Z][\w-]*$/D', $storeId)) {
             throw new ComplexElementBuilderException(
                 "Invalid storeId '$storeId' — must start with a letter; use letters, digits, hyphens, underscores."
             );
@@ -69,7 +69,7 @@ class PagedNavigatorBuilder extends ComplexElementBuilder {
         // ---- optional fields -----------------------------------------
         $pageField = isset($config['pageField']) && $config['pageField'] !== ''
             ? (string)$config['pageField'] : 'page';
-        if (!preg_match('/^[a-zA-Z_][\w]*$/', $pageField)) {
+        if (!preg_match('/^[a-zA-Z_][\w]*$/D', $pageField)) {
             throw new ComplexElementBuilderException(
                 "Invalid pageField '$pageField' — must be a valid JSON property name (letters/digits/_)."
             );
@@ -77,7 +77,7 @@ class PagedNavigatorBuilder extends ComplexElementBuilder {
 
         $totalPagesField = isset($config['totalPagesField']) && $config['totalPagesField'] !== ''
             ? (string)$config['totalPagesField'] : 'totalPages';
-        if (!preg_match('/^[a-zA-Z_][\w]*$/', $totalPagesField)) {
+        if (!preg_match('/^[a-zA-Z_][\w]*$/D', $totalPagesField)) {
             throw new ComplexElementBuilderException(
                 "Invalid totalPagesField '$totalPagesField' — must be a valid JSON property name."
             );

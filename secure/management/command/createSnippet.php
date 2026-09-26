@@ -71,7 +71,7 @@ function __command_createSnippet(array $params = [], array $urlParams = []): Api
     }
     
     // Validate ID format (alphanumeric, dashes, underscores)
-    if (!preg_match('/^[a-zA-Z][a-zA-Z0-9_-]*$/', $snippetId)) {
+    if (!preg_match('/^[a-zA-Z][a-zA-Z0-9_-]*$/D', $snippetId)) {
         return ApiResponse::create(400, 'snippets.invalid_id')
             ->withMessage('Snippet ID must start with a letter and contain only letters, numbers, dashes, and underscores');
     }

@@ -33,7 +33,7 @@ $__qsApiProject = null;
             && isset($__segs[$__i + 3])) {
             $__cand = rawurldecode($__segs[$__i + 3]);
             // F1 shape only — membership is checked after auth, below.
-            if (preg_match('/^[A-Za-z0-9_-]{1,64}$/', $__cand)) {
+            if (preg_match('/^[A-Za-z0-9_-]{1,64}$/D', $__cand)) {
                 $__qsApiProject = $__cand;
             }
             break;

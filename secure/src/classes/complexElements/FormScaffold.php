@@ -135,10 +135,10 @@ class FormScaffoldBuilder extends ComplexElementBuilder {
             self::requireField($config, 'endpointId');
             $apiId = (string)$config['apiId'];
             $endpointId = (string)$config['endpointId'];
-            if (!preg_match('/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/', $apiId)) {
+            if (!preg_match('/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/D', $apiId)) {
                 throw new ComplexElementBuilderException("Invalid apiId '$apiId'");
             }
-            if (!preg_match('/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/', $endpointId)) {
+            if (!preg_match('/^[a-zA-Z0-9][a-zA-Z0-9_-]*$/D', $endpointId)) {
                 throw new ComplexElementBuilderException("Invalid endpointId '$endpointId'");
             }
             $onsubmitCalls[] = '{{call:fetch:@' . $apiId . '/' . $endpointId . ',body=#' . $id . '}}';

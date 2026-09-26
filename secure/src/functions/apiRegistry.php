@@ -391,7 +391,7 @@ if (!function_exists('qs_api_client_origins')) {
             }
             // Host and port only, and only from parse_url's own output — never
             // a substring of the author's string.
-            if (!preg_match('/^[A-Za-z0-9._-]+$/', $parts['host'])) {
+            if (!preg_match('/^[A-Za-z0-9._-]+$/D', $parts['host'])) {
                 continue;
             }
             $origin = strtolower($parts['scheme']) . '://' . $parts['host'];

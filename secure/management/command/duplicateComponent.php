@@ -50,7 +50,7 @@ function __command_duplicateComponent(array $params = [], array $urlParams = [])
     }
     
     // Validate new name format (alphanumeric with hyphens)
-    if (!preg_match('/^[a-zA-Z][a-zA-Z0-9-]*$/', $newName)) {
+    if (!preg_match('/^[a-zA-Z][a-zA-Z0-9-]*$/D', $newName)) {
         return ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage('Component name must start with a letter and contain only letters, numbers, and hyphens')
             ->withData(['invalid' => $newName]);

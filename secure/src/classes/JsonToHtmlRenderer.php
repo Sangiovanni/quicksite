@@ -699,7 +699,7 @@ class JsonToHtmlRenderer {
         }
 
         // Sanitize tag name (only allow alphanumeric and hyphen)
-        if (!preg_match('/^[a-z0-9-]+$/i', $tag)) {
+        if (!preg_match('/^[a-z0-9-]+$/iD', $tag)) {
             error_log("Invalid tag name: {$tag}");
             return "<!-- Invalid tag name -->";
         }
@@ -922,7 +922,7 @@ class JsonToHtmlRenderer {
                 $value = substr($value, 7); // Remove __LIT__ prefix
             }
             // Check if value looks like a translation key (contains dots, alphanumeric/underscore, no spaces)
-            elseif (preg_match('/^[a-z0-9_]+(\.[a-z0-9_]+)+$/i', $value)) {
+            elseif (preg_match('/^[a-z0-9_]+(\.[a-z0-9_]+)+$/iD', $value)) {
                 // It's a translation key - translate it
                 $value = $this->translator->translate($value);
             }

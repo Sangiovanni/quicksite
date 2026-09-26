@@ -11820,3 +11820,104 @@ added the same day. `secure/src/functions/runtimeHandoff.php`
 `secure/admin/templates/layout.php`,
 `secure/admin/templates/pages/preview-config.php`,
 `secure/src/functions/contentSecurityPolicy.php`.
+
+### Every validator in the engine ends at the true end of the string, and an import takes only the settings a command could write (locked 2026-09-26)
+
+**Amends**: *Every validator ends at the true end of the string, and the pattern catalogue
+holds only patterns something calls* (locked 2026-09-25), which left the anchored
+validators outside the catalogue until each one's consumer had been read, and *An export
+carries the project's snippets; every file the site reads refuses a broken archive whole,
+and may show a PHP opening tag* (locked 2026-09-25), under which a settings file had only
+to be readable and parse. Their decisions stand; this entry carries both further.
+
+**Decision**: six changes, made together.
+
+- **A validator outside the catalogue ends at the true end of the string too.** Outside
+  the catalogue, 103 patterns are anchored at both ends. The 77 that validate — a project,
+  route, snippet, component, build or backup name, an OAuth provider, API, endpoint or
+  store id, a form field or template variable name, a request's Host header, a session or
+  form-token cookie, a user id, a node id, a tag name — now end at the true end of the
+  string: 76 carry the `D` modifier, and `createProject`'s language code uses the
+  catalogue's rule. The other 26 keep their pattern, each for a stated reason. Eight are
+  detectors, where matching more is the safe side: an event-handler attribute name, a
+  URL-bearing attribute name, a malformed resolver input, a browser-storage reference, an
+  OAuth placeholder read back from a resolver. Eighteen parse text an author wrote, and
+  their consumer trims or splits it: workflow conditions and templates, the stylesheet's
+  animation shorthand, the placeholders in a stored endpoint path, and a text node's
+  variable placeholder in the preview.
+- **A check vouches for the value its caller uses.** The relative-path check behind
+  `build`'s `public`, `secure` and `space` checked a trimmed copy and approved it, while
+  `build` went on with the value as sent. It now refuses whitespace at either end.
+- **One rule for the language codes a project holds: two or three lowercase letters.**
+  `createProject` accepted two letters with an optional region (`en-US`) and refused
+  three, where `addLang`, `deleteLang` and `setDefaultLang` do the opposite — so a
+  project created with a region could never delete its first language, nor make it the
+  default again, by name. The translation commands, which read or write a language the
+  project already has, still accept a region suffix; no command or import can give a
+  project one now.
+- **A native language name can be entered.** A display name takes combining marks, each
+  after the letter it belongs to, so the Hindi, Tamil, Bengali, Gujarati and Kannada names
+  of those languages pass; a name made only of marks is still refused. `setMultilingual`'s
+  own table already wrote the Hindi name that `addLang` refused.
+- **An import takes a setting only if the command that writes it would.** Each value in an
+  archive's `config.json` is checked against its writer's rule — the site name's length and
+  control characters, the language codes, the display names, the flags, the theme default
+  and the favicon path — and against the rules the commands keep between settings: the
+  language list is never empty and has no duplicates, the default is on it, and every
+  display name belongs to a listed language. The first that fails refuses the whole
+  archive before anything is created, answering `400 validation.unsafe_param` with the
+  reason `invalid_setting` and `value` naming the setting.
+- **Every setting a command writes travels.** The favicon and the three theme settings,
+  written by `editFavicon` and `setThemeMode`, were dropped by both the export and the
+  import, so a project lost them on its way through an archive; both now carry them. The
+  two keys nothing wrote or read are gone from both lists.
+
+**Reasoning**: no legitimate input ends in a newline, and a rule that reached only the
+catalogue left the same defect everywhere else. Measured on the code before this change,
+through the real commands: a route segment, a snippet id, a build name and an archive's
+folder name each passed their check with a trailing newline and went on to the filesystem,
+which refused the name on Windows — a route answered 500, and a build reported that
+another build of the same name was in progress — and would have created it on Linux,
+where a newline is a legal filename character. The check on the space an nginx `location`
+line is written from, and the check on a CSRF header name, each accepted exactly the
+character their own comments say they exist to keep out. Where a value is trimmed before
+its check the modifier changes nothing; it is added anyway, so the only exceptions are the
+ones listed.
+
+A detector's looser match is its margin: the event-handler check classes more names as
+handlers, which are then blocked, and an exact match would catch fewer. A parser of
+hand-written text is judged by what reads it. A workflow condition's captured parts are
+trimmed, and a shipped workflow does carry a string ending in its file's own newline — the
+stylesheet a build step sends — so a trailing newline there is content. The attribute
+translation-key test went the other way, in the renderer and the compiler together so that
+preview and build agree: a value ending in a newline is not a key, and it now shows as
+written rather than as a missing translation.
+
+The settings check sits in the archive gate for the gate's own reason: the settings are the
+site. A language code becomes part of a translation file's path in the translator and in
+several commands, and part of a regular expression in the renderer and the compiler; an
+archive could set it to anything, and every signed-in account may import. Checking at the
+gate, against the rule of the command that writes each setting, closes every consumer at
+once and costs an export nothing: every setting on the install passes, and the real export
+of every real project imports whole.
+
+**Alternatives considered**: the modifier on every anchored pattern, detectors and parsers
+included (rejected — see above). Trimming in each caller of the relative-path check
+(rejected — the next caller would have to know to). For the language code, the union of
+what any writer accepted (rejected — it keeps a code the other commands cannot manage), or
+regional codes in the four commands that manage languages (not taken — that is a
+feature). An existing reason for a bad setting (rejected — `unsafe_value` names a
+structure attribute and `disallowed_content` the file-type and content check; a setting is
+neither). Requiring two languages for multilingual mode, or a display name for every
+language (rejected — deleting a language, and turning multilingual mode off, leave exactly
+those states, and the import must take what the commands produce). Refusing an unknown key
+in `config.json` (not taken — it is ignored, as before, and never written).
+
+**Source**: Sangio's ruling on combining marks, 2026-09-25, and his four answers during
+beta.12, 2026-09-26 — whitespace refused, the lost settings carried, one language-code
+rule, a reason of its own. `secure/src/classes/RegexPatterns.php` (`language_name`);
+`secure/src/functions/PathManagement.php` (`is_valid_relative_path`);
+`secure/management/command/createProject.php`, `importProject.php`
+(`importFirstInvalidSetting`, `importFirstStructureFailure`) and `exportProject.php`; and
+the anchored validators in 48 further files under `public/` and `secure/`. Behaviour:
+[COMMAND_API.md](COMMAND_API.md) (*Archive import limits*).

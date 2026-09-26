@@ -113,8 +113,8 @@ foreach ($segments as $index => $segment) {
     //      ([a-z_][a-z0-9_]*). Lowercase-only matches the literal-
     //      segment convention; mixed-case param names get rejected
     //      so the route author and URL author share the same rule.
-    $isLiteral = (bool) preg_match('/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/', $segment);
-    $isParam   = (bool) preg_match('/^:[a-z_][a-z0-9_]*$/', $segment);
+    $isLiteral = (bool) preg_match('/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/D', $segment);
+    $isParam   = (bool) preg_match('/^:[a-z_][a-z0-9_]*$/D', $segment);
     if (!$isLiteral && !$isParam) {
         ApiResponse::create(400, 'route.invalid_segment')
             ->withMessage("Invalid segment '$segment'. Use lowercase letters, numbers, hyphens for literals (no leading/trailing hyphens), or ':name' for a path parameter (lowercase identifier).")

@@ -410,7 +410,7 @@ class AdminRouter {
             return $this->formToken;
         }
         $existing = (string)($_COOKIE[self::FORM_TOKEN_COOKIE] ?? '');
-        if (preg_match('/^[0-9a-f]{64}$/', $existing) === 1) {
+        if (preg_match('/^[0-9a-f]{64}$/D', $existing) === 1) {
             $this->formToken = $existing;
             return $this->formToken;
         }

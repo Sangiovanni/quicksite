@@ -74,7 +74,7 @@ function __command_duplicateSnippet(array $params = [], array $urlParams = []): 
     }
     
     // Validate new ID format
-    if (!preg_match('/^[a-zA-Z][a-zA-Z0-9_-]*$/', $newId)) {
+    if (!preg_match('/^[a-zA-Z][a-zA-Z0-9_-]*$/D', $newId)) {
         return ApiResponse::create(400, 'snippets.invalid_id')
             ->withMessage('New ID must start with a letter and contain only letters, numbers, dashes, and underscores');
     }
