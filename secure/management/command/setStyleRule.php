@@ -60,29 +60,30 @@ if (empty($styles) && empty($removeProperties)) {
         ->send();
 }
 
-// Security validation - prevent CSS injection attacks
-$dangerousPatterns = [
-    '/javascript\s*:/i',
-    '/expression\s*\(/i',
-    '/url\s*\(\s*javascript/i',
-    '/@import/i',
-    '/<\s*script/i',
-    '/<\s*style/i',
-];
-
-// Validate against dangerous patterns
-$textToCheck = $styles . ' ' . $selector;
-foreach ($dangerousPatterns as $pattern) {
-    if (preg_match($pattern, $textToCheck)) {
+// SECURITY: the scan every stylesheet writer runs (qs_css_first_danger), on each
+// piece of CSS text this command receives and on the rule as it will be written,
+// because a denylisted sequence can span two pieces.
+$pieces = ['selector' => $selector, 'styles' => (string) $styles];
+if ($mediaQuery !== null) {
+    $pieces['mediaQuery'] = $mediaQuery;
+}
+$rule = $selector . " {\n" . $styles . "\n}";
+$pieces['rule'] = $mediaQuery !== null ? '@media ' . $mediaQuery . " {\n" . $rule . "\n}" : $rule;
+foreach ($pieces as $field => $text) {
+    $danger = qs_css_first_danger($text);
+    if ($danger !== null) {
         ApiResponse::create(400, 'validation.security')
             ->withMessage('Potentially dangerous CSS pattern detected')
+            ->withErrors([
+                ['field' => $field, 'reason' => 'dangerous_pattern', 'pattern' => $danger]
+            ])
             ->send();
     }
 }
 
-// F-C13-4 confinement — a `{` or `}` in the selector, the media query, or the
+// Brace confinement — a `{` or `}` in the selector, the media query, or the
 // declaration block lets the input escape its rule and emit arbitrary CSS. The
-// denylist above does NOT cover braces, and mediaQuery never reached it at all.
+// denylist does not cover braces.
 foreach (['selector' => $selector, 'styles' => $styles, 'mediaQuery' => $mediaQuery] as $field => $value) {
     if ($value !== null && $value !== '' && !qs_css_confine((string) $value)) {
         ApiResponse::create(400, 'validation.security')
@@ -91,14 +92,11 @@ foreach (['selector' => $selector, 'styles' => $styles, 'mediaQuery' => $mediaQu
     }
 }
 
-// Validate media query format if provided
-if ($mediaQuery !== null && !RegexPatterns::match('media_query_basic', $mediaQuery)) {
-    // Allow common media query formats
-    if (!RegexPatterns::match('media_query_chars', $mediaQuery)) {
-        ApiResponse::create(400, 'validation.invalid_media_query')
-            ->withMessage('Invalid media query format')
-            ->send();
-    }
+// Validate the media query, if provided, with the one media-query rule.
+if ($mediaQuery !== null && !RegexPatterns::match('media_query_chars', $mediaQuery)) {
+    ApiResponse::create(400, 'validation.invalid_media_query')
+        ->withMessage('Invalid media query format')
+        ->send();
 }
 
 $styleFile = cssLivePath();

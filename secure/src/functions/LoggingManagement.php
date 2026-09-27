@@ -618,7 +618,7 @@ function clearCommandHistory(string $beforeDate, string $project = ''): array {
     $files = glob($dir . '/commands_*.json');
     foreach ($files as $file) {
         // Extract date from filename
-        if (preg_match('/commands_(\d{4}-\d{2}-\d{2})\.json$/', $file, $matches)) {
+        if (preg_match('/commands_(\d{4}-\d{2}-\d{2})\.json$/D', $file, $matches)) {
             $fileDate = new DateTime($matches[1]);
             if ($fileDate < $cutoff) {
                 $size = filesize($file);
@@ -658,7 +658,7 @@ function getLogDates(string $project = ''): array {
     $files = glob($dir . '/commands_*.json');
 
     foreach ($files as $file) {
-        if (preg_match('/commands_(\d{4}-\d{2}-\d{2})\.json$/', $file, $matches)) {
+        if (preg_match('/commands_(\d{4}-\d{2}-\d{2})\.json$/D', $file, $matches)) {
             $content = json_decode(file_get_contents($file), true);
             $dates[] = [
                 'date' => $matches[1],

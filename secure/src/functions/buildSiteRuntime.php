@@ -538,7 +538,6 @@ if (!function_exists('qs_site_verify_servable')) {
             'src/classes/Page.php',
             'src/classes/Translator.php',
             'src/classes/TrimParameters.php',
-            'src/classes/RegexPatterns.php',
             'src/functions/String.php',
             'src/functions/projectLanguage.php',
             'src/functions/routeHelpers.php',

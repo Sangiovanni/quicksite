@@ -519,15 +519,14 @@ if (($copyError = qs_safe_copy(PROJECT_PATH . '/config.php', $buildFullPath . '/
 // server-side data path, because a resolver-backed page fetches its data on
 // every request and no amount of precompilation can do that ahead of time.
 //
-//   Page / Translator / TrimParameters / RegexPatterns  render + route + translate
-//   DataResolver                                        fires a route's resolvers
-//   OutboundUrlPolicy                                   vets the URL before the call
-//   IframeSandbox                                       per-domain sandbox policy
+//   Page / Translator / TrimParameters  render + route + translate
+//   DataResolver                        fires a route's resolvers
+//   OutboundUrlPolicy                   vets the URL before the call
+//   IframeSandbox                       per-domain sandbox policy
 $classFiles = [
     'Page.php',
     'Translator.php',
     'TrimParameters.php',
-    'RegexPatterns.php',
     'DataResolver.php',
     'OutboundUrlPolicy.php',
     'IframeSandbox.php',

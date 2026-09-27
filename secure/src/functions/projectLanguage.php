@@ -27,11 +27,11 @@
  * was a fatal. One function, four callers.
  *
  * WHY `src/functions/` AND NOT `utilsManagement.php`.
- * Both callers travel into a production build, which carries only
- * src/classes/{Page,Translator,TrimParameters,RegexPatterns}.php and
- * src/functions/String.php. utilsManagement.php does not travel, so putting
- * the answer there would make every built site fatal on its first page. This
- * file is copied by the build alongside String.php, for the same reason.
+ * Both callers travel into a production build, which carries a fixed list of
+ * engine files — src/classes/{Page,Translator,TrimParameters}.php and
+ * src/functions/String.php among them. utilsManagement.php does not travel, so
+ * putting the answer there would make every built site fatal on its first page.
+ * This file is copied by the build alongside String.php, for the same reason.
  *
  * The vocabulary, smallest to largest:
  *

@@ -11921,3 +11921,112 @@ rule, a reason of its own. `secure/src/classes/RegexPatterns.php` (`language_nam
 (`importFirstInvalidSetting`, `importFirstStructureFailure`) and `exportProject.php`; and
 the anchored validators in 48 further files under `public/` and `secure/`. Behaviour:
 [COMMAND_API.md](COMMAND_API.md) (*Archive import limits*).
+
+### One scan for every stylesheet writer and the import, a media query never holds the start of an end tag, and keyframes as CSS writes them (locked 2026-09-26)
+
+**Amends**: *Every validator ends at the true end of the string, and the pattern catalogue
+holds only patterns something calls* (locked 2026-09-25), where it described the media-query
+and keyframe rules; *An export carries the project's snippets; every file the site reads
+refuses a broken archive whole, and may show a PHP opening tag* (locked 2026-09-25), under
+which a stylesheet in an archive was skipped on its own when refused; and *Every validator in
+the engine ends at the true end of the string, and an import takes only the settings a command
+could write* (locked 2026-09-26), whose relative-path check still approved a rewritten copy.
+Their decisions stand; this entry carries each of them further.
+
+**Decision**: six changes, made together.
+
+- **One scan for every path that puts CSS text into a project stylesheet.** `editStyles`,
+  `setStyleRule`, `setKeyframes`, `setRootVariables`, `injectSnippetCss` and the import's
+  content check run the same scan, defined once. On the text as the browser reads it —
+  comments removed, escapes decoded — it refuses a `javascript:` or `vbscript:` URL,
+  `expression(`, `behavior:`, `-moz-binding:`, a `data:text/html` URI, an `@import` of a
+  scheme or of another host, and an HTML script or style tag: the union of the four lists the
+  writers each kept. A relative `@import` stays legal. On the raw bytes it refuses a PHP
+  opening tag, with the import's own test. Each writer scans every piece of CSS text it
+  receives — a media query, a variable's name, a snippet's CSS and the comment that carries
+  the snippet's id included — and the text as it will be written, with the pieces joined the
+  way the writer joins them.
+- **A comment is removed only where the browser reads one.** Inside a quoted string, and
+  inside an unquoted `url(…)`, the characters that open a comment are ordinary text, and the
+  scan keeps them.
+- **A stylesheet refuses the whole archive** when it cannot be read or fails the content
+  check, which now includes the scan: any `.css` entry, checked before any project is created,
+  answering `400 validation.unsafe_param` with the reason `disallowed_content`. That includes a
+  stylesheet holding a PHP opening tag, which the import used to skip on its own.
+- **A media query never holds `<` directly followed by `/`**, the start of an HTML end tag.
+  `<`, `>` and `/` on their own stay legal: range syntax and ratios need them. One rule checks a
+  media query: the single-feature pattern accepted nothing the other did not, so
+  `setStyleRule` calls the other alone and the single-feature pattern is gone.
+- **Keyframe keys as CSS writes them.** A frame key is a percentage with decimals allowed,
+  `from`, `to`, or a comma-separated list mixing them. The stylesheet parser reads frames
+  with its block tree instead of a pattern, so it returns every key as written, and
+  `getKeyframes` hands out what `setKeyframes` takes back.
+- **Four validator gaps close.** A header name the server-side fetch builds from an API's
+  token source is an RFC 7230 token, checked when an API is saved and again when the request
+  is built. An endpoint path holds only what a URL's path and query may hold, RFC 3986's
+  characters and percent escapes. The relative-path check behind `build`'s folder names refuses
+  a backslash and a doubled slash instead of approving a rewritten copy. And a suffix test that
+  decides what happens to a value ends at the true end of the string: whether a workflow
+  template names a file, which command-log file a date names, which route a page file names.
+  Three suffix tests keep their pattern: a detector, where matching more is the safe side, and
+  two that only ever see text ending in the suffix itself — a declaration block the parser
+  reads to its end, and a path a directory listing for that suffix returned.
+
+**Reasoning**: the four lists had drifted apart, and the three per-rule writers ran theirs on
+raw bytes, so a comment or an escape inside a keyword passed them while `editStyles` refused
+the same text; `injectSnippetCss` ran none at all, and a project snippet can arrive in an
+imported archive. A scan defined once cannot drift. The union costs no legitimate rule its
+verdict: on every stylesheet on the install — live, built and backed up — the starter
+template, every snippet's CSS, and every stylesheet a shipped workflow or the command log
+sends, no piece trips any entry, a PHP opening tag or the media query's new rule.
+
+The pieces are joined because a writer adds text between them. `setRootVariables` writes a
+name, then `: `, then a value, so a keyword can end the name and take its colon from the
+writer; a comment opened in one frame can close in the next. A scan that treats a comment
+opener inside a string or a URL as a comment removes text the browser still reads, so it sees
+less than the browser does.
+
+Every signed-in account may import, and a stylesheet the editor refuses used to arrive
+unchecked and be served as it was, after which the editor refused every whole-sheet save of
+it. With the scan in the content check, a sheet any writer accepts always imports again — the
+tag rule is the import's own — and a sheet the scan refuses never arrives. Refusing the
+archive, rather than skipping the file, keeps the promise the other site files keep: a
+project imported without its stylesheet is a site with its styling missing.
+
+`</` begins an HTML end tag, so a media query holding it could close a style element the
+stylesheet was written into. Pages link the stylesheet as a file, so this is defence in
+depth; no media query needs the sequence. A decimal frame key came back from the parser as a
+different percentage, and `from, to` as `to` alone, so loading an animation and saving it
+back changed it without a word; CSS allows both forms.
+
+A header name holding a line break is a header-splitting payload, not a name, and an
+endpoint's own auth object and an imported registry never pass the check made when an API is
+saved. A path holding a newline carries it into the URL. A check that approves a rewritten
+copy vouches for a value its caller never uses; on Linux a backslash is a legal filename
+character.
+
+**Alternatives considered**: the `editStyles` list alone (rejected — it drops the tag entries
+the per-rule writers kept). Refusing any `@import` (rejected — a relative one is legal in a
+sheet). A scan with a list per writer (rejected — one list is the point). Scanning each piece
+alone (rejected — see above). The import skipping a refused stylesheet, as it skips an asset
+(offered, not taken — it imports a site without its styling), or leaving the import as it was
+(rejected — the editor's refusals would not hold for an archive). Refusing `<`, `>` and `/` in
+a media query (rejected — range syntax and ratios need them). Widening the parser's keyframe
+pattern (rejected — a key outside its grammar is misread without a word; the block tree
+returns what is there, and the validator refuses what it must). Checking a header name only
+when an API is saved (rejected — two paths never pass that check). Replacing the variable-value
+check with the scan (not taken — it keeps refusing angle brackets and braces in a value, which
+the scan does not).
+
+**Source**: Sangio's rulings, 2026-09-26 — the union with a remote-only `@import`, the whole
+archive refused for a stylesheet, the variable-value check kept, one header-name rule applied
+when an API is saved and when the request is built.
+`secure/src/functions/utilsStyleManagement.php` (`qs_css_first_danger`,
+`qs_css_normalize_for_scan`), the five commands above, `secure/src/functions/filePolicy.php`
+(`qs_import_validate_content`), `secure/management/command/importProject.php`
+(`importIsStylesheet`, `importFirstStructureFailure`), `secure/src/classes/RegexPatterns.php`
+(`media_query_chars`, `keyframe_selector`), `secure/src/classes/CssParser.php`
+(`getKeyframes`), `secure/src/functions/apiRegistry.php` (`qs_http_header_name_is_token`),
+`secure/src/classes/ApiEndpointManager.php`, `secure/src/functions/serverFetch.php` and
+`secure/src/functions/PathManagement.php`. Behaviour: [COMMAND_API.md](COMMAND_API.md)
+(*Export / Import*, *Archive import limits*) and the `help` entries of the five commands.

@@ -1193,7 +1193,7 @@ class WorkflowManager {
         $template = $workflow['promptTemplate'] ?? '';
         
         // If template is a filename (ends with .md), load it directly
-        if (preg_match('/\.md$/', $template)) {
+        if (preg_match('/\.md$/D', $template)) {
             $folder = $workflow['_folder'] ?? ($this->workflowsBasePath . '/core');
             $mdPath = $folder . '/' . $template;
             
@@ -1660,7 +1660,7 @@ class WorkflowManager {
         }
         
         // Scan promptTemplate (when it's a .md filename) for {{> name}} references and warn on missing files.
-        if (isset($workflow['promptTemplate']) && preg_match('/\.md$/', (string)$workflow['promptTemplate'])) {
+        if (isset($workflow['promptTemplate']) && preg_match('/\.md$/D', (string)$workflow['promptTemplate'])) {
             $folder = $workflow['_folder'] ?? ($this->workflowsBasePath . '/core');
             $mdPath = $folder . '/' . $workflow['promptTemplate'];
             if (file_exists($mdPath)) {

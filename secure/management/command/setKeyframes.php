@@ -62,11 +62,13 @@ if (!is_array($frames) || empty($frames)) {
 }
 
 // Validate each frame
+$block = '@keyframes ' . $name . " {\n";
 foreach ($frames as $key => $styles) {
-    // Validate frame key (0%-100%, from, to)
+    // Validate the frame key: a percentage (decimals allowed), from or to, or a
+    // comma-separated list of them
     if (!RegexPatterns::match('keyframe_selector', $key)) {
         ApiResponse::create(400, 'validation.invalid_frame')
-            ->withMessage("Invalid frame key: '$key'. Must be percentage(s) or 'from'/'to'")
+            ->withMessage("Invalid frame key: '$key'. Must be a percentage, 'from' or 'to', or a comma-separated list of them")
             ->send();
     }
     
@@ -76,28 +78,38 @@ foreach ($frames as $key => $styles) {
             ->send();
     }
     
-    // Security validation
-    $dangerousPatterns = [
-        '/javascript\s*:/i',
-        '/expression\s*\(/i',
-        '/<\s*script/i',
-    ];
-
-    foreach ($dangerousPatterns as $pattern) {
-        if (preg_match($pattern, $styles)) {
-            ApiResponse::create(400, 'validation.security')
-                ->withMessage('Potentially dangerous CSS pattern detected')
-                ->send();
-        }
+    // SECURITY: the scan every stylesheet writer runs (qs_css_first_danger)
+    $danger = qs_css_first_danger($styles);
+    if ($danger !== null) {
+        ApiResponse::create(400, 'validation.security')
+            ->withMessage('Potentially dangerous CSS pattern detected')
+            ->withErrors([
+                ['field' => 'frames', 'frame' => (string) $key, 'reason' => 'dangerous_pattern', 'pattern' => $danger]
+            ])
+            ->send();
     }
 
-    // F-C13-4 confinement — a `}` in a frame's declaration block escapes the
-    // @keyframes block and emits arbitrary CSS. The denylist above does not catch it.
+    // Brace confinement — a `}` in a frame's declaration block escapes the
+    // @keyframes block and emits arbitrary CSS. The denylist does not catch it.
     if (!qs_css_confine($styles)) {
         ApiResponse::create(400, 'validation.security')
             ->withMessage('Frame styles may not contain "{" or "}"')
             ->send();
     }
+
+    $block .= $key . " {\n" . $styles . "\n}\n";
+}
+
+// ...and on the block as it will be written, because a denylisted sequence can
+// span two frames.
+$danger = qs_css_first_danger($block . '}');
+if ($danger !== null) {
+    ApiResponse::create(400, 'validation.security')
+        ->withMessage('Potentially dangerous CSS pattern detected')
+        ->withErrors([
+            ['field' => 'frames', 'reason' => 'dangerous_pattern', 'pattern' => $danger]
+        ])
+        ->send();
 }
 
 $styleFile = cssLivePath();

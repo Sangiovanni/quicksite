@@ -403,7 +403,7 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
             // Entries refused by the hidden-path rule, the extension allowlist or
             // content validation. Reported rather than fatal: one stray file must
             // not block an otherwise legitimate import, but it must never be
-            // silent. A file the site reads is never listed here —
+            // silent. A file the site reads, or a stylesheet, is never listed here —
             // importFirstStructureFailure() refuses the whole archive for it instead.
             'skipped_disallowed_files' => count($stats['skipped_disallowed']),
             'skipped_disallowed' => $stats['skipped_disallowed'],
@@ -648,13 +648,14 @@ function extractProjectFromZipSecure(ZipArchive $zip, string $prefix, string $de
         // passes any extension check ever written. SVG comes back sanitised, so
         // write what the validator returns, not the raw bytes. A refused entry is
         // skipped and reported while the rest imports — unless it is a file the
-        // site reads, which the gate checked the same way: a refusal of one here
-        // fails the whole import (the second layer). Those files are also the only
-        // entries the check treats as never served, which exempts their text from
-        // the PHP-opening-tag rule — see importIsSiteData().
+        // site reads or a stylesheet, which the gate checked the same way: a
+        // refusal of one here fails the whole import (the second layer). The files
+        // the site reads are also the only entries the check treats as never
+        // served, which exempts their text from the PHP-opening-tag rule — see
+        // importIsSiteData().
         $verdict = qs_import_validate_content($relativePath, $content, $siteData);
         if (!$verdict['ok']) {
-            if ($siteData) {
+            if ($siteData || importIsStylesheet($relativePath)) {
                 return ['success' => false, 'error' => "$relativePath: {$verdict['reason']}"];
             }
             $stats['skipped_disallowed'][] = $relativePath . ' (' . $verdict['reason'] . ')';
@@ -845,6 +846,22 @@ function importIsSiteData(string $relativePath): bool {
 }
 
 /**
+ * Is this entry a STYLESHEET — any `.css` file, wherever the archive puts it, not
+ * at a hidden path (which the import never writes)?
+ *
+ * A stylesheet the content check refuses — it opens a PHP block, or holds a
+ * construct every command that writes a stylesheet refuses (qs_css_first_danger())
+ * — refuses the whole archive rather than being skipped: a project imported
+ * without its stylesheet is a site with its styling missing, and the same text is
+ * refused however it would arrive.
+ *
+ * @param string $relativePath the entry's path inside the project folder, `/`-separated
+ */
+function importIsStylesheet(string $relativePath): bool {
+    return qs_policy_extension($relativePath) === 'css' && !qs_policy_has_hidden_segment($relativePath);
+}
+
+/**
  * The tag gate's SITE predicate: given an archive entry, return the first tag the
  * render/compile layers would refuse, or null when this entry carries no
  * renderable structure at all (see importStructureKind() for which entries do).
@@ -1000,6 +1017,10 @@ function importFirstInvalidSetting(array $config): ?array {
  *      the attribute;
  *   4. `blocked_tag` — a tag the renderer refuses;
  *   5. `invalid_component_reference` — a reference the resolver refuses.
+ * Every stylesheet (importIsStylesheet()) the import policy allows is checked
+ * too, and one that cannot be read or fails the content check — which for a
+ * stylesheet includes the scan every stylesheet writer runs — answers
+ * `disallowed_content`.
  * Every other entry keeps the extraction's per-entry rule: an asset, a stray file
  * or anything at a hidden path is skipped and reported when refused, while the
  * rest imports.
@@ -1019,7 +1040,28 @@ function importFirstStructureFailure(ZipArchive $zip, string $prefix): ?array {
         if ($nameRefusal !== null) {
             return ['file' => $relativePath, 'reason' => 'unsafe_path', 'message' => $nameRefusal];
         }
-        if ($isDirectory || !importIsSiteData($relativePath)) {
+        if ($isDirectory) {
+            continue;
+        }
+        if (importIsStylesheet($relativePath)) {
+            // A type the import policy does not allow is skipped at extraction,
+            // a stylesheet included; there is nothing to check then.
+            if (!qs_import_allows_extension($relativePath)) {
+                continue;
+            }
+            $content = $zip->getFromIndex($i);
+            if ($content === false) {
+                return ['file' => $relativePath, 'reason' => 'disallowed_content',
+                        'message' => 'The entry cannot be read from the archive (it is damaged or encrypted).'];
+            }
+            $verdict = qs_import_validate_content($relativePath, $content);
+            if (!$verdict['ok']) {
+                return ['file' => $relativePath, 'reason' => 'disallowed_content',
+                        'message' => ucfirst($verdict['reason']) . '.'];
+            }
+            continue;
+        }
+        if (!importIsSiteData($relativePath)) {
             continue;
         }
         $kind = importStructureKind($relativePath);

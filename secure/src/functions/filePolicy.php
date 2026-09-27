@@ -454,6 +454,10 @@ function qs_policy_has_php_open_tag(string $content): bool
  * the file is served as the image it is. Refusing it would mean refusing real
  * user content, which is the worse failure.
  *
+ * A stylesheet (.css) must also pass qs_css_first_danger(), the scan every
+ * command that writes a project stylesheet runs, so a sheet the editor would
+ * refuse cannot arrive by archive either.
+ *
  * @param bool $neverServed true when the caller has established that the entry is
  *                          JSON no web server serves — importProject's site data
  *                          (importIsSiteData()). It lifts the PHP-block rule for
@@ -567,7 +571,17 @@ function qs_import_validate_content(string $path, string $content, bool $neverSe
         }
     }
 
-    // 4. Structured text must actually parse as what it claims.
+    // 4. A stylesheet must pass the scan every stylesheet writer runs, so an
+    //    archive cannot bring in CSS the editor would refuse.
+    if ($ext === 'css') {
+        require_once __DIR__ . '/utilsStyleManagement.php';   // qs_css_first_danger
+        $danger = qs_css_first_danger($content);
+        if ($danger !== null) {
+            return $deny("stylesheet holds a dangerous CSS pattern: {$danger}");
+        }
+    }
+
+    // 5. Structured text must actually parse as what it claims.
     if ($ext === 'json') {
         json_decode($content, true);
         if (json_last_error() !== JSON_ERROR_NONE) {
@@ -575,7 +589,7 @@ function qs_import_validate_content(string $path, string $content, bool $neverSe
         }
     }
 
-    // 5. SVG is text that can carry script — reuse the sanitiser the upload
+    // 6. SVG is text that can carry script — reuse the sanitiser the upload
     //    path already applies rather than inventing a second rule for it.
     if ($ext === 'svg') {
         require_once SECURE_FOLDER_PATH . '/src/classes/SvgSanitizer.php';

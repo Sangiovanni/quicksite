@@ -18,20 +18,19 @@
  * the input in memory (block-tree + substr copies), so at the install's 128 MB
  * limit the 8.0.30 FLOOR fatals around 0.9 MB. 512 KB parses at ~77 MB peak on the
  * floor (≈40% headroom) and is still 12x the largest real stylesheet on this
- * install (quicksite, 40 KB). The prior 2 MB write cap was ~2.5x beyond what the
- * floor survives — a single oversized write bricked every CssParser-using command
- * for that project (F-C13-6).
+ * install (quicksite, 40 KB). A cap the floor cannot parse would let one oversized
+ * write break every CssParser-using command for that project.
  */
 const CSS_MAX_BYTES = 512 * 1024;
 
 /**
- * F-C13-4 confinement. `{` and `}` are the only characters that open or close a
+ * Brace confinement. `{` and `}` are the only characters that open or close a
  * CSS block, so a selector / media prelude / variable name / declaration that
  * carries either can break out of its rule and emit arbitrary CSS. No legitimate
  * value in any of those positions contains a brace — the `>` child combinator,
  * quotes, `[attr="x"]` selectors, `var()`, `calc()` are all fine and pass. This is
  * the CSS-structural guard only; HTML metacharacters are handled at the render
- * boundary (F-C13-3), not here, because CSS values legitimately contain quotes.
+ * boundary, not here, because CSS values legitimately contain quotes.
  *
  * @param string $fragment A single CSS input (selector, media prelude, variable
  *                         name/value, or declaration block) — never a whole sheet.
@@ -42,38 +41,285 @@ function qs_css_confine(string $fragment): bool {
 }
 
 /**
- * Normalise CSS for a SECURITY SCAN only (never for writing). A byte-level denylist
- * is trivially bypassed by the two things CSS lets you write without changing meaning:
+ * The constructs no project stylesheet may hold: ONE list for every path that puts
+ * CSS text into a stylesheet — editStyles, setStyleRule, setKeyframes,
+ * setRootVariables, injectSnippetCss and the import's content check — so a sheet
+ * one of them accepts is never one another refuses. qs_css_first_danger() runs each
+ * entry on the normalised copy (qs_css_normalize_for_scan), where a comment between
+ * a keyword's letters or an escape inside them no longer hides it.
+ *
+ * `@import` is refused only when it names a scheme or another host: a relative
+ * import is legal in a sheet and inert inside a rule, while a remote one loads a
+ * stylesheet from elsewhere, against the dependency-free policy. CSS needs no
+ * whitespace after the keyword, so the entry needs none either.
+ */
+const QS_CSS_DENYLIST = [
+    '/javascript\s*:/i'           => 'JavaScript protocol',
+    '/vbscript\s*:/i'             => 'VBScript protocol',
+    '/expression\s*\(/i'          => 'CSS expression (IE-specific JS)',
+    '/(?<!scroll-)behavior\s*:/i' => 'CSS behavior (IE-specific)',
+    '/-moz-binding\s*:/i'         => 'XBL binding (Firefox-specific)',
+    '/@import\s*(?:url\(\s*)?["\']?\s*(?:[a-z][a-z0-9+.\-]*:|\/\/)/i' => 'Remote @import (external stylesheet — blocked by the dependency-free policy)',
+    '/data\s*:\s*text\/html/i'    => 'Data URI with HTML',
+    '/<\s*script/i'               => 'HTML script tag',
+    '/<\s*style/i'                => 'HTML style tag',
+];
+
+/**
+ * The first dangerous construct in CSS text a writer is about to store, or null.
+ *
+ * Pass the text as it will sit in the stylesheet: a whole sheet, or the rule,
+ * block or declaration a writer adds with its pieces joined the way the writer
+ * joins them, because a denylisted sequence can span two pieces — a variable's
+ * name and its value, say, which the writer joins with `: `.
+ *
+ * A PHP opening tag is tested on the raw bytes with the import's own test
+ * (qs_policy_has_php_open_tag): the import refuses a stylesheet that holds one, so
+ * a sheet any writer accepts always imports again.
+ *
+ * @param string $css CSS text as it will be written.
+ * @return string|null What was found, worded for the refusal; null when clean.
+ */
+function qs_css_first_danger(string $css): ?string {
+    require_once __DIR__ . '/filePolicy.php';   // qs_policy_has_php_open_tag
+    if (qs_policy_has_php_open_tag($css)) {
+        return 'PHP opening tag';
+    }
+    $scan = qs_css_normalize_for_scan($css);
+    foreach (QS_CSS_DENYLIST as $pattern => $description) {
+        if (preg_match($pattern, $scan)) {
+            return $description;
+        }
+    }
+    return null;
+}
+
+/**
+ * Normalise CSS for a SECURITY SCAN only (never for writing): the text the browser
+ * parses, with its comments removed and its escapes decoded. A byte-level denylist
+ * misses the two things CSS lets you write without changing meaning:
  *   - comments between tokens:   `behavior/**​/:`  ->  `behavior:`
  *   - escapes inside identifiers: `b\65 havior`    ->  `behavior`
- * Stripping comments and decoding `\XX` / `\c` escapes first makes the denylist see
- * what the browser will actually parse. The decoded copy is used ONLY to run the
- * patterns; the original bytes are what gets stored. (F-C13-3 / F5 denylist.)
+ *
+ * A comment runs from where the CSS tokenizer reads one. Inside a quoted string
+ * and inside an unquoted url(…) the two characters that open a comment are
+ * ordinary text: a comment opened there never reaches past the string or the URL,
+ * because removing text beyond it that the browser still reads would hide that
+ * text from the scan. A comment opened AND closed inside one is removed from it
+ * all the same — the way a lax parser read it — which only joins text the scan then
+ * sees. The tokenizer's own rules decide where those two contexts begin and end — a
+ * line break ends a string, and `url(` opens an unquoted URL only when the
+ * identifier before the parenthesis is exactly `url`.
+ *
+ * An escape — a backslash with up to six hex digits and one optional whitespace, or
+ * with any other character but a line break — is decoded everywhere, strings and
+ * url(…) included, because the browser decodes it there too. The dangerous keywords
+ * are ASCII, so ASCII is what must decode faithfully; a NUL escape decodes to
+ * nothing, which joins its neighbours — the strict side. The copy is used only to run
+ * the patterns; the original bytes are what is stored.
  *
  * @param string $css Raw CSS to scan.
- * @return string A comment-stripped, escape-decoded copy for pattern matching.
+ * @return string The comment-free, escape-decoded copy for pattern matching.
  */
 function qs_css_normalize_for_scan(string $css): string {
-    // 1. Drop /* ... */ comments.
-    $css = preg_replace('~/\*.*?\*/~s', '', $css) ?? $css;
-
-    // 2. Decode CSS escapes: `\` + 1-6 hex (with an optional single trailing space),
-    //    or `\` + any single char. The dangerous keywords are all ASCII, so ASCII is
-    //    what must decode faithfully; other code points collapse to a placeholder that
-    //    still breaks any keyword they were hiding inside.
-    return preg_replace_callback('/\\\\([0-9a-fA-F]{1,6})[ \t\n\r\f]?|\\\\(.)/s', static function ($m) {
-        if (isset($m[1]) && $m[1] !== '') {
-            $cp = hexdec($m[1]);
-            if ($cp === 0) return '';
-            if ($cp >= 0x20 && $cp <= 0x7E) return chr($cp);
-            if (function_exists('mb_chr')) {
-                $ch = mb_chr($cp, 'UTF-8');
-                return $ch === false ? "\u{FFFD}" : $ch;
+    $out   = '';
+    $len   = strlen($css);
+    $i     = 0;
+    $ident = '';     // the identifier ending at $i, decoded and lower-cased (capped: only "url" matters)
+    $open  = true;   // false when that identifier follows `#` or `@`: a hash or an at-keyword, never a function
+    while ($i < $len) {
+        // Ordinary text, up to the next character that can open a comment, a string,
+        // an escape or a function's parenthesis.
+        $run = strcspn($css, "/\"'\\(", $i);
+        if ($run > 0) {
+            $chunk = substr($css, $i, $run);
+            $out  .= $chunk;
+            $k = $run;
+            while ($k > 0 && qs_css_is_name_byte($chunk[$k - 1])) {
+                $k--;
             }
-            return "\u{FFFD}";
+            if ($k === 0) {
+                $ident .= strtolower($chunk);
+            } else {
+                $ident = strtolower(substr($chunk, $k));
+                $open  = $chunk[$k - 1] !== '#' && $chunk[$k - 1] !== '@';
+            }
+            if (strlen($ident) > 3) {
+                $ident = '....';
+            }
+            $i += $run;
+            continue;
         }
-        return $m[2] ?? '';
-    }, $css) ?? $css;
+        $c = $css[$i];
+        if ($c === '/') {
+            if ($i + 1 < $len && $css[$i + 1] === '*') {
+                $end = strpos($css, '*/', $i + 2);
+                $i   = $end === false ? $len : $end + 2;
+            } else {
+                $out .= '/';
+                $i++;
+            }
+            $ident = '';
+            $open  = true;
+            continue;
+        }
+        if ($c === '"' || $c === "'") {
+            $out  .= qs_css_scan_string($css, $i);
+            $ident = '';
+            $open  = true;
+            continue;
+        }
+        if ($c === '\\') {
+            if ($i + 1 < $len && strpos("\n\r\f", $css[$i + 1]) === false) {
+                // A valid escape is part of the identifier it sits in.
+                $decoded = qs_css_scan_escape($css, $i);
+                $out    .= $decoded;
+                $ident  .= strtolower($decoded);
+                if (strlen($ident) > 3) {
+                    $ident = '....';
+                }
+            } else {
+                $out  .= '\\';
+                $i++;
+                $ident = '';
+                $open  = true;
+            }
+            continue;
+        }
+        // $c === '(': an unquoted url(…) is read to its closing parenthesis, whole.
+        $out .= '(';
+        $i++;
+        if ($open && $ident === 'url') {
+            $out .= qs_css_scan_url($css, $i);
+        }
+        $ident = '';
+        $open  = true;
+    }
+    return $out;
+}
+
+/** A byte that continues a CSS identifier: an ASCII letter or digit, `-`, `_`, or any non-ASCII byte. */
+function qs_css_is_name_byte(string $b): bool {
+    return ($b >= 'a' && $b <= 'z') || ($b >= 'A' && $b <= 'Z') || ($b >= '0' && $b <= '9')
+        || $b === '-' || $b === '_' || ord($b) >= 0x80;
+}
+
+/**
+ * Decode the escape whose backslash is at $i, for the scan, and move $i past it.
+ * The caller has established that a character follows and that it is not a line break.
+ */
+function qs_css_scan_escape(string $css, int &$i): string {
+    $len = strlen($css);
+    $i++;
+    if ($i >= $len) {
+        return '';
+    }
+    $hex = strspn($css, '0123456789abcdefABCDEF', $i, 6);
+    if ($hex === 0) {
+        return $css[$i++];
+    }
+    $cp = hexdec(substr($css, $i, $hex));
+    $i += $hex;
+    if ($i < $len) {
+        if ($css[$i] === "\r" && $i + 1 < $len && $css[$i + 1] === "\n") {
+            $i += 2;
+        } elseif (strpos(" \t\n\r\f", $css[$i]) !== false) {
+            $i++;
+        }
+    }
+    if ($cp === 0) {
+        return '';
+    }
+    if ($cp >= 0x20 && $cp <= 0x7E) {
+        return chr($cp);
+    }
+    $replacement = "\xEF\xBF\xBD";   // U+FFFD, what the browser substitutes
+    if ($cp > 0x10FFFF || ($cp >= 0xD800 && $cp <= 0xDFFF) || !function_exists('mb_chr')) {
+        return $replacement;
+    }
+    $ch = mb_chr($cp, 'UTF-8');
+    return $ch === false ? $replacement : $ch;
+}
+
+/**
+ * The quoted string opening at $i, escapes decoded, quotes kept; $i moves past it.
+ * An unescaped line break ends it as the browser ends it, and is left to be read
+ * next; an escaped one continues the string and is dropped. A comment opened and
+ * closed inside it is removed (qs_css_normalize_for_scan says why).
+ */
+function qs_css_scan_string(string $css, int &$i): string {
+    $len   = strlen($css);
+    $quote = $css[$i];
+    $text  = '';
+    $close = '';
+    $i++;
+    while ($i < $len) {
+        $run   = strcspn($css, $quote . "\\\n\r\f", $i);
+        $text .= substr($css, $i, $run);
+        $i    += $run;
+        if ($i >= $len) {
+            break;
+        }
+        $c = $css[$i];
+        if ($c === $quote) {
+            $close = $quote;
+            $i++;
+            break;
+        }
+        if ($c !== '\\') {
+            break;
+        }
+        if ($i + 1 < $len && strpos("\n\r\f", $css[$i + 1]) !== false) {
+            $i += ($css[$i + 1] === "\r" && $i + 2 < $len && $css[$i + 2] === "\n") ? 3 : 2;
+            continue;
+        }
+        $text .= qs_css_scan_escape($css, $i);
+    }
+    return $quote . qs_css_scan_drop_inner_comments($text) . $close;
+}
+
+/** $text with every comment opened AND closed inside it removed; an unclosed opener stays text. */
+function qs_css_scan_drop_inner_comments(string $text): string {
+    return strpos($text, '/*') === false ? $text : (preg_replace('~/\*.*?\*/~s', '', $text) ?? $text);
+}
+
+/**
+ * What follows `url(` at $i. A quoted argument is left to be read as a string;
+ * otherwise the unquoted URL runs to its closing parenthesis (or the end), escapes
+ * decoded, and a comment opened in it never reaches past it — though one opened
+ * and closed inside it is removed (qs_css_normalize_for_scan says why). $i moves
+ * past what was read.
+ */
+function qs_css_scan_url(string $css, int &$i): string {
+    $len = strlen($css);
+    $ws  = strspn($css, " \t\n\r\f", $i);
+    $out = substr($css, $i, $ws);
+    $i  += $ws;
+    if ($i < $len && ($css[$i] === '"' || $css[$i] === "'")) {
+        return $out;
+    }
+    $text  = '';
+    $close = '';
+    while ($i < $len) {
+        $run   = strcspn($css, ")\\", $i);
+        $text .= substr($css, $i, $run);
+        $i    += $run;
+        if ($i >= $len) {
+            break;
+        }
+        if ($css[$i] === ')') {
+            $close = ')';
+            $i++;
+            break;
+        }
+        if ($i + 1 < $len && strpos("\n\r\f", $css[$i + 1]) === false) {
+            $text .= qs_css_scan_escape($css, $i);
+        } else {
+            $text .= '\\';
+            $i++;
+        }
+    }
+    return $out . qs_css_scan_drop_inner_comments($text) . $close;
 }
 
 /**
@@ -132,7 +378,7 @@ function cssReleaseLock($lock): void {
  * @throws Exception If a directory cannot be created or a write fails.
  */
 function cssWriteAllTargets(string $content, string $livePath, string $projectPath): void {
-    // F-C13-6 — the single enforcement point for the write cap. Every rule-level
+    // The single enforcement point for the write cap. Every rule-level
     // writer (setStyleRule / setRootVariables / setKeyframes / delete*) reaches disk
     // through here, so capping here caps all of them at a size the CssParser can
     // read back. editStyles and injectSnippetCss write directly for their own
@@ -168,14 +414,12 @@ function cssWriteAllTargets(string $content, string $livePath, string $projectPa
  * Shared: `injectSnippetCss` reaches it through `extractSnippetCss()` in
  * SnippetManagement.php, which `createSnippet` and `duplicateSnippet` call.
  *
- * THE COMPONENTS DIRECTORY IS PASSED IN, NOT READ FROM AMBIENT STATE. It used
- * to be `TEMPLATES_JSON_PATH . '/components'` — a constant nothing defines, so
- * the component branch fataled on the first node carrying `component`. An
- * ambient global is also the wrong shape for a function whose caller already
- * knows which project it is working on: `extractSnippetCss()` is handed a
- * project NAME, so a request-bound constant would have read components from
- * whichever project the REQUEST bound rather than the one being extracted. The
- * caller derives the directory from that name and hands it down.
+ * THE COMPONENTS DIRECTORY IS PASSED IN, NOT READ FROM AMBIENT STATE. An
+ * ambient global is the wrong shape for a function whose caller already knows
+ * which project it is working on: `extractSnippetCss()` is handed a project
+ * NAME, so a request-bound constant would read components from whichever
+ * project the REQUEST bound rather than the one being extracted. The caller
+ * derives the directory from that name and hands it down.
  *
  * (Its stylesheet lookup still prefers the request-bound PUBLIC_CONTENT_PATH and
  * only falls back to the named project's own copy, so the two halves agree only
@@ -186,10 +430,9 @@ function cssWriteAllTargets(string $content, string $livePath, string $projectPa
  * {"imgClass": "menu-icon"}}` — and this walk binds them through the shared
  * `qs_resolve_component_placeholders()`, the same substitution the renderer
  * performs, so the selectors collected here are the ones the visitor's page
- * will really carry. It used to read `data['class']` and `data['id']` and
- * nothing else, which meant a component naming its class slot anything other
- * than `class` had its real class silently missed and the matching rules left
- * out of the stored snippet CSS (measured: 206 bytes for one `menu-link`).
+ * will really carry. Reading only `data['class']` and `data['id']` would miss
+ * the real class of a component whose class slot has any other name, and leave
+ * the matching rules out of the stored snippet CSS.
  *
  * An UNBOUND slot is dropped rather than stored. A class named `{{imgClass}}`
  * matches no rule — it contributes no CSS either way — so keeping it only
@@ -239,7 +482,7 @@ function extractCssSelectorsFromStructure(array $structure, string $componentsDi
 
             // Load component if not already loaded
             if (!isset($components[$componentName]) && $componentsDir !== '') {
-                // beta.11 S3.10c: stored reference, jailed by the shared resolver.
+                // A stored reference, jailed by the shared resolver.
                 $componentPath = qs_resolve_component_path($componentName, $componentsDir);
                 if ($componentPath !== null) {
                     $componentContent = @file_get_contents($componentPath);
@@ -291,7 +534,7 @@ function extractCssSelectorsFromStructure(array $structure, string $componentsDi
             // slots, so they bind against the data in scope; at the top level
             // $data is empty and the substitution is a no-op. The is_string
             // guards are the type contract of the shared resolver — a stored
-            // `"class": ["a"]` used to reach trim() and fatal on PHP 8.
+            // `"class": ["a"]` would otherwise reach trim() and fatal on PHP 8.
             if (isset($node['params']) && is_array($node['params'])) {
                 if (isset($node['params']['class']) && is_string($node['params']['class'])) {
                     $boundClass = qs_resolve_component_placeholders($node['params']['class'], $data);
@@ -319,8 +562,8 @@ function extractCssSelectorsFromStructure(array $structure, string $componentsDi
     // parser could match, and storing it would claim a snippet uses a
     // selector that will never exist on the page.
     $bound = static function ($selector): bool {
-        // `$selector &&` keeps the truthiness test the default array_filter
-        // callback applied here before; the placeholder rule is what is new.
+        // `$selector &&` is the default array_filter truthiness test; the
+        // placeholder rule is added to it.
         return $selector && (!is_string($selector) || strpos($selector, '{{') === false);
     };
 

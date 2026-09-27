@@ -1,15 +1,15 @@
 <?php
 /**
- * consentHelpers.php — consent-layer config + client hydration for the storage
- * registry's GDPR consent layer (beta.9, Phase 2).
+ * consentHelpers.php — consent-layer config, and the payload the page hydrates
+ * from, for the storage registry's GDPR consent layer.
  *
- * The consent layer is OFF until the author generates + enables it (slice 7).
+ * The consent layer is OFF until the author generates + enables it.
  * Per-project config lives in data/consent.json (author website data → JSON):
  *
  *   { "enabled": false, "policyRoute": null, "version": 1 }
  *
  *   enabled      — is runtime write-gating + the banner active for this project
- *   policyRoute  — route the generated cookie-policy page lives at (slice 8)
+ *   policyRoute  — route the generated cookie-policy page lives at
  *   version      — bump (or a registry category change) re-prompts the visitor
  *
  * When enabled, the page emits window.QS_CONSENT carrying the key→category map
@@ -23,9 +23,6 @@ if (!defined('SECURE_FOLDER_PATH')) {
 
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/storageHelpers.php';
-// qs_consent_hydration_script() lives with the runtime handoff, because a built
-// site emits the tag and cannot carry this authoring file.
-require_once SECURE_FOLDER_PATH . '/src/functions/runtimeHandoff.php';
 
 const CONSENT_CONFIG_DEFAULTS = ['enabled' => false, 'policyRoute' => null, 'version' => 1];
 
@@ -69,19 +66,6 @@ function consentCategoryMap(): array {
         }
     }
     return $map;
-}
-
-/**
- * The <script> hydration tag for the consent runtime, or '' when the layer is
- * disabled (nothing emitted → qs.js gating stays dormant). Live-site only;
- * callers skip this in editor mode.
- */
-function consentHydrationScript(): string {
-    $payload = qs_consent_payload();
-    if ($payload === null) {
-        return '';
-    }
-    return qs_consent_hydration_script($payload);
 }
 
 /**

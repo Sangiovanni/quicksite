@@ -32,11 +32,10 @@ require_once SECURE_FOLDER_PATH . '/src/functions/utilsStyleManagement.php';
 function __command_injectSnippetCss(array $params = [], array $urlParams = []): ApiResponse {
     $snippetId = $params['id'] ?? null;
     $mode = $params['mode'] ?? null;
-    // C8 8.5 CONTAINMENT: this command REWRITES a project's live stylesheet, so
-    // the target is BOUND to the URL marker the dispatcher authorized; a body
-    // `project` is an optional echo that must match. (F-C8-8.5-1: it used to select
-    // the target freely and fall back to an installation-wide default project, so an
-    // editor authorized on one project could overwrite another project's style.css.)
+    // CONTAINMENT: this command REWRITES a project's live stylesheet, so the target
+    // is BOUND to the URL marker the dispatcher authorized; a body `project` is an
+    // optional echo that must match. A freely selected target would let an editor
+    // authorized on one project overwrite another project's style.css.
     $bound = qs_bind_marker_project($params, 'injectSnippetCss');
     if ($bound['refusal'] !== null) {
         return $bound['refusal'];
@@ -65,9 +64,21 @@ function __command_injectSnippetCss(array $params = [], array $urlParams = []): 
     $snippetCss = $snippet['css'] ?? '';
     $snippetSelectors = $snippet['selectors'] ?? [];
 
-    if (empty($snippetCss)) {
+    if (!is_string($snippetCss) || empty($snippetCss)) {
         return ApiResponse::create(400, 'snippets.no_css')
             ->withMessage('This snippet has no saved CSS to inject');
+    }
+
+    // SECURITY: the scan every stylesheet writer runs (qs_css_first_danger), on the
+    // CSS the snippet carries. A project snippet can arrive in an imported archive,
+    // and nothing else checks its CSS.
+    $danger = qs_css_first_danger($snippetCss);
+    if ($danger !== null) {
+        return ApiResponse::create(400, 'validation.security')
+            ->withMessage("The snippet's CSS contains a potentially dangerous CSS pattern")
+            ->withErrors([
+                ['field' => 'css', 'reason' => 'dangerous_pattern', 'pattern' => $danger]
+            ]);
     }
 
     // Load or create target stylesheet — read from live public (source of truth)
@@ -172,10 +183,24 @@ function __command_injectSnippetCss(array $params = [], array $urlParams = []): 
 
     // Append CSS with comment marker
     $comment = "/* Snippet: {$snippetId} — " . ($mode === 'missing' ? 'added missing CSS' : 'replaced CSS') . " */";
-    $newCss = rtrim($existingCss) . "\n\n{$comment}\n" . $cssToInject . "\n";
+    $block = $comment . "\n" . $cssToInject;
 
-    // F-C13-6: cap the result at the size the CssParser can read back, matching
-    // every other CSS writer (this command writes directly, so it checks here).
+    // ...and on the block as it will be appended: its comment carries the snippet's
+    // id, which is CSS text once written.
+    foreach (['id' => $comment, 'css' => $block] as $field => $text) {
+        $danger = qs_css_first_danger($text);
+        if ($danger !== null) {
+            return ApiResponse::create(400, 'validation.security')
+                ->withMessage("The snippet's CSS contains a potentially dangerous CSS pattern")
+                ->withErrors([
+                    ['field' => $field, 'reason' => 'dangerous_pattern', 'pattern' => $danger]
+                ]);
+        }
+    }
+    $newCss = rtrim($existingCss) . "\n\n" . $block . "\n";
+
+    // Cap the result at the size the CssParser can read back, matching every
+    // other CSS writer (this command writes directly, so it checks here).
     if (strlen($newCss) > CSS_MAX_BYTES) {
         return ApiResponse::create(413, 'validation.size_limit_exceeded')
             ->withMessage('Injecting this snippet would exceed the maximum stylesheet size ('

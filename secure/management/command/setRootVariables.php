@@ -32,6 +32,7 @@ if (!is_array($variables) || empty($variables)) {
 }
 
 // Validate each variable
+$declarations = '';
 foreach ($variables as $name => $value) {
     if (!is_string($name) || !is_string($value)) {
         ApiResponse::create(400, 'validation.invalid_format')
@@ -39,21 +40,48 @@ foreach ($variables as $name => $value) {
             ->send();
     }
 
-    // Basic CSS value validation - prevent injection
+    // A value holds no angle bracket, brace, `javascript:` or `expression(`
     if (RegexPatterns::match('css_injection', $value)) {
         ApiResponse::create(400, 'validation.invalid_css')
             ->withMessage('Invalid CSS value detected')
             ->send();
     }
 
-    // F-C13-4 confinement — the css_injection check above covers the VALUE (it
-    // rejects `{ } < >`) but the NAME was never validated, so a braced key could
-    // escape the :root block. Confine both for uniformity.
+    // Brace confinement — the css_injection check above covers the VALUE; a braced
+    // NAME could escape the :root block. Confine both for uniformity.
     if (!qs_css_confine($name) || !qs_css_confine($value)) {
         ApiResponse::create(400, 'validation.invalid_css')
             ->withMessage('Variable names and values may not contain "{" or "}"')
             ->send();
     }
+
+    // SECURITY: the scan every stylesheet writer runs (qs_css_first_danger), on the
+    // declaration as it will be written — the name with the `--` the parser adds when
+    // it is missing: the name is CSS text too, and a denylisted sequence can span the
+    // name and the value the writer joins with ': '.
+    $declaration = (str_starts_with($name, '--') ? $name : '--' . $name) . ': ' . $value . ';';
+    $danger = qs_css_first_danger($declaration);
+    if ($danger !== null) {
+        ApiResponse::create(400, 'validation.invalid_css')
+            ->withMessage('Potentially dangerous CSS pattern detected')
+            ->withErrors([
+                ['field' => 'variables', 'variable' => $name, 'reason' => 'dangerous_pattern', 'pattern' => $danger]
+            ])
+            ->send();
+    }
+    $declarations .= $declaration . "\n";
+}
+
+// ...and on every declaration together, as one block, because a denylisted
+// sequence can span two of them.
+$danger = qs_css_first_danger($declarations);
+if ($danger !== null) {
+    ApiResponse::create(400, 'validation.invalid_css')
+        ->withMessage('Potentially dangerous CSS pattern detected')
+        ->withErrors([
+            ['field' => 'variables', 'reason' => 'dangerous_pattern', 'pattern' => $danger]
+        ])
+        ->send();
 }
 
 // Resolve themeTarget → CSS scope selector

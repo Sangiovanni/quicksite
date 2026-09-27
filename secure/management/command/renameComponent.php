@@ -16,7 +16,6 @@ require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_js
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
-require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 
 /**

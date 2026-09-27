@@ -1,12 +1,5 @@
 <?php
 
-// Polyfill for str_starts_with (PHP <8.0)
-if (!function_exists('str_starts_with')) {
-    function str_starts_with(string $haystack, string $needle): bool {
-        return $needle === '' || strpos($haystack, $needle) === 0;
-    }
-}
-
 function removePrefix(string $haystack, string $prefix): string {
     // Normalize both to trim trailing slashes for comparison
     $haystackNorm = rtrim($haystack, '/');

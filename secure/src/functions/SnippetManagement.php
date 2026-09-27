@@ -12,15 +12,11 @@ require_once __DIR__ . '/utilsManagement.php'; // qs_json_write
  *              (secure/snippets/custom/{userId}/)
  *   Project  = user-created, project-only (secure/projects/{proj}/snippets/)
  *
- * The middle tier used to be called GLOBAL and lived in one flat
- * secure/snippets/custom/ with no owner in the path. Every read and every delete
- * reached it from ANY project marker, while every other write in the same
- * commands is marker-bound (C8 8.5). Proven live in beta.10 C13 13.6b: a member
- * of project A wrote a snippet there, and a member of project B — sharing no
- * project with A, refused 403 on A's own marker — listed it, read its full
- * structure, inserted A's content into project B's page, and deleted A's file.
- * The tier is per-USER now, which is what "available to all projects" was always
- * meant to say: all of MINE.
+ * The middle tier is per-USER, which is what "available to all projects" means:
+ * all of MINE. A shared folder with no owner in the path would be reachable from
+ * ANY project marker while every other write in the same commands is
+ * marker-bound: a member of project B, sharing no project with A, could list,
+ * read, insert and delete a snippet a member of A wrote.
  */
 
 /**
@@ -109,7 +105,7 @@ function getPersonalSnippetsPath(?string $userId = null): ?string {
     // The id is minted as 'usr_' . bin2hex(random_bytes(16)). Pin that shape
     // rather than sanitising: this string is concatenated into a filesystem
     // path, and an allowlist is the only form of that check that cannot be
-    // out-thought (C3/C11).
+    // out-thought.
     if (!is_string($userId) || preg_match('/^usr_[a-f0-9]{32}$/D', $userId) !== 1) {
         return null;
     }
@@ -261,10 +257,9 @@ function loadSnippetFile(string $filePath, string $source = 'core'): ?array {
  *
  * @param string $snippetId Snippet ID
  * @param string|null $projectName Project name. null = search personal + core only.
- *                    C15 15.3: there is no installation-wide project to fall back to, and
- *                    guessing one let a caller authorized on project A read project B's
- *                    snippets (flagged in C8 8.5 as a cross-project leak vector). All four
- *                    callers pass the marker project explicitly.
+ *                    There is no installation-wide project to fall back to: guessing
+ *                    one would let a caller authorized on project A read project B's
+ *                    snippets. All four callers pass the marker project explicitly.
  * @return array|null Full snippet data or null if not found
  */
 function getSnippetById(string $snippetId, ?string $projectName = null): ?array {
@@ -398,8 +393,7 @@ function extractSnippetCss(array $structure, string $projectName): array {
 
     // Components resolve from the project this snippet belongs to — the same
     // $projectName the stylesheet lookup below uses, so both halves of the
-    // extraction describe one project. (It used to be an ambient
-    // TEMPLATES_JSON_PATH constant, which nothing defines.)
+    // extraction describe one project.
     $componentsDir = SECURE_FOLDER_PATH . '/projects/' . $projectName . '/templates/model/json/components';
 
     $components = [];
@@ -439,54 +433,6 @@ function extractSnippetCss(array $structure, string $projectName): array {
     $css = $parser->formatExtractedCss($extracted);
 
     return ['selectors' => $selectors, 'css' => $css];
-}
-
-/**
- * Check if CSS selectors already exist in project stylesheet
- * 
- * @param string $css CSS content to check
- * @param string $stylesheetPath Path to project stylesheet
- * @return bool True if CSS already exists
- */
-function snippetCssExists(string $css, string $stylesheetPath): bool {
-    if (!file_exists($stylesheetPath)) {
-        return false;
-    }
-    
-    $existingCss = file_get_contents($stylesheetPath);
-    
-    // Extract selector names from snippet CSS (qs-snippet-* classes)
-    if (preg_match_all('/\.qs-snippet-[\w-]+/', $css, $matches)) {
-        $selectors = array_unique($matches[0]);
-        // Check if any of these selectors exist in stylesheet
-        foreach ($selectors as $selector) {
-            if (strpos($existingCss, $selector) !== false) {
-                return true;
-            }
-        }
-    }
-    
-    return false;
-}
-
-/**
- * Append snippet CSS to project stylesheet
- * 
- * @param string $css CSS content to append
- * @param string $stylesheetPath Path to project stylesheet
- * @return bool True on success
- */
-function appendSnippetCss(string $css, string $stylesheetPath): bool {
-    // Ensure directory exists
-    $dir = dirname($stylesheetPath);
-    if (!is_dir($dir)) {
-        mkdir($dir, 0755, true);
-    }
-    
-    // Add comment header
-    $cssWithComment = "\n\n/* Snippet CSS - Auto-added */\n" . $css . "\n";
-    
-    return file_put_contents($stylesheetPath, $cssWithComment, FILE_APPEND) !== false;
 }
 
 /**
@@ -556,9 +502,8 @@ function deleteProjectSnippet(string $snippetId, string $projectName): array {
     $snippet = findSnippetInPath($snippetId, $projectSnippetsPath, 'project');
 
     if ($snippet === null) {
-        // Then the CALLER'S OWN personal snippets. This is the row that mattered
-        // most: on the flat layout a member of any project could delete a
-        // snippet any other user had authored.
+        // Then the CALLER'S OWN personal snippets — never another user's, or a
+        // member of any project could delete a snippet any other user authored.
         $personalPath = getPersonalSnippetsPath();
         if ($personalPath !== null) {
             $snippet = findSnippetInPath($snippetId, $personalPath, 'personal');

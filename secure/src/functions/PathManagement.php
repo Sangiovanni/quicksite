@@ -6,26 +6,20 @@ function is_valid_relative_path(string $path, int $max_length = 255, int $max_de
     if ($path === '') {
         return $allow_empty;
     }
-    // 1. Whitespace at either end is refused, not trimmed: the caller uses the
-    //    value it passed, so the value checked has to be that value.
+    // 1. The value checked is the value the caller uses, never a normalised copy:
+    //    whitespace at either end is refused, not trimmed, and a backslash or a
+    //    doubled slash is refused (by D and by C's empty part), not rewritten.
     if ($path !== trim($path)) {
         return false;
     }
-    $normalized_path = $path;
-    
-    // Convert all backslashes (common in Windows input) to forward slashes
-    $normalized_path = str_replace('\\', '/', $normalized_path);
-    
-    // Remove duplicate slashes (e.g., 'a//b' becomes 'a/b')
-    $normalized_path = preg_replace('/\/+/', '/', $normalized_path);
     
     // 2. Length Check (filesystem limit - most systems allow 255-4096 chars)
-    if (strlen($normalized_path) > $max_length) {
+    if (strlen($path) > $max_length) {
         return false;
     }
 
     // 3. Depth Check (number of directory levels)
-    $path_parts = explode('/', $normalized_path);
+    $path_parts = explode('/', $path);
     if (count($path_parts) > $max_depth) {
         return false;
     }
@@ -33,13 +27,13 @@ function is_valid_relative_path(string $path, int $max_length = 255, int $max_de
     // 4. Critical Security & Format Checks
     
     // A. Check for directory traversal attempts ('../', '/../', or '..')
-     if (strpos($normalized_path, '..') !== false) {
+     if (strpos($path, '..') !== false) {
         // Log a security warning here if necessary
         return false;
     }
     
     // B. Check for absolute path indicators (leading slash)
-    if (str_starts_with($normalized_path, '/')) {
+    if (str_starts_with($path, '/')) {
         return false;
     }
 
@@ -47,7 +41,7 @@ function is_valid_relative_path(string $path, int $max_length = 255, int $max_de
     $reserved_names = ['CON', 'PRN', 'AUX', 'NUL', 'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9', 'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9'];
 
     foreach ($path_parts as $part) {
-        // Also check for empty parts (from double slashes that shouldn't exist after normalization)
+        // An empty part is a doubled, leading or trailing slash
         if ($part === '' || in_array(strtoupper($part), $reserved_names)) {
             return false;
         }
@@ -57,12 +51,12 @@ function is_valid_relative_path(string $path, int $max_length = 255, int $max_de
     // Only allows: letters, numbers, hyphens, underscores, dots
     // Format: segment or segment/segment/segment...
     $valid_path_regex = '/^[a-zA-Z0-9_\.\-]+([\/][a-zA-Z0-9_\.\-]+)*$/D';
-    if (!preg_match($valid_path_regex, $normalized_path)) {
+    if (!preg_match($valid_path_regex, $path)) {
         return false;
     }
 
     // E. Check for trailing slash
-    if (str_ends_with($normalized_path, '/')) {
+    if (str_ends_with($path, '/')) {
         return false;
     }
 
@@ -318,12 +312,12 @@ function write_htaccess_fallback(string $htaccess_path, string $fallback_resourc
  * Returns a machine-readable reason, or null when the pair is safe.
  *
  * `build` advertises, in its own refusal message, that the secure folder can
- * never sit under the public one. It used to check that by comparing the FIRST
- * PATH SEGMENT of each name, which answers a different question. `public='.'`
- * is a valid relative path, its first segment is '.', 'secure' differs, so the
- * pair passed — and `.` makes the public content path the build ROOT, putting
- * the entire secure folder (config.php, data/*.json, translate/*.json) under
- * the document root of the deployed site (beta.11 S3.10c, audit F2).
+ * never sit under the public one. Comparing only the FIRST PATH SEGMENT of each
+ * name answers a different question: `public='.'` is a valid relative path, its
+ * first segment is '.', 'secure' differs, so the pair would pass — and `.` makes
+ * the public content path the build ROOT, putting the entire secure folder
+ * (config.php, data/*.json, translate/*.json) under the document root of the
+ * deployed site.
  *
  * Two rules, both kept:
  *   - CONTAINMENT: neither normalised path may be the other, nor an ancestor of
@@ -394,7 +388,7 @@ function qs_build_paths_conflict(string $publicName, string $secureName): ?strin
  * confined to.
  *
  * Two details that are easy to get wrong and are the reason this is one
- * function rather than three copies (beta.11 S3.10c):
+ * function rather than three copies:
  *   - the jail carries a TRAILING SEPARATOR, so a sibling whose name merely
  *     PREFIXES the root ("/srv/wwwroot-old" vs "/srv/www") cannot satisfy it;
  *   - on Windows the comparison is case-folded, because NTFS resolves

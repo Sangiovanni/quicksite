@@ -682,14 +682,16 @@ class CssParser {
             $name = trim($match[1]);
             $framesContent = trim($match[2]);
             
-            // Parse individual frames
+            // The frames, read by the block tree like any other rule: a frame's key
+            // is the prelude before its brace, trimmed and otherwise verbatim — a
+            // decimal (`12.5%`), a keyword list (`from, to`) — so setKeyframes takes
+            // back exactly what this returns.
             $frames = [];
-            preg_match_all('/([\d%,\s]+|from|to)\s*\{([^}]*)\}/s', $framesContent, $frameMatches, PREG_SET_ORDER);
-            
-            foreach ($frameMatches as $frame) {
-                $key = trim($frame[1]);
-                $value = trim($frame[2]);
-                $frames[$key] = $value;
+            $frameParser = new self($framesContent);
+            foreach ($frameParser->parseTopLevelBlocks() as $frame) {
+                if ($frame['type'] === 'rule') {
+                    $frames[$frame['selector']] = trim(substr($framesContent, $frame['innerStart'], $frame['innerEnd'] - $frame['innerStart']));
+                }
             }
             
             $keyframes[$name] = $frames;

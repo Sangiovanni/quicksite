@@ -74,13 +74,15 @@ class RegexPatterns
             'examples' => ['fadeIn', 'slide-up', 'bounce_effect']
         ],
         
-        // CSS whitespace between the percentages, not only a space: the
-        // stylesheet parser hands a frame list out with its inner line breaks
-        // ("0%,\n    100%"), and the console sends it back as it came.
+        // A frame key as CSS writes one: a percentage (decimals allowed), `from` or
+        // `to`, or a comma-separated list mixing them. CSS whitespace around the
+        // commas, not only a space: the stylesheet parser hands a frame list out
+        // with its inner line breaks ("0%,\n    100%"), and the console sends it
+        // back as it came.
         'keyframe_selector' => [
-            'pattern' => '/^(\d+%([ \t\n\r\f]*,[ \t\n\r\f]*\d+%)*|from|to)$/iD',
-            'description' => 'Keyframe selector (percentage, from, or to)',
-            'examples' => ['0%', '50%', '100%', 'from', 'to', '0%, 50%, 100%']
+            'pattern' => '/^(?:from|to|(?:\d+(?:\.\d+)?|\.\d+)%)(?:[ \t\n\r\f]*,[ \t\n\r\f]*(?:from|to|(?:\d+(?:\.\d+)?|\.\d+)%))*$/iD',
+            'description' => 'Keyframe selector: a percentage (decimals allowed), from, or to, or a comma-separated list of them',
+            'examples' => ['0%', '12.5%', '100%', 'from', 'to', '0%, 50%, 100%', 'from, to']
         ],
         
         'build_name' => [
@@ -142,20 +144,15 @@ class RegexPatterns
         
         // === MEDIA QUERY ===
         
-        // One character set for both: letters, digits and - _ ( ) : , . / < > = + *,
-        // which is everything a media query is written with, ratios (16/9) and
-        // range syntax (width >= 600px) included. CSS whitespace goes only
-        // between tokens, for the reason given at keyframe_selector.
-        'media_query_basic' => [
-            'pattern' => '/^\([\w\-(:,.\/<>=+* \t\n\r\f]+\)$/D',
-            'description' => 'A single media feature in parentheses',
-            'examples' => ['(max-width: 768px)', '(orientation: landscape)', '(400px <= width <= 700px)']
-        ],
-        
+        // Letters, digits and - _ ( ) : , . / < > = + *, which is everything a
+        // media query is written with, ratios (16/9) and range syntax
+        // (width >= 600px) included. CSS whitespace goes only between tokens, for
+        // the reason given at keyframe_selector. `<` directly followed by `/` is
+        // refused: no media query holds it, and it is how an HTML end tag begins.
         'media_query_chars' => [
-            'pattern' => '/^[\w\-():,.\/<>=+*]+([ \t\n\r\f]+[\w\-():,.\/<>=+*]+)*$/D',
-            'description' => 'Media query: letters, digits and - _ ( ) : , . / < > = + *, with whitespace between words',
-            'examples' => ['max-width: 768px', 'screen and (color)', 'print', 'screen and (width >= 768px)']
+            'pattern' => '/^(?![\s\S]*<\/)[\w\-():,.\/<>=+*]+([ \t\n\r\f]+[\w\-():,.\/<>=+*]+)*$/D',
+            'description' => 'Media query: letters, digits and - _ ( ) : , . / < > = + *, with whitespace between words, and never < directly followed by /',
+            'examples' => ['max-width: 768px', 'screen and (color)', 'print', 'screen and (width >= 768px)', '(min-aspect-ratio: 16/9)']
         ],
     ];
     

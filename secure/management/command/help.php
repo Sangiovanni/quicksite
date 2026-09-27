@@ -1955,7 +1955,7 @@ $GLOBALS['__help_commands'] = [
                 'type' => 'string',
                 'description' => 'Complete CSS/SCSS content (replaces existing file). Can use "css" as alias.',
                 'example' => 'body { margin: 0; }',
-                'validation' => 'Must be string, max 2MB',
+                'validation' => 'A non-empty string of at most 512 KB that passes the stylesheet scan (see notes)',
                 'alias' => 'css'
             ]
         ],
@@ -1974,13 +1974,13 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '400.validation.required' => 'Missing content parameter',
-            '400.validation.invalid_format' => 'Content must be string or exceeds 2MB limit',
+            '400.validation.invalid_format' => 'The content fails the stylesheet scan (see notes); errors[0].pattern names what was found',
             '404.file.not_found' => 'Style file not found',
             '500.server.file_write_failed' => 'Failed to read or write style file',
             '400.validation.invalid_length' => 'The content parameter is empty, or larger than 512 KB.',
             '400.validation.invalid_type' => 'The content parameter must be a string.'
         ],
-        'notes' => 'Completely replaces style.css content. Response includes backup_content for manual rollback if needed. Max size: 2MB. File locking prevents concurrent writes.'
+        'notes' => 'Completely replaces style.css content. Response includes backup_content for manual rollback if needed. Max size: 512 KB. File locking prevents concurrent writes. THE STYLESHEET SCAN — run by every command that writes CSS into a stylesheet (editStyles, setStyleRule, setKeyframes, setRootVariables, injectSnippetCss) and by importProject on every .css entry: with comments removed and CSS escapes decoded, the text may not hold a javascript: or vbscript: URL, expression(, behavior: (scroll-behavior is fine), -moz-binding:, a data:text/html URI, an @import of another host or of a scheme (a relative @import is fine), or an HTML script or style tag; and its raw bytes may not open a PHP block (<?php, <?=, or <? followed by whitespace or the end of the text), which an import refuses.'
     ],
     
     // ==========================================================================
@@ -2032,7 +2032,7 @@ $GLOBALS['__help_commands'] = [
                 'type' => 'object',
                 'description' => 'Object of variable names and values to set/update',
                 'example' => '{"--color-primary": "#ff6600", "--new-var": "10px"}',
-                'validation' => 'Variable names must start with -- or will be auto-prefixed'
+                'validation' => 'Variable names must start with -- or will be auto-prefixed. A value holds no < > { }, javascript: or expression(; a name holds no { or }; and each declaration as written (--name: value) passes the stylesheet scan (see editStyles)'
             ],
             'themeTarget' => [
                 'required' => false,
@@ -2058,14 +2058,13 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.validation.required' => 'Missing variables parameter',
             '400.validation.invalid_format' => 'Variables must be a non-empty object',
-            '400.validation.security' => 'Dangerous CSS pattern detected',
             '404.file.not_found' => 'Style file not found',
             '500.server.file_write_failed' => 'Failed to write style file',
-            '400.validation.invalid_css' => 'Invalid CSS value detected. Variable names and values may not contain "{" or "}".',
+            '400.validation.invalid_css' => 'Invalid CSS value detected: a value holds < > { }, javascript: or expression(; a name or value holds { or }; or a declaration fails the stylesheet scan, answered "Potentially dangerous CSS pattern detected" with errors[0].pattern naming what was found.',
             '500.server.lock_failed' => 'Could not acquire file lock.',
             '500.server.operation_failed' => 'An unexpected failure while writing the variables; the stylesheet lock is released first. The exception message is returned.'
         ],
-        'notes' => 'Adds new variables or updates existing ones. Security validated against CSS injection. File locking prevents concurrent writes. Creates :root block if not exists.'
+        'notes' => 'Adds new variables or updates existing ones. Each declaration, as it will be written (--name: value), passes the stylesheet scan every CSS writer runs (see editStyles). File locking prevents concurrent writes. Creates :root block if not exists.'
     ],
 
     'setThemeMode' => [
@@ -2212,7 +2211,8 @@ $GLOBALS['__help_commands'] = [
                 'required' => false,
                 'type' => 'string',
                 'description' => 'Media query context (creates if not exists)',
-                'example' => '(max-width: 768px)'
+                'example' => '(max-width: 768px)',
+                'validation' => 'Letters, digits and - _ ( ) : , . / < > = + *, with whitespace only between words, and never < directly followed by /. Range syntax and ratios are fine: (width >= 600px), (min-aspect-ratio: 16/9)'
             ]
         ],
         'example_post' => 'POST /management/p/<projectId>/setStyleRule with body: {"selector": ".btn-custom", "styles": {"background": "#007bff", "color": "white"}}',
@@ -2232,14 +2232,14 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.validation.required' => 'Missing selector, or neither styles nor removeProperties provided',
             '400.validation.invalid_format' => 'Invalid selector or styles format',
-            '400.validation.security' => 'Dangerous CSS pattern detected (javascript:, expression(), etc.)',
+            '400.validation.security' => 'The selector, the styles, the media query or the rule as it will be written fails the stylesheet scan (see editStyles) — errors[0].field and errors[0].pattern say where and what — or one of the three holds { or }',
             '400.validation.invalid_media_query' => 'Invalid media query format',
             '404.file.not_found' => 'Style file not found',
             '500.server.file_write_failed' => 'Failed to write style file',
             '500.server.lock_failed' => 'Could not acquire file lock.',
             '500.server.operation_failed' => 'An unexpected failure while writing the rule; the stylesheet lock is released first. The exception message is returned.'
         ],
-        'notes' => 'Styles can be string or object format. Use removeProperties to selectively delete properties. If removing properties leaves the rule empty, it is automatically deleted (action: deleted). Security validated.'
+        'notes' => 'Styles can be string or object format. Use removeProperties to selectively delete properties. If removing properties leaves the rule empty, it is automatically deleted (action: deleted). The selector, the styles, the media query and the rule as it will be written each pass the stylesheet scan every CSS writer runs (see editStyles).'
     ],
     
     'deleteStyleRule' => [
@@ -2355,8 +2355,8 @@ $GLOBALS['__help_commands'] = [
             'data' => [
                 'keyframes' => [
                     'fadeIn' => [
-                        'frames' => ['from', 'to'],
-                        'content' => '@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }'
+                        'from' => 'opacity: 0;',
+                        'to' => 'opacity: 1;'
                     ]
                 ],
                 'count' => 1
@@ -2367,7 +2367,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.file_read_failed' => 'Failed to read style file',
             '404.keyframe.not_found' => 'Keyframe animation not found.'
         ],
-        'notes' => 'Returns all @keyframes animations with their frame definitions. Use setKeyframes to add/update animations.'
+        'notes' => 'Returns all @keyframes animations, each as an object of frame key => declarations; with {name}, data carries that animation\'s name and frames. A frame key is returned exactly as the stylesheet writes it, trimmed — a decimal (12.5%) or a list (from, to) included — so setKeyframes takes the frames back unchanged. Use setKeyframes to add/update animations.'
     ],
     
     'setKeyframes' => [
@@ -2383,14 +2383,16 @@ $GLOBALS['__help_commands'] = [
             'frames' => [
                 'required' => true,
                 'type' => 'object',
-                'description' => 'Object with frame keys (0%, 50%, 100%, from, to) and CSS values',
-                'example' => '{"from": "opacity: 0;", "to": "opacity: 1;"} or {"0%, 100%": "transform: scale(1);", "50%": "transform: scale(1.1);"}'
+                'description' => 'Object with frame keys and CSS values',
+                'example' => '{"from": "opacity: 0;", "to": "opacity: 1;"} or {"0%, 100%": "transform: scale(1);", "50%": "transform: scale(1.1);"}',
+                'validation' => 'A key is a percentage, decimals allowed (12.5%), from or to, or a comma-separated list of them (0%, 100% or from, to), with whitespace only around the commas. A value is a string holding no { or } that passes the stylesheet scan (see editStyles)'
             ],
             'allowOverwrite' => [
                 'required' => false,
                 'type' => 'boolean',
-                'description' => 'If false, returns error when animation exists. If true (default), overwrites existing animation.',
-                'example' => 'false'
+                'description' => 'If true, overwrites an existing animation of the same name. Otherwise an existing name answers 409 keyframe.already_exists.',
+                'example' => 'true',
+                'default' => false
             ]
         ],
         'example_patch' => 'PATCH /management/p/<projectId>/setKeyframes with body: {"name": "bounce", "frames": {"0%, 100%": "transform: translateY(0);", "50%": "transform: translateY(-20px);"}}',
@@ -2408,16 +2410,15 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.validation.required' => 'Missing name or frames parameter',
             '400.validation.invalid_format' => 'Invalid name format (must start with letter, alphanumeric only)',
-            '400.validation.invalid_frame' => 'Invalid frame key (must be percentage or from/to)',
-            '400.validation.security' => 'Dangerous CSS pattern detected',
-            '409.keyframes.exists' => 'Animation already exists (when allowOverwrite is false)',
+            '400.validation.invalid_frame' => 'Invalid frame key: not a percentage, from or to, nor a comma-separated list of them',
+            '400.validation.security' => 'A frame, or the @keyframes block as it will be written, fails the stylesheet scan (see editStyles; errors[0].pattern names what was found), or a frame holds { or }',
             '404.file.not_found' => 'Style file not found',
             '500.server.file_write_failed' => 'Failed to write style file',
             '409.keyframe.already_exists' => 'Keyframe already exists. Set allowOverwrite: true to replace it.',
             '500.server.lock_failed' => 'Could not acquire file lock.',
             '500.server.operation_failed' => 'An unexpected failure while writing the keyframes; the stylesheet lock is released first. The exception message is returned.'
         ],
-        'notes' => 'Frame keys: percentages (0%, 50%, 100%), combined (0%, 100%), or keywords (from, to). Use allowOverwrite:false to prevent accidental overwrites. Security validated against CSS injection.'
+        'notes' => 'Frame keys: percentages, decimals included (0%, 12.5%, 100%), keywords (from, to), or a comma-separated list mixing them (0%, 100% or from, to). getKeyframes returns every key exactly as the stylesheet writes it, so its frames can be sent back unchanged. An existing animation is replaced only with allowOverwrite:true. Each frame, and the block as it will be written, pass the stylesheet scan every CSS writer runs (see editStyles).'
     ],
     
     'deleteKeyframes' => [
@@ -4342,10 +4343,11 @@ $GLOBALS['__help_commands'] = [
             ]
         ],
         'notes' => [
-            'An archive is untrusted input. Entries are accepted against an extension ALLOWLIST and each one is checked so its content matches what its name claims (magic bytes for binary formats, valid JSON for .json, no PHP opening tag in a text file a web server could serve, sanitisation for SVG).',
-            'A refused entry is skipped and listed in security.skipped_disallowed with the reason, and the rest of the archive still imports — except an entry whose name is not a clean path and a file the site reads, which refuse the whole archive (next notes). security.skipped_unsafe lists entries whose folder the filesystem would not create.',
+            'An archive is untrusted input. Entries are accepted against an extension ALLOWLIST and each one is checked so its content matches what its name claims (magic bytes for binary formats, valid JSON for .json, no PHP opening tag in a text file a web server could serve, sanitisation for SVG, and for a .css file the stylesheet scan every CSS writer runs — see editStyles).',
+            'A refused entry is skipped and listed in security.skipped_disallowed with the reason, and the rest of the archive still imports — except an entry whose name is not a clean path, a file the site reads and a stylesheet, which refuse the whole archive (next notes). security.skipped_unsafe lists entries whose folder the filesystem would not create.',
             'Every entry in the project folder must have a clean relative path as its name: not absolute, no empty segment (two slashes in a row), no . or .. segment, no segment ending in a dot or a space. One that does not refuses the WHOLE archive with 400 and nothing is created, because another spelling of a path can land on a real file without being recognised as it. Entries outside the project folder are ignored.',
             'The files the site reads are checked before the project is created: config.json and routes.json at the project root, any .json file under config/, translate/ or data/, and every structure file — any .json file under templates/model/json/ or snippets/. Each must be readable, parse as a JSON array or object and pass the content check, and a structure file must also carry no unsafe attribute, blocked tag or invalid component reference. Every setting in config.json must be a value the command that writes it would accept: a language code is 2-3 lowercase letters, the default language is one of the listed ones, a display name follows addLang\'s rule, the flags are true or false, the theme default is light, dark or system, and the favicon is an image under /assets/images/ with a favicon extension. The first one that fails refuses the WHOLE archive with 400 and nothing is created, because importing the rest would leave a route whose page is missing, a language showing raw keys, or settings and routes replaced by the defaults. A file at a hidden path is not one of them: the import never writes a hidden path.',
+            'Every stylesheet — any .css entry not at a hidden path — is checked before the project is created too. One that cannot be read, opens a PHP block, or fails the stylesheet scan every CSS writer runs (see editStyles) refuses the WHOLE archive with 400 (reason disallowed_content) and nothing is created: a project imported without its stylesheet would be a site with its styling missing, and a stylesheet the editor refuses cannot arrive by archive either.',
             'The files the site reads may show a PHP opening tag in their text — a page that displays PHP code, say. No web server serves them, and the engine writes their values into generated PHP only as string literals. Every other text file keeps the rule.',
             'Archive resource limits are enforced from the ZIP headers before anything is extracted: entry count, total and per-entry uncompressed size, and per-entry compression ratio. Exceeding any of them returns 413 and writes nothing.',
             'The permitted extensions and the limits can be changed by copying <secure>/management/config/import-policy.php.example to import-policy.php.',
@@ -6015,7 +6017,7 @@ $GLOBALS['__help_commands'] = [
             'auth' => [
                 'required' => false,
                 'type' => 'object',
-                'description' => 'Authentication configuration: {type: "none"|"bearer"|"apiKey"|"basic", tokenSource: "localStorage:key"|"sessionStorage:key"|"config:key"}',
+                'description' => 'Authentication configuration: {type: "none"|"bearer"|"apiKey"|"basic", tokenSource: "localStorage:key"|"sessionStorage:key"|"config:key"|"header:Header-Name"}. A header name is an RFC 7230 token: letters, digits and ! # $ % & \' * + - . ^ _ ` | ~',
                 'example' => '{"type": "bearer", "tokenSource": "localStorage:apiToken"}'
             ]
         ],
@@ -6036,7 +6038,7 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '400.api.error.missing_parameter' => 'Missing required parameter (apiId, name, or baseUrl)',
-            '400.api.error.invalid_parameter' => 'API with this ID already exists'
+            '400.api.error.invalid_parameter' => 'API with this ID already exists, or an invalid apiId, baseUrl or auth (a tokenSource header name that is not an RFC 7230 token included); the message says which'
         ],
         'notes' => 'After creating an API, add endpoints using editApi with addEndpoint parameter. The API config is stored in data/api-endpoints.json and compiled to qs-api-config.js for client-side use.'
     ],
@@ -6072,7 +6074,7 @@ $GLOBALS['__help_commands'] = [
             'auth' => [
                 'required' => false,
                 'type' => 'object',
-                'description' => 'New authentication config',
+                'description' => 'New authentication config, in the shape addApi takes. A header:Header-Name tokenSource names an RFC 7230 token: letters, digits and ! # $ % & \' * + - . ^ _ ` | ~',
                 'example' => '{"type": "apiKey", "tokenSource": "header:X-API-Key"}'
             ],
             'endpoints' => [
@@ -6084,7 +6086,7 @@ $GLOBALS['__help_commands'] = [
             'addEndpoint' => [
                 'required' => false,
                 'type' => 'object',
-                'description' => 'Add a single endpoint: {id, name, path, method, description?, requestSchema?, responseSchema?, headers?, queryParams?, responseBindings?, callableFrom?}. callableFrom: "client" | "server" | "both". Absent = auto-derived from auth type (apiKey → server; others → both). Server-only endpoints are filtered out of qs-api-config.js.',
+                'description' => 'Add a single endpoint: {id, name, path, method, description?, requestSchema?, responseSchema?, headers?, queryParams?, responseBindings?, callableFrom?}. path starts with / and holds only letters, digits, - . _ ~ ! $ & \' ( ) * + , ; = : @ / ? and %XX escapes (":name" segments are placeholders). callableFrom: "client" | "server" | "both". Absent = auto-derived from auth type (apiKey → server; others → both). Server-only endpoints are filtered out of qs-api-config.js.',
                 'example' => '{"id": "contact", "name": "Contact Form", "path": "/contact", "method": "POST"}'
             ],
             'editEndpoint' => [
@@ -6123,7 +6125,7 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '400.api.error.missing_parameter' => 'Missing apiId or no updates provided',
-            '400.api.error.invalid_parameter' => 'Endpoint already exists (when adding), invalid update operation, or invalid callableFrom value (must be client/server/both or omitted for auto-derive)',
+            '400.api.error.invalid_parameter' => 'Endpoint already exists (when adding), invalid update operation, invalid callableFrom value (must be client/server/both or omitted for auto-derive), an endpoint path outside its character set, or a tokenSource header name that is not an RFC 7230 token',
             '404.api.error.not_found' => 'API or endpoint not found'
         ],
         'notes' => 'Use ONE endpoint operation per request: endpoints (full replace), addEndpoint, editEndpoint, or deleteEndpoint. Regenerates qs-api-config.js automatically (server-only endpoints are filtered out). **callableFrom**: per-endpoint marker — "client"/"server"/"both", or absent for auto-derive (apiKey → server, others → both). **countKeyWarnings**: advisory list of count-sentence bindings whose translation key does not resolve in every project language (empty array when all resolve). The edit is saved regardless. **auth.csrf**: optional on auth type "cookie" only — {"from": "cookie:XSRF-TOKEN", "to": "header:X-XSRF-TOKEN"} makes QS.fetch echo the named cookie into the named request header (the double-submit pattern used by the AUTHOR\'s own API, unrelated to QuickSite\'s session).'
@@ -6592,9 +6594,10 @@ $GLOBALS['__help_commands'] = [
             '200.snippets.css_nothing_to_inject' => 'No CSS rules to inject.',
             '400.project.mismatch' => 'The project named in the body does not match the project in the URL marker. The marker decides; a disagreeing echo is refused rather than ignored.',
             '413.validation.size_limit_exceeded' => 'Injecting this snippet would take the project stylesheet past 512 KB, the ceiling every CSS writer enforces.',
+            '400.validation.security' => 'The snippet\'s CSS, or the block as it will be appended (its comment names the snippet id), fails the stylesheet scan (see editStyles); errors[0].field and errors[0].pattern say where and what. Nothing is written.',
             '500.server.file_write_failed' => 'Failed to write stylesheet.'
         ],
-        'notes' => 'Writes to both the live public stylesheet and the project backup in <secure>/projects/. Includes :root variables referenced by injected rules. In "replace" mode, only global-scope rules are removed (media query rules are left untouched).'
+        'notes' => 'Writes to both the live public stylesheet and the project backup in <secure>/projects/. Includes :root variables referenced by injected rules. In "replace" mode, only global-scope rules are removed (media query rules are left untouched). The snippet\'s CSS and the block appended pass the stylesheet scan every CSS writer runs (see editStyles) — a project snippet can arrive in an imported archive.'
     ],
 
     'getIframeSandbox' => [

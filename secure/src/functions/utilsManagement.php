@@ -721,7 +721,7 @@ function scanAllPageJsonFiles(?string $projectPath = null): array {
             // Extract route from path
             // For folder structure: guides/getting-started/getting-started.json → guides/getting-started
             // For flat structure: home.json → home
-            $route = preg_replace('/\.json$/', '', $relativePath);
+            $route = preg_replace('/\.json$/D', '', $relativePath);
 
             // If folder structure, the last segment is duplicated: guides/getting-started/getting-started
             // Remove the duplicate leaf

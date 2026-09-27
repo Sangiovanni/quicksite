@@ -259,13 +259,24 @@ function _serverFetchPrepare(string $endpointRef, array $inputs, array $context)
                 'ok' => false,
                 'status' => 0,
                 'data' => null,
-                'error' => "apiKey not configured for API '{$apiIdForSecret}' in " . SECURE_FOLDER_NAME . "/admin/config/api-secrets.php (see .example template).",
+                'error' => "apiKey not configured for API '{$apiIdForSecret}' in <secure>/admin/config/api-secrets.php (see .example template).",
             ]];
         }
         $keyValue = $apiSecrets[$apiIdForSecret];
         $tokenSource = $auth['tokenSource'] ?? 'header:X-API-Key';
-        if (strpos($tokenSource, 'header:') === 0) {
+        if (is_string($tokenSource) && strpos($tokenSource, 'header:') === 0) {
             $headerName = substr($tokenSource, 7);
+            // The name is sent verbatim, so it must be an RFC 7230 token. Saving an
+            // API refuses any other name, but an endpoint's own auth object and an
+            // imported registry reach this point without that check.
+            if (!qs_http_header_name_is_token($headerName)) {
+                return ['state' => 'error', 'result' => [
+                    'ok' => false,
+                    'status' => 0,
+                    'data' => null,
+                    'error' => "Invalid header name in the tokenSource of API '{$apiIdForSecret}'.",
+                ]];
+            }
             $headers[] = $headerName . ': ' . $keyValue;
         }
         // Future tokenSource variants (e.g. 'query:apikey') would slot in

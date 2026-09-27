@@ -17,9 +17,7 @@ class Page {
         $this->showMenu = $showMenu;
         $this->showFooter = $showFooter;
         $this->pageEventsScript = $pageEventsScript;
-        // Tolerate the old pre-rendered-tag form so a page compiled by an
-        // earlier build cannot fatal here; it simply carries no stores.
-        $this->stateStores = is_array($stateStores) ? $stateStores : [];
+        $this->stateStores = $stateStores;
     }
 
     public function render() {
@@ -127,8 +125,8 @@ class Page {
     // fetched — in the one order they have to be in.
     //
     // Emitted through the SHARED writer, which the live /p/<projectId>/ render
-    // also uses. A built page used to emit its own shorter version of this run
-    // and silently lost the consent map and both resolver blocks.
+    // also uses: a separate version of this run in a built page would drift from
+    // it, and lose blocks such as the consent map or the resolver data.
     require_once SECURE_FOLDER_PATH . '/src/functions/resolverRegistry.php';
     require_once SECURE_FOLDER_PATH . '/src/functions/apiRegistry.php';
 

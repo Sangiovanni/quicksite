@@ -651,12 +651,20 @@ class ApiEndpointManager {
         // Validate tokenSource format (prefix:key)
         if (!empty($auth['tokenSource'])) {
             $validPrefixes = ['localStorage', 'sessionStorage', 'config', 'header'];
-            $parts = explode(':', $auth['tokenSource'], 2);
+            $parts = is_string($auth['tokenSource']) ? explode(':', $auth['tokenSource'], 2) : [];
 
             if (count($parts) !== 2 || !in_array($parts[0], $validPrefixes)) {
                 return [
                     'valid' => false,
                     'error' => 'Invalid tokenSource format. Use: localStorage:key, sessionStorage:key, config:key, or header:headerName'
+                ];
+            }
+            // A header name is sent verbatim in a request header, so it is held to
+            // RFC 7230's token rule.
+            if ($parts[0] === 'header' && !qs_http_header_name_is_token($parts[1])) {
+                return [
+                    'valid' => false,
+                    'error' => "Invalid tokenSource header name. A header name is letters, digits and ! # $ % & ' * + - . ^ _ ` | ~ (RFC 7230), e.g. header:X-API-Key"
                 ];
             }
         }
@@ -686,7 +694,7 @@ class ApiEndpointManager {
             // held to RFC 7230's token grammar — a name carrying CR, LF or a
             // colon is a header-splitting payload, not a typo.
             if (!is_string($from) || !preg_match('/^cookie:[^\s;,=]+$/D', $from)
-                || !is_string($to) || !preg_match('/^header:[A-Za-z0-9!#$%&\'*+.^_`|~-]+$/D', $to)) {
+                || !is_string($to) || strpos($to, 'header:') !== 0 || !qs_http_header_name_is_token(substr($to, 7))) {
                 return [
                     'valid' => false,
                     'error' => 'Invalid csrf config. Use: {"from": "cookie:XSRF-TOKEN", "to": "header:X-XSRF-TOKEN"}'
@@ -806,8 +814,16 @@ class ApiEndpointManager {
         }
         
         // Path must start with /
-        if ($endpoint['path'][0] !== '/') {
+        if (!is_string($endpoint['path']) || $endpoint['path'][0] !== '/') {
             return ['valid' => false, 'error' => 'Endpoint path must start with /'];
+        }
+
+        // ...and hold only what a URL's path and query may hold (RFC 3986), and
+        // what the placeholder substitution (qs_api_substitute_path) expects: no
+        // whitespace or control character, which it would carry into the URL, and
+        // anything else outside the set written as a %XX escape.
+        if (!preg_match('~^/(?:[A-Za-z0-9\-._\~!$&\'()*+,;=:@/?]|%[0-9A-Fa-f]{2})*$~D', $endpoint['path'])) {
+            return ['valid' => false, 'error' => "Endpoint path may hold only letters, digits, - . _ ~ ! $ & ' ( ) * + , ; = : @ / ? and %XX escapes"];
         }
         
         if (empty($endpoint['method'])) {

@@ -142,6 +142,21 @@ if (!function_exists('qs_api_effective_callable_from')) {
     }
 }
 
+if (!function_exists('qs_http_header_name_is_token')) {
+    /**
+     * May a request carry a header by this name? RFC 7230's `token`: one or more
+     * letters, digits and ! # $ % & ' * + - . ^ _ ` | ~. A name holding anything
+     * else — a space, a colon, a CR or an LF — is a header-splitting payload, not a
+     * name. ApiEndpointManager refuses such a name when an API is saved, and
+     * serverFetch refuses to send one: an endpoint's own auth object and an
+     * imported registry reach it without passing the save-time check.
+     */
+    function qs_http_header_name_is_token(string $name): bool
+    {
+        return (bool) preg_match('/^[A-Za-z0-9!#$%&\'*+.^_`|~-]+$/D', $name);
+    }
+}
+
 if (!function_exists('qs_api_count_strings')) {
     /**
      * The count-sentence strings this project's bindings need, in THIS
