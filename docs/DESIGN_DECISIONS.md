@@ -12126,3 +12126,28 @@ and `languages.NOTICE.txt` (the Unicode License v3 notice the names are used und
 `secure/src/classes/RegexPatterns.php` (`language_code`, `language_name`); the language
 commands under `secure/management/command/`; `secure/management/config/categories.php`
 (`getLanguageList`). Behaviour: [COMMAND_API.md](COMMAND_API.md) and `help`.
+
+### A new project starts with an empty stylesheet (locked 2026-09-27)
+
+**Decision**: `createProject` writes the project's `public/style/style.css` empty. The starter
+pages keep their three class names — `main-nav` on the menu, `main-footer` on the footer,
+`container` on each page's root element — as hooks an author can style; nothing styles them.
+Projects that already exist keep their stylesheets.
+
+**Reasoning**: the stylesheet a new project used to receive was a fixed starter theme: three
+colour variables, a reset, a font stack, and rules for classes most new projects do not have.
+On the starter pages it painted what the author had not made — an empty coloured bar where the
+menu is and an empty grey block where the footer is — while its `.hero`, `.nav-links` and
+`.error-page` rules styled nothing a new project contains. A new site should show only what its
+author adds. An empty file is safe for every command that reads or edits the stylesheet: each
+tells an empty file from a missing one, and `setRootVariables` writes the `:root` block when
+there is none.
+
+**Alternatives considered**: keeping the starter theme (rejected — it styles elements a new
+project leaves empty or does not have). Emptying the stylesheet and removing the three class
+names from the starter pages (not taken — the names cost nothing and give an author something
+to style).
+
+**Source**: Sangio's review of a new project during beta.12, 2026-09-27.
+`secure/management/command/createProject.php` (`createEmptyStylesheet()`). Behaviour: the
+`createProject` `help` entry.
