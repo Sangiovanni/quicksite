@@ -11,7 +11,8 @@
  * 
  * @param string $name Project name (required)
  * @param string $site_name Display name for the site (optional)
- * @param string $language Default language code (optional, default: en)
+ * @param string $language The project's first language: a code from the
+ *                         installation's language list (optional, default: en)
  * @param bool $switch_to Make the new project the CREATOR's editing target
  *                        (their per-user selected_project) after creation
  *                        (optional, default: false). Never changes the served
@@ -21,8 +22,10 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
-require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/languageRegistry.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/projectSettings.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php'; // qs_delete_tree
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -57,36 +60,68 @@ function __command_createProject(array $params = [], array $urlParams = []): Api
             ->withErrors(['name' => 'This name is reserved for system use']);
     }
     
-    // Optional parameters
-    $siteName = mb_substr(trim($params['site_name'] ?? ucfirst($projectName)), 0, 200);
+    // Optional parameters: absent (or null) takes the default; any other value
+    // must be a string (an array reached trim() as a TypeError).
+    foreach (['site_name', 'language'] as $field) {
+        if (isset($params[$field]) && !is_string($params[$field])) {
+            return ApiResponse::create(400, 'validation.invalid_type')
+                ->withMessage("The {$field} parameter must be a string.")
+                ->withErrors([['field' => $field, 'reason' => 'invalid_type', 'expected' => 'string']]);
+        }
+    }
+    $siteName = mb_substr(trim(qs_param_string($params, 'site_name', ucfirst($projectName))), 0, 200);
     // Cap length + strip control bytes (\x00-\x1F, \x7F). Byte-wise strip is
     // UTF-8-safe: control bytes never occur inside a multibyte sequence. Display
     // titles keep spaces / punctuation / accents — no strict format enforced.
     $siteName = preg_replace('/[\x00-\x1F\x7F]/', '', $siteName);
-    $defaultLang = trim($params['language'] ?? 'en');
+    $defaultLang = trim(qs_param_string($params, 'language', 'en'));
     $switchTo = filter_var($params['switch_to'] ?? false, FILTER_VALIDATE_BOOLEAN);
-    
-    // Validate language code — the rule addLang, deleteLang and setDefaultLang
-    // use, so the project's first language can later be deleted or made default
-    // by name.
-    if (!RegexPatterns::match('language_code', $defaultLang)) {
-        return ApiResponse::create(400, 'validation.invalid_format')
-            ->withMessage('Invalid language code format')
-            ->withErrors(['language' => 'Use 2-3 lowercase letters (ISO 639): en, fr, de, zho']);
+
+    // The project's first language is a NEW language: a code from the
+    // installation's language list.
+    if (!qs_language_is_listed($defaultLang)) {
+        return qs_language_not_listed_response($defaultLang, 'language');
     }
-    
+
+    $config = [
+        'SITE_NAME' => $siteName,
+        'LANGUAGE_DEFAULT' => $defaultLang,
+        'LANGUAGES_SUPPORTED' => [$defaultLang],
+        'MULTILINGUAL_SUPPORT' => false,
+    ];
+    $refusal = qs_project_settings_guard($config, array_keys($config));
+    if ($refusal !== null) {
+        return $refusal;
+    }
+
     // Check project doesn't already exist
     $projectPath = SECURE_FOLDER_PATH . '/projects/' . $projectName;
-    
+
     if (is_dir($projectPath)) {
         return ApiResponse::create(409, 'resource.already_exists')
             ->withMessage("Project '$projectName' already exists")
             ->withData(['existing_path' => SECURE_FOLDER_NAME . '/projects/' . $projectName]);
     }
-    
+
+    // The project root is created exclusively, so two creates of one name cannot
+    // share a folder, and every failure below removes a folder this request made:
+    // a create that answers an error leaves nothing behind.
+    if (!@mkdir($projectPath, 0755)) {
+        return is_dir($projectPath)
+            ? ApiResponse::create(409, 'resource.already_exists')
+                ->withMessage("Project '$projectName' already exists")
+                ->withData(['existing_path' => SECURE_FOLDER_NAME . '/projects/' . $projectName])
+            : ApiResponse::create(500, 'server.directory_create_failed')
+                ->withMessage('Failed to create project structure')
+                ->withData(['failed_path' => '']);
+    }
+    $fail = static function (ApiResponse $response) use ($projectPath): ApiResponse {
+        qs_delete_tree($projectPath);
+        return $response;
+    };
+
     // Create project structure
     $folders = [
-        '',
         '/config',
         '/templates',
         '/templates/pages',
@@ -108,9 +143,9 @@ function __command_createProject(array $params = [], array $urlParams = []): Api
     foreach ($folders as $folder) {
         $path = $projectPath . $folder;
         if (!mkdir($path, 0755, true) && !is_dir($path)) {
-            return ApiResponse::create(500, 'server.directory_create_failed')
+            return $fail(ApiResponse::create(500, 'server.directory_create_failed')
                 ->withMessage('Failed to create project structure')
-                ->withData(['failed_path' => $folder]);
+                ->withData(['failed_path' => $folder]));
         }
     }
 
@@ -122,17 +157,17 @@ function __command_createProject(array $params = [], array $urlParams = []): Api
     }
     
     // Create config.php
-    $configContent = createProjectConfig($siteName, $defaultLang);
+    $configContent = createProjectConfig($config);
     if (file_put_contents($projectPath . '/config.php', $configContent, LOCK_EX) === false) {
-        return ApiResponse::create(500, 'server.file_write_failed')
-            ->withMessage('Failed to create config.php');
+        return $fail(ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage('Failed to create config.php'));
     }
-    
+
     // Create routes.php with home route (associative array format)
     $routesContent = "<?php\n/**\n * Route definitions (auto-generated)\n * Created: " . date('Y-m-d H:i:s') . "\n */\n\nreturn " . varExportNested(['home' => []]) . ";\n";
     if (file_put_contents($projectPath . '/routes.php', $routesContent, LOCK_EX) === false) {
-        return ApiResponse::create(500, 'server.file_write_failed')
-            ->withMessage('Failed to create routes.php');
+        return $fail(ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage('Failed to create routes.php'));
     }
     
     // Create empty aliases.json
@@ -167,8 +202,8 @@ FallbackResource $fallbackPath
 HTACCESS;
     file_put_contents($projectPath . '/public/.htaccess', $htaccess . "\n", LOCK_EX);
     
-    // Create basic style.css
-    createBasicStyles($projectPath);
+    // An empty style.css
+    createEmptyStylesheet($projectPath);
 
     // --- Membership (C5): the creator becomes the project's sole owner ---
     // No project may exist without a members.json (L9). Requires AuthManagement.
@@ -182,8 +217,8 @@ HTACCESS;
     // as sole owner. A create with no resolvable owner is invalid (an ownerless,
     // inaccessible project); fail loudly rather than mint one.
     if (!qs_project_birth_write_members($projectPath, $creatorId)) {
-        return ApiResponse::create(500, 'server.file_write_failed')
-            ->withMessage('Failed to initialise project membership');
+        return $fail(ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage('Failed to initialise project membership'));
     }
 
     // Update the creator's derived project index (users.php) — cache only, NO
@@ -226,18 +261,13 @@ HTACCESS;
 }
 
 /**
- * Generate config.php content
+ * Generate config.php content. var_export writes every value as a PHP literal,
+ * so a quote or a backslash in the site name is stored exactly as it was sent.
+ * A project stores language codes only; their names come from the
+ * installation's language list when they are shown.
  */
-function createProjectConfig(string $siteName, string $defaultLang): string {
-    // Get display name for default language
-    $commonLanguages = [
-        'en' => 'English', 'fr' => 'Français', 'es' => 'Español', 'de' => 'Deutsch',
-        'it' => 'Italiano', 'pt' => 'Português', 'nl' => 'Nederlands', 'ru' => 'Русский',
-        'zh' => '中文', 'ja' => '日本語', 'ko' => '한국어', 'ar' => 'العربية'
-    ];
-    $defaultLangName = $commonLanguages[$defaultLang] ?? ucfirst($defaultLang);
-    
-    return "<?php\n/**\n * Site Configuration\n * Created: " . date('Y-m-d H:i:s') . "\n */\n\nreturn [\n    'SITE_NAME' => '" . addslashes($siteName) . "',\n    'LANGUAGE_DEFAULT' => '$defaultLang',\n    'LANGUAGES_SUPPORTED' => ['$defaultLang'],\n    'LANGUAGES_NAME' => ['$defaultLang' => '$defaultLangName'],\n    'MULTILINGUAL_SUPPORT' => false\n];\n";
+function createProjectConfig(array $config): string {
+    return "<?php\n/**\n * Site Configuration\n * Created: " . date('Y-m-d H:i:s') . "\n */\n\nreturn " . var_export($config, true) . ";\n";
 }
 
 /**
@@ -313,12 +343,14 @@ function createMenuAndFooter(string $projectPath, string $siteName): void {
 }
 
 /**
- * Create basic stylesheet
+ * The project's stylesheet, empty: a new site shows only what its author adds. The starter
+ * structures keep their class names (main-nav, main-footer, container) as hooks, unstyled. The
+ * commands that edit the stylesheet only need the file to exist: setRootVariables creates the
+ * :root block when there is none.
  */
-function createBasicStyles(string $projectPath): void {
-    $css = ":root {\n    --primary-color: #3498db;\n    --text-color: #333;\n    --bg-color: #fff;\n}\n\n* {\n    margin: 0;\n    padding: 0;\n    box-sizing: border-box;\n}\n\nbody {\n    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;\n    color: var(--text-color);\n    background: var(--bg-color);\n    line-height: 1.6;\n}\n\n.hero {\n    text-align: center;\n    padding: 4rem 2rem;\n}\n\n.hero h1 {\n    font-size: 2.5rem;\n    margin-bottom: 1rem;\n}\n\n.main-nav {\n    display: flex;\n    justify-content: space-between;\n    align-items: center;\n    padding: 1rem 2rem;\n    background: var(--primary-color);\n    color: white;\n}\n\n.main-nav a {\n    color: white;\n    text-decoration: none;\n}\n\n.nav-links {\n    display: flex;\n    list-style: none;\n    gap: 1rem;\n}\n\nfooter {\n    text-align: center;\n    padding: 2rem;\n    background: #f5f5f5;\n}\n\n.error-page {\n    text-align: center;\n    padding: 4rem 2rem;\n}\n";
-    file_put_contents($projectPath . '/public/style/style.css', $css, LOCK_EX);
-    
+function createEmptyStylesheet(string $projectPath): void {
+    file_put_contents($projectPath . '/public/style/style.css', '', LOCK_EX);
+
     // index.php for style folder
     file_put_contents($projectPath . '/public/style/index.php', "<?php\n// Directory listing disabled\nhttp_response_code(403);\n", LOCK_EX);
 }

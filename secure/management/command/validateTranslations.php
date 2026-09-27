@@ -13,7 +13,7 @@
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
-require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/languageRegistry.php';
 
 /**
  * Extract all textKeys from structures (uses refactored utility function)
@@ -123,7 +123,7 @@ function __command_validateTranslations(array $params = [], array $urlParams = [
                 ]);
         }
         
-        // Length validation (max 10 chars for locale codes)
+        // Length validation (no language code, and not "default", is longer)
         if (strlen($targetLang) > 10) {
             return ApiResponse::create(400, 'validation.invalid_length')
                 ->withMessage('Language code must not exceed 10 characters')
@@ -132,17 +132,12 @@ function __command_validateTranslations(array $params = [], array $urlParams = [
                 ]);
         }
         
-        // Format validation - supports ISO 639 and BCP 47 locale codes.
-        // Also supports "default" for mono-language mode (per Beta.9 A4
-        // Slice 7 — was silently 400-ing on monolingual sites because
-        // 'default' fails the regex, causing the translation-keys-grouped
-        // helper to fall through with empty missing_keys, which made
-        // EVERY key appear as "used" in the Translation Manager).
-        $isDefault = ($targetLang === 'default');
-        if (!$isDefault && !RegexPatterns::match('language_code_extended', $targetLang)) {
-            return ApiResponse::create(400, 'validation.invalid_format')
-                ->withMessage('Invalid language code format')
-                ->withErrors([RegexPatterns::validationError('language_code_extended', 'language', $targetLang)]);
+        // An EXISTING language: one of the project's, or "default" — the
+        // mono-language translation file, which the Translation Manager asks
+        // for on a monolingual site (refusing it would leave missing_keys
+        // empty there and show every key as used).
+        if (!qs_project_has_language($targetLang, true)) {
+            return qs_language_not_in_project_response($targetLang, 'language', true);
         }
     }
 

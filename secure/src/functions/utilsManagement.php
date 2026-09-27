@@ -997,15 +997,24 @@ function qs_favicon_repoint(string $projectPath, string $oldName, ?string $newNa
         return false;
     }
 
+    // FAVICON_PATH's one rule (projectSettings.php): a renamed favicon keeps its
+    // pointer only if the new path follows it; otherwise the pointer is cleared,
+    // never written invalid and never left naming a file that is gone.
+    require_once SECURE_FOLDER_PATH . '/src/functions/projectSettings.php';
+    $newPath = $newName === null ? null : '/assets/images/' . $newName;
+    if ($newPath !== null && qs_project_setting_error('FAVICON_PATH', $newPath) !== null) {
+        $newPath = null;
+    }
+
     $changed = false;
-    qs_config_mutate($configPath, function (array &$config) use ($oldName, $newName, &$changed): bool {
+    qs_config_mutate($configPath, function (array &$config) use ($oldName, $newPath, &$changed): bool {
         if (($config['FAVICON_PATH'] ?? null) !== '/assets/images/' . $oldName) {
             return false;   // not ours — abandon, leave the file untouched
         }
-        if ($newName === null) {
+        if ($newPath === null) {
             unset($config['FAVICON_PATH']);
         } else {
-            $config['FAVICON_PATH'] = '/assets/images/' . $newName;
+            $config['FAVICON_PATH'] = $newPath;
         }
         $changed = true;
         return true;

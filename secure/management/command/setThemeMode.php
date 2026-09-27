@@ -1,5 +1,6 @@
 <?php
 require_once SECURE_FOLDER_PATH . '/src/functions/opcacheHygiene.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/projectSettings.php';
 /**
  * setThemeMode - Enable/disable dark mode support and configure theme defaults
  *
@@ -38,7 +39,7 @@ if ($hasEnabled) {
     $enabled = $params['enabled'];
     if ($enabled === 'true')  $enabled = true;
     if ($enabled === 'false') $enabled = false;
-    if (!is_bool($enabled)) {
+    if (qs_project_setting_error('THEME_MODE_ENABLED', $enabled) !== null) {
         ApiResponse::create(400, 'validation.invalid_type')
             ->withMessage('"enabled" must be a boolean (true/false)')
             ->send();
@@ -49,7 +50,7 @@ if ($hasEnabled) {
 $defaultTheme = null;
 if ($hasDefault) {
     $defaultTheme = trim((string)$params['default']);
-    if (!in_array($defaultTheme, ['light', 'dark', 'system'], true)) {
+    if (qs_project_setting_error('THEME_DEFAULT', $defaultTheme) !== null) {
         ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage('"default" must be "light", "dark", or "system"')
             ->send();
@@ -62,7 +63,7 @@ if ($hasUserToggle) {
     $userToggle = $params['userToggle'];
     if ($userToggle === 'true')  $userToggle = true;
     if ($userToggle === 'false') $userToggle = false;
-    if (!is_bool($userToggle)) {
+    if (qs_project_setting_error('THEME_USER_TOGGLE_ENABLED', $userToggle) !== null) {
         ApiResponse::create(400, 'validation.invalid_type')
             ->withMessage('"userToggle" must be a boolean (true/false)')
             ->send();

@@ -134,7 +134,7 @@ const QS_LOG_SKIP_BODY_COMMANDS = [
  * deleted this project, and when" is exactly the question the bucket should
  * still be able to answer, so lifecycle events are never dropped.
  *
- * `logoutSession` is dropped here for a DIFFERENT reason from the two reads
+ * `logoutSession` is dropped here for a DIFFERENT reason from the three reads
  * above it, and the difference matters. It is not noise — it is an event about
  * an ACCOUNT rather than about a project, so it belongs in the security log
  * (securityLog.php), which is where it is now written from. Dropping it here
@@ -149,6 +149,7 @@ const QS_LOG_SKIP_BODY_COMMANDS = [
 const QS_LOG_SKIP_GLOBAL_COMMANDS = [
     'listProjects',
     'help',
+    'getLanguageList',
     'logoutSession',
 ];
 

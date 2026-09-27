@@ -38,18 +38,15 @@ class RegexPatterns
     private static array $patterns = [
         // === IDENTIFIERS (strict ASCII) ===
         
+        // The shape of a code in the installation's language list (languageRegistry.php): an ISO
+        // 639 code as BCP 47 writes a primary language subtag. Whether a code may be USED is the
+        // list's question, not this pattern's.
         'language_code' => [
             'pattern' => '/^[a-z]{2,3}$/D',
-            'description' => '2-3 lowercase letters (ISO 639-1 or 639-2)',
-            'examples' => ['en', 'fr', 'es', 'zho']
+            'description' => '2 or 3 lowercase letters, an ISO 639 code',
+            'examples' => ['en', 'fr', 'zh', 'fil']
         ],
-        
-        'language_code_extended' => [
-            'pattern' => '/^[a-z]{2,3}(-[A-Za-z]{2,4})?$/D',
-            'description' => 'Language code with optional region (e.g., en, en-US, zh-Hans)',
-            'examples' => ['en', 'fr', 'en-US', 'zh-Hans']
-        ],
-        
+
         'identifier_alphanum' => [
             'pattern' => '/^[a-zA-Z0-9_-]+$/D',
             'description' => 'Letters, numbers, underscores, and hyphens',
@@ -93,13 +90,16 @@ class RegexPatterns
         
         // === HUMAN-READABLE TEXT (Unicode support) ===
         
-        // A combining mark (a vowel sign, a virama) belongs to the letter before
-        // it: many scripts spell their own names with them (हिन्दी, தமிழ், বাংলা),
-        // and a name made only of marks is not a name.
+        // A name in the installation's language list. A combining mark (a vowel
+        // sign, a virama) belongs to the letter before it: many scripts spell their
+        // own names with them (हिन्दी, தமிழ், বাংলা), and a name made only of marks
+        // is not a name. The typographic apostrophes, the parentheses and the
+        // Tibetan syllable mark (U+0F0B) are there because the list's own names use
+        // them (O‘zbek, Kurdî (kurmancî), བོད་སྐད་). At least one letter.
         'language_name' => [
-            'pattern' => '/^(?:\p{L}\p{M}*|[ \-\'\.])+$/uD',
-            'description' => 'Language display name (letters with their combining marks, spaces, hyphens, apostrophes, dots)',
-            'examples' => ['English', 'Français', 'Español', 'Русский', '日本語', "Kreyòl ayisyen", 'हिन्दी']
+            'pattern' => '/^(?=.*\p{L})(?:\p{L}\p{M}*|[ \-\'.()\x{2018}\x{2019}\x{0F0B}])+$/uD',
+            'description' => 'Language name: letters with their combining marks, spaces, hyphens, apostrophes, dots, parentheses and the Tibetan syllable mark, with at least one letter',
+            'examples' => ['English', 'Français', '日本語', 'हिन्दी', 'Kurdî (kurmancî)', 'O‘zbek', 'བོད་སྐད་']
         ],
         
         // === STRUCTURED DATA ===

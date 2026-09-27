@@ -11,7 +11,7 @@
  */
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
-require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/languageRegistry.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/translationHelpers.php';
 
 $params = $trimParametersManagement->params();
@@ -53,7 +53,7 @@ if (strpos($language, '..') !== false ||
         ->send();
 }
 
-// Length validation for language code (max 10 chars for locale codes like "zh-Hans-CN")
+// Length validation (no language code, and not "default", is longer)
 if (strlen($language) > 10) {
     ApiResponse::create(400, 'validation.invalid_length')
         ->withMessage('Language code must not exceed 10 characters')
@@ -63,14 +63,10 @@ if (strlen($language) > 10) {
         ->send();
 }
 
-// SECURITY: Validate language code format
-// Also supports "default" for mono-language mode
-$isDefault = ($language === 'default');
-if (!$isDefault && !RegexPatterns::match('language_code_extended', $language)) {
-    ApiResponse::create(400, 'validation.invalid_format')
-        ->withMessage('Invalid language code format')
-        ->withErrors([RegexPatterns::validationError('language_code_extended', 'language', $language)])
-        ->send();
+// An EXISTING language: one of the project's, or "default" (the mono-language
+// translation file). A translation file is never created for any other code.
+if (!qs_project_has_language($language, true)) {
+    qs_language_not_in_project_response($language, 'language', true)->send();
 }
 
 // Type validation - translations must be array/object

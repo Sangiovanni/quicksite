@@ -2,6 +2,7 @@
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_json_write
 require_once SECURE_FOLDER_PATH . '/src/functions/opcacheHygiene.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/projectSettings.php';
 
 /**
  * setMultilingual - Enable or disable multilingual support
@@ -33,19 +34,17 @@ if (!isset($params['enabled'])) {
 
 $enabled = $params['enabled'];
 
-// Must be boolean
-if (!is_bool($enabled)) {
-    // Accept string 'true'/'false' as well
-    if ($enabled === 'true') {
-        $enabled = true;
-    } elseif ($enabled === 'false') {
-        $enabled = false;
-    } else {
-        ApiResponse::create(400, 'validation.invalid_type')
-            ->withMessage('The "enabled" parameter must be a boolean (true/false)')
-            ->withErrors([['field' => 'enabled', 'value' => $enabled, 'expected' => 'boolean']])
-            ->send();
-    }
+// Accept string 'true'/'false' as well; the setting's rule decides the rest.
+if ($enabled === 'true') {
+    $enabled = true;
+} elseif ($enabled === 'false') {
+    $enabled = false;
+}
+if (qs_project_setting_error('MULTILINGUAL_SUPPORT', $enabled) !== null) {
+    ApiResponse::create(400, 'validation.invalid_type')
+        ->withMessage('The "enabled" parameter must be a boolean (true/false)')
+        ->withErrors([['field' => 'enabled', 'value' => $enabled, 'expected' => 'boolean']])
+        ->send();
 }
 
 $configPath = PROJECT_PATH . '/config.php';
@@ -198,36 +197,11 @@ function countKeys(array $arr): int {
     return $count;
 }
 
-// Update config.php - use freshConfig as the base (not stale CONFIG constant)
+// Update config.php - use freshConfig as the base (not stale CONFIG constant).
+// Only the mode changes: a project stores its language codes, and their names
+// come from the installation's language list wherever they are shown.
 $config = $freshConfig;
 $config['MULTILINGUAL_SUPPORT'] = $enabled;
-
-// Common language display names
-$commonLanguages = [
-    'en' => 'English', 'fr' => 'Français', 'es' => 'Español', 'de' => 'Deutsch',
-    'it' => 'Italiano', 'pt' => 'Português', 'nl' => 'Nederlands', 'ru' => 'Русский',
-    'zh' => '中文', 'ja' => '日本語', 'ko' => '한국어', 'ar' => 'العربية',
-    'hi' => 'हिन्दी', 'pl' => 'Polski', 'sv' => 'Svenska', 'da' => 'Dansk',
-    'no' => 'Norsk', 'fi' => 'Suomi', 'tr' => 'Türkçe', 'cs' => 'Čeština',
-    'el' => 'Ελληνικά', 'he' => 'עברית', 'th' => 'ไทย', 'vi' => 'Tiếng Việt'
-];
-
-if ($enabled) {
-    // Ensure LANGUAGES_NAME includes all supported languages with proper display names
-    $languagesName = $config['LANGUAGES_NAME'] ?? [];
-    foreach ($config['LANGUAGES_SUPPORTED'] as $langCode) {
-        if (!isset($languagesName[$langCode])) {
-            $languagesName[$langCode] = $commonLanguages[$langCode] ?? ucfirst($langCode);
-        }
-    }
-    $config['LANGUAGES_NAME'] = $languagesName;
-} else {
-    // When disabling multilingual, reset LANGUAGES_NAME to just the default language
-    // This ensures a clean state for future multilingual setup
-    $config['LANGUAGES_NAME'] = [
-        $defaultLang => $commonLanguages[$defaultLang] ?? ucfirst($defaultLang)
-    ];
-}
 
 $configContent = "<?php\n\nreturn " . var_export($config, true) . ";\n";
 

@@ -235,25 +235,45 @@
          * read its rendered height. Slice 2 verification feedback
          * ("when the function is already really low on the page" it
          * should open upward like the preview-toggle popover does).
+         *
+         * Three measurements keep it inside the visible page:
+         *   - the height it WANTS is measured under the stylesheet's own
+         *     max-height, never under a cap an earlier call set. Measured
+         *     against its own earlier cap, a full list re-filled after a
+         *     search came out a border taller than the room it had been
+         *     given, and flipped where the first opening had not.
+         *   - the room is capped by that stylesheet max-height too: the
+         *     inline cap only ever shrinks the dropdown, so a long list
+         *     no longer grows to fill everything below the trigger.
+         *   - the visible bottom is documentElement.clientHeight, which
+         *     leaves out a horizontal scrollbar; window.innerHeight
+         *     counts it, and the list's last rows ended up under it.
          */
         _positionDropdown(triggerRect) {
             if (!this.dropdownEl) return;
             const margin = 8;
-            const dropdownHeight = this.dropdownEl.offsetHeight;
-            const spaceBelow = window.innerHeight - triggerRect.bottom - margin;
+            const gap = 4;
+
+            this.dropdownEl.style.maxHeight = '';
+            const wanted = this.dropdownEl.offsetHeight;
+            const styleCap = parseFloat(getComputedStyle(this.dropdownEl).maxHeight) || Infinity;
+            // max-height sizes the content box; the borders sit outside it.
+            const frame = wanted - this.dropdownEl.clientHeight;
+
+            const spaceBelow = document.documentElement.clientHeight - triggerRect.bottom - margin;
             const spaceAbove = triggerRect.top - margin;
-            const flipUp = (dropdownHeight > spaceBelow) && (spaceAbove > spaceBelow);
+            const flipUp = (wanted > spaceBelow) && (spaceAbove > spaceBelow);
+
+            const maxH = Math.max(120, Math.min(styleCap, (flipUp ? spaceAbove : spaceBelow) - frame));
+            this.dropdownEl.style.maxHeight = maxH + 'px';
+            const height = Math.min(wanted, maxH + frame);
 
             if (flipUp) {
                 // Position bottom-aligned to the trigger's top edge.
-                const maxH = Math.max(120, spaceAbove);
-                this.dropdownEl.style.maxHeight = maxH + 'px';
-                this.dropdownEl.style.top = Math.max(margin, triggerRect.top - Math.min(dropdownHeight, maxH) - 4) + 'px';
+                this.dropdownEl.style.top = Math.max(margin, triggerRect.top - height - gap) + 'px';
                 this.dropdownEl.classList.add('qs-searchable-select__dropdown--flip-up');
             } else {
-                const maxH = Math.max(120, spaceBelow);
-                this.dropdownEl.style.maxHeight = maxH + 'px';
-                this.dropdownEl.style.top = (triggerRect.bottom + 4) + 'px';
+                this.dropdownEl.style.top = (triggerRect.bottom + gap) + 'px';
                 this.dropdownEl.classList.remove('qs-searchable-select__dropdown--flip-up');
             }
         }

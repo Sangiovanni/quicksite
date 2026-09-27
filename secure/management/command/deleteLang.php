@@ -1,10 +1,11 @@
 <?php
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/opcacheHygiene.php';
-require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/languageRegistry.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/projectSettings.php';
 
-// Note: Removed multilingual mode requirement to allow cleanup of orphaned languages
-// This supports fresh-start workflows that need to delete extra languages regardless of mode
+// Works in either mode, so fresh-start workflows can delete orphaned languages
+// before multilingual mode is on.
 
 $params = $trimParametersManagement->params();
 
@@ -26,16 +27,8 @@ if (!is_string($params['code'])) {
 
 $langCode = trim($params['code']);
 
-// Validate language code format
-if (!RegexPatterns::match('language_code', $langCode)) {
-    ApiResponse::create(400, 'validation.invalid_format')
-        ->withMessage("Invalid language code format")
-        ->withErrors([RegexPatterns::validationError('language_code', 'code', $langCode)])
-        ->send();
-}
-
-// Check if language exists
-if (!in_array($langCode, CONFIG['LANGUAGES_SUPPORTED'])) {
+// An EXISTING language: it must be one of the project's.
+if (!qs_project_has_language($langCode)) {
     ApiResponse::create(404, 'route.not_found')
         ->withMessage("Language not found")
         ->withData([
@@ -60,21 +53,7 @@ if (count(CONFIG['LANGUAGES_SUPPORTED']) === 1) {
         ->send();
 }
 
-// --- DELETE TRANSLATION FILE FIRST (safer - file can be recreated, config corruption is worse) ---
-$translation_file = PROJECT_PATH . '/translate/' . $langCode . '.json';
-$deleted = false;
-
-if (file_exists($translation_file)) {
-    $deleted = unlink($translation_file);
-    if (!$deleted) {
-        ApiResponse::create(500, 'server.file_write_failed')
-            ->withMessage("Failed to delete translation file")
-            ->withData(['file' => $translation_file])
-            ->send();
-    }
-}
-
-// --- UPDATE CONFIG FILE ---
+// --- READ THE CONFIG, AND CHECK WHAT WILL BE WRITTEN BEFORE CHANGING ANYTHING ---
 $config_path = CONFIG_PATH;
 
 // Read current config (use include to get fresh copy, not cached by require)
@@ -89,12 +68,31 @@ if (!is_array($current_config)) {
         ->send();
 }
 
-// Remove language from arrays
+// Remove the language from the list
 $current_config['LANGUAGES_SUPPORTED'] = array_values(
     array_filter($current_config['LANGUAGES_SUPPORTED'], fn($lang) => $lang !== $langCode)
 );
-unset($current_config['LANGUAGES_NAME'][$langCode]);
 
+$refusal = qs_project_settings_guard($current_config, ['LANGUAGES_SUPPORTED']);
+if ($refusal !== null) {
+    $refusal->send();
+}
+
+// --- DELETE TRANSLATION FILE FIRST (safer - file can be recreated, config corruption is worse) ---
+$translation_file = PROJECT_PATH . '/translate/' . $langCode . '.json';
+$deleted = false;
+
+if (file_exists($translation_file)) {
+    $deleted = unlink($translation_file);
+    if (!$deleted) {
+        ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage("Failed to delete translation file")
+            ->withData(['file' => 'translate/' . $langCode . '.json'])
+            ->send();
+    }
+}
+
+// --- UPDATE CONFIG FILE ---
 // Build new config file content using var_export for safety
 $new_config_content = "<?php\n\nreturn " . var_export($current_config, true) . ";\n";
 
@@ -113,7 +111,7 @@ ApiResponse::create(200, 'operation.success')
     ->withMessage('Language removed successfully')
     ->withData([
         'code' => $langCode,
-        'config_updated' => $config_path,
+        'config_updated' => true,
         'translation_file_deleted' => $deleted,
         'remaining_languages' => $current_config['LANGUAGES_SUPPORTED']
     ])

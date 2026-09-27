@@ -500,6 +500,15 @@ const FIELD_PICKERS = {
     // --- Language: the languages the project ALREADY HAS -------------------
     setStorageDescLang: { kind: 'select', param: 'lang', source: 'languages' },
     setPrivacyDescLang: { kind: 'select', param: 'lang', source: 'languages' },
+    // Labelled with each language's name, and without the default: deleteLang
+    // answers "Cannot remove default language", so offering it would offer a
+    // choice the command refuses.
+    deleteLang:         { kind: 'language', param: 'code', source: 'project', exclude: 'default' },
+
+    // --- Language: a NEW one, from the installation's language list --------
+    // addLang leaves out the languages the project already has (it answers 409).
+    addLang:            { kind: 'language', param: 'code', source: 'list', exclude: 'project' },
+    createProject:      { kind: 'language', param: 'language', source: 'list' },
 
     // --- the parameter is a page OR a component, per its type field -------
     //
@@ -940,6 +949,7 @@ function _swapForSelect(form, paramName) {
     const select = QSDom.el('select', { name: paramName, class: 'admin-select' });
     if (input.required) select.required = true;
     if (input.dataset.urlParam !== undefined) select.dataset.urlParam = '';
+    if (input.dataset.default !== undefined) select.dataset.default = input.dataset.default;
     input.replaceWith(select);
     return select;
 }
@@ -1034,6 +1044,86 @@ async function _initSnippetSelect(form, cfg) {
         }));
 
     _fillSelect(select, rows, t('commandForm.select.snippet'));
+}
+
+/**
+ * A language field: a searchable dropdown, each language labelled with its name.
+ *
+ *   cfg.source 'list'    the installation's language list (getLanguageList), for
+ *                        a field that ADDS a language. cfg.exclude 'project'
+ *                        leaves out the ones the project already has.
+ *   cfg.source 'project' the project's own languages (getLangList), for a field
+ *                        that names one it HAS. cfg.exclude 'default' leaves out
+ *                        the project's default language.
+ *
+ * The field's documented default (data-default, set by renderFormField) is
+ * preselected when it is offered, so the form shows what the command would use
+ * anyway. The options are read again after the command succeeds: a language was
+ * just added or removed, and the list must not offer it the wrong way round.
+ *
+ * @param {HTMLFormElement} form
+ * @param {Object} cfg  a FIELD_PICKERS row
+ * @returns {Promise<void>}
+ */
+async function _initLanguagePicker(form, cfg) {
+    const select = _swapForSelect(form, cfg.param);
+    if (!select) return;
+
+    const placeholder = t('commandForm.select.language');
+    _makeSearchable(select, placeholder);
+
+    const load = async () => {
+        let rows = [];
+        try {
+            rows = await _languageRows(cfg);
+        } catch (error) {
+            rows = []; // the placeholder stands; the field is still submittable
+        }
+        _fillSelect(select, rows, placeholder);
+        const preferred = select.dataset.default;
+        if (preferred && rows.some(r => r.value === preferred)) {
+            select.value = preferred;
+            _syncPicker(select);
+        }
+    };
+    await load();
+
+    form.addEventListener('command-success', async (e) => {
+        if (e.detail.command === COMMAND_NAME) {
+            await load();
+        }
+    });
+}
+
+/**
+ * The {value, label} rows a language picker offers, per its FIELD_PICKERS row.
+ *
+ * @param {Object} cfg
+ * @returns {Promise<Array<{value: string, label: string}>>}
+ */
+async function _languageRows(cfg) {
+    const read = async (command) => {
+        const res = await QuickSiteAdmin.apiRequest(command, 'GET');
+        return (res && res.ok && res.data && res.data.data) || {};
+    };
+    const label = (name, code) => (name && name !== code) ? name + ' (' + code + ')' : code;
+
+    const needsProject = cfg.source === 'project' || cfg.exclude === 'project';
+    const project = needsProject ? await read('getLangList') : {};
+    const projectCodes = Array.isArray(project.languages) ? project.languages : [];
+
+    if (cfg.source === 'project') {
+        const names = project.language_names || {};
+        return projectCodes
+            .filter(code => !(cfg.exclude === 'default' && code === project.default_language))
+            .map(code => ({ value: code, label: label(names[code], code) }));
+    }
+
+    const list = await read('getLanguageList');
+    const languages = Array.isArray(list.languages) ? list.languages : [];
+    return languages
+        .filter(l => !(cfg.exclude === 'project' && projectCodes.includes(l.code)))
+        .map(l => ({ value: l.code, label: label(l.name, l.code) }));
 }
 
 /**
@@ -1526,6 +1616,8 @@ async function applyPagePickers() {
             _initEnumSelect(form, cfg);
         } else if (cfg.kind === 'jsfunction') {
             await _initJsFunctionSelect(form, cfg);
+        } else if (cfg.kind === 'language') {
+            await _initLanguagePicker(form, cfg);
         }
     }
 
@@ -4814,6 +4906,10 @@ function renderFormField(rawName, param, required) {
         const props = Object.assign({ name: name, id: inputId }, extra || {});
         if (required) props.required = 'required';
         if (isUrlParam) props['data-url-param'] = '';
+        // A picker that replaces this input preselects it (see _initLanguagePicker).
+        if (typeof param.default === 'string' || typeof param.default === 'number') {
+            props['data-default'] = String(param.default);
+        }
         return props;
     }
 
@@ -5043,6 +5139,14 @@ function renderFormField(rawName, param, required) {
         _renderHint([description])
     ]);
 
+    // What the command uses when the field is left empty, as help.php documents it.
+    if (param.default !== undefined) {
+        group.appendChild(_renderHint([
+            QSDom.el('strong', { text: t('commandForm.field.defaultLabel') }),
+            ' ' + _formatDefault(param.default)
+        ]));
+    }
+
     if (validation) {
         group.appendChild(_renderHint([
             QSDom.el('strong', { text: t('commandForm.field.validationLabel') }),
@@ -5051,6 +5155,19 @@ function renderFormField(rawName, param, required) {
     }
 
     return group;
+}
+
+/**
+ * A documented default as the form shows it: text as written, booleans and
+ * numbers as their literal, anything structured as JSON.
+ *
+ * @param {*} value
+ * @returns {string}
+ */
+function _formatDefault(value) {
+    if (typeof value === 'string') return value;
+    if (typeof value === 'boolean' || typeof value === 'number') return String(value);
+    return JSON.stringify(value);
 }
 
 /**

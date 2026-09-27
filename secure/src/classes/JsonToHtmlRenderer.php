@@ -1297,7 +1297,7 @@ class JsonToHtmlRenderer {
             if (!preg_match('/^\/(assets|style)\//i', $url)) {
                 // Don't add language if URL already starts with a language code
                 $supportedLangs = defined('CONFIG') && isset(CONFIG['LANGUAGES_SUPPORTED']) ? CONFIG['LANGUAGES_SUPPORTED'] : ['en', 'fr'];
-                $langPattern = '/^\/' . '(' . implode('|', $supportedLangs) . ')' . '(\/|$)/';
+                $langPattern = '/^\/(' . implode('|', array_map(static fn($l) => preg_quote((string) $l, '/'), $supportedLangs)) . ')(\/|$)/';
                 if (!preg_match($langPattern, $url)) {
                     $fullUrl .= $this->context['lang'] . '/';
                 }

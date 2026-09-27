@@ -17,8 +17,9 @@ thing that does: a project named in the request body is an optional echo that mu
 agree with the marker, never a substitute for it. Called without a marker, a
 project-scoped command answers `400 project.required`.
 
-Only seven commands belong to no project and take the first form: `help`, `login`,
-`register`, `logoutSession`, `listProjects`, `createProject` and `importProject`.
+Only eight commands belong to no project and take the first form: `help`, `login`,
+`register`, `logoutSession`, `listProjects`, `createProject`, `importProject` and
+`getLanguageList`.
 
 **Which form a command takes is part of its own spec.** Every entry `help`
 returns carries a `scope` (`project` or `global`) and an `endpoint` showing the
@@ -673,8 +674,8 @@ administrator role to expose it to.
 | `createProject`, `importProject` | The project does not exist yet when the command runs. |
 | `deleteProject` | Rerouted here by the logger when the project's own directory is already gone, so the audit of a project's death outlives the project. |
 
-**Global-scope READS are deliberately not written.** `listProjects` and `help`
-answer without changing anything, and a bucket nothing reads is not the place for
+**Global-scope READS are deliberately not written.** `listProjects`, `help` and
+`getLanguageList` answer without changing anything, and a bucket nothing reads is not the place for
 a poll: the panel calls them constantly, and their records would be the bulk of
 what accumulates. Dropping them is a signal decision, not a privacy one — nothing
 in those entries is sensitive. `logoutSession` is absent for a different reason:

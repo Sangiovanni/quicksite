@@ -16,7 +16,7 @@
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
-require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/languageRegistry.php';
 
 /**
  * Extract all textKeys from all structures
@@ -142,10 +142,9 @@ function __command_analyzeTranslations(array $params = [], array $urlParams = []
                 ->withMessage('Language code must not exceed 10 characters');
         }
         
-        if (!RegexPatterns::match('language_code_extended', $targetLang)) {
-            return ApiResponse::create(400, 'validation.invalid_format')
-                ->withMessage('Invalid language code format')
-                ->withErrors([RegexPatterns::validationError('language_code_extended', 'language', $targetLang)]);
+        // An EXISTING language: one of the project's.
+        if (!qs_project_has_language($targetLang)) {
+            return qs_language_not_in_project_response($targetLang, 'language');
         }
     }
 

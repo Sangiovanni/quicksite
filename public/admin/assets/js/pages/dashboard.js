@@ -1161,10 +1161,48 @@
             }
         });
         
+        // The project's first language, offered from the installation's language
+        // list. getLanguageList is global, so it answers before any project
+        // exists. Filled once, the first time the dialog opens.
+        const CREATE_PROJECT_DEFAULT_LANGUAGE = 'en'; // createProject's documented default
+        let createLanguagesLoading = null;
+
+        async function fillCreateLanguageSelect() {
+            const select = document.getElementById('create-project-language');
+            if (!select) return;
+            QSDom.setSelectPlaceholder(select, select.dataset.placeholder);
+            try {
+                const res = await QuickSiteAdmin.apiRequest('getLanguageList', 'GET');
+                const languages = (res && res.ok && res.data && res.data.data && res.data.data.languages) || [];
+                languages.forEach(l => {
+                    select.appendChild(QSDom.el('option', {
+                        value: l.code,
+                        text: (l.name && l.name !== l.code) ? l.name + ' (' + l.code + ')' : l.code
+                    }));
+                });
+                if (languages.some(l => l.code === CREATE_PROJECT_DEFAULT_LANGUAGE)) {
+                    select.value = CREATE_PROJECT_DEFAULT_LANGUAGE;
+                }
+            } catch (error) {
+                // The placeholder stands: a create sent without a language takes
+                // the command's own default.
+            }
+            if (window.QSSearchableSelect && !select._qsPicker) {
+                select._qsPicker = new window.QSSearchableSelect(select, {
+                    placeholder: select.dataset.placeholder,
+                    searchPlaceholder: select.dataset.searchPlaceholder,
+                    emptyText: select.dataset.emptyText
+                });
+            }
+        }
+
         // Create project modal
         function openCreateProjectModal() {
             document.getElementById('modal-create-project').style.display = 'flex';
             document.getElementById('create-project-name').focus();
+            if (!createLanguagesLoading) {
+                createLanguagesLoading = fillCreateLanguageSelect();
+            }
         }
 
         document.getElementById('btn-create-project').addEventListener('click', openCreateProjectModal);
@@ -1245,10 +1283,12 @@
             
             QSDom.setButtonBusy(this, common.loading || 'Creating...');
             try {
-                const result = await QuickSiteAdmin.apiRequest('createProject', 'POST', {
-                    name: name,
-                    switch_to: activateCheckbox.checked
-                });
+                const body = { name: name, switch_to: activateCheckbox.checked };
+                const languageSelect = document.getElementById('create-project-language');
+                if (languageSelect && languageSelect.value) {
+                    body.language = languageSelect.value;
+                }
+                const result = await QuickSiteAdmin.apiRequest('createProject', 'POST', body);
                 
                 if (result.ok) {
                     QuickSiteAdmin.showToast((proj.created || 'Project created') + ': ' + name, 'success');

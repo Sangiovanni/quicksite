@@ -12030,3 +12030,99 @@ when an API is saved and when the request is built.
 `secure/src/classes/ApiEndpointManager.php`, `secure/src/functions/serverFetch.php` and
 `secure/src/functions/PathManagement.php`. Behaviour: [COMMAND_API.md](COMMAND_API.md)
 (*Export / Import*, *Archive import limits*) and the `help` entries of the five commands.
+
+### One language list for the installation: a new language must be on it, an existing one must be the project's, and every name shown comes from it (locked 2026-09-27)
+
+**Amends**: *Every validator in the engine ends at the true end of the string, and an import
+takes only the settings a command could write* (locked 2026-09-26), which made two or three
+lowercase letters the rule for a project's language codes, let the translation commands keep
+a region suffix, and had the import check each display name against `addLang`'s rule. Its
+decisions stand; this entry narrows the first, removes the second and replaces the third.
+
+**Decision**: one list, and two questions asked of it.
+
+- **The installation has one language list, kept in its configuration.**
+  `<secure>/management/config/languages.json.example` ships with QuickSite; an installation
+  that wants a different list copies it to `languages.json` beside it, which is gitignored and,
+  when present, is the list the engine reads. An entry is `"code": "name"`. The shipped list
+  holds every ISO 639-1 language — 183, without the code that names the Bihari languages as a
+  group — and 47 languages that have only a three-letter code: those the Unicode CLDR ships
+  locale data for that at least a million people speak or that are official somewhere,
+  nationally or regionally (Filipino, Cantonese, Maithili, Santali, Central Kurdish, Swiss
+  German, Hawaiian and others). A code is written the way BCP 47 writes a primary language
+  subtag: the two-letter code when the language has one, otherwise its three-letter code.
+- **Every entry is checked when the list is read.** A code must be two or three lowercase
+  letters and a name must be readable text — letters with their marks, spaces and a few
+  punctuation marks — of at most 100 bytes. An entry that breaks either rule is dropped, and
+  a copy that is not a JSON object is ignored whole and the shipped list read instead. Because
+  of that check a code on the list is safe wherever it goes: a translation file's name, a
+  regular expression, a page's `lang` attribute. The renderer and the compiler also quote each
+  code where they build a pattern from a project's languages, as each already did for its other
+  such pattern.
+- **A new language must be on the list; an existing one must be the project's.**
+  `createProject`, `addLang` and the import ask the first question. The thirteen other
+  language parameters ask the second: `deleteLang`, `setDefaultLang`, `editTitle`, the seven
+  translation commands, `importStructureTranslations` and the two description-language
+  commands. Both answers are strict — the value must be a string and match exactly. The region
+  form the translation commands accepted is gone with its pattern; the six commands that took
+  the literal `default` (the mono-language translation file) still take it. A code the list no
+  longer holds stays usable in a project that already has it.
+- **A language's name comes from the list whenever it is shown.** A project stores codes only:
+  no command writes `LANGUAGES_NAME` any more, `addLang` takes no name, an export carries no
+  names and an import ignores them. `getLangList`, `getSiteMap` and `setDefaultLang` read each
+  name from the list, and show the code when the list does not hold it. The four name tables —
+  three in commands, one in the workflow manager — are gone. Names already stored in a project
+  stay where they are, unread.
+- **The list can be read before any project exists.** `getLanguageList` returns it and now
+  belongs to no project, like `createProject`, so a caller creating a first project can see the
+  languages it may start in.
+- **One rule per project setting, used by every writer and by the import, and one list of the
+  settings an archive carries.** Each command that writes a setting checks the value it is
+  about to write with the shared rule; the import checks an archive's settings with the same
+  function, and the language list for the codes the archive brings. The build size limit,
+  which `build` reads and no command writes, now travels too, as a positive whole number.
+
+**Reasoning**: the rule before was a shape — any two or three lowercase letters. `qq` passed,
+and so did `zho`: a real ISO 639-2 code for Chinese, but not the one the web uses. BCP 47 takes
+the shortest code, so a page in Chinese says `zh`, and a page whose `lang` attribute says `zho`
+is not read as Chinese by browsers, screen readers or search engines. A list turns the question
+from "does it look like a code" into "is it a language this installation offers", which is also
+the question a picker asks. The earlier choice — a curated list offered as a suggestion, with
+anything typed accepted — is what let an invalid code reach the page. The list being the
+installation's own configuration keeps what that choice was for: an installation can offer any
+language by adding it.
+
+The names follow from the list. Four tables gave a language whichever name the command that
+added it held — `addLang`'s were English, the others native — so one project showed "French"
+and another "Français" for the same language, depending on its history. Reading the name when
+it is shown costs nothing that was found: no page a visitor sees and nothing a build ships reads
+a stored name; only three commands did, and they now read the list.
+
+Native names come from the Unicode CLDR because ISO 639 publishes codes and reference names in
+English and French only, never the name a language gives itself. The shipped list was generated
+from CLDR 45, as ICU 75.1 distributes it; the 39 names QuickSite already carried are kept as
+they were, and CLDR gives the same name for 37 of them. Where CLDR has no name of a language in
+that language, the English name stands. The first letter is capitalised as the earlier names
+were, in the scripts that write initial capitals — not in Georgian, whose capital letters are
+never used that way.
+
+**Alternatives considered**: ISO 639-1 alone (rejected — Filipino, the national language of the
+Philippines, and several official languages of India have only a three-letter code). Every
+three-letter language CLDR ships a locale for (not taken — the smaller ones are better added by
+an installation that needs them). ISO 639-2 or 639-3 in full (rejected — hundreds or thousands
+of codes, many historical, with no native names). A shipped list with an installation's
+additions merged over it (not taken — one file that is the whole list is simpler to reason
+about, and an installation that has made no copy follows the shipped list as it changes).
+Storing a name in the project when its language is added (rejected — a project would keep the
+name its history gave it). Keeping `addLang`'s name parameter as an override (rejected — the list
+is the one place a name changes). Showing the list's names in the panel while the check stays a
+shape (rejected — the shape is what let the invalid code through).
+
+**Source**: Sangio's rulings of 2026-09-26 and his design answers of 2026-09-27, during beta.12 —
+the list in configuration, ISO 639-1 with the widely used three-letter languages, names looked
+up where they are shown, no name parameter. `secure/src/functions/languageRegistry.php`;
+`secure/src/functions/projectSettings.php`; `secure/management/config/languages.json.example`
+and `languages.NOTICE.txt` (the Unicode License v3 notice the names are used under);
+`secure/src/classes/RegexPatterns.php` (`language_code`, `language_name`); the language
+commands under `secure/management/command/`; `secure/management/config/categories.php`
+(`getLanguageList`). Behaviour: [COMMAND_API.md](COMMAND_API.md) and `help`.

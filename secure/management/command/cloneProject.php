@@ -22,6 +22,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/projectSettings.php';
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -120,6 +121,11 @@ function __command_cloneProject(array $params = [], array $urlParams = []): ApiR
         $config = include $configPath;
         if (is_array($config)) {
             $config['SITE_NAME'] = ucfirst(str_replace(['-', '_'], ' ', $newName));
+            $refusal = qs_project_settings_guard($config, ['SITE_NAME']);
+            if ($refusal !== null) {
+                deleteDirectoryRecursive($targetPath);
+                return $refusal;
+            }
             $configContent = "<?php\n/**\n * Site Configuration\n * Cloned on " . date('Y-m-d H:i:s') . "\n */\n\nreturn " . var_export($config, true) . ";\n";
             file_put_contents($configPath, $configContent, LOCK_EX);
         }

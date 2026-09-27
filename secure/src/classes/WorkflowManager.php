@@ -13,6 +13,7 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/CommandRunner.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/languageRegistry.php';
 
 class WorkflowManager {
     
@@ -33,50 +34,7 @@ class WorkflowManager {
     
     /** Max recursion depth for {{> partial}} resolution (cycle/runaway guard). */
     private const PARTIALS_MAX_DEPTH = 5;
-    
-    /** @var array Language name mappings */
-    private static array $languageNames = [
-        'en' => 'English',
-        'fr' => 'Français',
-        'es' => 'Español',
-        'de' => 'Deutsch',
-        'it' => 'Italiano',
-        'pt' => 'Português',
-        'nl' => 'Nederlands',
-        'ru' => 'Русский',
-        'zh' => '中文',
-        'ja' => '日本語',
-        'ko' => '한국어',
-        'ar' => 'العربية',
-        'pl' => 'Polski',
-        'sv' => 'Svenska',
-        'da' => 'Dansk',
-        'fi' => 'Suomi',
-        'no' => 'Norsk',
-        'cs' => 'Čeština',
-        'tr' => 'Türkçe',
-        'el' => 'Ελληνικά',
-        'he' => 'עברית',
-        'th' => 'ไทย',
-        'vi' => 'Tiếng Việt',
-        'id' => 'Bahasa Indonesia',
-        'ms' => 'Bahasa Melayu',
-        'hi' => 'हिन्दी',
-        'bn' => 'বাংলা',
-        'uk' => 'Українська',
-        'ro' => 'Română',
-        'hu' => 'Magyar',
-        'ca' => 'Català',
-        'bg' => 'Български',
-        'hr' => 'Hrvatski',
-        'sk' => 'Slovenčina',
-        'sl' => 'Slovenščina',
-        'sr' => 'Српски',
-        'et' => 'Eesti',
-        'lv' => 'Latviešu',
-        'lt' => 'Lietuvių'
-    ];
-    
+
     /**
      * Constructor
      * 
@@ -1092,7 +1050,7 @@ class WorkflowManager {
             'ucfirst', 'capitalize' => ucfirst($value),
             'ucwords', 'title' => ucwords($value),
             'trim' => trim($value),
-            'langname', 'language' => self::getLanguageName($value),
+            'langname', 'language' => qs_language_label($value),
             default => $value
         };
     }
@@ -1683,25 +1641,6 @@ class WorkflowManager {
             'errors' => $errors,
             'warnings' => $warnings,
         ];
-    }
-    
-    /**
-     * Get a language's display name
-     * 
-     * @param string $code Language code
-     * @return string Display name or the code if not found
-     */
-    public static function getLanguageName(string $code): string {
-        return self::$languageNames[$code] ?? $code;
-    }
-    
-    /**
-     * Get all available language names
-     * 
-     * @return array Language code => name mappings
-     */
-    public static function getAllLanguageNames(): array {
-        return self::$languageNames;
     }
     
     /**

@@ -722,9 +722,9 @@ $GLOBALS['__help_commands'] = [
             'lang' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Language code (must be in supported languages)',
+                'description' => 'The language of the title',
                 'example' => 'en',
-                'validation' => '2-char code, must be supported language'
+                'validation' => 'One of the project\'s languages (getLangList returns them)'
             ],
             'title' => [
                 'required' => true,
@@ -749,19 +749,18 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.validation.missing_field' => 'Missing route, lang, or title parameter',
             '400.validation.invalid_type' => 'route, lang, or title must be a string',
-            '400.validation.invalid_format' => 'Invalid characters in route (path traversal blocked)',
-            '400.validation.invalid_length' => 'route too long (>100) or title too long (>200 chars)',
-            '400.validation.invalid_lang' => 'Language not in supported languages list',
+            '400.validation.invalid_format' => 'Invalid characters in route or lang (path traversal blocked)',
+            '400.validation.invalid_length' => 'route too long (>100), lang too long (>10) or title too long (>200 chars)',
             '404.validation.invalid_route' => 'Route does not exist in ROUTES',
             '404.file.not_found' => 'Translation file not found for language',
             '500.server.file_read_failed' => 'Failed to read translation file',
             '500.server.file_write_failed' => 'Failed to write updated translation file',
             '500.server.internal_error' => 'Invalid JSON in translation file',
-            '400.validation.unsupported_language' => 'Language is not supported.',
+            '400.validation.unsupported_language' => 'The language is not one of the project\'s; errors[0].allowed lists what it takes',
             '500.server.invalid_json' => 'Translation file contains invalid JSON.',
             '500.server.json_encode_failed' => 'Failed to encode translation data.'
         ],
-        'notes' => 'Updates ONE language at a time for single route. Updates page.titles.{route} key in the specified language translation file. Creates nested page.titles object if it doesn\'t exist. Used by Page.php: $translator->translate("page.titles.{$route}"). Route must exist in ROUTES constant, and language must be in supported languages list.'
+        'notes' => 'Updates ONE language at a time for single route. Updates page.titles.{route} key in the specified language translation file. Creates nested page.titles object if it doesn\'t exist. Used by Page.php: $translator->translate("page.titles.{$route}"). Route must exist in ROUTES constant, and the language must be one of the project\'s.'
     ],
     
     'getRoutes' => [
@@ -1059,9 +1058,9 @@ $GLOBALS['__help_commands'] = [
             '{lang}' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Language code (URL segment), or "default" for mono-language mode',
+                'description' => 'The language to read (URL segment)',
                 'example' => 'en',
-                'validation' => '2-3 lowercase letters, or literal "default"'
+                'validation' => 'One of the project\'s languages (getLangList returns them), or the literal "default" — the mono-language translation file'
             ]
         ],
         'example_get' => 'GET /management/p/<projectId>/getTranslation/en',
@@ -1072,13 +1071,14 @@ $GLOBALS['__help_commands'] = [
             'data' => [
                 'language' => 'en',
                 'translations' => '(translation object)',
-                'file' => '/path/to/en.json'
+                'file' => 'translate/en.json'
             ]
         ],
         'error_responses' => [
             '400.validation.required' => 'Missing language code in URL',
-            '400.validation.invalid_format' => 'Invalid language code format',
-            '404.file.not_found' => 'Translation file not found',
+            '400.validation.invalid_format' => 'Language code contains invalid characters',
+            '400.validation.unsupported_language' => 'The language is not one of the project\'s; errors[0].allowed lists what it takes',
+            '404.file.not_found' => 'No default.json in a mono-language project (a project language whose file does not exist yet answers 200 with no translations)',
             '500.server.file_write_failed' => 'Failed to read translation file',
             '400.validation.invalid_length' => 'Language code must not exceed 10 characters.',
             '400.validation.invalid_type' => 'The language parameter must be a string.',
@@ -1119,9 +1119,9 @@ $GLOBALS['__help_commands'] = [
             'language' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Language code, or "default" for mono-language mode',
+                'description' => 'The language to write',
                 'example' => 'en',
-                'validation' => '2-3 lowercase letters, or literal "default"'
+                'validation' => 'One of the project\'s languages (getLangList returns them), or the literal "default" — the mono-language translation file'
             ],
             'translations' => [
                 'required' => true,
@@ -1147,7 +1147,7 @@ $GLOBALS['__help_commands'] = [
             'message' => 'Translation keys updated successfully',
             'data' => [
                 'language' => 'en',
-                'file' => '/path/to/en.json',
+                'file' => 'translate/en.json',
                 'keys_added' => 2,
                 'keys_updated' => 1,
                 'keys_unchanged' => 'preserved'
@@ -1156,6 +1156,7 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.validation.required' => 'Missing language or translations parameter',
             '400.validation.invalid_format' => 'Invalid translation format',
+            '400.validation.unsupported_language' => 'The language is not one of the project\'s; errors[0].allowed lists what it takes',
             '500.server.file_write_failed' => 'Failed to write translation file',
             '400.validation.invalid_length' => 'Language code must not exceed 10 characters. Translation data too large (max 5MB).',
             '400.validation.invalid_type' => 'The language parameter must be a string. The translations parameter must be an object/array.',
@@ -1171,9 +1172,9 @@ $GLOBALS['__help_commands'] = [
             'language' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Language code, or "default" for mono-language mode',
+                'description' => 'The language to delete keys from',
                 'example' => 'en',
-                'validation' => '2-3 lowercase letters, or literal "default"'
+                'validation' => 'One of the project\'s languages (getLangList returns them), or the literal "default" — the mono-language translation file'
             ],
             'keys' => [
                 'required' => true,
@@ -1190,7 +1191,7 @@ $GLOBALS['__help_commands'] = [
             'message' => 'Translation keys deleted successfully',
             'data' => [
                 'language' => 'en',
-                'file' => '/path/to/en.json',
+                'file' => 'translate/en.json',
                 'deleted' => ['home.old_key'],
                 'deleted_count' => 1,
                 'not_found' => ['nonexistent.key'],
@@ -1201,7 +1202,8 @@ $GLOBALS['__help_commands'] = [
             '400.validation.required' => 'Missing language or keys parameter',
             '404.resource.not_found' => 'Translation file not found or no keys deleted',
             '500.server.file_write_failed' => 'Failed to write translation file',
-            '400.validation.invalid_format' => 'Language code contains invalid characters. Invalid language code format.',
+            '400.validation.invalid_format' => 'Language code contains invalid characters.',
+            '400.validation.unsupported_language' => 'The language is not one of the project\'s; errors[0].allowed lists what it takes',
             '400.validation.invalid_length' => 'Language code must not exceed 10 characters.',
             '400.validation.invalid_type' => 'The language parameter is not a string, the keys parameter is not an array, or one of its entries is not a string. The offending index is named in errors[].',
             '500.server.file_read_failed' => 'Failed to read translation file.',
@@ -1232,15 +1234,15 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '500.server.internal_error' => 'Configuration not loaded.'
         ],
-        'notes' => 'Returns configuration from config.php. Useful for UI language selectors and checking current mode.'
+        'notes' => 'Returns configuration from config.php. Useful for UI language selectors and checking current mode. language_names gives each of the project\'s codes its name from the installation\'s language list (the code itself when the list does not hold it): a project stores codes only.'
     ],
 
     'getLanguageList' => [
-        'description' => 'Returns the master list of languages a project can add. This is the fixed engine catalogue, not the project\'s configuration — for the languages a project has actually enabled, use getLangList.',
+        'description' => 'Returns the installation\'s language list: every language a project can add, with its name. It belongs to the installation, not to a project, so it is called without a project marker — for the languages a project has, use getLangList.',
         'method' => 'GET',
-        'url_structure' => '/management/p/<projectId>/getLanguageList',
+        'url_structure' => '/management/getLanguageList',
         'parameters' => [],
-        'example_get' => 'GET /management/p/<projectId>/getLanguageList',
+        'example_get' => 'GET /management/getLanguageList',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -1250,12 +1252,12 @@ $GLOBALS['__help_commands'] = [
                     ['code' => 'en', 'name' => 'English'],
                     ['code' => 'fr', 'name' => 'Français'],
                     ['code' => 'es', 'name' => 'Español'],
-                    '... 39 entries in total'
+                    '... one entry per language in the list'
                 ]
             ]
         ],
         'error_responses' => [],
-        'notes' => 'The catalogue holds 39 languages and is the same on every installation — it is compiled into the engine, not read from project data, so nothing a project does changes it. Each entry is an object with a "code" (the ISO 639 code passed to addLang) and a "name" (the language\'s own endonym, e.g. "Français", "日本語"). Intended for populating an "add a language" picker; pair it with getLangList to show which of the 39 a project already has.'
+        'notes' => 'The list belongs to the installation: <secure>/management/config/languages.json when the installation has made its own copy of the shipped languages.json.example beside it, and the shipped list otherwise — so two installations can answer differently, and nothing a project does changes it. The shipped list holds every ISO 639-1 language and the most widely used languages that have only a three-letter code. Each entry has a "code" — an ISO 639 code as BCP 47 writes it: two letters, or three when the language has no two-letter code — and a "name", the language\'s own name (e.g. "Français", "日本語"), which is what QuickSite shows for that language everywhere. A NEW language must be in the list: createProject, addLang and importProject refuse a code it does not hold. Pair it with getLangList to show which of them a project already has.'
     ],
     
     'setMultilingual' => [
@@ -1330,27 +1332,19 @@ $GLOBALS['__help_commands'] = [
     ],
     
     'addLang' => [
-        'description' => 'Adds a new language to the system. Can be used before or after enabling multilingual mode.',
+        'description' => 'Adds a language to the project, from the installation\'s language list. Can be used before or after enabling multilingual mode.',
         'method' => 'POST',
         'parameters' => [
             'code' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => 'Language code (ISO 639-1). Can use "lang" as shorthand, or "language" — all three spellings are accepted, first non-empty wins in the order code, lang, language.',
+                'description' => 'The language to add. "lang" and "language" are accepted as other spellings; the first present wins, in the order code, lang, language. One of the three is required.',
                 'example' => 'es',
-                'validation' => '2-3 lowercase letters',
+                'validation' => 'A code in the installation\'s language list (getLanguageList returns it), and not already one of the project\'s languages',
                 'alias' => 'lang'
-            ],
-            'name' => [
-                'required' => false,
-                'type' => 'string',
-                'description' => 'Language display name. Auto-generated if not provided (e.g., "fr" → "French").',
-                'example' => 'Español',
-                'validation' => '1-100 bytes of letters with their combining marks, spaces, hyphens, apostrophes and dots, so a native name such as हिन्दी is accepted',
-                'default' => 'Auto-generated from language code'
             ]
         ],
-        'example_post' => 'POST /management/p/<projectId>/addLang with body: {"lang": "fr"} or {"code": "es", "name": "Español"}',
+        'example_post' => 'POST /management/p/<projectId>/addLang with body: {"code": "es"}',
         'success_response' => [
             'status' => 201,
             'code' => 'operation.success',
@@ -1358,56 +1352,55 @@ $GLOBALS['__help_commands'] = [
             'data' => [
                 'code' => 'es',
                 'name' => 'Español',
-                'config_updated' => '/path/to/config.php',
-                'translation_file' => '/path/to/es.json',
+                'config_updated' => true,
+                'translation_file' => 'translate/es.json',
                 'copied_from' => 'en'
             ]
         ],
         'error_responses' => [
             '400.validation.required' => 'Missing code/lang parameter',
-            '400.validation.invalid_format' => 'Invalid language code format',
+            '400.validation.invalid_format' => 'The code is not a string',
+            '400.validation.unsupported_language' => 'The code is not in the installation\'s language list (getLanguageList returns it)',
             '409.conflict.duplicate' => 'Language already exists',
             '500.server.file_write_failed' => 'Failed to update config or create translation file',
             '500.file.not_found' => 'Configuration file not found.',
             '500.server.internal_error' => 'Failed to create config lock file. Failed to acquire config lock. Failed to parse configuration file.'
         ],
-        'notes' => 'Can be used before enabling multilingual mode (to add languages first). Use setMultilingual to enable multilingual mode after adding 2+ languages. Updates config.php and creates translation file by copying from default language.'
+        'notes' => 'Can be used before enabling multilingual mode (to add languages first). Use setMultilingual to enable multilingual mode after adding 2+ languages. Updates config.php and creates translation file by copying from default language. The language\'s name is not stored: it comes from the installation\'s language list wherever it is shown, and data.name carries it. translation_file is relative to the project.'
     ],
     
     'deleteLang' => [
-        'description' => 'Deletes a language from the system. Requires MULTILINGUAL_SUPPORT = true.',
+        'description' => 'Deletes one of the project\'s languages and its translation file. Works in either mode.',
         'method' => 'DELETE',
-        'requires_mode' => 'multilingual',
         'parameters' => [
             'code' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Language code to delete',
+                'description' => 'The language to delete',
                 'example' => 'es',
-                'validation' => 'Must be an existing language (not default, not last)'
+                'validation' => 'One of the project\'s languages (getLangList returns them); not the default language, and not the last one'
             ]
         ],
         'example_delete' => 'DELETE /management/p/<projectId>/deleteLang with body: {"code": "es"}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
-            'message' => 'Language deleted successfully',
+            'message' => 'Language removed successfully',
             'data' => [
                 'code' => 'es',
-                'config_updated' => '/path/to/config.php',
+                'config_updated' => true,
                 'translation_file_deleted' => true,
                 'remaining_languages' => ['en', 'fr']
             ]
         ],
         'error_responses' => [
             '400.validation.required' => 'Missing code parameter',
-            '400.validation.invalid_format' => 'Cannot delete default or last language',
-            '403.mode.requires_multilingual' => 'This command requires multilingual mode',
-            '404.route.not_found' => 'Language not found',
+            '400.validation.invalid_format' => 'code is not a string, or it is the default or the last language',
+            '404.route.not_found' => 'The language is not one of the project\'s',
             '500.server.file_write_failed' => 'Failed to update config',
             '500.server.internal_error' => 'Failed to parse configuration file.'
         ],
-        'notes' => 'Only available when MULTILINGUAL_SUPPORT = true. Cannot delete default language or last remaining language.'
+        'notes' => 'Works in either mode, so a fresh start can remove languages before multilingual mode is on. Cannot delete the default language or the last remaining one. A language the installation\'s list no longer holds can still be deleted.'
     ],
 
     'cleanOrphanTranslations' => [
@@ -1451,9 +1444,9 @@ $GLOBALS['__help_commands'] = [
             'lang' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Language code to set as default',
+                'description' => 'The language to make the default',
                 'example' => 'fr',
-                'validation' => '2-3 lowercase letters, must exist in LANGUAGES_SUPPORTED'
+                'validation' => 'One of the project\'s languages (getLangList returns them); upper case is lowered first'
             ]
         ],
         'example_patch' => 'PATCH /management/p/<projectId>/setDefaultLang with body: {"lang": "fr"}',
@@ -1470,9 +1463,9 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '200.operation.no_change' => 'Language is already the default',
             '400.validation.required' => 'Missing lang parameter',
-            '400.validation.invalid_format' => 'Invalid language code format',
+            '400.validation.invalid_format' => 'lang is not a string',
             '403.mode.requires_multilingual' => 'This command requires multilingual mode',
-            '404.not_found.language' => 'Language not found in LANGUAGES_SUPPORTED',
+            '404.not_found.language' => 'The language is not one of the project\'s',
             '500.server.file_write_failed' => 'Failed to update config file',
             '500.file.not_found' => 'Configuration file not found.',
             '500.server.internal_error' => 'Failed to parse configuration file.'
@@ -1488,9 +1481,9 @@ $GLOBALS['__help_commands'] = [
             '{lang}' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => 'Language code to check translation status (URL segment). If provided, returns translated/untranslated status for each key',
+                'description' => 'The language to check translation status in (URL segment). If provided, returns translated/untranslated status for each key',
                 'example' => 'en',
-                'validation' => '2-10 characters (ISO 639 or BCP 47 locale code)'
+                'validation' => 'One of the project\'s languages (getLangList returns them), or the literal "default" — the mono-language translation file'
             ]
         ],
         'example_get' => 'GET /management/p/<projectId>/getTranslationKeys (keys only) or GET /management/p/<projectId>/getTranslationKeys/fr (with translation status)',
@@ -1519,12 +1512,7 @@ $GLOBALS['__help_commands'] = [
             ]
         ],
         'error_responses' => [
-            [
-                'status' => 400,
-                'code' => 'validation.invalid_format',
-                'message' => 'Invalid language code format'
-            ],
-            '400.validation.invalid_format' => 'Invalid language code format.',
+            '400.validation.unsupported_language' => 'The language is not one of the project\'s; errors[0].allowed lists what it takes',
             '400.validation.invalid_length' => 'Language code must not exceed 10 characters.',
             '400.validation.invalid_type' => 'The language parameter must be a string.'
         ],
@@ -1539,9 +1527,9 @@ $GLOBALS['__help_commands'] = [
             '{lang}' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => 'Language code to validate (URL segment). If omitted, validates all languages',
+                'description' => 'The language to validate (URL segment). If omitted, validates all the project\'s languages',
                 'example' => 'en',
-                'validation' => '2-3 lowercase letters'
+                'validation' => 'One of the project\'s languages (getLangList returns them), or the literal "default" — the mono-language translation file'
             ]
         ],
         'example_get' => 'GET /management/p/<projectId>/validateTranslations (all languages) or GET /management/p/<projectId>/validateTranslations/fr (specific)',
@@ -1573,7 +1561,7 @@ $GLOBALS['__help_commands'] = [
             ]
         ],
         'error_responses' => [
-            '400.validation.invalid_format' => 'Invalid language code format',
+            '400.validation.unsupported_language' => 'The language is not one of the project\'s; errors[0].allowed lists what it takes',
             '400.validation.invalid_length' => 'Language code must not exceed 10 characters.',
             '400.validation.invalid_type' => 'The language parameter must be a string.'
         ],
@@ -1588,9 +1576,9 @@ $GLOBALS['__help_commands'] = [
             '{lang}' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => 'Language code to check (URL segment). If omitted, checks all languages',
+                'description' => 'The language to check (URL segment). If omitted, checks all the project\'s languages',
                 'example' => 'en',
-                'validation' => '2-3 lowercase letters'
+                'validation' => 'One of the project\'s languages (getLangList returns them), or the literal "default" — the mono-language translation file'
             ]
         ],
         'example_get' => 'GET /management/p/<projectId>/getUnusedTranslationKeys or GET /management/p/<projectId>/getUnusedTranslationKeys/en',
@@ -1613,7 +1601,7 @@ $GLOBALS['__help_commands'] = [
             ]
         ],
         'error_responses' => [
-            '400.validation.invalid_format' => 'Invalid language code format',
+            '400.validation.unsupported_language' => 'The language is not one of the project\'s; errors[0].allowed lists what it takes',
             '400.validation.invalid_length' => 'Language code must not exceed 10 characters.',
             '400.validation.invalid_type' => 'The language parameter must be a string.'
         ],
@@ -1628,9 +1616,9 @@ $GLOBALS['__help_commands'] = [
             '{lang}' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => 'Language code to analyze (URL segment). If omitted, analyzes all languages',
+                'description' => 'The language to analyze (URL segment). If omitted, analyzes all the project\'s languages',
                 'example' => 'en',
-                'validation' => '2-3 lowercase letters'
+                'validation' => 'One of the project\'s languages (getLangList returns them); not the literal "default"'
             ]
         ],
         'example_get' => 'GET /management/p/<projectId>/analyzeTranslations or GET /management/p/<projectId>/analyzeTranslations/fr',
@@ -1658,7 +1646,7 @@ $GLOBALS['__help_commands'] = [
             ]
         ],
         'error_responses' => [
-            '400.validation.invalid_format' => 'Invalid language code format',
+            '400.validation.unsupported_language' => 'The language is not one of the project\'s; errors[0].allowed lists what it takes',
             '400.validation.invalid_length' => 'Language code must not exceed 10 characters.',
             '400.validation.invalid_type' => 'The language parameter must be a string.'
         ],
@@ -3618,9 +3606,9 @@ $GLOBALS['__help_commands'] = [
             'language' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => 'Default language code',
+                'description' => 'The project\'s first language, which becomes its default',
                 'default' => 'en',
-                'validation' => '2-3 lowercase letters (ISO 639-1 or 639-2), the rule addLang, deleteLang and setDefaultLang use: en, fr, de, zho'
+                'validation' => 'A code in the installation\'s language list (getLanguageList returns it)'
             ],
             'switch_to' => [
                 'required' => false,
@@ -3647,11 +3635,13 @@ $GLOBALS['__help_commands'] = [
             '400.validation.missing_field' => 'Missing name parameter',
             '400.validation.invalid_format' => 'Invalid project name format',
             '400.validation.reserved_name' => 'Project name is reserved for system use',
+            '400.validation.invalid_type' => 'site_name or language is not a string',
+            '400.validation.unsupported_language' => 'The code is not in the installation\'s language list (getLanguageList returns it)',
             '409.resource.already_exists' => 'Project already exists',
             '500.server.directory_create_failed' => 'Failed to create project structure.',
             '500.server.file_write_failed' => 'Failed to create config.php. Failed to create routes.php. Failed to initialise project membership.'
         ],
-        'notes' => 'Creates complete project structure: config.php, routes.php, templates/, translate/, etc. with basic home page template.'
+        'notes' => 'Creates complete project structure: config.php, routes.php, templates/, translate/, etc. with basic home page template and an empty stylesheet. A create that fails part-way removes what it wrote: no project folder is left behind.'
     ],
 
     'cloneProject' => [
@@ -4295,7 +4285,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.zip_error' => 'The archive failed to finalise',
             '500.server.move_failed' => 'save=true, but the archive could not be written into the exports folder'
         ],
-        'notes' => 'Project-scoped: the exported project is the one in the URL marker; a name/project in the request is optional and must match. Export format v2.0-secure - PHP files are NOT included, they are rebuilt from JSON on import. The archive carries every setting a command writes (site name, languages and their display names, multilingual mode, theme mode, favicon) and the routes as config.json and routes.json, config/*.json except members.json, its page, component, menu and footer structures, its own snippets, its translations and data, and - unless include_public=false - public/assets and public/style. It never carries builds, backups or earlier exports. Saved exports live in that project\'s own folder (<secure>/projects/<id>/exports/), are auto-cleaned (keeps the last 5), and are reachable only through their own project\'s marker via downloadExport.'
+        'notes' => 'Project-scoped: the exported project is the one in the URL marker; a name/project in the request is optional and must match. Export format v2.0-secure - PHP files are NOT included, they are rebuilt from JSON on import. The archive carries the project\'s settings (site name, languages, multilingual mode, theme mode, favicon and build size limit) and the routes as config.json and routes.json, config/*.json except members.json, its page, component, menu and footer structures, its own snippets, its translations and data, and - unless include_public=false - public/assets and public/style. It never carries builds, backups or earlier exports. Saved exports live in that project\'s own folder (<secure>/projects/<id>/exports/), are auto-cleaned (keeps the last 5), and are reachable only through their own project\'s marker via downloadExport.'
     ],
     
     'importProject' => [
@@ -4346,7 +4336,7 @@ $GLOBALS['__help_commands'] = [
             'An archive is untrusted input. Entries are accepted against an extension ALLOWLIST and each one is checked so its content matches what its name claims (magic bytes for binary formats, valid JSON for .json, no PHP opening tag in a text file a web server could serve, sanitisation for SVG, and for a .css file the stylesheet scan every CSS writer runs — see editStyles).',
             'A refused entry is skipped and listed in security.skipped_disallowed with the reason, and the rest of the archive still imports — except an entry whose name is not a clean path, a file the site reads and a stylesheet, which refuse the whole archive (next notes). security.skipped_unsafe lists entries whose folder the filesystem would not create.',
             'Every entry in the project folder must have a clean relative path as its name: not absolute, no empty segment (two slashes in a row), no . or .. segment, no segment ending in a dot or a space. One that does not refuses the WHOLE archive with 400 and nothing is created, because another spelling of a path can land on a real file without being recognised as it. Entries outside the project folder are ignored.',
-            'The files the site reads are checked before the project is created: config.json and routes.json at the project root, any .json file under config/, translate/ or data/, and every structure file — any .json file under templates/model/json/ or snippets/. Each must be readable, parse as a JSON array or object and pass the content check, and a structure file must also carry no unsafe attribute, blocked tag or invalid component reference. Every setting in config.json must be a value the command that writes it would accept: a language code is 2-3 lowercase letters, the default language is one of the listed ones, a display name follows addLang\'s rule, the flags are true or false, the theme default is light, dark or system, and the favicon is an image under /assets/images/ with a favicon extension. The first one that fails refuses the WHOLE archive with 400 and nothing is created, because importing the rest would leave a route whose page is missing, a language showing raw keys, or settings and routes replaced by the defaults. A file at a hidden path is not one of them: the import never writes a hidden path.',
+            'The files the site reads are checked before the project is created: config.json and routes.json at the project root, any .json file under config/, translate/ or data/, and every structure file — any .json file under templates/model/json/ or snippets/. Each must be readable, parse as a JSON array or object and pass the content check, and a structure file must also carry no unsafe attribute, blocked tag or invalid component reference. Every setting in config.json must be a value the command that writes it would accept: every language is in this installation\'s language list (getLanguageList), the default language is one of the listed ones, the flags are true or false, the theme default is light, dark or system, the favicon is an image under /assets/images/ with a favicon extension, and the build size limit, which no command writes, is a positive whole number. Language names are not imported: a project stores codes only, and names come from the installation\'s list. The first one that fails refuses the WHOLE archive with 400 and nothing is created, because importing the rest would leave a route whose page is missing, a language showing raw keys, or settings and routes replaced by the defaults. A file at a hidden path is not one of them: the import never writes a hidden path.',
             'Every stylesheet — any .css entry not at a hidden path — is checked before the project is created too. One that cannot be read, opens a PHP block, or fails the stylesheet scan every CSS writer runs (see editStyles) refuses the WHOLE archive with 400 (reason disallowed_content) and nothing is created: a project imported without its stylesheet would be a site with its styling missing, and a stylesheet the editor refuses cannot arrive by archive either.',
             'The files the site reads may show a PHP opening tag in their text — a page that displays PHP code, say. No web server serves them, and the engine writes their values into generated PHP only as string literals. Every other text file keeps the rule.',
             'Archive resource limits are enforced from the ZIP headers before anything is extracted: entry count, total and per-entry uncompressed size, and per-entry compression ratio. Exceeding any of them returns 413 and writes nothing.',
@@ -4361,7 +4351,7 @@ $GLOBALS['__help_commands'] = [
             '400.upload.failed' => 'File upload failed',
             '400.validation.invalid_zip' => 'Invalid or corrupted ZIP',
             '400.validation.invalid_structure' => 'ZIP missing required project files',
-            '400.validation.unsafe_param' => 'An entry in the archive failed a check that refuses the whole archive, so nothing is created. errors[0].file names the entry and errors[0].reason the check: unsafe_path (the name is not a clean relative path), invalid_json (cannot be read, does not parse, or is not a JSON array or object), disallowed_content (the import policy or the content check refused it), invalid_setting (a setting in config.json the command that writes it would refuse — errors[0].value names the setting), unsafe_value (an unsafe attribute — errors[0].node and errors[0].attribute name it), blocked_tag or invalid_component_reference (errors[0].value names the tag or reference).',
+            '400.validation.unsafe_param' => 'An entry in the archive failed a check that refuses the whole archive, so nothing is created. errors[0].file names the entry and errors[0].reason the check: unsafe_path (the name is not a clean relative path), invalid_json (cannot be read, does not parse, or is not a JSON array or object), disallowed_content (the import policy or the content check refused it), invalid_setting (a setting in config.json the command that writes it would refuse, or a language this installation\'s list does not hold — errors[0].value names the setting), unsafe_value (an unsafe attribute — errors[0].node and errors[0].attribute name it), blocked_tag or invalid_component_reference (errors[0].value names the tag or reference).',
             '409.resource.already_exists' => 'A project with that id already exists',
             '400.validation.incomplete_project' => 'Imported project is incomplete.',
             '400.validation.invalid_format' => 'Invalid project name format.',
@@ -5282,8 +5272,9 @@ $GLOBALS['__help_commands'] = [
             'language' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Target language code (must be in the project LANGUAGES_SUPPORTED config).',
-                'example' => 'fr'
+                'description' => 'Target language',
+                'example' => 'fr',
+                'validation' => 'One of the project\'s languages (getLangList returns them)'
             ],
             'header' => [
                 'required' => false,
@@ -5650,7 +5641,7 @@ $GLOBALS['__help_commands'] = [
         'description' => 'Change the language storage descriptions are authored in (registry-level descLang on data/storage.json). MOVES every item description from the current language to the target in the translate files (true move — source cleared), OVERWRITING any existing target-language values. Two-step: call without confirm to preview (409 needsConfirm with moved/overwrites counts), then re-call with confirm:true to execute. Descriptions are page content (textKeys) so the move is live — no regenerate needed.',
         'method' => 'POST',
         'parameters' => [
-            'lang' => ['required' => true, 'type' => 'string', 'description' => 'Target language, must be in LANGUAGES_SUPPORTED.'],
+            'lang' => ['required' => true, 'type' => 'string', 'description' => 'Target language', 'validation' => 'One of the project\'s languages (getLangList returns them)'],
             'confirm' => ['required' => false, 'type' => 'boolean', 'description' => 'Execute the move (defaults false → preview only).']
         ],
         'example_post' => 'POST /management/p/<projectId>/setStorageDescLang with {"lang":"fr","confirm":true}',
@@ -5830,7 +5821,7 @@ $GLOBALS['__help_commands'] = [
         'description' => 'Change the language collected-data prose is authored in (descLang on data/privacy.json). Mirrors setStorageDescLang: MOVES every datum label + purpose from the current language to the target in translate/ (empty-not-delete on the source), OVERWRITING existing target values. Two-step: call without confirm to preview (409 needsConfirm with moved/overwrites), then re-call with confirm:true.',
         'method' => 'POST',
         'parameters' => [
-            'lang' => ['required' => true, 'type' => 'string', 'description' => 'Target language, must be in LANGUAGES_SUPPORTED.'],
+            'lang' => ['required' => true, 'type' => 'string', 'description' => 'Target language', 'validation' => 'One of the project\'s languages (getLangList returns them)'],
             'confirm' => ['required' => false, 'type' => 'boolean', 'description' => 'Execute the move (defaults false → preview only).']
         ],
         'example_post' => 'POST /management/p/<projectId>/setPrivacyDescLang with {"lang":"fr","confirm":true}',

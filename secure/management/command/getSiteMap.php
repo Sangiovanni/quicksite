@@ -17,6 +17,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/renderBootstrap.php'; // qs_resolve_public_base (C15 15.4)
 require_once SECURE_FOLDER_PATH . '/src/functions/sitemapHelpers.php';  // shared config read/apply
+require_once SECURE_FOLDER_PATH . '/src/functions/languageRegistry.php';
 
 /**
  * Recursively count non-empty translation values
@@ -66,7 +67,13 @@ function __command_getSiteMap(array $params = [], array $urlParams = []): ApiRes
     $multilingual = CONFIG['MULTILINGUAL_SUPPORT'] ?? false;
     $languages = CONFIG['LANGUAGES_SUPPORTED'] ?? ['en'];
     $defaultLang = CONFIG['LANGUAGE_DEFAULT'] ?? 'en';
-    $languageNames = CONFIG['LANGUAGES_NAME'] ?? [];
+    // Names come from the installation's language list; a project stores codes only.
+    $languageNames = [];
+    foreach ($languages as $code) {
+        if (is_string($code)) {
+            $languageNames[$code] = qs_language_label($code);
+        }
+    }
 
     // Get all routes (flatten nested structure)
     $routes = flattenRoutes(ROUTES);

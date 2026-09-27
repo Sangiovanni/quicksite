@@ -34,7 +34,7 @@ return [
         'commands' => [
             'getRoutes', 'getSiteMap', 'getStructure', 'getComponent', 'listComponents',
             'listPages', 'findComponentUsages', 'getTranslation', 'getTranslations',
-            'getTranslationKeys', 'getLangList', 'getLanguageList', 'checkStructureMulti',
+            'getTranslationKeys', 'getLangList', 'checkStructureMulti',
             'validateTranslations', 'getUnusedTranslationKeys', 'analyzeTranslations',
             'analyzeReachability', 'listAssets', 'getStyles', 'getRootVariables',
             'listStyleRules', 'getStyleRule', 'listKeyframes', 'getKeyframes',
@@ -269,10 +269,13 @@ return [
     // sole owner, and discards any archived roster — so it is GLOBAL like
     // createProject, not the project-scoped admin-tier project.data it used to sit
     // in (C8 8.4). The deep ZIP-internal path/zip-slip sweep stays C11.
+    // getLanguageList reads the installation's language list, which a new
+    // project's first language must come from: it belongs to no project, and a
+    // caller creating their first one has no project to name.
     'projects.create' => [
         'scope' => 'global',
         'access' => 'any',
-        'commands' => ['createProject', 'importProject'],
+        'commands' => ['createProject', 'importProject', 'getLanguageList'],
     ],
 
     // NOTE — there is deliberately NO owner-gated global category. The former

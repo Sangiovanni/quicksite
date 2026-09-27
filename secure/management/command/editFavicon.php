@@ -3,6 +3,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/filePolicy.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/projectSettings.php';
 
 /**
  * editFavicon — point the site's favicon at an existing image asset.
@@ -128,6 +129,15 @@ if (!$clearing) {
 // ── Write the pointer ─────────────────────────────────────────────────────
 $faviconPath = $clearing ? null : '/assets/images/' . $imageName;
 $previous    = null;
+
+// What is written follows FAVICON_PATH's one rule, the one the import checks
+// an archive against; the checks above say why a name would fail it.
+if ($faviconPath !== null) {
+    $refusal = qs_project_settings_guard(['FAVICON_PATH' => $faviconPath], ['FAVICON_PATH']);
+    if ($refusal !== null) {
+        $refusal->send();
+    }
+}
 
 $result = qs_config_mutate(
     PROJECT_PATH . '/config.php',

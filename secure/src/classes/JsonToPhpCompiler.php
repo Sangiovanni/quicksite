@@ -287,7 +287,11 @@ class JsonToPhpCompiler {
             if (defined('MULTILINGUAL_SUPPORT') && MULTILINGUAL_SUPPORT && !empty($lang)) {
                 // Don't add language if URL already starts with a language code
                 $supportedLangs = defined('CONFIG') && isset(CONFIG['LANGUAGES_SUPPORTED']) ? CONFIG['LANGUAGES_SUPPORTED'] : ['en', 'fr'];
-                $langPattern = '/^\\/(' . implode('|', $supportedLangs) . ')(\\/|$)/';
+                $__prefixQuoted = [];
+                foreach ($supportedLangs as $__sl) {
+                    $__prefixQuoted[] = preg_quote((string) $__sl, '/');
+                }
+                $langPattern = '/^\\/(' . implode('|', $__prefixQuoted) . ')(\\/|$)/';
                 if (!preg_match($langPattern, $url)) {
                     $fullUrl .= $lang . '/';
                 }

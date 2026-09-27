@@ -1,6 +1,6 @@
 <?php
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
-require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/languageRegistry.php';
 
 /**
  * getTranslation - Retrieves translations for a specific language
@@ -49,7 +49,7 @@ function __command_getTranslation(array $params = [], array $urlParams = []): Ap
             ]);
     }
 
-    // Length validation for language code (max 10 chars for locale codes)
+    // Length validation (no language code, and not "default", is longer)
     if (strlen($language) > 10) {
         return ApiResponse::create(400, 'validation.invalid_length')
             ->withMessage('Language code must not exceed 10 characters')
@@ -58,42 +58,28 @@ function __command_getTranslation(array $params = [], array $urlParams = []): Ap
             ]);
     }
 
-    // SECURITY: Validate language code format
-    // Supports: en, fr, eng (ISO 639), en-US, zh-Hans (BCP 47 locale codes)
-    // Also supports "default" for mono-language mode
-    // Pattern: 2-3 lowercase letters, optionally followed by dash and 2-4 alphanumeric chars
-    $isDefault = ($language === 'default');
-    if (!$isDefault && !RegexPatterns::match('language_code_extended', $language)) {
-        return ApiResponse::create(400, 'validation.invalid_format')
-            ->withMessage('Invalid language code format')
-            ->withErrors([RegexPatterns::validationError('language_code_extended', 'language', $language)]);
+    // An EXISTING language: one of the project's, or "default" (the
+    // mono-language translation file).
+    if (!qs_project_has_language($language, true)) {
+        return qs_language_not_in_project_response($language, 'language', true);
     }
+    $isDefault = ($language === 'default');
 
     $translations_file = PROJECT_PATH . '/translate/' . $language . '.json';
 
-    // Beta.9 A4 Slice 1 — declared-but-missing tolerance.
-    // When a language is DECLARED in CONFIG['LANGUAGES_SUPPORTED'] but the
-    // <lang>.json file doesn't exist yet (fresh-language race — addLang
-    // succeeded, file write deferred or skipped), return 200 with empty
-    // translations so the Translation Manager panel can render "0%
-    // translated, all keys unset" instead of an opaque 404.
+    // Declared-but-missing tolerance: a project language whose <lang>.json does
+    // not exist yet (addLang succeeded, the file write was deferred or skipped)
+    // answers 200 with empty translations, so the Translation Manager panel can
+    // render "0% translated, all keys unset" instead of an opaque 404.
     //
-    // Two cases stay 404:
-    //   1. Language not in LANGUAGES_SUPPORTED (truly unknown).
-    //   2. The 'default' pseudo-language with no file (mono-language
-    //      projects without translation seeds).
+    // The 'default' pseudo-language with no file stays 404 (a mono-language
+    // project without translation seeds).
     //
     // The Translator class itself still uses `default.json` as the
     // mono-language fallback; this tolerance only affects the API surface
     // for the admin panel.
     if (!file_exists($translations_file)) {
-        $isSupported = !$isDefault
-            && defined('CONFIG')
-            && isset(CONFIG['LANGUAGES_SUPPORTED'])
-            && is_array(CONFIG['LANGUAGES_SUPPORTED'])
-            && in_array($language, CONFIG['LANGUAGES_SUPPORTED'], true);
-
-        if ($isSupported) {
+        if (!$isDefault) {
             return ApiResponse::create(200, 'operation.success')
                 ->withMessage('Translation file not yet created for declared language; returning empty.')
                 ->withData([

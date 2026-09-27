@@ -2,34 +2,29 @@
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_json_write
 require_once SECURE_FOLDER_PATH . '/src/functions/opcacheHygiene.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
-require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/languageRegistry.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/projectSettings.php';
 
 // NOTE: addLang works regardless of MULTILINGUAL_SUPPORT setting
 // This allows adding languages BEFORE enabling multilingual mode
-// (setMultilingual requires 2+ languages to enable)
 
 $params = $trimParametersManagement->params();
 
-// Support multiple parameter names for flexibility:
-// - 'code'/'name' (full form)
-// - 'lang' (shorthand with auto-generated name)  
-// - 'language' (AI often uses this)
+// The code only: a language's name comes from the installation's language list
+// wherever it is shown. Three spellings are accepted ('language' is the one AI
+// callers often use); the first present wins.
 $langCode = $params['code'] ?? $params['lang'] ?? $params['language'] ?? null;
-$langName = $params['name'] ?? null;
 
 // Validate required parameters
 if ($langCode === null) {
     ApiResponse::create(400, 'validation.required')
         ->withMessage('Language code is required')
-        ->withErrors([['field' => 'code', 'reason' => 'missing', 'hint' => 'Use "code" and "name", or just "lang" for shorthand']])
+        ->withErrors([['field' => 'code', 'reason' => 'missing', 'hint' => 'Send the language code as "code" (or "lang")']])
         ->send();
 }
 
-// Type validation - must be strings.
-// This block used to sit BELOW the name-generation block, one step too late:
-// `strtolower($langCode)` ran first and TypeError'd on `?code[]=x` before the
-// check it needed could fire (beta.10 C13 F-C13-11). The guard was never
-// missing — only mis-ordered.
+// Type validation - must be a string, checked before anything reads it as one
+// (an array reached strtolower() as a TypeError, beta.10 C13 F-C13-11).
 if (!is_string($langCode)) {
     ApiResponse::create(400, 'validation.invalid_format')
         ->withMessage("Invalid parameter type")
@@ -37,56 +32,15 @@ if (!is_string($langCode)) {
         ->send();
 }
 
-if ($langName !== null && !is_string($langName)) {
-    ApiResponse::create(400, 'validation.invalid_format')
-        ->withMessage("Invalid parameter type")
-        ->withErrors([['field' => 'name', 'reason' => 'must be a string', 'received_type' => gettype($langName)]])
-        ->send();
-}
-
-// If name not provided, generate from code (e.g., 'fr' -> 'French', 'es' -> 'Spanish')
-if ($langName === null) {
-    $commonLanguages = [
-        'en' => 'English', 'fr' => 'French', 'es' => 'Spanish', 'de' => 'German',
-        'it' => 'Italian', 'pt' => 'Portuguese', 'nl' => 'Dutch', 'ru' => 'Russian',
-        'zh' => 'Chinese', 'ja' => 'Japanese', 'ko' => 'Korean', 'ar' => 'Arabic',
-        'hi' => 'Hindi', 'pl' => 'Polish', 'sv' => 'Swedish', 'da' => 'Danish',
-        'no' => 'Norwegian', 'fi' => 'Finnish', 'tr' => 'Turkish', 'cs' => 'Czech',
-        'el' => 'Greek', 'he' => 'Hebrew', 'th' => 'Thai', 'vi' => 'Vietnamese'
-    ];
-    $langName = $commonLanguages[strtolower($langCode)] ?? ucfirst($langCode);
-}
-
 $langCode = trim($langCode);
-$langName = trim($langName);
 
-// Validate language code format (2-3 lowercase letters)
-if (!RegexPatterns::match('language_code', $langCode)) {
-    ApiResponse::create(400, 'validation.invalid_format')
-        ->withMessage("Invalid language code format")
-        ->withErrors([RegexPatterns::validationError('language_code', 'code', $langCode)])
-        ->send();
-}
-
-// Validate language name length and content
-if (strlen($langName) === 0 || strlen($langName) > 100) {
-    ApiResponse::create(400, 'validation.invalid_format')
-        ->withMessage("Invalid language name length")
-        ->withErrors([['field' => 'name', 'reason' => 'must be between 1 and 100 characters']])
-        ->send();
-}
-
-// Validate language name contains only safe characters
-// Uses Unicode \p{L} to support all scripts (Latin, Cyrillic, Arabic, CJK, etc.)
-if (!RegexPatterns::match('language_name', $langName)) {
-    ApiResponse::create(400, 'validation.invalid_format')
-        ->withMessage("Invalid language name format")
-        ->withErrors([RegexPatterns::validationError('language_name', 'name', $langName)])
-        ->send();
+// A NEW language: its code must be in the installation's language list.
+if (!qs_language_is_listed($langCode)) {
+    qs_language_not_listed_response($langCode, 'code')->send();
 }
 
 // Check if language already exists
-if (in_array($langCode, CONFIG['LANGUAGES_SUPPORTED'])) {
+if (qs_project_has_language($langCode)) {
     ApiResponse::create(409, 'conflict.duplicate')
         ->withMessage("Language already exists")
         ->withData([
@@ -144,7 +98,7 @@ if (!is_array($current_config)) {
 }
 
 // Check again under lock if language was added by concurrent request
-if (in_array($langCode, $current_config['LANGUAGES_SUPPORTED'] ?? [])) {
+if (in_array($langCode, $current_config['LANGUAGES_SUPPORTED'] ?? [], true)) {
     flock($lockHandle, LOCK_UN);
     fclose($lockHandle);
     @unlink($lockFile);
@@ -159,10 +113,14 @@ if (in_array($langCode, $current_config['LANGUAGES_SUPPORTED'] ?? [])) {
 
 // Add new language
 $current_config['LANGUAGES_SUPPORTED'][] = $langCode;
-if (!isset($current_config['LANGUAGES_NAME'])) {
-    $current_config['LANGUAGES_NAME'] = [];
+
+$refusal = qs_project_settings_guard($current_config, ['LANGUAGES_SUPPORTED']);
+if ($refusal !== null) {
+    flock($lockHandle, LOCK_UN);
+    fclose($lockHandle);
+    @unlink($lockFile);
+    $refusal->send();
 }
-$current_config['LANGUAGES_NAME'][$langCode] = $langName;
 
 // Build new config file content using var_export for safety
 $new_config_content = "<?php\n\nreturn " . var_export($current_config, true) . ";\n";
@@ -203,14 +161,15 @@ flock($lockHandle, LOCK_UN);
 fclose($lockHandle);
 @unlink($lockFile);
 
-// Success
+// Success. The paths are the project's own, relative to it: a response never
+// names where the installation keeps its files.
 ApiResponse::create(201, 'operation.success')
     ->withMessage('Language added successfully')
     ->withData([
         'code' => $langCode,
-        'name' => $langName,
-        'config_updated' => $config_path,
-        'translation_file' => $target_file,
+        'name' => qs_language_label($langCode),
+        'config_updated' => true,
+        'translation_file' => 'translate/' . $langCode . '.json',
         'copied_from' => file_exists($source_file) ? $default_lang : 'empty'
     ])
     ->send();

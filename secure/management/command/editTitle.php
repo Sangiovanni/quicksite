@@ -7,6 +7,7 @@
 
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/languageRegistry.php';
 
 /**
  * Modify Page Title Command
@@ -146,23 +147,9 @@ if (strlen($lang) > 10) {
         ->send();
 }
 
-// Validate language code format (2-3 lowercase letters, optional locale)
-if (!RegexPatterns::match('language_code_extended', $lang)) {
-    ApiResponse::create(400, 'validation.invalid_format')
-        ->withMessage('lang has invalid format')
-        ->withErrors([RegexPatterns::validationError('language_code_extended', 'lang', $lang)])
-        ->send();
-}
-
-// Validate language is supported
-if (!in_array($lang, CONFIG['LANGUAGES_SUPPORTED'])) {
-    ApiResponse::create(400, 'validation.unsupported_language')
-        ->withMessage('Language is not supported')
-        ->withData([
-            'provided_language' => $lang,
-            'supported_languages' => CONFIG['LANGUAGES_SUPPORTED']
-        ])
-        ->send();
+// An EXISTING language: it must be one of the project's.
+if (!qs_project_has_language($lang)) {
+    qs_language_not_in_project_response($lang, 'lang')->send();
 }
 
 // Validate title parameter is present

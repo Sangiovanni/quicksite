@@ -13,7 +13,7 @@
  */
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
-require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/languageRegistry.php';
 
 /**
  * Extract all textKeys from all structures
@@ -116,13 +116,10 @@ function __command_getUnusedTranslationKeys(array $params = [], array $urlParams
                 ]);
         }
         
-        // Also supports "default" for mono-language mode (per Beta.9 A4
-        // Slice 7 — see validateTranslations.php for the full context).
-        $isDefault = ($targetLang === 'default');
-        if (!$isDefault && !RegexPatterns::match('language_code_extended', $targetLang)) {
-            return ApiResponse::create(400, 'validation.invalid_format')
-                ->withMessage('Invalid language code format')
-                ->withErrors([RegexPatterns::validationError('language_code_extended', 'language', $targetLang)]);
+        // An EXISTING language: one of the project's, or "default" (see
+        // validateTranslations.php for why the Translation Manager sends it).
+        if (!qs_project_has_language($targetLang, true)) {
+            return qs_language_not_in_project_response($targetLang, 'language', true);
         }
     }
 

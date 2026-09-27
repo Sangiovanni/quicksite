@@ -1,13 +1,15 @@
 <?php
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
-require_once SECURE_FOLDER_PATH . '/src/classes/WorkflowManager.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/languageRegistry.php';
 
 /**
- * getLanguageList - Returns the full master list of available languages
- * 
+ * getLanguageList - Returns the installation's language list: every language
+ * a project can add, each with its name.
+ *
  * Unlike getLangList (which returns the project's configured languages),
- * this returns all languages that can be added to a project.
- * 
+ * this returns the list itself. It belongs to the installation, not to a
+ * project, so it is callable before a project exists.
+ *
  * @method GET
  * @url /management/getLanguageList
  * @auth required
@@ -16,16 +18,14 @@ require_once SECURE_FOLDER_PATH . '/src/classes/WorkflowManager.php';
 
 /**
  * Command function for internal execution via CommandRunner
- * 
+ *
  * @param array $params Body parameters (unused for this command)
  * @param array $urlParams URL segments (unused for this command)
  * @return ApiResponse
  */
 function __command_getLanguageList(array $params = [], array $urlParams = []): ApiResponse {
-    $allLanguages = WorkflowManager::getAllLanguageNames();
-    
     $languages = [];
-    foreach ($allLanguages as $code => $name) {
+    foreach (qs_language_list() as $code => $name) {
         $languages[] = [
             'code' => $code,
             'name' => $name

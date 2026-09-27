@@ -454,6 +454,14 @@ if (isset($_GET['denied'])): ?>
                 <small class="admin-hint"><?= __admin('dashboard.projects.nameHelp') ?></small>
             </div>
             <div class="admin-form-group">
+                <label class="admin-label" for="create-project-language"><?= __admin('dashboard.projects.languageLabel') ?></label>
+                <select id="create-project-language" class="admin-select"
+                        data-placeholder="<?= htmlspecialchars(__admin('dashboard.projects.languagePlaceholder'), ENT_QUOTES) ?>"
+                        data-search-placeholder="<?= htmlspecialchars(__admin('common.search'), ENT_QUOTES) ?>"
+                        data-empty-text="<?= htmlspecialchars(__admin('common.noResults'), ENT_QUOTES) ?>"></select>
+                <small class="admin-hint"><?= __admin('dashboard.projects.languageHelp') ?></small>
+            </div>
+            <div class="admin-form-group">
                 <label class="admin-checkbox">
                     <input type="checkbox" id="create-project-activate" checked />
                     <span><?= __admin('dashboard.projects.activateAfterCreate') ?></span>

@@ -30,21 +30,9 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/errorHygiene.php'; // qs_safe_error_message
-
-// Allowed keys in config.json export (security: no arbitrary PHP execution).
-// Every setting a command writes, and the list importProject takes back — a key
-// missing here is a setting lost on a round trip.
-const EXPORT_ALLOWED_CONFIG_KEYS = [
-    'SITE_NAME',
-    'LANGUAGES_SUPPORTED',
-    'LANGUAGE_DEFAULT',
-    'LANGUAGES_NAME',
-    'MULTILINGUAL_SUPPORT',
-    'THEME_MODE_ENABLED',
-    'THEME_DEFAULT',
-    'THEME_USER_TOGGLE_ENABLED',
-    'FAVICON_PATH'
-];
+// The settings an export carries into config.json (security: no arbitrary PHP
+// execution) are QS_PROJECT_SETTING_KEYS — the one list importProject takes back.
+require_once SECURE_FOLDER_PATH . '/src/functions/projectSettings.php';
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -277,7 +265,7 @@ function exportConfigAsJson(ZipArchive $zip, string $projectPath, string $projec
         
         // Filter to allowed keys only (security)
         $configJson = [];
-        foreach (EXPORT_ALLOWED_CONFIG_KEYS as $key) {
+        foreach (QS_PROJECT_SETTING_KEYS as $key) {
             if (isset($config[$key])) {
                 $configJson[$key] = $config[$key];
             }

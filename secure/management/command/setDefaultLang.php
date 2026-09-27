@@ -11,7 +11,8 @@
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/opcacheHygiene.php';
-require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/languageRegistry.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/projectSettings.php';
 
 // Check if multilingual mode is enabled
 if (!MULTILINGUAL_SUPPORT) {
@@ -41,16 +42,8 @@ if (!is_string($params['lang'])) {
 
 $langCode = trim(strtolower($params['lang']));
 
-// Validate language code format (2-3 lowercase letters)
-if (!RegexPatterns::match('language_code', $langCode)) {
-    ApiResponse::create(400, 'validation.invalid_format')
-        ->withMessage("Invalid language code format")
-        ->withErrors([RegexPatterns::validationError('language_code', 'lang', $langCode)])
-        ->send();
-}
-
-// Check if language exists in supported languages
-if (!in_array($langCode, CONFIG['LANGUAGES_SUPPORTED'])) {
+// An EXISTING language: it must be one of the project's.
+if (!qs_project_has_language($langCode)) {
     ApiResponse::create(404, 'not_found.language')
         ->withMessage("Language not found")
         ->withData([
@@ -67,14 +60,14 @@ if ($langCode === CONFIG['LANGUAGE_DEFAULT']) {
         ->withMessage("Language is already the default")
         ->withData([
             'code' => $langCode,
-            'name' => CONFIG['LANGUAGES_NAME'][$langCode] ?? $langCode
+            'name' => qs_language_label($langCode)
         ])
         ->send();
 }
 
 // Store previous default for response
 $previousDefault = CONFIG['LANGUAGE_DEFAULT'];
-$previousName = CONFIG['LANGUAGES_NAME'][$previousDefault] ?? $previousDefault;
+$previousName = qs_language_label((string) $previousDefault);
 
 // --- UPDATE CONFIG FILE ---
 $config_path = CONFIG_PATH;
@@ -107,6 +100,11 @@ if (!is_array($current_config)) {
 // Update default language
 $current_config['LANGUAGE_DEFAULT'] = $langCode;
 
+$refusal = qs_project_settings_guard($current_config, ['LANGUAGE_DEFAULT']);
+if ($refusal !== null) {
+    $refusal->send();
+}
+
 // Build new config file content using var_export for safety
 $new_config_content = "<?php\n\nreturn " . var_export($current_config, true) . ";\n";
 
@@ -126,7 +124,7 @@ ApiResponse::create(200, 'operation.success')
     ->withData([
         'new_default' => [
             'code' => $langCode,
-            'name' => CONFIG['LANGUAGES_NAME'][$langCode] ?? $langCode
+            'name' => qs_language_label($langCode)
         ],
         'previous_default' => [
             'code' => $previousDefault,

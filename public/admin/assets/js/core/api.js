@@ -176,7 +176,7 @@ window.QuickSiteAPI = (function() {
     // refused client-side when no project is selected.
     const FALLBACK_GLOBAL_COMMANDS = [
         'help', 'login', 'logoutSession', 'register',
-        'listProjects', 'createProject', 'importProject'
+        'listProjects', 'createProject', 'importProject', 'getLanguageList'
     ];
 
     function globalCommandSet() {

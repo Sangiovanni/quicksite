@@ -1,5 +1,9 @@
 <?php
 
+// The page's language comes from the single detection point, like the translator's. It travels
+// into a build with this file.
+require_once __DIR__ . '/../functions/projectLanguage.php';
+
 class Page {
     private $title;
     private $content;
@@ -23,7 +27,10 @@ class Page {
     public function render() {
         $title = $this->title;
         $content = $this->content;
-        $lang = $this->lang;
+        // A mono-language request names no language — the router reports null, since the URL
+        // carries none — but the page still has one: the project's. <html lang> asks the detector
+        // the translator asks, so it can never state a language the page is not in.
+        $lang = qs_resolve_project_language(is_string($this->lang) ? $this->lang : null);
         $showMenu = $this->showMenu;
         $showFooter = $this->showFooter;
         $pageEventsScript = $this->pageEventsScript;

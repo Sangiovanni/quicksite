@@ -455,6 +455,9 @@
             "nameHelp": "Lowercase letters, numbers, hyphens and underscores only",
             "nameRequired": "Project name is required",
             "activateAfterCreate": "Switch to this project after creation",
+            "languageLabel": "Language",
+            "languagePlaceholder": "Select a language...",
+            "languageHelp": "The site's first language. You can add others later.",
             "selectToDelete": "Select project to delete",
             "selectProject": "Select a project...",
             "active": "Active",
@@ -807,7 +810,8 @@
             "showPassword": "Show password",
             "hidePassword": "Hide password",
             "selectPlaceholder": "-- Select --",
-            "validationLabel": "Validation:"
+            "validationLabel": "Validation:",
+            "defaultLabel": "Default:"
         },
         "noDocumentation": "No additional documentation available.",
         "notExecutable": {
