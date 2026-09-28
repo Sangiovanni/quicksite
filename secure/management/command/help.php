@@ -316,7 +316,7 @@ $GLOBALS['__help_commands'] = [
                 'required' => false,
                 'type' => 'string',
                 'description' => 'PUBLIC_FOLDER_SPACE - subdirectory inside public folder for all public files (default: empty string)',
-                'example' => '' or 'web or space/v1',
+                'example' => 'web or space/v1',
                 'validation' => 'Max 255 chars, max 5 levels deep, alphanumeric/dots/hyphens/underscores/forward-slash only, empty allowed'
             ]
         ],
@@ -2020,7 +2020,7 @@ $GLOBALS['__help_commands'] = [
                 'type' => 'object',
                 'description' => 'Object of variable names and values to set/update',
                 'example' => '{"--color-primary": "#ff6600", "--new-var": "10px"}',
-                'validation' => 'Variable names must start with -- or will be auto-prefixed. A value holds no < > { }, javascript: or expression(; a name holds no { or }; and each declaration as written (--name: value) passes the stylesheet scan (see editStyles)'
+                'validation' => 'Variable names must start with -- or will be auto-prefixed. A value holds no < > { }, javascript: or expression(; a name holds no { or }; and each declaration as written (--name: value) is a CSS declaration — the name a custom property\'s, every quote, comment and bracket closed; the value may be empty — and passes the stylesheet scan (see editStyles)'
             ],
             'themeTarget' => [
                 'required' => false,
@@ -2045,14 +2045,15 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '400.validation.required' => 'Missing variables parameter',
-            '400.validation.invalid_format' => 'Variables must be a non-empty object',
+            '400.validation.invalid_format' => 'variables is not a non-empty object, a variable name or value is not a string, or themeTarget is not "light" or "dark"',
+            '400.validation.invalid_type' => 'themeTarget is not a string.',
             '404.file.not_found' => 'Style file not found',
             '500.server.file_write_failed' => 'Failed to write style file',
-            '400.validation.invalid_css' => 'Invalid CSS value detected: a value holds < > { }, javascript: or expression(; a name or value holds { or }; or a declaration fails the stylesheet scan, answered "Potentially dangerous CSS pattern detected" with errors[0].pattern naming what was found.',
+            '400.validation.invalid_css' => 'Invalid CSS value detected: a value holds < > { }, javascript: or expression(; a name or value holds { or }; a declaration as written is not a CSS declaration (errors[0].variable names it, errors[0].reason is unclosed_quote, unclosed_comment, unclosed_bracket or not_a_declaration); or a declaration fails the stylesheet scan, answered "Potentially dangerous CSS pattern detected" with errors[0].pattern naming what was found.',
             '500.server.lock_failed' => 'Could not acquire file lock.',
             '500.server.operation_failed' => 'An unexpected failure while writing the variables; the stylesheet lock is released first. The exception message is returned.'
         ],
-        'notes' => 'Adds new variables or updates existing ones. Each declaration, as it will be written (--name: value), passes the stylesheet scan every CSS writer runs (see editStyles). File locking prevents concurrent writes. Creates :root block if not exists.'
+        'notes' => 'Adds new variables or updates existing ones. Each declaration, as it will be written (--name: value), must be a CSS declaration — its name a custom property\'s, every quote, comment and bracket it opens closed — and passes the stylesheet scan every CSS writer runs (see editStyles). File locking prevents concurrent writes. Creates :root block if not exists.'
     ],
 
     'setThemeMode' => [
@@ -2144,7 +2145,7 @@ $GLOBALS['__help_commands'] = [
                 'required' => true,
                 'type' => 'string',
                 'description' => 'CSS selector (URL-encoded if contains special chars)',
-                'example' => '.btn-primary or body'
+                'example' => '.btn-primary'
             ],
             '{mediaQuery}' => [
                 'required' => false,
@@ -2170,7 +2171,7 @@ $GLOBALS['__help_commands'] = [
             '404.selector.not_found' => 'Selector not found (in specified scope)',
             '500.server.file_read_failed' => 'Failed to read style file.'
         ],
-        'notes' => 'URL-encode selectors with special characters. Returns styles as raw CSS string. Use listStyleRules to discover available selectors.'
+        'notes' => 'URL-encode the selector and the media query. The command decodes them once more after the URL itself is decoded, so a + or a % in them is encoded twice (a + as %252B). Returns styles as raw CSS string. Use listStyleRules to discover available selectors.'
     ],
     
     'setStyleRule' => [
@@ -2181,19 +2182,22 @@ $GLOBALS['__help_commands'] = [
                 'required' => true,
                 'type' => 'string',
                 'description' => 'CSS selector to add/update',
-                'example' => '.my-class or #my-id'
+                'example' => '.my-class'
             ],
             'styles' => [
                 'required' => 'conditional',
                 'type' => 'string|object',
-                'description' => 'CSS declarations as string or object. Required unless removeProperties is provided.',
-                'example' => '"background: #fff; padding: 10px;" or {"background": "#fff", "padding": "10px"}'
+                'ui_type' => 'textarea',
+                'description' => 'CSS declarations, as a string or as an object of property => value. They are merged into the rule: a property sent replaces that property, and the rule\'s other properties stay. To delete one, list it in removeProperties. Always sent; it may be an empty string when removeProperties is provided.',
+                'example' => 'background: #fff; padding: 10px;',
+                'validation' => 'Each declaration is property: value, and every quote, comment and bracket it opens is closed. An object\'s values are strings or numbers. The declarations pass the stylesheet scan (see editStyles).'
             ],
             'removeProperties' => [
                 'required' => false,
                 'type' => 'array',
                 'description' => 'Array of property names to remove from the rule. If all properties are removed, the entire rule is deleted.',
-                'example' => '["margin", "padding", "border"]'
+                'example' => '["margin", "padding", "border"]',
+                'validation' => 'An array of strings'
             ],
             'mediaQuery' => [
                 'required' => false,
@@ -2204,7 +2208,7 @@ $GLOBALS['__help_commands'] = [
             ]
         ],
         'example_post' => 'POST /management/p/<projectId>/setStyleRule with body: {"selector": ".btn-custom", "styles": {"background": "#007bff", "color": "white"}}',
-        'example_remove' => 'PATCH /management/p/<projectId>/setStyleRule with body: {"selector": ".btn-custom", "removeProperties": ["margin", "padding"]}',
+        'example_remove' => 'PATCH /management/p/<projectId>/setStyleRule with body: {"selector": ".btn-custom", "styles": "", "removeProperties": ["margin", "padding"]}',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -2213,13 +2217,13 @@ $GLOBALS['__help_commands'] = [
                 'action' => 'added|updated|deleted',
                 'selector' => '.btn-custom',
                 'mediaQuery' => null,
-                'styles' => 'background: #007bff; color: white;',
-                'removedProperties' => ['margin', 'padding']
+                'styles' => 'background: #007bff; color: white;'
             ]
         ],
         'error_responses' => [
-            '400.validation.required' => 'Missing selector, or neither styles nor removeProperties provided',
-            '400.validation.invalid_format' => 'Invalid selector or styles format',
+            '400.validation.required' => 'Missing selector (a selector that is not a string reads as missing), or no styles parameter',
+            '400.validation.invalid_format' => 'The selector is empty; the styles are empty and removeProperties is not provided; or the styles are not CSS declarations — errors[0].reason is unclosed_quote, unclosed_comment, unclosed_bracket or not_a_declaration',
+            '400.validation.invalid_type' => 'styles is neither a string nor an object whose values are strings or numbers, mediaQuery is not a string, or removeProperties is not an array of strings; errors[0].field names it',
             '400.validation.security' => 'The selector, the styles, the media query or the rule as it will be written fails the stylesheet scan (see editStyles) — errors[0].field and errors[0].pattern say where and what — or one of the three holds { or }',
             '400.validation.invalid_media_query' => 'Invalid media query format',
             '404.file.not_found' => 'Style file not found',
@@ -2227,7 +2231,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.lock_failed' => 'Could not acquire file lock.',
             '500.server.operation_failed' => 'An unexpected failure while writing the rule; the stylesheet lock is released first. The exception message is returned.'
         ],
-        'notes' => 'Styles can be string or object format. Use removeProperties to selectively delete properties. If removing properties leaves the rule empty, it is automatically deleted (action: deleted). The selector, the styles, the media query and the rule as it will be written each pass the stylesheet scan every CSS writer runs (see editStyles).'
+        'notes' => 'The styles are merged into the rule: a property sent replaces that property, and the rule\'s other properties stay (getStyleRule returns what the rule holds). Use removeProperties to delete properties; if that leaves the rule empty, it is deleted (action: deleted). The styles must be CSS declarations: each declaration is property: value, and every quote, comment and bracket it opens is closed, because one left open reads on into the rules after it. Anything else — a quoted string, "color red", a quote left open — answers 400 invalid_format and nothing is written. The selector, the styles, the media query and the rule as it will be written each pass the stylesheet scan every CSS writer runs (see editStyles).'
     ],
     
     'deleteStyleRule' => [
@@ -2366,20 +2370,20 @@ $GLOBALS['__help_commands'] = [
                 'required' => true,
                 'type' => 'string',
                 'description' => 'Animation name (alphanumeric, hyphens, underscores)',
-                'example' => 'fadeIn or slideInFromLeft'
+                'example' => 'fadeIn'
             ],
             'frames' => [
                 'required' => true,
                 'type' => 'object',
                 'description' => 'Object with frame keys and CSS values',
-                'example' => '{"from": "opacity: 0;", "to": "opacity: 1;"} or {"0%, 100%": "transform: scale(1);", "50%": "transform: scale(1.1);"}',
-                'validation' => 'A key is a percentage, decimals allowed (12.5%), from or to, or a comma-separated list of them (0%, 100% or from, to), with whitespace only around the commas. A value is a string holding no { or } that passes the stylesheet scan (see editStyles)'
+                'example' => '{"0%, 100%": "transform: scale(1);", "50%": "transform: scale(1.1);"}',
+                'validation' => 'A key is a percentage, decimals allowed (12.5%), from or to, or a comma-separated list of them (0%, 100% or from, to), with whitespace only around the commas. A value is a string holding no { or }, whose declarations are property: value with every quote, comment and bracket they open closed, and that passes the stylesheet scan (see editStyles)'
             ],
             'allowOverwrite' => [
                 'required' => false,
                 'type' => 'boolean',
                 'description' => 'If true, overwrites an existing animation of the same name. Otherwise an existing name answers 409 keyframe.already_exists.',
-                'example' => 'true',
+                'example' => true,
                 'default' => false
             ]
         ],
@@ -2396,8 +2400,8 @@ $GLOBALS['__help_commands'] = [
             ]
         ],
         'error_responses' => [
-            '400.validation.required' => 'Missing name or frames parameter',
-            '400.validation.invalid_format' => 'Invalid name format (must start with letter, alphanumeric only)',
+            '400.validation.required' => 'Missing name or frames parameter (a name that is not a string reads as missing)',
+            '400.validation.invalid_format' => 'The name is not a valid animation name (must start with a letter; letters, digits, hyphens, underscores); the frames are not a non-empty object; a frame value is not a string; or a frame is not CSS declarations — errors[0].frame names it and errors[0].reason is unclosed_quote, unclosed_comment, unclosed_bracket or not_a_declaration',
             '400.validation.invalid_frame' => 'Invalid frame key: not a percentage, from or to, nor a comma-separated list of them',
             '400.validation.security' => 'A frame, or the @keyframes block as it will be written, fails the stylesheet scan (see editStyles; errors[0].pattern names what was found), or a frame holds { or }',
             '404.file.not_found' => 'Style file not found',
@@ -2406,7 +2410,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.lock_failed' => 'Could not acquire file lock.',
             '500.server.operation_failed' => 'An unexpected failure while writing the keyframes; the stylesheet lock is released first. The exception message is returned.'
         ],
-        'notes' => 'Frame keys: percentages, decimals included (0%, 12.5%, 100%), keywords (from, to), or a comma-separated list mixing them (0%, 100% or from, to). getKeyframes returns every key exactly as the stylesheet writes it, so its frames can be sent back unchanged. An existing animation is replaced only with allowOverwrite:true. Each frame, and the block as it will be written, pass the stylesheet scan every CSS writer runs (see editStyles).'
+        'notes' => 'Frame keys: percentages, decimals included (0%, 12.5%, 100%), keywords (from, to), or a comma-separated list mixing them (0%, 100% or from, to). getKeyframes returns every key exactly as the stylesheet writes it, so its frames can be sent back unchanged. An existing animation is replaced only with allowOverwrite:true. A frame\'s value must be CSS declarations: each declaration is property: value, and every quote, comment and bracket it opens is closed. Each frame, and the block as it will be written, pass the stylesheet scan every CSS writer runs (see editStyles).'
     ],
     
     'deleteKeyframes' => [

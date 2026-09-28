@@ -747,6 +747,8 @@ Clicking any row opens the existing State & Animation Editor (`modals/transition
 | ✎ Edit | Opens the keyframe editor (`modals/keyframe.php`) on this keyframe. |
 | 🗑 Delete | Removes the `@keyframes` rule via `deleteKeyframes`. |
 
+The editor shows one frame per position on the timeline. A key naming several positions (`0%, 100%`, `from, to`) opens as one frame per position, each with the same declarations — the same animation — and is saved that way, `from` and `to` as `0%` and `100%`. A position named by two keys becomes one frame, the later key winning for a property both set. A decimal position (`12.5%`) is kept, and a frame's position can be typed as a decimal. An animation with a key the editor cannot place — neither `from`, `to` nor a percentage up to 100% — does not open.
+
 If the keyframe is used by ≥ 1 selector, a **used by N** chip appears next to the frame count. Clicking it expands an inline list below the row, each line showing a selector + an ✕ remove button that strips the `animation:` declaration from that rule (via `setStyleRule` with `removeProperties: ['animation']`). The data is pivoted from the same `animatedSelectorsData.animations` cache that drives the Animations sub-group, so the badge count updates immediately on any apply / remove inside the session.
 
 **Transition wizard** (modal opened from "+ Add transition" at the top of the Transitions sub-group):
@@ -3204,6 +3206,21 @@ Three routes, each gated on the same read the page is:
 ### 9.17 Command console (/admin/command)
 
 A form for every command in the Management API, generated from the same `help` metadata the API serves, plus a searchable index of them by category. It is the escape hatch into the raw API from inside the panel: everything the purpose-built pages do, and everything they do not. Command history is its own page (§9.18), not a tab here; `/admin/command?tab=history` redirects there.
+
+#### What a parameter's field shows
+
+Each field is built from the parameter's `help` entry:
+
+| From `help` | Where it shows |
+|---|---|
+| `example` | The field's placeholder, exactly as `help` writes it, JSON included. An example that offers alternatives — the word "or" standing alone in it, as in `landing or app/dashboard` — cannot be typed as it stands, so it is shown under the field as **Examples:** instead, and the field has no placeholder. |
+| `description` | Under the field. |
+| `default` | Under the field as **Default:** — what the command uses when the field is left empty. |
+| `validation` | Under the field as **Validation:**. |
+
+A field starts empty, JSON boxes included, and a field left empty is not sent: an optional parameter the form was not given is absent from the request, so the command applies its own default.
+
+`getStyleRule`, `setStyleRule` and `deleteStyleRule` add a **CSS Selector Picker** above the fields, listing every rule of the stylesheet by scope. Choosing a rule fills the selector and the media query; in `setStyleRule` it also fills the styles with the rule's current declarations, one per line. The command merges what is sent into the rule: a property sent replaces that property, and the rule's other properties stay — a line deleted from the box is not a property removed, which is what `removeProperties` is for.
 
 #### An installation can decline to offer it
 

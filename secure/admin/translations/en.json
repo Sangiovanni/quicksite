@@ -734,7 +734,9 @@
         "styleRule": {
             "title": "CSS Selector Picker",
             "loadingSelectors": "Loading selectors...",
-            "hint": "Select a CSS rule from the list above. The selector and media query fields will be filled automatically."
+            "hint": "Select a CSS rule from the list above. The selector and media query fields will be filled automatically.",
+            "hintSet": "Select a CSS rule from the list above. Its selector, its media query and its current declarations are filled in below.",
+            "loadFailed": "The declarations of this rule could not be loaded."
         },
         "setKeyframes": {
             "title": "Keyframe Builder",
@@ -811,7 +813,8 @@
             "hidePassword": "Hide password",
             "selectPlaceholder": "-- Select --",
             "validationLabel": "Validation:",
-            "defaultLabel": "Default:"
+            "defaultLabel": "Default:",
+            "examplesLabel": "Examples:"
         },
         "noDocumentation": "No additional documentation available.",
         "notExecutable": {

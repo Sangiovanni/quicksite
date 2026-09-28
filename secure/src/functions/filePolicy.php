@@ -434,7 +434,7 @@ function qs_policy_has_php_open_tag(string $content): bool
  *                  engine writes into generated PHP only as string literals. In
  *                  it a PHP opening tag is text a page shows (a site about PHP),
  *                  and refusing it would make such a project exportable but never
- *                  importable again. It must still parse, and detection (rule 2)
+ *                  importable again. It must still parse, and detection (rule 3)
  *                  still runs: valid JSON cannot begin with a tag, and finfo was
  *                  measured to report it as application/json with a tag at
  *                  every offset tried, on PHP 8.0 and on 8.4.
@@ -456,7 +456,8 @@ function qs_policy_has_php_open_tag(string $content): bool
  *
  * A stylesheet (.css) must also pass qs_css_first_danger(), the scan every
  * command that writes a project stylesheet runs, so a sheet the editor would
- * refuse cannot arrive by archive either.
+ * refuse cannot arrive by archive either. It runs before the rules below, so a
+ * stylesheet holding a PHP opening tag is refused in the scan's words.
  *
  * @param bool $neverServed true when the caller has established that the entry is
  *                          JSON no web server serves — importProject's site data
@@ -500,9 +501,20 @@ function qs_import_validate_content(string $path, string $content, bool $neverSe
         }
     }
 
-    // 2. Detection. Read ONCE, here, and used by every rule below — a matching
-    //    signature used to return before this ran, which is what let a BM
-    //    prefix plus a PHP block through.
+    // 2. A stylesheet passes the scan every stylesheet writer runs, so an archive
+    //    cannot bring in CSS the editor would refuse. First, because the scan tests a
+    //    PHP opening tag with this file's own test: a stylesheet is refused in the
+    //    scan's words, whatever it holds, as the editor refuses it.
+    if ($ext === 'css') {
+        require_once __DIR__ . '/utilsStyleManagement.php';   // qs_css_first_danger
+        $danger = qs_css_first_danger($content);
+        if ($danger !== null) {
+            return $deny("stylesheet holds a dangerous CSS pattern: {$danger}");
+        }
+    }
+
+    // 3. Detection. Read ONCE, here, and used by every rule below. It runs even when
+    //    a signature matched: a BM prefix plus a PHP block has a valid signature.
     //
     //    FILEINFO_MIME returns type AND charset from a SINGLE libmagic pass
     //    ("image/png; charset=binary"). Two separate finfo calls would scan the
@@ -533,7 +545,7 @@ function qs_import_validate_content(string $path, string $content, bool $neverSe
         }
     }
 
-    // 3. The PHP-block rule, per class (see the note above this function), and
+    // 4. The PHP-block rule, per class (see the note above this function), and
     //    not for never-served JSON — the text class's one exemption.
     if (qs_policy_has_php_open_tag($content) && !($neverServed && $ext === 'json')) {
         if ($isText) {
@@ -546,7 +558,7 @@ function qs_import_validate_content(string $path, string $content, bool $neverSe
         //
         //   type     — a real file detects as its format. A short magic prefix
         //              followed by a script detects as octet-stream (or, for a
-        //              2-byte prefix like BM, as text/plain, which rule 2 above
+        //              2-byte prefix like BM, as text/plain, which rule 3 above
         //              already refused).
         //   encoding — libmagic reports 'binary' for every real image, font and
         //              media file. A magic prefix plus an ASCII script reports
@@ -568,16 +580,6 @@ function qs_import_validate_content(string $path, string $content, bool $neverSe
         }
         if ($encoding !== null && $encoding !== 'binary') {
             return $deny("content opens a PHP block and is not binary but is named .{$ext}");
-        }
-    }
-
-    // 4. A stylesheet must pass the scan every stylesheet writer runs, so an
-    //    archive cannot bring in CSS the editor would refuse.
-    if ($ext === 'css') {
-        require_once __DIR__ . '/utilsStyleManagement.php';   // qs_css_first_danger
-        $danger = qs_css_first_danger($content);
-        if ($danger !== null) {
-            return $deny("stylesheet holds a dangerous CSS pattern: {$danger}");
         }
     }
 

@@ -19,7 +19,7 @@ class CssParser {
     private string $content;
 
     /**
-     * F-C13-6 — when the input is larger than the parser can process within the
+     * When the input is larger than the parser can process within the
      * install's memory_limit, every parse method degrades to empty/no-op instead
      * of allocating ~140-210x the input and fatally exhausting memory. This guards
      * the paths that land a stylesheet on disk WITHOUT going through the write cap
@@ -157,7 +157,7 @@ class CssParser {
      *   'innerEnd'   => int     byte offset of the closing '}'
      */
     private function parseTopLevelBlocks(): array {
-        if ($this->tooLarge) return [];   // F-C13-6: refuse before allocating the block tree
+        if ($this->tooLarge) return [];   // an oversized sheet: refuse before allocating the block tree
         $blocks = [];
         $len    = strlen($this->content);
         $pos    = 0;
@@ -387,28 +387,6 @@ class CssParser {
     }
 
     /**
-     * Build a regex pattern for matching a scope block.
-     * @deprecated Use findTopLevelBlock() instead.
-     */
-    private function buildScopePattern(string $selector): string {
-        $trimmed = trim($selector);
-        if ($trimmed === '[data-theme="dark"]' || $trimmed === "[data-theme='dark']") {
-            return '/\[data-theme\s*=\s*["\']dark["\']\]\s*\{([^}]+)\}/s';
-        }
-        $escapedSelector = preg_quote($selector, '/');
-        return '/' . $escapedSelector . '\s*\{([^}]+)\}/s';
-    }
-
-    /**
-     * Set/update :root variables (wrapper around setVariablesInScope for :root)
-     * @param array $variables Associative array of variable name => value
-     * @return array Summary of changes
-     */
-    public function setRootVariables(array $variables): array {
-        return $this->setVariablesInScope($variables, ':root');
-    }
-
-    /**
      * Get all selectors in the stylesheet.
      *
      * @return array List of ['selector' => string, 'mediaQuery' => string|null]
@@ -469,6 +447,118 @@ class CssParser {
         return ['selector' => $selector, 'styles' => trim($inner), 'mediaQuery' => null];
     }
     
+    // =========================================================================
+    // Declarations — read the way the CSS tokenizer reads them
+    // =========================================================================
+
+    /** The rule every declaration list a command writes into a stylesheet must meet. */
+    public const DECLARATION_RULE = 'each declaration is property: value, and every quote, comment and bracket it opens is closed';
+
+    /**
+     * A property name, a colon, a value. A custom property (--name) may have an empty
+     * value, as CSS allows; any other property may not.
+     */
+    private const DECLARATION = '/^(?:--(?:[A-Za-z0-9_-]|[\x80-\xFF]|\\\\.)*\s*:.*|-?(?:[A-Za-z_]|[\x80-\xFF]|\\\\.)(?:[A-Za-z0-9_-]|[\x80-\xFF]|\\\\.)*\s*:\s*\S.*)$/sD';
+
+    /**
+     * Split a declaration list at each `;` that ends a declaration: one outside a
+     * string, a comment and brackets, so `content: "a;b"` and a data URI in url()
+     * stay whole. A string ends at its closing quote or, as in CSS, at a line break;
+     * a comment ends at its closing mark.
+     *
+     * @return array{0: string[], 1: string[], 2: ?string} the declarations as written;
+     *   the same with each comment turned into a space; and what the text leaves open
+     *   at its end ('quote', 'comment' or 'bracket'), or null when it closes everything
+     */
+    private static function readDeclarations(string $text): array {
+        $len      = strlen($text);
+        $raw      = [];
+        $bare     = [];
+        $open     = null;
+        $brackets = [];
+        $start    = 0;
+        $buffer   = '';
+        $i        = 0;
+        while ($i < $len) {
+            $ch = $text[$i];
+            if ($ch === '/' && ($i + 1) < $len && $text[$i + 1] === '*') {
+                $end = strpos($text, '*/', $i + 2);
+                if ($end === false) {
+                    $open = $open ?? 'comment';
+                    break;
+                }
+                $buffer .= ' ';
+                $i = $end + 2;
+                continue;
+            }
+            if ($ch === '"' || $ch === "'") {
+                $j = $i + 1;
+                $closed = false;
+                while ($j < $len) {
+                    $c = $text[$j];
+                    if ($c === '\\') { $j += 2; continue; }
+                    if ($c === $ch) { $closed = true; $j++; break; }
+                    if ($c === "\n" || $c === "\r" || $c === "\f") break;
+                    $j++;
+                }
+                if (!$closed) {
+                    $open = $open ?? 'quote';
+                }
+                $j = min($j, $len);
+                $buffer .= substr($text, $i, $j - $i);
+                $i = $j;
+                continue;
+            }
+            if ($ch === '\\') {
+                $buffer .= substr($text, $i, 2);
+                $i += 2;
+                continue;
+            }
+            if ($ch === '(' || $ch === '[') {
+                $brackets[] = $ch === '(' ? ')' : ']';
+            } elseif (($ch === ')' || $ch === ']') && $brackets && end($brackets) === $ch) {
+                array_pop($brackets);
+            } elseif ($ch === ';' && !$brackets) {
+                $raw[]  = substr($text, $start, $i - $start);
+                $bare[] = $buffer;
+                $start  = $i + 1;
+                $buffer = '';
+                $i++;
+                continue;
+            }
+            $buffer .= $ch;
+            $i++;
+        }
+        $raw[]  = (string) substr($text, $start);
+        $bare[] = $buffer;
+        if ($brackets) {
+            $open = $open ?? 'bracket';
+        }
+        return [$raw, $bare, $open];
+    }
+
+    /**
+     * Why a declaration list cannot go into a stylesheet as it is, or null when it can
+     * (DECLARATION_RULE). A quote, a comment or a bracket left open reads on into the
+     * rules after it, in the browser and in this parser alike.
+     *
+     * @return string|null 'unclosed_quote', 'unclosed_comment', 'unclosed_bracket'
+     *                     or 'not_a_declaration'
+     */
+    public static function declarationProblem(string $declarations): ?string {
+        [, $bare, $open] = self::readDeclarations($declarations);
+        if ($open !== null) {
+            return 'unclosed_' . $open;
+        }
+        foreach ($bare as $declaration) {
+            $declaration = trim($declaration);
+            if ($declaration !== '' && !preg_match(self::DECLARATION, $declaration)) {
+                return 'not_a_declaration';
+            }
+        }
+        return null;
+    }
+
     /**
      * Parse CSS style declarations into an associative array
      * @param string $styles CSS declarations string
@@ -476,12 +566,9 @@ class CssParser {
      */
     private function parseStyleDeclarations(string $styles): array {
         $result = [];
-        // Split by semicolons, but be careful with values containing semicolons (rare but possible)
-        $declarations = preg_split('/;\s*/', trim($styles), -1, PREG_SPLIT_NO_EMPTY);
-        
-        foreach ($declarations as $declaration) {
+        foreach (self::readDeclarations($styles)[0] as $declaration) {
             $declaration = trim($declaration);
-            if (empty($declaration)) continue;
+            if ($declaration === '') continue;
             
             // Split on first colon only
             $colonPos = strpos($declaration, ':');
@@ -669,19 +756,56 @@ class CssParser {
     }
     
     /**
+     * The at-rules a @keyframes block may sit inside: CSS allows one in a
+     * conditional group rule, and every @keyframes command reaches it there.
+     */
+    private const KEYFRAMES_HOSTS = ['media', 'supports', 'layer', 'container', 'document', 'scope'];
+
+    /**
+     * Every @keyframes block, in document order, with its name and byte range, read
+     * by the block tree: a brace inside a string or a comment never ends one early,
+     * and text inside a comment or a string is never one. The name is a single word
+     * of letters, digits, `_` and `-`; any other prelude is not taken as a name.
+     *
+     * @param int $offset added to every position (the block's place in the content
+     *                    of the parser this one was cut from)
+     * @return array<int, array{name: string, start: int, end: int, innerStart: int, innerEnd: int}>
+     */
+    private function keyframesBlocks(int $offset = 0): array {
+        $found = [];
+        foreach ($this->parseTopLevelBlocks() as $block) {
+            if ($block['type'] !== 'atrule' || !empty($block['noBody'])) continue;
+            $keyword = strtolower($block['keyword']);
+            if ($keyword === 'keyframes') {
+                if (preg_match('/^[\w-]+$/D', $block['prelude'])) {
+                    $found[] = [
+                        'name'       => $block['prelude'],
+                        'start'      => $offset + $block['start'],
+                        'end'        => $offset + $block['end'],
+                        'innerStart' => $offset + $block['innerStart'],
+                        'innerEnd'   => $offset + $block['innerEnd'],
+                    ];
+                }
+            } elseif (in_array($keyword, self::KEYFRAMES_HOSTS, true)) {
+                $inner = substr($this->content, $block['innerStart'], $block['innerEnd'] - $block['innerStart']);
+                foreach ((new self($inner))->keyframesBlocks($offset + $block['innerStart']) as $nested) {
+                    $found[] = $nested;
+                }
+            }
+        }
+        return $found;
+    }
+
+    /**
      * Get all @keyframes animations
      * @return array List of keyframe names and their content
      */
     public function getKeyframes(): array {
-        if ($this->tooLarge) return [];   // F-C13-6: refuse before the whole-content regex allocates
+        if ($this->tooLarge) return [];   // an oversized sheet: refuse before the block tree allocates
         $keyframes = [];
+        foreach ($this->keyframesBlocks() as $block) {
+            $framesContent = substr($this->content, $block['innerStart'], $block['innerEnd'] - $block['innerStart']);
 
-        preg_match_all('/@keyframes\s+([\w-]+)\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/s', $this->content, $matches, PREG_SET_ORDER);
-        
-        foreach ($matches as $match) {
-            $name = trim($match[1]);
-            $framesContent = trim($match[2]);
-            
             // The frames, read by the block tree like any other rule: a frame's key
             // is the prelude before its brace, trimmed and otherwise verbatim — a
             // decimal (`12.5%`), a keyword list (`from, to`) — so setKeyframes takes
@@ -693,85 +817,92 @@ class CssParser {
                     $frames[$frame['selector']] = trim(substr($framesContent, $frame['innerStart'], $frame['innerEnd'] - $frame['innerStart']));
                 }
             }
-            
-            $keyframes[$name] = $frames;
+
+            $keyframes[$block['name']] = $frames;
         }
-        
         return $keyframes;
     }
-    
+
     /**
-     * Set/update a @keyframes animation
+     * Set/update a @keyframes animation. Every block of that name is replaced; with
+     * none, the animation is appended.
      * @param string $name Animation name
      * @param array $frames Associative array of frame => styles
      * @return array Operation result
      */
     public function setKeyframes(string $name, array $frames): array {
-        // F-C13-6: on an oversized sheet, do not run the whole-content regex; leave
-        // content untouched (the write cap rejects the oversized file downstream).
+        // On an oversized sheet, leave content untouched (the write cap
+        // rejects the oversized file downstream).
         if ($this->tooLarge) {
             return ['action' => 'unchanged', 'name' => $name, 'frames' => array_keys($frames)];
         }
-        $escapedName = preg_quote($name, '/');
         $action = 'added';
-        
+
         // Build the keyframes content
         $framesContent = '';
         foreach ($frames as $key => $styles) {
             $formattedStyles = $this->formatStyles($styles, '        ');
             $framesContent .= "    " . $key . " {\n" . $formattedStyles . "\n    }\n";
         }
-        
+
         $newKeyframes = "@keyframes " . $name . " {\n" . $framesContent . "}";
-        
-        // Check if keyframes already exists
-        $pattern = '/@keyframes\s+' . $escapedName . '\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/s';
-        
-        if (preg_match($pattern, $this->content)) {
-            // Update existing. F-C13-5: use a callback so `$0` / `\1` inside a
-            // caller-supplied frame style are written LITERALLY, not interpreted as
-            // preg_replace backreferences.
-            $this->content = preg_replace_callback($pattern, static fn() => $newKeyframes, $this->content);
+
+        $blocks = array_filter($this->keyframesBlocks(), static fn(array $block) => $block['name'] === $name);
+        if ($blocks) {
+            // The last block first, so the positions of the earlier ones still hold.
+            foreach (array_reverse($blocks) as $block) {
+                $this->content = substr($this->content, 0, $block['start'])
+                               . $newKeyframes
+                               . substr($this->content, $block['end']);
+            }
             $action = 'updated';
         } else {
-            // Add new
             $this->content = $this->appendToCustomSection("\n" . $newKeyframes);
         }
-        
+
         return [
             'action' => $action,
             'name' => $name,
             'frames' => array_keys($frames)
         ];
     }
-    
+
     /**
-     * Delete a @keyframes animation
+     * Delete a @keyframes animation: every block of that name, with the whitespace
+     * around each, which becomes one line break.
      * @param string $name Animation name
      * @return bool True if deleted, false if not found
      */
     public function deleteKeyframes(string $name): bool {
-        if ($this->tooLarge) return false;   // F-C13-6: refuse before the whole-content regex allocates
-        $escapedName = preg_quote($name, '/');
-        $pattern = '/\s*@keyframes\s+' . $escapedName . '\s*\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}\s*/s';
-        
-        if (preg_match($pattern, $this->content)) {
-            $this->content = preg_replace($pattern, "\n", $this->content);
-            return true;
+        if ($this->tooLarge) return false;   // an oversized sheet: refuse before the block tree allocates
+        $blocks = array_filter($this->keyframesBlocks(), static fn(array $block) => $block['name'] === $name);
+        if (!$blocks) {
+            return false;
         }
-        
-        return false;
+        foreach (array_reverse($blocks) as $block) {
+            $start = $block['start'];
+            $end   = $block['end'];
+            while ($start > 0 && ctype_space($this->content[$start - 1])) {
+                $start--;
+            }
+            $length = strlen($this->content);
+            while ($end < $length && ctype_space($this->content[$end])) {
+                $end++;
+            }
+            $this->content = substr($this->content, 0, $start) . "\n" . substr($this->content, $end);
+        }
+        return true;
     }
     
     /**
      * Format CSS styles with proper indentation.
      */
     private function formatStyles(string $styles, string $indent = '    '): string {
-        $declarations = array_filter(array_map('trim', explode(';', $styles)));
-        $formatted    = [];
-        foreach ($declarations as $declaration) {
+        $formatted = [];
+        foreach (self::readDeclarations($styles)[0] as $declaration) {
+            $declaration = trim($declaration);
             if ($declaration !== '') {
-                $formatted[] = $indent . trim($declaration) . ';';
+                $formatted[] = $indent . $declaration . ';';
             }
         }
         return implode("\n", $formatted);

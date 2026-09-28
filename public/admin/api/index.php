@@ -280,11 +280,16 @@ switch ($action) {
         break;
         
     case 'languages':
-        // Return list of languages
+        // The project's languages, each labelled "Name (code)" with the name the
+        // installation's list gives it (getLangList's language_names), as the console's
+        // other language pickers label it; a code the list lacks is shown as the code.
         $result = makeInternalApiCall('getLangList');
         if ($result['success']) {
-            $langs = array_map(function($lang) {
-                return ['value' => $lang, 'label' => strtoupper($lang)];
+            $names = $result['data']['language_names'] ?? [];
+            $langs = array_map(function($lang) use ($names) {
+                $name = $names[$lang] ?? null;
+                $label = (is_string($name) && $name !== '' && $name !== $lang) ? $name . ' (' . $lang . ')' : $lang;
+                return ['value' => $lang, 'label' => $label];
             }, $result['data']['languages'] ?? []);
             echo json_encode(['success' => true, 'data' => $langs]);
         } else {

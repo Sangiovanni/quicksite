@@ -65,5 +65,9 @@
       "snippet.navbar.contact": "Contact"
     }
   },
+  "selectors": {
+    "classes": ["qs-snippet-navbar", "qs-snippet-navbar-logo", "qs-snippet-navbar-links"],
+    "ids": []
+  },
   "css": ".qs-snippet-navbar { display: flex; align-items: center; justify-content: space-between; padding: 1rem 2rem; background: #333; } .qs-snippet-navbar-logo { color: #fff; font-size: 1.5rem; font-weight: bold; text-decoration: none; } .qs-snippet-navbar-links { display: flex; list-style: none; margin: 0; padding: 0; gap: 1.5rem; } .qs-snippet-navbar-links a { color: #fff; text-decoration: none; } .qs-snippet-navbar-links a:hover { text-decoration: underline; }"
 }

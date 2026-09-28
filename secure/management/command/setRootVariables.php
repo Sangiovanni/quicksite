@@ -60,6 +60,19 @@ foreach ($variables as $name => $value) {
     // it is missing: the name is CSS text too, and a denylisted sequence can span the
     // name and the value the writer joins with ': '.
     $declaration = (str_starts_with($name, '--') ? $name : '--' . $name) . ': ' . $value . ';';
+
+    // ...and it must be a declaration a stylesheet can hold (CssParser::DECLARATION_RULE):
+    // the name a custom property's, every quote, comment and bracket closed.
+    $problem = CssParser::declarationProblem($declaration);
+    if ($problem !== null) {
+        ApiResponse::create(400, 'validation.invalid_css')
+            ->withMessage('A variable is not a CSS declaration as written (--name: value): ' . CssParser::DECLARATION_RULE)
+            ->withErrors([
+                ['field' => 'variables', 'variable' => $name, 'reason' => $problem]
+            ])
+            ->send();
+    }
+
     $danger = qs_css_first_danger($declaration);
     if ($danger !== null) {
         ApiResponse::create(400, 'validation.invalid_css')
@@ -86,6 +99,14 @@ if ($danger !== null) {
 
 // Resolve themeTarget → CSS scope selector
 // "light" (default) → :root   |   "dark" → [data-theme="dark"]
+// A non-string answers 400: falling back to "light" would hide the mistake and write
+// the variables into the wrong scope.
+if (isset($params['themeTarget']) && !is_string($params['themeTarget'])) {
+    ApiResponse::create(400, 'validation.invalid_type')
+        ->withMessage('The themeTarget parameter must be a string.')
+        ->withErrors([['field' => 'themeTarget', 'reason' => 'invalid_type']])
+        ->send();
+}
 $themeTarget = isset($params['themeTarget']) ? trim($params['themeTarget']) : 'light';
 if (!in_array($themeTarget, ['light', 'dark'], true)) {
     ApiResponse::create(400, 'validation.invalid_format')

@@ -56,5 +56,9 @@
       "snippet.hero.secondary": "En savoir plus"
     }
   },
+  "selectors": {
+    "classes": ["qs-snippet-hero", "qs-snippet-hero-content", "qs-snippet-hero-title", "qs-snippet-hero-subtitle", "qs-snippet-hero-actions", "qs-snippet-btn-lg", "qs-snippet-btn-outline"],
+    "ids": []
+  },
   "css": ".qs-snippet-hero { min-height: 60vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 4rem 2rem; text-align: center; } .qs-snippet-hero-content { max-width: 800px; } .qs-snippet-hero-title { font-size: 3rem; color: #fff; margin: 0 0 1rem; } .qs-snippet-hero-subtitle { font-size: 1.25rem; color: rgba(255,255,255,0.9); margin: 0 0 2rem; line-height: 1.6; } .qs-snippet-hero-actions { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; } .qs-snippet-btn-lg { padding: 0.875rem 2rem; font-size: 1.1rem; } .qs-snippet-btn-outline { background: transparent; color: #fff; border: 2px solid #fff; } .qs-snippet-btn-outline:hover { background: #fff; color: #667eea; }"
 }

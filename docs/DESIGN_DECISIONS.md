@@ -12151,3 +12151,80 @@ to style).
 **Source**: Sangio's review of a new project during beta.12, 2026-09-27.
 `secure/management/command/createProject.php` (`createEmptyStylesheet()`). Behaviour: the
 `createProject` `help` entry.
+
+### A command writes only declarations a stylesheet can hold, and the console shows an example as one value or as a hint (locked 2026-09-27)
+
+**Decision**: six changes, made together.
+
+- **A declaration list a command writes into a stylesheet must be one.** The styles
+  `setStyleRule` merges into a rule, each frame `setKeyframes` writes, and each variable
+  `setRootVariables` writes, as `--name: value`, must be CSS declarations: each declaration is
+  `property: value`, and every quote, comment and bracket the text opens is closed. A custom
+  property's value may be empty, as CSS allows; no other property's may. Anything else answers
+  400 and nothing is written. The stylesheet parser reads declarations the same way when it
+  writes them: it splits a list only at a `;` outside a string, a comment and brackets, so a `;`
+  inside a quoted value or a data URI stays where it is.
+- **`setStyleRule` stays a merge.** A property sent replaces that property, and the rule's other
+  properties stay; `removeProperties` deletes. In the command console, choosing a rule loads its
+  current declarations into the form, and the form says the command merges.
+- **The command console shows a documented example as one value or as a hint.** An example is
+  the field's placeholder when it is one value, shown exactly as `help` writes it, JSON included.
+  An example that offers alternatives — the word "or" standing alone in it — is shown under the
+  field as *Examples*, and the field has no placeholder. The examples of the CSS commands are
+  each one value that can be typed as it stands.
+- **The stylesheet parser finds a `@keyframes` block with its block tree**, as it already read the
+  frames inside one. Reading, replacing and deleting an animation take the whole block — a brace
+  inside a string or a comment no longer ends it — and text inside a comment or a string is never
+  one. A block inside a conditional group rule is still found.
+- **The visual editor's keyframe editor places one frame per position.** A key naming several
+  positions — `0%, 100%`, `from, to` — opens as one frame per position, each with the same
+  declarations, and is saved that way; a decimal position is kept. A position named by two keys
+  becomes one frame, the later key winning for a property both set. An animation with a key the
+  editor cannot place does not open.
+- **The four shipped snippets carry their selector list**: the classes of their structure that
+  their own CSS styles. The snippet selector offers a snippet's CSS only when the snippet names
+  its selectors, and the shipped ones never did.
+
+**Reasoning**: the console showed `setStyleRule`'s example as a quoted declaration list, "or" an
+object. Typed as it stands, the quoted text reached the command, which cut it at the `;` inside
+the quotes into a declaration whose name began with a quote, and a lone quote. The merge dropped
+the lone quote, and the quote left open read on to the next quote in the stylesheet, past the
+closing brace of the rule. A check on the input cannot hold if the writer then cuts what it
+accepted, so both read declarations one way. Two questions — is each piece a declaration, does
+the text close what it opens — cover what reads on into the rules that follow and what is not
+CSS at all; a list naming each malformed shape bought nothing more. No rule, frame or variable in
+any stylesheet on the install, the starter template, the snippets' CSS, or the CSS a shipped
+workflow or the command log sends is refused by them.
+
+The command merges because the visual editor sends one property per call — an animation applied
+to a selector, a transition, one edited value — and a full setter would erase the rest of the rule
+each time. The console is where the whole rule is on screen, so it is where the merge is stated.
+
+An example offering alternatives invites the reader to type the alternatives, and a placeholder
+is exactly where that happens. The documented examples mark alternatives with the word "or"; the
+two that list them with commas sit on fields the console replaces with a picker. An example
+written as JSON was encoded a second time by the console and showed its own quotes and
+backslashes.
+
+A brace inside a string ended the pattern that found an animation, so the animation came back cut
+short, and a replace left the tail of the old block behind. A list key read as its first number
+saved `0%, 100%` back as `0%`: the shipped pulse and shake presets lost their end frame on any
+save from the editor. One frame per position is the same animation in the one form the editor's
+timeline can place.
+
+**Alternatives considered**: refusals naming each malformed shape — a stray closing bracket, an
+empty value, a `;` inside a variable's value, a quote in the selector (withdrawn: the two
+questions cover what matters). `setStyleRule` as a full setter (declined — see above). A
+`replace` parameter (not taken). The console removing a property whose loaded line was deleted
+(not taken: the form states the merge). A second alternatives test for comma lists (not taken).
+Keeping a list key as one frame in the editor (not taken: the timeline places one position per
+frame). A hint saying when the snippet CSS options appear (not taken: the shipped snippets now
+carry their list).
+
+**Source**: Sangio's rulings of 2026-09-27, during beta.12. `secure/src/classes/CssParser.php`
+(`declarationProblem`, `readDeclarations`, `keyframesBlocks`); `setStyleRule`, `setKeyframes`
+and `setRootVariables` under `secure/management/command/`;
+`public/admin/assets/js/pages/command-form.js`;
+`public/admin/assets/js/pages/preview/preview-style-motion.js`; `secure/snippets/core/`.
+Behaviour: the `help` entries of the three commands, [ADMIN_PANEL.md](ADMIN_PANEL.md) §8.11 and
+§9.17.

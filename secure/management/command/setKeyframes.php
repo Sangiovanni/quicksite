@@ -28,12 +28,15 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/CssParser.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsStyleManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_param_string
 
 // Get parameters
 $params = $trimParametersManagement->params();
 
-// Validate required parameters
-if (!isset($params['name'])) {
+// Validate required parameters. qs_param_string, not isset: `?name[]=x` is SET but is
+// an array, and reached trim() as a TypeError; a non-string reads as absent.
+$nameParam = qs_param_string($params, 'name');
+if ($nameParam === null) {
     ApiResponse::create(400, 'validation.required')
         ->withMessage('Missing required parameter: name')
         ->send();
@@ -44,7 +47,7 @@ if (!isset($params['frames'])) {
         ->send();
 }
 
-$name = trim($params['name']);
+$name = trim($nameParam);
 $frames = $params['frames'];
 
 // Validate name (alphanumeric and hyphens only)
@@ -94,6 +97,16 @@ foreach ($frames as $key => $styles) {
     if (!qs_css_confine($styles)) {
         ApiResponse::create(400, 'validation.security')
             ->withMessage('Frame styles may not contain "{" or "}"')
+            ->send();
+    }
+
+    // A frame's styles must be declarations a stylesheet can hold
+    // (CssParser::DECLARATION_RULE).
+    $problem = CssParser::declarationProblem($styles);
+    if ($problem !== null) {
+        ApiResponse::create(400, 'validation.invalid_format')
+            ->withMessage("Frame '$key' is not CSS declarations: " . CssParser::DECLARATION_RULE)
+            ->withErrors([['field' => 'frames', 'frame' => (string) $key, 'reason' => $problem]])
             ->send();
     }
 

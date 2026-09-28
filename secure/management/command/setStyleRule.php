@@ -14,12 +14,15 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/CssParser.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsStyleManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_param_string
 
 // Get parameters
 $params = $trimParametersManagement->params();
 
-// Validate required parameters
-if (!isset($params['selector'])) {
+// Validate required parameters. qs_param_string, not isset: `?selector[]=x` is SET
+// but is an array, and reached trim() as a TypeError; a non-string reads as absent.
+$selectorParam = qs_param_string($params, 'selector');
+if ($selectorParam === null) {
     ApiResponse::create(400, 'validation.required')
         ->withMessage('Missing required parameter: selector')
         ->send();
@@ -30,12 +33,37 @@ if (!isset($params['styles'])) {
         ->send();
 }
 
-$selector = trim($params['selector']);
+// A parameter of the wrong type answers 400. Falling back to a default would hide the
+// mistake: a mediaQuery array would write the rule at the global scope.
+$typeError = null;
+if (is_array($params['styles'])) {
+    foreach ($params['styles'] as $value) {
+        if (!is_string($value) && !is_int($value) && !is_float($value)) {
+            $typeError = ['styles', 'a string, or an object whose values are strings or numbers'];
+            break;
+        }
+    }
+} elseif (!is_string($params['styles'])) {
+    $typeError = ['styles', 'a string, or an object whose values are strings or numbers'];
+}
+if ($typeError === null && isset($params['mediaQuery']) && !is_string($params['mediaQuery'])) {
+    $typeError = ['mediaQuery', 'a string'];
+}
+if ($typeError === null && isset($params['removeProperties'])
+    && (!is_array($params['removeProperties']) || array_filter($params['removeProperties'], static fn($p) => !is_string($p)))) {
+    $typeError = ['removeProperties', 'an array of property names'];
+}
+if ($typeError !== null) {
+    ApiResponse::create(400, 'validation.invalid_type')
+        ->withMessage("The {$typeError[0]} parameter must be {$typeError[1]}.")
+        ->withErrors([['field' => $typeError[0], 'reason' => 'invalid_type']])
+        ->send();
+}
+
+$selector = trim($selectorParam);
 $styles = $params['styles'];
 $mediaQuery = isset($params['mediaQuery']) ? trim($params['mediaQuery']) : null;
-$removeProperties = isset($params['removeProperties']) && is_array($params['removeProperties']) 
-    ? array_map('trim', $params['removeProperties']) 
-    : [];
+$removeProperties = isset($params['removeProperties']) ? array_map('trim', $params['removeProperties']) : [];
 
 // Convert styles array/object to string if necessary
 if (is_array($styles)) {
@@ -90,6 +118,16 @@ foreach (['selector' => $selector, 'styles' => $styles, 'mediaQuery' => $mediaQu
             ->withMessage('CSS ' . $field . ' may not contain "{" or "}"')
             ->send();
     }
+}
+
+// The styles must be declarations a stylesheet can hold (CssParser::DECLARATION_RULE):
+// a quote, a comment or a bracket left open reads on into the rules after this one.
+$problem = CssParser::declarationProblem((string) $styles);
+if ($problem !== null) {
+    ApiResponse::create(400, 'validation.invalid_format')
+        ->withMessage('The styles are not CSS declarations: ' . CssParser::DECLARATION_RULE)
+        ->withErrors([['field' => 'styles', 'reason' => $problem]])
+        ->send();
 }
 
 // Validate the media query, if provided, with the one media-query rule.

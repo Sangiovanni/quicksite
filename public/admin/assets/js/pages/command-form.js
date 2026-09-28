@@ -2979,18 +2979,31 @@ async function initSetRootVariablesForm() {
         
         // Clear button
         clearBtn.addEventListener('click', () => {
-            variablesTextarea.value = '{}';
+            variablesTextarea.value = '';
         });
         
         // Refresh after successful command
         form.addEventListener('command-success', async (e) => {
             if (e.detail.command === 'setRootVariables') {
                 await loadVariables();
-                variablesTextarea.value = '{}';
+                variablesTextarea.value = '';
                 currentValueSpan.textContent = '-';
             }
         });
     }
+}
+
+/**
+ * One URL segment of a getStyleRule call: its selector or its media query. The
+ * command decodes a segment once more after the URL itself is decoded (see its
+ * help notes), so the segment is encoded once for each decoding. Encoded only once,
+ * a "+" would arrive as a space, and "#", "?" or "/" would end or split the path.
+ *
+ * @param {string} value
+ * @returns {string}
+ */
+function _styleRuleSegment(value) {
+    return encodeURIComponent(encodeURIComponent(value));
 }
 
 /**
@@ -3000,6 +3013,9 @@ async function initStyleRuleForm() {
     const form = document.getElementById('command-form');
     const selectorInput = form.querySelector('[name="selector"]');
     const mediaQueryInput = form.querySelector('[name="mediaQuery"]');
+    // setStyleRule: the chosen rule's current declarations fill the styles field, so
+    // the rule the command merges into is on screen.
+    const stylesInput = COMMAND_NAME === 'setStyleRule' ? form.querySelector('[name="styles"]') : null;
     
     if (selectorInput) {
         // Create a helper section above the selector input
@@ -3013,7 +3029,7 @@ async function initStyleRuleForm() {
             QSDom.el('div', {
                 style: 'display: flex; gap: var(--space-sm); margin-bottom: var(--space-sm);'
             }, [ruleSelector]),
-            _renderHint([t('commandForm.styleRule.hint')])
+            _renderHint([t(stylesInput ? 'commandForm.styleRule.hintSet' : 'commandForm.styleRule.hint')])
         ]);
         selectorInput.parentNode.parentNode.insertBefore(helperDiv, selectorInput.parentNode);
         
@@ -3061,8 +3077,32 @@ async function initStyleRuleForm() {
         
         await loadSelectors();
         
+        // The declarations of the rule last chosen, one per line with the stylesheet's
+        // indentation dropped. A later choice wins over an answer still on its way.
+        let declarationsRequest = 0;
+        async function loadDeclarations(selector, mediaQuery) {
+            const request = ++declarationsRequest;
+            const segments = [selector].concat(mediaQuery ? [mediaQuery] : []).map(_styleRuleSegment);
+            let res = null;
+            try {
+                res = await QuickSiteAdmin.apiRequest('getStyleRule', 'GET', null, segments);
+            } catch (error) {
+                res = null;
+            }
+            if (request !== declarationsRequest) return;
+            if (!(res && res.ok && res.data && res.data.data)) {
+                QuickSiteAdmin.showToast(t('commandForm.styleRule.loadFailed'), 'error');
+                return;
+            }
+            stylesInput.value = String(res.data.data.styles || '')
+                .split(/\r?\n/)
+                .map(line => line.trim())
+                .filter(line => line !== '')
+                .join('\n');
+        }
+
         // When a selector is chosen, fill in the form fields
-        ruleSelector.addEventListener('change', () => {
+        ruleSelector.addEventListener('change', async () => {
             const selected = ruleSelector.selectedOptions[0];
             if (selected) {
                 // Fill selector input
@@ -3071,18 +3111,20 @@ async function initStyleRuleForm() {
                 }
                 
                 // Fill media query input if present
-                if (mediaQueryInput) {
-                    const mediaQuery = selected.dataset.mediaQuery || '';
-                    if (mediaQueryInput.tagName === 'INPUT') {
-                        mediaQueryInput.value = mediaQuery;
-                    }
+                const mediaQuery = selected.dataset.mediaQuery || '';
+                if (mediaQueryInput && mediaQueryInput.tagName === 'INPUT') {
+                    mediaQueryInput.value = mediaQuery;
+                }
+
+                if (stylesInput) {
+                    await loadDeclarations(selected.value, mediaQuery);
                 }
             }
         });
         
-        // Refresh after successful delete
+        // Refresh after a rule is deleted, or one may have been created
         form.addEventListener('command-success', async (e) => {
-            if (e.detail.command === 'deleteStyleRule') {
+            if (e.detail.command === 'deleteStyleRule' || e.detail.command === 'setStyleRule') {
                 await loadSelectors();
             }
         });
@@ -3410,7 +3452,7 @@ async function initSetKeyframesForm() {
         
         // Clear frames button
         kfClearBtn.addEventListener('click', () => {
-            framesTextarea.value = '{}';
+            framesTextarea.value = '';
             QuickSiteAdmin.showToast(t('commandForm.toast.framesCleared'), 'success');
         });
         
@@ -3430,7 +3472,7 @@ async function initSetKeyframesForm() {
         form.addEventListener('command-success', async (e) => {
             if (e.detail.command === 'setKeyframes') {
                 await loadKeyframes();
-                framesTextarea.value = '{}';
+                framesTextarea.value = '';
                 nameInput.value = '';
                 _showFramesNotice('commandForm.setKeyframes.noAnimationSelected');
             }
@@ -4426,7 +4468,7 @@ async function initSetTranslationKeysForm() {
             
             // Clear button
             clearBtn.addEventListener('click', () => {
-                translationsTextarea.value = '{}';
+                translationsTextarea.value = '';
             });
             
             // Helper function to refresh key selector
@@ -4491,7 +4533,7 @@ async function initSetTranslationKeysForm() {
                 if (e.detail.command === 'setTranslationKeys') {
                     await refreshKeySelector();
                     // Clear the textarea for next input
-                    translationsTextarea.value = '{}';
+                    translationsTextarea.value = '';
                     valueInput.value = '';
                 }
             });
@@ -4684,7 +4726,7 @@ async function initDeleteTranslationKeysForm() {
             
             // Clear keys button handler
             clearKeysBtn.addEventListener('click', () => {
-                keysTextarea.value = '[]';
+                keysTextarea.value = '';
             });
             
             // Helper function to refresh key selector
@@ -4739,7 +4781,7 @@ async function initDeleteTranslationKeysForm() {
                 if (e.detail.command === 'deleteTranslationKeys') {
                     await refreshKeySelector();
                     // Clear the textarea
-                    keysTextarea.value = '[]';
+                    keysTextarea.value = '';
                 }
             });
         }
@@ -4882,7 +4924,10 @@ function renderFormField(rawName, param, required) {
     const type = param.type || 'string';
     const uiType = param.ui_type || null; // Custom UI type for special inputs
     const description = param.description || '';
-    const example = param.example || '';
+    // An example that offers alternatives cannot be typed as it stands, so it is never
+    // the placeholder: the field shows it as a hint instead (below the description).
+    const offersAlternatives = _exampleOffersAlternatives(param.example);
+    const example = offersAlternatives ? '' : (param.example || '');
     const validation = param.validation || '';
 
     // Detect URL parameters from curly braces in name (e.g., {lang}, {type}, {name?})
@@ -5076,13 +5121,17 @@ function renderFormField(rawName, param, required) {
 
             case 'array':
             case 'object': {
+                // An example help.php writes as JSON text is shown as written; encoding
+                // it again would fill the placeholder with quotes and backslashes.
+                // The box starts EMPTY: a pre-filled [] or {} hid the example, and was
+                // sent as a value the user never chose — an empty field is not sent.
                 const placeholderValue = example
-                    ? JSON.stringify(example, null, 2)
+                    ? (typeof example === 'string' ? example : JSON.stringify(example, null, 2))
                     : (type === 'array' ? '[]' : '{}');
                 const props = { name: name, id: inputId, class: 'admin-textarea', placeholder: placeholderValue };
                 props['data-json-editor'] = '';
                 if (isUrlParam) props['data-url-param'] = '';
-                inputArea = QSDom.el('textarea', props, [type === 'array' ? '[]' : '{}']);
+                inputArea = QSDom.el('textarea', props);
                 break;
             }
 
@@ -5139,6 +5188,13 @@ function renderFormField(rawName, param, required) {
         _renderHint([description])
     ]);
 
+    if (offersAlternatives) {
+        group.appendChild(_renderHint([
+            QSDom.el('strong', { text: t('commandForm.field.examplesLabel') }),
+            ' ' + param.example
+        ]));
+    }
+
     // What the command uses when the field is left empty, as help.php documents it.
     if (param.default !== undefined) {
         group.appendChild(_renderHint([
@@ -5168,6 +5224,18 @@ function _formatDefault(value) {
     if (typeof value === 'string') return value;
     if (typeof value === 'boolean' || typeof value === 'number') return String(value);
     return JSON.stringify(value);
+}
+
+/**
+ * Whether a documented example offers alternatives ("landing or app/dashboard")
+ * instead of being one value a user can type as it stands: the word "or" standing
+ * alone in it.
+ *
+ * @param {*} example
+ * @returns {boolean}
+ */
+function _exampleOffersAlternatives(example) {
+    return typeof example === 'string' && /(^|\s)or(\s|$)/.test(example);
 }
 
 /**

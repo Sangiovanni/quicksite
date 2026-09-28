@@ -816,6 +816,10 @@
             if (data.status === 200 && data.data && data.data.frames) {
                 const keyframeData = data.data.frames;
                 const frames = parseKeyframeData(keyframeData);
+                // A key the editor cannot place would be lost on save: do not open.
+                if (frames === null) {
+                    throw new Error('A frame key the editor cannot read');
+                }
                 openKeyframeModal(keyframeName, frames, 'edit');
             } else {
                 throw new Error(data.message || 'Keyframe not found');
@@ -834,56 +838,131 @@
         openKeyframeModal('', defaultFrames, 'create');
     }
     
+    /**
+     * The editor's frames from getKeyframes' {key: declarations}: one frame per
+     * position, sorted. A key names one position or a comma-separated list of them
+     * (`0%, 100%`, `from, to`), and each position it names gets the declarations — the
+     * same animation, written one position per key. A position named by two keys
+     * becomes one frame, the later key's value winning for a property both set.
+     * Null when a key names something the editor cannot place.
+     *
+     * @param {Object<string, string>} keyframeData
+     * @returns {Array<{percent: number, properties: Array<{property: string, value: string}>}>|null}
+     */
     function parseKeyframeData(keyframeData) {
-        const frames = [];
-        
-        if (typeof keyframeData === 'object' && keyframeData !== null) {
-            for (const [key, value] of Object.entries(keyframeData)) {
-                let percent = key.trim();
-                if (percent.toLowerCase() === 'from') percent = 0;
-                else if (percent.toLowerCase() === 'to') percent = 100;
-                else percent = parseFloat(percent);
-                
-                const properties = [];
-                const propRegex = /([a-z-]+)\s*:\s*([^;]+);?/gi;
-                let propMatch;
-                while ((propMatch = propRegex.exec(value)) !== null) {
-                    properties.push({
-                        property: propMatch[1].trim(),
-                        value: propMatch[2].trim()
-                    });
+        const byPercent = new Map();
+        for (const [key, value] of Object.entries(keyframeData || {})) {
+            const positions = framePositions(key);
+            if (positions === null) return null;
+            const declarations = frameDeclarations(String(value));
+            for (const percent of positions) {
+                if (!byPercent.has(percent)) byPercent.set(percent, []);
+                const properties = byPercent.get(percent);
+                for (const declaration of declarations) {
+                    const same = properties.find(p => p.property === declaration.property);
+                    if (same) {
+                        same.value = declaration.value;
+                    } else {
+                        properties.push({ property: declaration.property, value: declaration.value });
+                    }
                 }
-                
-                frames.push({ percent, properties });
-            }
-        } else if (typeof keyframeData === 'string') {
-            const frameRegex = /([\d.]+%|from|to)\s*\{([^}]*)\}/gi;
-            let match;
-            
-            while ((match = frameRegex.exec(keyframeData)) !== null) {
-                let percent = match[1].trim();
-                if (percent.toLowerCase() === 'from') percent = 0;
-                else if (percent.toLowerCase() === 'to') percent = 100;
-                else percent = parseFloat(percent);
-                
-                const propertiesStr = match[2].trim();
-                const properties = [];
-                
-                const propRegex = /([a-z-]+)\s*:\s*([^;]+);?/gi;
-                let propMatch;
-                while ((propMatch = propRegex.exec(propertiesStr)) !== null) {
-                    properties.push({
-                        property: propMatch[1].trim(),
-                        value: propMatch[2].trim()
-                    });
-                }
-                
-                frames.push({ percent, properties });
             }
         }
-        
-        frames.sort((a, b) => a.percent - b.percent);
-        return frames;
+        return Array.from(byPercent, ([percent, properties]) => ({ percent, properties }))
+            .sort((a, b) => a.percent - b.percent);
+    }
+
+    /**
+     * The positions one frame key names, in percent: `from` is 0, `to` 100, a
+     * percentage its number (decimals kept), a comma-separated list each of its items.
+     * Null when an item is none of those, or lies beyond 100%.
+     *
+     * @param {string} key
+     * @returns {number[]|null}
+     */
+    function framePositions(key) {
+        const positions = [];
+        for (const item of String(key).split(',')) {
+            const word = item.trim().toLowerCase();
+            if (word === 'from') {
+                positions.push(0);
+            } else if (word === 'to') {
+                positions.push(100);
+            } else if (/^(\d+(\.\d+)?|\.\d+)%$/.test(word) && parseFloat(word) <= 100) {
+                positions.push(parseFloat(word));
+            } else {
+                return null;
+            }
+        }
+        return positions;
+    }
+
+    /**
+     * One frame's declarations as {property, value}, split the way the engine splits
+     * them (CssParser::readDeclarations): at each `;` outside a string, a comment and
+     * brackets, so a `;` inside a string or url() stays in its value. Comments are
+     * dropped; a line break between a value's words becomes a space, since the value
+     * is edited in a one-line field.
+     *
+     * @param {string} text
+     * @returns {Array<{property: string, value: string}>}
+     */
+    function frameDeclarations(text) {
+        const declarations = [];
+        const brackets = [];
+        let current = '';
+        const flush = () => {
+            const declaration = current.trim();
+            current = '';
+            const colon = declaration.indexOf(':');
+            if (colon <= 0) return;
+            const property = declaration.slice(0, colon).trim();
+            const value = declaration.slice(colon + 1).trim().replace(/\s*[\r\n]+\s*/g, ' ');
+            if (property && value) declarations.push({ property, value });
+        };
+        let i = 0;
+        while (i < text.length) {
+            const ch = text[i];
+            if (ch === '/' && text[i + 1] === '*') {
+                const end = text.indexOf('*/', i + 2);
+                if (end === -1) break;
+                current += ' ';
+                i = end + 2;
+                continue;
+            }
+            if (ch === '"' || ch === "'") {
+                let j = i + 1;
+                while (j < text.length) {
+                    const c = text[j];
+                    if (c === '\\') { j += 2; continue; }
+                    if (c === ch) { j++; break; }
+                    if (c === '\n' || c === '\r' || c === '\f') break;
+                    j++;
+                }
+                j = Math.min(j, text.length);
+                current += text.slice(i, j);
+                i = j;
+                continue;
+            }
+            if (ch === '\\') {
+                current += text.slice(i, i + 2);
+                i += 2;
+                continue;
+            }
+            if (ch === '(' || ch === '[') {
+                brackets.push(ch === '(' ? ')' : ']');
+            } else if ((ch === ')' || ch === ']') && brackets.length && brackets[brackets.length - 1] === ch) {
+                brackets.pop();
+            } else if (ch === ';' && !brackets.length) {
+                flush();
+                i++;
+                continue;
+            }
+            current += ch;
+            i++;
+        }
+        flush();
+        return declarations;
     }
     
     function openKeyframeModal(name, frames, mode) {
@@ -1064,7 +1143,7 @@
             // Percent input change handler
             const percentInput = header.querySelector('.preview-keyframe-modal__frame-percent-input');
             percentInput.addEventListener('change', (e) => {
-                const newPercent = parseInt(e.target.value, 10);
+                const newPercent = parseFloat(e.target.value);
                 if (isNaN(newPercent) || newPercent < 0 || newPercent > 100) {
                     e.target.value = frame.percent;
                     return;
@@ -1201,7 +1280,7 @@
     function promptAddFrame() {
         const percent = prompt(PreviewConfig.i18n.enterFramePercent, '50');
         if (percent !== null) {
-            const percentNum = parseInt(percent, 10);
+            const percentNum = parseFloat(percent);
             if (!isNaN(percentNum) && percentNum >= 0 && percentNum <= 100) {
                 if (keyframeFrames.find(f => f.percent === percentNum)) {
                     showToast(PreviewConfig.i18n.frameExists, 'warning');

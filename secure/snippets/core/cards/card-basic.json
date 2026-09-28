@@ -53,5 +53,9 @@
       "snippet.card.button": "En savoir plus"
     }
   },
+  "selectors": {
+    "classes": ["qs-snippet-card", "qs-snippet-card-img", "qs-snippet-card-body", "qs-snippet-card-title", "qs-snippet-card-text", "qs-snippet-btn", "qs-snippet-btn-primary"],
+    "ids": []
+  },
   "css": ".qs-snippet-card { max-width: 350px; background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); overflow: hidden; } .qs-snippet-card-img { width: 100%; height: auto; display: block; } .qs-snippet-card-body { padding: 1.5rem; } .qs-snippet-card-title { margin: 0 0 0.75rem; color: #333; } .qs-snippet-card-text { margin: 0 0 1rem; color: #666; line-height: 1.5; } .qs-snippet-btn { display: inline-block; padding: 0.5rem 1rem; border: none; border-radius: 4px; font-size: 0.9rem; text-decoration: none; cursor: pointer; } .qs-snippet-btn-primary { background: #007bff; color: #fff; } .qs-snippet-btn-primary:hover { background: #0056b3; }"
 }
