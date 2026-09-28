@@ -91,6 +91,7 @@ secure/management/config/quota.php
 secure/management/config/console.php
 secure/management/config/embed-policy.json
 secure/management/config/languages.json
+secure/management/config/default-language.php
 
 # Login/registration/upload-throttle runtime state - machine-written JSON
 # (auto-created; hashed-key backoff counters) plus flock sidecars and

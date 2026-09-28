@@ -12,7 +12,8 @@
  * @param string $name Project name (required)
  * @param string $site_name Display name for the site (optional)
  * @param string $language The project's first language: a code from the
- *                         installation's language list (optional, default: en)
+ *                         installation's language list (optional, default: the
+ *                         installation's default language, qs_language_default())
  * @param bool $switch_to Make the new project the CREATOR's editing target
  *                        (their per-user selected_project) after creation
  *                        (optional, default: false). Never changes the served
@@ -74,7 +75,7 @@ function __command_createProject(array $params = [], array $urlParams = []): Api
     // UTF-8-safe: control bytes never occur inside a multibyte sequence. Display
     // titles keep spaces / punctuation / accents — no strict format enforced.
     $siteName = preg_replace('/[\x00-\x1F\x7F]/', '', $siteName);
-    $defaultLang = trim(qs_param_string($params, 'language', 'en'));
+    $defaultLang = trim(qs_param_string($params, 'language') ?? qs_language_default());
     $switchTo = filter_var($params['switch_to'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
     // The project's first language is a NEW language: a code from the

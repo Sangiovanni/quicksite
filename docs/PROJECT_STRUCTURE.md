@@ -41,6 +41,9 @@ quicksite/
 │   │   │   ├── quota.php         # Per-account storage ceiling and upload rate (gitignored; optional, ABSENT MEANS NO LIMIT)
 │   │   │   ├── console.php       # Is the /admin/command console offered here (optional; ABSENT MEANS OFFERED)
 │   │   │   ├── import-policy.php # Archive import + publish allowlists and archive size limits (gitignored; optional, built-in defaults apply without it)
+│   │   │   ├── languages.json    # The installation's language list, {"code": "name"} — the languages a project may start in or add, and their names (gitignored; optional, ABSENT MEANS the shipped languages.json.example is the list)
+│   │   │   ├── languages.NOTICE.txt # The Unicode License v3 notice the shipped list's language names are used under (tracked, beside languages.json.example)
+│   │   │   ├── default-language.php # The language a new project starts in when none is chosen (gitignored; optional, ABSENT MEANS en)
 │   │   │   └── embed-policy.json # Install-wide iframe embed sandbox policy — which hosts a project's <iframe> may embed (gitignored; created from .example by setup, then by hand)
 │   │   └── routes.php            # Command whitelist
 │   ├── admin/                    # Admin panel backend

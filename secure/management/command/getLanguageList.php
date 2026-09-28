@@ -4,7 +4,8 @@ require_once SECURE_FOLDER_PATH . '/src/functions/languageRegistry.php';
 
 /**
  * getLanguageList - Returns the installation's language list: every language
- * a project can add, each with its name.
+ * a project can add, each with its name — and the installation's default
+ * language, the one a new project starts in when none is chosen.
  *
  * Unlike getLangList (which returns the project's configured languages),
  * this returns the list itself. It belongs to the installation, not to a
@@ -35,7 +36,8 @@ function __command_getLanguageList(array $params = [], array $urlParams = []): A
     return ApiResponse::create(200, 'operation.success')
         ->withMessage('Language list retrieved successfully')
         ->withData([
-            'languages' => $languages
+            'languages' => $languages,
+            'default_language' => qs_language_default()
         ]);
 }
 

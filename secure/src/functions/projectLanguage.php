@@ -81,7 +81,9 @@ function qs_project_languages(): array
  * The project's configured fallback language.
  *
  * Never empty: a project with no LANGUAGE_DEFAULT still has to name a
- * translation file, and 'en' is the code createProject seeds.
+ * translation file, so it falls back to 'en', QuickSite's shipped default
+ * language — not the installation's own default, which a built site cannot
+ * read: a build carries no installation config.
  */
 function qs_project_default_language(): string
 {

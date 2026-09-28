@@ -24,9 +24,10 @@ REM   6. Setup token          - read the first-run credential off disk
 REM   7. Storage quotas       - per-account size and upload-rate ceilings
 REM   8. Self-deploy          - may this install write a built site onto a path?
 REM   9. Command console      - offer the raw command runner at /admin/command?
+REM  10. Default language     - the language a new project starts in
 REM
 REM Items 1-3 rewrite init.php constants and the .htaccess routing. Items 4-5
-REM and 7-9 write config files under the secure folder. Item 6 only reads.
+REM and 7-10 write config files under the secure folder. Item 6 only reads.
 REM
 REM WHAT THIS SCRIPT CANNOT DO: create your account. No account exists yet, so
 REM there is nobody to be one. That happens in the browser at /admin/, and the
@@ -108,6 +109,7 @@ echo   Self-registration:  !SELFREG_LABEL!
 echo   Storage quotas:     !QUOTA_LABEL!
 echo   Self-deploy:        !DEPLOY_LABEL!
 echo   Command console:    !CONSOLE_LABEL!
+echo   Default language:   !DEFLANG_LABEL!
 echo.
 echo     1^) Rename the public folder
 echo     2^) Rename the secure folder
@@ -118,6 +120,7 @@ echo     6^) Show my setup token
 echo     7^) Storage quotas (per user)
 echo     8^) Allow / forbid deploying from this install
 echo     9^) Offer / withhold the command console ^(/admin/command^)
+echo    10^) Default language for new projects
 echo     q^) Finish
 echo.
 set "CHOICE="
@@ -132,6 +135,7 @@ if "!CHOICE!"=="6" goto :go_token
 if "!CHOICE!"=="7" goto :go_quota
 if "!CHOICE!"=="8" goto :go_deploy
 if "!CHOICE!"=="9" goto :go_console
+if "!CHOICE!"=="10" goto :go_deflang
 if /i "!CHOICE!"=="q" goto :finish
 if "!CHOICE!"=="" goto :finish
 echo   Unknown choice: !CHOICE!
@@ -186,6 +190,11 @@ call :item_console
 call :pause_menu
 goto :menu
 
+:go_deflang
+call :item_deflang
+call :pause_menu
+goto :menu
+
 REM ==========================================================
 REM Finish
 REM ==========================================================
@@ -205,6 +214,7 @@ echo   Self-registration:  !SELFREG_LABEL!
 echo   Storage quotas:     !QUOTA_LABEL!
 echo   Self-deploy:        !DEPLOY_LABEL!
 echo   Command console:    !CONSOLE_LABEL!
+echo   Default language:   !DEFLANG_LABEL!
 echo.
 echo   Next steps:
 echo     1. Point your vhost DocumentRoot at the public folder
@@ -406,7 +416,54 @@ if exist "!CONSOLE_FILE!" (
     findstr /c:"    'allow_console' => false," "!CONSOLE_FILE!" >nul 2>&1 && set "CONSOLE_LABEL=off  (/admin/command is not offered)"
     findstr /c:"    'allow_console' => true," "!CONSOLE_FILE!" >nul 2>&1 && set "CONSOLE_LABEL=on"
 )
+
+REM The default language for new projects. ABSENT MEANS 'en', and so does a
+REM file the engine cannot use - broken, or naming a code the language list
+REM does not hold. The label says which of the two, because a file somebody
+REM wrote that the engine ignores is worth a look (the engine logs why).
+REM The list is the installation's own languages.json when it has made one,
+REM the shipped list otherwise. (The engine also falls back to the shipped list
+REM when the own copy is not JSON; findstr cannot tell, so that is the one case
+REM where the two disagree.)
+set "DEFLANG_FILE=!CONFIG_DIR!\default-language.php"
+set "LANGLIST_FILE=!CONFIG_DIR!\languages.json.example"
+if exist "!CONFIG_DIR!\languages.json" set "LANGLIST_FILE=!CONFIG_DIR!\languages.json"
+set "DEFLANG_EFFECTIVE=en"
+set "DEFLANG_LABEL=en   (default - default-language.php not created yet)"
+if exist "!DEFLANG_FILE!" call :deflang_read
 goto :eof
+
+REM The code default-language.php names, when it is one the list holds. The
+REM pattern writes the quotes around the key as '.', so no single quote reaches
+REM the for /f command line, and it is anchored at the start of the line so the
+REM file's own comments - which talk about the setting - never match.
+:deflang_read
+set "DEFLANG_LABEL=en   (value unusable - check default-language.php)"
+set "DL_CODE="
+for /f "tokens=4 delims='" %%a in ('findstr /r /c:"^ *.default_language. *=> *.[a-z]*.," "!DEFLANG_FILE!" 2^>nul') do if not defined DL_CODE set "DL_CODE=%%a"
+if not defined DL_CODE goto :eof
+call :deflang_listed
+if errorlevel 1 goto :eof
+set "DEFLANG_LABEL=!DL_CODE!"
+set "DEFLANG_EFFECTIVE=!DL_CODE!"
+goto :eof
+
+REM errorlevel 0 when DL_CODE is a code in the language list: two or three
+REM lowercase letters (the engine's own rule, spelled letter by letter because
+REM findstr's [a-z] also matches most capitals), then a key of the list. The
+REM value is passed in a variable, never as a call argument: call parses its
+REM arguments a second time, and an & typed at the prompt would run.
+:deflang_listed
+set "DL_TMP=%TEMP%\qs_setup_deflang.txt"
+> "!DL_TMP!" echo(!DL_CODE!
+findstr /r /x /c:"[abcdefghijklmnopqrstuvwxyz][abcdefghijklmnopqrstuvwxyz]" /c:"[abcdefghijklmnopqrstuvwxyz][abcdefghijklmnopqrstuvwxyz][abcdefghijklmnopqrstuvwxyz]" "!DL_TMP!" >nul 2>&1
+set "DL_SHAPE=!errorlevel!"
+del "!DL_TMP!" 2>nul
+if not "!DL_SHAPE!"=="0" exit /b 1
+if not exist "!LANGLIST_FILE!" exit /b 1
+findstr /r /c:"\"!DL_CODE!\" *:" "!LANGLIST_FILE!" >nul 2>&1
+if errorlevel 1 exit /b 1
+exit /b 0
 
 REM A line-oriented "press Enter", not `pause`. `pause` consumes a single
 REM CHARACTER, so on a redirected stdin it splits a line in half and the menu
@@ -1145,6 +1202,102 @@ if /i "!CON_VALUE!"=="false" (
 ) else (
     echo   + Command console: on
 )
+goto :eof
+
+REM ==========================================================
+REM Item 10 - the default language for new projects
+REM ==========================================================
+REM The language a NEW project starts in when nobody chooses one: createProject's
+REM default, what the panel's New Project dialog preselects, and what an
+REM imported archive that lists no language gets. A project that exists never
+REM reads it.
+REM
+REM A free-text value, so Enter KEEPS what is there (items 1-3's rule), rather
+REM than resetting to the shipped default the way the yes/no items do.
+REM
+REM ABSENT MEANS 'en', and choosing 'en' when no file exists LEAVES IT ABSENT -
+REM item 9's rule: a file that says what the default already is would read as
+REM a decision somebody made. A code that is not in the language list is
+REM refused here and nothing is written: the engine would ignore it (and log
+REM why) anyway.
+:item_deflang
+call :read_state
+echo.
+echo Default language for new projects
+echo.
+echo   The language a new project starts in when nobody chooses one. The
+echo   admin panel's New Project dialog preselects it, and an imported
+echo   project whose archive lists no language gets it. Projects that
+echo   already exist keep their languages.
+echo.
+echo   Currently: !DEFLANG_LABEL!
+echo.
+echo   Type a code from this installation's language list, lowercase as the
+echo   list writes it: en, fr, es, de, pt, zh, ja, fil... The list is
+echo     !LANGLIST_FILE!
+echo.
+
+set "DL_ANSWER="
+set /p "DL_ANSWER=  Language code (Enter keeps !DEFLANG_EFFECTIVE!): "
+if defined DL_ANSWER set "DL_ANSWER=!DL_ANSWER: =!"
+if not defined DL_ANSWER (
+    echo   Unchanged.
+    goto :eof
+)
+
+if not exist "!CONFIG_DIR!" (
+    echo   X Error: config folder not found: !CONFIG_DIR!
+    goto :eof
+)
+
+set "DL_CODE=!DL_ANSWER!"
+call :deflang_listed
+if errorlevel 1 (
+    echo   X '!DL_ANSWER!' is not a code in this installation's language list.
+    echo     Nothing was written.
+    goto :eof
+)
+
+if "!DL_ANSWER!"=="en" if not exist "!DEFLANG_FILE!" (
+    echo.
+    echo   + Default language stays en - default-language.php left absent,
+    echo     which is what a fresh install has.
+    goto :eof
+)
+
+REM default-language.php.example is the shipped documentation and is never
+REM edited: the live file is a COPY with the value patched, so every
+REM explanatory comment survives into the file the operator will read later.
+if not exist "!DEFLANG_FILE!" (
+    if not exist "!CONFIG_DIR!\default-language.php.example" (
+        echo   X Error: neither default-language.php nor default-language.php.example is present
+        echo     !CONFIG_DIR!
+        goto :eof
+    )
+    copy /y "!CONFIG_DIR!\default-language.php.example" "!DEFLANG_FILE!" >nul
+)
+
+REM Anchored to the start of a line ((?m)^), so a commented-out line in the
+REM operator's own file is left alone. -Encoding UTF8 is load-bearing - see
+REM item 9.
+set "PS_DL_TEMP=%TEMP%\qs_setup_deflang.ps1"
+echo $f = '!DEFLANG_FILE!' > "%PS_DL_TEMP%"
+echo $v = '!DL_ANSWER!' >> "%PS_DL_TEMP%"
+echo $c = Get-Content $f -Raw -Encoding UTF8 >> "%PS_DL_TEMP%"
+echo $c = $c -replace "(?m)^( *)'default_language'\s*=>\s*'[^']*',", ('$1' + "'default_language' => '" + $v + "',") >> "%PS_DL_TEMP%"
+echo [IO.File]::WriteAllText($f, $c, (New-Object System.Text.UTF8Encoding $false)) >> "%PS_DL_TEMP%"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%PS_DL_TEMP%" <nul >nul 2>&1
+del "%PS_DL_TEMP%" 2>nul
+
+call :read_state
+if not "!DEFLANG_EFFECTIVE!"=="!DL_ANSWER!" (
+    echo   X Could not set the value automatically.
+    echo     Edit this file by hand and set 'default_language' =^> '!DL_ANSWER!':
+    echo     !DEFLANG_FILE!
+    goto :eof
+)
+echo   + Default language for new projects: !DL_ANSWER!
+echo     Only projects created from now on start in it.
 goto :eof
 
 REM ==========================================================

@@ -12228,3 +12228,70 @@ and `setRootVariables` under `secure/management/command/`;
 `public/admin/assets/js/pages/preview/preview-style-motion.js`; `secure/snippets/core/`.
 Behaviour: the `help` entries of the three commands, [ADMIN_PANEL.md](ADMIN_PANEL.md) §8.11 and
 §9.17.
+
+### A new project starts in the installation's default language (locked 2026-09-28)
+
+**Decision**: the installation has one default language for new projects, and every place that
+gives a new project a language uses it.
+
+- **One setting, in the installation's configuration.** `<secure>/management/config/default-language.php`
+  returns `['default_language' => '<code>']`; `default-language.php.example` ships beside it and
+  documents it, and the live file is gitignored. Without the file the default is `en`, as QuickSite
+  ships. The operator sets it in that file, or with menu item 10 of `setup.sh` / `setup.bat`, which
+  checks the code against the language list and writes no file for `en`. The first-run form in the
+  browser asks nothing. No command and no panel control writes it.
+- **It must be a code in the installation's language list.** When the file is present but cannot
+  be used — unreadable, a syntax error, not PHP, the wrong shape, a missing key, a value that is not
+  a string, a code the list does not hold — the default is `en` too, and the reason is written to
+  the PHP error log. The file is read fresh by every request that asks, its compiled copy dropped
+  from the opcode cache first, so a change takes effect on the next request.
+- **It is used wherever a new project is given a language:** `createProject` when the request names
+  none; the admin panel's New Project dialog and the command console's `createProject` form, which
+  preselect it; and an imported archive that lists no language — no `LANGUAGES_SUPPORTED` in its
+  `config.json`, or no `config.json` at all — which gets it as its only language and its default. A
+  `LANGUAGE_DEFAULT` such an archive names must then be that language. `getLanguageList` returns the
+  default beside the list, which is how the panel reads it.
+- **`help` names the rule, never the value.** `createProject`'s default reads "the installation's
+  default language (getLanguageList returns it)", and `help` answers the same whatever the setting
+  says.
+- **Nothing that already exists reads it.** A project keeps its languages. A project whose
+  configuration names no default language still falls back to `en`, because a built site carries
+  no installation configuration to read. No project is migrated.
+
+**Reasoning**: every new project started in English, whatever the installation was for. An
+installation whose authors write in French had to say so every time: in the New Project dialog,
+in the console, in each call to `createProject` — and an archive without languages became an
+English project without anyone choosing it. Which language a new project starts in is a decision
+about the installation, like its language list, so it is made in the installation's configuration,
+by the operator, and nothing a signed-in user does changes it.
+
+It has a file of its own rather than a place in the language list. The list's own copy replaces the
+shipped list whole, so a default kept in it would oblige an operator who only wants a different
+default to copy all of the list's languages, and the installation would then stop following the
+shipped list as it changes. In the list a key beginning with `_` is a comment, and a copy that does
+not parse is dropped whole, which would take the default with it. One value that an operator
+changes and only the engine reads is the kind of configuration QuickSite keeps as PHP, like the
+environment and the console switch; the language list is JSON because an installation extends it.
+
+Every failure gives `en`, following the environment setting's policy: a typo in a configuration
+file must not stop anyone creating a project, and this setting guards nothing — a wrong default is a
+project that starts in a language it can change. The operator learns of it from the error log.
+
+**Alternatives considered**: the default inside the language list (rejected — above). A JSON file
+(not taken — no operator extends a single value, and a PHP file reads like its neighbours). Falling
+back to the list's first language (rejected — the shipped list is in code order, so its first
+language is Afar, and an operator who re-sorted a copy would change the default without meaning
+to). Refusing to create a project while the setting is broken (rejected — no neighbouring
+configuration file fails that way, and one typo would block every author). Asking for it on the
+first-run form (not taken — the operator sets it in the file, and the setup menu offers it). Having
+the shipped workflows' language fields follow it (not taken — those workflows rebuild a project
+that already exists, whose own language is the natural default).
+
+**Source**: Sangio's ruling of 2026-09-27 ("do it now, not after v1") and his answers of 2026-09-28,
+during beta.12 — its own PHP file, `en` on every failure with the reason logged, the setup menu item.
+`secure/src/functions/languageRegistry.php` (`qs_language_default()`);
+`secure/management/config/default-language.php.example`; `createProject`, `importProject` and
+`getLanguageList` under `secure/management/command/`; `secure/src/functions/projectSettings.php`;
+`public/admin/assets/js/pages/dashboard.js` and `command-form.js`; `setup.sh` and `setup.bat`.
+Behaviour: the `help` entries of those three commands, [ADMIN_PANEL.md](ADMIN_PANEL.md) §9 and
+[PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md).

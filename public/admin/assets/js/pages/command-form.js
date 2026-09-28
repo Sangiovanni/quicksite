@@ -507,8 +507,10 @@ const FIELD_PICKERS = {
 
     // --- Language: a NEW one, from the installation's language list --------
     // addLang leaves out the languages the project already has (it answers 409).
+    // createProject preselects the installation's default language, the one the
+    // command uses when none is sent.
     addLang:            { kind: 'language', param: 'code', source: 'list', exclude: 'project' },
-    createProject:      { kind: 'language', param: 'language', source: 'list' },
+    createProject:      { kind: 'language', param: 'language', source: 'list', preselect: 'default' },
 
     // --- the parameter is a page OR a component, per its type field -------
     //
@@ -949,7 +951,6 @@ function _swapForSelect(form, paramName) {
     const select = QSDom.el('select', { name: paramName, class: 'admin-select' });
     if (input.required) select.required = true;
     if (input.dataset.urlParam !== undefined) select.dataset.urlParam = '';
-    if (input.dataset.default !== undefined) select.dataset.default = input.dataset.default;
     input.replaceWith(select);
     return select;
 }
@@ -1055,11 +1056,13 @@ async function _initSnippetSelect(form, cfg) {
  *   cfg.source 'project' the project's own languages (getLangList), for a field
  *                        that names one it HAS. cfg.exclude 'default' leaves out
  *                        the project's default language.
+ *   cfg.preselect 'default' preselects the installation's default language
+ *                        (getLanguageList's default_language) when it is offered:
+ *                        the language a NEW project starts in when none is sent,
+ *                        so the form shows what the command would use anyway.
  *
- * The field's documented default (data-default, set by renderFormField) is
- * preselected when it is offered, so the form shows what the command would use
- * anyway. The options are read again after the command succeeds: a language was
- * just added or removed, and the list must not offer it the wrong way round.
+ * The options are read again after the command succeeds: a language was just
+ * added or removed, and the list must not offer it the wrong way round.
  *
  * @param {HTMLFormElement} form
  * @param {Object} cfg  a FIELD_PICKERS row
@@ -1073,16 +1076,15 @@ async function _initLanguagePicker(form, cfg) {
     _makeSearchable(select, placeholder);
 
     const load = async () => {
-        let rows = [];
+        let offer = { rows: [], preferred: null };
         try {
-            rows = await _languageRows(cfg);
+            offer = await _languageRows(cfg);
         } catch (error) {
-            rows = []; // the placeholder stands; the field is still submittable
+            // the placeholder stands; the field is still submittable
         }
-        _fillSelect(select, rows, placeholder);
-        const preferred = select.dataset.default;
-        if (preferred && rows.some(r => r.value === preferred)) {
-            select.value = preferred;
+        _fillSelect(select, offer.rows, placeholder);
+        if (offer.preferred && offer.rows.some(r => r.value === offer.preferred)) {
+            select.value = offer.preferred;
             _syncPicker(select);
         }
     };
@@ -1096,10 +1098,11 @@ async function _initLanguagePicker(form, cfg) {
 }
 
 /**
- * The {value, label} rows a language picker offers, per its FIELD_PICKERS row.
+ * What a language picker offers, per its FIELD_PICKERS row: the {value, label}
+ * rows, and the code to preselect (null when the row asks for none).
  *
  * @param {Object} cfg
- * @returns {Promise<Array<{value: string, label: string}>>}
+ * @returns {Promise<{rows: Array<{value: string, label: string}>, preferred: ?string}>}
  */
 async function _languageRows(cfg) {
     const read = async (command) => {
@@ -1114,16 +1117,22 @@ async function _languageRows(cfg) {
 
     if (cfg.source === 'project') {
         const names = project.language_names || {};
-        return projectCodes
-            .filter(code => !(cfg.exclude === 'default' && code === project.default_language))
-            .map(code => ({ value: code, label: label(names[code], code) }));
+        return {
+            rows: projectCodes
+                .filter(code => !(cfg.exclude === 'default' && code === project.default_language))
+                .map(code => ({ value: code, label: label(names[code], code) })),
+            preferred: null
+        };
     }
 
     const list = await read('getLanguageList');
     const languages = Array.isArray(list.languages) ? list.languages : [];
-    return languages
-        .filter(l => !(cfg.exclude === 'project' && projectCodes.includes(l.code)))
-        .map(l => ({ value: l.code, label: label(l.name, l.code) }));
+    return {
+        rows: languages
+            .filter(l => !(cfg.exclude === 'project' && projectCodes.includes(l.code)))
+            .map(l => ({ value: l.code, label: label(l.name, l.code) })),
+        preferred: (cfg.preselect === 'default' && typeof list.default_language === 'string') ? list.default_language : null
+    };
 }
 
 /**
@@ -4951,10 +4960,6 @@ function renderFormField(rawName, param, required) {
         const props = Object.assign({ name: name, id: inputId }, extra || {});
         if (required) props.required = 'required';
         if (isUrlParam) props['data-url-param'] = '';
-        // A picker that replaces this input preselects it (see _initLanguagePicker).
-        if (typeof param.default === 'string' || typeof param.default === 'number') {
-            props['data-default'] = String(param.default);
-        }
         return props;
     }
 

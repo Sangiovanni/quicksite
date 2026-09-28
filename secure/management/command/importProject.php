@@ -904,7 +904,8 @@ function importFirstInvalidComponentReference(string $relativePath, string $cont
  * in projectSettings.php. And every language the archive brings must be in this
  * installation's language list, as a language addLang adds must be: an import
  * adds languages to the installation's projects. When the archive lists no
- * languages, the rebuild gives the project ['en'], which is then the list checked.
+ * languages, the rebuild gives the project the installation's default language
+ * (qs_language_default()), which is then the list checked.
  *
  * A setting that is absent (or null) is not checked: the rebuild gives it its
  * default. A key that is not a setting is not imported, so it is not checked
@@ -917,8 +918,16 @@ function importFirstInvalidSetting(array $config): ?array {
     if ($bad !== null) {
         return $bad;
     }
-    $languages = isset($config['LANGUAGES_SUPPORTED']) ? $config['LANGUAGES_SUPPORTED'] : ['en'];
-    foreach ($languages as $code) {
+    if (!isset($config['LANGUAGES_SUPPORTED'])) {
+        // The default comes from the installation's own setting, which is 'en'
+        // whenever that setting cannot be used, so it can only fail here when
+        // the installation's list leaves 'en' out.
+        $default = qs_language_default();
+        return qs_language_is_listed($default) ? null
+            : ['key' => 'LANGUAGES_SUPPORTED',
+               'message' => "The archive lists no language, and this installation's default language '{$default}' is not in its language list."];
+    }
+    foreach ($config['LANGUAGES_SUPPORTED'] as $code) {
         if (!qs_language_is_listed($code)) {
             // The setting's rule has already made every entry 2 or 3 lowercase
             // letters, so the code is safe to name.
@@ -1087,15 +1096,18 @@ function rebuildPhpFromJson(string $projectPath): array {
             }
         }
         
-        // Set defaults for required keys
+        // Set defaults for required keys. An archive that lists no language gets
+        // the installation's default language. A list the archive does bring has
+        // passed its setting's rule in the archive gate — a non-empty list — so
+        // its first language is always there to be the default.
         if (!isset($validConfig['SITE_NAME'])) {
             $validConfig['SITE_NAME'] = basename($projectPath);
         }
         if (!isset($validConfig['LANGUAGES_SUPPORTED'])) {
-            $validConfig['LANGUAGES_SUPPORTED'] = ['en'];
+            $validConfig['LANGUAGES_SUPPORTED'] = [qs_language_default()];
         }
         if (!isset($validConfig['LANGUAGE_DEFAULT'])) {
-            $validConfig['LANGUAGE_DEFAULT'] = $validConfig['LANGUAGES_SUPPORTED'][0] ?? 'en';
+            $validConfig['LANGUAGE_DEFAULT'] = $validConfig['LANGUAGES_SUPPORTED'][0];
         }
         if (!isset($validConfig['MULTILINGUAL_SUPPORT'])) {
             $validConfig['MULTILINGUAL_SUPPORT'] = false;
@@ -1112,11 +1124,13 @@ function rebuildPhpFromJson(string $projectPath): array {
         // Remove config.json after successful rebuild
         unlink($configJsonPath);
     } else {
-        // Create default config if no config.json
+        // Create default config if no config.json: the project starts in the
+        // installation's default language, as a new project does.
+        $defaultLanguage = qs_language_default();
         $defaultConfig = [
             'SITE_NAME' => basename($projectPath),
-            'LANGUAGES_SUPPORTED' => ['en'],
-            'LANGUAGE_DEFAULT' => 'en',
+            'LANGUAGES_SUPPORTED' => [$defaultLanguage],
+            'LANGUAGE_DEFAULT' => $defaultLanguage,
             'MULTILINGUAL_SUPPORT' => false
         ];
         $configPhp = "<?php\n/**\n * Site Configuration (default)\n * Created on import: " . date('Y-m-d H:i:s') . "\n */\n\nreturn " . var_export($defaultConfig, true) . ";\n";

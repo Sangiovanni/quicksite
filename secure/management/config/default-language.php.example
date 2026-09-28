@@ -1,0 +1,40 @@
+<?php
+/**
+ * Default language for new projects
+ *
+ * Copy this file to default-language.php and set default_language (the line at
+ * the bottom) to change the language a NEW project starts in on this
+ * installation. `setup.sh` / `setup.bat` offer it as menu item 10.
+ *
+ * IF THIS FILE IS ABSENT, THE DEFAULT IS 'en'. You only need it to choose
+ * another language.
+ *
+ * WHAT IT GOVERNS — a new project, and nothing else:
+ *   - createProject, when the request names no language;
+ *   - the admin panel's New Project dialog and the command console's
+ *     createProject form, which preselect it;
+ *   - importProject, for an archive that lists no language.
+ * A project that already exists keeps its languages: changing this changes no
+ * project. A built site never reads it either — a build carries no
+ * installation config.
+ *
+ * THE VALUE is a language code from this installation's language list:
+ * languages.json beside this file when the installation has made one, and the
+ * shipped languages.json.example otherwise. getLanguageList returns the list,
+ * and this default beside it. Write the code exactly as the list does: 'fr',
+ * not 'FR' or 'fr-FR'.
+ *
+ * WHAT A BROKEN FILE MEANS: 'en'. An unreadable file, a syntax error, a file
+ * that is not PHP, a wrong shape, a missing key, a value that is not a string,
+ * and a code the language list does not hold all give 'en', and the reason is
+ * written to the PHP error log rather than taking the request down. If your own
+ * language list leaves 'en' out, set a code it holds here: with none, a
+ * createProject that names no language is refused.
+ *
+ * A change takes effect on the next request: the file is read fresh each time,
+ * with its cached compiled copy dropped first.
+ */
+
+return [
+    'default_language' => 'en',
+];

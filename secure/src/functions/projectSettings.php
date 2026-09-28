@@ -32,6 +32,7 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/filePolicy.php'; // qs_favicon_extensions
+require_once SECURE_FOLDER_PATH . '/src/functions/languageRegistry.php'; // qs_language_default
 
 const QS_PROJECT_SETTING_KEYS = [
     'SITE_NAME',
@@ -49,8 +50,8 @@ const QS_PROJECT_SETTING_KEYS = [
  * Why $value cannot be setting $key, or null when it can.
  *
  * @param array $settings the settings it is written beside: LANGUAGE_DEFAULT must be listed in
- *                        their LANGUAGES_SUPPORTED (['en'] when they have none, the list a
- *                        rebuilt config then gets)
+ *                        their LANGUAGES_SUPPORTED (the installation's default language when they
+ *                        have none — the list the import's rebuild then gives the project)
  */
 function qs_project_setting_error(string $key, $value, array $settings = []): ?string
 {
@@ -70,7 +71,7 @@ function qs_project_setting_error(string $key, $value, array $settings = []): ?s
                 : "LANGUAGES_SUPPORTED must be a list of distinct language codes ({$codeRule}), not empty.";
 
         case 'LANGUAGE_DEFAULT':
-            $list = $settings['LANGUAGES_SUPPORTED'] ?? ['en'];
+            $list = $settings['LANGUAGES_SUPPORTED'] ?? [qs_language_default()];
             return (is_string($value) && RegexPatterns::match('language_code', $value)
                     && is_array($list) && in_array($value, $list, true))
                 ? null

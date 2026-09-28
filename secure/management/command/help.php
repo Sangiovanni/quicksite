@@ -1238,7 +1238,7 @@ $GLOBALS['__help_commands'] = [
     ],
 
     'getLanguageList' => [
-        'description' => 'Returns the installation\'s language list: every language a project can add, with its name. It belongs to the installation, not to a project, so it is called without a project marker — for the languages a project has, use getLangList.',
+        'description' => 'Returns the installation\'s language list: every language a project can add, with its name — and the installation\'s default language, the one a new project starts in when none is chosen. It belongs to the installation, not to a project, so it is called without a project marker — for the languages a project has, use getLangList.',
         'method' => 'GET',
         'url_structure' => '/management/getLanguageList',
         'parameters' => [],
@@ -1253,11 +1253,12 @@ $GLOBALS['__help_commands'] = [
                     ['code' => 'fr', 'name' => 'Français'],
                     ['code' => 'es', 'name' => 'Español'],
                     '... one entry per language in the list'
-                ]
+                ],
+                'default_language' => 'en'
             ]
         ],
         'error_responses' => [],
-        'notes' => 'The list belongs to the installation: <secure>/management/config/languages.json when the installation has made its own copy of the shipped languages.json.example beside it, and the shipped list otherwise — so two installations can answer differently, and nothing a project does changes it. The shipped list holds every ISO 639-1 language and the most widely used languages that have only a three-letter code. Each entry has a "code" — an ISO 639 code as BCP 47 writes it: two letters, or three when the language has no two-letter code — and a "name", the language\'s own name (e.g. "Français", "日本語"), which is what QuickSite shows for that language everywhere. A NEW language must be in the list: createProject, addLang and importProject refuse a code it does not hold. Pair it with getLangList to show which of them a project already has.'
+        'notes' => 'The list belongs to the installation: <secure>/management/config/languages.json when the installation has made its own copy of the shipped languages.json.example beside it, and the shipped list otherwise — so two installations can answer differently, and nothing a project does changes it. The shipped list holds every ISO 639-1 language and the most widely used languages that have only a three-letter code. Each entry has a "code" — an ISO 639 code as BCP 47 writes it: two letters, or three when the language has no two-letter code — and a "name", the language\'s own name (e.g. "Français", "日本語"), which is what QuickSite shows for that language everywhere. A NEW language must be in the list: createProject, addLang and importProject refuse a code it does not hold. Pair it with getLangList to show which of them a project already has. "default_language" is the installation\'s default language: the language a new project starts in when none is chosen — createProject\'s default, the one the admin panel preselects for a new project, and the language an imported archive gets when it lists none. The operator sets it in <secure>/management/config/default-language.php (the shipped default-language.php.example documents it, and setup.sh / setup.bat offer it). It is en when that file is absent, and also when the file cannot be used — unreadable, broken, or naming a code the list does not hold — which is written to the PHP error log. A project that already exists never reads it.'
     ],
     
     'setMultilingual' => [
@@ -3611,7 +3612,7 @@ $GLOBALS['__help_commands'] = [
                 'required' => false,
                 'type' => 'string',
                 'description' => 'The project\'s first language, which becomes its default',
-                'default' => 'en',
+                'default' => 'The installation\'s default language (getLanguageList returns it)',
                 'validation' => 'A code in the installation\'s language list (getLanguageList returns it)'
             ],
             'switch_to' => [
@@ -4341,6 +4342,7 @@ $GLOBALS['__help_commands'] = [
             'A refused entry is skipped and listed in security.skipped_disallowed with the reason, and the rest of the archive still imports — except an entry whose name is not a clean path, a file the site reads and a stylesheet, which refuse the whole archive (next notes). security.skipped_unsafe lists entries whose folder the filesystem would not create.',
             'Every entry in the project folder must have a clean relative path as its name: not absolute, no empty segment (two slashes in a row), no . or .. segment, no segment ending in a dot or a space. One that does not refuses the WHOLE archive with 400 and nothing is created, because another spelling of a path can land on a real file without being recognised as it. Entries outside the project folder are ignored.',
             'The files the site reads are checked before the project is created: config.json and routes.json at the project root, any .json file under config/, translate/ or data/, and every structure file — any .json file under templates/model/json/ or snippets/. Each must be readable, parse as a JSON array or object and pass the content check, and a structure file must also carry no unsafe attribute, blocked tag or invalid component reference. Every setting in config.json must be a value the command that writes it would accept: every language is in this installation\'s language list (getLanguageList), the default language is one of the listed ones, the flags are true or false, the theme default is light, dark or system, the favicon is an image under /assets/images/ with a favicon extension, and the build size limit, which no command writes, is a positive whole number. Language names are not imported: a project stores codes only, and names come from the installation\'s list. The first one that fails refuses the WHOLE archive with 400 and nothing is created, because importing the rest would leave a route whose page is missing, a language showing raw keys, or settings and routes replaced by the defaults. A file at a hidden path is not one of them: the import never writes a hidden path.',
+            'An archive that lists no language — no LANGUAGES_SUPPORTED in its config.json, or no config.json at all — gets the installation\'s default language, as a new project does (getLanguageList returns it), and that language is also its default. A LANGUAGE_DEFAULT the archive names without a LANGUAGES_SUPPORTED must then be that same language, or the archive is refused like any other setting.',
             'Every stylesheet — any .css entry not at a hidden path — is checked before the project is created too. One that cannot be read, opens a PHP block, or fails the stylesheet scan every CSS writer runs (see editStyles) refuses the WHOLE archive with 400 (reason disallowed_content) and nothing is created: a project imported without its stylesheet would be a site with its styling missing, and a stylesheet the editor refuses cannot arrive by archive either.',
             'The files the site reads may show a PHP opening tag in their text — a page that displays PHP code, say. No web server serves them, and the engine writes their values into generated PHP only as string literals. Every other text file keeps the rule.',
             'Archive resource limits are enforced from the ZIP headers before anything is extracted: entry count, total and per-entry uncompressed size, and per-entry compression ratio. Exceeding any of them returns 413 and writes nothing.',

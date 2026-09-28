@@ -847,7 +847,7 @@ The AI call is browser-direct via `QSAiCall.call(...)` (see `public/admin/assets
 
 | Page | What it does |
 |---|---|
-| **Dashboard** (`dashboard.js`) | Stats cards (route count, language count, recent build), command activity feed, recent history. Calls `help`, `getRoutes`, `getCommandHistory`. |
+| **Dashboard** (`dashboard.js`) | Stats cards (route count, language count, recent build), command activity feed, recent history. Calls `help`, `getRoutes`, `getCommandHistory`. The **New Project** dialog asks for the project's name and its first language: a searchable list of the installation's languages with the installation's default language preselected, both read from `getLanguageList`. It creates the project with `createProject`. |
 | **Command** (`command.js`) | Permission-filtered command index. An installation can decline to offer the console at all — see §9.17. |
 | **Command form** (`command-form.js`) | Renders a dynamic form for any command from `help` metadata, then executes it. The escape hatch into raw API. Withheld with the rest of the console when the installation turns it off (§9.17). |
 | **History** (`history.js`) | Its own page at `/admin/history` — see §9.18. Browses `getCommandHistory` for the **currently edited project**, exports what is on screen as CSV, and clears the stored trail. The command history is per-project, so switching projects switches the trail. Actions that belong to no project (creating a project, signing out) are recorded server-side but are not shown here; see *Command history storage* in `COMMAND_API.md`. Admin and owner only. |

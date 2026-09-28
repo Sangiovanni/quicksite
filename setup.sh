@@ -25,9 +25,10 @@
 #   7. Storage quotas       — per-account size and upload-rate ceilings
 #   8. Self-deploy          — may this install write a built site onto a path?
 #   9. Command console      — offer the raw command runner at /admin/command?
+#  10. Default language     — the language a new project starts in
 #
 # Items 1-3 rewrite init.php constants and the .htaccess routing. Items 4-5 and
-# 7-9 write config files under the secure folder. Item 6 only reads.
+# 7-10 write config files under the secure folder. Item 6 only reads.
 #
 # WHAT THIS SCRIPT CANNOT DO: create your account. No account exists yet, so
 # there is nobody to be one. That happens in the browser at /admin/, and the
@@ -327,6 +328,65 @@ console_label() {
         false) echo -e "${YELLOW}off${NC}  ${DIM}(/admin/command is not offered)${NC}" ;;
         *)     echo -e "${YELLOW}off${NC}  ${DIM}(value unreadable — check console.php)${NC}" ;;
     esac
+}
+
+# The language list the engine reads: the installation's own languages.json when
+# it has made one, the shipped list otherwise. (The engine also falls back to the
+# shipped list when the own copy is not JSON; this reader does not parse JSON, so
+# it cannot tell — a broken copy is the one case where the two disagree.)
+language_list_file() {
+    local cfg_dir; cfg_dir="$(CONFIG_DIR)"
+    if [ -f "$cfg_dir/languages.json" ]; then
+        echo "$cfg_dir/languages.json"
+    else
+        echo "$cfg_dir/languages.json.example"
+    fi
+}
+
+# Is $1 a code in that list? The shape is checked first — two or three lowercase
+# letters, the engine's own rule — so the code is safe inside the grep pattern.
+# A key is matched as "code": anywhere on a line, which a minified copy also
+# satisfies; a quoted word inside the file's comments cannot match, because a
+# quote inside a JSON string is written \".
+deflang_listed() {
+    local code="$1" list
+    case "$code" in
+        [a-z][a-z]|[a-z][a-z][a-z]) ;;
+        *) return 1 ;;
+    esac
+    list="$(language_list_file)"
+    [ -f "$list" ] && grep -q "\"$code\"[[:space:]]*:" "$list"
+}
+
+# The code default-language.php names, or '' when the file has not been created
+# yet. The trailing comma in the pattern is load-bearing for the same reason it
+# is in deploy_current above.
+deflang_current() {
+    first_capture "$(CONFIG_DIR)/default-language.php" \
+        "'default_language'[[:space:]]*=>[[:space:]]*'\([a-z]*\)',"
+}
+
+# The default the engine actually uses: the file's code when it is in the list,
+# and 'en' otherwise — absent, broken, or naming a code the list does not hold.
+deflang_effective() {
+    local v; v="$(deflang_current)"
+    if [ -n "$v" ] && deflang_listed "$v"; then echo "$v"; else echo "en"; fi
+}
+
+# ABSENT MEANS 'en', and so does a file the engine cannot use. The label says
+# which of the two it is, because a file somebody wrote that the engine ignores
+# is worth a look — the engine logs why it ignored it.
+deflang_label() {
+    if [ ! -f "$(CONFIG_DIR)/default-language.php" ]; then
+        echo -e "en   ${DIM}(default — default-language.php not created yet)${NC}"
+        return
+    fi
+    local v; v="$(deflang_current)"
+    if [ -n "$v" ] && deflang_listed "$v"; then
+        echo -e "$v"
+    else
+        echo -e "en   ${YELLOW}(value unusable — check default-language.php)${NC}"
+    fi
 }
 
 # Quota is the one config whose ABSENCE is a real setting: no quota.php means
@@ -1234,6 +1294,95 @@ item_console() {
 }
 
 # ==========================================================
+# Item 10 — the default language for new projects
+# ==========================================================
+# The language a NEW project starts in when nobody chooses one: createProject's
+# default, what the panel's New Project dialog preselects, and what an imported
+# archive that lists no language gets. A project that exists never reads it.
+#
+# A free-text value, so Enter KEEPS what is there (items 1-3's rule), rather than
+# resetting to the shipped default the way the yes/no items do.
+#
+# ABSENT MEANS 'en', and choosing 'en' when no file exists LEAVES IT ABSENT —
+# item 9's rule: a file that says what the default already is would read as a
+# decision somebody made. A code that is not in the language list is refused
+# here and nothing is written: the engine would ignore it (and log why) anyway.
+item_deflang() {
+    local cfg_dir; cfg_dir="$(CONFIG_DIR)"
+    local live="$cfg_dir/default-language.php"
+    local example="$cfg_dir/default-language.php.example"
+
+    echo ""
+    echo -e "${BOLD}Default language for new projects${NC}"
+    echo ""
+    echo "  The language a new project starts in when nobody chooses one. The"
+    echo "  admin panel's New Project dialog preselects it, and an imported"
+    echo "  project whose archive lists no language gets it. Projects that"
+    echo "  already exist keep their languages."
+    echo ""
+    echo -e "  Currently: $(deflang_label)"
+    echo ""
+    echo "  Type a code from this installation's language list, lowercase as the"
+    echo "  list writes it: en, fr, es, de, pt, zh, ja, fil… The list is"
+    echo "    $(language_list_file)"
+    echo ""
+
+    local ANSWER
+    read -r -p "  Language code (Enter keeps $(deflang_effective)): " ANSWER || true
+    local VALUE="${ANSWER:-}"
+    VALUE="${VALUE//[[:space:]]/}"
+
+    if [ -z "$VALUE" ]; then
+        echo -e "  ${DIM}Unchanged.${NC}"
+        return 0
+    fi
+
+    if [ ! -d "$cfg_dir" ]; then
+        echo -e "  ${RED}✗ Error: config folder not found:${NC} $cfg_dir"
+        return 0
+    fi
+
+    if ! deflang_listed "$VALUE"; then
+        echo -e "  ${RED}✗ '$VALUE' is not a code in this installation's language list.${NC}"
+        echo "    Nothing was written."
+        return 0
+    fi
+
+    if [ "$VALUE" = "en" ] && [ ! -f "$live" ]; then
+        echo ""
+        echo -e "  ${GREEN}✓${NC} Default language stays en — default-language.php left absent,"
+        echo "    which is what a fresh install has."
+        return 0
+    fi
+
+    # default-language.php.example is the shipped documentation and is never
+    # edited: the live file is a COPY with the value patched, so every
+    # explanatory comment survives into the file the operator will read later.
+    if [ ! -f "$live" ]; then
+        if [ -f "$example" ]; then
+            cp "$example" "$live"
+        else
+            echo -e "  ${RED}✗ Error: neither default-language.php nor default-language.php.example is present${NC}"
+            echo "    $cfg_dir"
+            return 0
+        fi
+    fi
+
+    # Anchored to start-of-line so the value quoted inside the file's own
+    # comments is left alone. '#' as the delimiter — item 4 says why.
+    sed -i "s#^\( *\)'default_language'[[:space:]]*=>[[:space:]]*'[^']*',#\1'default_language' => '$VALUE',#" "$live"
+
+    if [ "$(deflang_current)" = "$VALUE" ]; then
+        echo -e "  ${GREEN}✓${NC} Default language for new projects: ${BOLD}$VALUE${NC}"
+        echo -e "  ${DIM}  Only projects created from now on start in it.${NC}"
+    else
+        echo -e "  ${RED}✗ Could not set the value automatically.${NC}"
+        echo "    Edit this file by hand and set 'default_language' => '$VALUE':"
+        echo "    $live"
+    fi
+}
+
+# ==========================================================
 # The menu
 # ==========================================================
 show_header() {
@@ -1253,6 +1402,7 @@ show_menu() {
     echo -e "  Storage quotas:     $(quota_label)"
     echo -e "  Self-deploy:        $(deploy_label)"
     echo -e "  Command console:    $(console_label)"
+    echo -e "  Default language:   $(deflang_label)"
     echo ""
     echo "    1) Rename the public folder"
     echo "    2) Rename the secure folder"
@@ -1263,6 +1413,7 @@ show_menu() {
     echo "    7) Storage quotas (per user)"
     echo "    8) Allow / forbid deploying from this install"
     echo "    9) Offer / withhold the command console (/admin/command)"
+    echo "   10) Default language for new projects"
     echo "    q) Finish"
     echo ""
 }
@@ -1291,6 +1442,7 @@ while true; do
         7) item_quota; pause_for_menu ;;
         8) item_deploy; pause_for_menu ;;
         9) item_console; pause_for_menu ;;
+        10) item_deflang; pause_for_menu ;;
         q|Q|"") break ;;
         *) echo -e "  ${RED}Unknown choice: $CHOICE${NC}" ;;
     esac
@@ -1313,6 +1465,7 @@ echo -e "  Self-registration:  $(selfreg_label)"
 echo -e "  Storage quotas:     $(quota_label)"
 echo -e "  Self-deploy:        $(deploy_label)"
 echo -e "  Command console:    $(console_label)"
+echo -e "  Default language:   $(deflang_label)"
 echo ""
 
 if [ -n "$OWNERSHIP_WARNING" ]; then

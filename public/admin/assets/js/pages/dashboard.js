@@ -1162,9 +1162,10 @@
         });
         
         // The project's first language, offered from the installation's language
-        // list. getLanguageList is global, so it answers before any project
-        // exists. Filled once, the first time the dialog opens.
-        const CREATE_PROJECT_DEFAULT_LANGUAGE = 'en'; // createProject's documented default
+        // list with the installation's default language preselected — the one
+        // createProject uses when none is sent. getLanguageList returns both, and
+        // it is global, so it answers before any project exists. Filled once, the
+        // first time the dialog opens.
         let createLanguagesLoading = null;
 
         async function fillCreateLanguageSelect() {
@@ -1173,15 +1174,16 @@
             QSDom.setSelectPlaceholder(select, select.dataset.placeholder);
             try {
                 const res = await QuickSiteAdmin.apiRequest('getLanguageList', 'GET');
-                const languages = (res && res.ok && res.data && res.data.data && res.data.data.languages) || [];
+                const data = (res && res.ok && res.data && res.data.data) || {};
+                const languages = data.languages || [];
                 languages.forEach(l => {
                     select.appendChild(QSDom.el('option', {
                         value: l.code,
                         text: (l.name && l.name !== l.code) ? l.name + ' (' + l.code + ')' : l.code
                     }));
                 });
-                if (languages.some(l => l.code === CREATE_PROJECT_DEFAULT_LANGUAGE)) {
-                    select.value = CREATE_PROJECT_DEFAULT_LANGUAGE;
+                if (languages.some(l => l.code === data.default_language)) {
+                    select.value = data.default_language;
                 }
             } catch (error) {
                 // The placeholder stands: a create sent without a language takes
