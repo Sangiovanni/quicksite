@@ -587,7 +587,7 @@ window.PreviewConfig = {
             addTransitionSelectorRequired: <?= json_encode(__admin('preview.addTransitionSelectorRequired', 'Pick a selector first')) ?>
         },
 
-        // ── Source tab (preview-style-source.js — Beta.9 A3) ──
+        // ── Source tab (preview-style-source.js) ──
         source: {
             styleSource: <?= json_encode(__admin('preview.styleSource', 'Source')) ?>,
             styleSourceHint: <?= json_encode(__admin('preview.styleSourceHint', 'Edit the full style.css source')) ?>,
@@ -610,11 +610,18 @@ window.PreviewConfig = {
             styleSourceSaved: <?= json_encode(__admin('preview.styleSourceSaved', 'style.css saved')) ?>,
             styleSourceSaveError: <?= json_encode(__admin('preview.styleSourceSaveError', 'Save failed: {error}')) ?>,
             styleSourceCancelConfirm: <?= json_encode(__admin('preview.styleSourceCancelConfirm', 'Discard unsaved changes and reload style.css from the server?')) ?>,
-            styleSourceSwitchConfirm: <?= json_encode(__admin('preview.styleSourceSwitchConfirm', 'You have unsaved Source edits. Discard them and switch?')) ?>,
+            styleSourceSwitchConfirm: <?= json_encode(__admin('preview.styleSourceSwitchConfirm')) ?>,
+            styleSourceLeaveConfirm: <?= json_encode(__admin('preview.styleSourceLeaveConfirm')) ?>,
             styleSourceRestoreTitle: <?= json_encode(__admin('preview.styleSourceRestoreTitle', 'Unsaved draft available')) ?>,
             styleSourceRestoreDetail: <?= json_encode(__admin('preview.styleSourceRestoreDetail', 'From {time}')) ?>,
+            styleSourceRestoreDetailChanged: <?= json_encode(__admin('preview.styleSourceRestoreDetailChanged')) ?>,
             styleSourceRestoreAccept: <?= json_encode(__admin('preview.styleSourceRestoreAccept', 'Restore')) ?>,
-            styleSourceRestoreDecline: <?= json_encode(__admin('preview.styleSourceRestoreDecline', 'Discard')) ?>
+            styleSourceRestoreDecline: <?= json_encode(__admin('preview.styleSourceRestoreDecline', 'Discard')) ?>,
+            styleSourceConflictStatus: <?= json_encode(__admin('preview.styleSourceConflictStatus')) ?>,
+            styleSourceConflictNotSaved: <?= json_encode(__admin('preview.styleSourceConflictNotSaved')) ?>,
+            styleSourceSavedOverChange: <?= json_encode(__admin('preview.styleSourceSavedOverChange')) ?>,
+            styleSourceCheckFailed: <?= json_encode(__admin('preview.styleSourceCheckFailed')) ?>,
+            styleSourceUnknownError: <?= json_encode(__admin('common.unknownError')) ?>
         },
 
         // ── AI tools panel (preview-ai-tools.js) ──

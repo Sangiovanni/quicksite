@@ -1,17 +1,24 @@
 /**
- * Preview — Style Source Tab (A3)
+ * Preview — Style Source view
  *
- * Hosts the full-CSS code editor. Slice 2 fetches the current style.css
- * via `getStyles` and mounts QSCodeEditor into #preview-source-canvas-mount.
- * Save / dirty / iframe injection / draft persist land in slices 4–5;
- * for now `onChange` is a no-op.
+ * UI path: the CSS tool in the sidebar → the **Source** button above the Theme / Selectors / Motion
+ * tabs. It opens the whole style.css in QSCodeEditor, mounted into #preview-source-canvas-mount; the
+ * canvas takes the preview iframe's place while Source is shown.
+ *
+ * What Source shows. It reads style.css (getStyles) every time it is opened. With no unsaved edits it
+ * shows the file as it is now. With unsaved edits on a version that has changed since — saved from the
+ * Theme, Selectors or Motion tab, another window or another person — it keeps the edits and shows the
+ * conflict notice (Reload / Overwrite). Save reads the file again first and writes the whole file
+ * (editStyles) only over the version the edits are based on; a change that lands between that read and
+ * the write is reported from the save's answer, which carries the content it replaced.
  *
  * Public API:
  *   PreviewStyleSource.init()         — wire DOM refs (called once on load)
- *   PreviewStyleSource.enter()        — Source becomes active (lazy mount)
- *   PreviewStyleSource.leave()        — Source deactivates
+ *   PreviewStyleSource.enter()        — Source becomes active (mounts on the first entry, reads the file again on every later one)
+ *   PreviewStyleSource.leave()        — Source deactivates; unsaved edits are kept
  *   PreviewStyleSource.isActive()     — current activation state
  *   PreviewStyleSource.getEditor()    — QSCodeEditor instance or null
+ *   PreviewStyleSource.isDirty() / canLeave() / save() / cancel()
  */
 (function () {
     'use strict';
@@ -22,28 +29,30 @@
     var _mountEl   = null;
     var _loadingEl = null;
     var _editor    = null;
-    var _loaded    = false;   // styles fetched + editor mounted
-    var _loading   = false;   // fetch in-flight
+    var _loading   = false;   // first fetch in flight
 
-    // Dirty + save state (A3 slice 4). _serverContent is the last
-    // known content from the server (initial fetch or last successful
-    // save); diff against the editor's current value drives the dirty
-    // indicator + Save/Cancel button enable state.
+    // _serverContent is the version of style.css the editor's content is based on: the file as Source
+    // last read it with no unsaved edits, or last saved it. The editor differing from it is what
+    // "unsaved" means, and it drives the dirty indicator + Save/Cancel button state.
     var _serverContent = '';
     var _isDirty       = false;
     var _isSaving      = false;
+    // Set when style.css was read while edits were unsaved and it is no longer the version they are
+    // based on: { content: the file as read }. The conflict notice stands while it is set.
+    var _conflict      = null;
+    // Every read and every save takes the next number. A read's answer is applied only while it is the
+    // latest, so an opening's read that answers after a save cannot put an older file back.
+    var _readSeq       = 0;
     var _draftTimer    = null;
-    // Slice 5 — debounce timer for the iframe <style> injection. Cleared
-    // on save / cancel / leave so the injection is never written after
-    // those state-resync actions.
+    // Debounce timer for the iframe <style> injection. Cleared on save / reload so the injection is
+    // never written after those state-resync actions.
     var _injectTimer   = null;
-    // When true, the next page-unload beforeunload event is allowed to
-    // proceed without prompting. Set after the user explicitly confirms
-    // a same-tab navigation (e.g. the Refine link) — otherwise they'd
+    // When true, the next page-unload beforeunload event is allowed to proceed without prompting. Set
+    // after the user explicitly confirms a same-tab navigation (the Refine link) — otherwise they'd
     // get our custom confirm AND the native browser prompt.
     var _navigationConsented = false;
 
-    // Sidebar Save/Cancel + dirty UI refs (A3 slice 4)
+    // Sidebar Save/Cancel + dirty UI refs
     var _saveBtn       = null;
     var _cancelBtn     = null;
     var _saveLabel     = null;
@@ -51,13 +60,19 @@
     var _statusTextEl  = null;
     var _refineLink    = null;
 
-    // Restore-banner refs in the canvas (A3 slice 4)
+    // Draft-restore banner refs in the canvas, and the draft it offers
     var _restoreBanner     = null;
     var _restoreDetail     = null;
     var _restoreAcceptBtn  = null;
     var _restoreDeclineBtn = null;
+    var _offeredDraft      = null;
 
-    // Search state (A3 slice 3). Empty query → no search active.
+    // Conflict notice refs in the canvas
+    var _conflictNotice       = null;
+    var _conflictReloadBtn    = null;
+    var _conflictOverwriteBtn = null;
+
+    // Search state. Empty query → no search active.
     var _search = {
         input:        null,
         countEl:      null,
@@ -78,65 +93,57 @@
         _search.countEl = document.getElementById('preview-source-search-count');
         _search.prevBtn = document.getElementById('preview-source-search-prev');
         _search.nextBtn = document.getElementById('preview-source-search-next');
-        // Slice 4 — Save/Cancel + dirty UI
         _saveBtn       = document.getElementById('source-sidebar-save-btn');
         _cancelBtn     = document.getElementById('source-sidebar-cancel-btn');
         _saveLabel     = document.getElementById('source-sidebar-save-label');
         _statusEl      = document.getElementById('source-sidebar-status');
         _statusTextEl  = document.getElementById('source-sidebar-status-text');
         _refineLink    = document.getElementById('source-sidebar-refine-link');
-        // Slice 4 — restore banner
         _restoreBanner     = document.getElementById('preview-source-restore-banner');
         _restoreDetail     = document.getElementById('preview-source-restore-detail');
         _restoreAcceptBtn  = document.getElementById('preview-source-restore-accept');
         _restoreDeclineBtn = document.getElementById('preview-source-restore-decline');
+        _conflictNotice       = document.getElementById('preview-source-conflict-notice');
+        _conflictReloadBtn    = document.getElementById('preview-source-conflict-reload');
+        _conflictOverwriteBtn = document.getElementById('preview-source-conflict-overwrite');
         wireSearchHandlers();
         wireSaveCancelHandlers();
+        wireCanvasHandlers();
     }
 
     function enter() {
         if (_active) return;
         _active = true;
-        // Lazy: fetch + mount on first activation. Reuse on subsequent
-        // entries — the editor keeps its content + scroll position.
-        if (!_loaded && !_loading) {
+        if (!_editor) {
+            // First entry: fetch + mount. A failed fetch leaves no editor, so the next entry tries again.
+            if (_loading) return;
             _loading = true;
             fetchStyles()
-                .then(function (content) {
-                    mountEditor(content);
-                    _loaded = true;
-                })
-                .catch(function (err) {
-                    renderError(err);
-                })
+                .then(mountEditor)
+                .catch(renderError)
                 .then(function () {
                     _loading = false;
                 });
-        } else if (_editor) {
-            // Already mounted. Reset scroll to the top before focusing —
-            // when the canvas goes display:none and back, browsers can
-            // reset the textarea's scrollTop while the <pre> overlay
-            // (set programmatically) keeps its position, leaving the
-            // layers out of sync. Resetting both to 0 keeps them aligned.
-            try { _editor.resetScroll(); } catch (e) { /* no-op */ }
-            try { _editor.focus();       } catch (e) { /* no-op */ }
-            // Slice 5: leave() removed the previous injection — restore
-            // it so the iframe is back in sync with the editor's content.
-            injectLiveStyles(_editor.getValue());
+            return;
         }
+        // Later entries reuse the editor. Reset scroll to the top before focusing — when the canvas goes
+        // display:none and back, browsers can reset the textarea's scrollTop while the <pre> overlay
+        // (set programmatically) keeps its position, leaving the layers out of sync. Resetting both to 0
+        // keeps them aligned.
+        try { _editor.resetScroll(); } catch (e) { /* no-op */ }
+        try { _editor.focus();       } catch (e) { /* no-op */ }
+        // The iframe may have reloaded while Source was away, which drops the injection of unsaved edits.
+        syncLiveStyles();
+        // Every opening reads the file again: whatever wrote it meanwhile, Source shows it or says so.
+        rereadStyles();
     }
 
     function leave() {
         if (!_active) return;
         _active = false;
-        // Slice 5: the live <style> injection STAYS across leaves. The
-        // whole point of live injection is so unsaved Source edits remain
-        // visible in the iframe — including while the user is inspecting
-        // other Style tabs (Theme / Selectors / Animations) or other
-        // sidebar modes. Only save / cancel tear it down (they reset
-        // state authoritatively). A pending debounce is also allowed to
-        // fire after leave — it harmlessly updates the iframe to match
-        // the latest editor value, ready for when Source is shown again.
+        // Unsaved edits stay — in the editor, in the draft, and in the preview's injection, which keeps
+        // showing them while the user looks at the other tabs or modes. Only save / reload / cancel put
+        // the preview back on the file.
     }
 
     function isActive() {
@@ -149,104 +156,134 @@
 
     // ── Internals ──
 
+    // A panel string by its PreviewConfig.i18n name. A missing one shows its name, so it is seen and
+    // keyed rather than hidden.
+    function t(name) {
+        var value = PreviewConfig.i18n[name];
+        return (typeof value === 'string') ? value : name;
+    }
+
+    function errorText(err) {
+        return (err && err.message) || t('styleSourceUnknownError');
+    }
+
     function fetchStyles() {
-        // Prefer the shared API layer (matches preview-style-theme.js).
-        if (window.QuickSiteAPI && QuickSiteAPI.request) {
-            return QuickSiteAPI.request('getStyles', 'GET').then(function (result) {
-                if (result.ok && result.data && result.data.data && typeof result.data.data.content === 'string') {
-                    return result.data.data.content;
-                }
-                var msg = (result.data && (result.data.message || result.data.error)) || 'Failed to fetch style.css';
-                throw new Error(msg);
-            });
-        }
-        // Fallback for contexts without QuickSiteAPI (unlikely on the
-        // preview page, but mirrors the theme module's defensive code).
-        var url = (window.PreviewConfig && PreviewConfig.managementUrl ? PreviewConfig.managementUrl : '/management/') + 'getStyles';
-        return fetch(url, { credentials: 'same-origin' }).then(function (r) {
-            return r.json();
-        }).then(function (data) {
-            if (data && data.status === 200 && data.data && typeof data.data.content === 'string') {
-                return data.data.content;
+        return QuickSiteAPI.request('getStyles', 'GET').then(function (result) {
+            var env = result.data || {};
+            if (result.ok && env.data && typeof env.data.content === 'string') {
+                return env.data.content;
             }
-            throw new Error((data && data.message) || 'Failed to fetch style.css');
+            throw new Error(env.message || env.error || t('styleSourceLoadError'));
         });
     }
 
     function mountEditor(content) {
         if (!_mountEl) return;
-        // Hide the loading indicator. The mount call clears the mount
-        // element, but doing this first avoids a flash.
+        // Hide the loading indicator. The mount call clears the mount element, but doing this first
+        // avoids a flash.
         if (_loadingEl) _loadingEl.style.display = 'none';
-        if (!window.QSCodeEditor || !QSCodeEditor.create) {
-            renderError(new Error('Code editor not loaded'));
-            return;
-        }
-        var tokenize = (QSCodeEditor.tokenizers && QSCodeEditor.tokenizers.css) || null;
         _editor = QSCodeEditor.create({
             mount:    _mountEl,
             value:    content,
-            tokenize: tokenize,
+            tokenize: QSCodeEditor.tokenizers.css,
             onChange: handleChange
         });
-        // Slice 4: baseline server content — drives dirty diff.
         _serverContent = content;
-        _isDirty = false;
-        renderDirtyUI();
+        updateDirty();
         try { _editor.focus(); } catch (e) { /* no-op */ }
-        // Slice 5: prime the iframe <style> tag with the current content.
-        // This is a no-op visually (editor == server right now) but it
-        // ensures the tag exists for subsequent live updates.
-        injectLiveStyles(content);
-        // Offer to restore an unsaved draft if one exists and differs
-        // from the server content. The user can Restore (load the draft
-        // into the editor + mark dirty) or Discard (clear the draft).
-        maybeShowRestoreBanner();
+        // Offer to restore an unsaved draft of this project if one exists and differs from the file.
+        offerDraft();
     }
 
     function handleChange(/* newValue */) {
-        // Re-run the current search when the textarea content changes —
-        // existing match positions become stale on any edit.
+        // Re-run the current search when the textarea content changes — existing match positions
+        // become stale on any edit.
         if (_search.query) runSearch(_search.query, /* preserveIdx */ true);
-        // Slice 4: dirty diff vs server content + debounced draft persist.
         updateDirty();
         schedulePersistDraft();
-        // Slice 5: debounced <style> inject into the iframe so the
-        // preview reflects unsaved edits the moment Source is exited.
+        // Debounced <style> sync into the iframe, so the preview reflects unsaved edits the moment
+        // Source is exited.
         scheduleInjectLiveStyles();
     }
 
-    // ── Dirty / Save / Cancel (A3 slice 4) ──
+    function hasUnsavedEdits() {
+        return !!_editor && _editor.getValue() !== _serverContent;
+    }
+
+    // ── Reading the file again ──
+
+    function rereadStyles() {
+        var seq = ++_readSeq;
+        fetchStyles().then(function (content) {
+            if (seq === _readSeq) reconcile(content);
+        }, function (err) {
+            // Source could not check the file: it keeps what it shows, and says so.
+            if (seq === _readSeq) QuickSiteUtils.showToast(t('styleSourceLoadError') + ': ' + errorText(err), 'error');
+        });
+    }
+
+    // What a read found, applied to the editor.
+    function reconcile(content) {
+        if (!_editor) return;
+        if (content === _serverContent) {
+            // The file is the version the edits are based on: a notice about another version no longer
+            // applies (that change was undone).
+            setConflict(null);
+            return;
+        }
+        if (!hasUnsavedEdits()) {
+            showFile(content);
+            return;
+        }
+        // Unsaved edits on a version that has changed since: keep them, and say so.
+        setConflict(content);
+    }
+
+    // No unsaved edits: show style.css as it is now.
+    function showFile(content) {
+        _serverContent = content;
+        _editor.setValue(content);
+        setConflict(null);
+        updateDirty();
+        if (_search.query) runSearch(_search.query, /* preserveIdx */ true);
+        syncLiveStyles();
+        renderRestoreBanner();
+    }
+
+    function setConflict(content) {
+        _conflict = (content === null) ? null : { content: content };
+        if (_conflictNotice) _conflictNotice.style.display = _conflict ? '' : 'none';
+        renderDirtyUI();
+    }
+
+    // ── Dirty / Save / Cancel ──
 
     function updateDirty() {
         if (!_editor) return;
-        var nowDirty = (_editor.getValue() !== _serverContent);
-        if (nowDirty === _isDirty) return;
-        _isDirty = nowDirty;
+        _isDirty = hasUnsavedEdits();
         renderDirtyUI();
     }
 
     function renderDirtyUI() {
-        var i18n = (window.PreviewConfig && PreviewConfig.i18n) || {};
+        var flagged = _isDirty || !!_conflict;
         if (_statusEl) {
-            _statusEl.classList.toggle('preview-source-sidebar__status--dirty', _isDirty);
-            _statusEl.classList.toggle('preview-source-sidebar__status--clean', !_isDirty);
+            _statusEl.classList.toggle('preview-source-sidebar__status--dirty', flagged);
+            _statusEl.classList.toggle('preview-source-sidebar__status--clean', !flagged);
         }
         if (_statusTextEl) {
-            _statusTextEl.textContent = _isDirty
-                ? (i18n.styleSourceDirty || 'Unsaved changes')
-                : (i18n.styleSourceClean || 'All saved');
+            _statusTextEl.textContent = _conflict ? t('styleSourceConflictStatus')
+                : (_isDirty ? t('styleSourceDirty') : t('styleSourceClean'));
         }
-        if (_saveBtn)   _saveBtn.disabled   = !_isDirty || _isSaving;
+        // While the conflict notice stands, Save waits for the user's choice in it.
+        if (_saveBtn)   _saveBtn.disabled   = !_isDirty || _isSaving || !!_conflict;
         if (_cancelBtn) _cancelBtn.disabled = !_isDirty || _isSaving;
+        if (_conflictReloadBtn)    _conflictReloadBtn.disabled    = _isSaving;
+        if (_conflictOverwriteBtn) _conflictOverwriteBtn.disabled = !_isDirty || _isSaving;
     }
 
     function setSaveLabel(saving) {
         if (!_saveLabel) return;
-        var i18n = (window.PreviewConfig && PreviewConfig.i18n) || {};
-        _saveLabel.textContent = saving
-            ? (i18n.styleSourceSaving || 'Saving…')
-            : (i18n.styleSourceSave || 'Save');
+        _saveLabel.textContent = saving ? t('styleSourceSaving') : t('styleSourceSave');
     }
 
     function wireSaveCancelHandlers() {
@@ -256,185 +293,167 @@
         window.addEventListener('beforeunload', onBeforeUnload);
     }
 
+    function wireCanvasHandlers() {
+        if (_restoreAcceptBtn)     _restoreAcceptBtn.addEventListener('click', restoreDraft);
+        if (_restoreDeclineBtn)    _restoreDeclineBtn.addEventListener('click', discardDraft);
+        if (_conflictReloadBtn)    _conflictReloadBtn.addEventListener('click', reloadFromServer);
+        if (_conflictOverwriteBtn) _conflictOverwriteBtn.addEventListener('click', overwrite);
+    }
+
     function onBeforeUnload(e) {
-        // The user already confirmed a same-tab navigation (e.g. Refine
-        // link) — let it through without the native browser prompt.
+        // The user already confirmed a same-tab navigation (e.g. Refine link) — let it through without
+        // the native browser prompt.
         if (_navigationConsented) {
             _navigationConsented = false;
             return;
         }
         if (_isDirty) {
-            // Modern browsers show their own generic prompt; setting
-            // returnValue is what triggers it.
+            // What was typed in the last half second is in the draft too, whatever the user answers.
+            flushDraft();
+            // Modern browsers show their own generic prompt; setting returnValue is what triggers it.
             e.preventDefault();
             e.returnValue = '';
         }
     }
 
     function onRefineClick(e) {
-        // Same-tab navigation: warn if dirty so the user doesn't lose
-        // edits silently. Modifier-clicks (open in new tab / window) and
-        // middle-clicks should bypass the warning since they don't leave
+        // Same-tab navigation: warn if dirty so the user doesn't lose edits silently. Modifier-clicks
+        // (open in new tab / window) and middle-clicks should bypass the warning since they don't leave
         // the current page.
         if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
         if (!_isDirty) return;
-        var i18n = (window.PreviewConfig && PreviewConfig.i18n) || {};
-        var msg = i18n.styleSourceSwitchConfirm || 'You have unsaved Source edits. Discard them and switch?';
-        if (!window.confirm(msg)) {
+        if (!window.confirm(t('styleSourceLeaveConfirm'))) {
             e.preventDefault();
             return;
         }
-        // User confirmed — suppress the native beforeunload prompt so
-        // they don't get asked twice. The draft is still in localStorage,
-        // so on return the restore banner will offer to bring it back.
+        // User confirmed — the draft takes the edits (Source offers them back on return), and the
+        // native beforeunload prompt is suppressed so they are not asked twice.
+        flushDraft();
         _navigationConsented = true;
     }
 
-    // Resolve a REAL toast. This module previously called the bare
-    // `window.showToast`, which is undefined on the preview page — so save
-    // errors and successes silently no-op'd (a refused save looked like nothing
-    // happened). The working entrypoints, in order: QuickSiteUtils.showToast
-    // (always loaded via layout.php), QuickSiteAdmin.showToast (what preview.js
-    // uses), then the legacy global. Falls back to the console only if none exist.
-    function sourceToast(message, type) {
-        if (window.QuickSiteUtils && typeof QuickSiteUtils.showToast === 'function') {
-            QuickSiteUtils.showToast(message, type);
-        } else if (window.QuickSiteAdmin && typeof QuickSiteAdmin.showToast === 'function') {
-            QuickSiteAdmin.showToast(message, type);
-        } else if (typeof window.showToast === 'function') {
-            window.showToast(message, type);
-        } else {
-            console.log('[Toast]', type, message);
-        }
-    }
-
-    // Build a save-error message that surfaces the SPECIFIC reason the server
-    // gave (e.g. "Remote @import … blocked") from the response envelope's
-    // errors[], not just the generic top-line message.
+    // Build a save-error message that surfaces the SPECIFIC reason the server gave (e.g. "Remote
+    // @import … blocked") from the response envelope's errors[], not just the generic top-line message.
     function saveErrorMessage(data) {
         data = data || {};
-        var base = data.message || data.error || 'Save failed';
+        var base = data.message || data.error || t('styleSourceUnknownError');
         var e = data.errors && data.errors[0];
         var detail = e && (e.pattern || e.hint || e.reason);
         return detail ? base + ' — ' + detail : base;
     }
 
     function saveStyles() {
-        if (!_editor || _isSaving || !_isDirty) return;
+        if (!_editor || _isSaving || !_isDirty || _conflict) return;
         var content = _editor.getValue();
+        var base = _serverContent;
+        // An opening's read still in flight must not answer into the editor after this save.
+        ++_readSeq;
         _isSaving = true;
         setSaveLabel(true);
         renderDirtyUI();
-        var i18n = (window.PreviewConfig && PreviewConfig.i18n) || {};
-        var done = function () {
+        // Never write over a version these edits are not based on: read the file first, and write only
+        // if it is still that version.
+        fetchStyles().then(function (current) {
+            if (current !== base) {
+                setConflict(current);
+                QuickSiteUtils.showToast(t('styleSourceConflictNotSaved'), 'warning');
+                return null;
+            }
+            return QuickSiteAPI.request('editStyles', 'POST', { content: content });
+        }, function (err) {
+            QuickSiteUtils.showToast(t('styleSourceCheckFailed').replace('{error}', errorText(err)), 'error');
+            return null;
+        }).then(function (result) {
+            if (!result) return;
+            if (!result.ok) {
+                throw new Error(saveErrorMessage(result.data));
+            }
+            onSaved(content, base, result.data);
+        }).catch(function (err) {
+            QuickSiteUtils.showToast(t('styleSourceSaveError').replace('{error}', errorText(err)), 'error');
+        }).then(function () {
             _isSaving = false;
             setSaveLabel(false);
             renderDirtyUI();
-        };
-        var failed = function (err) {
-            var msg = (err && err.message) || 'Unknown error';
-            var tpl = i18n.styleSourceSaveError || 'Save failed: {error}';
-            sourceToast(tpl.replace('{error}', msg), 'error');
-        };
-        var ok = function () {
-            _serverContent = content;
-            _isDirty = false;
-            // Whether the save succeeded was decided by the server, and it has
-            // already answered. Everything in this block is LOCAL follow-up
-            // work — clearing the draft, dropping the live injection, making
-            // the iframe re-fetch its stylesheet, invalidating the other tabs'
-            // caches. It used to run inside the promise chain with the success
-            // toast fired part-way through it, so a throw anywhere here landed
-            // in .catch(failed) and put an ERROR toast on screen after the
-            // SUCCESS toast, for one save the server had accepted. Isolated so
-            // a local refresh failure can no longer contradict the server's
-            // verdict; it is reported to the console, where it belongs.
-            try {
-                clearDraft();
-                // Drop the live injection and force the iframe's
-                // <link rel="stylesheet"> to re-fetch — saved content is now
-                // authoritative, the injection has nothing left to add.
-                if (_injectTimer) { clearTimeout(_injectTimer); _injectTimer = null; }
-                removeLiveStyles();
-                if (window.PreviewState && PreviewState.hotReloadCss) {
-                    PreviewState.hotReloadCss();
-                }
-                // A Source save can change anything in style.css — including
-                // :root variables that the other structured tabs cache. Mark
-                // their caches stale so the next view re-fetches.
-                invalidateStructuredTabs();
-            } catch (e) {
-                console.error('[style-source] post-save refresh failed', e);
-            }
-            // Last, and outside the try: one save produces exactly one toast,
-            // and it reports what the server said.
-            sourceToast(i18n.styleSourceSaved || 'style.css saved', 'success');
-        };
-        if (window.QuickSiteAPI && QuickSiteAPI.request) {
-            QuickSiteAPI.request('editStyles', 'POST', { content: content })
-                .then(function (result) {
-                    if (!result.ok) {
-                        throw new Error(saveErrorMessage(result.data));
-                    }
-                    ok();
-                })
-                .catch(failed)
-                .then(done);
-        } else {
-            var url = (window.PreviewConfig && PreviewConfig.managementUrl ? PreviewConfig.managementUrl : '/management/') + 'editStyles';
-            fetch(url, {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ content: content })
-            }).then(function (r) { return r.json(); })
-              .then(function (data) {
-                  if (!data || (data.status !== 200 && data.status !== 201)) {
-                      throw new Error(saveErrorMessage(data));
-                  }
-                  ok();
-              })
-              .catch(failed)
-              .then(done);
+        });
+    }
+
+    function onSaved(content, base, env) {
+        _serverContent = content;
+        // editStyles answers with the content it replaced, read just before its write. Anything but the
+        // version this save was based on means a change landed between the check and the write.
+        var replaced = (env && env.data && typeof env.data.backup_content === 'string') ? env.data.backup_content : null;
+        // Whether the save succeeded was decided by the server, and it has already answered. Everything
+        // in this block is LOCAL follow-up work — clearing the draft, syncing the injection, making the
+        // iframe re-fetch its stylesheet, invalidating the other tabs' caches. It is isolated so a local
+        // refresh failure cannot contradict the server's verdict with a second toast; it is reported to
+        // the console, where it belongs.
+        try {
+            updateDirty();
+            clearDraft();
+            if (_injectTimer) { clearTimeout(_injectTimer); _injectTimer = null; }
+            // Saved content is now authoritative: the injection has nothing left to add (unless the user
+            // typed on while the save was in flight), and the iframe's <link rel="stylesheet"> re-fetches.
+            syncLiveStyles();
+            PreviewState.hotReloadCss();
+            // A Source save can change anything in style.css — including :root variables that the other
+            // structured tabs cache. Mark their caches stale so the next view re-fetches.
+            invalidateStructuredTabs();
+        } catch (e) {
+            console.error('[style-source] post-save refresh failed', e);
         }
+        // Last, and outside the try: one save produces exactly one toast, and it reports what the server
+        // did.
+        if (replaced !== null && replaced !== base) {
+            QuickSiteUtils.showToast(t('styleSourceSavedOverChange'), 'warning');
+        } else {
+            QuickSiteUtils.showToast(t('styleSourceSaved'), 'success');
+        }
+    }
+
+    // The conflict notice's Overwrite: the version the notice spoke about becomes the base, so the save
+    // writes over exactly that version — and stops again if yet another change has landed since.
+    function overwrite() {
+        if (!_conflict || _isSaving) return;
+        _serverContent = _conflict.content;
+        setConflict(null);
+        updateDirty();
+        saveStyles();
     }
 
     function cancelEdit() {
         if (!_isDirty || _isSaving) return;
-        var i18n = (window.PreviewConfig && PreviewConfig.i18n) || {};
-        var msg = i18n.styleSourceCancelConfirm || 'Discard unsaved changes and reload style.css from the server?';
-        if (!window.confirm(msg)) return;
-        // Re-fetch from server — picks up any out-of-band changes too.
+        if (!window.confirm(t('styleSourceCancelConfirm'))) return;
+        reloadFromServer();
+    }
+
+    // Discard the unsaved edits and load style.css as it is now: the conflict notice's Reload, and
+    // Cancel once confirmed.
+    function reloadFromServer() {
+        if (_isSaving || !_editor) return;
+        var seq = ++_readSeq;
         fetchStyles().then(function (content) {
-            _serverContent = content;
-            if (_editor) _editor.setValue(content);
-            _isDirty = false;
+            if (seq !== _readSeq) return;
             clearDraft();
-            renderDirtyUI();
-            // Slice 5: drop the live injection + flush the iframe's
-            // cached style.css. The editor is back to server state, and
-            // so should the preview be.
             if (_injectTimer) { clearTimeout(_injectTimer); _injectTimer = null; }
-            removeLiveStyles();
-            if (window.PreviewState && PreviewState.hotReloadCss) {
-                PreviewState.hotReloadCss();
-            }
-            // Slice 6 fix: cancel re-fetches the file; if it differs from
-            // the cached state of the other tabs, their caches are stale.
+            showFile(content);
+            // The iframe's stylesheet is re-fetched, and the other tabs' caches are marked stale: the
+            // file may differ from what they hold.
+            PreviewState.hotReloadCss();
             invalidateStructuredTabs();
         }).catch(function (err) {
-            var label = i18n.styleSourceLoadError || 'Failed to load style.css';
-            sourceToast(label + ': ' + ((err && err.message) || ''), 'error');
+            QuickSiteUtils.showToast(t('styleSourceLoadError') + ': ' + errorText(err), 'error');
         });
     }
 
-    // ── Draft persist (A3 slice 4) ──
-    // Writes the current editor value to localStorage (debounced ~500ms)
-    // whenever the content differs from server. Cleared on save / discard.
+    // ── Draft persist ──
+    // The editor's content is written to localStorage (debounced ~500ms) whenever it differs from the
+    // version it is based on, together with that version and the project. A draft is offered back only
+    // in its own project, and one made on a version that has changed since restores with the conflict
+    // notice standing. Cleared on save / reload / cancel / discard.
 
     function getDraftKey() {
-        return (window.QuickSiteStorageKeys && QuickSiteStorageKeys.styleSourceDraft)
-            || 'qs_style_source_draft';
+        return QuickSiteStorageKeys.styleSourceDraft;
     }
 
     function schedulePersistDraft() {
@@ -443,6 +462,7 @@
     }
 
     function persistDraft() {
+        _draftTimer = null;
         if (!_editor) return;
         var content = _editor.getValue();
         if (content === _serverContent) {
@@ -452,84 +472,111 @@
         try {
             localStorage.setItem(getDraftKey(), JSON.stringify({
                 content: content,
+                base:    _serverContent,
+                project: PreviewConfig.currentProject,
                 savedAt: Date.now()
             }));
         } catch (e) {
-            // localStorage may be full or disabled — silent failure is OK,
-            // the editor still works without draft persistence.
+            // localStorage may be full or disabled — silent failure is OK, the editor still works without
+            // draft persistence.
+        }
+    }
+
+    // Write a pending draft now rather than at the end of its debounce: the page is being left.
+    function flushDraft() {
+        if (_draftTimer) {
+            clearTimeout(_draftTimer);
+            persistDraft();
         }
     }
 
     function clearDraft() {
+        if (_draftTimer) { clearTimeout(_draftTimer); _draftTimer = null; }
         try { localStorage.removeItem(getDraftKey()); } catch (e) { /* no-op */ }
     }
 
+    // The stored draft, when it belongs to this project. Another project's draft is left for it; one
+    // without its base or its project cannot be checked, and is dropped.
     function readDraft() {
+        var parsed;
         try {
             var raw = localStorage.getItem(getDraftKey());
             if (!raw) return null;
-            var parsed = JSON.parse(raw);
-            if (parsed && typeof parsed.content === 'string') return parsed;
-            return null;
+            parsed = JSON.parse(raw);
         } catch (e) {
             return null;
         }
+        if (!parsed || typeof parsed.content !== 'string'
+            || typeof parsed.base !== 'string' || typeof parsed.project !== 'string') {
+            clearDraft();
+            return null;
+        }
+        return (parsed.project === PreviewConfig.currentProject) ? parsed : null;
     }
 
-    function maybeShowRestoreBanner() {
+    function offerDraft() {
         var draft = readDraft();
         if (!draft) return;
         if (draft.content === _serverContent) {
-            // Draft matches what's on the server now — nothing to restore.
+            // The draft is the file as it is now — nothing to restore.
             clearDraft();
             return;
         }
-        if (!_restoreBanner || !_restoreDetail) return;
-        var i18n = (window.PreviewConfig && PreviewConfig.i18n) || {};
-        var tpl = i18n.styleSourceRestoreDetail || 'From {time}';
-        var when = new Date(draft.savedAt || Date.now());
-        _restoreDetail.textContent = tpl.replace('{time}', when.toLocaleString());
+        _offeredDraft = draft;
+        renderRestoreBanner();
+    }
+
+    function renderRestoreBanner() {
+        if (!_restoreBanner) return;
+        if (!_offeredDraft) {
+            _restoreBanner.style.display = 'none';
+            return;
+        }
+        var when = new Date(_offeredDraft.savedAt || Date.now()).toLocaleString();
+        var tpl = (_offeredDraft.base === _serverContent) ? t('styleSourceRestoreDetail') : t('styleSourceRestoreDetailChanged');
+        if (_restoreDetail) _restoreDetail.textContent = tpl.replace('{time}', when);
         _restoreBanner.style.display = '';
-        // Rebind handlers each time so they always close over the freshest
-        // draft contents.
-        if (_restoreAcceptBtn) {
-            _restoreAcceptBtn.onclick = function () {
-                if (_editor) _editor.setValue(draft.content);
-                _isDirty = (draft.content !== _serverContent);
-                renderDirtyUI();
-                hideRestoreBanner();
-                // Slice 5: re-inject so the iframe matches the restored
-                // draft. setValue() doesn't fire handleChange (it's an
-                // input-event callback), so we sync the injection here.
-                injectLiveStyles(draft.content);
-                // Leave the draft in localStorage — it's still the user's
-                // working copy until they save / cancel.
-            };
-        }
-        if (_restoreDeclineBtn) {
-            _restoreDeclineBtn.onclick = function () {
-                clearDraft();
-                hideRestoreBanner();
-            };
-        }
     }
 
-    function hideRestoreBanner() {
-        if (_restoreBanner) _restoreBanner.style.display = 'none';
+    // The banner's Restore: the draft's edits come back on the version they were made on. If the file has
+    // changed since, the conflict notice stands at once.
+    function restoreDraft() {
+        var draft = _offeredDraft;
+        if (!draft || !_editor || _isSaving) return;
+        _offeredDraft = null;
+        renderRestoreBanner();
+        var current = _serverContent;
+        _serverContent = draft.base;
+        _editor.setValue(draft.content);
+        updateDirty();
+        setConflict((_isDirty && draft.base !== current) ? current : null);
+        if (_search.query) runSearch(_search.query, /* preserveIdx */ true);
+        // setValue() doesn't fire handleChange (it's an input-event callback), so the injection is
+        // synced here. The draft stays in localStorage — it's still the user's working copy until they
+        // save, reload or cancel.
+        syncLiveStyles();
     }
 
-    // ── Live iframe injection (A3 slice 5) ──
-    // While Source is active, mirror the editor's content into a
-    // <style id="qs-source-live-styles"> element appended to the iframe's
-    // <head>. The iframe is hidden during Source mode, so this isn't
-    // "visible while typing" — but the moment the user exits Source (tab
-    // click, mode switch), the iframe shows the unsaved edits already
-    // applied instead of a flash of pre-edit state.
+    // The banner's Discard. The stored draft is cleared only while it is still the one offered: edits
+    // typed since the banner appeared have replaced it with the current draft.
+    function discardDraft() {
+        var offered = _offeredDraft;
+        _offeredDraft = null;
+        renderRestoreBanner();
+        var stored = readDraft();
+        if (offered && stored && stored.savedAt === offered.savedAt) clearDraft();
+    }
+
+    // ── Live iframe injection ──
+    // While the editor holds unsaved edits, its content is mirrored into a
+    // <style id="qs-source-live-styles"> appended to the iframe's <head>. The iframe is hidden while
+    // Source is shown, so this isn't "visible while typing" — but the moment the user exits Source (tab
+    // click, mode switch), the iframe shows the unsaved edits already applied. With no unsaved edits
+    // there is no injection, so the preview shows the file itself, including what the other tabs write.
     //
-    // Lifecycle: prime on mount + re-entry; update debounced on input;
-    // tear down on leave / save / cancel. saveStyles + cancelEdit follow
-    // up with PreviewState.hotReloadCss() so the iframe's actual
-    // <link rel="stylesheet"> picks up the server-side file again.
+    // Lifecycle: synced on every edit (debounced), on re-entry (the iframe may have reloaded) and on
+    // restore; gone once the edits are saved, reloaded or cancelled, which then make the iframe's
+    // <link rel="stylesheet"> re-fetch the file.
 
     var LIVE_INJECT_ID = 'qs-source-live-styles';
 
@@ -552,7 +599,6 @@
             if (!tag) {
                 tag = doc.createElement('style');
                 tag.id = LIVE_INJECT_ID;
-                tag.setAttribute('data-source', 'a3-live-injection');
                 doc.head.appendChild(tag);
             }
             tag.textContent = (content == null) ? '' : String(content);
@@ -570,51 +616,41 @@
         } catch (e) { /* silent */ }
     }
 
+    // The preview carries Source's content only while it holds unsaved edits.
+    function syncLiveStyles() {
+        if (hasUnsavedEdits()) injectLiveStyles(_editor.getValue());
+        else removeLiveStyles();
+    }
+
     function scheduleInjectLiveStyles() {
         if (_injectTimer) clearTimeout(_injectTimer);
         _injectTimer = setTimeout(function () {
             _injectTimer = null;
-            if (_editor) injectLiveStyles(_editor.getValue());
+            syncLiveStyles();
         }, 200);
     }
 
-    // ── Stale-cache invalidation for sibling style tabs (A3 slice 6 fix) ──
-    // Source writes the whole stylesheet, so anything the other Style tabs
-    // had cached can be stale after a save (or after cancel re-fetches the
-    // current server file). Each sibling module exposes its own invalidate
-    // / reset hook; we call whatever's available without coupling to the
-    // module's internals.
+    // ── Stale-cache invalidation for sibling style tabs ──
+    // Source writes the whole stylesheet, so anything the other Style tabs had cached can be stale after
+    // a save (or after a reload re-fetches the current server file). Each sibling module exposes its own
+    // invalidate / reset hook; a failure in one must not stop the others.
 
     function invalidateStructuredTabs() {
-        try {
-            if (window.PreviewStyleTheme && PreviewStyleTheme.invalidate) {
-                PreviewStyleTheme.invalidate();
-            }
-        } catch (e) { /* no-op */ }
-        try {
-            if (window.PreviewSelectorBrowser && PreviewSelectorBrowser.reset) {
-                PreviewSelectorBrowser.reset();
-            }
-        } catch (e) { /* no-op */ }
-        try {
-            if (window.PreviewStyleMotion && PreviewStyleMotion.reset) {
-                PreviewStyleMotion.reset();
-            }
-        } catch (e) { /* no-op */ }
+        try { PreviewStyleTheme.invalidate(); } catch (e) { /* no-op */ }
+        try { PreviewSelectorBrowser.reset(); } catch (e) { /* no-op */ }
+        try { PreviewStyleMotion.reset();     } catch (e) { /* no-op */ }
     }
 
     // ── Cross-tab / cross-mode guard ──
-    // Returns true if the caller may safely leave Source; false if the
-    // user cancelled the prompt (i.e. wants to stay).
+    // Returns true if the caller may leave Source; false if the user answered the prompt by staying.
+    // Leaving discards nothing: the prompt says where unsaved edits go.
     function canLeave() {
         if (!_isDirty) return true;
         if (_isSaving) return true;  // let in-flight save finish naturally
-        var i18n = (window.PreviewConfig && PreviewConfig.i18n) || {};
-        var msg = i18n.styleSourceSwitchConfirm || 'You have unsaved Source edits. Discard them and switch?';
-        return window.confirm(msg);
+        return window.confirm(t('styleSourceSwitchConfirm'));
     }
 
-    // ── Search (A3 slice 3) ──
+    // ── Search ──
 
     function wireSearchHandlers() {
         if (_search.input) {
@@ -812,19 +848,17 @@
 
     function updateSearchCount(current, total) {
         if (!_search.countEl) return;
-        var i18n = (window.PreviewConfig && PreviewConfig.i18n) || {};
         if (current == null || total == null) {
             _search.countEl.textContent = '';
             _search.countEl.classList.remove('preview-source-canvas__search-count--no-match');
             return;
         }
         if (total === 0) {
-            _search.countEl.textContent = i18n.styleSourceFindNoMatch || 'No match';
+            _search.countEl.textContent = t('styleSourceFindNoMatch');
             _search.countEl.classList.add('preview-source-canvas__search-count--no-match');
             return;
         }
-        var tpl = i18n.styleSourceFindCount || '{current}/{total}';
-        _search.countEl.textContent = tpl
+        _search.countEl.textContent = t('styleSourceFindCount')
             .replace('{current}', String(current))
             .replace('{total}', String(total));
         _search.countEl.classList.remove('preview-source-canvas__search-count--no-match');
@@ -837,15 +871,10 @@
 
     function renderError(err) {
         if (!_mountEl) return;
-        var msg = (err && err.message) || 'Failed to load style.css';
-        var i18n = (window.PreviewConfig && PreviewConfig.i18n) || {};
-        var label = i18n.styleSourceLoadError || 'Failed to load style.css';
-        _mountEl.innerHTML = '';
+        QSDom.clear(_mountEl);
         var box = document.createElement('div');
         box.className = 'preview-source-canvas__error';
-        var icon = document.createElement('svg');
-        // Simple inline-svg via createElementNS to avoid innerHTML for the SVG itself
-        icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        var icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         icon.setAttribute('viewBox', '0 0 24 24');
         icon.setAttribute('fill', 'none');
         icon.setAttribute('stroke', 'currentColor');
@@ -861,10 +890,10 @@
         icon.appendChild(circle); icon.appendChild(l1); icon.appendChild(l2);
         var title = document.createElement('span');
         title.className = 'preview-source-canvas__error-title';
-        title.textContent = label;
+        title.textContent = t('styleSourceLoadError');
         var detail = document.createElement('span');
         detail.className = 'preview-source-canvas__error-detail';
-        detail.textContent = msg;
+        detail.textContent = errorText(err);
         box.appendChild(icon);
         box.appendChild(title);
         box.appendChild(detail);
@@ -877,7 +906,6 @@
         leave:     leave,
         isActive:  isActive,
         getEditor: getEditor,
-        // Slice 4
         isDirty:   function () { return _isDirty; },
         canLeave:  canLeave,
         save:      saveStyles,

@@ -12295,3 +12295,81 @@ during beta.12 — its own PHP file, `en` on every failure with the reason logge
 `public/admin/assets/js/pages/dashboard.js` and `command-form.js`; `setup.sh` and `setup.bat`.
 Behaviour: the `help` entries of those three commands, [ADMIN_PANEL.md](ADMIN_PANEL.md) §9 and
 [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md).
+
+### A whole-file stylesheet editor reads the file again before it shows it or writes it, and never replaces a change it has not shown without saying so (locked 2026-09-29)
+
+**Decision**: the visual editor's Source view — the editor of the whole `style.css` — works from the
+file as it is, not from the copy it read first.
+
+- **It reads `style.css` every time it is opened.** With no unsaved edits it shows the file as it is
+  now. With unsaved edits on a version that has changed since, it keeps the edits and shows a notice
+  — *style.css was changed elsewhere* — with two choices: **Reload** (discard the edits, load the
+  file) and **Overwrite** (save the edits over the file, undoing the other change). While the notice
+  stands, Save is disabled.
+- **Save reads the file again first**, and writes the whole file (`editStyles`) only when it is still
+  the version the edits were made on. Otherwise nothing is written, and the notice appears.
+  Overwrite writes over the version the notice was raised for, and stops the same way if yet
+  another change lands after it.
+- **A change that lands between that read and the write is reported.** `editStyles` answers with
+  the content it replaced. When that is not the version the save checked, the save stands and says
+  that it replaced a change.
+- **A draft carries the version it was made on and its project.** It is offered only in its own
+  project; one made on a version that has changed since says so, and its edits come back with the
+  notice standing. A draft without either cannot be checked and is dropped. Leaving the page writes
+  the draft at once.
+- **The preview carries Source's copy only while it holds unsaved edits.** The live injection that
+  shows those edits outside Source is removed when they are saved, reloaded or cancelled, and is
+  never there when there are none.
+- **Leaving Source discards nothing**, and its prompt says so: the edits stay in Source, and the
+  preview shows them, until they are saved or cancelled.
+
+The rule holds for any panel surface that writes the whole stylesheet: it reads the file before it
+writes, and writes only over the version its user has seen.
+
+**Amends**: *Stylesheet editor — lightened scope* (locked 2026-06-22), which held that a dirty-state
+guard on tab-switch handles the race between a whole-file save and the structured tabs, and
+*Source / structured-tabs cross-tab cache invalidation* (locked 2026-06-23), which relied on that
+guard discarding Source's edits when switching tabs. Leaving Source keeps the edits — so that the
+preview can show them — so the guard never closed that race. Reading the file again does. Both
+entries' own decisions stand: Source as an advanced view of the CSS tool, and a Source save or reload
+invalidating the structured tabs' caches.
+
+**Reasoning**: Source kept the copy of `style.css` it fetched the first time it was opened. It never
+showed a change made afterwards in the Theme, Selectors or Motion tab, and a Source save wrote that
+old copy back as the whole file: the change was undone, and nothing said so.
+
+Reading the file is what catches every writer. Hooking the writers would not: the panel's
+stylesheet writers do not share one write path — the Selectors tab's new-selector call, the Animate
+dialog and a snippet's CSS injection skip the shared stylesheet refresh — and a write from another
+window, another member, the console or a workflow happens where the page cannot see it.
+
+The edits are kept and the user chooses, because no merge of two versions of a stylesheet can be
+trusted without understanding them. The choice stays on screen until it is made, with a button for
+each side; a confirm on Save would have made it a modal question with no way to reload.
+
+The check runs in the browser, which leaves the moment between its read and the write. That is one
+request — tens of milliseconds on a local server — and nothing on the page can write in it: while
+Source is shown the other CSS panels are hidden, and no style writer in the panel runs on a delay.
+Only another window or person can land there, and the content `editStyles` answers with turns that
+loss into a stated one. Closing the moment entirely needs `editStyles` itself to refuse a write
+made from an older copy — a change to the command, left for later.
+
+A draft is edits against a version. Restored without it, after the file changed, it brought the same
+silent overwrite back; without its project, a draft typed in one project was offered in another,
+where Restore then Save replaced that project's stylesheet.
+
+The injection was the whole stylesheet as Source had read it, left in the preview after Source was
+closed so that unsaved edits stay visible. With no edits at all it still covered every later change
+to anything it contained.
+
+**Alternatives considered**: notifying Source from each writer (rejected — above). Discarding the
+edits when Source is left (rejected — the live preview exists to show unsaved edits while the user
+looks at the other tabs). A confirm on Save instead of the notice (not taken — above). A server-side
+compare in `editStyles` (not taken now — a command change; the check in the browser covers one
+person in one window, and the replaced content makes the rest visible). Merging the two versions
+(rejected — above).
+
+**Source**: Sangio's UX run of 2026-09-28, which found that Source did not show a keyframe changed in
+the Motion tab, and his rulings of 2026-09-28 and 2026-09-29, during beta.12.
+`public/admin/assets/js/pages/preview/preview-style-source.js`; the conflict notice in
+`secure/admin/templates/pages/preview/main-area.php`. Behaviour: [ADMIN_PANEL.md](ADMIN_PANEL.md) §8.10.

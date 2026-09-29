@@ -1,20 +1,20 @@
 <div class="preview-main">
     <div class="preview-device-row">
         <div class="preview-toolbar__devices">
-            <button type="button" class="preview-device-btn preview-device-btn--active" data-device="desktop" title="Desktop (100%)">
+            <button type="button" class="preview-device-btn preview-device-btn--active" data-device="desktop" title="<?= __admin('preview.deviceDesktop') ?>">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
                     <line x1="8" y1="21" x2="16" y2="21"/>
                     <line x1="12" y1="17" x2="12" y2="21"/>
                 </svg>
             </button>
-            <button type="button" class="preview-device-btn" data-device="tablet" title="Tablet (768px)">
+            <button type="button" class="preview-device-btn" data-device="tablet" title="<?= __admin('preview.deviceTablet') ?>">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <rect x="4" y="2" width="16" height="20" rx="2" ry="2"/>
                     <line x1="12" y1="18" x2="12.01" y2="18"/>
                 </svg>
             </button>
-            <button type="button" class="preview-device-btn" data-device="mobile" title="Mobile (375px)">
+            <button type="button" class="preview-device-btn" data-device="mobile" title="<?= __admin('preview.deviceMobile') ?>">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
                     <line x1="12" y1="18" x2="12.01" y2="18"/>
@@ -42,7 +42,7 @@
             <?= __admin('preview.iframeWarningText') ?>
         </span>
         <a href="<?= $router->url('embed-security') ?>" class="preview-iframe-warning__link"><?= __admin('preview.iframeWarningLink') ?> &rarr;</a>
-        <button type="button" class="preview-iframe-warning__close" id="preview-iframe-warning-close" title="Dismiss">&times;</button>
+        <button type="button" class="preview-iframe-warning__close" id="preview-iframe-warning-close" title="<?= __admin('preview.iframeWarningDismiss') ?>">&times;</button>
     </div>
 
     <!-- Mobile Context Sections (info + actions, shown when element selected on mobile) -->
@@ -93,7 +93,7 @@
                     <polyline points="6 9 12 15 18 9"/>
                 </svg>
                 <span class="preview-mobile-section__title"><?= __admin('preview.actions') ?? 'Actions' ?></span>
-                <span class="preview-mobile-section__mode-label" id="mobile-actions-mode">Select</span>
+                <span class="preview-mobile-section__mode-label" id="mobile-actions-mode"><?= __admin('preview.toolSelect') ?></span>
             </button>
             <div class="preview-mobile-section__content" id="mobile-actions-content">
                 <!-- Select mode actions -->
@@ -147,7 +147,7 @@
         
     </div>
 
-    <!-- Source canvas (A3 — full-CSS code editor host). Hidden by default;
+    <!-- Source canvas (full-CSS code editor host). Hidden by default;
          preview.js shows it (and hides #preview-container) when Source is
          active inside Style mode. The editor mounts into
          #preview-source-canvas-mount on first activation. -->
@@ -160,7 +160,7 @@
                 </svg>
                 <code id="preview-source-canvas-file">style.css</code>
             </div>
-            <!-- Search bar (A3 slice 3). Always visible. Empty input = no
+            <!-- Search bar. Always visible. Empty input = no
                  search active. ':42' + Enter jumps to line 42; otherwise the
                  query is a plain case-insensitive substring search. -->
             <div class="preview-source-canvas__search" id="preview-source-search">
@@ -197,9 +197,10 @@
                 </button>
             </div>
         </div>
-        <!-- Restore-draft banner (A3 slice 4). Shown when entering Source if
-             a localStorage draft exists and differs from the server content.
-             JS sets the {time} text + wires the buttons; CSS toggles display. -->
+        <!-- Restore-draft banner. Shown when Source mounts if this project has a
+             localStorage draft that differs from the server content. JS sets the
+             detail text (when the draft was made, and whether style.css has
+             changed since) + wires the buttons. -->
         <div class="preview-source-canvas__restore-banner" id="preview-source-restore-banner" style="display: none;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
                 <path d="M3 12a9 9 0 1 0 3-6.7L3 8"/>
@@ -219,6 +220,36 @@
                         id="preview-source-restore-decline"
                         class="admin-btn admin-btn--sm admin-btn--ghost">
                     <?= __admin('preview.styleSourceRestoreDecline', 'Discard') ?>
+                </button>
+            </div>
+        </div>
+        <!-- Conflict notice, beside the restore banner and in its look. Shown while
+             Source holds unsaved edits on a version of style.css that has changed
+             since (saved from another tab, window or person): found when Source
+             opens, or when Save reads the file first. Save waits for a choice
+             here. JS shows it and wires the buttons. -->
+        <div class="preview-source-canvas__restore-banner" id="preview-source-conflict-notice" role="status" style="display: none;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <div class="preview-source-canvas__restore-text">
+                <span class="preview-source-canvas__restore-title"><?= __admin('preview.styleSourceConflictTitle') ?></span>
+                <span class="preview-source-canvas__restore-detail"><?= __admin('preview.styleSourceConflictDetail') ?></span>
+            </div>
+            <div class="preview-source-canvas__restore-actions">
+                <button type="button"
+                        id="preview-source-conflict-reload"
+                        class="admin-btn admin-btn--sm admin-btn--primary"
+                        title="<?= __admin('preview.styleSourceConflictReloadHint') ?>">
+                    <?= __admin('preview.styleSourceConflictReload') ?>
+                </button>
+                <button type="button"
+                        id="preview-source-conflict-overwrite"
+                        class="admin-btn admin-btn--sm admin-btn--ghost"
+                        title="<?= __admin('preview.styleSourceConflictOverwriteHint') ?>">
+                    <?= __admin('preview.styleSourceConflictOverwrite') ?>
                 </button>
             </div>
         </div>
@@ -265,7 +296,7 @@
                 id="preview-iframe"
                 class="preview-iframe"
                 src="<?= $siteUrl ?>"
-                title="Website Preview"
+                title="<?= __admin('preview.iframeTitle') ?>"
             ></iframe>
             
             <!-- Loading Overlay -->

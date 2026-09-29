@@ -648,7 +648,19 @@ This matters because `LANGUAGES_SUPPORTED` for monolingual projects often lists 
 
 An advanced sub-view of CSS mode that exposes the entire `style.css` as a code-editor surface for designers / developers who need to read or edit the whole file in context, without leaving the visual editor. Hidden for roles without the `editStyles` permission.
 
-**Where you land it from:** CSS sidebar mode → top-row **Source** button above the Theme / Selectors / Animations tabs. Activating it hides the three tabs and swaps the iframe canvas for the editor; deactivating restores both.
+**Where you land it from:** CSS sidebar mode → top-row **Source** button above the Theme / Selectors / Motion tabs. Activating it hides the three tabs and swaps the iframe canvas for the editor; deactivating restores both.
+
+**What it shows.** Source reads `style.css` (`getStyles`) every time it is opened, so it catches every writer — the Theme, Selectors and Motion tabs, the console, a workflow, another window, another member.
+
+| When Source opens and… | It shows |
+|---|---|
+| there are no unsaved edits | the file as it is now |
+| there are unsaved edits, and the file is still the version they were made on | the edits, as they were left |
+| there are unsaved edits, and the file has changed since | the edits, **and the conflict notice** |
+
+The **conflict notice** sits between the toolbar and the editor, in the draft banner's look: *style.css was changed elsewhere*, with two choices. **Reload** discards the edits and loads the file as it is now. **Overwrite** saves the edits over the current file, undoing the other change. While it stands, Save is disabled and the status reads *Changed elsewhere*.
+
+**How a save checks first.** Save reads the file again before it writes, and writes (`editStyles`, the whole file) only when it is still the version the edits were made on. If it is not, nothing is written: the conflict notice appears and a toast says the save did not happen. Overwrite writes over the version the notice was raised for, and stops the same way if yet another change lands after it. `editStyles` answers with the content it replaced; if that is not the version Source checked — a change landed in the moment between the check and the write — the save stands and its toast says it replaced that change, instead of *style.css saved*.
 
 **Canvas (editor surface):**
 
@@ -663,10 +675,10 @@ An advanced sub-view of CSS mode that exposes the entire `style.css` as a code-e
 | Element | What it shows / does |
 |---|---|
 | File row | Static `File: style.css` label. |
-| Status indicator | Green dot + "All saved" when content matches the server; amber dot + "Unsaved changes" otherwise. |
-| Save button | Disabled when clean. Saves via `editStyles` (whole-file write) then hot-reloads the iframe's `<link rel="stylesheet">`. |
-| Cancel button | Disabled when clean. Re-fetches the file from server with a confirm. |
-| "Refine in CSS Refiner →" link | Same-tab navigation to `/admin/optimize`. When dirty, a custom confirm prompts before navigating; the native `beforeunload` prompt is suppressed once to avoid a double-prompt. Modifier-clicks (Ctrl/Cmd/Shift/middle) skip the confirm — they don't leave the current page. |
+| Status indicator | Green dot + "All saved" when the content is the version it was read or saved as; amber dot + "Unsaved changes" otherwise, or "Changed elsewhere" while the conflict notice stands. |
+| Save button | Disabled when clean, and while the conflict notice stands. Checks the file first (see *How a save checks first*), saves via `editStyles` (whole-file write), then hot-reloads the iframe's `<link rel="stylesheet">`. |
+| Cancel button | Disabled when clean. After a confirm, discards the edits and loads the file as it is now — the conflict notice's Reload, with a confirm. |
+| "Refine in CSS Refiner →" link | Same-tab navigation to `/admin/optimize`. When dirty, a custom confirm says the edits leave the editor and come back as a draft on return; the draft is written at once, and the native `beforeunload` prompt is suppressed once to avoid a double-prompt. Modifier-clicks (Ctrl/Cmd/Shift/middle) skip the confirm — they don't leave the current page. |
 
 **Search bar:**
 
@@ -681,9 +693,9 @@ An advanced sub-view of CSS mode that exposes the entire `style.css` as a code-e
 
 Match highlighting paints into a separate `<pre>` overlay layer (between the highlight and the textarea) so every match is visible at once; the current match gets a stronger amber + outline. Substring search is case-insensitive.
 
-**Live preview.** Every keystroke (debounced ~200ms) injects / updates a `<style id="qs-source-live-styles">` element appended to the iframe's `<head>`. The iframe is hidden while Source is active, but exiting Source (tab click, mode switch) immediately shows the unsaved edits applied — no save needed. The injection is removed on save (replaced by a real `hotReloadCss` of `style.css`) and on Cancel (the iframe reverts to the server file).
+**Live preview.** While Source holds unsaved edits, every keystroke (debounced ~200ms) injects / updates a `<style id="qs-source-live-styles">` element appended to the iframe's `<head>`. The iframe is hidden while Source is active, but exiting Source (tab click, mode switch) immediately shows the unsaved edits applied — no save needed. Because the injection is the whole stylesheet as edited, it also covers what the other tabs change until the edits are saved, reloaded or cancelled, which remove it and hot-reload `style.css`. With no unsaved edits there is no injection, so the preview shows the file itself.
 
-**Draft persistence.** On every input the editor's content is debounced-written (500ms) to `localStorage` under `STYLE_SOURCE_DRAFT` (see §6). On the next Source entry, if the draft differs from the server file, a restore banner appears between the toolbar and the editor offering **Restore** (load the draft + mark dirty) or **Discard** (clear the draft). The draft is also cleared on successful save / Cancel.
+**Draft persistence.** While the content differs from the version it was made on, it is debounced-written (500ms) to `localStorage` under `styleSourceDraft` (see §6), together with that version and the project; leaving the page writes it at once. When Source mounts, a draft of the same project that differs from the file is offered by a banner between the toolbar and the editor: **Restore** (the edits come back, on the version they were made on) or **Discard** (clear the draft). When the file has changed since the draft was made, the banner says so, and Restore brings the conflict notice with the edits. A draft of another project is not offered; one without its version or its project is dropped. The draft is cleared on a successful save, on Reload and on Cancel.
 
 **Content restrictions.** A whole-file save (and every structured style write) is validated before it lands:
 
@@ -693,27 +705,27 @@ Match highlighting paints into a separate `<pre>` overlay layer (between the hig
 
 Selectors, media queries, variable names, and declaration blocks additionally may not contain a raw `{` or `}` (which would break out of the rule) — the `>` child combinator, pseudo-classes, and attribute selectors are all fine.
 
-**Dirty guards:**
-- Switching from Source to Theme / Selectors / Animations while dirty → confirm before discarding.
+**Dirty guards.** Leaving Source discards nothing: the edits stay in the editor, in the draft and in the preview.
+- Closing Source while dirty — its **Source** button again, the way back to Theme / Selectors / Motion, whose tabs are hidden while Source is shown → a confirm says the edits are not saved and stay in Source, shown in the preview, until they are saved or cancelled. Cancelling it stays in Source.
 - Switching to another sidebar mode while dirty → same prompt (via `setMode`'s guard).
-- Closing the browser tab / refreshing while dirty → native `beforeunload` prompt.
+- Closing the browser tab / refreshing while dirty → the draft is written at once, then the native `beforeunload` prompt.
 
-**Cross-tab cache invalidation.** A Source save / Cancel rewrites or re-reads the whole `style.css`, so the three structured tabs' caches are invalidated (`PreviewStyleTheme.invalidate()` + `PreviewSelectorBrowser.reset()` + `PreviewStyleAnimations.reset()`). The next view of any tab triggers a fresh fetch — visible both from the tab-click handler and from `deactivateSource()` so all exit paths converge. See `DESIGN_DECISIONS.md` "Source / structured-tabs cross-tab cache invalidation" for the accepted trade-off (a structured tab's unsaved edits are lost on the next view after a Source save).
+**Cross-tab cache invalidation.** A Source save, Reload or Cancel rewrites or re-reads the whole `style.css`, so the three structured tabs' caches are invalidated (`PreviewStyleTheme.invalidate()` + `PreviewSelectorBrowser.reset()` + `PreviewStyleMotion.reset()`). The next view of any tab triggers a fresh fetch — visible both from the tab-click handler and from `deactivateSource()` so all exit paths converge. See `DESIGN_DECISIONS.md` "Source / structured-tabs cross-tab cache invalidation" for the accepted trade-off (a structured tab's unsaved edits are lost on the next view after a Source save). The other direction needs no hook in those tabs: Source reads the file again every time it opens.
 
 **Files**
 
 | Concern | Where |
 |---|---|
 | Source button + advanced row + sidebar panel | `secure/admin/templates/pages/preview/contextual-style.php` |
-| Canvas mount + toolbar + restore banner | `secure/admin/templates/pages/preview/main-area.php` |
+| Canvas mount + toolbar + restore banner + conflict notice | `secure/admin/templates/pages/preview/main-area.php` |
 | JS module | `public/admin/assets/js/pages/preview/preview-style-source.js` |
 | Code-editor widget library | `public/admin/assets/js/lib/code-editor/` (see §5.7) |
 | Mode wiring + cross-tab guards | `public/admin/assets/js/pages/preview/preview.js` (`activateSource` / `deactivateSource` / `initStyleSource` / `initStyleTabs`) |
 | i18n keys exposed to JS | `secure/admin/templates/pages/preview-config.php` (`i18nPanels.source` block) |
 | CSS | `public/admin/assets/admin.css` (`.preview-source-canvas__*`, `.preview-source-sidebar__*`, `.preview-contextual-style-source-btn*`, `.qs-code-editor__*`, `.qs-tk-*`, `.qs-search-match*`) |
-| Storage key | `STYLE_SOURCE_DRAFT` in `js/core/storage-keys.js` (see §6) |
+| Storage key | `styleSourceDraft` in `js/core/storage-keys.js` (see §6) |
 | Server: read | `getStyles` (returns `{ content, file, size, modified }`) |
-| Server: write | `editStyles` (whole-file replace; basic CSS injection blacklist; writes both live + project copies) |
+| Server: write | `editStyles` (whole-file replace; the stylesheet scan every CSS writer runs; writes both live + project copies; answers with `backup_content`, the content it replaced) |
 
 ### 8.11 Motion tab (CSS mode)
 
