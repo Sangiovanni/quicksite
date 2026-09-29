@@ -34,8 +34,9 @@
      *   QS.routePath   — the matched pattern, e.g. 'products/:slug'
      *   QS.routeFound  — true when a route matched, false otherwise
      *
-     * Multilingual: strips the first URL segment if it matches the
-     * page's <html lang> attribute. Other prefix handling (BASE_URL,
+     * Multilingual: on a multilingual site (window.QS_MULTILINGUAL), strips
+     * the first URL segment if it matches the page's <html lang>
+     * attribute. Other prefix handling (BASE_URL,
      * PUBLIC_FOLDER_SPACE for sites in subpaths) is NOT yet handled —
      * filed as a follow-up. For now sites in subpaths would see the
      * subpath as the first segment.
@@ -50,8 +51,12 @@
         // Normalise the URL path.
         let path = (window.location && window.location.pathname) || '';
 
-        // Strip lang prefix if the first segment matches <html lang>.
-        const lang = (document.documentElement && document.documentElement.lang) || '';
+        // Strip lang prefix if the first segment matches <html lang> — on a
+        // multilingual site only. A single-language site's URL carries no
+        // language, so there a first segment equal to its code is part of
+        // the page's address. The server says which (the runtime handoff's
+        // QS_MULTILINGUAL, written before this file loads).
+        const lang = (window.QS_MULTILINGUAL === true && document.documentElement && document.documentElement.lang) || '';
         if (lang) {
             if (path === '/' + lang || path === '/' + lang + '/') {
                 path = '/';
@@ -678,7 +683,7 @@
         const RESERVED_OPTS = new Set([
             'body', 'onSuccess', 'onError', 'silent', '_auth', '_endpoint', '_baseUrl',
             // Translatable toast labels — already resolved to strings by
-            // PHP at compile time. They're not path placeholders and
+            // the server, in the page's language. They're not path placeholders and
             // shouldn't leak into the query string.
             'toastSuccessKey', 'toastErrorKey',
             // Suppress the endpoint's responseBindings for this call — used by

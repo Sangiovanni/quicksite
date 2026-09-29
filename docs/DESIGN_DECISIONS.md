@@ -12373,3 +12373,97 @@ person in one window, and the replaced content makes the rest visible). Merging 
 the Motion tab, and his rulings of 2026-09-28 and 2026-09-29, during beta.12.
 `public/admin/assets/js/pages/preview/preview-style-source.js`; the conflict notice in
 `secure/admin/templates/pages/preview/main-area.php`. Behaviour: [ADMIN_PANEL.md](ADMIN_PANEL.md) §8.10.
+
+### A multilingual build looks a translated call argument up when the page is served, and the runtime knows whether the site is multilingual (locked 2026-09-29)
+
+**Amends**: *A data value written into an inline script cannot end or change the script* (locked
+2026-09-26). Its decision stands. It placed the call argument's literal in `CallTransformer`
+(`jsSingleQuoted`). The literal is now `qs_js_single_quoted()` in `runtimeHandoff.php`, beside the
+encoder, and `CallTransformer` calls it. A built page of a multilingual site calls it too, when it
+is served.
+
+**Decision**:
+
+- **A translatable call argument is looked up in the language of the request, on both surfaces.**
+  That means a `toast` message and a `fetch` toast key (`toastSuccessKey`, `toastErrorKey`): every
+  positional argument the verb catalogue marks `translationKey`, and every keyword argument
+  `CallTransformer` lists as translatable. It holds in a page event (`onload`, `onresize`,
+  `onscroll`) and in an element's `on*` attribute, in a page, the menu or the footer.
+  - The live `/p/` render looks the argument up while it renders, as before.
+  - A multilingual build writes it into the compiled page as a call to
+    `qs_translated_call_argument()`. The page makes that call each time it is served, and the live
+    render calls the same function.
+- **One implementation.** Three functions in `runtimeHandoff.php`, which a build ships:
+  - `qs_js_single_quoted()`, the literal;
+  - `qs_call_argument_js()`, one argument: `event` or `this` bare, anything else a literal;
+  - `qs_translated_call_argument()`, which looks the key up, keeps today's rule for a missing key
+    (a positional argument falls back to the text as authored; a keyword argument carries the
+    missing marker), and writes the result.
+
+  `CallTransformer` calls them and keeps no copy. A built page writes an argument exactly as the
+  preview does, with every guarantee of the entry this one amends, and in an attribute it is still
+  HTML-escaped. The handler is validated as written in the build's language. Every translation is
+  written as a complete literal, so no language can make it anything else.
+- **A single-language build compiles as before.** It has one language, so its arguments are
+  written once, when it is built, and its compiled pages are byte-identical.
+- **The runtime handoff says whether the site is multilingual:** `window.QS_MULTILINGUAL`, `true`
+  or `false`. It sits in the same script as `QS_PROJECT`, before `qs.js`.
+  - `qs.js`'s route matching strips a leading URL segment equal to `<html lang>` only when the flag
+    is `true`.
+  - `{{lang}}` in a `QS.fetch` URL still reads `<html lang>`.
+- **The live render changes by that one statement.** Every `/p/` page's handoff carries it, and
+  nothing else in the live render changes.
+- **An existing build keeps what it was built with** until it is rebuilt: its toasts stay in the
+  default language, and its route matching strips as before.
+
+**Reasoning**:
+
+**Why a build served one language.** A build compiles each route once, in the language the build
+request resolves: the default. The call transform translated arguments while it ran. So a built
+multilingual site served the default language's toast text on every language's pages, while the
+preview, which transforms on every request, showed each language its own. A compiled page already
+translates its text nodes and translatable attributes per request, with the translator it
+constructs. The call argument was the one translated value that was baked in.
+
+**Why the literal moved.** The request-time lookup must quote with the same literal, and a build
+does not ship `CallTransformer`; it ships `runtimeHandoff.php` and `Translator.php`. A second copy of
+the literal in a shipped file would need a proof that two escape tables stay equal, and one function
+has nothing to keep in step. The segments the compiler turns into PHP come from the same walk of the
+chain that the live render resolves on the spot, so the two cannot write different JavaScript
+around the argument.
+
+**Why a single-language build defers nothing.** It would add a function call to every served page
+for no difference.
+
+**Why the flag.** `qs.js` stripped any first segment equal to `<html lang>`, on a single-language
+site too, whose addresses carry no language. There, a page whose address begins with the site's own
+code, such as `/en/guide` on an English site or a page named `en`, was matched as another page or
+as none. The page cannot tell from its address; only the server knows.
+- The flag rides the `QS_PROJECT` script because the matcher runs as `qs.js` loads.
+- The shared handoff writes it from `MULTILINGUAL_SUPPORT`, which both surfaces define from the
+  project's config, so the two agree. That is why the live render carries it too.
+
+**Alternatives considered**:
+- **Compile each route once per language** (rejected). It multiplies the build by the number of
+  languages and needs a per-language page layout the front controller does not have. The compiled
+  page already translates everything else per request.
+- **Ship `CallTransformer` in the build** (rejected). It brings the verb catalogue and the handler
+  validation, which a served page does not need, and the compiled page would still need a
+  per-request expression.
+- **Two copies of the literal, one per path, with a probe proving them equal** (rejected — above).
+- **Look arguments up per request on every build** (not taken — above).
+- **Emit the flag only from a built page** (rejected). The two surfaces would stop sharing one
+  handoff.
+- **Emit it only when true** (not taken). Its absence would mean both "single-language" and "a page
+  from before the flag existed", and `qs.js` strips only on a definite `true`.
+
+**Source**: a measurement made while reviewing the engine's inline scripts during beta.12, ruled by
+Sangio 2026-09-26. The route-matching half comes from his UX run of 2026-09-27; the shape was ruled
+2026-09-29.
+- `secure/src/functions/runtimeHandoff.php` (`qs_js_single_quoted`, `qs_call_argument_js`,
+  `qs_translated_call_argument`, `QS_MULTILINGUAL`)
+- `secure/src/classes/CallTransformer.php` (`transformSegments`, `resolveSegments`)
+- `secure/src/classes/JsonToPhpCompiler.php` (`callSegmentsToPhp`)
+- `secure/src/runtime/qs.js` (`matchRouteOnLoad`)
+
+Behaviour: [ARCHITECTURE.md](ARCHITECTURE.md) §9.0.2.

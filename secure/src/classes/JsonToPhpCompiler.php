@@ -27,6 +27,13 @@ class JsonToPhpCompiler {
     private bool $needsIframeSandbox = false;
 
     /**
+     * Set while compiling a structure that writes a translatable call argument
+     * as a request-time lookup, so the generated file requires the runtime
+     * handoff (which holds the lookup) only when it calls it.
+     */
+    private bool $needsRuntimeHandoff = false;
+
+    /**
      * Attributes where an EMPTY value is a statement, not an omission.
      *
      * Mirrors JsonToHtmlRenderer::EMPTY_MEANINGFUL_ATTRIBUTES — `alt=""` marks
@@ -72,6 +79,7 @@ class JsonToPhpCompiler {
      */
     public function compilePage(array $structure, string $pageTitle, bool $showMenu = true, bool $showFooter = true, array $pageEvents = [], array $stateStores = []): string {
         $this->needsIframeSandbox = false;
+        $this->needsRuntimeHandoff = false;
         $output = "<?php\n\n";
         $output .= "require_once SECURE_FOLDER_PATH . '/src/classes/TrimParameters.php';\n";
         $output .= "\$trimParameters = new TrimParameters();\n";
@@ -111,18 +119,20 @@ class JsonToPhpCompiler {
             $structure = [$structure];
         }
         // Compiled BEFORE it is appended, because compiling is what discovers
-        // whether this page needs the iframe-sandbox runtime.
+        // whether this page needs the iframe-sandbox runtime, or the runtime
+        // handoff for a translatable call argument.
         $nodesOutput = $this->compileNodes($structure);
-        $output .= $this->iframeSandboxRequire();
-        $output .= $nodesOutput;
-        
+
         // Compile page-level events (onload, onresize, onscroll) into a script tag
-        $pageEventsScript = $this->compilePageEvents($pageEvents);
+        $pageEventsPhp = $this->compilePageEvents($pageEvents);
+
+        $output .= $this->iframeSandboxRequire();
+        $output .= $this->runtimeHandoffRequire();
+        $output .= $nodesOutput;
 
         // Pass layout settings to Page constructor
         $showMenuStr = $showMenu ? 'true' : 'false';
         $showFooterStr = $showFooter ? 'true' : 'false';
-        $pageEventsScriptStr = addcslashes($pageEventsScript, "'\\");
 
         // The state stores travel as DATA, not as a ready-made <script> tag.
         // The tag is written by the shared runtime handoff, which also needs the
@@ -131,7 +141,7 @@ class JsonToPhpCompiler {
         $stateStoresLiteral = var_export($stateStores, true);
 
         $output .= "\nrequire_once SECURE_FOLDER_PATH . '/src/classes/Page.php';\n";
-        $output .= "\$page = new Page(\$pageTitle, \$content, \$lang, {$showMenuStr}, {$showFooterStr}, '{$pageEventsScriptStr}', {$stateStoresLiteral});\n";
+        $output .= "\$page = new Page(\$pageTitle, \$content, \$lang, {$showMenuStr}, {$showFooterStr}, {$pageEventsPhp}, {$stateStoresLiteral});\n";
         $output .= "\$page->render();\n";
         
         return $output;
@@ -146,12 +156,16 @@ class JsonToPhpCompiler {
      * - onresize → window.addEventListener("resize", ...)
      * - onscroll → window.addEventListener("scroll", ...)
      * 
+     * A translatable call argument is looked up when the page is served on a
+     * multilingual site (see callSegmentsToPhp()), so what this returns is PHP.
+     *
      * @param array $events The events for one page route, e.g. ['onload' => ['{{call:show:#modal}}']]
-     * @return string The compiled <script> tag, or empty string if no events
+     * @return string A PHP expression giving the <script> tag, or '' (the empty
+     *                string's literal) if no events
      */
     public function compilePageEvents(array $events): string {
         if (empty($events)) {
-            return '';
+            return "''";
         }
         
         $eventScripts = [];
@@ -174,28 +188,77 @@ class JsonToPhpCompiler {
                 // before the token was ever saved. The awaitable-verb detection
                 // can only see a chain it is handed whole.
                 $chain = implode('', $events[$eventName]);
-                $transformed = CallTransformer::transform($chain);
+                $segments = CallTransformer::transformSegments($chain);
+                $transformed = CallTransformer::resolveSegments($segments);
                 // Keep any transformed result — a real QS.* call, or the
                 // console.warn CallTransformer emits for an unknown verb. Skip
                 // only when nothing was transformed at all.
                 if ($transformed && $transformed !== $chain) {
-                    $eventScripts[] = $listener['target'] . '.addEventListener("' . $listener['event'] . '",function(){' . $transformed . '});';
+                    $eventScripts[] = array_merge(
+                        [$listener['target'] . '.addEventListener("' . $listener['event'] . '",function(){'],
+                        $segments,
+                        ['});']
+                    );
                 }
             }
         }
         
         if (empty($eventScripts)) {
-            return '';
+            return "''";
         }
         
-        return '<script>' . implode('', $eventScripts) . '</script>';
+        return $this->callSegmentsToPhp(
+            array_merge(['<script>'], array_merge(...$eventScripts), ['</script>']),
+            fn(string $js) => "'" . addcslashes($js, "'\\") . "'"
+        );
     }
     
+    /**
+     * Call segments (CallTransformer::transformSegments()) as one PHP expression.
+     *
+     * ⚠ A MULTILINGUAL build writes each translatable argument as a lookup the
+     * page makes when it is served: build.php compiles each route once, so an
+     * argument translated now would be served in the build's language to every
+     * language of the site. qs_translated_call_argument() is the function the
+     * live render calls, so a built page writes the argument exactly as the
+     * preview does, in the visitor's language.
+     *
+     * A single-language build has one answer, so it keeps writing the argument
+     * now, and compiles exactly as it did.
+     *
+     * @param callable $quote string → the PHP literal the caller has always used
+     */
+    private function callSegmentsToPhp(array $segments, callable $quote): string {
+        if (!(defined('MULTILINGUAL_SUPPORT') && MULTILINGUAL_SUPPORT)) {
+            return $quote(CallTransformer::resolveSegments($segments));
+        }
+        $parts = [];
+        $pending = null;
+        foreach ($segments as $segment) {
+            if (is_string($segment)) {
+                $pending = ($pending ?? '') . $segment;
+                continue;
+            }
+            if ($pending !== null) {
+                $parts[] = $quote($pending);
+                $pending = null;
+            }
+            $parts[] = 'qs_translated_call_argument(' . var_export($segment['arg'], true)
+                     . ', ' . var_export($segment['keyword'], true) . ')';
+            $this->needsRuntimeHandoff = true;
+        }
+        if ($pending !== null || empty($parts)) {
+            $parts[] = $quote($pending ?? '');
+        }
+        return implode(' . ', $parts);
+    }
+
     /**
      * Compile menu/footer JSON structure to PHP code
      */
     public function compileMenuOrFooter(array $structure): string {
         $this->needsIframeSandbox = false;
+        $this->needsRuntimeHandoff = false;
         $output = "<?php\n";
         $output .= "// This file is auto-generated by build command\n\n";
         
@@ -220,6 +283,7 @@ class JsonToPhpCompiler {
         
         $nodesOutput = $this->compileNodes($structure, true);
         $output .= $this->iframeSandboxRequire();
+        $output .= $this->runtimeHandoffRequire();
         $output .= $nodesOutput;
         return $output;
     }
@@ -233,6 +297,17 @@ class JsonToPhpCompiler {
     private function iframeSandboxRequire(): string {
         return $this->needsIframeSandbox
             ? "require_once SECURE_FOLDER_PATH . '/src/classes/IframeSandbox.php';\n"
+            : '';
+    }
+
+    /**
+     * The require line for a structure that looks a call argument up when it is
+     * served (callSegmentsToPhp()), or ''. Only such a structure needs it, so
+     * every other compiled file stays as it was.
+     */
+    private function runtimeHandoffRequire(): string {
+        return $this->needsRuntimeHandoff
+            ? "require_once SECURE_FOLDER_PATH . '/src/functions/runtimeHandoff.php';\n"
             : '';
     }
 
@@ -590,10 +665,14 @@ class JsonToPhpCompiler {
                 // Handle event handler attributes (on*) - only allow {{call:...}} syntax
                 if (preg_match('/^on[a-z]+$/i', $attrName)) {
                     if (is_string($attrValue) && strpos($attrValue, '{{call:') !== false) {
-                        $transformedValue = CallTransformer::transform($attrValue);
+                        $segments = CallTransformer::transformSegments($attrValue);
+                        $transformedValue = CallTransformer::resolveSegments($segments);
+                        // Validated as written in the build's language. Any
+                        // translation is written as a complete literal, so no
+                        // language can make the handler anything else.
                         if (CallTransformer::isValidHandler($transformedValue)) {
                             $output .= ' ' . $attrName . '=\\"" . htmlspecialchars(';
-                            $output .= var_export($transformedValue, true);
+                            $output .= $this->callSegmentsToPhp($segments, fn(string $js) => var_export($js, true));
                             $output .= ', ENT_QUOTES | ENT_HTML5, \'UTF-8\') . "\\"';
                         }
                         // Skip if transformation failed (blocked)

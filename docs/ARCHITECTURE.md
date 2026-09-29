@@ -944,7 +944,7 @@ Two parallel resolution paths in `CallTransformer` (`buildCallJs`):
 
 Today's positional users: `toast.message` (with `allowFreeText: true`). Future verbs declaring `inputType: 'translationKey'` on a positional arg are picked up automatically — no renderer code change required.
 
-The build path (`JsonToPhpCompiler`) calls the same `CallTransformer::transform`, so render and compile stay in lockstep. Multi-language sites work natively: source JSON is identical across languages; each per-request render produces a per-language compiled chain.
+The build path (`JsonToPhpCompiler`) walks the chain with the same `CallTransformer` (`transformSegments()`), so render and compile stay in lockstep. Multi-language sites work natively: source JSON is identical across languages; each per-request render produces a per-language compiled chain, and a multilingual build writes each translatable argument as a lookup the built page makes when it is served, through `qs_translated_call_argument()`, the function the live render calls.
 
 See [ADMIN_PANEL.md §9.9](ADMIN_PANEL.md) for the authoring UX (translationKey picker + Custom Text sentinel in §9.9.7) and the full inputType taxonomy (§9.9.4).
 

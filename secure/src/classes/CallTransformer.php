@@ -2,6 +2,9 @@
 
 require_once __DIR__ . '/../functions/qsVerbCatalog.php';
 require_once __DIR__ . '/Translator.php';
+// The argument literal and the per-request translation lookup. They live in the
+// runtime handoff because a build ships that file and not this one.
+require_once __DIR__ . '/../functions/runtimeHandoff.php';
 
 /**
  * CallTransformer — single source of truth for {{call:verb:args}} -> QS.*()
@@ -16,9 +19,15 @@ require_once __DIR__ . '/Translator.php';
  *   - F-e: isValidHandler() uses a structural, quote-and-paren-aware scan, so a
  *     legitimate selector arg containing ')' (e.g. QS.hide('input:not(.x)'))
  *     validates instead of being dropped by the old /QS\.[a-zA-Z]+\([^)]*\)/.
- *   - buildCallJs() writes every argument as a complete single-quoted literal
- *     (jsSingleQuoted()): valid whatever the value holds, and no "<" from the
- *     value reaches the page.
+ *   - every argument is written as a complete single-quoted literal
+ *     (qs_js_single_quoted(), in runtimeHandoff.php): valid whatever the value
+ *     holds, and no "<" from the value reaches the page.
+ *
+ * A translatable argument is looked up in the request's language. The live
+ * render does that as it renders (transform()); a multilingual build compiles
+ * each route once, so it takes the chain as segments (transformSegments()) and
+ * writes each translatable argument as a lookup the built page makes when it is
+ * served.
  */
 class CallTransformer
 {
@@ -28,7 +37,7 @@ class CallTransformer
     /** Verbs returning a Promise — trigger async IIFE + `await` wrapping. */
     private const CHAIN_AWAITABLE = ['fetch', 'exchangeMagicLink', 'requestMagicLink', 'logoutServer'];
 
-    /** Per-verb keyword-args carrying translation KEYS resolved at compile time. */
+    /** Per-verb keyword-args carrying translation KEYS, looked up in the request's language. */
     private const TRANSLATABLE_KEYWORD_ARGS = [
         'fetch' => ['toastSuccessKey', 'toastErrorKey'],
     ];
@@ -44,8 +53,22 @@ class CallTransformer
     /** Transform every {{call:...}} in $value into QS.*() JS (chain-aware). */
     public static function transform(string $value): string
     {
+        return self::resolveSegments(self::transformSegments($value));
+    }
+
+    /**
+     * transform(), with each translatable argument left for the caller to look
+     * up: a list of JavaScript strings and ['arg' => <key>, 'keyword' => <name>
+     * or null] entries, in order. One walk of the chain for both uses, so the
+     * live render and a build cannot write different JavaScript around the
+     * argument.
+     *
+     * @return array<int, string|array{arg: string, keyword: ?string}>
+     */
+    public static function transformSegments(string $value): array
+    {
         if (!preg_match_all('/\{\{call:([a-zA-Z][a-zA-Z0-9]*)(:[^}]*)?\}\}/', $value, $matches, PREG_SET_ORDER)) {
-            return $value;
+            return [$value];
         }
         $allowed = self::allowedFunctions();
         $syncPrelude = [];
@@ -65,14 +88,14 @@ class CallTransformer
                 error_log("Unknown QS function: {$fn} (not in the runtime verb catalogue)");
                 // Context-neutral message (was "at render"/"at compile" in the
                 // two old copies — unified here).
-                $syncPrelude[] = "console.warn('[QS] unknown verb {{call:{$fn}:...}} dropped — not in the QuickSite runtime verb catalogue')";
+                $syncPrelude[] = ["console.warn('[QS] unknown verb {{call:{$fn}:...}} dropped — not in the QuickSite runtime verb catalogue')"];
                 continue;
             }
-            $callJs = self::buildCallJs($fn, $argsString);
+            $callSegments = self::buildCallSegments($fn, $argsString);
             if (in_array($fn, self::CHAIN_SYNC_PRELUDE, true)) {
-                $syncPrelude[] = $callJs;
+                $syncPrelude[] = $callSegments;
             } else {
-                $body[] = $callJs;
+                $body[] = $callSegments;
                 if (in_array($fn, self::CHAIN_AWAITABLE, true)) {
                     $hasAwaitable = true;
                 }
@@ -81,88 +104,112 @@ class CallTransformer
 
         $parts = [];
         if (!empty($syncPrelude)) {
-            $parts[] = implode(';', $syncPrelude);
+            $parts[] = self::joinSegments($syncPrelude, ';');
         }
         if (!empty($body)) {
             if ($hasAwaitable) {
-                $awaited = array_map(fn($c) => 'await ' . $c, $body);
-                $parts[] = "(async()=>{" . implode(';', $awaited) . "})().catch(e=>console.warn('[QS] chain aborted:',e))";
+                $awaited = array_map(fn($c) => array_merge(['await '], $c), $body);
+                $parts[] = array_merge(
+                    ['(async()=>{'],
+                    self::joinSegments($awaited, ';'),
+                    ["})().catch(e=>console.warn('[QS] chain aborted:',e))"]
+                );
             } else {
-                $parts[] = implode(';', $body);
+                $parts[] = self::joinSegments($body, ';');
             }
         }
-        return implode(';', $parts);
+        return self::mergeStrings(self::joinSegments($parts, ';'));
     }
 
-    private static function buildCallJs(string $fn, string $argsString): string
+    /**
+     * Segments joined into JavaScript, each translatable argument looked up now,
+     * in this request's language.
+     */
+    public static function resolveSegments(array $segments): string
+    {
+        $js = '';
+        foreach ($segments as $segment) {
+            $js .= is_string($segment)
+                ? $segment
+                : qs_translated_call_argument($segment['arg'], $segment['keyword']);
+        }
+        return $js;
+    }
+
+    /** implode() over segment lists. */
+    private static function joinSegments(array $lists, string $separator): array
+    {
+        $joined = [];
+        foreach (array_values($lists) as $i => $list) {
+            if ($i > 0) {
+                $joined[] = $separator;
+            }
+            foreach ($list as $segment) {
+                $joined[] = $segment;
+            }
+        }
+        return $joined;
+    }
+
+    /** Adjacent strings folded into one, so a chain with nothing to look up is one string. */
+    private static function mergeStrings(array $segments): array
+    {
+        $merged = [];
+        foreach ($segments as $segment) {
+            $last = count($merged) - 1;
+            if (is_string($segment) && $last >= 0 && is_string($merged[$last])) {
+                $merged[$last] .= $segment;
+            } else {
+                $merged[] = $segment;
+            }
+        }
+        return $merged;
+    }
+
+    private static function buildCallSegments(string $fn, string $argsString): array
     {
         if ($argsString === '') {
-            return "QS.{$fn}()";
+            return ["QS.{$fn}()"];
         }
-        $jsKeywords = ['event', 'this'];
         $args = preg_split('/(?<!\\\\),/', $argsString);
         $args = array_map(fn($a) => trim(str_replace('\\,', ',', $a)), $args);
 
         $translatableKwargs = self::TRANSLATABLE_KEYWORD_ARGS[$fn] ?? [];
-        if (!empty($translatableKwargs)) {
-            $args = array_map(function ($arg) use ($translatableKwargs) {
-                $eq = strpos($arg, '=');
-                if ($eq === false) return $arg;
-                $key = substr($arg, 0, $eq);
-                $val = substr($arg, $eq + 1);
-                if ($val === '' || !in_array($key, $translatableKwargs, true)) return $arg;
-                return $key . '=' . Translator::translate($val);
-            }, $args);
-        }
-
         $translatablePositions = self::getTranslatablePositionalIndices($fn);
-        foreach ($translatablePositions as $idx) {
-            if (!isset($args[$idx]) || $args[$idx] === '') continue;
-            if (strpos($args[$idx], '=') !== false) continue;
-            $args[$idx] = self::resolveTranslationKeyOrFallback($args[$idx]);
-        }
 
-        $quoted = array_map(function ($arg) use ($jsKeywords) {
-            if (in_array($arg, $jsKeywords, true)) return $arg;
-            return self::jsSingleQuoted($arg);
-        }, $args);
-        return "QS.{$fn}(" . implode(', ', $quoted) . ")";
+        $segments = ["QS.{$fn}("];
+        foreach ($args as $i => $arg) {
+            if ($i > 0) {
+                $segments[] = ', ';
+            }
+            $segments[] = self::argumentSegment($arg, $i, $translatableKwargs, $translatablePositions);
+        }
+        $segments[] = ')';
+        return $segments;
     }
 
     /**
-     * One argument as a complete single-quoted JavaScript literal: whatever
-     * $value holds, the literal is valid, reads back as exactly $value, and
-     * carries no "<" into the page.
+     * One argument: a translatable one as ['arg', 'keyword'] for the lookup,
+     * anything else written now.
      *
-     * Single quotes, because isValidHandler()'s scanner understands only those.
-     * What is escaped, and why:
-     *   \  '              the literal's own escape and delimiter
-     *   LF CR U+2028 U+2029
-     *                     line terminators: a raw one ends the literal early, a
-     *                     syntax error that takes the whole handler — or the
-     *                     whole page-events script — down with it
-     *   <                 as \x3C: the call lands inside a <script> element (page
-     *                     events) or an attribute, and a "<" from a value could
-     *                     end the element or switch the HTML tokenizer's state
-     *   NUL               as \x00: the HTML parser replaces a raw one with U+FFFD,
-     *                     so the literal would no longer hold the value
-     * strtr() makes one pass and never rescans what it wrote, so no escape can
-     * be escaped again. The escapes for line terminators, "<" and NUL are a
-     * backslash and ASCII letters and digits: htmlspecialchars() leaves them
-     * alone, so an attribute reads them exactly as a script element does.
+     *   keyword  `name=<key>`, when the verb lists `name` and the key is not empty
+     *   position an argument at a position the catalogue marks `translationKey`,
+     *            when it is not empty and is not itself a `name=value`
      */
-    private static function jsSingleQuoted(string $value): string
+    private static function argumentSegment(string $arg, int $index, array $translatableKwargs, array $translatablePositions)
     {
-        return "'" . strtr($value, [
-            '\\'       => '\\\\',
-            "'"        => "\\'",
-            "\n"       => '\\n',
-            "\r"       => '\\r',
-            "\u{2028}" => '\\u2028',
-            "\u{2029}" => '\\u2029',
-            '<'        => '\\x3C',
-            "\0"       => '\\x00',
-        ]) . "'";
+        $eq = strpos($arg, '=');
+        if ($eq !== false && !empty($translatableKwargs)) {
+            $key = substr($arg, 0, $eq);
+            $val = substr($arg, $eq + 1);
+            if ($val !== '' && in_array($key, $translatableKwargs, true)) {
+                return ['arg' => $val, 'keyword' => $key];
+            }
+        }
+        if ($eq === false && $arg !== '' && in_array($index, $translatablePositions, true)) {
+            return ['arg' => $arg, 'keyword' => null];
+        }
+        return qs_call_argument_js($arg);
     }
 
     private static function getTranslatablePositionalIndices(string $fn): array
@@ -181,15 +228,6 @@ class CallTransformer
             break;
         }
         return self::$translatablePositionalCache[$fn] = $indices;
-    }
-
-    private static function resolveTranslationKeyOrFallback(string $value): string
-    {
-        $translated = Translator::translate($value);
-        if (strpos($translated, '{translation missing:') === 0) {
-            return $value;
-        }
-        return $translated;
     }
 
     /**

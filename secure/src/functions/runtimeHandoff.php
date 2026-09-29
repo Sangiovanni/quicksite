@@ -85,6 +85,92 @@ if (!function_exists('qs_inline_script_json')) {
     }
 }
 
+if (!function_exists('qs_js_single_quoted')) {
+    /**
+     * One call argument as a complete single-quoted JavaScript literal: whatever
+     * $value holds, the literal is valid, reads back as exactly $value, and
+     * carries no "<" into the page.
+     *
+     * A data value goes through qs_inline_script_json() above; a call argument
+     * goes through this literal. It lives here, beside the encoder, for the same
+     * reason: a build copies this file, and a built page of a multilingual site
+     * writes its translated call arguments when it is served
+     * (qs_translated_call_argument() below).
+     *
+     * Single quotes, because CallTransformer::isValidHandler()'s scanner
+     * understands only those. What is escaped, and why:
+     *   \  '              the literal's own escape and delimiter
+     *   LF CR U+2028 U+2029
+     *                     line terminators: a raw one ends the literal early, a
+     *                     syntax error that takes the whole handler — or the
+     *                     whole page-events script — down with it
+     *   <                 as \x3C: the call lands inside a <script> element (page
+     *                     events) or an attribute, and a "<" from a value could
+     *                     end the element or switch the HTML tokenizer's state
+     *   NUL               as \x00: the HTML parser replaces a raw one with U+FFFD,
+     *                     so the literal would no longer hold the value
+     * strtr() makes one pass and never rescans what it wrote, so no escape can
+     * be escaped again. The escapes for line terminators, "<" and NUL are a
+     * backslash and ASCII letters and digits: htmlspecialchars() leaves them
+     * alone, so an attribute reads them exactly as a script element does.
+     */
+    function qs_js_single_quoted(string $value): string
+    {
+        return "'" . strtr($value, [
+                '\\'       => '\\\\',
+                "'"        => "\\'",
+                "\n"       => '\\n',
+                "\r"       => '\\r',
+                "\u{2028}" => '\\u2028',
+                "\u{2029}" => '\\u2029',
+                '<'        => '\\x3C',
+                "\0"       => '\\x00',
+        ]) . "'";
+    }
+}
+
+if (!function_exists('qs_call_argument_js')) {
+    /**
+     * One argument as it is written into a QS.*() call: the handler's own
+     * `event` or `this` bare, anything else as a qs_js_single_quoted() literal.
+     */
+    function qs_call_argument_js(string $value): string
+    {
+        return ($value === 'event' || $value === 'this') ? $value : qs_js_single_quoted($value);
+    }
+}
+
+if (!function_exists('qs_translated_call_argument')) {
+    /**
+     * A translatable call argument, looked up in THIS request's language and
+     * written as qs_call_argument_js() writes any argument.
+     *
+     * Both surfaces call it: the live render while it renders, and a compiled
+     * page of a multilingual build each time it is served. A build compiles
+     * each route once, so a lookup made while building would answer in the
+     * build's language for every language of the site.
+     *
+     * @param string      $value   The argument as authored: a translation key.
+     * @param string|null $keyword The keyword argument's name (`toastSuccessKey`),
+     *                             or null for a positional argument.
+     *   positional: a value with no translation passes through unchanged — it is
+     *               the author's own text (the "Custom text" choice)
+     *   keyword:    written as `name=<translation>`, the missing marker included
+     */
+    function qs_translated_call_argument(string $value, ?string $keyword): string
+    {
+        require_once __DIR__ . '/../classes/Translator.php';
+        $translated = Translator::translate($value);
+        if ($keyword !== null) {
+            return qs_call_argument_js($keyword . '=' . $translated);
+        }
+        if (strpos($translated, '{translation missing:') === 0) {
+            $translated = $value;
+        }
+        return qs_call_argument_js($translated);
+    }
+}
+
 if (!function_exists('qs_runtime_handoff')) {
     /**
      * Emit the whole handoff for one page.
@@ -123,7 +209,16 @@ if (!function_exists('qs_runtime_handoff')) {
         //    the path carries no id at all, so anything derived from
         //    location.pathname would give development and production different
         //    key prefixes for the same site.
-        $out .= '<script>window.QS_PROJECT=' . qs_inline_script_json($projectKey) . ';</script>';
+        //
+        //    QS_MULTILINGUAL rides the same tag, for the same reason it must come
+        //    before qs.js: the route matcher runs when qs.js loads, and it strips
+        //    a leading language segment only on a multilingual site. A
+        //    single-language site's URL carries no language, so a first segment
+        //    equal to its <html lang> is a page address. Read from the constant
+        //    rather than supplied: both surfaces define it from the same config.
+        $multilingual = defined('MULTILINGUAL_SUPPORT') && MULTILINGUAL_SUPPORT;
+        $out .= '<script>window.QS_PROJECT=' . qs_inline_script_json($projectKey)
+              . ';window.QS_MULTILINGUAL=' . ($multilingual ? 'true' : 'false') . ';</script>';
 
         // 3. The library.
         $out .= '<script src="' . $base . 'scripts/qs.js"></script>';
