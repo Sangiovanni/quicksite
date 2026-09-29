@@ -1224,7 +1224,7 @@ PHP and the browser runtime:
 | Block | Carries |
 |---|---|
 | `qs-route-schema.js` | `window.QS_ROUTES` — the client-side path matcher's table |
-| `window.QS_PROJECT` | the project id every browser-storage key is prefixed with |
+| `window.QS_PROJECT`, `window.QS_MULTILINGUAL` | the project id every browser-storage key is prefixed with; whether the site is multilingual (the route matcher strips a language segment only then) |
 | `qs.js` | the runtime itself |
 | `window.QS_CONSENT` | the key→category map that gates storage writes |
 | theme wiring | `[data-theme-toggle]` behaviour, keyed per project |
