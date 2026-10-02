@@ -33,13 +33,13 @@ if (!qs_project_has_language($langCode)) {
         ->withMessage("Language not found")
         ->withData([
             'code' => $langCode,
-            'existing_languages' => CONFIG['LANGUAGES_SUPPORTED']
+            'existing_languages' => qs_project_language_codes()
         ])
         ->send();
 }
 
 // Prevent removing default language
-if ($langCode === CONFIG['LANGUAGE_DEFAULT']) {
+if ($langCode === qs_project_default_language()) {
     ApiResponse::create(400, 'validation.invalid_format')
         ->withMessage("Cannot remove default language")
         ->withErrors([['field' => 'code', 'reason' => 'is_default_language']])
@@ -47,7 +47,7 @@ if ($langCode === CONFIG['LANGUAGE_DEFAULT']) {
 }
 
 // Prevent removing last language
-if (count(CONFIG['LANGUAGES_SUPPORTED']) === 1) {
+if (count(qs_project_language_codes()) === 1) {
     ApiResponse::create(400, 'validation.invalid_format')
         ->withMessage("Cannot remove last language")
         ->send();
@@ -70,7 +70,7 @@ if (!is_array($current_config)) {
 
 // Remove the language from the list
 $current_config['LANGUAGES_SUPPORTED'] = array_values(
-    array_filter($current_config['LANGUAGES_SUPPORTED'], fn($lang) => $lang !== $langCode)
+    array_filter(qs_project_language_codes($current_config), fn($lang) => $lang !== $langCode)
 );
 
 $refusal = qs_project_settings_guard($current_config, ['LANGUAGES_SUPPORTED']);

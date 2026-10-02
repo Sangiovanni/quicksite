@@ -12597,3 +12597,102 @@ sweep was measured at scale. `secure/src/functions/SessionManagement.php`
 `secure/management/config/auth.php.example`.
 Behaviour: [ARCHITECTURE.md §3](ARCHITECTURE.md), [COMMAND_API.md](COMMAND_API.md)
 (*Authentication*).
+
+### An archive names its languages or is refused, a project that exists has one language fallback, and one delete removes every tree (locked 2026-10-02)
+
+**Amends**: *A new project starts in the installation's default language* (locked
+2026-09-28). Its decision stands for a new project. Its statement that an imported
+archive which lists no language — no `LANGUAGES_SUPPORTED` in its `config.json`, or no
+`config.json` at all — gets the installation's default language no longer holds: such an
+archive is refused, below. **Extends**: *A delete that fails reports what survived, and
+keeps what a retry needs* (locked 2026-08-24), whose `qs_delete_tree()` is now the delete
+every command uses; and *An export carries the project's snippets; every file the site
+reads refuses a broken archive whole* (locked 2026-09-25), whose one-spelling rule for an
+entry's name now covers case.
+
+**Decision**: six changes, made together.
+
+- **An archive names its languages.** The import refuses, whole and before anything is
+  written, an archive whose project folder has no `config.json` (`400
+  validation.unsafe_param`, reason `missing_file`) and one whose `config.json` has no
+  `LANGUAGES_SUPPORTED` — an empty `{}` included (reason `invalid_setting`, value
+  `LANGUAGES_SUPPORTED`). The archive gate reads the entry names first, from the archive's
+  directory, before any entry is decompressed; then it checks `config.json`'s list is there
+  before it checks any other setting. The import no longer builds a default configuration
+  and never chooses a project's languages: a `LANGUAGE_DEFAULT` the archive leaves out is
+  the first language of its list. The rebuild of `config.php` keeps a second layer: an
+  archive that reached it without its list fails and is rolled back.
+- **Names the engine reads at a fixed spelling are spelled exactly.** An entry that spells
+  `config.json`, `routes.json` or the folders `config/`, `translate/`, `data/`, `snippets/`,
+  `public/` or `templates/model/json/` other than in lowercase refuses the whole archive
+  (`unsafe_path`). An archive identified only by a `config.php` or a `routes.php` — a format
+  no export writes — is no longer recognised as a project folder.
+- **The export always names the project's languages:** its list, or, when its
+  configuration lists none, its default language.
+- **A project that exists has one language fallback.** Its default language is its
+  `LANGUAGE_DEFAULT`, else `en`; its languages are its `LANGUAGES_SUPPORTED`, else its
+  default language alone. Two functions in `projectLanguage.php`, which a build carries,
+  answer both, for the current project or for a configuration a caller holds, and every
+  place that reads an existing project's languages asks them: the router, the translator,
+  the link builder in the preview and in a build's compiled pages, every command, the
+  admin panel and the project listing. The link builder's own fallback list, `en` and
+  `fr`, is gone. The commands that add or remove a language start from the languages the
+  project is served in.
+- **One delete removes every tree.** Every command that removes a directory tree — a
+  failed import's or clone's rollback, a backup deleted or pruned, the folders a restore
+  replaces — calls `qs_delete_tree()`; the four private copies are gone. It behaves the
+  same on every operating system: an entry that leads somewhere other than where it sits —
+  a symlink, or a Windows junction, which PHP does not report as a link — is removed as a
+  link and what it points to is left alone, and a file marked read-only is removed, as
+  Linux removes one, with its mark given back when it still cannot be.
+- **A rollback says what it could not remove**, in the PHP error log; its response is
+  the failure that caused it, as before. A restore that cannot clear a folder before
+  copying the backup over it says so in its `errors`.
+
+**Reasoning**: an archive without its languages is not one the export writes — the export
+always carries `config.json`, and every project has a language list — so giving one the
+installation's default language chose a project's languages for it, silently. Refusing it
+says what is missing. Reading the names first refuses such an archive before a byte of it
+is decompressed, and checking the list before the other settings makes the refusal name
+the setting that is actually missing.
+
+The import checked `config.json`'s settings whatever its case but rebuilt the project from
+the file named exactly `config.json`. On Windows the two are one file; on Linux a
+`CONFIG.JSON` was checked and then ignored, and the project got the defaults. The same
+holds for every folder the engine reads by name. One spelling makes an archive import the
+same way on every system, as the clean-name rule already did for slashes and dots.
+
+A project whose configuration leaves a setting out can exist only by a hand edit — no
+command removes the list — but where it did, the readers disagreed: the link builder
+treated `en` and `fr` as the project's languages, six readers assumed `en`, three assumed
+none, and the orphan-translation cleaner would then have deleted every translation file,
+the one the site falls back to included. One answer, in the file a build carries, makes
+the preview, a build and every command agree.
+
+Five recursive deletes existed, measured on PHP 8.0 and 8.4 under Windows and PHP 8.3
+under Linux: the import's emptied the target of a linked directory, the loop three of them
+shared deleted the target of a linked file outside the tree, none removed a read-only file
+on Windows, and the shared one descended into a Windows junction. One delete, with the link and read-only rules made
+explicit, removes a tree the same way wherever it runs.
+
+**Alternatives considered**: giving an archive that lists no language the installation's
+default (the previous rule; rejected — the import would keep choosing a project's languages
+for an archive no export made). Lowercasing the names the engine reads instead of refusing
+another spelling (rejected — it would also rewrite names that legitimately carry capitals,
+such as an image a page refers to, and two entries differing only in case would become one
+file with no rule for which wins). The export refusing a project that lists no language (not
+taken — the runtime serves such a project in its default language, so its archive names
+that). Changing only the link builder's `en` / `fr` (rejected — the other readers disagreed
+too). Keeping each command's own delete (rejected — they behaved differently with links,
+and differently on each system).
+
+**Source**: Sangio's rulings of 2026-10-01 and 2026-10-02, during beta.12.
+`secure/management/command/importProject.php` (`importFirstStructureFailure`,
+`importEntryNameRefusal`, `importFirstInvalidSetting`, `rebuildPhpFromJson`,
+`findProjectFolderInZip`), `exportProject.php` (`exportConfigAsJson`);
+`secure/src/functions/projectLanguage.php` (`qs_project_default_language`,
+`qs_project_language_codes`); `secure/src/functions/FileSystem.php` (`qs_delete_tree`,
+`qs_delete_tree_rollback`); `cloneProject`, `restoreBackup`, `deleteBackup` and
+`backupProject` under `secure/management/command/`. Behaviour: the `importProject`,
+`exportProject` and `getLanguageList` entries of `help`, and
+[COMMAND_API.md](COMMAND_API.md) (*Export / Import*, *Archive import limits*).

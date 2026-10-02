@@ -342,7 +342,7 @@ function __command_editComponentToNode(array $params = [], array $urlParams = []
         }
         
         // Create renderer with editor mode enabled
-        $lang = CONFIG['LANGUAGE_DEFAULT'] ?? 'en';
+        $lang = qs_project_default_language();
         $translator = new Translator($lang);
         $renderer = new JsonToHtmlRenderer($translator, ['editorMode' => true]);
         

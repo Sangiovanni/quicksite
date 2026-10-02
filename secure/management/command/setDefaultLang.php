@@ -48,14 +48,14 @@ if (!qs_project_has_language($langCode)) {
         ->withMessage("Language not found")
         ->withData([
             'code' => $langCode,
-            'available_languages' => CONFIG['LANGUAGES_SUPPORTED'],
+            'available_languages' => qs_project_language_codes(),
             'hint' => 'Use addLang to add a new language first'
         ])
         ->send();
 }
 
 // Check if already the default
-if ($langCode === CONFIG['LANGUAGE_DEFAULT']) {
+if ($langCode === qs_project_default_language()) {
     ApiResponse::create(200, 'operation.no_change')
         ->withMessage("Language is already the default")
         ->withData([
@@ -66,7 +66,7 @@ if ($langCode === CONFIG['LANGUAGE_DEFAULT']) {
 }
 
 // Store previous default for response
-$previousDefault = CONFIG['LANGUAGE_DEFAULT'];
+$previousDefault = qs_project_default_language();
 $previousName = qs_language_label((string) $previousDefault);
 
 // --- UPDATE CONFIG FILE ---

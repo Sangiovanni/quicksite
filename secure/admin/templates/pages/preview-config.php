@@ -23,6 +23,7 @@ $__previewRouteResolvers = loadResolversSidecar($editProjectPath ?? null);
 require_once SECURE_FOLDER_PATH . '/src/classes/TagRegistry.php';
 // qs_inline_script_json(), the encoder for a value in an inline script.
 require_once SECURE_FOLDER_PATH . '/src/functions/runtimeHandoff.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/projectLanguage.php'; // qs_project_default_language
 if (!isset($editConfig)) {
     $editConfig = defined('CONFIG') ? CONFIG : [];
 }
@@ -163,7 +164,7 @@ window.PreviewConfig = {
     authToken: <?= json_encode($router->getToken()) ?>,
     structureUrl: <?= json_encode($router->url('structure')) ?>,
     multilingual: <?= json_encode($editConfig['MULTILINGUAL_SUPPORT'] ?? false) ?>,
-    defaultLang: <?= json_encode($editConfig['LANGUAGE_DEFAULT'] ?? 'en') ?>,
+    defaultLang: <?= json_encode(qs_project_default_language($editConfig)) ?>,
     
     // Theme mode
     themeModeEnabled: <?= json_encode($editConfig['THEME_MODE_ENABLED'] ?? false) ?>,

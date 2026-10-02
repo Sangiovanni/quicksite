@@ -20,6 +20,7 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/projectLanguage.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/consentHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/consentLayerHelpers.php';
@@ -68,8 +69,7 @@ if (!$wroteBanner || !$wrotePopup) {
 //    Other languages are translated via the Translation Manager (the textKeys
 //    surface there as missing). fr default → French map; otherwise English.
 $seed = consentTranslationSeed();
-$defaultLang = (defined('CONFIG') && isset(CONFIG['LANGUAGE_DEFAULT']) && is_string(CONFIG['LANGUAGE_DEFAULT']))
-    ? CONFIG['LANGUAGE_DEFAULT'] : 'en';
+$defaultLang = qs_project_default_language();
 $languagesSeeded = [];
 $flat = ($defaultLang === 'fr') ? $seed['fr'] : $seed['en'];
 $newOnly = consentFilterNewKeys($defaultLang, $flat);

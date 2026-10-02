@@ -360,8 +360,10 @@ class JsonToPhpCompiler {
             // Build URL with language prefix
             $fullUrl = defined('BASE_URL') ? BASE_URL : '';
             if (defined('MULTILINGUAL_SUPPORT') && MULTILINGUAL_SUPPORT && !empty($lang)) {
-                // Don't add language if URL already starts with a language code
-                $supportedLangs = defined('CONFIG') && isset(CONFIG['LANGUAGES_SUPPORTED']) ? CONFIG['LANGUAGES_SUPPORTED'] : ['en', 'fr'];
+                // Don't add language if URL already starts with one of the project's
+                // language codes (qs_project_languages(): its list, or its default
+                // language when its config has none)
+                $supportedLangs = qs_project_languages();
                 $__prefixQuoted = [];
                 foreach ($supportedLangs as $__sl) {
                     $__prefixQuoted[] = preg_quote((string) $__sl, '/');
@@ -385,7 +387,7 @@ class JsonToPhpCompiler {
             // pair — a built site that speaks es/de gets the same treatment en/fr
             // used to get for free. Empty on a mono-language build, where a URL
             // that looks like a language code is an ordinary route.
-            $__langCodes = function_exists('qs_project_languages') ? qs_project_languages() : [];
+            $__langCodes = qs_project_languages();
             if (!empty($__langCodes)) {
                 $__quoted = [];
                 foreach ($__langCodes as $__lc) {

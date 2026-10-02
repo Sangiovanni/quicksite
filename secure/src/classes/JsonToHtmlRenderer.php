@@ -82,7 +82,7 @@ class JsonToHtmlRenderer {
         // and a caller that supplies one (every page template does) is
         // untouched.
         if (empty($this->context['lang']) && defined('CONFIG')) {
-            $this->context['lang'] = CONFIG['LANGUAGE_DEFAULT'] ?? 'en';
+            $this->context['lang'] = qs_project_default_language();
         }
 
         // Auto-detect editor mode from query parameter if not explicitly set
@@ -1295,8 +1295,10 @@ class JsonToHtmlRenderer {
         if (defined('MULTILINGUAL_SUPPORT') && MULTILINGUAL_SUPPORT && !empty($this->context['lang'])) {
             // Don't add language to asset paths (/assets/, /style/)
             if (!preg_match('/^\/(assets|style)\//i', $url)) {
-                // Don't add language if URL already starts with a language code
-                $supportedLangs = defined('CONFIG') && isset(CONFIG['LANGUAGES_SUPPORTED']) ? CONFIG['LANGUAGES_SUPPORTED'] : ['en', 'fr'];
+                // Don't add language if URL already starts with one of the project's
+                // language codes (qs_project_languages(): its list, or its default
+                // language when its config has none)
+                $supportedLangs = qs_project_languages();
                 $langPattern = '/^\/(' . implode('|', array_map(static fn($l) => preg_quote((string) $l, '/'), $supportedLangs)) . ')(\/|$)/';
                 if (!preg_match($langPattern, $url)) {
                     $fullUrl .= $this->context['lang'] . '/';

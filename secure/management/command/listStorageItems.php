@@ -14,15 +14,14 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/projectLanguage.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/storageHelpers.php';
 
 $registry = loadStorageRegistry();
 
 $descLang = storageDescLang($registry);
-$languages = (defined('CONFIG') && isset(CONFIG['LANGUAGES_SUPPORTED']) && is_array(CONFIG['LANGUAGES_SUPPORTED']))
-    ? array_values(array_filter(CONFIG['LANGUAGES_SUPPORTED'], fn($l) => is_string($l) && $l !== '' && $l !== 'default'))
-    : [$descLang];
+$languages = array_values(array_filter(qs_project_language_codes(), fn($l) => $l !== 'default'));
 if (empty($languages)) {
     $languages = [$descLang];
 }

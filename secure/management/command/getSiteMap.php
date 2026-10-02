@@ -65,8 +65,8 @@ function __command_getSiteMap(array $params = [], array $urlParams = []): ApiRes
         }
     }
     $multilingual = CONFIG['MULTILINGUAL_SUPPORT'] ?? false;
-    $languages = CONFIG['LANGUAGES_SUPPORTED'] ?? ['en'];
-    $defaultLang = CONFIG['LANGUAGE_DEFAULT'] ?? 'en';
+    $languages = qs_project_language_codes();
+    $defaultLang = qs_project_default_language();
     // Names come from the installation's language list; a project stores codes only.
     $languageNames = [];
     foreach ($languages as $code) {

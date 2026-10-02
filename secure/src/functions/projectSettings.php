@@ -32,7 +32,6 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/filePolicy.php'; // qs_favicon_extensions
-require_once SECURE_FOLDER_PATH . '/src/functions/languageRegistry.php'; // qs_language_default
 
 const QS_PROJECT_SETTING_KEYS = [
     'SITE_NAME',
@@ -50,8 +49,7 @@ const QS_PROJECT_SETTING_KEYS = [
  * Why $value cannot be setting $key, or null when it can.
  *
  * @param array $settings the settings it is written beside: LANGUAGE_DEFAULT must be listed in
- *                        their LANGUAGES_SUPPORTED (the installation's default language when they
- *                        have none — the list the import's rebuild then gives the project)
+ *                        their LANGUAGES_SUPPORTED, so beside no list it is refused
  */
 function qs_project_setting_error(string $key, $value, array $settings = []): ?string
 {
@@ -71,7 +69,7 @@ function qs_project_setting_error(string $key, $value, array $settings = []): ?s
                 : "LANGUAGES_SUPPORTED must be a list of distinct language codes ({$codeRule}), not empty.";
 
         case 'LANGUAGE_DEFAULT':
-            $list = $settings['LANGUAGES_SUPPORTED'] ?? [qs_language_default()];
+            $list = $settings['LANGUAGES_SUPPORTED'] ?? null;
             return (is_string($value) && RegexPatterns::match('language_code', $value)
                     && is_array($list) && in_array($value, $list, true))
                 ? null
@@ -102,8 +100,9 @@ function qs_project_setting_error(string $key, $value, array $settings = []): ?s
 
 /**
  * The first setting in $settings its rule refuses, or null. A setting that is absent (or null)
- * is not checked: the import's rebuild gives it its default. Keys that are not settings are
- * ignored — the import does not take them.
+ * is not checked: the import's rebuild gives it its default, except LANGUAGES_SUPPORTED, whose
+ * absence the import refuses before it asks this. Keys that are not settings are ignored — the
+ * import does not take them.
  *
  * @return array{key: string, message: string}|null
  */

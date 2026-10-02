@@ -37,6 +37,7 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/projectLanguage.php';
 
 function __command_cleanOrphanTranslations(array $params = [], array $urlParams = []): ApiResponse {
     $dryRun = !empty($params['dry_run']);
@@ -66,10 +67,7 @@ function __command_cleanOrphanTranslations(array $params = [], array $urlParams 
             ->withMessage('CONFIG not loaded');
     }
 
-    $supported = CONFIG['LANGUAGES_SUPPORTED'] ?? [];
-    if (!is_array($supported)) {
-        $supported = [];
-    }
+    $supported = qs_project_language_codes();
 
     // Build the "keep" set: every supported language code + the special 'default' file.
     // Using flip+isset for O(1) lookup; tolerates case-sensitivity differences by lowercasing.

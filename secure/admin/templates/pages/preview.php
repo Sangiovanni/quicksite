@@ -10,6 +10,8 @@
  * @version 2.1.0
  */
 
+require_once SECURE_FOLDER_PATH . '/src/functions/projectLanguage.php'; // the edited project's languages
+
 // Get auth token for API calls
 $token = $router->getToken();
 
@@ -21,11 +23,12 @@ $editProject     = $router->getCurrentProject() ?: (defined('PROJECT_NAME') ? PR
 $editProjectPath = SECURE_FOLDER_PATH . '/projects/' . $editProject;
 $editConfigFile  = $editProjectPath . '/config.php';
 $editConfig      = is_file($editConfigFile) ? (require $editConfigFile) : (defined('CONFIG') ? CONFIG : []);
+$editConfig      = is_array($editConfig) ? $editConfig : [];
 
 // Get multilingual config (of the EDITED project)
 $isMultilingual = $editConfig['MULTILINGUAL_SUPPORT'] ?? false;
-$defaultLang = $editConfig['LANGUAGE_DEFAULT'] ?? 'en';
-$languages = $isMultilingual ? ($editConfig['LANGUAGES_SUPPORTED'] ?? [$defaultLang]) : [$defaultLang];
+$defaultLang = qs_project_default_language($editConfig);
+$languages = $isMultilingual ? qs_project_language_codes($editConfig) : [$defaultLang];
 
 // Get site URL for iframe (start with default language) + ?_editor=1 for editor mode.
 // The project you EDIT is getCurrentProject() (per-user selected_project); every project

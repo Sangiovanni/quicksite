@@ -43,7 +43,7 @@ if (isset($_GET['_component']) && isset($_GET['_editor']) && $_GET['_editor'] ==
     
     require_once SECURE_FOLDER_PATH . '/src/classes/TrimParameters.php';
     $trimParameters = new TrimParameters();
-    $lang = $trimParameters->lang() ?: (CONFIG['LANGUAGE_DEFAULT'] ?? 'en');
+    $lang = $trimParameters->lang() ?: qs_project_default_language();
     
     require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';
     $translator = new Translator($lang);

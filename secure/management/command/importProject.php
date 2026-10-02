@@ -34,6 +34,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 // checked against the rule its writers follow (importFirstInvalidSetting()).
 require_once SECURE_FOLDER_PATH . '/src/functions/projectSettings.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/languageRegistry.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php'; // qs_delete_tree_rollback
 
 // The extension gate is an ALLOWLIST in filePolicy.php, not a blocklist here.
 // A blocklist had to enumerate every dangerous spelling, and missed three: it
@@ -50,28 +51,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/languageRegistry.php';
  * @return ApiResponse
  */
 function __command_importProject(array $params = [], array $urlParams = []): ApiResponse {
-    // ⚠ There is deliberately NO `array_merge($_GET, $_POST, $params)` here.
-    //
-    // The line that used to open this function was commented "merge query
-    // parameters for POST with multipart". The need behind it is real — a
-    // caller uploading an archive may put `name` and `switch_to` on the query
-    // string rather than in the multipart body — but it was already met: the
-    // dispatcher's TrimParametersManagement builds $params as $_GET merged
-    // with $_POST, in that same precedence, before this file is included. Over
-    // HTTP the merge was a no-op, and that those options still arrive was
-    // verified end to end.
-    //
-    // What it DID add was reach: it re-imported the ambient superglobals on
-    // EVERY call, an in-process one included, so every parameter this function
-    // reads was settable from the query string whatever the caller intended.
-    // That is how a branch commented "for internal calls" became a public one
-    // (S5.6a). A parameter this command reads is a parameter the web can set.
-
-    // Per-user resource limits (quota.php — absent file = no limits). The RATE
-    // axis first, before the archive is opened or a byte is read: an import is
-    // the most expensive upload QuickSite accepts, so a caller at their limit
-    // should be refused before any of that work is done. The counter is spent
-    // only by an import that actually completes.
+    
     require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
     $quotaUserId = (string)(getCurrentUser()['id'] ?? '');
     $rateWait = qs_quota_rate_wait($quotaUserId);
@@ -117,18 +97,6 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
         $uploadedFile = $file['name'];
     }
     // An uploaded file is the ONLY way an archive gets in.
-    //
-    // ⚠ There used to be a second method here: a `file_path` parameter,
-    // commented "for internal calls", that opened whatever absolute path it
-    // named — no project-name validation, no marker comparison, no base
-    // directory. It had no internal caller (importProject is not in
-    // CommandRunner's allowlist and no PHP file requires this one), it was
-    // documented nowhere, and because `projects.create` is a global
-    // access:'any' category it was reachable by every signed-in account,
-    // member of nothing. It handed them a filesystem existence oracle over the
-    // whole server and read past the containment that put each project's
-    // exports under its own marker. Removed in S5.6a — an import supplies its
-    // archive in the request body or not at all.
     else {
         // Same distinction uploadAsset draws: an archive PHP discarded for
         // exceeding post_max_size arrives here looking exactly like no archive
@@ -152,25 +120,6 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
             ])
             ->withErrors(['file' => 'Required. Upload a ZIP file as multipart/form-data.']);
     }
-    
-    // Options.
-    //
-    // ⚠ `overwrite` IS GONE (S2.5). It used to delete the existing project
-    // directory and re-create it from the archive, with the importer birth-
-    // written as sole owner — and with NO membership check of any kind.
-    // `projects.create` is a global access:'any' category, so that made
-    // "replace any project on this installation and take its id" available to
-    // every signed-in account, including one invited to edit a single
-    // unrelated project. Reproduced end to end: a non-member replaced
-    // another account's project and members.json came back naming the
-    // attacker as owner.
-    //
-    // The ruling is that two projects may never share an id, in any
-    // circumstance — which matters more since S2.4 made the id a browser
-    // storage namespace. So a collision now always refuses, and the way to
-    // reuse an id is to delete the project first: an explicit, owner-gated
-    // action that already exists as its own command, rather than a side effect
-    // of an upload.
     $newName = trim($params['name'] ?? '');
     $switchTo = filter_var($params['switch_to'] ?? false, FILTER_VALIDATE_BOOLEAN);
     
@@ -315,7 +264,7 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
     $zip->close();
     
     if (!$extractResult['success']) {
-        deleteImportDirectory($projectPath);
+        qs_delete_tree_rollback($projectPath, 'importProject');
         return ApiResponse::create(500, 'server.extract_failed')
             ->withMessage('Failed to extract project files')
             ->withData(['error' => $extractResult['error']]);
@@ -325,7 +274,7 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
     $rebuildResult = rebuildPhpFromJson($projectPath);
     
     if (!$rebuildResult['success']) {
-        deleteImportDirectory($projectPath);
+        qs_delete_tree_rollback($projectPath, 'importProject');
         return ApiResponse::create(500, 'server.rebuild_failed')
             ->withMessage('Failed to rebuild PHP files from JSON')
             ->withData(['error' => $rebuildResult['error']]);
@@ -335,7 +284,7 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
     $validation = validateImportedProject($projectPath);
     
     if (!$validation['valid']) {
-        deleteImportDirectory($projectPath);
+        qs_delete_tree_rollback($projectPath, 'importProject');
         return ApiResponse::create(400, 'validation.incomplete_project')
             ->withMessage('Imported project is incomplete')
             ->withErrors($validation['errors']);
@@ -359,7 +308,7 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
         error_log("importProject: discarded archive members.json for '{$projectName}' (owner='{$dOwner}', members={$dMembers}, invitations={$dInv}) — importer '{$importerId}' set as sole owner (C8 8.4 containment)");
     }
     if (!qs_project_birth_write_members($projectPath, $importerId)) {
-        deleteImportDirectory($projectPath);
+        qs_delete_tree_rollback($projectPath, 'importProject');
         return ApiResponse::create(500, 'server.file_write_failed')
             ->withMessage('Failed to initialise imported project membership');
     }
@@ -500,26 +449,26 @@ function checkArchiveLimits(ZipArchive $zip, ?int &$totalBytes = null): ?array {
 }
 
 /**
- * Find project folder in ZIP archive (v2.0 format)
+ * Find the project folder in the archive, as exportProject writes it: the folder
+ * holding config.json, routes.json or templates/model/json/, or the archive's
+ * root. Whether the folder holds what an import requires is the archive gate's
+ * question (importFirstStructureFailure()), which names what is missing.
  */
 function findProjectFolderInZip(ZipArchive $zip): ?array {
-    // Look for v2.0 format indicators: config.json, routes.json, or templates/model/json/
     for ($i = 0; $i < $zip->numFiles; $i++) {
         $name = $zip->getNameIndex($i);
         $parts = explode('/', $name);
-        
+
         $filename = basename($name);
-        
-        // Check for v2.0 JSON format
+
         if ($filename === 'config.json' || $filename === 'routes.json') {
             if (count($parts) === 1) {
-                return ['name' => 'imported_project', 'prefix' => '', 'format' => 'v2.0'];
+                return ['name' => 'imported_project', 'prefix' => ''];
             } elseif (count($parts) === 2) {
-                return ['name' => $parts[0], 'prefix' => $parts[0] . '/', 'format' => 'v2.0'];
+                return ['name' => $parts[0], 'prefix' => $parts[0] . '/'];
             }
         }
-        
-        // Check for templates/model/json/ structure
+
         if (strpos($name, 'templates/model/json/') !== false) {
             // Extract project folder name from path
             $jsonPos = strpos($name, '/templates/model/json/');
@@ -527,21 +476,12 @@ function findProjectFolderInZip(ZipArchive $zip): ?array {
                 $projectFolder = substr($name, 0, $jsonPos);
                 $firstSlash = strpos($projectFolder, '/');
                 if ($firstSlash === false) {
-                    return ['name' => $projectFolder, 'prefix' => $projectFolder . '/', 'format' => 'v2.0'];
+                    return ['name' => $projectFolder, 'prefix' => $projectFolder . '/'];
                 }
             }
         }
-        
-        // Legacy: check for config.php or routes.php (v1.0 format - still supported)
-        if ($filename === 'config.php' || $filename === 'routes.php') {
-            if (count($parts) === 1) {
-                return ['name' => 'imported_project', 'prefix' => '', 'format' => 'v1.0'];
-            } elseif (count($parts) === 2) {
-                return ['name' => $parts[0], 'prefix' => $parts[0] . '/', 'format' => 'v1.0'];
-            }
-        }
     }
-    
+
     return null;
 }
 
@@ -717,9 +657,18 @@ function importEntryRelativePath(string $name, string $prefix): ?string {
  * never looked at, or skip one the site needs. `..` walks out of the project. So a
  * clean name is relative (no leading slash, no drive letter), holds no NUL byte,
  * and is made of segments that are neither empty, `.` nor `..`, and do not end in
- * a dot or a space. exportProject never writes another shape — every name it
- * carries is one the engine chose or validated — so a name that fails comes from
- * an archive built some other way, and the whole archive is refused for it.
+ * a dot or a space.
+ *
+ * Case is a spelling too. The engine reads `config.json`, `routes.json` and the
+ * folders `config/`, `translate/`, `data/`, `snippets/`, `public/` and
+ * `templates/model/json/` by those exact names; on Windows `CONFIG.JSON` or
+ * `Templates/` lands on them, on Linux it is another file the engine never reads.
+ * So a name that matches one of them only when case is ignored is not clean
+ * either, and an archive imports the same way on every system.
+ *
+ * exportProject never writes another shape — every name it carries is one the
+ * engine chose or validated — so a name that fails comes from an archive built
+ * some other way, and the whole archive is refused for it.
  *
  * @param string $relativePath the entry's path inside the project folder (importEntryRelativePath())
  * @param bool   $isDirectory  a directory entry, whose name ends in the one `/` the format gives it
@@ -745,6 +694,14 @@ function importEntryNameRefusal(string $relativePath, bool $isDirectory): ?strin
         $last = substr($segment, -1);
         if ($last === '.' || $last === ' ') {
             return 'Not a clean path: a segment ends in a dot or a space.';
+        }
+    }
+    $probe = $isDirectory ? $relativePath . '/' : $relativePath;
+    foreach (['config.json', 'routes.json', 'config/', 'translate/', 'data/', 'snippets/', 'public/',
+              'templates/', 'templates/model/', 'templates/model/json/'] as $fixed) {
+        $spelled = substr($fixed, -1) === '/' ? substr($probe, 0, strlen($fixed)) : $probe;
+        if ($spelled !== $fixed && strcasecmp($spelled, $fixed) === 0) {
+            return "Not a clean path: '{$spelled}' must be spelled '{$fixed}', the one spelling the engine reads.";
         }
     }
     return null;
@@ -900,32 +857,30 @@ function importFirstInvalidComponentReference(string $relativePath, string $cont
  * language code becomes part of a translation file's path — so a value no command
  * could have written refuses the whole archive.
  *
- * Each setting follows the one rule its writers follow, qs_project_setting_error()
- * in projectSettings.php. And every language the archive brings must be in this
- * installation's language list, as a language addLang adds must be: an import
- * adds languages to the installation's projects. When the archive lists no
- * languages, the rebuild gives the project the installation's default language
- * (qs_language_default()), which is then the list checked.
+ * An archive must name its languages: LANGUAGES_SUPPORTED is the one setting it
+ * cannot leave out, checked first. The import never chooses a language for a
+ * project — an archive without its list is not one exportProject wrote.
  *
- * A setting that is absent (or null) is not checked: the rebuild gives it its
- * default. A key that is not a setting is not imported, so it is not checked
- * either — an archive's language names included: a project stores codes only.
+ * Then each setting follows the one rule its writers follow,
+ * qs_project_setting_error() in projectSettings.php. And every language the
+ * archive brings must be in this installation's language list, as a language
+ * addLang adds must be: an import adds languages to the installation's projects.
+ *
+ * Any other setting that is absent (or null) is not checked: the rebuild gives it
+ * its default — the default language is the list's first. A key that is not a
+ * setting is not imported, so it is not checked either — an archive's language
+ * names included: a project stores codes only.
  *
  * @return array|null ['key' => the setting, 'message' => the rule it breaks]
  */
 function importFirstInvalidSetting(array $config): ?array {
+    if (!isset($config['LANGUAGES_SUPPORTED'])) {
+        return ['key' => 'LANGUAGES_SUPPORTED',
+                'message' => "LANGUAGES_SUPPORTED is missing, so the archive names no language. It must list the project's languages, each one in this installation's language list."];
+    }
     $bad = qs_project_settings_first_error($config);
     if ($bad !== null) {
         return $bad;
-    }
-    if (!isset($config['LANGUAGES_SUPPORTED'])) {
-        // The default comes from the installation's own setting, which is 'en'
-        // whenever that setting cannot be used, so it can only fail here when
-        // the installation's list leaves 'en' out.
-        $default = qs_language_default();
-        return qs_language_is_listed($default) ? null
-            : ['key' => 'LANGUAGES_SUPPORTED',
-               'message' => "The archive lists no language, and this installation's default language '{$default}' is not in its language list."];
     }
     foreach ($config['LANGUAGES_SUPPORTED'] as $code) {
         if (!qs_language_is_listed($code)) {
@@ -944,17 +899,22 @@ function importFirstInvalidSetting(array $config): ?array {
  * archive. A project imported with one page dropped keeps that page's route, and
  * the route 404s; a refused import leaves nothing on disk.
  *
- * Every entry's name must be a clean relative path — `unsafe_path` otherwise
- * (importEntryNameRefusal()), because only a clean name lands where its spelling
- * says. Then every file the site reads (importIsSiteData()) is checked, per entry
- * the first of:
+ * First the NAMES, read from the archive's directory before any entry is
+ * decompressed. Every entry's name must be a clean relative path — `unsafe_path`
+ * otherwise (importEntryNameRefusal()), because only a clean name lands where its
+ * spelling says. And the project folder must hold `config.json` — `missing_file`
+ * otherwise: it is where an archive names its languages, and the import never
+ * chooses them for it.
+ *
+ * Then every file the site reads (importIsSiteData()) is checked, per entry the
+ * first of:
  *   1. `invalid_json` — the entry cannot be read, does not parse, or does not
  *      decode to a JSON array or object; the site could not read it either;
  *   2. `disallowed_content` — the import policy's extension allowlist or the
  *      archive content check refuses it, as it would at extraction;
- * and the root config.json also `invalid_setting` — a setting the command that
- * writes it would refuse, or a language this installation's language list does
- * not hold (importFirstInvalidSetting()), named in `value`;
+ * and the root config.json also `invalid_setting` — no language list, a setting
+ * the command that writes it would refuse, or a language this installation's
+ * language list does not hold (importFirstInvalidSetting()), named in `value`;
  * and a structure file (importStructureKind()) also the first of:
  *   3. `unsafe_value` — an attribute the write gate refuses, naming the node and
  *      the attribute;
@@ -972,6 +932,7 @@ function importFirstInvalidSetting(array $config): ?array {
  *                    `file` names the entry and `reason` the check it failed
  */
 function importFirstStructureFailure(ZipArchive $zip, string $prefix): ?array {
+    $hasConfig = false;
     for ($i = 0; $i < $zip->numFiles; $i++) {
         $name = $zip->getNameIndex($i);
         $relativePath = $name === false ? null : importEntryRelativePath($name, $prefix);
@@ -983,7 +944,19 @@ function importFirstStructureFailure(ZipArchive $zip, string $prefix): ?array {
         if ($nameRefusal !== null) {
             return ['file' => $relativePath, 'reason' => 'unsafe_path', 'message' => $nameRefusal];
         }
-        if ($isDirectory) {
+        if (!$isDirectory && $relativePath === 'config.json') {
+            $hasConfig = true;
+        }
+    }
+    if (!$hasConfig) {
+        return ['file' => 'config.json', 'reason' => 'missing_file',
+                'message' => 'The archive has no config.json, so it names no language. An archive must carry config.json with LANGUAGES_SUPPORTED listing its languages.'];
+    }
+
+    for ($i = 0; $i < $zip->numFiles; $i++) {
+        $name = $zip->getNameIndex($i);
+        $relativePath = $name === false ? null : importEntryRelativePath($name, $prefix);
+        if ($relativePath === null || substr($name, -1) === '/') {
             continue;
         }
         if (importIsStylesheet($relativePath)) {
@@ -1080,63 +1053,50 @@ function rebuildPhpFromJson(string $projectPath): array {
         'footer_rebuilt' => false
     ];
     
-    // 1. Rebuild config.php from config.json
+    // 1. Rebuild config.php from config.json. The archive gate refused an archive
+    // with no config.json, or one that lists no language, before anything was
+    // written; either one here means that gate is broken, and the import then
+    // fails whole and is rolled back, like the extraction's second layers.
     $configJsonPath = $projectPath . '/config.json';
-    if (file_exists($configJsonPath)) {
-        $configJson = json_decode(file_get_contents($configJsonPath), true);
-        if ($configJson === null) {
-            return ['success' => false, 'error' => 'Invalid config.json format'];
-        }
-        
-        // Validate and filter config keys
-        $validConfig = [];
-        foreach (QS_PROJECT_SETTING_KEYS as $key) {
-            if (isset($configJson[$key])) {
-                $validConfig[$key] = $configJson[$key];
-            }
-        }
-        
-        // Set defaults for required keys. An archive that lists no language gets
-        // the installation's default language. A list the archive does bring has
-        // passed its setting's rule in the archive gate — a non-empty list — so
-        // its first language is always there to be the default.
-        if (!isset($validConfig['SITE_NAME'])) {
-            $validConfig['SITE_NAME'] = basename($projectPath);
-        }
-        if (!isset($validConfig['LANGUAGES_SUPPORTED'])) {
-            $validConfig['LANGUAGES_SUPPORTED'] = [qs_language_default()];
-        }
-        if (!isset($validConfig['LANGUAGE_DEFAULT'])) {
-            $validConfig['LANGUAGE_DEFAULT'] = $validConfig['LANGUAGES_SUPPORTED'][0];
-        }
-        if (!isset($validConfig['MULTILINGUAL_SUPPORT'])) {
-            $validConfig['MULTILINGUAL_SUPPORT'] = false;
-        }
-        
-        $configPhp = "<?php\n/**\n * Site Configuration\n * Rebuilt from JSON on import: " . date('Y-m-d H:i:s') . "\n */\n\nreturn " . var_export($validConfig, true) . ";\n";
-        
-        if (file_put_contents($projectPath . '/config.php', $configPhp) === false) {
-            return ['success' => false, 'error' => 'Failed to write config.php'];
-        }
-        
-        $stats['config_rebuilt'] = true;
-        
-        // Remove config.json after successful rebuild
-        unlink($configJsonPath);
-    } else {
-        // Create default config if no config.json: the project starts in the
-        // installation's default language, as a new project does.
-        $defaultLanguage = qs_language_default();
-        $defaultConfig = [
-            'SITE_NAME' => basename($projectPath),
-            'LANGUAGES_SUPPORTED' => [$defaultLanguage],
-            'LANGUAGE_DEFAULT' => $defaultLanguage,
-            'MULTILINGUAL_SUPPORT' => false
-        ];
-        $configPhp = "<?php\n/**\n * Site Configuration (default)\n * Created on import: " . date('Y-m-d H:i:s') . "\n */\n\nreturn " . var_export($defaultConfig, true) . ";\n";
-        file_put_contents($projectPath . '/config.php', $configPhp);
-        $stats['config_rebuilt'] = true;
+    $configJson = is_file($configJsonPath) ? json_decode((string) file_get_contents($configJsonPath), true) : null;
+    if (!is_array($configJson)) {
+        return ['success' => false, 'error' => 'config.json is missing or not a JSON object'];
     }
+    if (!isset($configJson['LANGUAGES_SUPPORTED'])) {
+        return ['success' => false, 'error' => 'config.json lists no language'];
+    }
+
+    // Validate and filter config keys
+    $validConfig = [];
+    foreach (QS_PROJECT_SETTING_KEYS as $key) {
+        if (isset($configJson[$key])) {
+            $validConfig[$key] = $configJson[$key];
+        }
+    }
+
+    // Defaults for the settings an archive may leave out. Its list has passed its
+    // setting's rule in the archive gate — a non-empty list — so its first
+    // language is always there to be the default.
+    if (!isset($validConfig['SITE_NAME'])) {
+        $validConfig['SITE_NAME'] = basename($projectPath);
+    }
+    if (!isset($validConfig['LANGUAGE_DEFAULT'])) {
+        $validConfig['LANGUAGE_DEFAULT'] = $validConfig['LANGUAGES_SUPPORTED'][0];
+    }
+    if (!isset($validConfig['MULTILINGUAL_SUPPORT'])) {
+        $validConfig['MULTILINGUAL_SUPPORT'] = false;
+    }
+
+    $configPhp = "<?php\n/**\n * Site Configuration\n * Rebuilt from JSON on import: " . date('Y-m-d H:i:s') . "\n */\n\nreturn " . var_export($validConfig, true) . ";\n";
+
+    if (file_put_contents($projectPath . '/config.php', $configPhp) === false) {
+        return ['success' => false, 'error' => 'Failed to write config.php'];
+    }
+
+    $stats['config_rebuilt'] = true;
+
+    // Remove config.json after successful rebuild
+    unlink($configJsonPath);
     
     // 2. Rebuild routes.php from routes.json
     $routesJsonPath = $projectPath . '/routes.json';
@@ -1351,33 +1311,6 @@ function countRoutesRecursive(array $routes): int {
         }
     }
     return $count;
-}
-
-/**
- * Recursively delete a directory
- */
-function deleteImportDirectory(string $dir): bool {
-    if (!is_dir($dir)) {
-        return false;
-    }
-    
-    $items = scandir($dir);
-    
-    foreach ($items as $item) {
-        if ($item === '.' || $item === '..') {
-            continue;
-        }
-        
-        $path = $dir . '/' . $item;
-        
-        if (is_dir($path)) {
-            deleteImportDirectory($path);
-        } else {
-            unlink($path);
-        }
-    }
-    
-    return rmdir($dir);
 }
 
 /**

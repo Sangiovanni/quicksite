@@ -20,6 +20,7 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/projectLanguage.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/routeHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/policyPageHelpers.php';
@@ -96,8 +97,7 @@ saveConsentConfig(array_merge(loadConsentConfig(), ['policyRoute' => '/' . $rout
 // storage registry and resolved live.
 $seed = cookiePolicyTranslationSeed();
 $catSeed = consentTranslationSeed(); // category labels used by the table
-$defaultLang = (defined('CONFIG') && isset(CONFIG['LANGUAGE_DEFAULT']) && is_string(CONFIG['LANGUAGE_DEFAULT']))
-    ? CONFIG['LANGUAGE_DEFAULT'] : 'en';
+$defaultLang = qs_project_default_language();
 $languagesSeeded = [];
 $base = ($defaultLang === 'fr') ? $seed['fr'] : $seed['en'];
 $cats = ($defaultLang === 'fr') ? $catSeed['fr'] : $catSeed['en'];

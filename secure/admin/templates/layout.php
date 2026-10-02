@@ -10,6 +10,7 @@
 
 // qs_inline_script_json(), the encoder for a value in an inline script.
 require_once SECURE_FOLDER_PATH . '/src/functions/runtimeHandoff.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/projectLanguage.php'; // qs_project_default_language
 
 // Base URL (needed early for asset helper)
 $baseUrl = rtrim(BASE_URL, '/');
@@ -594,7 +595,7 @@ $langNames = [
             isOperator: <?= $isOperator ? 'true' : 'false' ?>,
             // The edited project's own value is project DATA, so it is written
             // the way every data value in an inline script is.
-            defaultLang: <?= qs_inline_script_json((string) (CONFIG['LANGUAGE_DEFAULT'] ?? 'en')) ?>,
+            defaultLang: <?= qs_inline_script_json(qs_project_default_language()) ?>,
             multilingual: <?= (CONFIG['MULTILINGUAL_SUPPORT'] ?? false) ? 'true' : 'false' ?>,
             translations: {
                 common: {
@@ -615,6 +616,11 @@ $langNames = [
                     copyFailed: '<?= __adminJs('common.copyFailed') ?>'
                 },
                 dashboard: {
+                    projects: {
+                        deleteTitle: '<?= __adminJs('dashboard.projects.deleteTitle') ?>',
+                        deleteBtn: '<?= __adminJs('dashboard.projects.deleteBtn') ?>',
+                        deleteConfirmNamed: '<?= __adminJs('dashboard.projects.deleteConfirmNamed') ?>'
+                    },
                     columns: {
                         command: '<?= __adminJs('dashboard.history.columns.command') ?>',
                         status: '<?= __adminJs('dashboard.history.columns.status') ?>',

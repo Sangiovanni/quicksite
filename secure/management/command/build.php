@@ -27,6 +27,7 @@
  * - Build size must not exceed MAX_BUILD_SIZE_MB
  */
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/projectLanguage.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/JsonToPhpCompiler.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/errorHygiene.php'; // qs_safe_copy
@@ -1196,8 +1197,8 @@ $manifest = [
     'secure' => $buildSecureName,
     'space' => $buildPublicSpace,
     'multilingual' => CONFIG['MULTILINGUAL_SUPPORT'],
-    'languages' => CONFIG['MULTILINGUAL_SUPPORT'] ? CONFIG['LANGUAGES_SUPPORTED'] : ['default'],
-    'default_language' => CONFIG['LANGUAGE_DEFAULT'],
+    'languages' => qs_project_is_multilingual() ? qs_project_language_codes() : ['default'],
+    'default_language' => qs_project_default_language(),
     'compiled_pages' => $compiledPages,
     'pages_count' => count($compiledPages),
     // Recorded here, not only in the build response, because it changes what the

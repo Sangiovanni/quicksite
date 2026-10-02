@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/../functions/jsonIo.php'; // qs_json_write
+require_once __DIR__ . '/../functions/projectLanguage.php';
 require_once __DIR__ . '/../functions/apiRegistry.php';   // the READ half, shared with a build
 /**
  * ApiEndpointManager
@@ -1012,11 +1013,7 @@ class ApiEndpointManager {
      */
     private function translationTables(): array {
         $dir = $this->basePath . '/translate';
-        $langs = [];
-        if (defined('CONFIG') && isset(CONFIG['LANGUAGES_SUPPORTED']) && is_array(CONFIG['LANGUAGES_SUPPORTED'])
-            && defined('MULTILINGUAL_SUPPORT') && MULTILINGUAL_SUPPORT) {
-            $langs = array_values(array_filter(CONFIG['LANGUAGES_SUPPORTED'], 'is_string'));
-        }
+        $langs = qs_project_languages();
         if (empty($langs)) {
             $langs = ['default'];
         }

@@ -153,7 +153,7 @@ function __command_analyzeTranslations(array $params = [], array $urlParams = []
     sort($requiredKeys);
 
     // Determine which languages to analyze
-    $languagesToAnalyze = $targetLang ? [$targetLang] : CONFIG['LANGUAGES_SUPPORTED'];
+    $languagesToAnalyze = $targetLang ? [$targetLang] : qs_project_language_codes();
 
     $analysis = [];
     $summary = [

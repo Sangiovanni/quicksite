@@ -29,6 +29,7 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/projectLanguage.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/translationHelpers.php';
 
@@ -177,8 +178,7 @@ function __command_importStructureTranslations(array $params = [], array $urlPar
     }
 
     // Language must be configured.
-    $configuredLangs = (defined('CONFIG') && isset(CONFIG['LANGUAGES_SUPPORTED']))
-        ? CONFIG['LANGUAGES_SUPPORTED'] : ['en'];
+    $configuredLangs = qs_project_language_codes();
     if (!in_array($language, $configuredLangs, true)) {
         return ApiResponse::create(400, 'validation.invalid_value')
             ->withMessage("Language '$language' is not in this project's configured languages.")

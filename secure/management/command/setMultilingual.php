@@ -1,5 +1,6 @@
 <?php
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_json_write
+require_once SECURE_FOLDER_PATH . '/src/functions/projectLanguage.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/opcacheHygiene.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectSettings.php';
@@ -84,7 +85,7 @@ if (!is_array($freshConfig)) {
 
 // Get current state from FRESH config
 $currentState = $freshConfig['MULTILINGUAL_SUPPORT'] ?? false;
-$defaultLang = $freshConfig['LANGUAGE_DEFAULT'] ?? 'en';
+$defaultLang = qs_project_default_language($freshConfig);
 
 // Check if already in desired state
 if ($currentState === $enabled) {

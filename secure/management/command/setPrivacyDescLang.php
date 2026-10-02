@@ -23,6 +23,7 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/projectLanguage.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/privacyHelpers.php';
 
@@ -37,8 +38,7 @@ if (!is_string($lang) || trim($lang) === '') {
 }
 $lang = trim($lang);
 
-$supported = (defined('CONFIG') && isset(CONFIG['LANGUAGES_SUPPORTED']) && is_array(CONFIG['LANGUAGES_SUPPORTED']))
-    ? CONFIG['LANGUAGES_SUPPORTED'] : ['en'];
+$supported = qs_project_language_codes();
 if (!in_array($lang, $supported, true)) {
     ApiResponse::create(400, 'validation.invalid')
         ->withMessage("Language '$lang' is not in the project's supported languages")

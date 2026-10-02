@@ -34,8 +34,8 @@ function __command_getLangList(array $params = [], array $urlParams = []): ApiRe
         ->withMessage('Language list retrieved successfully')
         ->withData([
             'multilingual_enabled' => CONFIG['MULTILINGUAL_SUPPORT'],
-            'languages' => CONFIG['LANGUAGES_SUPPORTED'],
-            'default_language' => CONFIG['LANGUAGE_DEFAULT'],
+            'languages' => qs_project_language_codes(),
+            'default_language' => qs_project_default_language(),
             'language_names' => $names
         ]);
 }

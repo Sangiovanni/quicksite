@@ -530,6 +530,12 @@ if (isset($_GET['denied'])): ?>
                 <input type="text" id="import-project-name" class="admin-input" pattern="[a-z0-9_\-]+" />
                 <small class="admin-hint"><?= __admin('dashboard.projects.importNameHelp') ?></small>
             </div>
+            <div class="admin-form-group">
+                <label class="admin-checkbox">
+                    <input type="checkbox" id="import-project-activate" checked />
+                    <span><?= __admin('dashboard.projects.activateAfterImport') ?></span>
+                </label>
+            </div>
         </div>
         <div class="admin-modal__footer">
             <button type="button" class="admin-btn admin-btn--ghost" data-close-modal><?= __admin('common.cancel') ?></button>

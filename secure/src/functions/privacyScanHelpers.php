@@ -17,6 +17,7 @@ if (!defined('SECURE_FOLDER_PATH')) {
 }
 
 require_once SECURE_FOLDER_PATH . '/src/functions/privacyHelpers.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/projectLanguage.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/consentHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/consentLayerHelpers.php';
 
@@ -228,9 +229,7 @@ function privacyBuildStatus(): array {
     $cookieRouteExists = (is_string($cookieRoute) && trim($cookieRoute, '/') !== '')
         ? consentRouteExists($cookieRoute) : false;
 
-    $languages = (defined('CONFIG') && isset(CONFIG['LANGUAGES_SUPPORTED']) && is_array(CONFIG['LANGUAGES_SUPPORTED']))
-        ? array_values(array_filter(CONFIG['LANGUAGES_SUPPORTED'], fn($l) => is_string($l) && $l !== '' && $l !== 'default'))
-        : [$descLang];
+    $languages = array_values(array_filter(qs_project_language_codes(), fn($l) => $l !== 'default'));
     if (empty($languages)) $languages = [$descLang];
 
     return [

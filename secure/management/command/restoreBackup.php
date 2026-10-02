@@ -19,6 +19,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php'; // qs_delete_tree
 
 /**
  * Recursively copy a directory
@@ -62,32 +63,6 @@ if (!function_exists('restore_copyDirectory')) {
         
         closedir($dir);
         return $success;
-    }
-}
-
-/**
- * Recursively delete a directory
- */
-if (!function_exists('restore_deleteDirectory')) {
-    function restore_deleteDirectory($dir) {
-        if (!is_dir($dir)) {
-            return false;
-        }
-        
-        $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS),
-            RecursiveIteratorIterator::CHILD_FIRST
-        );
-        
-        foreach ($iterator as $file) {
-            if ($file->isDir()) {
-                rmdir($file->getRealPath());
-            } else {
-                unlink($file->getRealPath());
-            }
-        }
-        
-        return rmdir($dir);
     }
 }
 
@@ -218,7 +193,11 @@ function __command_restoreBackup(array $params = [], array $urlParams = []): Api
         // Delete existing item if it exists
         if (file_exists($dstPath)) {
             if (is_dir($dstPath)) {
-                restore_deleteDirectory($dstPath);
+                $removal = qs_delete_tree($dstPath);
+                if (!$removal['ok']) {
+                    $errors[] = "Could not remove all of the current $item before restoring it: "
+                        . implode(', ', $removal['survived']);
+                }
             } else {
                 unlink($dstPath);
             }

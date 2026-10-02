@@ -145,7 +145,7 @@ function __command_validateTranslations(array $params = [], array $urlParams = [
     $requiredKeys = extractAllKeys_validate();
 
     // Determine which languages to validate
-    $languagesToValidate = $targetLang ? [$targetLang] : CONFIG['LANGUAGES_SUPPORTED'];
+    $languagesToValidate = $targetLang ? [$targetLang] : qs_project_language_codes();
 
     $validationResults = [];
 

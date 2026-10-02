@@ -36,18 +36,12 @@ function copyDirectory(string $source, string $dest): bool {
 /**
  * Recursively delete a directory, reporting what could NOT be removed.
  *
- * ⚠ WHY THIS RETURNS A REPORT. Two implementations of `deleteDirectory()` used
- * to exist under one name — this one, which swallowed every failure with
- * `@unlink` and answered only on the final `rmdir`, and a copy inside
- * deleteProject.php that returned on the FIRST failure. Both told the caller a
- * single boolean, so a project that half-deleted was reported as "failed" with
- * no way to learn that most of it was gone, and a locked file deep in the tree
- * looked identical to a permission problem at the root. (Being two global
- * functions of one name, they were also a latent redeclare fatal for any
- * process that loaded both — the class of collision S2.9 fixed for
- * formatBytes.)
+ * THE ONE RECURSIVE DELETE. Every command that removes a tree calls this, so a
+ * tree is removed the same way everywhere and on every operating system.
  *
- * So it keeps going, and it says what survived.
+ * It keeps going past a failure and says what survived: a caller learns that a
+ * tree half-deleted, and which entry stopped it, rather than one boolean for
+ * the whole of it.
  *
  * ⚠ PATHS ARE RELATIVE to `$dir`. What survived is diagnostic and travels into
  * API responses; the absolute path of a server directory does not belong
@@ -55,18 +49,25 @@ function copyDirectory(string $source, string $dest): bool {
  *
  * Depth-first, children before their parent, so a directory is attempted only
  * once everything under it is gone — a parent that then fails is a real
- * failure and not an artifact of ordering. Symlinks and Windows junctions are
- * removed as links rather than descended into, so a reparse point cannot walk
- * the delete out of the tree.
+ * failure and not an artifact of ordering.
+ *
+ * A LINK IS REMOVED, NEVER FOLLOWED. An entry that leads somewhere other than
+ * where it sits — a symlink, or a Windows junction, which PHP does not report as
+ * a link — is removed as the link it is, and whatever it points to is left
+ * alone, so a link cannot walk the delete out of the tree.
+ *
+ * A READ-ONLY FILE IS REMOVED, as Linux removes one from a folder it may write
+ * to. Windows refuses to delete a file marked read-only, so the mark is cleared
+ * first; a file that still cannot be removed gets its mark back and is reported.
  *
  * ⚠ `$deferLast` IS NOT MERELY AN ORDERING. Those entries are attempted only
  * once everything else is gone, and are LEFT ALONE when anything else failed.
  * The distinction is the whole point: a caller whose own authority to delete
  * lives inside the tree — deleteProject, whose permission gate reads
- * config/members.json — otherwise destroys that record on the way past and
- * leaves a half-deleted project with no owner, which no retry can finish
+ * config/members.json — would otherwise destroy that record on the way past and
+ * leave a half-deleted project with no owner, which no retry can finish
  * because the retry is refused. Ordering alone does not fix it: this function
- * continues past failures by design, so a merely-reordered entry still gets
+ * continues past failures by design, so a merely-reordered entry would still be
  * deleted at the end of a failed run.
  *
  * @param string   $dir       Directory path to delete.
@@ -139,10 +140,11 @@ function qs_delete_tree_walk(string $dir, string $rel, array &$report): bool {
         return false;
     }
 
+    $realDir = realpath($dir);
     foreach ($items as $item) {
         if ($item === '.' || $item === '..') continue;
         $childRel = $rel === '' ? $item : $rel . '/' . $item;
-        if (!qs_delete_tree_entry($dir, $item, $childRel, $report)) {
+        if (!qs_delete_tree_entry($dir, $item, $childRel, $report, $realDir)) {
             $ok = false;
         }
     }
@@ -158,25 +160,76 @@ function qs_delete_tree_walk(string $dir, string $rel, array &$report): bool {
 /**
  * Remove one entry — a subtree, a file, or a link — and record it either way.
  *
- * @param string $dir      The directory holding it.
- * @param string $item     Its name.
- * @param string $childRel Its path relative to the delete root, for reporting.
+ * @param string            $dir      The directory holding it.
+ * @param string            $item     Its name.
+ * @param string            $childRel Its path relative to the delete root, for reporting.
+ * @param string|false|null $realDir  realpath($dir), when the caller already has it.
  */
-function qs_delete_tree_entry(string $dir, string $item, string $childRel, array &$report): bool {
+function qs_delete_tree_entry(string $dir, string $item, string $childRel, array &$report, $realDir = null): bool {
     $path = $dir . DIRECTORY_SEPARATOR . $item;
 
-    // is_dir() follows a symlink/junction; is_link() catches it first so a
-    // reparse point is removed as the link it is, not descended into.
-    if (is_dir($path) && !is_link($path)) {
+    if (is_dir($path) && !qs_delete_tree_leads_elsewhere($dir, $item, $path, $realDir)) {
         return qs_delete_tree_walk($path, $childRel, $report);
     }
-    // A Windows directory junction needs rmdir, not unlink.
-    if (@unlink($path) || (is_link($path) && @rmdir($path))) {
+    // A file or a link. A link to a directory is removed with rmdir on Windows,
+    // a Windows junction always; neither touches what it points to.
+    if (@unlink($path) || @rmdir($path) || qs_delete_tree_unlink_read_only($path)) {
         $report['files']++;
         return true;
     }
     qs_delete_tree_note($report, $childRel);
     return false;
+}
+
+/**
+ * Whether a directory entry is a link: a symlink, or anything whose real path is
+ * not the path it sits at — a Windows junction, which is_link() does not report.
+ *
+ * @param string|false|null $realDir realpath($dir), when the caller already has it
+ */
+function qs_delete_tree_leads_elsewhere(string $dir, string $item, string $path, $realDir = null): bool {
+    if (is_link($path)) {
+        return true;
+    }
+    $realDir = $realDir ?? realpath($dir);
+    $real = realpath($path);
+    return $realDir === false || $real === false || $real !== $realDir . DIRECTORY_SEPARATOR . $item;
+}
+
+/** Remove a file marked read-only; give the mark back when it still cannot be removed. */
+function qs_delete_tree_unlink_read_only(string $path): bool {
+    if (!is_file($path) || is_writable($path)) {
+        return false;
+    }
+    $mode = @fileperms($path);
+    if (!@chmod($path, 0666)) {
+        return false;
+    }
+    if (@unlink($path)) {
+        return true;
+    }
+    if ($mode !== false) {
+        @chmod($path, $mode & 0777);
+    }
+    return false;
+}
+
+/**
+ * Remove a tree a failed command was building, and log what could not be
+ * removed. A rollback has already decided its answer — the failure that caused
+ * it — so what survived goes to the PHP error log for the operator: a leftover
+ * project folder is why a retry under the same name is refused.
+ *
+ * @param string $caller Who rolls back, for the log line (a command name).
+ */
+function qs_delete_tree_rollback(string $dir, string $caller): bool {
+    $report = qs_delete_tree($dir);
+    if (!$report['ok'] && file_exists($dir)) {
+        $left = count($report['survived']);
+        error_log("QuickSite: {$caller} could not remove all of '" . basename($dir) . "' while rolling back; "
+            . $left . ($left === 1 ? ' entry' : ' entries') . ' left: ' . implode(', ', $report['survived']));
+    }
+    return $report['ok'];
 }
 
 /** Record one survivor, up to the cap. */

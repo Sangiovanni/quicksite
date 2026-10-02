@@ -1129,6 +1129,17 @@
         return normalizeProjectName(base);
     }
 
+    /**
+     * Reload the dashboard after a success, its toast carried across the reload.
+     * A toast shown just before a reload is wiped by it, and a reload that stays
+     * on the same project then confirms nothing; admin.js shows the pending
+     * message on the next page load.
+     */
+    function reloadWithMessage(message) {
+        QuickSiteAdmin.setPendingMessage(message);
+        window.location.href = window.location.pathname + '?t=' + Date.now();
+    }
+
     function setupProjectManagerEvents() {
         const proj = t('dashboard.projects', {});
         const common = t('common', {});
@@ -1147,8 +1158,7 @@
                 // (quicksite stays at the site root). Panel state, not a command.
                 const result = await QuickSiteAdmin.setSelectedProject(newProject);
                 if (result.ok) {
-                    QuickSiteAdmin.showToast((proj.switched || 'Switched to project') + ': ' + newProject, 'success');
-                    window.location.href = window.location.pathname + '?t=' + Date.now();
+                    reloadWithMessage((proj.switched || 'Switched to project') + ': ' + newProject);
                 } else {
                     QuickSiteAdmin.showToast(result.data?.message || 'Failed to switch project', 'error');
                     this.disabled = false;
@@ -1251,11 +1261,11 @@
                 if (result.ok) {
                     const filesCopied = result.data?.data?.files_copied || '';
                     const msg = (proj.cloned || 'Project cloned') + ': ' + name + (filesCopied ? ' (' + filesCopied + ' files)' : '');
-                    QuickSiteAdmin.showToast(msg, 'success');
                     closeAllModals();
                     if (activateCheckbox.checked) {
-                        window.location.href = window.location.pathname + '?t=' + Date.now();
+                        reloadWithMessage(msg);
                     } else {
+                        QuickSiteAdmin.showToast(msg, 'success');
                         loadProjectManager();
                         this.disabled = false;
                         this.textContent = proj.cloneBtn || 'Clone Project';
@@ -1293,11 +1303,12 @@
                 const result = await QuickSiteAdmin.apiRequest('createProject', 'POST', body);
                 
                 if (result.ok) {
-                    QuickSiteAdmin.showToast((proj.created || 'Project created') + ': ' + name, 'success');
+                    const msg = (proj.created || 'Project created') + ': ' + name;
                     closeAllModals();
                     if (activateCheckbox.checked) {
-                        window.location.href = window.location.pathname + '?t=' + Date.now();
+                        reloadWithMessage(msg);
                     } else {
+                        QuickSiteAdmin.showToast(msg, 'success');
                         loadProjectManager();
                         this.disabled = false;
                         this.textContent = proj.createModal?.submit || 'Create Project';
@@ -1403,6 +1414,7 @@
             const formData = new FormData();
             formData.append('file', importFile);
             formData.append('name', name);
+            formData.append('switch_to', document.getElementById('import-project-activate').checked ? 'true' : 'false');
 
             const originalText = QSDom.setButtonBusy(this, proj.importing || 'Importing project...');
             // importProject is a GLOBAL command, so upload() sends it to the global
@@ -1418,10 +1430,9 @@
                 console.error('Import error:', error);
             }
             if (result && result.ok) {
-                QuickSiteAdmin.showToast(result.data?.message || proj.imported || 'Project imported successfully', 'success');
                 // Full reload: a new project changes the header picker, the nav
                 // permission set and the storage totals — not just this card.
-                window.location.href = window.location.pathname + '?t=' + Date.now();
+                reloadWithMessage(result.data?.message || proj.imported || 'Project imported successfully');
                 return;
             }
             QuickSiteAdmin.showToast(result?.data?.message || 'Failed to import project', 'error');
@@ -1478,6 +1489,19 @@
             const projectToDelete = selector.value;
             
             if (!projectToDelete) return;
+
+            // The modal warns in general terms; this names the project, the last
+            // step before it is gone for good.
+            const confirmed = await QuickSiteAdmin.confirm(
+                t('dashboard.projects.deleteConfirmNamed', 'dashboard.projects.deleteConfirmNamed').replace(':name', projectToDelete),
+                {
+                    title: t('dashboard.projects.deleteTitle', 'dashboard.projects.deleteTitle'),
+                    type: 'danger',
+                    confirmText: t('dashboard.projects.deleteBtn', 'dashboard.projects.deleteBtn'),
+                    confirmClass: 'danger'
+                }
+            );
+            if (!confirmed) return;
             
             this.disabled = true;
             try {
@@ -1490,7 +1514,6 @@
                 }, [], {}, { project: projectToDelete });
                 
                 if (result.ok) {
-                    QuickSiteAdmin.showToast(proj.deleted || 'Project deleted', 'success');
                     closeAllModals();
                     // If we just deleted the project we were EDITING, currentProject now
                     // points at a dead project — any further project-scoped call (e.g.
@@ -1498,9 +1521,10 @@
                     // marker and 403. Reload so the server re-resolves the effective
                     // project instead of refreshing in place.
                     if (projectToDelete === currentProject) {
-                        window.location.href = window.location.pathname + '?t=' + Date.now();
+                        reloadWithMessage(proj.deleted || 'Project deleted');
                         return;
                     }
+                    QuickSiteAdmin.showToast(proj.deleted || 'Project deleted', 'success');
                     loadProjectManager();
                     loadStorageOverview();
                 } else {
@@ -1956,9 +1980,8 @@
                 }, [], {}, { project: restoreTargetProject || currentProject });
 
                 if (result.ok) {
-                    QuickSiteAdmin.showToast(proj.restore_success || 'Backup restored successfully', 'success');
                     closeAllModals();
-                    window.location.href = window.location.pathname + '?restored=' + Date.now();
+                    reloadWithMessage(proj.restore_success || 'Backup restored successfully');
                 } else {
                     QuickSiteAdmin.showToast(result.data?.message || 'Failed to restore backup', 'error');
                     this.disabled = false;

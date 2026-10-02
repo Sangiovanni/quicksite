@@ -21,6 +21,7 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/projectLanguage.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/policyPageHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/privacyScanHelpers.php';
@@ -108,8 +109,7 @@ $reg['privacyRoute'] = '/' . $route;
 savePrivacyRegistry($reg);
 
 $seed = privacyPolicyTranslationSeed();
-$defaultLang = (defined('CONFIG') && isset(CONFIG['LANGUAGE_DEFAULT']) && is_string(CONFIG['LANGUAGE_DEFAULT']))
-    ? CONFIG['LANGUAGE_DEFAULT'] : 'en';
+$defaultLang = qs_project_default_language();
 $languagesSeeded = [];
 $flat = ($defaultLang === 'fr') ? $seed['fr'] : $seed['en'];
 $newOnly = consentFilterNewKeys($defaultLang, $flat);

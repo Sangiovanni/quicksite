@@ -580,7 +580,7 @@ function __command_insertSnippet(array $params = [], array $urlParams = []): Api
             $structureName = $type;
         }
         
-        $lang = CONFIG['LANGUAGE_DEFAULT'] ?? 'en';
+        $lang = qs_project_default_language();
         $translator = new Translator($lang);
         $renderer = new JsonToHtmlRenderer($translator, ['editorMode' => true]);
         

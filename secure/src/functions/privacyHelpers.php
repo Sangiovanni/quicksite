@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/utilsManagement.php'; // qs_json_write
+require_once __DIR__ . '/projectLanguage.php';
 /**
  * privacyHelpers.php — read / write the per-project privacy registry
  * (data/privacy.json). Structure-only (mirrors storage.json): the human-readable
@@ -91,14 +92,12 @@ function privacyDescLang(?array $reg = null): string {
     if (is_string($l) && $l !== '') {
         return $l;
     }
-    return (defined('CONFIG') && isset(CONFIG['LANGUAGE_DEFAULT']) && is_string(CONFIG['LANGUAGE_DEFAULT']))
-        ? CONFIG['LANGUAGE_DEFAULT'] : 'en';
+    return qs_project_default_language();
 }
 
 /** Project languages plus the synthetic `default` bucket. */
 function privacyAllLangs(): array {
-    $langs = (defined('CONFIG') && isset(CONFIG['LANGUAGES_SUPPORTED']) && is_array(CONFIG['LANGUAGES_SUPPORTED']))
-        ? CONFIG['LANGUAGES_SUPPORTED'] : ['en'];
+    $langs = qs_project_language_codes();
     $langs[] = 'default';
     return array_values(array_unique(array_filter($langs, fn($l) => is_string($l) && $l !== '')));
 }

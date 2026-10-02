@@ -16,6 +16,7 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/projectLanguage.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_format_size
 
@@ -123,8 +124,8 @@ function getProjectInfo(string $projectPath, string $projectName): array {
         $config = @include($projectPath . '/config.php');
         if (is_array($config)) {
             $info['site_name'] = $config['SITE_NAME'] ?? null;
-            $info['default_language'] = $config['LANGUAGE_DEFAULT'] ?? null;
-            $info['languages'] = $config['LANGUAGES_SUPPORTED'] ?? [];
+            $info['default_language'] = qs_project_default_language($config);
+            $info['languages'] = qs_project_language_codes($config);
             $info['multilingual'] = $config['MULTILINGUAL_SUPPORT'] ?? false;
         }
     }

@@ -33,6 +33,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/errorHygiene.php'; // qs_safe_
 // The settings an export carries into config.json (security: no arbitrary PHP
 // execution) are QS_PROJECT_SETTING_KEYS — the one list importProject takes back.
 require_once SECURE_FOLDER_PATH . '/src/functions/projectSettings.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/projectLanguage.php'; // qs_project_language_codes
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -247,31 +248,28 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
 }
 
 /**
- * Export config.php as sanitized config.json
+ * Export config.php as sanitized config.json.
+ *
+ * The project's config.php exists: the dispatcher loads a project-scoped command's
+ * project strictly, and refuses one without it before this command runs.
+ *
+ * The archive names the languages the project is served in — its list, or, when
+ * its config.php has none, its default language (qs_project_language_codes()) —
+ * because an import refuses an archive that names none.
  */
 function exportConfigAsJson(ZipArchive $zip, string $projectPath, string $projectName, array &$stats): void {
-    $configFile = $projectPath . '/config.php';
-    
-    if (!file_exists($configFile)) {
-        // Create minimal default config
-        $configJson = [
-            'SITE_NAME' => $projectName,
-            'LANGUAGES_SUPPORTED' => ['en'],
-            'LANGUAGE_DEFAULT' => 'en',
-            'MULTILINGUAL_SUPPORT' => false
-        ];
-    } else {
-        $config = require $configFile;
-        
-        // Filter to allowed keys only (security)
-        $configJson = [];
-        foreach (QS_PROJECT_SETTING_KEYS as $key) {
-            if (isset($config[$key])) {
-                $configJson[$key] = $config[$key];
-            }
+    $config = require $projectPath . '/config.php';
+    $config = is_array($config) ? $config : [];
+
+    // Filter to allowed keys only (security)
+    $configJson = [];
+    foreach (QS_PROJECT_SETTING_KEYS as $key) {
+        if (isset($config[$key])) {
+            $configJson[$key] = $config[$key];
         }
     }
-    
+    $configJson['LANGUAGES_SUPPORTED'] = qs_project_language_codes($config);
+
     $content = json_encode($configJson, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
     $zip->addFromString($projectName . '/config.json', $content);
     $stats['files']++;

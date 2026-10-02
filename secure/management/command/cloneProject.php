@@ -23,6 +23,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectSettings.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php'; // qs_delete_tree_rollback
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -107,10 +108,7 @@ function __command_cloneProject(array $params = [], array $urlParams = []): ApiR
     $excludeDirs = ['backups'];
     
     if (!cloneProjectDirectory($sourcePath, $targetPath, $excludeDirs)) {
-        // Cleanup on failure
-        if (is_dir($targetPath)) {
-            deleteDirectoryRecursive($targetPath);
-        }
+        qs_delete_tree_rollback($targetPath, 'cloneProject');
         return ApiResponse::create(500, 'server.operation_failed')
             ->withMessage('Failed to clone project files');
     }
@@ -123,7 +121,7 @@ function __command_cloneProject(array $params = [], array $urlParams = []): ApiR
             $config['SITE_NAME'] = ucfirst(str_replace(['-', '_'], ' ', $newName));
             $refusal = qs_project_settings_guard($config, ['SITE_NAME']);
             if ($refusal !== null) {
-                deleteDirectoryRecursive($targetPath);
+                qs_delete_tree_rollback($targetPath, 'cloneProject');
                 return $refusal;
             }
             $configContent = "<?php\n/**\n * Site Configuration\n * Cloned on " . date('Y-m-d H:i:s') . "\n */\n\nreturn " . var_export($config, true) . ";\n";
@@ -155,7 +153,7 @@ function __command_cloneProject(array $params = [], array $urlParams = []): ApiR
     if (!qs_project_birth_write_members($targetPath, $clonerId)) {
         // Files exist but the trust file could not be minted — an ownerless
         // project is inaccessible; roll back rather than orphan it.
-        deleteDirectoryRecursive($targetPath);
+        qs_delete_tree_rollback($targetPath, 'cloneProject');
         return ApiResponse::create(500, 'server.file_write_failed')
             ->withMessage('Failed to initialise cloned project membership');
     }
@@ -244,23 +242,6 @@ function cloneProjectDirectory(string $source, string $dest, array $excludeDirs)
     }
     
     return true;
-}
-
-/**
- * Recursively delete a directory
- */
-function deleteDirectoryRecursive(string $dir): void {
-    if (!is_dir($dir)) return;
-    
-    $iterator = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS),
-        RecursiveIteratorIterator::CHILD_FIRST
-    );
-    
-    foreach ($iterator as $item) {
-        $item->isDir() ? rmdir($item->getPathname()) : unlink($item->getPathname());
-    }
-    rmdir($dir);
 }
 
 /**

@@ -36,8 +36,9 @@
  * The vocabulary, smallest to largest:
  *
  *   qs_project_is_multilingual()      is this project multilingual at all?
+ *   qs_project_default_language()     its default language, else 'en'
+ *   qs_project_language_codes()       its languages, whatever the mode
  *   qs_project_languages()            the supported codes ([] when it is not)
- *   qs_project_default_language()     the configured fallback
  *   qs_is_project_language($segment)  is this URL segment one of them?
  *   qs_project_language_from_path()   the language this REQUEST's URL names
  *   qs_resolve_project_language()     ← THE answer. Everything else feeds it.
@@ -58,6 +59,57 @@ function qs_project_is_multilingual(): bool
 }
 
 /**
+ * ONE FALLBACK FOR A PROJECT THAT EXISTS. Every place that reads an existing
+ * project's default language or its languages asks the two functions below,
+ * never CONFIG directly, so a project whose config.php leaves a setting out is
+ * read the same way everywhere: by the router, the translator, the link
+ * builder, a build's compiled pages, every command and the admin panel.
+ *   - its default language: LANGUAGE_DEFAULT, else 'en';
+ *   - its languages: LANGUAGES_SUPPORTED, else its default language alone.
+ * The fallback is 'en', QuickSite's shipped default language — not the
+ * installation's own default, which a built site cannot read: a build carries
+ * no installation config. A NEW project's language is a different question
+ * (languageRegistry.php).
+ *
+ * Both take the settings to read: a config.php array a caller already holds
+ * (an export, a project listing, the panel's edited project), or nothing for
+ * the current project's CONFIG.
+ */
+function qs_project_language_settings(?array $config): array
+{
+    if ($config !== null) {
+        return $config;
+    }
+    return (defined('CONFIG') && is_array(CONFIG)) ? CONFIG : [];
+}
+
+/**
+ * The project's default language. Never empty: a project still has to name a
+ * translation file.
+ */
+function qs_project_default_language(?array $config = null): string
+{
+    $default = qs_project_language_settings($config)['LANGUAGE_DEFAULT'] ?? null;
+    return (is_string($default) && $default !== '') ? $default : 'en';
+}
+
+/**
+ * The project's language codes, in declaration order, whatever its
+ * multilingual mode. Never empty: a project with no list speaks its default
+ * language.
+ *
+ * @return string[]
+ */
+function qs_project_language_codes(?array $config = null): array
+{
+    $settings = qs_project_language_settings($config);
+    $langs = (isset($settings['LANGUAGES_SUPPORTED']) && is_array($settings['LANGUAGES_SUPPORTED']))
+        ? array_values(array_filter($settings['LANGUAGES_SUPPORTED'], static fn($l): bool => is_string($l) && $l !== ''))
+        : [];
+    return $langs !== [] ? $langs : [qs_project_default_language($settings)];
+}
+
+/**
  * The language codes this project serves, in declaration order.
  *
  * Empty when the project is mono-language — which is what makes
@@ -68,27 +120,7 @@ function qs_project_is_multilingual(): bool
  */
 function qs_project_languages(): array
 {
-    if (!qs_project_is_multilingual()) {
-        return [];
-    }
-    $langs = (defined('CONFIG') && isset(CONFIG['LANGUAGES_SUPPORTED']) && is_array(CONFIG['LANGUAGES_SUPPORTED']))
-        ? CONFIG['LANGUAGES_SUPPORTED']
-        : [];
-    return array_values(array_filter($langs, 'is_string'));
-}
-
-/**
- * The project's configured fallback language.
- *
- * Never empty: a project with no LANGUAGE_DEFAULT still has to name a
- * translation file, so it falls back to 'en', QuickSite's shipped default
- * language — not the installation's own default, which a built site cannot
- * read: a build carries no installation config.
- */
-function qs_project_default_language(): string
-{
-    $default = (defined('CONFIG') && isset(CONFIG['LANGUAGE_DEFAULT'])) ? CONFIG['LANGUAGE_DEFAULT'] : null;
-    return (is_string($default) && $default !== '') ? $default : 'en';
+    return qs_project_is_multilingual() ? qs_project_language_codes() : [];
 }
 
 /**

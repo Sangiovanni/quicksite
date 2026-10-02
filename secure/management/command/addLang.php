@@ -45,7 +45,7 @@ if (qs_project_has_language($langCode)) {
         ->withMessage("Language already exists")
         ->withData([
             'code' => $langCode,
-            'existing_languages' => CONFIG['LANGUAGES_SUPPORTED']
+            'existing_languages' => qs_project_language_codes()
         ])
         ->send();
 }
@@ -98,7 +98,7 @@ if (!is_array($current_config)) {
 }
 
 // Check again under lock if language was added by concurrent request
-if (in_array($langCode, $current_config['LANGUAGES_SUPPORTED'] ?? [], true)) {
+if (in_array($langCode, qs_project_language_codes($current_config), true)) {
     flock($lockHandle, LOCK_UN);
     fclose($lockHandle);
     @unlink($lockFile);
@@ -106,13 +106,13 @@ if (in_array($langCode, $current_config['LANGUAGES_SUPPORTED'] ?? [], true)) {
         ->withMessage("Language already exists")
         ->withData([
             'code' => $langCode,
-            'existing_languages' => $current_config['LANGUAGES_SUPPORTED']
+            'existing_languages' => qs_project_language_codes($current_config)
         ])
         ->send();
 }
 
 // Add new language
-$current_config['LANGUAGES_SUPPORTED'][] = $langCode;
+$current_config['LANGUAGES_SUPPORTED'] = array_merge(qs_project_language_codes($current_config), [$langCode]);
 
 $refusal = qs_project_settings_guard($current_config, ['LANGUAGES_SUPPORTED']);
 if ($refusal !== null) {
@@ -140,7 +140,7 @@ qs_opcache_invalidate($config_path);
 
 // --- CREATE TRANSLATION FILE ---
 // Copy from default language
-$default_lang = CONFIG['LANGUAGE_DEFAULT'];
+$default_lang = qs_project_default_language();
 $source_file = PROJECT_PATH . '/translate/' . $default_lang . '.json';
 $target_file = PROJECT_PATH . '/translate/' . $langCode . '.json';
 

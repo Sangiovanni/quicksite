@@ -26,20 +26,20 @@
  * code the list no longer holds is shown as the code itself (qs_language_label()).
  *
  * THE INSTALLATION'S DEFAULT LANGUAGE is the language a NEW project starts in when none is chosen
- * (qs_language_default()): createProject's default, the language the panel preselects for a new
- * project, and the languages an imported archive gets when it lists none. The operator sets it in
- * `<secure>/management/config/default-language.php`; it is 'en' when that file is absent, and on
- * every path where it cannot be used — each of those is written to the PHP error log. A project that
- * exists never reads it.
+ * (qs_language_default()): createProject's default and the language the panel preselects for a new
+ * project. The operator sets it in `<secure>/management/config/default-language.php`; it is 'en' when
+ * that file is absent, and on every path where it cannot be used — each of those is written to the
+ * PHP error log. A project that exists never reads it, and neither does an import: an archive names
+ * its own languages or is refused.
  *
- * Engine-side only: nothing a build ships may require this file. The site's own language
- * detection is projectLanguage.php, which travels into builds and answers a different question
- * (which language a URL names).
+ * Engine-side only: nothing a build ships may require this file. A project's own languages, and
+ * which of them a URL names, are projectLanguage.php, which travels into builds.
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/opcacheHygiene.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/projectLanguage.php'; // qs_project_language_codes
 
 /** Where the installation's own copy lives; the shipped list is this path plus `.example`. */
 function qs_language_list_path(): string
@@ -181,19 +181,6 @@ function qs_language_default_read(string $file): string
 
     error_log("QuickSite: ignoring default-language.php ({$problem}) — new projects start in '{$shipped}'.");
     return $shipped;
-}
-
-/**
- * The codes the current project has, in declaration order — whatever its multilingual mode.
- *
- * @return string[]
- */
-function qs_project_language_codes(): array
-{
-    $langs = (defined('CONFIG') && isset(CONFIG['LANGUAGES_SUPPORTED']) && is_array(CONFIG['LANGUAGES_SUPPORTED']))
-        ? CONFIG['LANGUAGES_SUPPORTED']
-        : [];
-    return array_values(array_filter($langs, 'is_string'));
 }
 
 /**

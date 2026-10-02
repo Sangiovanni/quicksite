@@ -149,7 +149,7 @@ function __command_getUnusedTranslationKeys(array $params = [], array $urlParams
     $usedKeys = array_unique($usedKeys);
 
     // Determine which languages to check
-    $languagesToCheck = $targetLang ? [$targetLang] : CONFIG['LANGUAGES_SUPPORTED'];
+    $languagesToCheck = $targetLang ? [$targetLang] : qs_project_language_codes();
 
     $results = [];
     $totalUnused = 0;

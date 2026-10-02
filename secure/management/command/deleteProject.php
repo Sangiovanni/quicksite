@@ -282,21 +282,6 @@ function countProjectFiles(string $dir): array {
     return $stats;
 }
 
-// (Removed, beta.11) A local deleteDirectory(). It shadowed the shared one in
-// FileSystem.php — two global functions of one name with DIFFERENT semantics
-// (the shared one ignored failures and returned rmdir's result; this one bailed
-// on the first), so which behaviour ran depended on which file a process had
-// loaded, and loading both was a redeclare fatal. Deleting now goes through
-// qs_delete_tree(), required at the top of this file. Exactly the collision the
-// note below records for formatBytes — same class, same file, twelve lines
-// apart.
-
-// (Removed, S2.9) A local formatBytes(). Byte formatting lives in
-// qs_format_size() in utilsManagement.php, already required at the top of this
-// file. Three copies existed; they disagreed with each other and with the
-// shared one above 100 units, and none of them had a TB unit — so a large
-// deletion reported "1024 GB". Being global functions in command files, two of
-// them were also a latent redeclare collision for any process that loaded both.
 
 // Execute command if called directly via API (not internal call)
 if (!defined('COMMAND_INTERNAL_CALL')) {

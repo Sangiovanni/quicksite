@@ -90,12 +90,6 @@ if (!function_exists('qs_apply_alias_routing')) {
         }
         $aliasType = $aliasInfo['type'] ?? 'redirect';
 
-        // The language segment is the same for both outcomes. It used to be read
-        // from CONFIG['DEFAULT_LANGUAGE'] — a key no project config has ever
-        // held; it is LANGUAGE_DEFAULT — so on a multilingual project reached
-        // without a language in the URL the prefix came out empty and the
-        // Location header became protocol-relative (`//home`), which a browser
-        // resolves as a different HOST.
         $langPrefix = qs_project_is_multilingual()
             ? '/' . ($langCode ?? qs_project_default_language())
             : '';

@@ -21,6 +21,7 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php'; // qs_delete_tree
 
 /**
  * Recursively copy a directory
@@ -260,21 +261,7 @@ function __command_backupProject(array $params = [], array $urlParams = []): Api
         foreach ($toDelete as $oldBackup) {
             $oldPath = $backups[$oldBackup]['path'];
             
-            // Recursively delete old backup
-            $iterator = new RecursiveIteratorIterator(
-                new RecursiveDirectoryIterator($oldPath, RecursiveDirectoryIterator::SKIP_DOTS),
-                RecursiveIteratorIterator::CHILD_FIRST
-            );
-            
-            foreach ($iterator as $file) {
-                if ($file->isDir()) {
-                    rmdir($file->getRealPath());
-                } else {
-                    unlink($file->getRealPath());
-                }
-            }
-            
-            if (rmdir($oldPath)) {
+            if (qs_delete_tree($oldPath)['ok']) {
                 $deletedBackups[] = $oldBackup;
                 unset($backups[$oldBackup]);
             }
