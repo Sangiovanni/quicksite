@@ -102,7 +102,9 @@ const QS_REGISTER_FLASH_TTL = 86400;
  *                (0 = never; the operator CLI still works). Logins are rare and
  *                already write to disk, which is why the sweep rides one rather
  *                than every request — PHP's own gc_probability/gc_divisor idiom,
- *                with a divisor sized for logins instead of session starts.
+ *                with a divisor sized for logins instead of session starts. The
+ *                sweep runs once the login has been answered, never before it
+ *                (qs_session_sweep_maybe).
  *
  * Every key is optional and absent means the default: an auth.php written
  * before a key existed keeps working.
@@ -208,7 +210,55 @@ function qs_session_boot(bool $forWrite): bool {
     // Silenced deliberately: a stray PHP warning (headers already sent on a
     // late call) would land INSIDE a JSON response body. Failure is reported by
     // the return value, which every caller checks.
-    return @session_start($forWrite ? [] : ['read_and_close' => true]);
+    $opened = @session_start($forWrite ? [] : ['read_and_close' => true]);
+    if ($opened && $forWrite) {
+        qs_session_remember_refresh();
+    }
+    return $opened;
+}
+
+/**
+ * Send the session cookie for the open session: $lifetime seconds from now, or
+ * 0 for a cookie that dies with the browser session. Sent again with the same
+ * name, it replaces the browser's copy — a browser keeps the last one it is
+ * given.
+ */
+function qs_session_cookie_send(int $lifetime): void {
+    if (headers_sent()) {
+        return;
+    }
+    $params = qs_session_cookie_params($lifetime);
+    $params['expires'] = $lifetime > 0 ? time() + $lifetime : 0;
+    unset($params['lifetime']);
+    setcookie(QS_SESSION_COOKIE, session_id(), $params);
+}
+
+/**
+ * Keep a "remember me" cookie's lifetime when its session is opened for writing.
+ *
+ * PHP sends the session cookie again when one request opens the session a
+ * second time — every panel page reads the session to see who is signed in,
+ * then opens it for writing (the admin language) — and it sends it with the
+ * lifetime the session was started with, 0. Without this, a remembered sign-in
+ * held a browser-session cookie from the first page after it, and "remember me"
+ * never survived a browser restart.
+ *
+ * So an open session that was remembered, and is still within its idle limit,
+ * gets its cookie again after PHP's, with remember_ttl from now: the cookie
+ * lasts that long after the last visit. A session past idle_ttl is refused
+ * anyway, and its cookie is not renewed. Nothing on the server changes: the
+ * session's own idle limit is the same.
+ */
+function qs_session_remember_refresh(): void {
+    if (empty($_SESSION['qs_remember']) || !isset($_SESSION['qs_uid'])) {
+        return;
+    }
+    $knobs = qs_session_config();
+    $seen  = (int)($_SESSION['qs_seen'] ?? 0);
+    if ($seen <= 0 || time() - $seen > $knobs['idle_ttl']) {
+        return;
+    }
+    qs_session_cookie_send($knobs['remember_ttl']);
 }
 
 /**
@@ -344,22 +394,17 @@ function qs_session_establish(string $userId, int $generation, bool $remember): 
     // session was started with (lifetime 0). "Remember me" needs a longer one,
     // and session_set_cookie_params refuses to run while a session is active —
     // so re-emit the cookie explicitly. Same name and id: the browser keeps the
-    // last Set-Cookie for a name, which is this one.
-    $lifetime = $remember ? qs_session_config()['remember_ttl'] : 0;
-    if (!headers_sent()) {
-        $params = qs_session_cookie_params($lifetime);
-        $params['expires'] = $lifetime > 0 ? time() + $lifetime : 0;
-        unset($params['lifetime']);
-        setcookie(session_name(), session_id(), $params);
-    }
+    // last Set-Cookie for a name, which is this one. Later requests keep that
+    // lifetime through qs_session_remember_refresh().
+    qs_session_cookie_send($remember ? qs_session_config()['remember_ttl'] : 0);
 
     qs_session_cache_reset();
 
     // Opportunistic housekeeping, on a die (qs_session_sweep_maybe). A login is
     // the right host: infrequent, already writing, and it needs nothing an
-    // operator has to remember. Deliberately AFTER the session is established
-    // and the cookie is sent, so a sweep can never delay or affect the login
-    // that triggered it.
+    // operator has to remember. A hit only SCHEDULES the sweep: it runs at the
+    // end of the request, once this session is saved and the response is
+    // complete, so it can neither delay nor change the login that triggered it.
     qs_session_sweep_maybe();
 
     return $token;
@@ -484,8 +529,9 @@ function qs_session_touch(): void {
 // ============================================================================
 // Session store sweep — QuickSite collects on ITS OWN rule (see the file
 // header for why PHP's GC cannot). Two entries, per the S2 design:
-//   - opportunistically at LOGIN, on a 1-in-N die (qs_session_sweep_maybe);
-//   - explicitly from the operator CLI (secure/cli/session-sweep.php).
+//   - opportunistically after a LOGIN has been answered, on a 1-in-N die
+//     (qs_session_sweep_maybe);
+//   - explicitly from the operator's script (secure/tools/session-sweep.php).
 //
 // NOT a routed command, deliberately. Clearing the session store is
 // installation-wide and has no principal to authorize it: a per-project role
@@ -502,8 +548,16 @@ const QS_SESSION_SWEEP_EMPTY_GRACE = 3600;
 
 /** Safety valve, not a tuning knob: bounds one pass over a pathologically large
  *  store (the 5393 files that prompted this work would fit ~4 times over). A
- *  capped pass reports it and the next sweep continues. */
+ *  capped pass records how far it got (QS_SESSION_SWEEP_POSITION_FILE) and the
+ *  next pass starts there, so successive passes reach every file however many
+ *  there are. */
 const QS_SESSION_SWEEP_MAX_FILES = 20000;
+
+/** How far through the store the last pass got, kept in the store itself. Its
+ *  name does not start with `sess_`, so neither PHP's own collector nor the sweep
+ *  ever takes it for a session. It is also the lock that lets one pass run at a
+ *  time, and it is read and written only while that lock is held. */
+const QS_SESSION_SWEEP_POSITION_FILE = 'sweep-position.json';
 
 /**
  * Delete session files this install can prove are worthless, and leave
@@ -542,11 +596,32 @@ const QS_SESSION_SWEEP_MAX_FILES = 20000;
  * re-read under that lock, so a file that was rewritten between the scan and
  * the delete is re-judged rather than removed on stale evidence.
  *
+ * EACH PASS CONTINUES THE LAST. A pass examines at most
+ * QS_SESSION_SWEEP_MAX_FILES files. One that stops there records how many files
+ * it walked past and left in place, and the next pass skips that many — by
+ * name, without a stat — before it examines anything; a pass that reaches the
+ * end of the listing records 0, so the one after starts at the top again. On a
+ * store under the cap every pass therefore covers the whole store, and above it
+ * successive passes reach every file, wherever it sits in the listing. Files
+ * other processes create or delete meanwhile can shift a pass's starting point
+ * by as many files; whatever one cycle steps over, the next cycle reaches.
+ * Which files a pass examines never changes what it removes: the three rules
+ * above decide that, file by file.
+ *
+ * ONE PASS AT A TIME. The position file is also the pass's lock, taken without
+ * waiting: a pass that finds it held does nothing and reports `busy`, because
+ * another pass is already doing this work. A store whose position file cannot be
+ * opened is swept from the top, as if it had none. A dry run reads the position
+ * and never moves it; it writes nothing at all, so it creates no position file
+ * either, and it shares the lock with other dry runs.
+ *
  * @param bool     $dryRun report what would go, delete nothing
  * @param int|null $now    injectable clock (tests); null = time()
  * @return array{examined:int, removed:int, bytes:int, empty:int, idle:int,
- *               foreign:int, locked:int, capped:bool, seconds:float,
- *               removed_files:array<int,string>}
+ *               foreign:int, locked:int, capped:bool, busy:bool, from:int,
+ *               next:int, seconds:float, removed_files:array<int,string>}
+ *               `from` is where this pass started (files skipped), `next` where
+ *               the next one will.
  */
 function qs_session_sweep(bool $dryRun = false, ?int $now = null): array {
     $started = microtime(true);
@@ -557,6 +632,7 @@ function qs_session_sweep(bool $dryRun = false, ?int $now = null): array {
 
     $report = ['examined' => 0, 'removed' => 0, 'bytes' => 0, 'empty' => 0,
                'idle' => 0, 'foreign' => 0, 'locked' => 0, 'capped' => false,
+               'busy' => false, 'from' => 0, 'next' => 0,
                'seconds' => 0.0, 'removed_files' => []];
 
     $dir = qs_session_save_path();
@@ -567,15 +643,42 @@ function qs_session_sweep(bool $dryRun = false, ?int $now = null): array {
         return $report;
     }
 
+    // One pass at a time (see the docblock): the position file is the lock. A
+    // dry run changes nothing, not even by creating that file: it opens an
+    // existing one read-only and shares the lock.
+    $position = $dir . '/' . QS_SESSION_SWEEP_POSITION_FILE;
+    if ($dryRun) {
+        $state = is_file($position) ? @fopen($position, 'rb') : false;
+    } else {
+        $state = @fopen($position, 'c+');
+    }
+    if ($state !== false && !@flock($state, ($dryRun ? LOCK_SH : LOCK_EX) | LOCK_NB)) {
+        fclose($state);
+        $report['busy'] = true;
+        $report['seconds'] = round(microtime(true) - $started, 4);
+        return $report;
+    }
+    $from = $state !== false ? qs_session_sweep_position($state) : 0;
+    $report['from'] = $from;
+
     $dh = @opendir($dir);
     if ($dh === false) {
+        if ($state !== false) {
+            flock($state, LOCK_UN);
+            fclose($state);
+        }
         $report['seconds'] = round(microtime(true) - $started, 4);
         return $report;
     }
 
+    $skipped = 0;
     while (($entry = readdir($dh)) !== false) {
         if (strncmp($entry, 'sess_', 5) !== 0) {
-            continue; // not a session file (lock files, ., ..)
+            continue; // not a session file (the position file, ., ..)
+        }
+        if ($skipped < $from) {
+            $skipped++; // examined by an earlier pass of this cycle
+            continue;
         }
         if ($report['examined'] >= QS_SESSION_SWEEP_MAX_FILES) {
             $report['capped'] = true;
@@ -619,8 +722,39 @@ function qs_session_sweep(bool $dryRun = false, ?int $now = null): array {
     }
     closedir($dh);
 
+    // Where the next pass starts: past every file this cycle has walked and
+    // left in place, or back at the top once a pass has reached the end.
+    $report['next'] = $report['capped']
+        ? $skipped + $report['examined'] - $report['removed']
+        : 0;
+    if ($state !== false) {
+        if (!$dryRun) {
+            ftruncate($state, 0);
+            rewind($state);
+            fwrite($state, (string) json_encode(['next' => $report['next']]));
+            fflush($state);
+        }
+        flock($state, LOCK_UN);
+        fclose($state);
+    }
+
     $report['seconds'] = round(microtime(true) - $started, 4);
     return $report;
+}
+
+/**
+ * The position a pass starts from, read from the open, locked position file.
+ * Anything but a positive whole number — a new file, an empty one, one a crash
+ * cut short — reads as 0: the pass starts at the top, which costs one pass and
+ * never skips a file that would otherwise be reached.
+ *
+ * @param resource $state
+ */
+function qs_session_sweep_position($state): int {
+    rewind($state);
+    $data = json_decode((string) stream_get_contents($state), true);
+    $next = is_array($data) ? ($data['next'] ?? 0) : 0;
+    return is_int($next) && $next > 0 ? $next : 0;
 }
 
 /**
@@ -698,10 +832,15 @@ function qs_session_sweep_consider(
 }
 
 /**
- * Sweep on a 1-in-N die. Called by login, which is the right host for it: it is
- * infrequent, it is already writing to disk, and it needs no scheduler, no
- * cron entry and nothing for an operator to remember. `sweep_divisor` = 0
- * disables it entirely (the CLI entry still works).
+ * Roll the 1-in-N die for a login and, on a hit, schedule one sweep for the end
+ * of this request (qs_session_sweep_after_response). Called by
+ * qs_session_establish(): a login is the right host — infrequent, already
+ * writing to disk, and it needs no scheduler, no cron entry and nothing for an
+ * operator to remember. `sweep_divisor` = 0 disables it entirely (the CLI entry
+ * still works).
+ *
+ * It never sweeps here. The login it rides is waiting for its answer, and a
+ * pass over a large store takes seconds.
  */
 function qs_session_sweep_maybe(): void {
     $divisor = qs_session_config()['sweep_divisor'];
@@ -711,7 +850,81 @@ function qs_session_sweep_maybe(): void {
     if ($divisor > 1 && random_int(1, $divisor) !== 1) {
         return;
     }
+    if (!empty($GLOBALS['__qs_session_sweep_scheduled'])) {
+        return; // one sweep per request, however many logins it holds
+    }
+    $GLOBALS['__qs_session_sweep_scheduled'] = true;
+    register_shutdown_function('qs_session_sweep_after_response');
+}
+
+/**
+ * The scheduled sweep, run as a shutdown function: after the login's response
+ * has been written, and only once it is complete. In this order:
+ *
+ *  1. The session the login opened is saved and released. PHP would do that
+ *     only after every shutdown function, so the browser's next request — the
+ *     page a panel sign-in redirects to — would wait on the session's lock for
+ *     the whole sweep.
+ *  2. The response is completed (qs_session_response_complete).
+ *  3. The sweep.
+ *
+ * A response that cannot be completed first is not swept behind: the login
+ * keeps its answer, and the next login rolls the die again. Nothing the sweep
+ * does can reach a response completed before it — it writes no output, and an
+ * error raised in it comes after the caller already has its answer.
+ */
+function qs_session_sweep_after_response(): void {
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        session_write_close();
+    }
+    if (!qs_session_response_complete()) {
+        return;
+    }
+    ignore_user_abort(true);
     qs_session_sweep();
+}
+
+/**
+ * Hand the client the whole of this request's response now, while the script
+ * goes on running. True when that was done, false when it cannot be.
+ *
+ *  - PHP-FPM: fastcgi_finish_request(); LiteSpeed: litespeed_finish_request().
+ *    Each ends the request for the client and keeps the script running.
+ *  - Any other server (mod_php, CGI), only while nothing has been sent: the
+ *    whole response is then still in PHP's output buffers, so its exact length
+ *    is known. It goes out with that `Content-Length` and `Connection: close`,
+ *    and the client has its complete answer once those bytes arrive. Refused
+ *    when a buffer changes what passes through it (compression, a callback) or
+ *    cannot be removed — the length would then be the wrong one.
+ *  - Otherwise false: a response already written straight out, with no length
+ *    (ApiResponse::send() writes that way), ends only when the request does.
+ */
+function qs_session_response_complete(): bool {
+    if (function_exists('fastcgi_finish_request')) {
+        return fastcgi_finish_request();
+    }
+    if (function_exists('litespeed_finish_request')) {
+        return litespeed_finish_request();
+    }
+    if (headers_sent()) {
+        return false;
+    }
+    foreach (ob_get_status(true) as $buffer) {
+        if (($buffer['name'] ?? '') !== 'default output handler'
+            || !((int)($buffer['flags'] ?? 0) & PHP_OUTPUT_HANDLER_REMOVABLE)) {
+            return false;
+        }
+    }
+    $body = '';
+    while (ob_get_level() > 0) {
+        $body = (string)ob_get_contents() . $body; // innermost first
+        ob_end_clean();
+    }
+    header('Content-Length: ' . strlen($body));
+    header('Connection: close');
+    echo $body;
+    flush();
+    return true;
 }
 
 // ============================================================================
@@ -861,8 +1074,10 @@ function qs_login_throttle_clear(string $identifier): void {
 
 /**
  * Registration policy knobs from auth.php (all optional, secure defaults —
- * flag OFF, min password 12, no user cap, 3 attempts/IP/minute, 30 successful
- * registrations/hour install-wide; 0 disables a limit).
+ * flag OFF, min password 12, no user cap, 3 attempts/IP/minute, 1,000 successful
+ * registrations/hour install-wide; 0 disables a limit). The hourly cap is sized
+ * for a launch day rather than for a quiet install: it is the ceiling on a
+ * flood of accounts, and the per-IP limit is what slows any one caller.
  *
  * @return array{allow_self_registration:bool, min_password_length:int,
  *               max_users:int, per_ip_per_minute:int, global_per_hour:int}
@@ -875,7 +1090,7 @@ function qs_registration_config(): array {
         'min_password_length'     => max(1, (int)($cfg['min_password_length'] ?? 12)),
         'max_users'               => max(0, (int)($cfg['max_users'] ?? 0)),
         'per_ip_per_minute'       => max(0, (int)($throttle['per_ip_per_minute'] ?? 3)),
-        'global_per_hour'         => max(0, (int)($throttle['global_per_hour'] ?? 30)),
+        'global_per_hour'         => max(0, (int)($throttle['global_per_hour'] ?? 1000)),
     ];
 }
 

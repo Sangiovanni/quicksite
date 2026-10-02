@@ -1,10 +1,11 @@
 <?php
 /**
- * session-sweep.php — the operator's entry to the session store sweep.
+ * session-sweep.php — the operator's entry to the session store sweep. One of the
+ * deployer's tools in this folder (see its README.md).
  *
- *   php secure/cli/session-sweep.php              sweep now
- *   php secure/cli/session-sweep.php --dry-run    report what would go, delete nothing
- *   php secure/cli/session-sweep.php --quiet      exit code only (for cron)
+ *   php secure/tools/session-sweep.php              sweep now
+ *   php secure/tools/session-sweep.php --dry-run    report what would go, delete nothing
+ *   php secure/tools/session-sweep.php --quiet      exit code only (for cron)
  *
  * WHY THIS IS A SCRIPT AND NOT A COMMAND. Clearing the session store is
  * installation-wide and has no principal to authorize it. QuickSite's
@@ -16,11 +17,16 @@
  * gate here is "you can run PHP on this box", enforced by living outside the
  * web root and refusing to run under a web SAPI.
  *
- * It is normally unnecessary: a login sweeps on a 1-in-N die
- * (auth.php `authentication.session.sweep_divisor`), which keeps an install in
- * ordinary use tidy with nothing scheduled. This exists for the cases that die
- * does not cover — an install nobody logs into, a store that grew before the
- * read-mode fix landed, or an operator who simply wants it done now.
+ * It is normally unnecessary: a login sweeps on a 1-in-N die once it has been
+ * answered (auth.php `authentication.session.sweep_divisor`), which keeps an
+ * install in ordinary use tidy with nothing scheduled. This exists for the cases
+ * that die does not cover — an install nobody logs into, a store that grew
+ * before the read-mode fix landed, or an operator who simply wants it done now.
+ *
+ * One run is one pass, and a pass examines at most QS_SESSION_SWEEP_MAX_FILES
+ * files. A pass that stops there records how far it got, and the next pass —
+ * this script again, or a login's — continues from there. Only one pass runs at
+ * a time: when another is already running, this one says so and does nothing.
  *
  * What it deletes and why is documented on qs_session_sweep() in
  * secure/src/functions/SessionManagement.php. In short: empty files, sessions
@@ -66,16 +72,33 @@ if ($quiet) {
 $verb = $dryRun ? 'would remove' : 'removed';
 printf("QuickSite session sweep%s\n", $dryRun ? ' (dry run)' : '');
 printf("  store      %s\n", qs_session_save_path());
+if ($report['busy']) {
+    printf("  NOTE       another pass is running right now; this one did nothing\n");
+    exit(0);
+}
+if ($report['from'] > 0) {
+    printf("  started    after the first %d files, which earlier passes examined\n", $report['from']);
+}
 printf("  examined   %d file%s in %.3fs\n",
     $report['examined'], $report['examined'] === 1 ? '' : 's', $report['seconds']);
 printf("  %s %d (%d empty, %d idle) — %s\n",
     $verb, $report['removed'], $report['empty'], $report['idle'],
     qs_cli_bytes($report['bytes']));
-printf("  kept       %d live or foreign, %d locked by a request in flight\n",
-    $report['foreign'], $report['locked']);
+// Every examined file that stays: recent enough to be alive without opening it,
+// read and judged alive (or not QuickSite's to judge), or locked by a request.
+$kept = $report['examined'] - $report['removed'];
+printf("  kept       %d (%d recent, %d read and judged alive or not ours, %d locked by a request in flight)\n",
+    $kept, $kept - $report['foreign'] - $report['locked'], $report['foreign'], $report['locked']);
 if ($report['capped']) {
-    printf("  NOTE       stopped at the %d-file ceiling; run it again to continue\n",
-        QS_SESSION_SWEEP_MAX_FILES);
+    if ($dryRun) {
+        printf("  NOTE       stopped at the %d-file ceiling; a dry run does not move the\n"
+             . "             position, so the next pass starts where this one did\n",
+            QS_SESSION_SWEEP_MAX_FILES);
+    } else {
+        printf("  NOTE       stopped at the %d-file ceiling; run it again to continue\n"
+             . "             from there\n",
+            QS_SESSION_SWEEP_MAX_FILES);
+    }
 }
 if ($report['removed_files']) {
     printf("  first few  %s%s\n", implode(', ', array_slice($report['removed_files'], 0, 5)),

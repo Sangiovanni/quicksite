@@ -44,7 +44,7 @@ QuickSite separates concerns into three top-level layers. Each one has a clear b
                │  src/                  │  (Renderer, Compiler, Translator…)
                │  projects/<projectId>/ │  (sites)
                │  admin/                │  (templates + workflows)
-               │  cli/ · cron/          │  (operator + deployment
+               │  tools/ · cron/        │  (operator + deployment
                │  deploy/ · snippets/   │   scripts and templates)
                └────────────────────────┘
 ```
@@ -272,14 +272,14 @@ Nothing anywhere creates, disables, or deletes an account **for someone else**. 
 | `registration.min_password_length` | 12 | applies to registration and to an account password change |
 | `registration.max_users` | 0 | absolute ceiling on accounts; 0 is no ceiling |
 | `registration.throttle.per_ip_per_minute` | 3 | registration attempts per IP |
-| `registration.throttle.global_per_hour` | 30 | successful registrations per hour, install-wide |
+| `registration.throttle.global_per_hour` | 1000 | successful registrations per hour, install-wide |
 | `cors.*` | — | which **other** origins may call `/management` from a browser; a same-origin caller is allowed before this list is read |
 
 A session holds five values and nothing more: the user id, the generation stamped at login, the session token, the last-seen time, and whether it was a "remember me". Sessions are PHP's own, stored under `secure/tmp/sessions`.
 
 **A read never creates a session.** A cookie naming no session gets no session and no `Set-Cookie` — the request is simply anonymous. Only a deliberate write creates one: logging in, or storing something for a visitor who has none. Reads also release the session file immediately, so concurrent requests never queue behind each other's lock. Without the rule, a caller that ignores `Set-Cookie` — a script, a scanner, a crawler — would be handed a fresh session on every request and leave a file behind each time.
 
-**Expiry is QuickSite's rule, not PHP's.** A session idle longer than `idle_ttl` stops being accepted whatever PHP thinks. PHP's own collector cannot do the tidying: one `gc_maxlifetime` has to cover every session in the store, and the longest promise here is `remember_ttl`, so it refuses to touch anything younger than that. The sweep runs instead on a login, at the `sweep_divisor` chance, and on demand from `php secure/cli/session-sweep.php`. It is a script rather than a command on purpose — clearing the session store is installation-wide, and authority in QuickSite is per project, so no principal could authorize it. The credential is filesystem access to the server.
+**Expiry is QuickSite's rule, not PHP's.** A session idle longer than `idle_ttl` stops being accepted whatever PHP thinks. PHP's own collector cannot do the tidying: one `gc_maxlifetime` has to cover every session in the store, and the longest promise here is `remember_ttl`, so it refuses to touch anything younger than that. The sweep runs instead on a login, at the `sweep_divisor` chance, and on demand from `php secure/tools/session-sweep.php`. It is a script rather than a command on purpose — clearing the session store is installation-wide, and authority in QuickSite is per project, so no principal could authorize it. The credential is filesystem access to the server.
 
 **The first account** is created on the first-run page: while the registry is empty every admin URL renders `/admin/setup`, which asks for the token the engine wrote to `setup-token.txt`. Being able to read that file is the authorisation — filesystem access to the install, strictly stronger than any account it can mint — so no default credential ships and no command line is required. The rule sits at the single account-creation path every route shares, so a direct call to `register` on an empty registry is refused identically; the token is consumed on use and the gate independently requires an empty registry, so the path dies permanently once an account exists.
 

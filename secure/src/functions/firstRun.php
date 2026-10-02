@@ -85,12 +85,13 @@ function qs_operator_path(): string {
  *
  * IF AN ACTION NEEDS AN OPERATOR, IT DOES NOT BELONG ON THE HTTP SURFACE. The
  * operator is whoever has filesystem access to the server — that is the design
- * (§2.3 of the S2 concern), and it is why `applyUpdate` became a CLI script and
- * why the session sweep is a CLI entry point rather than a routed command. A
- * thing only an operator may do is a thing a shell does.
+ * (§2.3 of the S2 concern), and it is why applying an update is the operator's
+ * own `git pull` and the session sweep a script the operator runs
+ * (secure/tools/), never a routed command. A thing only an operator may do is a
+ * thing a shell does.
  *
- * If you are here to add a capability check on this list: the answer is a CLI
- * script under secure/cli/, or a per-project role. Not this.
+ * If you are here to add a capability check on this list: the answer is a
+ * script under secure/tools/, or a per-project role. Not this.
  * ══════════════════════════════════════════════════════════════════════════════
  *
  * DEFAULT-ON-ABSENT: a missing, unreadable or malformed file reads as "nobody",

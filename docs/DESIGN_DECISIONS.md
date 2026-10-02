@@ -12467,3 +12467,133 @@ Sangio 2026-09-26. The route-matching half comes from his UX run of 2026-09-27; 
 - `secure/src/runtime/qs.js` (`matchRouteOnLoad`)
 
 Behaviour: [ARCHITECTURE.md](ARCHITECTURE.md) §9.0.2.
+
+### A sign-in never waits for the session sweep, successive passes reach every file, registration allows 1,000 accounts an hour, and "remember me" keeps its cookie (locked 2026-10-01)
+
+**Amends**: *QuickSite sweeps its own session store, and the sweep is not a command*
+(locked 2026-08-14). Its decision stands — the same three rules, the same die, the
+same two entries; this entry says when the sweep runs once the die is won, and how one
+pass continues the last. Also *Registration is denied by default and flood-controlled
+on three axes* (locked 2026-07-12): its decision stands, and the one statement of it
+that no longer holds is corrected below rather than rewritten there.
+
+**Decision**: five changes, made together.
+
+- **The sweep runs after the sign-in has its answer.** A login that wins the 1-in-N
+  die schedules the sweep for the end of its request instead of sweeping inside it.
+  At the end of the request the session the login opened is saved and released first,
+  then the response is completed, then the store is swept. The response is completed
+  with `fastcgi_finish_request()` under PHP-FPM and `litespeed_finish_request()` under
+  LiteSpeed; on any other server (mod_php, CGI) it is sent with its exact
+  `Content-Length` and `Connection: close` while it is still whole in PHP's output
+  buffers. A response that cannot be completed first — one already written out with no
+  length, as the `login` command's is on mod_php — is not swept behind: that sign-in
+  keeps its answer, and the next one rolls the die again.
+- **Each pass continues the last.** A pass still examines at most 20,000 files. One
+  that stops there records how many files it walked past and left in place, in a small
+  file in the store itself (`sweep-position.json`); the next pass skips that many
+  before it examines anything, and a pass that reaches the end of the listing records
+  0. Below 20,000 files every pass covers the whole store, as before. The same file is
+  a lock: one pass runs at a time, and a pass that finds another running does nothing.
+  A dry run reads the position and never moves it. The operator's script is still one
+  pass per run, and says where it started and that a second run continues.
+- **The install-wide registration cap defaults to 1,000 successful registrations an
+  hour** (`registration.throttle.global_per_hour`; `0` still means no limit). An
+  `auth.php` that writes a value keeps it: nothing rewrites an installation's own file.
+- **The operator's script moves to `secure/tools/`**, beside a `README.md` that says what it
+  does, when it is needed and how to run it. The entries above name it at its old path,
+  `secure/cli/session-sweep.php`.
+- **"Remember me" keeps its cookie.** A remembered session opened for writing gets its
+  cookie again, after the one PHP sends, lasting `remember_ttl` from that moment: the cookie
+  now ends 30 days after the last visit. A session past `idle_ttl` is refused and its cookie
+  is not renewed. Nothing changes on the server: a remembered session is still refused after
+  `idle_ttl` unused, so no session lives longer and the store holds no more files.
+
+What the sweep removes does not change: empty files past the grace, sessions idle past
+`idle_ttl`, and sessions holding no QuickSite login past the longest lifetime the
+install promises — judged file by file, under each file's own lock, as before.
+
+Corrected statement of the 2026-07-12 entry:
+
+- *"a global hourly ceiling (30 per hour)"* — 1,000 per hour by default.
+
+**Reasoning**: the sweep could not change a sign-in's outcome, but it could delay it.
+It ran inside the request, and the one sign-in in ten that rolled it waited for a pass
+over the whole store before getting its answer: 0.62 s for a store of 3,000 files,
+2.1 s for 10,000. At the scale an installation opened to the public reaches, that
+lands on the one action a user is waiting on. Answering first moves the cost off the
+user without moving it anywhere an operator has to remember: there is still no
+scheduler, and shared hosting with no cron keeps working. The session is saved before
+the response is completed because PHP would otherwise release it only after the
+sweep, and the page a panel sign-in redirects to would then wait on its lock instead.
+Measured on mod_php with 10,000 files, a tenth of them dead: the panel's sign-in
+answered as fast with the die forced as with it never rolled, the page it redirects
+to answered in 15 ms, and the store was swept two seconds later. A response that
+cannot be completed first is skipped rather than swept behind, because a sign-in that
+waits is exactly what this removes. Under PHP-FPM and LiteSpeed every sign-in is
+completed first; on mod_php the panel's always is, and only the `login` command's
+sign-ins leave the sweep to the next one.
+
+The cap was meant to bound one pass over a pathologically large store, not to decide
+which files are ever looked at, but each pass started at the top of the listing. At
+50,000 files, 45,000 of them live, successive passes removed 2,000, 200, 20, 2 and
+then nothing, and 2,778 dead files were never reached. With a recorded position,
+three passes removed all 5,000. It counts the files left in place rather than the
+files examined, because the ones a pass removes are no longer in the listing the next
+pass reads. Files other processes create or remove between passes can shift where a
+pass starts; whatever one cycle steps over, the next reaches, because every cycle
+starts again at the top. The position lives in the store, beside what it describes,
+and its name does not start with `sess_`, so neither PHP's collector nor the sweep
+takes it for a session.
+
+Thirty registrations an hour is a quiet installation's number; a launch day needs far
+more. The hourly cap is the ceiling on a flood of accounts, and the per-address limit
+is what slows any one caller. A value an operator wrote stays, because rewriting an
+installation's configuration on upgrade is a migration this release does not do.
+
+`cli` said how the script runs, not who it is for. It is the deployer's tool, and the folder
+now says so, with the how-to beside it instead of only inside the script. `cron/` keeps its
+name: installations already call its script from a crontab.
+
+"Remember me" did not survive a browser restart in a browser that does not restore session
+cookies, Firefox by default. Every panel page reads the session to see who is signed in and
+then opens it for writing, for the admin language. PHP sends the session cookie again on that
+second opening, with the lifetime the session was started with, 0, and a browser keeps the
+last cookie it is given. Measured through the panel: 30 days at the sign-in, a browser-session
+cookie from the first page after it. Sending the cookie again after PHP's keeps what the
+sign-in promised, and ending it 30 days after the last visit is what a person who ticked the
+box expects.
+
+**Alternatives considered**: a shorter time budget per pass (rejected — it shortens
+the wait but keeps it, on the one action a user is waiting on). Sweeping within a
+time budget only when the response cannot be completed first (rejected — the same
+wait, smaller). Moving the trigger off the sign-in, to a request the page sends once
+it has loaded (rejected — a new endpoint, reachable by anyone, for housekeeping the
+end of the request already does without one). A random starting point for each pass
+(rejected — no file is guaranteed to be reached). Splitting the store by the first
+character of the session id (rejected — on a small store a full cycle would take
+dozens of passes, where one pass covers it today). Raising the cap (rejected — it
+bounds how long one pass holds a worker; the stranding came from where a pass
+started, not from how far it went). A setting for the cap, the position file or the
+completion rule (rejected — conventions: the cap is a safety valve, not a tuning
+knob). Rewriting an existing `auth.php`'s 30 (rejected — no migration). One deployer folder for
+both `cli/` and `cron/` (rejected — it moves a script installations already call from a
+crontab). Opening the session a second time with PHP's cookie switched off (rejected — the
+setting stays off for the rest of the request, and the register and first-run forms rely on
+PHP sending the new session's cookie later in that same request, so the assigned username
+would be lost). A cookie that ends 30 days after the sign-in rather than the last visit
+(rejected — every session would need a sixth value, and the idle limit already ends an unused
+one). Remembered sessions lasting 30 days unused (left for later: it changes how long sessions
+live and what the sweep keeps).
+
+**Source**: Sangio's rulings during beta.12, 2026-09-25 and 2026-10-01, after the
+sweep was measured at scale. `secure/src/functions/SessionManagement.php`
+(`qs_session_boot`, `qs_session_cookie_send`, `qs_session_remember_refresh`,
+`qs_session_establish`, `qs_session_sweep`, `qs_session_sweep_position`,
+`qs_session_sweep_maybe`, `qs_session_sweep_after_response`,
+`qs_session_response_complete`, `QS_SESSION_SWEEP_MAX_FILES`,
+`QS_SESSION_SWEEP_POSITION_FILE`, `qs_registration_config`),
+`secure/tools/session-sweep.php` and its `README.md`,
+`secure/management/config/auth.php.example`.
+Behaviour: [ARCHITECTURE.md §3](ARCHITECTURE.md), [COMMAND_API.md](COMMAND_API.md)
+(*Authentication*).

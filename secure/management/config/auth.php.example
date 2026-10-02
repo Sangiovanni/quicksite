@@ -19,18 +19,21 @@ return [
                                         // accepted (1 day). Sliding: it moves
                                         // forward as the caller works.
             'remember_ttl' => 2592000,   // how long a "remember me" session cookie
-                                        // survives a browser restart (30 days).
-                                        // Without it the cookie dies with the
-                                        // browser session.
+                                        // survives a browser restart (30 days),
+                                        // counted from the last visit. Without it
+                                        // the cookie dies with the browser
+                                        // session. Either way the session itself
+                                        // ends after idle_ttl unused.
             'sweep_divisor' => 10,       // 1-in-N chance that a login also sweeps
-                                        // the session store (0 = never). PHP's own
+                                        // the session store (0 = never), once that
+                                        // login has been answered. PHP's own
                                         // collector cannot do this job: it runs on
                                         // 0.1% of session starts and its lifetime
                                         // must cover remember_ttl, so it refuses to
                                         // touch anything younger than the longest
                                         // promise here. QuickSite sweeps on its own
                                         // idle rule instead. The operator CLI
-                                        // (secure/cli/session-sweep.php) forces a
+                                        // (secure/tools/session-sweep.php) forces a
                                         // pass regardless of this setting.
         ],
         // Self-registration policy. allow_self_registration false (secure
@@ -45,7 +48,7 @@ return [
             'max_users'               => 0,    // absolute account cap (users.php entries)
             'throttle' => [
                 'per_ip_per_minute' => 3,      // register attempts per IP per minute
-                'global_per_hour'   => 30,     // successful registrations per hour, install-wide
+                'global_per_hour'   => 1000,   // successful registrations per hour, install-wide
             ],
         ],
     ],

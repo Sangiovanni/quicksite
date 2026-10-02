@@ -101,9 +101,10 @@ quicksite/
 │   ├── deploy/                   # Apache + nginx vhost examples for the install
 │   ├── nginx/                    # Auto-generated nginx config, dynamic_routes.conf (gitignored)
 │   ├── cron/                     # Optional cron scripts (nginx reload fallback)
-│   ├── cli/                      # Scripts an operator runs on the machine, not through the API,
-│   │                             #   because they act on the whole installation rather than on one
-│   │                             #   project — session-sweep.php tidies the session store
+│   ├── tools/                    # The deployer's tools: scripts an operator runs on the machine,
+│   │                             #   not through the API, because they act on the whole
+│   │                             #   installation rather than on one project — session-sweep.php
+│   │                             #   tidies the session store; README.md says how to run it
 │   ├── cache/                    # Generated caches, safe to delete (gitignored)
 │   │   ├── resolver/             #   data-resolver responses, held for their TTL
 │   │   └── space/                #   measured per-project disk sizes
