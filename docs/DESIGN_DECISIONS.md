@@ -12696,3 +12696,112 @@ and differently on each system).
 `backupProject` under `secure/management/command/`. Behaviour: the `importProject`,
 `exportProject` and `getLanguageList` entries of `help`, and
 [COMMAND_API.md](COMMAND_API.md) (*Export / Import*, *Archive import limits*).
+
+### The browser reads the route the server resolved, a value in an inline script is always a complete expression, and the runtime's own developer errors go to the console (locked 2026-10-02)
+
+**Amends**: *A multilingual build looks a translated call argument up when the page is served,
+and the runtime knows whether the site is multilingual* (locked 2026-09-29). Its decision on call
+arguments stands. Its `window.QS_MULTILINGUAL` flag is gone: its only reader was `qs.js`'s route
+matching, which is gone too, and the statement it added to the `QS_PROJECT` script is now
+`window.QS_ROUTE`. **Amends**: *Specificity wins; ties broken by declaration order* and
+*Route-meta JS schema includes `type` info* (both locked 2026-06-04), where they describe matching
+in `qs.js`: the browser matches nothing now, the server's router is the only one, and `qs.js` does
+not read the route schema. **Extends**: *A data value written into an inline script cannot end or
+change the script* (locked 2026-09-26): its encoder also writes a byte sequence that is not UTF-8 as
+U+FFFD, and never returns an empty value.
+
+**Decision**:
+
+- **The page hands `qs.js` the route the server resolved for it.** The runtime handoff writes
+  `window.QS_ROUTE` — `path` (the matched pattern), `params` (the captured values, always an
+  object) and `found` — in the `QS_PROJECT` script, before `qs.js`, through
+  `qs_inline_script_json()`. Both surfaces fill it from the router call the page was rendered
+  with: `PageManagement::render()` on `/p/<projectId>/`, and `Page::render()` in a built site,
+  each time the page is served. A route that was not found carries no path and no params.
+- **A value in an inline script is always a complete expression.** `qs_inline_script_json()`
+  writes a byte sequence that is not UTF-8 as U+FFFD (`JSON_INVALID_UTF8_SUBSTITUTE`), and a value
+  that still cannot be encoded (INF, NAN, a resource, nesting past the depth limit) as `null`. It
+  never returns an empty value. Valid input is written byte for byte as before. Every writer that
+  uses the encoder gets the rule, not only `QS_ROUTE`.
+- **`qs.js` matches nothing.** It sets `QS.routePath`, `QS.routeParams` and `QS.routeFound` from
+  `QS_ROUTE` as it loads, and never reads its own address for a route. The three keep their
+  meaning: when `QS.routeFound` is false, the path is `null` and the params are empty.
+- **The route schema stays.** `qs-route-schema.js` (`window.QS_ROUTES`) is still written and
+  loaded, as the project's route table; nothing in the engine reads it in the browser.
+- **The three errors the runtime showed as English toasts are console messages**, one
+  `console.error` line each: an endpoint that is not in the client config, a fetch with no URL,
+  and a missing required path parameter. The call rejects with the same error as before, and a
+  visitor sees no toast. Toasts a project writes are untouched, and a missing translation still
+  shows its marker, as all page text does.
+- **Every page differs by one statement.** On the live render and in a served built page,
+  `window.QS_MULTILINGUAL=…;` becomes `window.QS_ROUTE=…;`. A build's compiled pages are
+  byte-identical; it ships the new `qs.js`, `runtimeHandoff.php` and `Page.php`.
+- **An existing build keeps what it was built with** until it is rebuilt.
+
+**Reasoning**:
+
+**Why the server's answer, and not a second router.** Under any base, the browser matched
+nothing. The server removes the base before it routes: the `/p/<projectId>/` marker and the
+installation's URL space on the live render, the build's space on a built site. `qs.js` read
+`location.pathname` whole. So in the preview, and on any site served under a space, a page at
+`products/red-vase` had an empty `QS.routeParams`, and a state field initialised from `param:slug`
+started empty while the page around it showed the value.
+
+Teaching the browser the base would have left a second router to keep in step with the first,
+and on a site at its domain's root the two already disagreed, in four cases observed before the
+change:
+
+- a `+` in a segment: the server decodes it to a space, the browser kept the `+`;
+- `/a/b/c` with the routes `a/b` and `a/:x/c`: the router takes the literal `b` at its level and
+  does not backtrack, so the server answers not found; the browser matched `a/:x/c`;
+- an internal (rewrite) alias: the server serves the alias's target, and the browser, still on
+  the alias's address, matched nothing;
+- the root: the server serves `home`, and the browser reported no route.
+
+The router's answer leaves nothing to keep in step: the base, a multilingual site's language
+segment, aliases, decoding and precedence are all decided once, by the server.
+
+**Why the encoder changed.** `QS_ROUTE` is the first value in the handoff taken from the request,
+and the router decodes a URL segment without checking that it is UTF-8. `/products/%FF` handed the
+encoder a byte `json_encode()` refuses; the encoder returned an empty string, and the page carried
+`window.QS_ROUTE=;`. That is a syntax error, and a browser drops the whole script, `QS_PROJECT` with
+it, so the page fell back to the unnamed storage namespace. An API response that is not UTF-8 did the
+same to `QS_RESOLVED` before this change: a resolver that exposes the whole response keeps it as raw
+text when it does not parse as JSON. Substituting keeps the rest of the value readable, and `null` is
+a value every reader of these globals already handles.
+
+**Why in the `QS_PROJECT` script.** `qs.js` sets the three globals while it loads, so the value has
+to exist before it, as the storage namespace does.
+
+**Why the flag went.** `QS_MULTILINGUAL` existed so the matcher could strip a language segment only
+on a multilingual site. The router already knows which segment is a language, and the browser no
+longer strips anything.
+
+**Why the console.** A toast is page text, which a visitor reads in the page's language. These three
+are mistakes in a call the author wrote, worded in English for the author, and the call fails
+anyway.
+
+**Alternatives considered**:
+- **The base in the handoff, with the browser's matcher kept** (ruled first, then replaced before
+  it was built). It fixes the preview and the URL space and keeps the four disagreements above; a
+  rewrite alias, for one, could not be followed without a copy of the alias table in the browser.
+- **The browser reads the base from its own address** (rejected): a built site's address carries
+  no marker, and the depth of a space cannot be read from a path.
+- **The browser applies the alias table** (rejected — a second copy of a server rule).
+- **`console.warn`, as elsewhere in `qs.js`** (not taken — each of these failures stops the call).
+- **Keeping `QS_MULTILINGUAL`** (rejected — nothing reads it).
+- **The router refuses an address that is not UTF-8** (not taken here): it would fix the route, not
+  an API value, and the encoder is the one place every value passes.
+- **Dropping the invalid bytes** (`JSON_INVALID_UTF8_IGNORE`; rejected — it changes the value
+  silently, and two different addresses would read the same).
+- **`null` for any value holding invalid UTF-8** (rejected — a store would lose a whole API body for
+  one byte).
+
+**Source**: Sangio's rulings of 2026-10-01 (the preview matches routes as the built site does; the
+runtime's developer errors) and 2026-10-02 (a site under a URL space works as one at the root; the
+server hands the route over), during beta.12; the encoder's half from the manager's audit of
+2026-10-03, which found the empty value on a page, ruled by Sangio the same day. `secure/src/runtime/qs.js` (`readServedRoute`,
+`QS.fetch`); `secure/src/functions/runtimeHandoff.php` (`qs_runtime_handoff`, `QS_ROUTE`,
+`qs_inline_script_json`);
+`secure/src/classes/PageManagement.php` and `secure/src/classes/Page.php` (the route each surface
+passes). Behaviour: [ARCHITECTURE.md](ARCHITECTURE.md) §6.3, §9.1 and §9.5.

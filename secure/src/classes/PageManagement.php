@@ -211,6 +211,14 @@ class PageManagement {
             'base'               => $base,
             'contentPath'        => PUBLIC_CONTENT_PATH,
             'projectKey'         => $projectKey,
+            // The route this page was rendered for, so qs.js reads the router's
+            // answer instead of matching its own address (which starts with the
+            // /p/<projectId>/ marker this request was served under).
+            'route'              => [
+                'path'   => $__routePath,
+                'params' => $trimParameters->routeParams(),
+                'found'  => $trimParameters->routeFound(),
+            ],
             'themeEnabled'       => $themeEnabled,
             'themeToggleEnabled' => $toggleEnabled,
             'consentPayload'     => $__handoffConsentPayload,

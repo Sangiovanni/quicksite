@@ -18,109 +18,34 @@
     const QS = {};
 
     /**
-     * Client-side path matcher (beta.8 A1 Build Slice 2).
+     * The route this page was served for, as the server resolved it.
      *
-     * Mirrors server-side TrimParameters::resolveRoute in pure JS.
-     * Walks window.QS_ROUTES (build-emitted by qs-route-schema.js,
-     * loaded BEFORE this file) and finds the best match for
-     * location.pathname.
-     *
-     * Specificity rule (locked 2026-06-04): more literal segments
-     * wins; declaration order in QS_ROUTES is the tie-breaker (first
-     * match at the highest score wins).
+     * The server writes it before this file loads, in the runtime handoff:
+     * window.QS_ROUTE = { path, params, found }, from the same router call the
+     * page was rendered with. Nothing here reads the page's own address. The
+     * page may be served under a base the router removed first (the
+     * /p/<projectId>/ preview, an installation's URL space, a build's space),
+     * and the router also decides the language segment of a multilingual site,
+     * internal aliases, how a segment is decoded and which route wins; a
+     * second router in the browser would have to agree with it on all of that.
      *
      * Exposed:
      *   QS.routeParams — captured URL path-params, e.g. {slug:'red-vase'}
      *   QS.routePath   — the matched pattern, e.g. 'products/:slug'
      *   QS.routeFound  — true when a route matched, false otherwise
-     *
-     * Multilingual: on a multilingual site (window.QS_MULTILINGUAL), strips
-     * the first URL segment if it matches the page's <html lang>
-     * attribute. Other prefix handling (BASE_URL,
-     * PUBLIC_FOLDER_SPACE for sites in subpaths) is NOT yet handled —
-     * filed as a follow-up. For now sites in subpaths would see the
-     * subpath as the first segment.
+     *                    (then routePath is null and routeParams empty)
      */
     QS.routeParams = {};
     QS.routePath   = null;
     QS.routeFound  = false;
-    (function matchRouteOnLoad() {
-        const schema = window.QS_ROUTES;
-        if (!Array.isArray(schema)) return;
-
-        // Normalise the URL path.
-        let path = (window.location && window.location.pathname) || '';
-
-        // Strip lang prefix if the first segment matches <html lang> — on a
-        // multilingual site only. A single-language site's URL carries no
-        // language, so there a first segment equal to its code is part of
-        // the page's address. The server says which (the runtime handoff's
-        // QS_MULTILINGUAL, written before this file loads).
-        const lang = (window.QS_MULTILINGUAL === true && document.documentElement && document.documentElement.lang) || '';
-        if (lang) {
-            if (path === '/' + lang || path === '/' + lang + '/') {
-                path = '/';
-            } else if (path.indexOf('/' + lang + '/') === 0) {
-                path = path.substring(lang.length + 1);
-            }
-        }
-
-        // Trim leading / trailing slashes; drop empty segments
-        path = path.replace(/^\/+|\/+$/g, '');
-        if (!path) return; // root URL — no route to match
-
-        const urlSegments = path.split('/');
-
-        // Iterate routes, find the highest-specificity match.
-        // Specificity score = literal-segment count. Ties broken by
-        // declaration order: first-encountered match at the highest
-        // score wins (so we use strict-greater-than, not >=, when
-        // updating bestMatch).
-        let bestMatch = null;
-        let bestScore = -1;
-
-        for (let i = 0; i < schema.length; i++) {
-            const route = schema[i];
-            if (!route || typeof route.path !== 'string') continue;
-
-            const patternSegments = route.path.split('/');
-            if (patternSegments.length !== urlSegments.length) continue;
-
-            const params = {};
-            let literalScore = 0;
-            let matched = true;
-
-            for (let s = 0; s < patternSegments.length; s++) {
-                const pat = patternSegments[s];
-                const url = urlSegments[s];
-
-                if (pat.length > 1 && pat.charAt(0) === ':') {
-                    // Param segment — capture (urldecode to match
-                    // server-side TrimParameters behavior).
-                    try {
-                        params[pat.substring(1)] = decodeURIComponent(url);
-                    } catch (e) {
-                        params[pat.substring(1)] = url;
-                    }
-                } else if (pat === url) {
-                    literalScore++;
-                } else {
-                    matched = false;
-                    break;
-                }
-            }
-
-            if (matched && literalScore > bestScore) {
-                bestScore = literalScore;
-                bestMatch = { path: route.path, params: params };
-            }
-        }
-
-        if (bestMatch) {
-            QS.routePath   = bestMatch.path;
-            QS.routeParams = bestMatch.params;
-            QS.routeFound  = true;
-        }
+    (function readServedRoute() {
+        const route = window.QS_ROUTE;
+        if (!route || typeof route !== 'object' || route.found !== true) return;
+        const params = route.params;
+        QS.routePath   = typeof route.path === 'string' ? route.path : null;
+        QS.routeParams = (params && typeof params === 'object' && !Array.isArray(params))
+            ? Object.assign({}, params) : {};
+        QS.routeFound  = true;
     })();
 
     // Inject default hidden class CSS if not already defined
@@ -626,22 +551,22 @@
         if (target.startsWith('@')) {
             const resolved = resolveEndpoint(target.substring(1));
             if (!resolved) {
-                // beta.8 Track A4 — a missing endpoint here can mean:
+                // A missing endpoint here can mean:
                 //   (a) typo in the @api/endpoint reference,
                 //   (b) the endpoint is callableFrom:'server' and was
                 //       filtered out of qs-api-config.js by design
                 //       (server-only endpoints never reach client config),
                 //   (c) qs-api-config.js is stale and a rebuild is needed.
-                // Give devs the hint via console; users still get the
-                // friendly toast (they shouldn't see this in healthy
-                // configurations).
-                console.warn(
+                // This and the two errors below are the AUTHOR's mistakes, so
+                // they are told to the console, one line each, and the call
+                // rejects. A visitor sees no toast: a toast is page text, in
+                // the page's language, and these are not.
+                console.error(
                     '[QS] fetch: endpoint ' + target + ' not in client config. '
                     + 'Likely causes: typo, the endpoint is marked '
                     + "callableFrom:'server' (won't appear here by design), "
                     + 'or qs-api-config.js is stale (rebuild).'
                 );
-                QS.toast('API endpoint not found: ' + target, 'error');
                 return Promise.reject(new Error('Endpoint not found'));
             }
             url = resolved.url;
@@ -666,7 +591,7 @@
         }
         
         if (!url) {
-            QS.toast('No URL specified for fetch', 'error');
+            console.error("[QS] fetch: no URL given. Call it as QS.fetch('@api/endpoint') or QS.fetch('GET', url).");
             return Promise.reject(new Error('No URL'));
         }
         
@@ -702,8 +627,7 @@
             );
             if (sub.missingRequired.length > 0) {
                 const msg = '[QS] fetch: missing required parameter: ' + sub.missingRequired[0];
-                console.warn(msg);
-                QS.toast('Missing required parameter: ' + sub.missingRequired[0], 'error');
+                console.error(msg);
                 return Promise.reject(new Error(msg));
             }
             sub.consumed.forEach(function (n) { delete opts[n]; });  // don't echo into the query string

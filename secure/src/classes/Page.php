@@ -149,16 +149,22 @@ class Page {
         }
     }
 
+    // The route this request resolved, read once: for this route's resolvers,
+    // and handed to qs.js so the browser reads the router's answer instead of
+    // matching its own address (which starts with the site's URL space).
     $__routePath = '';
+    $__route = null;
     if (class_exists('TrimParameters')) {
         $__tp = new TrimParameters();
         $__routePath = $__tp->routePath();
+        $__route = ['path' => $__routePath, 'params' => $__tp->routeParams(), 'found' => $__tp->routeFound()];
     }
 
     echo qs_runtime_handoff([
         'base'               => '/' . $spacePrefix,
         'contentPath'        => defined('PUBLIC_CONTENT_PATH') ? PUBLIC_CONTENT_PATH : '',
         'projectKey'         => $projectKey,
+        'route'              => $__route,
         'themeEnabled'       => $themeEnabled,
         'themeToggleEnabled' => $toggleEnabled,
         'consentPayload'     => $__consentPayload,

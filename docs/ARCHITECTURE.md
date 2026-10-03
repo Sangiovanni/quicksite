@@ -720,7 +720,7 @@ Captured values are URL-decoded before exposure, matching PHP's `$_GET` conventi
 #### How captured params flow
 
 - **Server (PHP)** — `Page::render()` injects each captured value as a template variable named after the param. Inside a page's PHP template, `$slug`, `$id`, etc. sit alongside `$translator` and other request-scoped variables. Inside JSON pages a `{{param:NAME}}` placeholder is substituted in raw text, translated text and attributes, on both the served site and a build (§4.2). The literal `param:` prefix is required so it doesn't collide with component-variable patterns.
-- **Client (qs.js)** — The build emits the project's own `public/scripts/qs-route-schema.js` listing every route's pattern + param shape. qs.js's synchronous IIFE walks the schema against `location.pathname` on load and exposes three globals: `QS.routeParams` (a dict of captured values), `QS.routePath` (the matched pattern), `QS.routeFound` (a boolean). State stores can initialise a field from `init: 'param:slug'` — a fifth source kind alongside the existing `query:` / `localStorage:` / `sessionStorage:` / literal. The matcher is purely client-side; for a deeper URL → live data loop (server-rendered authed pages, SEO) the server data resolver builds on the same schema.
+- **Client (qs.js)** — The page hands `qs.js` the route the server resolved for it: the runtime handoff (§9.5) writes `window.QS_ROUTE` — the matched pattern, the captured values and whether a route was found — from the same router call the page was rendered with. qs.js's synchronous IIFE exposes it on load as three globals: `QS.routeParams` (a dict of captured values), `QS.routePath` (the matched pattern), `QS.routeFound` (a boolean; when it is false the other two are `null` and empty). The browser does no matching of its own, so it agrees with the server under any base the page is served at — the `/p/<projectId>/` preview, an installation's URL space, a build's space — and on everything the rules above decide, a multilingual site's language segment and internal aliases included. State stores can initialise a field from `init: 'param:slug'` — a fifth source kind alongside the existing `query:` / `localStorage:` / `sessionStorage:` / literal. The project's own `public/scripts/qs-route-schema.js` (`window.QS_ROUTES`) lists every route's pattern + param shape; for a deeper URL → live data loop (server-rendered authed pages, SEO) the server data resolver builds on the same schema.
 
 #### Conflict detection
 
@@ -734,7 +734,7 @@ The response carries a `warnings` array of `{ type, message }` entries. The site
 #### Limitations
 
 - **Wildcards** (`:*`, `**`). A param captures one segment.
-- **Per-param type matching** beyond string. The schema's optional `type` field is reserved for a future `'integer'` form but unused at the matcher today.
+- **Per-param type matching** beyond string. The schema's optional `type` field is reserved for a future `'integer'` form but unused by the router today.
 - **Param defaults**. A route with required params 404s when the URL is missing a segment. Users who want optional captures hand-author both shapes (`/products/:product` and `/products/:product/:variant`).
 - **Case-insensitive matching**. Paths are case-sensitive, matching Unix filesystem + HTTP convention.
 
@@ -964,9 +964,10 @@ server-side from per-project `data/api-endpoints.json`.
 
 **Path templating**: endpoint `path` may contain `:placeholder`
 segments. At runtime, `QS.fetch` substitutes each `:name` with
-`opts.name` (URL-encoded). Missing **required** placeholders reject
-with a toast; missing **optional** ones stay literal so the
-omission is visible. Remaining (non-reserved) opts become
+`opts.name` (URL-encoded). A missing **required** placeholder makes
+the call reject, and the browser console names it; a visitor sees
+nothing. An omitted **optional** one is dropped from the path rather
+than sent literally. Remaining (non-reserved) opts become
 query-string parameters.
 
 **Path templating example**:
@@ -1223,8 +1224,8 @@ PHP and the browser runtime:
 
 | Block | Carries |
 |---|---|
-| `qs-route-schema.js` | `window.QS_ROUTES` — the client-side path matcher's table |
-| `window.QS_PROJECT`, `window.QS_MULTILINGUAL` | the project id every browser-storage key is prefixed with; whether the site is multilingual (the route matcher strips a language segment only then) |
+| `qs-route-schema.js` | `window.QS_ROUTES` — the project's route table: every pattern and its params |
+| `window.QS_PROJECT`, `window.QS_ROUTE` | the project id every browser-storage key is prefixed with; the route the server resolved for this request (pattern, captured values, found), which `qs.js` exposes as `QS.routePath` / `QS.routeParams` / `QS.routeFound` (§6.3) |
 | `qs.js` | the runtime itself |
 | `window.QS_CONSENT` | the key→category map that gates storage writes |
 | theme wiring | `[data-theme-toggle]` behaviour, keyed per project |
@@ -1236,7 +1237,7 @@ PHP and the browser runtime:
 | `window.QS_RESOLVED_BY_INDEX` | the same values under the `r0` / `r1` addresses templates use |
 | page events | the compiled `onload` / `onresize` / `onscroll` chain |
 
-**Order is part of the contract.** The route schema and the storage namespace go
+**Order is part of the contract.** The storage namespace and the route go
 before `qs.js`, because its IIFE reads them synchronously at load. The state
 stores go after `qs-api-config.js`, because a store's endpoint resolves against
 `window.QS_API_ENDPOINTS`. The page-events script goes last, because an onload

@@ -23,9 +23,9 @@
  *     access to the values the page was rendered with.
  *
  * ⚠ ORDER IS PART OF THE CONTRACT, not formatting.
- *   - the route schema and the storage namespace go BEFORE qs.js, because its
- *     IIFE reads window.QS_ROUTES and window.QS_PROJECT synchronously at load;
- *     after it, the matcher has already run against undefined
+ *   - the storage namespace and the served route go BEFORE qs.js, because its
+ *     IIFE reads window.QS_PROJECT and window.QS_ROUTE synchronously at load;
+ *     after it, QS.routeParams has already been set from undefined
  *   - the state stores go AFTER qs-api-config, because a store's endpoint
  *     resolves against QS_API_ENDPOINTS
  *   - the page-events script goes LAST, because an onload chain can call
@@ -66,6 +66,19 @@ if (!function_exists('qs_inline_script_json')) {
      *   no HEX_AMP/APOS/QUOT    those matter inside an HTML attribute; script
      *                           data has no character references and no
      *                           attribute quotes to break.
+     *   JSON_INVALID_UTF8_SUBSTITUTE
+     *                           a byte sequence that is not UTF-8 becomes
+     *                           U+FFFD (written \ufffd) instead of failing the
+     *                           whole value. Values reach this function from the
+     *                           request — a route param is the URL segment,
+     *                           decoded — and from an API's response body, and
+     *                           neither is promised to be UTF-8.
+     *
+     * ⚠ IT NEVER RETURNS AN EMPTY VALUE. Every caller writes the result after
+     * `=` or inside a call, so an empty result leaves `x=;` and the browser drops
+     * the whole script, every other statement in it included. A value that still
+     * cannot be encoded (INF, NAN, a resource, nesting past json_encode's depth)
+     * is written as `null`. Valid input is written exactly as without the flag.
      *
      * One function for every writer, so the rule has no exceptions: the runtime
      * handoff's blocks below, both theme scripts (Page.php, PageManagement.php),
@@ -74,14 +87,12 @@ if (!function_exists('qs_inline_script_json')) {
      * calls it at request time; a file of its own would have to join the build's
      * copy list too.
      *
-     * A value json_encode() cannot encode (invalid UTF-8) gives '', as it did
-     * when each writer called json_encode() itself.
-     *
-     * @param mixed $value Any JSON-encodable value.
+     * @param mixed $value Any value.
      */
     function qs_inline_script_json(mixed $value): string
     {
-        return (string) json_encode($value, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG);
+        $json = json_encode($value, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_INVALID_UTF8_SUBSTITUTE);
+        return $json === false ? 'null' : $json;
     }
 }
 
@@ -179,6 +190,10 @@ if (!function_exists('qs_runtime_handoff')) {
      *   base:               string  URL prefix for script srcs, trailing slash
      *   contentPath:        string  filesystem dir holding scripts/
      *   projectKey:         string  PROJECT_NAME — the browser-storage namespace
+     *   route:              ?array  the route this request resolved, from the
+     *                               router call the page was rendered with:
+     *                               ['path' => string, 'params' => array,
+     *                                'found' => bool]; null when there is none
      *   themeEnabled:       bool
      *   themeToggleEnabled: bool
      *   consentPayload:     ?array  from qs_consent_payload(), null when off
@@ -199,7 +214,7 @@ if (!function_exists('qs_runtime_handoff')) {
 
         $out = '';
 
-        // 1. Route schema — BEFORE qs.js (see the ordering note above).
+        // 1. Route schema — window.QS_ROUTES, the project's route table.
         if ($contentPath !== '' && file_exists($contentPath . '/scripts/qs-route-schema.js')) {
             $out .= '<script src="' . $base . 'scripts/qs-route-schema.js"></script>';
         }
@@ -210,15 +225,25 @@ if (!function_exists('qs_runtime_handoff')) {
         //    location.pathname would give development and production different
         //    key prefixes for the same site.
         //
-        //    QS_MULTILINGUAL rides the same tag, for the same reason it must come
-        //    before qs.js: the route matcher runs when qs.js loads, and it strips
-        //    a leading language segment only on a multilingual site. A
-        //    single-language site's URL carries no language, so a first segment
-        //    equal to its <html lang> is a page address. Read from the constant
-        //    rather than supplied: both surfaces define it from the same config.
-        $multilingual = defined('MULTILINGUAL_SUPPORT') && MULTILINGUAL_SUPPORT;
+        //    QS_ROUTE rides the same tag, for the same reason: qs.js sets
+        //    QS.routePath / QS.routeParams / QS.routeFound from it when it loads.
+        //    It is the route the SERVER resolved for this request, so the browser
+        //    derives nothing from its own address. That address may start with a
+        //    base the router removed (the /p/<projectId>/ preview, a URL space)
+        //    and the router also takes off a multilingual site's language
+        //    segment, applies internal aliases, decodes segments and picks the
+        //    winning route; a second router in qs.js would have to agree with it
+        //    on all of that. A route that was not found carries no path and no
+        //    params, and the params are always written as an object.
+        $routeCtx = is_array($ctx['route'] ?? null) ? $ctx['route'] : [];
+        $found = ($routeCtx['found'] ?? false) === true;
+        $route = [
+            'path'   => $found && is_string($routeCtx['path'] ?? null) ? $routeCtx['path'] : null,
+            'params' => (object) ($found && is_array($routeCtx['params'] ?? null) ? $routeCtx['params'] : []),
+            'found'  => $found,
+        ];
         $out .= '<script>window.QS_PROJECT=' . qs_inline_script_json($projectKey)
-              . ';window.QS_MULTILINGUAL=' . ($multilingual ? 'true' : 'false') . ';</script>';
+              . ';window.QS_ROUTE=' . qs_inline_script_json($route) . ';</script>';
 
         // 3. The library.
         $out .= '<script src="' . $base . 'scripts/qs.js"></script>';

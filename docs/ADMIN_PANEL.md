@@ -1673,7 +1673,7 @@ Phase 3 — Page loads, exchange runs:
 
 | Verb | Purpose | Typical chain |
 |---|---|---|
-| `QS.exchangeMagicLink(endpoint, paramName, returnTo?)` | Landing-page exchange. Reads `QS.routeParams[paramName]` (populated by the path matcher — see [ARCHITECTURE §6.3](ARCHITECTURE.md)), POSTs `{key:<code>}`, stores response in `QS._lastFetchResult`. Dispatches `qs:auth:exchange-started` before fetch + `qs:auth:exchange-failed` in catch so the `magic-link-handler` component's `data-auth-show="connecting"` / `"failed"` UI morphs. | `exchangeMagicLink` → `saveToken` × 2 → `redirect` |
+| `QS.exchangeMagicLink(endpoint, paramName, returnTo?)` | Landing-page exchange. Reads `QS.routeParams[paramName]` (the route the server resolved for the page — see [ARCHITECTURE §6.3](ARCHITECTURE.md)), POSTs `{key:<code>}`, stores response in `QS._lastFetchResult`. Dispatches `qs:auth:exchange-started` before fetch + `qs:auth:exchange-failed` in catch so the `magic-link-handler` component's `data-auth-show="connecting"` / `"failed"` UI morphs. | `exchangeMagicLink` → `saveToken` × 2 → `redirect` |
 | `QS.requestMagicLink(endpoint, email, returnTo?)` | Forward path. POSTs `{email}` to the issue endpoint. `email` accepts a literal address OR a `#selector` / `.selector` to read from an `<input>` (same convention as `setState`'s value arg). | `validate` → `requestMagicLink` → optional `redirect` to "check your email" page |
 | `QS.logoutServer(endpoint)` | Server-side logout — POST so the auth API can invalidate the session / revoke the refresh token. Thin wrapper over `QS.fetch` so registry bearer auth is applied. Errors are intentionally swallowed (the user wants out either way). | `logoutServer` BEFORE `clearToken` × 2 → `redirect` |
 
@@ -1953,7 +1953,7 @@ actions. Delete is read-modify-write — it re-saves the route's remaining store
   `URL path param "slug"` → `init: "param:slug"`; etc.). On edit it parses the
   stored string back into the pair, so existing `state-stores.json` files
   round-trip unchanged. The **URL path param** kind reads from `QS.routeParams`
-  (populated by qs.js's client-side path matcher — see ARCHITECTURE §6.3),
+  (the route the server resolved for the page, handed to qs.js — see ARCHITECTURE §6.3),
   closing the URL → live data loop: a field with `init: 'param:slug'` on a
   `/products/:slug` page starts with the captured slug. Missing on a static
   route → silent fallback to `default`, matching `query:` semantics.
