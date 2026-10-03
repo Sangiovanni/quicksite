@@ -12805,3 +12805,132 @@ server hands the route over), during beta.12; the encoder's half from the manage
 `qs_inline_script_json`);
 `secure/src/classes/PageManagement.php` and `secure/src/classes/Page.php` (the route each surface
 passes). Behaviour: [ARCHITECTURE.md](ARCHITECTURE.md) §6.3, §9.1 and §9.5.
+
+### The style merge keeps what it is given, every folder is copied and measured one way, and a restore that does not fully succeed says so (locked 2026-10-03)
+
+**Amends**: *A snippet saved outside a project belongs to its author, not to the installation*
+(locked 2026-08-07). Its decision stands. Its statement that files left in the old shared
+snippet folder are logged once, by name, for an operator to relocate no longer holds: nothing
+reads that folder any more, so nothing is logged. Before 1.0 there is no such file to find.
+**Extends**: *A command writes only declarations a stylesheet can hold…* (locked 2026-09-27),
+whose reading of a declaration list the merge now uses for names too; and *A delete that fails
+reports what survived, and keeps what a retry needs* (locked 2026-08-24), whose rule that a
+link is removed and never followed now holds for the copy and the measure as well.
+
+**Decision**: four changes, made together.
+
+- **`setStyleRule`'s merge keeps what it is given.** It stays a merge: a property sent
+  replaces that property, and the rule's other properties stay.
+  - Property names compare without case, as CSS reads them: `COLOR: red` replaces
+    `color: blue`. A custom property (`--name`) keeps its case, because CSS compares those as
+    written. The lowering is ASCII only and never reads the locale, so every supported PHP
+    version compares the same. Escapes in a name are compared as written. `removeProperties`
+    compares the same way.
+  - A property sent replaces every declaration of it, in the place of the first, written as
+    sent. A property not sent keeps all of its declarations, so a fallback written twice
+    (`display: -webkit-box; display: flex`) survives an update of another property.
+  - A name is read without its comments, and no comment is dropped. One written before a
+    declaration stays where it is when that declaration is replaced or removed; one at the end
+    of a rule stays. A rule left with comments and no declaration is deleted, as an empty rule
+    always was.
+  - Updating a rule inside `@media`, adding one to it, or emptying one in it no longer adds a
+    blank line to the block each time.
+- **The hero snippet styles its buttons.** `hero-centered` carries the card snippet's button
+  rules (`qs-snippet-btn`, `qs-snippet-btn-primary`), placed before its own size and outline
+  rules, and its `selectors` list names them, so inserting it alone with "Add only missing CSS"
+  gives styled buttons. A snippet row says which tier it came from in `source` alone; the
+  `isCore` flag, which repeated it, is gone from the answers, the core files and every reader.
+- **Every folder is copied and measured one way, in `FileSystem.php`.** `qs_copy_tree()` is the
+  copy (`copyDirectory()` its boolean face): it keeps going past a failure and reports what it
+  could not copy, relative to the source. `getDirectorySize()` and `countDirectoryFiles()` are
+  the measure: plain files only, an unreadable folder skipped, 0 for a path that is not a
+  folder. Backup, restore, delete-backup, clone, the project list, the backup list, the size
+  report, the build, and the account's space overview with the storage quota it feeds use them;
+  their private copies are gone. In all three, **a link is never
+  followed**: a copy leaves it out and lists it, a measure does not count it, so neither carries
+  or counts what lies outside the tree. The deployment's copier is a different function
+  (it never overwrites a file it does not own, stays inside the build, records what it created
+  and refreshes OPcache) and is named `deploy_copyDirectory()`; each copy function name now
+  exists once. The delete's read-only step leaves a link alone, so it can never change the mode
+  of the file a link points to.
+- **A restore that does not fully succeed says so.** It keeps going past a failure, so that as
+  much as possible comes back, but it never answers success for a partial restore: `500
+  restore.incomplete` names the items it could not restore completely (`failed_items`) and the
+  paths that failed, and says the backup is untouched and can be restored again. The dashboard
+  shows that message in red, after reloading the project as it now is, until it is closed. Each
+  item is removed before it is restored as the one delete removes an entry, so a link there is
+  removed and never followed: given a link as the folder to delete, the delete used to empty the
+  folder the link pointed to. The snapshot of the current state before a restore stays off
+  unless asked for.
+
+**Reasoning**:
+
+**The merge.** "A property sent replaces that property" was untrue in three cases: a different
+case, a comment before the name (the merge read the comment into the name, so the update added a
+second declaration instead of replacing the first), and a fallback the merge collapsed on any
+update of the rule. A merge exists so that a caller can send one property without knowing the
+rest of the rule; each of those cases changed or lost something the caller did not send. The
+visual editor sends one property per call, so a rule written by hand meets this merge every time
+the editor touches it. The blank line came from the `@media` block's inner text, which already
+starts with the line break after its brace, written after a second one.
+
+**Why case is folded and custom properties are not.** CSS defines property names as ASCII
+case-insensitive and custom property names as case-sensitive; comparing any other way makes the
+merge disagree with the browser about which declarations are the same property. PHP's
+`strtolower()` follows the locale on PHP 8.0 and 8.1, so it is not used.
+
+**The hero.** The hero snippet used the button classes the card and form snippets style, without
+their rules, and its `selectors` list did not name them, so inserting it alone gave plain links.
+The card's rules fit: like the hero's buttons, the card's is a link.
+
+**One copy, one measure.** The engine held four recursive copiers, seven size helpers and four
+file counters. Two names were global and declared twice, a fatal error for any process that
+loaded both files, and they disagreed about links. The backup's and the restore's copiers
+followed a link to a folder and copied what it held, a Windows junction included; the clone made
+an empty folder in a linked folder's place and copied a linked file's target; the project list
+counted a linked file's target, as did the space overview and so the storage quota, and the size
+report a linked folder's contents; an unreadable folder made the overview fail; on PHP 8.0, the
+supported floor, the clone and the sizes also walked into a Windows junction, which later
+versions' directory iterator does not enter; and a broken link made the shared measure throw.
+Holding the delete's link rule at the copy and the measure as well means a link cannot carry
+content from outside a project into its backup or clone, or inflate a size, whichever command
+reads the tree. On trees with no link, every size, count and copy is what it was.
+
+**The restore.** A restore that could not clear or copy something answered "Backup restored
+successfully" and left its failures in a field the panel never showed, so the person had no reason
+to try again — while the backup, which a restore only reads, was still there to try with. Stopping
+at the first failure would leave a project half cleared; going on and saying so leaves the most
+complete state possible and the way back.
+
+**Alternatives considered**:
+- **`setStyleRule` as a full setter** (rejected before: the editor's one-property calls would
+  erase the rest of the rule).
+- **Comparing names as written** (rejected — `COLOR` and `color` are one property to the browser).
+- **Folding custom properties too** (rejected — `--Brand` and `--brand` are two properties).
+- **Keeping the existing spelling of a replaced name** (not taken: the declaration sent is written
+  as sent).
+- **Dropping the comment with its declaration** (rejected — the comments found in real
+  stylesheets label a group of declarations, not one).
+- **Merging the copiers but keeping their link behaviour** (rejected — four behaviours, and two
+  of them copy what lies outside the tree).
+- **Merging the deployment's copier into the copy** (rejected — it is a different job; it is
+  renamed instead).
+- **`207` for a partial restore** (rejected — a client that only checks for a 2xx would read it
+  as success).
+- **Stopping the restore at the first failure** (rejected — it leaves a half-cleared project).
+- **Taking a snapshot before every restore by default** (rejected — the person makes a copy of
+  the current state when they want one).
+
+**Source**: Sangio's rulings during beta.12 — 2026-09-27 (the merge stays a merge), 2026-09-28
+(the merge's three defects and the hero's buttons), 2026-10-02 and 2026-10-03 (one helper per
+folder job; a restore that does not fully succeed says so; the snapshot stays off) — and the
+design round of 2026-10-03 that settled the case rule, the comments and fallbacks, one copy and
+one measure that never follow a link, the restore's answer and the removal of `isCore`.
+`secure/src/classes/CssParser.php` (`parseStyleDeclarations`, `declarationKey`, `mergeStyles`,
+`setStyleRule`); `secure/snippets/core/`; `secure/src/functions/SnippetManagement.php`;
+`secure/src/functions/FileSystem.php` (`qs_copy_tree`, `copyDirectory`, `getDirectorySize`,
+`countDirectoryFiles`, `qs_delete_entry`, `qs_delete_tree_unlink_read_only`);
+`secure/src/functions/spaceUsage.php` (`qs_dir_size`);
+`secure/management/command/restoreBackup.php`; `public/admin/assets/js/pages/dashboard.js`.
+Behaviour: the `setStyleRule`, `restoreBackup`, `backupProject`, `cloneProject`, `listSnippets`
+and `getSnippet` entries of `help`.

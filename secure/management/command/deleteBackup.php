@@ -17,27 +17,7 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
-require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php'; // qs_delete_tree
-
-/**
- * Calculate directory size
- */
-if (!function_exists('delbackup_getDirectorySize')) {
-    function delbackup_getDirectorySize($path) {
-        $size = 0;
-        $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($path, RecursiveDirectoryIterator::SKIP_DOTS)
-        );
-        
-        foreach ($iterator as $file) {
-            if ($file->isFile()) {
-                $size += $file->getSize();
-            }
-        }
-        
-        return $size;
-    }
-}
+require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php'; // qs_delete_tree, getDirectorySize
 
 /**
  * Format size for display
@@ -114,7 +94,7 @@ function __command_deleteBackup(array $params = [], array $urlParams = []): ApiR
     }
 
     // Get backup size before deletion
-    $backupSize = delbackup_getDirectorySize($backupPath);
+    $backupSize = getDirectorySize($backupPath);
 
     if (!qs_delete_tree($backupPath)['ok']) {
         return ApiResponse::create(500, 'backup.delete_failed')

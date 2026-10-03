@@ -15,96 +15,7 @@
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
-
-/**
- * Calculate directory size recursively
- */
-if (!function_exists('sizeinfo_getDirectorySize')) {
-    function sizeinfo_getDirectorySize($path) {
-        if (!is_dir($path)) {
-            return 0;
-        }
-        
-        $size = 0;
-        try {
-            $iterator = new RecursiveIteratorIterator(
-                new RecursiveDirectoryIterator($path, 
-                    RecursiveDirectoryIterator::SKIP_DOTS | 
-                    RecursiveDirectoryIterator::FOLLOW_SYMLINKS
-                ),
-                RecursiveIteratorIterator::SELF_FIRST,
-                RecursiveIteratorIterator::CATCH_GET_CHILD
-            );
-            
-            foreach ($iterator as $file) {
-                try {
-                    if ($file->isFile() && !$file->isLink()) {
-                        $size += $file->getSize();
-                    }
-                } catch (Exception $e) {
-                    // Skip inaccessible files
-                }
-            }
-        } catch (Exception $e) {
-            // If iterator fails, try a simple glob approach
-            $files = glob($path . '/*');
-            foreach ($files as $file) {
-                if (is_file($file)) {
-                    $size += filesize($file);
-                } elseif (is_dir($file)) {
-                    $size += sizeinfo_getDirectorySize($file);
-                }
-            }
-        }
-        
-        return $size;
-    }
-}
-
-/**
- * Count files in directory
- */
-if (!function_exists('sizeinfo_countFiles')) {
-    function sizeinfo_countFiles($path) {
-        if (!is_dir($path)) {
-            return 0;
-        }
-        
-        $count = 0;
-        try {
-            $iterator = new RecursiveIteratorIterator(
-                new RecursiveDirectoryIterator($path, 
-                    RecursiveDirectoryIterator::SKIP_DOTS | 
-                    RecursiveDirectoryIterator::FOLLOW_SYMLINKS
-                ),
-                RecursiveIteratorIterator::SELF_FIRST,
-                RecursiveIteratorIterator::CATCH_GET_CHILD
-            );
-            
-            foreach ($iterator as $file) {
-                try {
-                    if ($file->isFile() && !$file->isLink()) {
-                        $count++;
-                    }
-                } catch (Exception $e) {
-                    // Skip inaccessible files
-                }
-            }
-        } catch (Exception $e) {
-            // If iterator fails, try a simple glob approach
-            $files = glob($path . '/*');
-            foreach ($files as $file) {
-                if (is_file($file)) {
-                    $count++;
-                } elseif (is_dir($file)) {
-                    $count += sizeinfo_countFiles($file);
-                }
-            }
-        }
-        
-        return $count;
-    }
-}
+require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php'; // getDirectorySize, countDirectoryFiles
 
 /**
  * Format size for display
@@ -128,7 +39,7 @@ if (!function_exists('sizeinfo_formatSize')) {
  */
 if (!function_exists('sizeinfo_getFolderInfo')) {
     function sizeinfo_getFolderInfo($path, $name = null) {
-        $size = sizeinfo_getDirectorySize($path);
+        $size = getDirectorySize($path);
         // NOTE: the absolute filesystem `path` is deliberately NOT returned (C8 8.5)
         // — it disclosed the install layout to every authenticated caller.
         return [
@@ -136,7 +47,7 @@ if (!function_exists('sizeinfo_getFolderInfo')) {
             'exists' => is_dir($path),
             'size' => $size,
             'size_formatted' => sizeinfo_formatSize($size),
-            'files' => sizeinfo_countFiles($path)
+            'files' => countDirectoryFiles($path)
         ];
     }
 }
@@ -177,7 +88,7 @@ function __command_getSizeInfo(array $params = [], array $urlParams = []): ApiRe
     ];
     
     // Calculate total public size (including root files like index.php, init.php)
-    $publicTotalSize = sizeinfo_getDirectorySize($publicRoot);
+    $publicTotalSize = getDirectorySize($publicRoot);
     $publicSubfoldersSize = array_sum(array_column($publicFolders, 'size'));
     $publicRootFilesSize = max(0, $publicTotalSize - $publicSubfoldersSize);
     
@@ -185,7 +96,7 @@ function __command_getSizeInfo(array $params = [], array $urlParams = []): ApiRe
         'total' => [
             'size' => $publicTotalSize,
             'size_formatted' => sizeinfo_formatSize($publicTotalSize),
-            'files' => sizeinfo_countFiles($publicRoot)
+            'files' => countDirectoryFiles($publicRoot)
         ],
         'root_files' => [
             'size' => $publicRootFilesSize,
@@ -225,14 +136,14 @@ function __command_getSizeInfo(array $params = [], array $urlParams = []): ApiRe
     // for, and the served-main flag is gone (it named a project the caller may have
     // no relationship with).
     $projectDir   = $secureRoot . '/projects/' . $markerProject;
-    $projectSize  = sizeinfo_getDirectorySize($projectDir);
+    $projectSize  = getDirectorySize($projectDir);
     $projectsData = [
         'total'    => [
             'name'           => 'project',
             'exists'         => is_dir($projectDir),
             'size'           => $projectSize,
             'size_formatted' => sizeinfo_formatSize($projectSize),
-            'files'          => sizeinfo_countFiles($projectDir),
+            'files'          => countDirectoryFiles($projectDir),
         ],
         'projects' => [],
     ];
@@ -247,7 +158,7 @@ function __command_getSizeInfo(array $params = [], array $urlParams = []): ApiRe
         $backupDirs = glob($backupsDir . '/*', GLOB_ONLYDIR);
         foreach ($backupDirs as $backupDir) {
             $backupName = basename($backupDir);
-            $backupSize = sizeinfo_getDirectorySize($backupDir);
+            $backupSize = getDirectorySize($backupDir);
             $backupsInfo['items'][] = [
                 'name' => $backupName,
                 'size' => $backupSize,
@@ -268,7 +179,7 @@ function __command_getSizeInfo(array $params = [], array $urlParams = []): ApiRe
         'total' => [
             'size' => $projectSize,
             'size_formatted' => sizeinfo_formatSize($projectSize),
-            'files' => sizeinfo_countFiles($projectDir)
+            'files' => countDirectoryFiles($projectDir)
         ],
         'without_backups' => [
             'size' => $projectSizeWithoutBackups,
@@ -281,7 +192,7 @@ function __command_getSizeInfo(array $params = [], array $urlParams = []): ApiRe
     $secureFolders['projects'] = $projectsData['total'];
     
     // Calculate total secure size
-    $secureTotalSize = sizeinfo_getDirectorySize($secureRoot);
+    $secureTotalSize = getDirectorySize($secureRoot);
     $secureSubfoldersSize = array_sum(array_column($secureFolders, 'size'));
     $secureRootFilesSize = max(0, $secureTotalSize - $secureSubfoldersSize);
     
@@ -289,7 +200,7 @@ function __command_getSizeInfo(array $params = [], array $urlParams = []): ApiRe
         'total' => [
             'size' => $secureTotalSize,
             'size_formatted' => sizeinfo_formatSize($secureTotalSize),
-            'files' => sizeinfo_countFiles($secureRoot)
+            'files' => countDirectoryFiles($secureRoot)
         ],
         'root_files' => [
             'size' => $secureRootFilesSize,
@@ -314,7 +225,7 @@ function __command_getSizeInfo(array $params = [], array $urlParams = []): ApiRe
                   + $projectsData['total']['size'];
     
     // Builds: the project's qs_build/ (production deployment, outside public/)
-    $buildsSpace = sizeinfo_getDirectorySize($projectDir . '/qs_build');
+    $buildsSpace = getDirectorySize($projectDir . '/qs_build');
     
     // Admin-related: public/admin + secure/admin
     $adminSpace = $publicFolders['admin']['size'] 

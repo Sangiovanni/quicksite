@@ -17,46 +17,7 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
-
-/**
- * Calculate directory size
- */
-if (!function_exists('listbackups_getDirectorySize')) {
-    function listbackups_getDirectorySize($path) {
-        $size = 0;
-        $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($path, RecursiveDirectoryIterator::SKIP_DOTS)
-        );
-        
-        foreach ($iterator as $file) {
-            if ($file->isFile()) {
-                $size += $file->getSize();
-            }
-        }
-        
-        return $size;
-    }
-}
-
-/**
- * Count files in directory
- */
-if (!function_exists('listbackups_countFiles')) {
-    function listbackups_countFiles($path) {
-        $count = 0;
-        $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($path, RecursiveDirectoryIterator::SKIP_DOTS)
-        );
-        
-        foreach ($iterator as $file) {
-            if ($file->isFile()) {
-                $count++;
-            }
-        }
-        
-        return $count;
-    }
-}
+require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php'; // getDirectorySize, countDirectoryFiles
 
 /**
  * Format size for display
@@ -132,8 +93,8 @@ function __command_listBackups(array $params = [], array $urlParams = []): ApiRe
 
     foreach ($backupDirs as $dir) {
         $name = basename($dir);
-        $size = listbackups_getDirectorySize($dir);
-        $fileCount = listbackups_countFiles($dir);
+        $size = getDirectorySize($dir);
+        $fileCount = countDirectoryFiles($dir);
         $created = filemtime($dir);
         
         // Detect backup type

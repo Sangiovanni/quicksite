@@ -140,7 +140,7 @@ function __command_duplicateSnippet(array $params = [], array $urlParams = []): 
             'category' => $newSnippet['category'],
             'path' => $result['path'],
             'project' => $projectName,
-            'note' => $sourceSnippet['isCore'] 
+            'note' => $sourceSnippet['source'] === 'core'
                 ? 'Core snippet CSS not copied. Adapt classes to use your project styles.'
                 : null
         ]);

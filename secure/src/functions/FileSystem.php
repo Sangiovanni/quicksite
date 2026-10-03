@@ -8,29 +8,105 @@
  */
 
 /**
- * Recursively copy a directory and all its contents
- * 
+ * Recursively copy a directory, reporting what could NOT be copied.
+ *
+ * THE ONE COPY. Every command that copies a tree calls this, or copyDirectory(),
+ * its boolean face, so a tree is copied the same way everywhere. The publish
+ * boundary is the exception, on purpose: qs_copy_publishable_directory()
+ * (filePolicy.php) filters what a web server will serve.
+ *
+ * It keeps going past a failure and says what failed, so a caller can name what
+ * is missing from the copy rather than answer one boolean for the whole of it.
+ *
+ * ⚠ PATHS ARE RELATIVE to `$source`, for the same reason as qs_delete_tree()'s:
+ * they travel into API responses.
+ *
+ * A LINK IS NEVER FOLLOWED. An entry that leads somewhere other than where it
+ * sits — a symlink, or a Windows junction — is not copied and is listed in
+ * `links`, so a copy cannot carry what lies outside the tree into it. A source
+ * that is itself a link copies nothing. A skipped link is not a failure: it is
+ * not part of the tree.
+ *
+ * A read-only file copies like any other, and its copy can be written.
+ *
+ * @param string   $source  Directory to copy.
+ * @param string   $dest    Directory to copy into; made when missing.
+ * @param string[] $skipTop Top-level entry names to leave out.
+ * @return array{ok: bool, files: int, dirs: int, failed: string[], links: string[]}
+ *         `ok` is true only when every file and folder was copied. `failed` and
+ *         `links` are capped at 50 entries each.
+ */
+function qs_copy_tree(string $source, string $dest, array $skipTop = []): array {
+    $report = ['ok' => false, 'files' => 0, 'dirs' => 0, 'failed' => [], 'links' => []];
+    if (is_link($source)) {
+        qs_copy_tree_note($report['links'], '.');
+        return $report;
+    }
+    if (!is_dir($source)) {
+        return $report;
+    }
+    $report['ok'] = qs_copy_tree_walk($source, $dest, '', $skipTop, $report);
+    return $report;
+}
+
+/** The recursion behind qs_copy_tree(). $rel is the path so far, for reporting. */
+function qs_copy_tree_walk(string $source, string $dest, string $rel, array $skip, array &$report): bool {
+    if (!is_dir($dest) && !@mkdir($dest, 0755, true) && !is_dir($dest)) {
+        qs_copy_tree_note($report['failed'], $rel === '' ? '.' : $rel);
+        return false;
+    }
+    $items = @scandir($source);
+    if ($items === false) {
+        qs_copy_tree_note($report['failed'], $rel === '' ? '.' : $rel);
+        return false;
+    }
+
+    $ok = true;
+    $realSource = realpath($source);
+    foreach ($items as $item) {
+        if ($item === '.' || $item === '..' || in_array($item, $skip, true)) continue;
+        $from = $source . DIRECTORY_SEPARATOR . $item;
+        $to = $dest . DIRECTORY_SEPARATOR . $item;
+        $childRel = $rel === '' ? $item : $rel . '/' . $item;
+
+        if (qs_delete_tree_leads_elsewhere($source, $item, $from, $realSource)) {
+            qs_copy_tree_note($report['links'], $childRel);
+            continue;
+        }
+        if (is_dir($from)) {
+            if (qs_copy_tree_walk($from, $to, $childRel, [], $report)) {
+                $report['dirs']++;
+            } else {
+                $ok = false;
+            }
+        } elseif (@copy($from, $to)) {
+            $report['files']++;
+        } else {
+            qs_copy_tree_note($report['failed'], $childRel);
+            $ok = false;
+        }
+    }
+    return $ok;
+}
+
+/** Record one path in a qs_copy_tree() list, up to the cap. */
+function qs_copy_tree_note(array &$list, string $rel): void {
+    if (count($list) < 50) {
+        $list[] = $rel;
+    }
+}
+
+/**
+ * Recursively copy a directory and all its contents.
+ *
+ * The boolean face of qs_copy_tree(), for callers that only branch on success.
+ *
  * @param string $source Source directory path
  * @param string $dest Destination directory path
  * @return bool True on success, false on failure
  */
 function copyDirectory(string $source, string $dest): bool {
-    if (!is_dir($source)) return false;
-    if (!is_dir($dest) && !mkdir($dest, 0755, true)) return false;
-    
-    foreach (scandir($source) as $item) {
-        if ($item == '.' || $item == '..') continue;
-        
-        $sourcePath = $source . '/' . $item;
-        $destPath = $dest . '/' . $item;
-        
-        if (is_dir($sourcePath)) {
-            if (!copyDirectory($sourcePath, $destPath)) return false;
-        } else {
-            if (!copy($sourcePath, $destPath)) return false;
-        }
-    }
-    return true;
+    return qs_copy_tree($source, $dest)['ok'];
 }
 
 /**
@@ -184,6 +260,7 @@ function qs_delete_tree_entry(string $dir, string $item, string $childRel, array
 /**
  * Whether a directory entry is a link: a symlink, or anything whose real path is
  * not the path it sits at — a Windows junction, which is_link() does not report.
+ * The copy and the measure ask the same question, so all three treat a link alike.
  *
  * @param string|false|null $realDir realpath($dir), when the caller already has it
  */
@@ -196,9 +273,13 @@ function qs_delete_tree_leads_elsewhere(string $dir, string $item, string $path,
     return $realDir === false || $real === false || $real !== $realDir . DIRECTORY_SEPARATOR . $item;
 }
 
-/** Remove a file marked read-only; give the mark back when it still cannot be removed. */
+/**
+ * Remove a file marked read-only; give the mark back when it still cannot be removed.
+ * A link is left to the caller: its mode is its target's, so clearing the mark
+ * would change a file the delete must never touch.
+ */
 function qs_delete_tree_unlink_read_only(string $path): bool {
-    if (!is_file($path) || is_writable($path)) {
+    if (is_link($path) || !is_file($path) || is_writable($path)) {
         return false;
     }
     $mode = @fileperms($path);
@@ -254,15 +335,77 @@ function deleteDirectory(string $dir): bool {
 }
 
 /**
- * Calculate total size of a directory and all its contents
- * 
+ * Remove one entry of a directory — a tree, a file or a link — by qs_delete_tree()'s
+ * rules: a link is removed and never followed, a read-only file is removed, and
+ * what survived is reported relative to `$dir`. An entry that is not there is
+ * already removed.
+ *
+ * @return array{ok: bool, files: int, dirs: int, survived: string[], retained: string[]}
+ */
+function qs_delete_entry(string $dir, string $item): array {
+    $report = ['ok' => true, 'files' => 0, 'dirs' => 0, 'survived' => [], 'retained' => []];
+    $path = $dir . DIRECTORY_SEPARATOR . $item;
+    if (file_exists($path) || is_link($path)) {
+        $report['ok'] = qs_delete_tree_entry($dir, $item, $item, $report);
+    }
+    return $report;
+}
+
+/**
+ * Total size of the files under a directory, in bytes.
+ *
+ * Counts what a copy copies: plain files. A link is neither followed nor
+ * counted, an unreadable folder is skipped, and a path that is not a directory
+ * measures 0.
+ *
  * @param string $dir Directory path
  * @return int Total size in bytes
  */
 function getDirectorySize(string $dir): int {
-    $size = 0;
-    foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS)) as $file) {
-        $size += $file->getSize();
+    return qs_tree_measure($dir)['bytes'];
+}
+
+/**
+ * Number of files under a directory, by getDirectorySize()'s rules.
+ *
+ * @param string $dir Directory path
+ * @return int File count
+ */
+function countDirectoryFiles(string $dir): int {
+    return qs_tree_measure($dir)['files'];
+}
+
+/**
+ * The files under a directory and their total size, read once.
+ *
+ * @return array{files: int, bytes: int}
+ */
+function qs_tree_measure(string $dir): array {
+    $measure = ['files' => 0, 'bytes' => 0];
+    if (!is_link($dir) && is_dir($dir)) {
+        qs_tree_measure_walk($dir, $measure);
     }
-    return $size;
+    return $measure;
+}
+
+/** The recursion behind qs_tree_measure(). */
+function qs_tree_measure_walk(string $dir, array &$measure): void {
+    $items = @scandir($dir);
+    if ($items === false) {
+        return;
+    }
+    $realDir = realpath($dir);
+    foreach ($items as $item) {
+        if ($item === '.' || $item === '..') continue;
+        $path = $dir . DIRECTORY_SEPARATOR . $item;
+        if (qs_delete_tree_leads_elsewhere($dir, $item, $path, $realDir)) {
+            continue;
+        }
+        if (is_dir($path)) {
+            qs_tree_measure_walk($path, $measure);
+        } elseif (is_file($path)) {
+            $measure['files']++;
+            $measure['bytes'] += (int) @filesize($path);
+        }
+    }
 }

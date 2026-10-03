@@ -3,7 +3,6 @@
   "name": "Basic Card",
   "category": "cards",
   "description": "Simple card with image, title, text and button",
-  "isCore": true,
   "structure": {
     "tag": "div",
     "params": { "class": "qs-snippet-card" },

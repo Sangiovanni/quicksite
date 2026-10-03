@@ -2,8 +2,8 @@
 /**
  * Restore Backup Command
  * 
- * Restores a project from a specific backup.
- * Creates a pre-restore backup automatically for safety.
+ * Restores a project from a specific backup. A snapshot of the current state is
+ * taken first only when asked (create_backup).
  * 
  * @method POST
  * @route /management/restoreBackup
@@ -19,52 +19,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
-require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php'; // qs_delete_tree
-
-/**
- * Recursively copy a directory
- */
-if (!function_exists('restore_copyDirectory')) {
-    function restore_copyDirectory($src, $dst, $exclude = []) {
-        if (!is_dir($src)) {
-            return false;
-        }
-        
-        if (!is_dir($dst)) {
-            mkdir($dst, 0755, true);
-        }
-        
-        $dir = opendir($src);
-        $success = true;
-        
-        while (($file = readdir($dir)) !== false) {
-            if ($file === '.' || $file === '..') {
-                continue;
-            }
-            
-            // Check if this file/folder should be excluded
-            if (in_array($file, $exclude)) {
-                continue;
-            }
-            
-            $srcPath = $src . '/' . $file;
-            $dstPath = $dst . '/' . $file;
-            
-            if (is_dir($srcPath)) {
-                if (!restore_copyDirectory($srcPath, $dstPath, $exclude)) {
-                    $success = false;
-                }
-            } else {
-                if (!copy($srcPath, $dstPath)) {
-                    $success = false;
-                }
-            }
-        }
-        
-        closedir($dir);
-        return $success;
-    }
-}
+require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php'; // qs_delete_entry, qs_copy_tree
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -137,6 +92,9 @@ function __command_restoreBackup(array $params = [], array $urlParams = []): Api
         $createBackup = filter_var($createBackup, FILTER_VALIDATE_BOOLEAN);
     }
 
+    // What a backup holds, and so what a restore brings back.
+    $itemsToCopy = ['config.php', 'routes.php', 'templates', 'translate', 'data', 'public'];
+
     $preRestoreName = null;
     $preRestoreItems = [];
 
@@ -150,85 +108,102 @@ function __command_restoreBackup(array $params = [], array $urlParams = []): Api
                 ->withMessage('Failed to create pre-restore backup');
         }
 
-        // C15 15.3 — no "sync live public into the project" step: the project's own public/
-        // IS the live one, so the current state below already includes it (same reasoning as
-        // backupProject).
-
-        // Copy current state to pre-restore backup
-        $itemsToCopy = ['config.php', 'routes.php', 'templates', 'translate', 'data', 'public'];
-        
+        // Copy current state to pre-restore backup. The project's own public/ is the
+        // one it serves from, so the current state includes it.
         foreach ($itemsToCopy as $item) {
             $srcPath = $projectPath . '/' . $item;
             $dstPath = $preRestorePath . '/' . $item;
-            
-            if (!file_exists($srcPath)) {
-                continue;
+
+            if (is_link($srcPath) || !file_exists($srcPath)) {
+                continue; // missing, or a link, which a copy never follows (qs_copy_tree)
             }
-            
-            if (is_dir($srcPath)) {
-                if (restore_copyDirectory($srcPath, $dstPath)) {
-                    $preRestoreItems[] = $item;
-                }
-            } else {
-                if (copy($srcPath, $dstPath)) {
-                    $preRestoreItems[] = $item;
-                }
+
+            $copied = is_dir($srcPath) ? qs_copy_tree($srcPath, $dstPath)['ok'] : copy($srcPath, $dstPath);
+            if ($copied) {
+                $preRestoreItems[] = $item;
             }
         }
     }
 
-    // Now restore from the selected backup
-    $itemsToCopy = ['config.php', 'routes.php', 'templates', 'translate', 'data', 'public'];
+    // Now restore from the selected backup. It keeps going past a failure, so that as
+    // much as possible comes back, and names every item it could not restore whole.
+    // The backup is only read: whatever happens here, it can be restored again.
     $restoredItems = [];
+    $failedItems = [];
     $errors = [];
+    $filesCopied = 0;
 
     foreach ($itemsToCopy as $item) {
         $srcPath = $backupPath . '/' . $item;
         $dstPath = $projectPath . '/' . $item;
-        
-        if (!file_exists($srcPath)) {
-            continue;
+
+        if (is_link($srcPath) || !file_exists($srcPath)) {
+            continue; // missing, or a link, which a copy never follows (qs_copy_tree)
         }
-        
-        // Delete existing item if it exists
-        if (file_exists($dstPath)) {
-            if (is_dir($dstPath)) {
-                $removal = qs_delete_tree($dstPath);
-                if (!$removal['ok']) {
-                    $errors[] = "Could not remove all of the current $item before restoring it: "
-                        . implode(', ', $removal['survived']);
-                }
-            } else {
-                unlink($dstPath);
-            }
+
+        // The current item goes first, as the one delete removes an entry: a link is
+        // removed and never followed, a read-only file is removed.
+        $whole = true;
+        $removal = qs_delete_entry($projectPath, $item);
+        if (!$removal['ok']) {
+            $whole = false;
+            $errors[] = "Could not remove all of the current $item before restoring it: "
+                . implode(', ', $removal['survived']);
         }
-        
-        // Copy from backup
+
         if (is_dir($srcPath)) {
-            if (restore_copyDirectory($srcPath, $dstPath)) {
-                $restoredItems[] = $item;
-            } else {
-                $errors[] = "Failed to restore directory: $item";
+            $copy = qs_copy_tree($srcPath, $dstPath);
+            $filesCopied += $copy['files'];
+            if (!$copy['ok']) {
+                $whole = false;
+                $errors[] = "Could not restore all of $item: " . implode(', ', array_map(
+                    static fn(string $rel): string => $rel === '.' ? $item : $item . '/' . $rel,
+                    $copy['failed']
+                ));
             }
+        } elseif (@copy($srcPath, $dstPath)) {
+            $filesCopied++;
         } else {
-            if (copy($srcPath, $dstPath)) {
-                $restoredItems[] = $item;
-            } else {
-                $errors[] = "Failed to restore file: $item";
-            }
+            $whole = false;
+            $errors[] = "Could not restore $item";
+        }
+
+        if ($whole) {
+            $restoredItems[] = $item;
+        } else {
+            $failedItems[] = $item;
         }
     }
 
-    // C15 15.3 — nothing to push out afterwards: restoring the project's public/ restores
-    // the very directory it serves from. The old post-restore copy pushed it to the web
-    // root, which was only ever the served project's live location.
+    // A restore reads its backup and never changes it, so a failed one can be run
+    // again once its cause is fixed. Both failure answers say so.
+    $retry = 'The backup itself is untouched; fix the cause (most often a file held open by another process, '
+        . 'or a permission the web server does not have) and restore it again.';
 
-    if (empty($restoredItems)) {
+    if ($restoredItems === [] && $filesCopied === 0) {
         return ApiResponse::create(500, 'restore.no_files_restored')
-            ->withMessage('Failed to restore backup - no files restored')
+            ->withMessage('Failed to restore backup - no files restored. ' . $retry)
             ->withData([
                 'errors' => $errors,
+                'failed_items' => $failedItems,
+                'backup_intact' => true,
                 'pre_restore_backup' => $preRestoreName
+            ]);
+    }
+
+    if ($failedItems !== []) {
+        return ApiResponse::create(500, 'restore.incomplete')
+            ->withMessage("Backup $backupName was only partly restored: " . implode(', ', $failedItems)
+                . ' could not be restored completely. ' . $retry)
+            ->withData([
+                'project' => $projectName,
+                'restored_backup' => $backupName,
+                'pre_restore_backup' => $preRestoreName,
+                'restored_items' => $restoredItems,
+                'failed_items' => $failedItems,
+                'pre_restore_items' => $preRestoreItems,
+                'backup_intact' => true,
+                'errors' => $errors
             ]);
     }
 

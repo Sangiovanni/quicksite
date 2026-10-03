@@ -19,6 +19,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectLanguage.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_format_size
+require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php'; // getDirectorySize
 
 /**
  * Count routes recursively in a nested routes structure
@@ -163,22 +164,6 @@ function getProjectInfo(string $projectPath, string $projectName): array {
     $info['modified'] = date('Y-m-d H:i:s', filemtime($projectPath));
     
     return $info;
-}
-
-/**
- * Calculate directory size recursively
- */
-function getDirectorySize(string $path): int {
-    $size = 0;
-    $iterator = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator($path, RecursiveDirectoryIterator::SKIP_DOTS)
-    );
-    foreach ($iterator as $file) {
-        if ($file->isFile()) {
-            $size += $file->getSize();
-        }
-    }
-    return $size;
 }
 
 // (Removed, S2.9) A local formatBytes(). qs_format_size() in

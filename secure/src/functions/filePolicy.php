@@ -609,12 +609,10 @@ function qs_import_validate_content(string $path, string $content, bool $neverSe
  * Recursively copy a directory into a web-served location, skipping anything
  * the publish allowlist does not permit.
  *
- * Separate from FileSystem.php's generic `copyDirectory()` on purpose. That
- * function means "copy a directory" and should keep meaning exactly that;
- * publishing policy belongs to the step that publishes. Keeping them apart
- * also avoids `deployBuild.php`, which declares its own global function of the
- * same name — requiring FileSystem.php there would be a fatal redeclare.
- *
+ * Separate from FileSystem.php's generic copy (`qs_copy_tree()`) on purpose.
+ * That function means "copy a directory" and should keep meaning exactly that;
+ * publishing policy belongs to the step that publishes.
+*
  * Entries that resolve OUTSIDE the copy root are refused. `scandir()` and
  * `is_dir()` report a reparse point (an NTFS junction, a symlink) as an ordinary
  * directory, so without canonicalisation the recursion follows one straight out

@@ -23,7 +23,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectSettings.php';
-require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php'; // qs_delete_tree_rollback
+require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php'; // qs_copy_tree, qs_delete_tree_rollback, countDirectoryFiles
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -105,9 +105,7 @@ function __command_cloneProject(array $params = [], array $urlParams = []): ApiR
     }
 
     // Recursive copy, excluding backups/
-    $excludeDirs = ['backups'];
-    
-    if (!cloneProjectDirectory($sourcePath, $targetPath, $excludeDirs)) {
+    if (!qs_copy_tree($sourcePath, $targetPath, ['backups'])['ok']) {
         qs_delete_tree_rollback($targetPath, 'cloneProject');
         return ApiResponse::create(500, 'server.operation_failed')
             ->withMessage('Failed to clone project files');
@@ -161,7 +159,7 @@ function __command_cloneProject(array $params = [], array $urlParams = []): ApiR
     error_log("cloneProject: '{$newName}' birth-written to owner '{$clonerId}'; source '{$sourceProject}' roster NOT carried over (C8 8.4 containment)");
 
     // Count cloned files for the response
-    $fileCount = countFilesRecursive($targetPath);
+    $fileCount = countDirectoryFiles($targetPath);
 
     $result = [
         'project' => $newName,
@@ -200,62 +198,6 @@ function __command_cloneProject(array $params = [], array $urlParams = []): ApiR
     return ApiResponse::create(201, 'resource.created')
         ->withMessage("Project '$sourceProject' cloned to '$newName' successfully")
         ->withData($result);
-}
-
-/**
- * Recursively copy a directory, excluding specified subdirectory names
- */
-function cloneProjectDirectory(string $source, string $dest, array $excludeDirs): bool {
-    if (!mkdir($dest, 0755, true) && !is_dir($dest)) {
-        return false;
-    }
-    
-    $iterator = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator($source, RecursiveDirectoryIterator::SKIP_DOTS),
-        RecursiveIteratorIterator::SELF_FIRST
-    );
-    
-    foreach ($iterator as $item) {
-        $subPath = $iterator->getSubPathname();
-        
-        // Check if any part of the path starts with an excluded dir
-        $skip = false;
-        foreach ($excludeDirs as $excludeDir) {
-            if (str_starts_with($subPath, $excludeDir . DIRECTORY_SEPARATOR) || $subPath === $excludeDir) {
-                $skip = true;
-                break;
-            }
-        }
-        if ($skip) continue;
-        
-        $destPath = $dest . DIRECTORY_SEPARATOR . $subPath;
-        
-        if ($item->isDir()) {
-            if (!is_dir($destPath) && !mkdir($destPath, 0755, true)) {
-                return false;
-            }
-        } else {
-            if (!copy($item->getPathname(), $destPath)) {
-                return false;
-            }
-        }
-    }
-    
-    return true;
-}
-
-/**
- * Count files in a directory recursively
- */
-function countFilesRecursive(string $dir): int {
-    $count = 0;
-    $iterator = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator($dir, RecursiveDirectoryIterator::SKIP_DOTS)
-    );
-    foreach ($iterator as $item) {
-        if ($item->isFile()) $count++;
-    }
-    return $count;
 }
 
 // Direct execution block

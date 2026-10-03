@@ -3,7 +3,6 @@
   "name": "Contact Form",
   "category": "forms",
   "description": "Basic contact form with name, email and message fields",
-  "isCore": true,
   "structure": {
     "tag": "form",
     "params": { "class": "qs-snippet-contact-form" },

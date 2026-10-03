@@ -1038,7 +1038,7 @@ async function _initSnippetSelect(form, cfg) {
     }
 
     const rows = snippets
-        .filter(s => !(cfg.userOnly && s.isCore))
+        .filter(s => !(cfg.userOnly && s.source === 'core'))
         .map(s => ({
             value: s.id,
             label: s.name ? s.name + ' (' + s.id + ')' : s.id

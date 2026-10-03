@@ -47,55 +47,6 @@ function getCustomSnippetsRoot(): string {
  *                     null as "this tier does not exist for you" and skip it —
  *                     fail closed, because this value becomes a path segment.
  */
-/**
- * Snippets left in the FLAT pre-13.6b layout (secure/snippets/custom/*.json or
- * custom/<category>/*.json, i.e. not under a usr_ directory).
- *
- * They are no longer served: nothing in the file records who wrote them, so
- * there is no user to attribute them to, and continuing to serve them to
- * everybody is the defect itself. They are NOT deleted either — the bytes stay
- * on disk and this logs them once per call site so an operator can move them
- * into the right secure/snippets/custom/<userId>/ folder. A fresh install ships
- * none (only .gitkeep is tracked), so on most installations this returns [].
- *
- * @return string[] absolute paths of orphaned legacy snippet files
- */
-function findLegacyFlatSnippets(): array {
-    $root = getCustomSnippetsRoot();
-    if (!is_dir($root)) {
-        return [];
-    }
-    $found = array_merge(glob($root . '/*.json') ?: [], glob($root . '/*/*.json') ?: []);
-    // Anything directly under a usr_ directory belongs to that user, not to the
-    // legacy tier — the second glob above would otherwise sweep it up.
-    return array_values(array_filter($found, static function (string $p): bool {
-        return preg_match('#/usr_[a-f0-9]{32}/[^/]+\.json$#', str_replace('\\', '/', $p)) !== 1;
-    }));
-}
-
-/**
- * Log the orphaned legacy snippets, at most once per request.
- *
- * The guard is not cosmetic: this runs from listSnippets, which the editor calls
- * on every snippet listing, so without it an affected installation writes its
- * whole orphan list to the error log on every read. A diagnostic that repeats
- * that often stops being read, which is the opposite of what it is for.
- */
-function warnAboutLegacyFlatSnippets(): void {
-    static $alreadyWarned = false;
-    if ($alreadyWarned) {
-        return;
-    }
-    $legacy = findLegacyFlatSnippets();
-    if ($legacy === []) {
-        return;
-    }
-    $alreadyWarned = true;
-    error_log('QuickSite [snippets]: ' . count($legacy) . ' snippet(s) remain in the older flat '
-        . SECURE_FOLDER_NAME . '/snippets/custom/ layout and are no longer served (no owner recorded). Move each into '
-        . SECURE_FOLDER_NAME . '/snippets/custom/<userId>/<category>/ to restore it: ' . implode(', ', $legacy));
-}
-
 function getPersonalSnippetsPath(?string $userId = null): ?string {
     if ($userId === null) {
         require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
@@ -124,26 +75,13 @@ function getProjectSnippetsPath(string $projectName): string {
 }
 
 /**
- * Get path to snippets directory (legacy compatibility)
- * 
- * @param string|null $projectName Project name (null for core snippets)
- * @return string Path to snippets directory
- */
-function getSnippetsPath(?string $projectName = null): string {
-    if ($projectName === null) {
-        return getCoreSnippetsPath();
-    }
-    return getProjectSnippetsPath($projectName);
-}
-
-/**
  * Ensure project snippets directory exists
  * 
  * @param string $projectName Project name
  * @return bool True if directory exists or was created
  */
 function ensureProjectSnippetsDir(string $projectName): bool {
-    $path = getSnippetsPath($projectName);
+    $path = getProjectSnippetsPath($projectName);
     if (!is_dir($path)) {
         return mkdir($path, 0755, true);
     }
@@ -244,7 +182,6 @@ function loadSnippetFile(string $filePath, string $source = 'core'): ?array {
         'category' => $data['category'] ?? 'other',
         'description' => $data['description'] ?? '',
         'source' => $source,
-        'isCore' => $source === 'core',
         'hasTranslations' => isset($data['translations']) && !empty($data['translations']),
         'hasCss' => isset($data['css']) && !empty($data['css']),
         'file' => basename($filePath)
@@ -361,9 +298,8 @@ function loadFullSnippet(string $filePath, string $snippetId, string $source = '
         return null;
     }
     
-    // Add source and legacy isCore flag
+    // The tier the snippet came from
     $data['source'] = $source;
-    $data['isCore'] = $source === 'core';
     $data['_filePath'] = $filePath;
     
     return $data;
@@ -476,7 +412,6 @@ function saveProjectSnippet(array $snippetData, string $projectName, string $sco
     }
     
     // Remove internal flags
-    unset($snippetData['isCore']);
     unset($snippetData['source']);
     unset($snippetData['_filePath']);
     

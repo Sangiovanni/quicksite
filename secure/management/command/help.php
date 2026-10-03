@@ -2189,14 +2189,14 @@ $GLOBALS['__help_commands'] = [
                 'required' => 'conditional',
                 'type' => 'string|object',
                 'ui_type' => 'textarea',
-                'description' => 'CSS declarations, as a string or as an object of property => value. They are merged into the rule: a property sent replaces that property, and the rule\'s other properties stay. To delete one, list it in removeProperties. Always sent; it may be an empty string when removeProperties is provided.',
+                'description' => 'CSS declarations, as a string or as an object of property => value. They are merged into the rule: a property sent replaces that property, and the rule\'s other properties stay. Property names compare without case (COLOR replaces color); a custom property (--name) keeps its case. To delete one, list it in removeProperties. Always sent; it may be an empty string when removeProperties is provided.',
                 'example' => 'background: #fff; padding: 10px;',
                 'validation' => 'Each declaration is property: value, and every quote, comment and bracket it opens is closed. An object\'s values are strings or numbers. The declarations pass the stylesheet scan (see editStyles).'
             ],
             'removeProperties' => [
                 'required' => false,
                 'type' => 'array',
-                'description' => 'Array of property names to remove from the rule. If all properties are removed, the entire rule is deleted.',
+                'description' => 'Array of property names to remove from the rule, compared as styles compares them (without case, a custom property with it). If all properties are removed, the entire rule is deleted.',
                 'example' => '["margin", "padding", "border"]',
                 'validation' => 'An array of strings'
             ],
@@ -2232,7 +2232,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.lock_failed' => 'Could not acquire file lock.',
             '500.server.operation_failed' => 'An unexpected failure while writing the rule; the stylesheet lock is released first. The exception message is returned.'
         ],
-        'notes' => 'The styles are merged into the rule: a property sent replaces that property, and the rule\'s other properties stay (getStyleRule returns what the rule holds). Use removeProperties to delete properties; if that leaves the rule empty, it is deleted (action: deleted). The styles must be CSS declarations: each declaration is property: value, and every quote, comment and bracket it opens is closed, because one left open reads on into the rules after it. Anything else — a quoted string, "color red", a quote left open — answers 400 invalid_format and nothing is written. The selector, the styles, the media query and the rule as it will be written each pass the stylesheet scan every CSS writer runs (see editStyles).'
+        'notes' => 'The styles are merged into the rule: a property sent replaces that property, and the rule\'s other properties stay (getStyleRule returns what the rule holds). A property sent replaces every declaration of it, in the place of the first, written as sent; a property not sent keeps all of its declarations, a fallback written twice included. Property names compare without case, as CSS reads them (COLOR: red replaces color: blue); a custom property (--name) keeps its case, as CSS compares those as written. No comment in the rule is dropped: one written before a declaration stays where it is when that declaration is replaced or removed. Use removeProperties to delete properties; if that leaves the rule empty, it is deleted (action: deleted). The styles must be CSS declarations: each declaration is property: value, and every quote, comment and bracket it opens is closed, because one left open reads on into the rules after it. Anything else — a quoted string, "color red", a quote left open — answers 400 invalid_format and nothing is written. The selector, the styles, the media query and the rule as it will be written each pass the stylesheet scan every CSS writer runs (see editStyles).'
     ],
     
     'deleteStyleRule' => [
@@ -3703,7 +3703,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.operation_failed' => 'The recursive copy failed; anything already copied is removed first.',
             '500.server.file_write_failed' => 'The clone\'s membership file could not be created. The whole clone is deleted rather than left ownerless.'
         ],
-        'notes' => 'The clone does NOT inherit the source\'s roster: its membership file is written fresh with the caller as sole owner, no members, no pending invitations, visibility private and joining closed. A clone is an independent project — re-invite collaborators explicitly. The backups folder is skipped, so a clone starts with no backup history; everything else, including config, templates, translations, data and public assets, is copied. The clone\'s site name is derived from the new project name, and any site.name entry in its translation files is rewritten to match. data.files_copied counts the files present in the clone after the copy.'
+        'notes' => 'The clone does NOT inherit the source\'s roster: its membership file is written fresh with the caller as sole owner, no members, no pending invitations, visibility private and joining closed. A clone is an independent project — re-invite collaborators explicitly. The backups folder is skipped, so a clone starts with no backup history; everything else, including config, templates, translations, data and public assets, is copied. A link inside the project is not followed: what it points to is not copied. The clone\'s site name is derived from the new project name, and any site.name entry in its translation files is rewritten to match. data.files_copied counts the files present in the clone after the copy.'
     ],
     
     'deleteProject' => [
@@ -4455,7 +4455,7 @@ $GLOBALS['__help_commands'] = [
             '500.backup.folder_create_failed' => 'Failed to create backups directory.',
             '500.backup.no_files_copied' => 'Failed to create backup - no files copied.'
         ],
-        'notes' => 'Backups are stored in project/backups/ folder. Old backups are auto-deleted when max_backups is exceeded. For sharing projects externally, use exportProject instead (JSON-only, secure).'
+        'notes' => 'Backups are stored in project/backups/ folder. Old backups are auto-deleted when max_backups is exceeded. A link inside the project is not followed: what it points to is not copied into the backup. For sharing projects externally, use exportProject instead (JSON-only, secure).'
     ],
     
     'listBackups' => [
@@ -4501,7 +4501,7 @@ $GLOBALS['__help_commands'] = [
             '200.backup.list_success' => 'The backup list, newest first. An empty list is still a 200 — no backups is not an error.',
             '400.validation.invalid_format' => 'Invalid project name.'
         ],
-        'notes' => 'Backup types: "manual" (created via backupProject), "pre-restore" (auto-created before restore), "auto" (scheduled backups).'
+        'notes' => 'Backup types, read from the folder name: "pre-restore" (the snapshot restoreBackup takes when create_backup is asked), "auto" (a name starting with auto_), "manual" (every other, backupProject\'s).'
     ],
     
     'restoreBackup' => [
@@ -4549,9 +4549,10 @@ $GLOBALS['__help_commands'] = [
             '404.project.not_found' => 'Project not found',
             '404.backup.not_found' => 'Backup not found',
             '500.backup.prerestore_failed' => 'create_backup=true was requested but the pre-restore snapshot folder could not be created - nothing was overwritten',
-            '500.restore.no_files_restored' => 'No file could be restored; data.errors lists why, data.pre_restore_backup names the snapshot if one was taken'
+            '500.restore.no_files_restored' => 'No file could be restored; data.errors lists why, data.failed_items the items, data.pre_restore_backup names the snapshot if one was taken. The backup is untouched (data.backup_intact) and can be restored again',
+            '500.restore.incomplete' => 'Part of the backup was restored and part could not be: data.failed_items names the items not restored completely, data.restored_items the ones that were, data.errors the paths that failed. The project now mixes the two states. The backup is untouched (data.backup_intact) and can be restored again once the cause is fixed'
         ],
-        'notes' => 'DESTRUCTIVE: config.php, routes.php, templates/, translate/, data/ and public/ are overwritten from the chosen backup. There is NO automatic safety net - pass create_backup=true to snapshot the current state first (data.pre_restore_backup then names it, and restoring that snapshot undoes this restore). Omit it and data.pre_restore_backup is null and the state being overwritten is not recoverable from within QuickSite. The admin panel asks before it restores and sends create_backup according to the answer; a direct API caller gets no such prompt.'
+        'notes' => 'DESTRUCTIVE: config.php, routes.php, templates/, translate/, data/ and public/ are overwritten from the chosen backup. There is NO automatic safety net - pass create_backup=true to snapshot the current state first (data.pre_restore_backup then names it, and restoring that snapshot undoes this restore). Omit it and data.pre_restore_backup is null and the state being overwritten is not recoverable from within QuickSite. The admin panel asks before it restores and sends create_backup according to the answer; a direct API caller gets no such prompt. A restore keeps going past a failure, so that as much as possible comes back, and answers 500 restore.incomplete when anything could not be restored completely: it never answers success for a partial restore. The backup is only read, never changed, so it can be restored again. Each item is removed before it is restored as deleteProject removes a tree: a link is removed and never followed, a read-only file is removed. A link inside the backup is not followed either: what it points to is not restored.'
     ],
     
     'deleteBackup' => [
@@ -6262,12 +6263,12 @@ $GLOBALS['__help_commands'] = [
             'message' => 'Snippets retrieved',
             'data' => [
                 'snippets' => [
-                    ['id' => 'navbar-basic', 'name' => 'Basic Navbar', 'category' => 'nav', 'description' => 'Basic navigation bar', 'isCore' => true],
-                    ['id' => 'contact-form', 'name' => 'Contact Form', 'category' => 'forms', 'description' => 'Basic contact form', 'isCore' => true]
+                    ['id' => 'navbar-basic', 'name' => 'Basic Navbar', 'category' => 'nav', 'description' => 'Basic navigation bar', 'source' => 'core'],
+                    ['id' => 'contact-form', 'name' => 'Contact Form', 'category' => 'forms', 'description' => 'Basic contact form', 'source' => 'core']
                 ],
                 'byCategory' => [
-                    'nav' => [['id' => 'navbar-basic', 'name' => 'Basic Navbar', 'isCore' => true]],
-                    'forms' => [['id' => 'contact-form', 'name' => 'Contact Form', 'isCore' => true]]
+                    'nav' => [['id' => 'navbar-basic', 'name' => 'Basic Navbar', 'source' => 'core']],
+                    'forms' => [['id' => 'contact-form', 'name' => 'Contact Form', 'source' => 'core']]
                 ],
                 'categories' => ['nav', 'forms', 'cards', 'layouts']
             ]
@@ -6276,7 +6277,7 @@ $GLOBALS['__help_commands'] = [
             '400.project.mismatch' => 'The project named in the body does not match the project in the URL marker. The marker decides; a disagreeing echo is refused rather than ignored.',
             '400.project.required' => 'No project marker on the request. This command is project-scoped: target a project with /management/p/<projectId>/.'
         ],
-        'notes' => 'Core snippets are read-only and can be duplicated to project snippets. Project snippets can be edited and deleted.'
+        'notes' => 'Each row\'s source names its tier: core (shipped, read-only; it can be duplicated to the project), personal (the caller\'s own library) or project. Personal and project snippets can be edited and deleted.'
     ],
     
     'getSnippet' => [
@@ -6300,7 +6301,7 @@ $GLOBALS['__help_commands'] = [
                 'name' => 'Basic Navbar',
                 'category' => 'nav',
                 'description' => 'Basic navigation bar with logo and links',
-                'isCore' => true,
+                'source' => 'core',
                 'structure' => ['tag' => 'nav', 'params' => ['class' => 'qs-snippet-navbar'], 'children' => []],
                 'translations' => ['en' => ['snippet.navbar.home' => 'Home'], 'fr' => ['snippet.navbar.home' => 'Accueil']],
                 'css' => '.qs-snippet-navbar { ... }'

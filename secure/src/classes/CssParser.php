@@ -560,59 +560,162 @@ class CssParser {
     }
 
     /**
-     * Parse CSS style declarations into an associative array
+     * The declarations of a list, in order, as the merge reads them. Each entry is
+     * ['key' => string|null, 'lead' => string, 'name' => string, 'value' => string]:
+     * the key compares the name (see declarationKey()); the lead is whatever is written
+     * before the name, a comment and the space after it, kept as written; a comment that
+     * stands alone, with no declaration after it, is an entry with a null key and its
+     * text in lead. Anything else that is not a declaration is not kept.
+     *
      * @param string $styles CSS declarations string
-     * @return array Property => value pairs
+     * @return array<int, array{key: ?string, lead: string, name: string, value: string}>
      */
     private function parseStyleDeclarations(string $styles): array {
         $result = [];
         foreach (self::readDeclarations($styles)[0] as $declaration) {
             $declaration = trim($declaration);
             if ($declaration === '') continue;
-            
-            // Split on first colon only
-            $colonPos = strpos($declaration, ':');
-            if ($colonPos === false) continue;
-            
-            $property = trim(substr($declaration, 0, $colonPos));
-            $value = trim(substr($declaration, $colonPos + 1));
-            
-            if (!empty($property) && $value !== '') {
-                $result[$property] = $value;
+
+            $colonPos = self::declarationColon($declaration);
+            if ($colonPos === false) {
+                if (trim((string) preg_replace('#/\*.*?\*/#s', '', $declaration)) === '') {
+                    $result[] = ['key' => null, 'lead' => $declaration, 'name' => '', 'value' => ''];
+                }
+                continue;
+            }
+
+            $before = rtrim(substr($declaration, 0, $colonPos));
+            $value  = trim(substr($declaration, $colonPos + 1));
+            $lead   = '';
+            while (preg_match('#^(\s*/\*.*?\*/\s*)#s', substr($before, strlen($lead)), $m)) {
+                $lead .= $m[1];
+            }
+            $name = substr($before, strlen($lead));
+            $key  = self::declarationKey($name);
+
+            if ($key !== '' && $value !== '') {
+                $result[] = ['key' => $key, 'lead' => $lead, 'name' => $name, 'value' => $value];
+            } elseif ($lead !== '') {
+                $result[] = ['key' => null, 'lead' => rtrim($lead), 'name' => '', 'value' => ''];
             }
         }
-        
+
         return $result;
     }
-    
+
     /**
-     * Merge new styles with existing styles
+     * Where a declaration's name ends: its first `:` outside a comment, a string and an
+     * escape, or false when it has none.
+     */
+    private static function declarationColon(string $declaration): int|false {
+        $len = strlen($declaration);
+        for ($i = 0; $i < $len; $i++) {
+            $ch = $declaration[$i];
+            if ($ch === '/' && ($i + 1) < $len && $declaration[$i + 1] === '*') {
+                $end = strpos($declaration, '*/', $i + 2);
+                if ($end === false) return false;
+                $i = $end + 1;
+            } elseif ($ch === '"' || $ch === "'") {
+                for ($i++; $i < $len && $declaration[$i] !== $ch; $i++) {
+                    if ($declaration[$i] === '\\') $i++;
+                }
+            } elseif ($ch === '\\') {
+                $i++;
+            } elseif ($ch === ':') {
+                return $i;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * What two property names are compared by: the name without its comments, in ASCII
+     * lowercase, because CSS property names ignore case. A custom property (--name) keeps
+     * its case, because CSS compares those as written. The lowering never reads the
+     * locale, so every PHP version compares the same.
+     */
+    private static function declarationKey(string $name): string {
+        $name = trim((string) preg_replace('#/\*.*?\*/#s', '', $name));
+        return str_starts_with($name, '--') ? $name : strtr($name, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz');
+    }
+
+    /**
+     * Merge new styles into existing ones. A property sent replaces every declaration of
+     * that property, in the place of the first, written as sent; every other declaration
+     * stays as it is, a fallback written twice included. Properties are compared as
+     * declarationKey() says. No comment is dropped: the one before a replaced or removed
+     * declaration stays where it was.
+     *
      * @param string $existingStyles Current CSS declarations
      * @param string $newStyles New CSS declarations to merge
      * @param array $removeProperties Properties to remove from the result
-     * @return string Merged and formatted CSS declarations
+     * @return string Merged and formatted CSS declarations; empty when no declaration is left
      */
     private function mergeStyles(string $existingStyles, string $newStyles, array $removeProperties = []): string {
         $existing = $this->parseStyleDeclarations($existingStyles);
         $new = $this->parseStyleDeclarations($newStyles);
-        
-        // Merge - new values override existing
-        $merged = array_merge($existing, $new);
-        
-        // Remove specified properties
+
+        $sent = [];
+        foreach ($new as $entry) {
+            if ($entry['key'] !== null) $sent[$entry['key']][] = $entry;
+        }
+        $remove = [];
         foreach ($removeProperties as $prop) {
-            unset($merged[$prop]);
+            $remove[self::declarationKey((string) $prop)] = true;
         }
-        
-        // Convert back to CSS string with proper formatting
+
+        // A comment that stays where its declaration went.
+        $commentOf = static fn(array $entry): array => ['key' => null, 'lead' => rtrim($entry['lead']), 'name' => '', 'value' => ''];
+
+        $merged = [];
+        $placed = [];
+        foreach ($existing as $entry) {
+            $key = $entry['key'];
+            if ($key === null || !isset($sent[$key])) {
+                $merged[] = $entry;
+                continue;
+            }
+            if (!isset($placed[$key])) {
+                foreach ($sent[$key] as $i => $replacement) {
+                    // The comment written before the declaration stays; one sent with it is
+                    // added, unless it is that same comment sent back.
+                    if ($i === 0 && trim($replacement['lead']) !== trim($entry['lead'])) {
+                        $replacement['lead'] = $entry['lead'] . $replacement['lead'];
+                    } elseif ($i === 0) {
+                        $replacement['lead'] = $entry['lead'];
+                    }
+                    $merged[] = $replacement;
+                }
+                $placed[$key] = true;
+            } elseif ($entry['lead'] !== '') {
+                $merged[] = $commentOf($entry);
+            }
+        }
+        foreach ($new as $entry) {
+            if ($entry['key'] === null || !isset($placed[$entry['key']])) {
+                $merged[] = $entry;
+            }
+        }
+
         $lines = [];
-        foreach ($merged as $property => $value) {
-            $lines[] = '    ' . $property . ': ' . $value . ';';
+        $declarations = 0;
+        foreach ($merged as $entry) {
+            if ($entry['key'] !== null && isset($remove[$entry['key']])) {
+                if ($entry['lead'] !== '') $lines[] = '    ' . $commentOf($entry)['lead'];
+                continue;
+            }
+            if ($entry['key'] === null) {
+                $lines[] = '    ' . $entry['lead'];
+                continue;
+            }
+            $lines[] = '    ' . $entry['lead'] . $entry['name'] . ': ' . $entry['value'] . ';';
+            $declarations++;
         }
-        
-        return implode("\n", $lines);
+
+        // A rule left with comments and no declaration is a rule with nothing in it.
+        return $declarations === 0 ? '' : implode("\n", $lines);
     }
-    
+
     /**
      * Set/update a style rule (merges with existing properties).
      *
@@ -637,10 +740,10 @@ class CssParser {
                     $mergedStyles   = $this->mergeStyles($existingStyles, $styles, $removeProperties);
 
                     if (trim($mergedStyles) === '') {
-                        // Remove this rule from the media content
-                        $newInnerContent = substr($innerContent, 0, $rule['start'])
+                        // Remove this rule from the media content, with the space before it:
+                        // what follows it starts on its own line already.
+                        $newInnerContent = rtrim(substr($innerContent, 0, $rule['start']))
                                          . substr($innerContent, $rule['end']);
-                        $newInnerContent = preg_replace('/\n{3,}/', "\n\n", $newInnerContent);
                         if (trim($newInnerContent) === '') {
                             // Media query is now empty — remove entire block
                             $this->content = substr($this->content, 0, $mediaBlock['start'])
@@ -648,7 +751,7 @@ class CssParser {
                             $this->content = preg_replace('/\n{3,}/', "\n\n", $this->content);
                             return ['action' => 'deleted', 'selector' => $selector, 'mediaQuery' => $mediaQuery];
                         }
-                        $newMediaContent = '@media ' . $mediaBlock['prelude'] . " {\n" . $newInnerContent . "\n}";
+                        $newMediaContent = '@media ' . $mediaBlock['prelude'] . ' {' . $newInnerContent . '}';
                         $this->content   = substr($this->content, 0, $mediaBlock['start'])
                                          . $newMediaContent
                                          . substr($this->content, $mediaBlock['end']);
@@ -669,7 +772,9 @@ class CssParser {
                     $newInnerContent = rtrim($innerContent) . "\n" . $newRule . "\n";
                 }
 
-                $newMediaContent = '@media ' . $mediaBlock['prelude'] . " {\n" . $newInnerContent . "}";
+                // The block's inner text keeps the line break that follows its brace, so
+                // the brace is written alone: adding one more grew a blank line each time.
+                $newMediaContent = '@media ' . $mediaBlock['prelude'] . ' {' . $newInnerContent . '}';
                 $this->content   = substr($this->content, 0, $mediaBlock['start'])
                                  . $newMediaContent
                                  . substr($this->content, $mediaBlock['end']);

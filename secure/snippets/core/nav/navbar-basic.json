@@ -3,7 +3,6 @@
   "name": "Basic Navbar",
   "category": "nav",
   "description": "Simple horizontal navigation bar with logo and links",
-  "isCore": true,
   "structure": {
     "tag": "nav",
     "params": { "class": "qs-snippet-navbar" },

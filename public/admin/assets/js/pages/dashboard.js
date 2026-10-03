@@ -1133,10 +1133,11 @@
      * Reload the dashboard after a success, its toast carried across the reload.
      * A toast shown just before a reload is wiped by it, and a reload that stays
      * on the same project then confirms nothing; admin.js shows the pending
-     * message on the next page load.
+     * message on the next page load. A failure that changed the project reloads
+     * too, with its type ('error') and a duration of 0, so it stays until closed.
      */
-    function reloadWithMessage(message) {
-        QuickSiteAdmin.setPendingMessage(message);
+    function reloadWithMessage(message, type, duration) {
+        QuickSiteAdmin.setPendingMessage(message, type, duration);
         window.location.href = window.location.pathname + '?t=' + Date.now();
     }
 
@@ -1962,17 +1963,17 @@
         // The button's resting label, rebuilt after a failed restore.
         const restoreLabel = () => [
             QSDom.iconEl(QuickSiteUtils.ICON_PATHS.refresh, 16),
-            ' ' + (t('dashboard.projects', {}).restoreBtn || 'Restore')
+            ' ' + t('dashboard.projects.restoreBtn', 'dashboard.projects.restoreBtn')
         ];
+        const restoreFailed = t('dashboard.projects.restore_failed', 'dashboard.projects.restore_failed');
 
         confirmRestoreBtn.addEventListener('click', async function() {
             if (!pendingRestoreBackup) return;
-            
-            const proj = t('dashboard.projects', {});
+
             const createBackup = document.getElementById('restore-create-backup').checked;
-            
-            QSDom.setButtonBusy(this, proj.restoring || 'Restoring...', { size: 16 });
-            
+
+            QSDom.setButtonBusy(this, t('dashboard.projects.restoring', 'dashboard.projects.restoring'), { size: 16 });
+
             try {
                 const result = await QuickSiteAdmin.apiRequest('restoreBackup', 'POST', {
                     backup: pendingRestoreBackup,
@@ -1981,15 +1982,26 @@
 
                 if (result.ok) {
                     closeAllModals();
-                    reloadWithMessage(proj.restore_success || 'Backup restored successfully');
+                    reloadWithMessage(t('dashboard.projects.restore_success', 'dashboard.projects.restore_success'));
+                } else if (result.data?.code === 'restore.incomplete') {
+                    // Part of the backup came back, so the project has changed: the page
+                    // reloads to show it as it now is, with a message that stays until
+                    // it is closed and names what the restore could not bring back.
+                    const items = (result.data.data?.failed_items || []).join(', ');
+                    closeAllModals();
+                    reloadWithMessage(
+                        t('dashboard.projects.restore_incomplete', 'dashboard.projects.restore_incomplete').replace(':items', items),
+                        'error',
+                        0
+                    );
                 } else {
-                    QuickSiteAdmin.showToast(result.data?.message || 'Failed to restore backup', 'error');
+                    QuickSiteAdmin.showToast(result.data?.message || restoreFailed, 'error');
                     this.disabled = false;
                     QSDom.clear(this);
                     restoreLabel().forEach(n => this.append(n));
                 }
             } catch (error) {
-                QuickSiteAdmin.showToast('Failed to restore backup', 'error');
+                QuickSiteAdmin.showToast(restoreFailed, 'error');
                 this.disabled = false;
                 QSDom.clear(this);
                 restoreLabel().forEach(n => this.append(n));

@@ -619,7 +619,12 @@ $langNames = [
                     projects: {
                         deleteTitle: '<?= __adminJs('dashboard.projects.deleteTitle') ?>',
                         deleteBtn: '<?= __adminJs('dashboard.projects.deleteBtn') ?>',
-                        deleteConfirmNamed: '<?= __adminJs('dashboard.projects.deleteConfirmNamed') ?>'
+                        deleteConfirmNamed: '<?= __adminJs('dashboard.projects.deleteConfirmNamed') ?>',
+                        restoring: '<?= __adminJs('dashboard.projects.restoring') ?>',
+                        restoreBtn: '<?= __adminJs('dashboard.projects.restoreBtn') ?>',
+                        restore_success: '<?= __adminJs('dashboard.projects.restore_success') ?>',
+                        restore_failed: '<?= __adminJs('dashboard.projects.restore_failed') ?>',
+                        restore_incomplete: '<?= __adminJs('dashboard.projects.restore_incomplete') ?>'
                     },
                     columns: {
                         command: '<?= __adminJs('dashboard.history.columns.command') ?>',

@@ -9,7 +9,7 @@
  * 
  * Returns all snippets visible to the caller (core + their own personal +
  * the marker project's) organized by category.
- * Core snippets are read-only and marked with isCore: true.
+ * Each row's source names its tier: core (read-only), personal or project.
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
@@ -47,7 +47,6 @@ function __command_listSnippets(array $params = [], array $urlParams = []): ApiR
     if ($personalSnippetsPath !== null) {
         $personalSnippets = listSnippetsFromPath($personalSnippetsPath, 'personal');
     }
-    warnAboutLegacyFlatSnippets();
 
     // Load project snippets
     $projectSnippets = [];

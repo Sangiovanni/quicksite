@@ -420,6 +420,8 @@
             "restore_btn": "Restore",
             "restoreBtn": "Restore",
             "restore_success": "Backup restored successfully",
+            "restore_failed": "Failed to restore backup",
+            "restore_incomplete": "The backup was only partly restored: :items could not be restored completely. The backup itself is untouched; fix the cause (most often a file held open by another process, or a permission the web server does not have) and restore it again.",
             "restore_warning": "A pre-restore backup will be created automatically.",
             "confirm_restore": "Restore from backup",
             "confirmRestore": "Confirm Restore",

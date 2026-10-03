@@ -1161,15 +1161,6 @@ class WorkflowManager {
                 return "Error: Template file not found: $template";
             }
         }
-        // Legacy support: Check for @file: syntax within template content
-        elseif (preg_match('/^@file:\s*(.+\.md)$/m', $template, $matches)) {
-            $mdFile = trim($matches[1]);
-            $mdPath = ($workflow['_folder'] ?? '') . '/' . $mdFile;
-            
-            if (file_exists($mdPath)) {
-                $template = file_get_contents($mdPath);
-            }
-        }
         
         // Build commands context from relatedCommands + fetched help data
         $commandsContext = $this->buildCommandsContext($workflow, $fetchedData);

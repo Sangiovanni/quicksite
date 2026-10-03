@@ -21,92 +21,7 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
-require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php'; // qs_delete_tree
-
-/**
- * Recursively copy a directory
- */
-if (!function_exists('backup_copyDirectory')) {
-    function backup_copyDirectory($src, $dst, $exclude = []) {
-        if (!is_dir($src)) {
-            return false;
-        }
-        
-        if (!is_dir($dst)) {
-            mkdir($dst, 0755, true);
-        }
-        
-        $dir = opendir($src);
-        $success = true;
-        
-        while (($file = readdir($dir)) !== false) {
-            if ($file === '.' || $file === '..') {
-                continue;
-            }
-            
-            // Check if this file/folder should be excluded
-            if (in_array($file, $exclude)) {
-                continue;
-            }
-            
-            $srcPath = $src . '/' . $file;
-            $dstPath = $dst . '/' . $file;
-            
-            if (is_dir($srcPath)) {
-                if (!backup_copyDirectory($srcPath, $dstPath, $exclude)) {
-                    $success = false;
-                }
-            } else {
-                if (!copy($srcPath, $dstPath)) {
-                    $success = false;
-                }
-            }
-        }
-        
-        closedir($dir);
-        return $success;
-    }
-}
-
-/**
- * Calculate directory size
- */
-if (!function_exists('backup_getDirectorySize')) {
-    function backup_getDirectorySize($path) {
-        $size = 0;
-        $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($path, RecursiveDirectoryIterator::SKIP_DOTS)
-        );
-        
-        foreach ($iterator as $file) {
-            if ($file->isFile()) {
-                $size += $file->getSize();
-            }
-        }
-        
-        return $size;
-    }
-}
-
-/**
- * Count files in directory
- */
-if (!function_exists('backup_countFiles')) {
-    function backup_countFiles($path) {
-        $count = 0;
-        $iterator = new RecursiveIteratorIterator(
-            new RecursiveDirectoryIterator($path, RecursiveDirectoryIterator::SKIP_DOTS)
-        );
-        
-        foreach ($iterator as $file) {
-            if ($file->isFile()) {
-                $count++;
-            }
-        }
-        
-        return $count;
-    }
-}
+require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php'; // qs_copy_tree, qs_delete_tree, getDirectorySize
 
 /**
  * Format size for display
@@ -203,12 +118,12 @@ function __command_backupProject(array $params = [], array $urlParams = []): Api
         $srcPath = $projectPath . '/' . $item;
         $dstPath = $backupPath . '/' . $item;
         
-        if (!file_exists($srcPath)) {
-            continue; // Skip if doesn't exist
+        if (is_link($srcPath) || !file_exists($srcPath)) {
+            continue; // missing, or a link, which a copy never follows (qs_copy_tree)
         }
-        
+
         if (is_dir($srcPath)) {
-            if (backup_copyDirectory($srcPath, $dstPath)) {
+            if (qs_copy_tree($srcPath, $dstPath)['ok']) {
                 $copiedItems[] = $item;
             } else {
                 $errors[] = "Failed to copy directory: $item";
@@ -232,8 +147,8 @@ function __command_backupProject(array $params = [], array $urlParams = []): Api
     }
 
     // Calculate backup size
-    $backupSize = backup_getDirectorySize($backupPath);
-    $fileCount = backup_countFiles($backupPath);
+    $backupSize = getDirectorySize($backupPath);
+    $fileCount = countDirectoryFiles($backupPath);
 
     // Get list of all backups and apply max_backups limit
     $backups = [];

@@ -699,9 +699,11 @@ $createdFiles = [];
 $createdDirs = [];
 
 /**
- * Recursively copy a directory, tracking all created items for rollback
+ * Recursively copy a directory into a deployment, tracking all created items for
+ * rollback. Not FileSystem.php's copy: this one never overwrites a file it does
+ * not own, stays inside the build, records what it created and refreshes OPcache.
  */
-function copyDirectory(string $source, string $dest, bool $overwrite, array &$createdFiles, array &$createdDirs, ?callable $ownsPath = null): array {
+function deploy_copyDirectory(string $source, string $dest, bool $overwrite, array &$createdFiles, array &$createdDirs, ?callable $ownsPath = null): array {
     if (!is_dir($dest)) {
         if (!mkdir($dest, 0755, true)) {
             return ['files' => 0, 'directories' => 0, 'php_invalidated' => 0, 'error' => "Failed to create directory: {$dest}"];
@@ -827,7 +829,7 @@ function rollbackDeployment(array $createdFiles, array $createdDirs): array {
 }
 
 // Copy public folder
-$publicResult = copyDirectory($sourcePublic, $destPublic, $overwrite, $createdFiles, $createdDirs, $ownsPublicPath);
+$publicResult = deploy_copyDirectory($sourcePublic, $destPublic, $overwrite, $createdFiles, $createdDirs, $ownsPublicPath);
 
 if (isset($publicResult['error'])) {
     $rollbackErrors = rollbackDeployment($createdFiles, $createdDirs);
@@ -845,7 +847,7 @@ if (isset($publicResult['error'])) {
 }
 
 // Copy secure folder
-$secureResult = copyDirectory($sourceSecure, $destSecure, $overwrite, $createdFiles, $createdDirs);
+$secureResult = deploy_copyDirectory($sourceSecure, $destSecure, $overwrite, $createdFiles, $createdDirs);
 
 if (isset($secureResult['error'])) {
     $rollbackErrors = rollbackDeployment($createdFiles, $createdDirs);

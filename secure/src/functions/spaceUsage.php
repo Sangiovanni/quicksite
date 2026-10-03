@@ -30,6 +30,7 @@ require_once __DIR__ . '/utilsManagement.php'; // qs_json_write
  */
 
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php'; // getDirectorySize
 
 /**
  * Seconds a measured project size stays fresh.
@@ -71,22 +72,13 @@ function qs_owned_projects(string $userId): array {
     return $owned;
 }
 
-/** Recursive byte total for a directory (0 when absent). */
+/**
+ * Recursive byte total for a directory (0 when absent), by the one measure every
+ * command uses (FileSystem.php): plain files only, a link neither followed nor
+ * counted, an unreadable folder skipped. The quota charges what a copy would copy.
+ */
 function qs_dir_size(string $path): int {
-    if (!is_dir($path)) {
-        return 0;
-    }
-    $size = 0;
-    $it = new RecursiveIteratorIterator(
-        new RecursiveDirectoryIterator($path, FilesystemIterator::SKIP_DOTS),
-        RecursiveIteratorIterator::SELF_FIRST
-    );
-    foreach ($it as $f) {
-        if ($f->isFile()) {
-            $size += $f->getSize();
-        }
-    }
-    return $size;
+    return getDirectorySize($path);
 }
 
 /** Count of immediate entries matching a glob (0 when absent). */

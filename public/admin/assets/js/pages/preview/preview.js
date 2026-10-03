@@ -5995,7 +5995,7 @@
         }
         
         function sourceFromSnippet(snippet) {
-            return snippet.source || (snippet.isCore ? 'core' : 'project');
+            return snippet.source;
         }
         
         // Dropdown open/close
@@ -6215,7 +6215,7 @@
         // Update hidden input
         if (addSnippetInput) addSnippetInput.value = snippet.id;
         
-        const src = snippet.source || (snippet.isCore ? 'core' : 'project');
+        const src = snippet.source;
         const srcLabel = src === 'core' ? 'Core'
             : ((src === 'personal' || src === 'global') ? 'Personal' : 'Project');
         
@@ -6255,7 +6255,7 @@
             return;
         }
         
-        const src = selectedSnippetData.source || (selectedSnippetData.isCore ? 'core' : 'project');
+        const src = selectedSnippetData.source;
         if (src === 'core') {
             showToast(PreviewConfig.i18n.cannotDeleteCore || 'Cannot delete core snippets', 'error');
             return;
