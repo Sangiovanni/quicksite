@@ -18,6 +18,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php'; // qs_delete_tree, getDirectorySize
+require_once SECURE_FOLDER_PATH . '/src/functions/spaceUsage.php'; // qs_invalidate_space_cache
 
 /**
  * Format size for display
@@ -96,7 +97,11 @@ function __command_deleteBackup(array $params = [], array $urlParams = []): ApiR
     // Get backup size before deletion
     $backupSize = getDirectorySize($backupPath);
 
-    if (!qs_delete_tree($backupPath)['ok']) {
+    $removed = qs_delete_tree($backupPath)['ok'];
+    // The space it took no longer counts: the overview and the storage quota
+    // measure the project again at once.
+    qs_invalidate_space_cache($projectName);
+    if (!$removed) {
         return ApiResponse::create(500, 'backup.delete_failed')
             ->withMessage('Failed to delete backup directory');
     }

@@ -543,6 +543,16 @@
             action: 'removeNodeSuccess', 
             nodeId: nodeId 
         }, ALLOWED_ORIGIN);
+
+        // The structure's last element is gone. Only the server renders the empty
+        // structure's placeholder (the selectable root), so the editor reloads.
+        if (!document.querySelector(qsStructSel(struct))) {
+            window.parent.postMessage({
+                source: 'quicksite-preview',
+                action: 'structureEmptied',
+                struct: struct
+            }, ALLOWED_ORIGIN);
+        }
         
         clearSelection();
     }

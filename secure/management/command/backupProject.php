@@ -3,7 +3,8 @@
  * Backup Project Command
  * 
  * Creates a timestamped backup of the current (or specified) project.
- * Backups are stored in the project's backups/ folder as complete folder copies.
+ * Backups are stored in the project's backups/ folder as folder copies of what
+ * projectBackup.php says a backup holds.
  * 
  * This is for INTERNAL backups (same server, instant restore).
  * For external sharing, use exportProject instead.
@@ -21,7 +22,10 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
-require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php'; // qs_copy_tree, qs_delete_tree, getDirectorySize
+require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php'; // qs_delete_tree, getDirectorySize, qs_tree_measure
+require_once SECURE_FOLDER_PATH . '/src/functions/projectBackup.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/spaceUsage.php'; // qs_invalidate_space_cache
 
 /**
  * Format size for display
@@ -78,8 +82,31 @@ function __command_backupProject(array $params = [], array $urlParams = []): Api
             ->withMessage('Project not found: ' . $projectName);
     }
 
-    // Create backups folder if doesn't exist
     $backupsDir = $projectPath . '/backups';
+
+    // The older backups this one replaces, so that max_backups holds once it is
+    // made. Chosen now, so the quota is checked against what the backup removes.
+    $toPrune = qs_backup_prune_plan($backupsDir, $maxBackups);
+
+    // The storage quota, before anything is written: what the backup copies, less
+    // the older backups it removes, charged to the project's owner.
+    if (qs_quota_storage_limited()) {
+        $callerId = (string)(getCurrentUser()['id'] ?? '');
+        $freed = 0;
+        foreach ($toPrune as $old) {
+            $freed += getDirectorySize($backupsDir . '/' . $old);
+        }
+        $breach = qs_quota_check_storage(qs_quota_storage_owner($projectName, $callerId),
+            qs_backup_measure($projectPath), $callerId,
+            ['project' => $projectName, 'kind' => 'backup', 'freed' => $freed]);
+        if ($breach !== null) {
+            return ApiResponse::create(507, 'quota.storage_exceeded')
+                ->withMessage($breach['message'])
+                ->withData($breach['data']);
+        }
+    }
+
+    // Create backups folder if doesn't exist
     if (!is_dir($backupsDir)) {
         if (!mkdir($backupsDir, 0755, true)) {
             return ApiResponse::create(500, 'backup.folder_create_failed')
@@ -104,102 +131,74 @@ function __command_backupProject(array $params = [], array $urlParams = []): Api
             ->withMessage('Failed to create backup directory');
     }
 
-    // C15 15.3 — no pre-backup "sync live public back into the project" step any more.
-    // A project's own public/ IS the live one it serves from, so style edits and asset
-    // uploads land there directly and are already in scope below. The old step existed
-    // only because the served project's live copy sat at the web root instead.
+    // The project's own public/ is the live one it serves from, so style edits and
+    // asset uploads land there directly and are part of what is copied.
+    $copy = qs_backup_copy($projectPath, $backupPath);
 
-    // Copy project contents to backup (excluding backups folder itself)
-    $itemsToCopy = ['config.php', 'routes.php', 'templates', 'translate', 'data', 'public'];
-    $copiedItems = [];
-    $errors = [];
-
-    foreach ($itemsToCopy as $item) {
-        $srcPath = $projectPath . '/' . $item;
-        $dstPath = $backupPath . '/' . $item;
-        
-        if (is_link($srcPath) || !file_exists($srcPath)) {
-            continue; // missing, or a link, which a copy never follows (qs_copy_tree)
+    // A backup that is not whole is not kept: restoring it would replace each item
+    // of the project with a partial copy. No older backup is removed for it.
+    if ($copy['copied'] === [] || $copy['failed'] !== []) {
+        $removal = qs_delete_tree($backupPath);
+        qs_invalidate_space_cache($projectName);
+        $closing = 'Nothing was kept and no older backup was removed. The project itself is untouched; '
+            . 'fix the cause (most often a file held open by another process, or a permission the web '
+            . 'server does not have) and back it up again.'
+            . ($removal['ok'] ? '' : " The incomplete copy could not be fully removed: delete backup $backupName before restoring anything.");
+        $data = [
+            'project' => $projectName,
+            'failed_items' => $copy['failed'],
+            'errors' => $copy['errors'],
+            'project_intact' => true,
+            'backup_kept' => false,
+            'leftover' => $removal['ok'] ? null : $backupName,
+        ];
+        if ($copy['copied'] === []) {
+            return ApiResponse::create(500, 'backup.no_files_copied')
+                ->withMessage('Failed to create backup - no files copied. ' . $closing)
+                ->withData($data);
         }
-
-        if (is_dir($srcPath)) {
-            if (qs_copy_tree($srcPath, $dstPath)['ok']) {
-                $copiedItems[] = $item;
-            } else {
-                $errors[] = "Failed to copy directory: $item";
-            }
-        } else {
-            if (copy($srcPath, $dstPath)) {
-                $copiedItems[] = $item;
-            } else {
-                $errors[] = "Failed to copy file: $item";
-            }
-        }
-    }
-
-    // Check if backup was successful
-    if (empty($copiedItems)) {
-        // Clean up empty backup
-        rmdir($backupPath);
-        return ApiResponse::create(500, 'backup.no_files_copied')
-            ->withMessage('Failed to create backup - no files copied')
-            ->withData(['errors' => $errors]);
+        return ApiResponse::create(500, 'backup.incomplete')
+            ->withMessage("Backup $backupName could not be made completely: " . implode(', ', $copy['failed'])
+                . ' could not be copied. ' . $closing)
+            ->withData($data);
     }
 
     // Calculate backup size
-    $backupSize = getDirectorySize($backupPath);
-    $fileCount = countDirectoryFiles($backupPath);
+    $measure = qs_tree_measure($backupPath);
 
-    // Get list of all backups and apply max_backups limit
-    $backups = [];
-    $backupDirs = glob($backupsDir . '/*', GLOB_ONLYDIR);
-
-    foreach ($backupDirs as $dir) {
-        $name = basename($dir);
-        $backups[$name] = [
-            'name' => $name,
-            'path' => $dir,
-            'created' => filemtime($dir)
-        ];
-    }
-
-    // Sort by creation time (oldest first)
-    uasort($backups, function($a, $b) {
-        return $a['created'] - $b['created'];
-    });
-
-    // Delete oldest backups if over limit
+    // Remove the older backups chosen above. One that cannot be fully removed does
+    // not make this backup fail: it is whole, and the answer names the other.
     $deletedBackups = [];
-    if ($maxBackups > 0 && count($backups) > $maxBackups) {
-        $toDelete = array_slice(array_keys($backups), 0, count($backups) - $maxBackups);
-        
-        foreach ($toDelete as $oldBackup) {
-            $oldPath = $backups[$oldBackup]['path'];
-            
-            if (qs_delete_tree($oldPath)['ok']) {
-                $deletedBackups[] = $oldBackup;
-                unset($backups[$oldBackup]);
-            }
+    $pruneFailed = [];
+    foreach ($toPrune as $oldBackup) {
+        if (qs_delete_tree($backupsDir . '/' . $oldBackup)['ok']) {
+            $deletedBackups[] = $oldBackup;
+        } else {
+            $pruneFailed[] = $oldBackup;
         }
     }
+    qs_invalidate_space_cache($projectName);
 
     return ApiResponse::create(200, 'backup.created')
-        ->withMessage("Backup created successfully: $backupName")
+        ->withMessage("Backup created successfully: $backupName"
+            . ($pruneFailed === [] ? '' : '. An older backup could not be fully removed: ' . implode(', ', $pruneFailed)
+                . '; delete it from the backup list'))
         ->withData([
             'project' => $projectName,
             'backup' => [
                 'name' => $backupName,
                 'path' => $backupPath,
-                'size' => $backupSize,
-                'size_formatted' => backup_formatSize($backupSize),
-                'files' => $fileCount,
-                'items' => $copiedItems,
+                'size' => $measure['bytes'],
+                'size_formatted' => backup_formatSize($measure['bytes']),
+                'files' => $measure['files'],
+                'items' => $copy['copied'],
                 'created' => $timestamp
             ],
-            'total_backups' => count($backups),
+            'total_backups' => count(glob($backupsDir . '/*', GLOB_ONLYDIR) ?: []),
             'max_backups' => $maxBackups,
             'deleted_old_backups' => $deletedBackups,
-            'errors' => $errors
+            'prune_failed' => $pruneFailed,
+            'errors' => []
         ]);
 }
 

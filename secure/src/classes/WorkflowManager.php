@@ -106,13 +106,6 @@ class WorkflowManager {
     }
     
     /**
-     * @deprecated Use getWorkflowsByCategory() instead
-     */
-    public function getSpecsByCategory(): array {
-        return $this->getWorkflowsByCategory();
-    }
-    
-    /**
      * Load a workflow by ID
      * 
      * @param string $workflowId Workflow identifier

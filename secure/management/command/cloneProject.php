@@ -24,6 +24,8 @@ require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectSettings.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php'; // qs_copy_tree, qs_delete_tree_rollback, countDirectoryFiles
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/spaceUsage.php'; // qs_invalidate_space_cache
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -104,6 +106,18 @@ function __command_cloneProject(array $params = [], array $urlParams = []): ApiR
         return qs_unsafe_structure_param_response($unsafeStructureParam);
     }
 
+    // The storage quota, before the clone exists: a clone is a new project, so it
+    // is charged to whoever makes it, who becomes its owner — as an import is.
+    if (qs_quota_storage_limited()) {
+        $incoming = max(0, getDirectorySize($sourcePath) - getDirectorySize($sourcePath . '/backups'));
+        $breach = qs_quota_check_storage((string)(getCurrentUser()['id'] ?? ''), $incoming, null, ['kind' => 'clone']);
+        if ($breach !== null) {
+            return ApiResponse::create(507, 'quota.storage_exceeded')
+                ->withMessage($breach['message'])
+                ->withData($breach['data']);
+        }
+    }
+
     // Recursive copy, excluding backups/
     if (!qs_copy_tree($sourcePath, $targetPath, ['backups'])['ok']) {
         qs_delete_tree_rollback($targetPath, 'cloneProject');
@@ -157,6 +171,9 @@ function __command_cloneProject(array $params = [], array $urlParams = []): ApiR
     }
     @unlink($targetPath . '/config/members.json.lock'); // stale sidecar if it was copied
     error_log("cloneProject: '{$newName}' birth-written to owner '{$clonerId}'; source '{$sourceProject}' roster NOT carried over (C8 8.4 containment)");
+
+    // A measurement left by an earlier project of the same name is not this one's.
+    qs_invalidate_space_cache($newName);
 
     // Count cloned files for the response
     $fileCount = countDirectoryFiles($targetPath);

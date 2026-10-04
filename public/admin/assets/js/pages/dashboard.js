@@ -739,6 +739,10 @@
                         + ' / ' + (quota.limit_formatted || formatSize(quota.limit || 0));
             }
 
+            // Over the quota: a warning that says what is refused and how to get room back.
+            const overBox = document.getElementById('owner-space-over');
+            if (overBox) overBox.style.display = (quota.configured && quota.over) ? '' : 'none';
+
             const list = document.getElementById('owner-space-projects');
             list.replaceChildren(
                 ...(data.projects || []).map(p => _renderOwnerSpaceRow(p, total))
@@ -1451,17 +1455,32 @@
                 if (result.ok && result.data?.data?.backup) {
                     const data = result.data.data;
                     QuickSiteAdmin.showToast(
-                        (proj.backup_created || 'Backup created') + ': ' + data.backup.name + ' (' + data.backup.size_formatted + ')',
+                        t('dashboard.projects.backup_created', 'dashboard.projects.backup_created') + ': ' + data.backup.name + ' (' + data.backup.size_formatted + ')',
                         'success'
                     );
+                } else if (result.data?.code === 'backup.incomplete') {
+                    // Nothing was kept, so nothing on the page changed: a red message that
+                    // stays until it is closed, naming what could not be copied.
+                    const items = (result.data.data?.failed_items || []).join(', ');
+                    QuickSiteAdmin.showToast(
+                        t('dashboard.projects.backup_incomplete', 'dashboard.projects.backup_incomplete').replace(':items', items),
+                        'error',
+                        0
+                    );
                 } else {
-                    QuickSiteAdmin.showToast(result.data?.message || 'Failed to create backup', 'error');
+                    // The server's own words: a quota refusal carries the figures and the
+                    // way out, so it stays until it is closed too.
+                    QuickSiteAdmin.showToast(
+                        result.data?.message || t('dashboard.projects.backup_failed', 'dashboard.projects.backup_failed'),
+                        'error',
+                        result.data?.code === 'quota.storage_exceeded' ? 0 : undefined
+                    );
                 }
             } catch (error) {
                 console.error('Backup error:', error);
-                QuickSiteAdmin.showToast('Failed to create backup', 'error');
+                QuickSiteAdmin.showToast(t('dashboard.projects.backup_failed', 'dashboard.projects.backup_failed'), 'error');
             }
-            
+
             this.disabled = false;
             this.textContent = originalText;
         });
@@ -1558,7 +1577,8 @@
         
         document.getElementById('restore-backup-name').textContent = backupName;
         document.getElementById('restore-create-backup').checked = false;
-        
+        document.getElementById('restore-delete-backup').checked = false;
+
         updateRestoreWarning();
         
         document.getElementById('modal-restore-confirm').style.display = 'flex';
@@ -1630,7 +1650,6 @@
     function _renderBackupItem(backup, proj, target) {
         let typeBadge = null;
         if (backup.type === 'pre-restore') typeBadge = QSDom.el('span', { class: 'badge badge--warning', text: proj.pre_restore || 'Pre-restore' });
-        else if (backup.type === 'auto') typeBadge = QSDom.el('span', { class: 'badge badge--info', text: proj.auto_backup || 'Auto' });
 
         const restoreBtn = QSDom.el('button', { type: 'button', class: 'admin-btn admin-btn--sm admin-btn--primary btn-restore-this' }, [
             QSDom.svgIcon('M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15', 14),
@@ -1971,13 +1990,15 @@
             if (!pendingRestoreBackup) return;
 
             const createBackup = document.getElementById('restore-create-backup').checked;
+            const deleteBackup = document.getElementById('restore-delete-backup').checked;
 
             QSDom.setButtonBusy(this, t('dashboard.projects.restoring', 'dashboard.projects.restoring'), { size: 16 });
 
             try {
                 const result = await QuickSiteAdmin.apiRequest('restoreBackup', 'POST', {
                     backup: pendingRestoreBackup,
-                    create_backup: createBackup
+                    create_backup: createBackup,
+                    delete_backup: deleteBackup
                 }, [], {}, { project: restoreTargetProject || currentProject });
 
                 if (result.ok) {
@@ -1995,7 +2016,10 @@
                         0
                     );
                 } else {
-                    QuickSiteAdmin.showToast(result.data?.message || restoreFailed, 'error');
+                    // A quota refusal names the way out (free space, or delete this backup
+                    // once it is restored), so it stays until it is closed.
+                    QuickSiteAdmin.showToast(result.data?.message || restoreFailed, 'error',
+                        result.data?.code === 'quota.storage_exceeded' ? 0 : undefined);
                     this.disabled = false;
                     QSDom.clear(this);
                     restoreLabel().forEach(n => this.append(n));

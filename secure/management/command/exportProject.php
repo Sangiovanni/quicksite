@@ -34,6 +34,8 @@ require_once SECURE_FOLDER_PATH . '/src/functions/errorHygiene.php'; // qs_safe_
 // execution) are QS_PROJECT_SETTING_KEYS — the one list importProject takes back.
 require_once SECURE_FOLDER_PATH . '/src/functions/projectSettings.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectLanguage.php'; // qs_project_language_codes
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/spaceUsage.php'; // qs_invalidate_space_cache
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -207,8 +209,28 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
                 ->withMessage('Failed to create the export directory');
         }
 
+        // The storage quota: a saved archive is kept in the project, so it is charged
+        // to the project's owner, less the oldest archive the five-export limit drops
+        // for it. A refused archive is not kept. (A streamed export lives in the
+        // system's temporary folder for the download only, and is not charged.)
+        if (qs_quota_storage_limited()) {
+            $quotaCallerId = (string)(getCurrentUser()['id'] ?? '');
+            $freed = 0;
+            foreach (exportsBeyondLimit($exportDir, $projectName, 1) as $oldExport) {
+                $freed += (int) @filesize($oldExport);
+            }
+            $quotaBreach = qs_quota_check_storage(qs_quota_storage_owner($projectName, $quotaCallerId), (int) $zipSize,
+                $quotaCallerId, ['project' => $projectName, 'kind' => 'export', 'freed' => $freed]);
+            if ($quotaBreach !== null) {
+                unlink($zipPath);
+                return ApiResponse::create(507, 'quota.storage_exceeded')
+                    ->withMessage($quotaBreach['message'])
+                    ->withData($quotaBreach['data']);
+            }
+        }
+
         $finalPath = $exportDir . '/' . $zipFileName;
-        
+
         // Move ZIP to exports folder
         if (!rename($zipPath, $finalPath)) {
             // Try copy+delete if rename fails
@@ -222,7 +244,8 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
         
         // Clean up old exports (keep last 5 per project)
         cleanupOldExports($exportDir, $projectName);
-        
+        qs_invalidate_space_cache($projectName);
+
         return ApiResponse::create(200, 'resource.exported')
             ->withMessage("Project '$projectName' exported and saved")
             ->withData([
@@ -519,21 +542,25 @@ function streamZipDownload(string $zipPath, string $filename): void {
  * Clean up old exports
  */
 function cleanupOldExports(string $exportDir, string $projectName): void {
-    $pattern = $exportDir . '/' . $projectName . '_export_*.zip';
-    $files = glob($pattern);
-    
-    if ($files === false || count($files) <= 5) {
-        return;
+    foreach (exportsBeyondLimit($exportDir, $projectName, 0) as $file) {
+        unlink($file);
     }
-    
-    // Sort by modification time
+}
+
+/**
+ * The saved archives past the last 5 once $adding more are saved: the oldest, by
+ * modification time. The quota check asks with 1 before an archive is kept.
+ *
+ * @return string[] paths, oldest first
+ */
+function exportsBeyondLimit(string $exportDir, string $projectName, int $adding): array {
+    $files = glob($exportDir . '/' . $projectName . '_export_*.zip') ?: [];
+    $excess = count($files) + $adding - 5;
+    if ($excess <= 0) {
+        return [];
+    }
     usort($files, fn($a, $b) => filemtime($a) - filemtime($b));
-    
-    // Delete oldest files, keep last 5
-    $toDelete = count($files) - 5;
-    for ($i = 0; $i < $toDelete; $i++) {
-        unlink($files[$i]);
-    }
+    return array_slice($files, 0, $excess);
 }
 
 /**

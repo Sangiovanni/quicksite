@@ -94,6 +94,19 @@ if (isset($_GET['denied'])): ?>
             </div>
         </div>
 
+        <!-- Shown when this account's projects are over its storage quota: what is refused
+             until space is freed, and how to free it. -->
+        <div class="admin-alert admin-alert--warning" id="owner-space-over" role="alert" style="display: none; margin-top: var(--space-md);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            <div>
+                <strong><?= __admin('dashboard.storage.overTitle') ?></strong>
+                <p style="margin: 0.25rem 0 0 0; font-size: 0.875rem;"><?= __admin('dashboard.storage.overBody') ?></p>
+            </div>
+        </div>
+
         <!-- Per-owned-project rows (built in JS: dynamic structure) -->
         <div class="owner-space__projects" id="owner-space-projects"></div>
 
@@ -424,6 +437,10 @@ if (isset($_GET['denied'])): ?>
             <label class="admin-checkbox-group" style="cursor: pointer;">
                 <input type="checkbox" id="restore-create-backup" class="admin-checkbox">
                 <span class="admin-checkbox-label"><?= __admin('dashboard.projects.createBackupBeforeRestore') ?></span>
+            </label>
+            <label class="admin-checkbox-group" style="cursor: pointer;">
+                <input type="checkbox" id="restore-delete-backup" class="admin-checkbox">
+                <span class="admin-checkbox-label"><?= __admin('dashboard.projects.deleteBackupAfterRestore') ?></span>
             </label>
         </div>
         <div class="admin-modal__footer">

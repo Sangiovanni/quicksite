@@ -18,6 +18,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php'; // getDirectorySize, countDirectoryFiles
+require_once SECURE_FOLDER_PATH . '/src/functions/projectBackup.php'; // QS_BACKUP_ITEMS
 
 /**
  * Format size for display
@@ -98,17 +99,11 @@ function __command_listBackups(array $params = [], array $urlParams = []): ApiRe
         $created = filemtime($dir);
         
         // Detect backup type
-        $type = 'manual';
-        if (strpos($name, 'pre-restore_') === 0) {
-            $type = 'pre-restore';
-        } elseif (strpos($name, 'auto_') === 0) {
-            $type = 'auto';
-        }
+        $type = strpos($name, 'pre-restore_') === 0 ? 'pre-restore' : 'manual';
         
         // List contents
         $contents = [];
-        $items = ['config.php', 'routes.php', 'templates', 'translate', 'data', 'public'];
-        foreach ($items as $item) {
+        foreach (QS_BACKUP_ITEMS as $item) {
             if (file_exists($dir . '/' . $item)) {
                 $contents[] = $item;
             }

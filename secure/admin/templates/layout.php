@@ -624,7 +624,10 @@ $langNames = [
                         restoreBtn: '<?= __adminJs('dashboard.projects.restoreBtn') ?>',
                         restore_success: '<?= __adminJs('dashboard.projects.restore_success') ?>',
                         restore_failed: '<?= __adminJs('dashboard.projects.restore_failed') ?>',
-                        restore_incomplete: '<?= __adminJs('dashboard.projects.restore_incomplete') ?>'
+                        restore_incomplete: '<?= __adminJs('dashboard.projects.restore_incomplete') ?>',
+                        backup_created: '<?= __adminJs('dashboard.projects.backup_created') ?>',
+                        backup_failed: '<?= __adminJs('dashboard.projects.backup_failed') ?>',
+                        backup_incomplete: '<?= __adminJs('dashboard.projects.backup_incomplete') ?>'
                     },
                     columns: {
                         command: '<?= __adminJs('dashboard.history.columns.command') ?>',

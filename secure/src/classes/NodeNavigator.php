@@ -151,7 +151,63 @@ class NodeNavigator {
         
         return self::insertNodeAtPath($structure, $path, $newNode, $position);
     }
-    
+
+    /**
+     * Insert a node at a structure's root: the one rule for every command that
+     * takes targetNodeId "root".
+     *
+     * A root has one of two shapes. A LIST of top-level nodes (every page, menu and
+     * footer) takes the new node as its first entry; one NODE with children (a
+     * component) takes it as its first child. The new node's id is "0" in both. A
+     * structure with no nodes is a list with no entries.
+     *
+     * Writing `children` into a list instead turns it into an object the renderer
+     * cannot read: the page shows nothing and the insert is lost.
+     *
+     * A node root that cannot hold children (a component call, a text node) is
+     * refused, as an insert inside one is.
+     *
+     * @param mixed $structure The whole structure, as read from its file
+     * @param array $newNode   The node to insert
+     * @param int[] $adopt     Indices of root entries to move into the new node first,
+     *                         keeping their order: addNode's rule for an insert inside
+     *                         a node that holds text. Used only when the new node has
+     *                         children.
+     * @return array ['success' => true, 'structure' => array, 'newNodeId' => '0'],
+     *               or ['success' => false, 'error' => string]
+     */
+    public static function insertAtRoot($structure, array $newNode, array $adopt = []): array {
+        if (!is_array($structure)) {
+            return ['success' => false, 'error' => 'The structure is neither a list of nodes nor a node'];
+        }
+        $isList = !self::isAssociativeArray($structure);
+        if (!$isList && (!isset($structure['tag']) || isset($structure['component']))) {
+            return ['success' => false, 'error' => 'The structure root cannot hold children'];
+        }
+
+        $entries = $isList ? $structure : (is_array($structure['children'] ?? null) ? $structure['children'] : []);
+
+        if ($adopt !== [] && isset($newNode['children']) && is_array($newNode['children'])) {
+            rsort($adopt);
+            $moved = [];
+            foreach ($adopt as $index) {
+                if (isset($entries[$index])) {
+                    array_unshift($moved, $entries[$index]);
+                    array_splice($entries, $index, 1);
+                }
+            }
+            $newNode['children'] = array_merge($moved, $newNode['children']);
+        }
+
+        array_unshift($entries, $newNode);
+        if ($isList) {
+            $structure = $entries;
+        } else {
+            $structure['children'] = $entries;
+        }
+        return ['success' => true, 'structure' => $structure, 'newNodeId' => '0'];
+    }
+
     /**
      * Parse a node identifier string into path array
      * 

@@ -21,6 +21,7 @@
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/NodeNavigator.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/JsonToHtmlRenderer.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
@@ -442,6 +443,10 @@ function __command_insertSnippet(array $params = [], array $urlParams = []): Api
     $isRootTarget = ($targetNodeId === 'root');
     if ($isRootTarget) {
         $position = 'inside';
+    } elseif (!is_scalar($targetNodeId) || !RegexPatterns::match('node_id', (string) $targetNodeId)) {
+        return ApiResponse::create(400, 'validation.invalid_format')
+            ->withMessage("Invalid targetNodeId format. Use dot notation like '0.2.1' or 'root'")
+            ->withErrors([RegexPatterns::validationError('node_id', 'targetNodeId', $targetNodeId)]);
     }
     
     if (!in_array($position, ['before', 'after', 'inside'])) {
@@ -523,21 +528,12 @@ function __command_insertSnippet(array $params = [], array $urlParams = []): Api
         $processedStructure = processSnippetStructure($snippetStructure, $prefix, $itemCounter, $keyMapping);
     }
     
-    // Add translations to project
-    $addedTranslations = [];
-    if (!empty($keyMapping)) {
-        $addedTranslations = addSnippetTranslations($keyMapping, $snippet['translations'] ?? []);
-    }
-    
-    // Insert processed structure into target
+    // Insert processed structure into target. A list root takes the snippet as its
+    // first entry, a node root as its first child (the rule every root insert shares).
     if ($isRootTarget) {
-        // Direct insertion into root's children (prepend like normal 'inside')
-        if (!isset($structure['children'])) $structure['children'] = [];
-        array_unshift($structure['children'], $processedStructure);
-        $newNodeId = '0';
-        $insertResult = ['success' => true, 'structure' => $structure, 'newNodeId' => $newNodeId];
+        $insertResult = NodeNavigator::insertAtRoot($structure, $processedStructure);
     } else {
-        $targetPath = array_map('intval', explode('.', $targetNodeId));
+        $targetPath = array_map('intval', explode('.', (string) $targetNodeId));
         $insertResult = insertNodeAtPosition($structure, $targetPath, $processedStructure, $position);
     }
     
@@ -561,6 +557,13 @@ function __command_insertSnippet(array $params = [], array $urlParams = []): Api
     $unsafeStructureParam = qs_first_unsafe_structure_param($structure);
     if ($unsafeStructureParam !== null) {
         return qs_unsafe_structure_param_response($unsafeStructureParam);
+    }
+
+    // The snippet's translations, once nothing can refuse the insert: a refused
+    // insert writes nothing at all.
+    $addedTranslations = [];
+    if (!empty($keyMapping)) {
+        $addedTranslations = addSnippetTranslations($keyMapping, $snippet['translations'] ?? []);
     }
 
     // Save structure

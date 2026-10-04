@@ -3545,6 +3545,11 @@
                 pageStructureClasses = e.data.classes || [];
                 console.log('[Preview] Received page classes:', pageStructureClasses.length);
             }
+            if (e.data.action === 'structureEmptied') {
+                // The last element of a structure was deleted: reload, so the server
+                // renders the placeholder that lets the author select its root again.
+                reloadPreview();
+            }
         }
     });
     
@@ -5983,14 +5988,10 @@
         
         let isOpen = false;
         
-        // Source label helper. The middle tier is per-USER now (beta.10 C13
-        // 13.6b) — it was one flat installation-wide directory every project
-        // could read and delete from, so a chip reading "Global" was telling the
-        // author something that is no longer true. 'global' still maps here
-        // because a snippet listed by an older server would carry it.
+        // Source label helper: the three tiers a listed snippet comes from.
         function sourceLabel(source) {
             if (source === 'core') return 'Core';
-            if (source === 'personal' || source === 'global') return 'Personal';
+            if (source === 'personal') return 'Personal';
             return 'Project';
         }
         
@@ -6217,7 +6218,7 @@
         
         const src = snippet.source;
         const srcLabel = src === 'core' ? 'Core'
-            : ((src === 'personal' || src === 'global') ? 'Personal' : 'Project');
+            : (src === 'personal' ? 'Personal' : 'Project');
         
         // Show preview panel
         if (addSnippetPreview) {
@@ -7324,9 +7325,11 @@
         const config = (typeof addComplexController.getConfig === 'function')
             ? addComplexController.getConfig() : {};
 
-        // The targetNodeId / structType plumbing mirrors addNode/addComponentNode.
-        const targetNodeId = (selectedNode === 'root') ? 'root' : String(selectedNode);
-        const position = getAddPosition();
+        // The targetNodeId / structType plumbing mirrors addNode/addComponentNode: the
+        // structure's own root is selected as '' (its data-qs-node) and sent as 'root'.
+        const isRoot = !selectedNode && selectedNode !== 0;
+        const targetNodeId = isRoot ? 'root' : String(selectedNode);
+        const position = isRoot ? 'inside' : getAddPosition();
         const body = {
             kind: kind,
             config: config,
@@ -10526,8 +10529,7 @@
             const translations = await extractAndRemapTranslations(keyMapping);
             
             // Call createSnippet API. 'personal' = the author's own library,
-            // reusable across THEIR projects (13.6b); the server still accepts
-            // 'global' as a legacy alias of the same thing.
+            // reusable across THEIR projects.
             const scope = saveSnippetGlobal?.checked ? 'personal' : 'project';
             
             const requestData = {

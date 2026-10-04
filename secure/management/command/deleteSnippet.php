@@ -54,7 +54,7 @@ function __command_deleteSnippet(array $params = [], array $urlParams = []): Api
             ->withMessage('Cannot delete core snippets. Use duplicateSnippet to create an editable copy.');
     }
     
-    // Delete project or global snippet
+    // Delete a project snippet or one of the caller's personal snippets
     $result = deleteProjectSnippet($snippetId, $projectName);
     
     if (!$result['success']) {

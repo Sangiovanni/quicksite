@@ -370,14 +370,11 @@ function __command_addComponentToNode(array $params = [], array $urlParams = [])
         }
     }
     
-    // Insert the node
+    // Insert the node. A list root takes it as its first entry, a node root as its
+    // first child (NodeNavigator::insertAtRoot, the rule every root insert shares).
     if ($isRootTarget) {
-        // Direct insertion into root's children (prepend like normal 'inside')
-        if (!isset($structure['children'])) $structure['children'] = [];
-        array_unshift($structure['children'], $newNode);
-        $insertedAt = 0;
+        $result = NodeNavigator::insertAtRoot($structure, $newNode);
         $newNodeId = '0';
-        $result = ['success' => true, 'structure' => $structure, 'insertedAt' => $insertedAt];
     } else {
         $result = NodeNavigator::insertNode($structure, $targetNodeId, $newNode, $position);
     }
@@ -397,7 +394,14 @@ function __command_addComponentToNode(array $params = [], array $urlParams = [])
     
     $updatedStructure = $result['structure'];
 
-    // The whole structure about to be written — checked before the
+    // SECURITY (F-C13-13): depth-check the RESULT of the component insert.
+    if (!qs_structure_depth_ok($updatedStructure)) {
+        return ApiResponse::create(400, 'validation.invalid_format')
+            ->withMessage("Structure too deeply nested (max 50 levels)")
+            ->withErrors([['field' => 'structure', 'reason' => 'exceeds max depth of 50']]);
+    }
+
+    // The whole structure about to be written. Both checks come before the
     // translation entries below, so a refused insert writes nothing at all.
     $unsafeStructureParam = qs_first_unsafe_structure_param($updatedStructure);
     if ($unsafeStructureParam !== null) {
@@ -437,13 +441,6 @@ function __command_addComponentToNode(array $params = [], array $urlParams = [])
             // Save translations
             qs_json_write($defaultFile, $translations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
         }
-    }
-    
-    // SECURITY (F-C13-13): depth-check the RESULT of the component insert.
-    if (!qs_structure_depth_ok($updatedStructure)) {
-        return ApiResponse::create(400, 'validation.invalid_format')
-            ->withMessage("Structure too deeply nested (max 50 levels)")
-            ->withErrors([['field' => 'structure', 'reason' => 'exceeds max depth of 50']]);
     }
 
     // Save structure

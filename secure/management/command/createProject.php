@@ -27,6 +27,8 @@ require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/languageRegistry.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectSettings.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php'; // qs_delete_tree
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/spaceUsage.php'; // qs_invalidate_space_cache
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -104,6 +106,17 @@ function __command_createProject(array $params = [], array $urlParams = []): Api
             ->withData(['existing_path' => SECURE_FOLDER_NAME . '/projects/' . $projectName]);
     }
 
+    // The storage quota: a new project is the caller's, and an owner already over
+    // the ceiling cannot start another. Checked before anything is written.
+    if (qs_quota_storage_limited()) {
+        $breach = qs_quota_check_storage((string)(getCurrentUser()['id'] ?? ''), 0, null, ['kind' => 'create']);
+        if ($breach !== null) {
+            return ApiResponse::create(507, 'quota.storage_exceeded')
+                ->withMessage($breach['message'])
+                ->withData($breach['data']);
+        }
+    }
+
     // The project root is created exclusively, so two creates of one name cannot
     // share a folder, and every failure below removes a folder this request made:
     // a create that answers an error leaves nothing behind.
@@ -120,6 +133,8 @@ function __command_createProject(array $params = [], array $urlParams = []): Api
         qs_delete_tree($projectPath);
         return $response;
     };
+    // A measurement left by an earlier project of the same name is not this one's.
+    qs_invalidate_space_cache($projectName);
 
     // Create project structure
     $folders = [

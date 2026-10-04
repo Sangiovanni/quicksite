@@ -16,6 +16,12 @@ require_once __DIR__ . '/spaceUsage.php';      // qs_owned_projects, qs_project_
  * missing control on a deployment surface rather than a missing feature, which
  * is why it ships with the deployment work.
  *
+ * The ceiling is checked by every write that adds a copy's worth of bytes: an
+ * upload, an import, a backup, a restore, a clone, a build and a saved export.
+ * Each passes its own kind, so the refusal names the write and the way out. A new
+ * project is refused to an owner already over the ceiling: what it writes is a few
+ * kilobytes, so it is the owner's standing, not its size, that decides.
+ *
  * ── DEFAULTS ARE PERMISSIVE, DELIBERATELY ────────────────────────────────────
  *
  * With no `secure/management/config/quota.php`, NOTHING is limited. An existing
@@ -58,17 +64,20 @@ require_once __DIR__ . '/spaceUsage.php';      // qs_owned_projects, qs_project_
  *
  * `qs_project_space()` caches a measurement for `QS_SPACE_CACHE_TTL` (300 s).
  * A ceiling read from a stale-LOW number would be a ceiling a burst walks
- * straight through, so growth must never be cached: every write path that
- * enforces a quota calls `qs_invalidate_space_cache()` after it writes, and the
- * next check re-walks that project. The sum is therefore exact for growth.
+ * straight through, so growth is never read from the cache where it matters:
  *
- * What can still age is a SHRINK — deleting a backup, an export or a whole
- * project elsewhere. That leaves the total stale-HIGH, i.e. the quota is
- * briefly stricter than reality, never looser. The existing escape hatch
- * already covers it: the dashboard's refresh control calls
- * GET /admin/self/space-usage?refresh=1, which re-measures AND rewrites the
+ *   1. The project a write lands in is MEASURED AFRESH by the check itself, so
+ *      the figure that decides is the disk's, whatever any earlier write did.
+ *   2. The owner's other projects come from the cache, and every write that grows
+ *      a project calls `qs_invalidate_space_cache()` after it writes, so those
+ *      entries are exact for growth too, and the overview moves at once.
+ *
+ * What can still age is a SHRINK in another project — deleting an export, a
+ * build or a whole project. That leaves the total stale-HIGH, i.e. the quota is
+ * briefly stricter than reality, never looser. The dashboard's refresh control
+ * calls GET /admin/self/space-usage?refresh=1, which re-measures AND rewrites the
  * cache entries, so a user who frees space and is refused can make the number
- * move immediately. The refusal message says so.
+ * move immediately. The upload refusal says so.
  */
 
 /**
@@ -144,6 +153,28 @@ function qs_quota_config(): array
 }
 
 /**
+ * Whether a storage ceiling is configured. A write that has to measure what it
+ * adds asks this first, so an install with no quota file never pays for the walk.
+ */
+function qs_quota_storage_limited(): bool
+{
+    return qs_quota_config()['max_total_bytes'] > 0;
+}
+
+/**
+ * The account a write into an existing project is charged to: the project's
+ * OWNER, because that is whose disk grows — not the caller, or any member with
+ * write rights could push an owner past their quota while spending none of their
+ * own. Falls back to the caller when no owner is recorded, which keeps a
+ * malformed members.json enforcing something rather than nothing.
+ */
+function qs_quota_storage_owner(string $project, string $callerId): string
+{
+    $owner = (string)(loadProjectMembers($project)['owner'] ?? '');
+    return $owner !== '' ? $owner : $callerId;
+}
+
+/**
  * Total bytes the given user's owned projects occupy right now.
  *
  * Consumes `spaceUsage.php` directly rather than running the account report in
@@ -151,10 +182,12 @@ function qs_quota_config(): array
  * rows, formatted sizes, per-category splits) and all this needs is the sum.
  * The measurement underneath is the same one, so the two can never disagree.
  *
- * @param string $userId Resolved caller id ('' → 0, fail-open like listProjects)
+ * @param string      $userId       Resolved caller id ('' → 0, fail-open like listProjects)
+ * @param string|null $freshProject A project to measure afresh rather than read from
+ *                                  the cache: the one a write is about to land in
  * @return array{bytes:int, projects:int}
  */
-function qs_quota_usage(string $userId): array
+function qs_quota_usage(string $userId, ?string $freshProject = null): array
 {
     if ($userId === '') {
         return ['bytes' => 0, 'projects' => 0];
@@ -163,7 +196,7 @@ function qs_quota_usage(string $userId): array
     $owned = qs_owned_projects($userId);
     $total = 0;
     foreach ($owned as $project) {
-        $space  = qs_project_space($project);
+        $space  = qs_project_space($project, $project === $freshProject);
         $total += (int)($space['total'] ?? 0);
     }
 
@@ -171,7 +204,7 @@ function qs_quota_usage(string $userId): array
 }
 
 /**
- * Would writing $incomingBytes for this user cross the storage ceiling?
+ * Would a write of $incomingBytes for this owner cross the storage ceiling?
  *
  * Returns null when the write is allowed — including for every install with no
  * quota file, which is the common case and costs no disk walk at all: the
@@ -179,32 +212,50 @@ function qs_quota_usage(string $userId): array
  *
  * ⚠ $ownerId IS THE ACCOUNT THAT RECEIVES THE BYTES, not the one sending them.
  * An asset uploaded into a project is charged to that project's OWNER, because
- * that is whose disk grows. Charging the caller instead let any member with
- * upload rights push an owner past their quota while spending none of their
- * own — the caller's own projects were measured, found small, and waved
- * through. The upload RATE limit is the opposite case and stays on the caller:
- * it bounds what one actor does, not where the bytes land.
+ * that is whose disk grows (qs_quota_storage_owner()). Charging the caller
+ * instead let any member with upload rights push an owner past their quota while
+ * spending none of their own — the caller's own projects were measured, found
+ * small, and waved through. The upload RATE limit is the opposite case and stays
+ * on the caller: it bounds what one actor does, not where the bytes land.
+ *
+ * `$write` describes the write; every key is optional:
+ *   - `project` — the existing project the bytes land in. It is measured afresh,
+ *     never read from the cache (see STALENESS above). A new project has none.
+ *   - `kind` — `upload` (the default; an import shares its words), `backup`,
+ *     `restore`, `clone`, `build`, `export` or `create` (a new project, checked
+ *     with nothing incoming): the refusal names the write and says what to do.
+ *   - `freed` — bytes the same write removes: the older backups max_backups
+ *     prunes, the archive the five-export limit drops, what a restore replaces.
+ *     Only the net growth is charged. Such a write crosses the ceiling only while
+ *     it runs, because it makes its copy before it removes what the copy replaces.
+ *   - `landed` — the bytes are already on disk in `project` (a build is checked
+ *     once it is made), so the fresh measurement holds them already.
  *
  * @param string      $ownerId  Account whose disk receives the bytes
  * @param int         $incomingBytes
  * @param string|null $callerId Who is asking, when that is not the owner.
  *                              Null means caller === owner (the usual case).
+ * @param array       $write    project / kind / freed / landed, as above
  * @return array{message:string, data:array}|null
  */
-function qs_quota_check_storage(string $ownerId, int $incomingBytes, ?string $callerId = null): ?array
+function qs_quota_check_storage(string $ownerId, int $incomingBytes, ?string $callerId = null, array $write = []): ?array
 {
     $quota = qs_quota_config();
     if ($quota['max_total_bytes'] <= 0) {
         return null; // unlimited — do not pay for a measurement nobody reads
     }
 
-    $usage = qs_quota_usage($ownerId);
-    $after = $usage['bytes'] + max(0, $incomingBytes);
-    if ($after <= $quota['max_total_bytes']) {
+    $kind     = (string)($write['kind'] ?? 'upload');
+    $incoming = max(0, $incomingBytes);
+    $freed    = max(0, (int)($write['freed'] ?? 0));
+    $net      = max(0, $incoming - $freed);
+    $usage    = qs_quota_usage($ownerId, isset($write['project']) ? (string)$write['project'] : null);
+    $used     = empty($write['landed']) ? $usage['bytes'] : max(0, $usage['bytes'] - $incoming);
+    if ($used + $net <= $quota['max_total_bytes']) {
         return null;
     }
 
-    $remaining = max(0, $quota['max_total_bytes'] - $usage['bytes']);
+    $remaining = max(0, $quota['max_total_bytes'] - $used);
 
     // A caller who is NOT the owner is told the outcome and nothing else. The
     // usage total and project count aggregate every project that owner has,
@@ -213,12 +264,10 @@ function qs_quota_check_storage(string $ownerId, int $incomingBytes, ?string $ca
     // is install-wide and not owner-specific, so it may still be named.
     if ($callerId !== null && $callerId !== $ownerId) {
         return [
-            'message' => 'The owner of this project has no storage space left, so nothing '
-                . 'more can be added to it. Ask them to free space — the ceiling on this '
-                . 'server is ' . qs_format_size($quota['max_total_bytes']) . ' per account.',
+            'message' => qs_quota_owner_scoped_message($kind, $quota['max_total_bytes']),
             'data' => [
-                'incoming_bytes' => max(0, $incomingBytes),
-                'incoming_human' => qs_format_size(max(0, $incomingBytes)),
+                'incoming_bytes' => $incoming,
+                'incoming_human' => qs_format_size($incoming),
                 'quota_bytes'    => $quota['max_total_bytes'],
                 'quota_human'    => qs_format_size($quota['max_total_bytes']),
                 'owner_scoped'   => true,
@@ -226,28 +275,91 @@ function qs_quota_check_storage(string $ownerId, int $incomingBytes, ?string $ca
         ];
     }
 
-    return [
-        'message' => 'This would put your projects over your storage quota. They currently use '
-            . qs_format_size($usage['bytes']) . ' of ' . qs_format_size($quota['max_total_bytes'])
-            . ', and this upload adds ' . qs_format_size(max(0, $incomingBytes)) . '. '
-            . ($remaining > 0
-                ? 'You have ' . qs_format_size($remaining) . ' left. '
-                : 'You have no room left. ')
-            . 'Delete backups, exports or unused projects to free space — then refresh the '
-            . 'storage figure on the dashboard, because a measurement can be up to '
-            . QS_SPACE_CACHE_TTL . ' seconds old after a deletion.',
-        'data' => [
-            'used_bytes'        => $usage['bytes'],
-            'used_human'        => qs_format_size($usage['bytes']),
-            'incoming_bytes'    => max(0, $incomingBytes),
-            'incoming_human'    => qs_format_size(max(0, $incomingBytes)),
-            'quota_bytes'       => $quota['max_total_bytes'],
-            'quota_human'       => qs_format_size($quota['max_total_bytes']),
-            'remaining_bytes'   => $remaining,
-            'remaining_human'   => qs_format_size($remaining),
-            'owned_projects'    => $usage['projects'],
-        ],
+    $data = [
+        'used_bytes'        => $used,
+        'used_human'        => qs_format_size($used),
+        'incoming_bytes'    => $incoming,
+        'incoming_human'    => qs_format_size($incoming),
+        'quota_bytes'       => $quota['max_total_bytes'],
+        'quota_human'       => qs_format_size($quota['max_total_bytes']),
+        'remaining_bytes'   => $remaining,
+        'remaining_human'   => qs_format_size($remaining),
+        'owned_projects'    => $usage['projects'],
     ];
+    if ($freed > 0) {
+        $data['freed_bytes'] = $freed;
+        $data['freed_human'] = qs_format_size($freed);
+        $data['net_bytes']   = $net;
+        $data['net_human']   = qs_format_size($net);
+    }
+
+    return [
+        'message' => qs_quota_refusal_message($kind, $used, $quota['max_total_bytes'], $incoming, $freed, $remaining),
+        'data'    => $data,
+    ];
+}
+
+/**
+ * The refusal an owner reads: their figures, what this write adds, and what to do
+ * for this kind of write.
+ */
+function qs_quota_refusal_message(string $kind, int $used, int $ceiling, int $incoming, int $freed, int $remaining): string
+{
+    if ($kind === 'create') {
+        return 'Your projects already use ' . qs_format_size($used) . ' of your ' . qs_format_size($ceiling)
+            . ' storage quota, so no new project can be created. Delete backups, exports or unused projects '
+            . 'to free space first.';
+    }
+    [$opening, $adds, $advice] = match ($kind) {
+        'backup'  => ['This backup', 'this backup adds',
+                      'Delete an older backup first (or exports or unused projects), then back up again.'],
+        'restore' => ['This restore', 'restoring this backup adds',
+                      'Free space first by deleting older backups, exports or unused projects, or restore it with '
+                      . '"Delete this backup once it is restored" (delete_backup), which frees the space the backup itself takes.'],
+        'clone'   => ['This clone', 'the copy adds',
+                      'Delete backups, exports or unused projects to free space first.'],
+        'build'   => ['This build', 'the build adds',
+                      'The build was removed. Delete backups, exports or unused projects to free space, then build again.'],
+        'export'  => ['Saving this export', 'the archive adds',
+                      'The archive was not kept. Download the export without saving it, or free space first.'],
+        default   => ['This', 'this upload adds',
+                      'Delete backups, exports or unused projects to free space — then refresh the '
+                      . 'storage figure on the dashboard, because a measurement can be up to '
+                      . QS_SPACE_CACHE_TTL . ' seconds old after a deletion.'],
+    };
+    $amount = $freed > 0
+        ? qs_format_size(max(0, $incoming - $freed)) . ' (it writes ' . qs_format_size($incoming)
+            . ' and removes ' . qs_format_size($freed) . ')'
+        : qs_format_size($incoming);
+
+    return $opening . ' would put your projects over your storage quota. They currently use '
+        . qs_format_size($used) . ' of ' . qs_format_size($ceiling)
+        . ', and ' . $adds . ' ' . $amount . '. '
+        . ($remaining > 0
+            ? 'You have ' . qs_format_size($remaining) . ' left. '
+            : 'You have no room left. ')
+        . $advice;
+}
+
+/**
+ * The refusal a caller who is not the project's owner reads: the outcome and the
+ * install-wide ceiling, never the owner's figures.
+ */
+function qs_quota_owner_scoped_message(string $kind, int $ceiling): string
+{
+    $tail = ' — the ceiling on this server is ' . qs_format_size($ceiling) . ' per account.';
+    return match ($kind) {
+        'backup'  => 'The owner of this project has no storage space left for this backup. '
+                     . 'Ask them to delete an older backup or free space' . $tail,
+        'restore' => 'The owner of this project has no storage space left for this restore. Ask them to free '
+                     . 'space, or restore it with "Delete this backup once it is restored" (delete_backup)' . $tail,
+        'build'   => 'The owner of this project has no storage space left for this build, so it was removed. '
+                     . 'Ask them to free space' . $tail,
+        'export'  => 'The owner of this project has no storage space left to keep this export, so it was not '
+                     . 'kept. Download the export without saving it, or ask them to free space' . $tail,
+        default   => 'The owner of this project has no storage space left, so nothing '
+                     . 'more can be added to it. Ask them to free space' . $tail,
+    };
 }
 
 // ============================================================================

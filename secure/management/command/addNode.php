@@ -335,72 +335,9 @@ function __command_addNode(array $params = [], array $urlParams = []): ApiRespon
     
     // Insert node
     if ($isRootTarget) {
-        // The page JSON root is naturally one of two shapes:
-        //   (a) LIST  — top-level array of sibling nodes: [ {tag:main, …}, {tag:footer, …} ]
-        //   (b) NODE  — single top-level node object: { tag:main, children:[…] }
-        // For (a), 'root' insertion means PREPEND a new sibling at the top
-        //          of the array. WRONG: writing to $structure['children']
-        //          here promotes the sequential array to an associative one
-        //          → JSON serialises as `{"0": main, "children": […]}` and
-        //          every subsequent NodeNavigator lookup is broken
-        //          (this was a latent bug filed in BACKLOG; finally hit
-        //          via a CLI smoke test on 2026-06-03 — fixing now).
-        // For (b), prepend into $structure['children'] as before.
-        //
-        // Same detection pattern as addComplexElement.php (its inline
-        // comment explains the same scar).
-        //
-        // ⚠ THE EMPTY CASE IS EXPLICIT, AND IT HAS TO BE. `range(0, -1)` is
-        // `[0, -1]` in PHP, not `[]`, so `array_keys([]) === range(0, count([]) - 1)`
-        // is FALSE and an emptied page took the NODE branch — it became
-        // `{"children":[…]}`, which renderJsonFile then handed to renderNode as
-        // a single node, and the page rendered as one "Unknown node type"
-        // comment. A page with no nodes is a LIST with no entries; the count
-        // arithmetic simply cannot say so.
-        $isListShapeRoot = is_array($structure)
-            && ($structure === []
-                || array_keys($structure) === range(0, count($structure) - 1));
-
-        if ($isListShapeRoot) {
-            // Move existing textKey children into the new node — same
-            // intent as the NODE-shape branch below, but the moved
-            // children live as top-level array items here. Rare path
-            // (textKey-children at root is unusual) but kept for parity.
-            if (!empty($movedTextKeys) && isset($newNode['children'])) {
-                rsort($movedTextKeys);
-                $movedChildren = [];
-                foreach ($movedTextKeys as $idx) {
-                    if (isset($structure[$idx])) {
-                        array_unshift($movedChildren, $structure[$idx]);
-                        array_splice($structure, $idx, 1);
-                    }
-                }
-                $newNode['children'] = array_merge($movedChildren, $newNode['children']);
-            }
-            array_unshift($structure, $newNode);
-        } else {
-            // NODE-shape root: original behavior.
-            if (!isset($structure['children'])) $structure['children'] = [];
-
-            // Move existing textKey children into the new node (same as normal inside insertion)
-            if (!empty($movedTextKeys) && isset($newNode['children'])) {
-                rsort($movedTextKeys);
-                $movedChildren = [];
-                foreach ($movedTextKeys as $idx) {
-                    if (isset($structure['children'][$idx])) {
-                        array_unshift($movedChildren, $structure['children'][$idx]);
-                        array_splice($structure['children'], $idx, 1);
-                    }
-                }
-                // Prepend moved children to new node's children
-                $newNode['children'] = array_merge($movedChildren, $newNode['children']);
-            }
-
-            // Prepend new node (insert at beginning, like normal 'inside')
-            array_unshift($structure['children'], $newNode);
-        }
-        $newNodeId = '0';
-        $insertResult = ['success' => true, 'structure' => $structure, 'newNodeId' => $newNodeId];
+        // A list root takes the node as its first entry, a node root as its first
+        // child (NodeNavigator::insertAtRoot, the rule every root insert shares).
+        $insertResult = NodeNavigator::insertAtRoot($structure, $newNode, $movedTextKeys);
     } else {
         $targetIndices = array_map('intval', explode('.', $targetNodeId));
         $insertResult = insertNodeIntoStructure_addNode($structure, $targetIndices, $newNode, $position, $movedTextKeys);

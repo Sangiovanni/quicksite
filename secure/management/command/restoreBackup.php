@@ -3,12 +3,15 @@
  * Restore Backup Command
  * 
  * Restores a project from a specific backup. A snapshot of the current state is
- * taken first only when asked (create_backup).
+ * taken first only when asked (create_backup), and the backup is deleted once it
+ * is restored whole only when asked (delete_backup).
  * 
  * @method POST
  * @route /management/restoreBackup
  * @auth required
  * @param string $backup Required - backup name (timestamp folder)
+ * @param bool $create_backup Optional - snapshot the current state first (default false)
+ * @param bool $delete_backup Optional - delete the backup once it is restored whole (default false)
  * @param string $name Optional - project name (defaults to active project)
  * @return ApiResponse Restore result info
  * 
@@ -19,7 +22,10 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
-require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php'; // qs_delete_entry, qs_copy_tree
+require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php'; // qs_delete_tree, getDirectorySize
+require_once SECURE_FOLDER_PATH . '/src/functions/projectBackup.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/spaceUsage.php'; // qs_invalidate_space_cache
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -86,20 +92,44 @@ function __command_restoreBackup(array $params = [], array $urlParams = []): Api
         return qs_unsafe_structure_param_response($unsafeStructureParam);
     }
 
-    // Check if user wants a pre-restore backup (default: false)
-    $createBackup = $params['create_backup'] ?? false;
-    if (is_string($createBackup)) {
-        $createBackup = filter_var($createBackup, FILTER_VALIDATE_BOOLEAN);
+    // Two optional booleans: a snapshot of the current state first, and deleting
+    // the backup once it is restored whole.
+    $flag = static function ($value): bool {
+        return is_string($value) ? filter_var($value, FILTER_VALIDATE_BOOLEAN) : (bool) $value;
+    };
+    $createBackup = $flag($params['create_backup'] ?? false);
+    $deleteBackup = $flag($params['delete_backup'] ?? false);
+
+    // What the backup brings back: only the items it holds replace the project's.
+    $items = qs_backup_items_in($backupPath);
+
+    // The storage quota, before anything is touched: what comes back and the
+    // snapshot, less what they replace and, when asked, the backup itself. A
+    // restore that does not fit is refused, and the refusal names both ways out.
+    if (qs_quota_storage_limited()) {
+        $callerId = (string)(getCurrentUser()['id'] ?? '');
+        $incoming = qs_backup_measure($backupPath, $items) + ($createBackup ? qs_backup_measure($projectPath) : 0);
+        $freed = qs_backup_measure($projectPath, $items) + ($deleteBackup ? getDirectorySize($backupPath) : 0);
+        $breach = qs_quota_check_storage(qs_quota_storage_owner($projectName, $callerId), $incoming, $callerId,
+            ['project' => $projectName, 'kind' => 'restore', 'freed' => $freed]);
+        if ($breach !== null) {
+            return ApiResponse::create(507, 'quota.storage_exceeded')
+                ->withMessage($breach['message'])
+                ->withData($breach['data']);
+        }
     }
 
-    // What a backup holds, and so what a restore brings back.
-    $itemsToCopy = ['config.php', 'routes.php', 'templates', 'translate', 'data', 'public'];
+    // A restore never changes its backup, so a failed one can be run again once its
+    // cause is fixed. Every failure answer says so.
+    $retry = 'The backup itself is untouched; fix the cause (most often a file held open by another process, '
+        . 'or a permission the web server does not have) and restore it again.';
 
     $preRestoreName = null;
     $preRestoreItems = [];
 
     if ($createBackup) {
-        // Create pre-restore backup for safety
+        // The snapshot is the user's way back: a restore that cannot make it whole
+        // does not go on, and leaves nothing of it behind.
         $preRestoreName = 'pre-restore_' . date('Y-m-d_H-i-s');
         $preRestorePath = $backupsDir . '/' . $preRestoreName;
 
@@ -108,64 +138,50 @@ function __command_restoreBackup(array $params = [], array $urlParams = []): Api
                 ->withMessage('Failed to create pre-restore backup');
         }
 
-        // Copy current state to pre-restore backup. The project's own public/ is the
-        // one it serves from, so the current state includes it.
-        foreach ($itemsToCopy as $item) {
-            $srcPath = $projectPath . '/' . $item;
-            $dstPath = $preRestorePath . '/' . $item;
-
-            if (is_link($srcPath) || !file_exists($srcPath)) {
-                continue; // missing, or a link, which a copy never follows (qs_copy_tree)
-            }
-
-            $copied = is_dir($srcPath) ? qs_copy_tree($srcPath, $dstPath)['ok'] : copy($srcPath, $dstPath);
-            if ($copied) {
-                $preRestoreItems[] = $item;
-            }
+        $snapshot = qs_backup_copy($projectPath, $preRestorePath);
+        if ($snapshot['failed'] !== []) {
+            qs_delete_tree($preRestorePath);
+            qs_invalidate_space_cache($projectName);
+            return ApiResponse::create(500, 'backup.prerestore_failed')
+                ->withMessage('The copy of the current state could not be made completely: '
+                    . implode(', ', $snapshot['failed']) . ' could not be copied, so nothing was restored. '
+                    . 'The project is untouched. ' . $retry)
+                ->withData([
+                    'failed_items' => $snapshot['failed'],
+                    'errors' => $snapshot['errors'],
+                    'project_intact' => true,
+                    'backup_intact' => true
+                ]);
         }
+        $preRestoreItems = $snapshot['copied'];
     }
 
     // Now restore from the selected backup. It keeps going past a failure, so that as
     // much as possible comes back, and names every item it could not restore whole.
-    // The backup is only read: whatever happens here, it can be restored again.
     $restoredItems = [];
     $failedItems = [];
     $errors = [];
     $filesCopied = 0;
 
-    foreach ($itemsToCopy as $item) {
-        $srcPath = $backupPath . '/' . $item;
-        $dstPath = $projectPath . '/' . $item;
-
-        if (is_link($srcPath) || !file_exists($srcPath)) {
-            continue; // missing, or a link, which a copy never follows (qs_copy_tree)
-        }
-
+    foreach ($items as $item) {
         // The current item goes first, as the one delete removes an entry: a link is
-        // removed and never followed, a read-only file is removed.
+        // removed and never followed, a read-only file is removed. config/ keeps what
+        // a backup never holds.
         $whole = true;
-        $removal = qs_delete_entry($projectPath, $item);
+        $removal = qs_backup_remove_item($projectPath, $item);
         if (!$removal['ok']) {
             $whole = false;
             $errors[] = "Could not remove all of the current $item before restoring it: "
                 . implode(', ', $removal['survived']);
         }
 
-        if (is_dir($srcPath)) {
-            $copy = qs_copy_tree($srcPath, $dstPath);
-            $filesCopied += $copy['files'];
-            if (!$copy['ok']) {
-                $whole = false;
-                $errors[] = "Could not restore all of $item: " . implode(', ', array_map(
-                    static fn(string $rel): string => $rel === '.' ? $item : $item . '/' . $rel,
-                    $copy['failed']
-                ));
-            }
-        } elseif (@copy($srcPath, $dstPath)) {
-            $filesCopied++;
-        } else {
+        $copy = qs_backup_copy_item($backupPath, $projectPath, $item);
+        $filesCopied += $copy['files'];
+        if (!$copy['ok']) {
             $whole = false;
-            $errors[] = "Could not restore $item";
+            $errors[] = $copy['failed'] === [$item]
+                ? "Could not restore $item"
+                : "Could not restore all of $item: " . implode(', ', $copy['failed']);
         }
 
         if ($whole) {
@@ -174,11 +190,7 @@ function __command_restoreBackup(array $params = [], array $urlParams = []): Api
             $failedItems[] = $item;
         }
     }
-
-    // A restore reads its backup and never changes it, so a failed one can be run
-    // again once its cause is fixed. Both failure answers say so.
-    $retry = 'The backup itself is untouched; fix the cause (most often a file held open by another process, '
-        . 'or a permission the web server does not have) and restore it again.';
+    qs_invalidate_space_cache($projectName);
 
     if ($restoredItems === [] && $filesCopied === 0) {
         return ApiResponse::create(500, 'restore.no_files_restored')
@@ -187,6 +199,7 @@ function __command_restoreBackup(array $params = [], array $urlParams = []): Api
                 'errors' => $errors,
                 'failed_items' => $failedItems,
                 'backup_intact' => true,
+                'backup_deleted' => false,
                 'pre_restore_backup' => $preRestoreName
             ]);
     }
@@ -203,18 +216,31 @@ function __command_restoreBackup(array $params = [], array $urlParams = []): Api
                 'failed_items' => $failedItems,
                 'pre_restore_items' => $preRestoreItems,
                 'backup_intact' => true,
+                'backup_deleted' => false,
                 'errors' => $errors
             ]);
     }
 
+    // Restored whole: the backup goes only now, when asked.
+    $backupDeleted = false;
+    $deleteNote = '';
+    if ($deleteBackup) {
+        $backupDeleted = qs_delete_tree($backupPath)['ok'];
+        qs_invalidate_space_cache($projectName);
+        $deleteNote = $backupDeleted
+            ? '. The backup was deleted'
+            : '. The backup could not be fully deleted; delete it from the backup list';
+    }
+
     return ApiResponse::create(200, 'restore.success')
-        ->withMessage("Backup restored successfully: $backupName")
+        ->withMessage("Backup restored successfully: $backupName" . $deleteNote)
         ->withData([
             'project' => $projectName,
             'restored_backup' => $backupName,
             'pre_restore_backup' => $preRestoreName,
             'restored_items' => $restoredItems,
             'pre_restore_items' => $preRestoreItems,
+            'backup_deleted' => $backupDeleted,
             'errors' => $errors
         ]);
 }

@@ -375,8 +375,20 @@ class JsonToHtmlRenderer {
         // every render of an empty page. Editor chrome inside the preview iframe
         // is the panel's concern — its styling is injected by
         // preview-iframe-inject.js as `.qs-empty-structure`.
+        //
+        // It names the structure: a page, the menu and the footer show in one
+        // view, so an author emptying one must see which one the area stands for.
+        $name = $this->currentStructure;
+        $what = match (true) {
+            $name === 'menu' => 'The menu',
+            $name === 'footer' => 'The footer',
+            $name === 'consent-banner' => 'The cookie banner',
+            $name === 'consent-popup' => 'The cookie popup',
+            strpos($name, 'component-') === 0 => 'This component',
+            default => 'This page',
+        };
         return '<div class="qs-empty-structure" data-qs-struct="' . $struct . '" data-qs-node="">'
-            . 'This page is empty. Select this area, then add your first element.'
+            . $what . ' is empty. Select this area, then add its first element.'
             . '</div>';
     }
 

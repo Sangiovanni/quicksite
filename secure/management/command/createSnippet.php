@@ -14,8 +14,8 @@
  * @param object $translations Optional - Translation keys by language
  * @param string $project Optional - Project name (defaults to active project)
  * @param string $scope Optional - 'project' (default) or 'personal' (the caller's
- *               own library, reusable across THEIR projects). 'global' is a
- *               legacy alias of 'personal'.
+ *               own library, reusable across THEIR projects). Any other value is
+ *               refused.
  *
  * Creates a new snippet in the project's snippets folder, or in the caller's own
  * personal library when scope=personal.
@@ -68,6 +68,18 @@ function __command_createSnippet(array $params = [], array $urlParams = []): Api
     if (!$structure) {
         return ApiResponse::create(400, 'snippets.structure_required')
             ->withMessage('Snippet structure is required');
+    }
+    
+    // Where the snippet is saved: the marker project's folder, or the caller's own
+    // personal library. Any other value is refused rather than read as 'project': a
+    // caller who meant its own library would otherwise publish the snippet to every
+    // member of the project.
+    $scopes = ['project', 'personal'];
+    $scope = $params['scope'] ?? 'project';
+    if (!in_array($scope, $scopes, true)) {
+        return ApiResponse::create(400, 'validation.invalid_value')
+            ->withMessage('Invalid scope. Must be one of: ' . implode(', ', $scopes))
+            ->withErrors([['field' => 'scope', 'value' => $scope, 'allowed' => $scopes]]);
     }
     
     // Validate ID format (alphanumeric, dashes, underscores)
@@ -153,23 +165,6 @@ function __command_createSnippet(array $params = [], array $urlParams = []): Api
         $snippetData['css'] = $cssResult['css'];
     }
     
-    // Determine save scope (project or personal).
-    //
-    // 'global' is accepted as a legacy ALIAS of 'personal'. The scope used to
-    // write to one flat installation-wide directory that every project marker
-    // could read, insert from and DELETE — proven cross-project in beta.10 C13
-    // 13.6b. It is per-user now, which is what the UI's "available to all
-    // projects" always meant: all of the author's own. The alias stays so a
-    // cached editor bundle (or any caller written against the old name) keeps
-    // working; it lands in the same per-user directory.
-    $scope = $params['scope'] ?? 'project';
-    if ($scope === 'global') {
-        $scope = 'personal';
-    }
-    if (!in_array($scope, ['project', 'personal'], true)) {
-        $scope = 'project';
-    }
-
     // Save snippet
     $result = saveProjectSnippet($snippetData, $projectName, $scope);
     

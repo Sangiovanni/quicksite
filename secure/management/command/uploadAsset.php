@@ -246,11 +246,8 @@ $quotaUserId = (string)(getCurrentUser()['id'] ?? '');
 //                   let the write through — so any member could push an owner
 //                   past their quota without spending any of their own.
 // Falls back to the caller when no owner is recorded, which keeps a malformed
-// members.json enforcing something rather than nothing.
-$quotaOwnerId = (string)(loadProjectMembers(defined('PROJECT_NAME') ? PROJECT_NAME : '')['owner'] ?? '');
-if ($quotaOwnerId === '') {
-    $quotaOwnerId = $quotaUserId;
-}
+// members.json enforcing something rather than nothing (qs_quota_storage_owner).
+$quotaOwnerId = qs_quota_storage_owner(defined('PROJECT_NAME') ? PROJECT_NAME : '', $quotaUserId);
 
 $rateWait = qs_quota_rate_wait($quotaUserId);
 if ($rateWait > 0) {
@@ -477,8 +474,10 @@ if ($file['size'] > $sizeLimits[$category]) {
 // crosses rather than a threshold it overshoots by one file. Costs nothing —
 // not even a disk walk — on an install with no quota file.
 // Storage is charged to the OWNER; the caller is passed so the refusal can be
-// generic when they are not that owner (see qs_quota_check_storage).
-$quotaBreach = qs_quota_check_storage($quotaOwnerId, (int)$file['size'], $quotaUserId);
+// generic when they are not that owner (see qs_quota_check_storage). The project
+// the file lands in is measured afresh.
+$quotaBreach = qs_quota_check_storage($quotaOwnerId, (int)$file['size'], $quotaUserId,
+    ['project' => defined('PROJECT_NAME') ? PROJECT_NAME : null]);
 if ($quotaBreach !== null) {
     if ($cleanupTmpFile) @unlink($cleanupTmpFile);
     ApiResponse::create(507, 'quota.storage_exceeded')

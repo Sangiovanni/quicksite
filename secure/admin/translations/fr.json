@@ -443,7 +443,6 @@
             "total_size": "total",
             "files": "fichiers",
             "pre_restore": "Pré-restauration",
-            "auto_backup": "Auto",
             "backup_deleted": "Sauvegarde supprimée",
             "confirm_delete_backup": "Supprimer la sauvegarde",
             "clone": "Dupliquer",

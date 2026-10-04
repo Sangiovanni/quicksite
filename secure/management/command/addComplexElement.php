@@ -300,35 +300,9 @@ function __command_addComplexElement(array $params = [], array $urlParams = []):
 
     // ----- Splice the subtree -----
     if ($isRootTarget) {
-        // The root shape differs by structType:
-        //   - PAGE:      $structure is a list/array of nodes ([{tag:main,...}]).
-        //                Prepend the new subtree directly into the array.
-        //   - COMPONENT: $structure is a single object with `tag` + `children`.
-        //                Prepend into its children list.
-        // Detect by checking if the top-level array's keys are a clean
-        // 0..N-1 sequence (PHP list shape). Earlier code unconditionally
-        // wrote to $structure['children'] which corrupted page roots into
-        // an object-shape `{"0": main, "children": [...]}` after the
-        // first 'root' insert — every subsequent operation then failed
-        // because NodeNavigator can no longer address nodes.
-        //
-        // ⚠ The empty case is explicit: `range(0, -1)` is `[0, -1]` in PHP, so
-        // the key comparison alone reads an EMPTY page as node-shaped and
-        // corrupts it into `{"children":[…]}`. A page with no nodes is a list
-        // with no entries. Same guard as addNode.php — keep them in step.
-        $isListShapeRoot = is_array($structure)
-            && ($structure === []
-                || array_keys($structure) === range(0, count($structure) - 1));
-        if ($isListShapeRoot) {
-            array_unshift($structure, $newNode);
-        } else {
-            if (!isset($structure['children']) || !is_array($structure['children'])) {
-                $structure['children'] = [];
-            }
-            array_unshift($structure['children'], $newNode);
-        }
-        $newNodeId = '0';
-        $insertResult = ['success' => true, 'structure' => $structure, 'newNodeId' => $newNodeId];
+        // A list root takes the subtree as its first entry, a node root as its
+        // first child (NodeNavigator::insertAtRoot, the rule every root insert shares).
+        $insertResult = NodeNavigator::insertAtRoot($structure, $newNode);
     } else {
         $targetIndices = array_map('intval', explode('.', $targetNodeId));
         // Reuse addNode's insertion helper — same atomicity guarantees,

@@ -92,7 +92,7 @@ function ensureProjectSnippetsDir(string $projectName): bool {
  * List all snippets from a directory (single level or with categories)
  * 
  * @param string $basePath Base path to search
- * @param string $source Source identifier: "core", "global", or "project"
+ * @param string $source Source identifier: "core", "personal", or "project"
  * @return array List of snippets with metadata
  */
 function listSnippetsFromPath(string $basePath, string $source = 'core'): array {
@@ -160,7 +160,7 @@ function listSnippetsFromPath(string $basePath, string $source = 'core'): array 
  * Load a single snippet file and return metadata
  * 
  * @param string $filePath Path to snippet JSON file
- * @param string $source Source identifier: "core", "global", or "project"
+ * @param string $source Source identifier: "core", "personal", or "project"
  * @return array|null Snippet metadata or null if invalid
  */
 function loadSnippetFile(string $filePath, string $source = 'core'): ?array {
@@ -228,7 +228,7 @@ function getSnippetById(string $snippetId, ?string $projectName = null): ?array 
  * 
  * @param string $snippetId Snippet ID to find
  * @param string $basePath Base path to search
- * @param string $source Source identifier: "core", "global", or "project"
+ * @param string $source Source identifier: "core", "personal", or "project"
  * @return array|null Full snippet data or null if not found
  */
 function findSnippetInPath(string $snippetId, string $basePath, string $source = 'core'): ?array {
@@ -283,7 +283,7 @@ function findSnippetInPath(string $snippetId, string $basePath, string $source =
  * 
  * @param string $filePath Path to snippet file
  * @param string $snippetId ID to match
- * @param string $source Source identifier: "core", "global", or "project"
+ * @param string $source Source identifier: "core", "personal", or "project"
  * @return array|null Full snippet data or null if ID doesn't match
  */
 function loadFullSnippet(string $filePath, string $snippetId, string $source = 'core'): ?array {
@@ -425,7 +425,7 @@ function saveProjectSnippet(array $snippetData, string $projectName, string $sco
 }
 
 /**
- * Delete snippet by ID from project or global scope
+ * Delete snippet by ID from the project or the caller's personal library
  * 
  * @param string $snippetId Snippet ID
  * @param string $projectName Project name
@@ -446,7 +446,7 @@ function deleteProjectSnippet(string $snippetId, string $projectName): array {
     }
 
     if ($snippet === null) {
-        return ['success' => false, 'error' => 'Snippet not found in project or global snippets', 'source' => null];
+        return ['success' => false, 'error' => 'Snippet not found in the project or in your personal snippets', 'source' => null];
     }
     
     $filePath = $snippet['_filePath'] ?? null;

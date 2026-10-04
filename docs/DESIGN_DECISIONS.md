@@ -12934,3 +12934,115 @@ one measure that never follow a link, the restore's answer and the removal of `i
 `secure/management/command/restoreBackup.php`; `public/admin/assets/js/pages/dashboard.js`.
 Behaviour: the `setStyleRule`, `restoreBackup`, `backupProject`, `cloneProject`, `listSnippets`
 and `getSnippet` entries of `help`.
+
+### One rule inserts at a structure's root, a backup is whole or not kept, and every write that adds a copy is checked against the storage quota (locked 2026-10-04)
+
+**Amends**: *A snippet saved outside a project belongs to its author, not to the installation*
+(locked 2026-08-07). Its decision stands. Its statement that the older scope name survives as an
+alias no longer holds: `createSnippet` refuses `global`, as it refuses any scope but `project`
+and `personal`.
+**Extends**: *An emptied page renders a selectable root, not nothing* (locked 2026-08-17), whose
+root-insert rule (an empty page is a list with no entries) now holds for every command that
+inserts at the root, from one helper; *A storage quota is charged to the project's owner, not
+the uploader* (locked 2026-08-20), whose rule now holds for every write the quota checks; and *A
+delete that fails reports what survived, and keeps what a retry needs* (locked 2026-08-24), whose
+link rule now holds for the folder the delete is given.
+
+**Decision**: five changes, made together.
+
+- **One rule inserts at a structure's root.** `NodeNavigator::insertAtRoot()` is the root insert
+  of `insertSnippet`, `addComponentToNode`, `addNode` and `addComplexElement`. A structure whose
+  root is a list of nodes (every page, menu and footer) takes the new node as its first entry;
+  one whose root is a single node (a component) takes it as its first child; either way its id is
+  `0`. A root that cannot hold children (a component call, a text node) is refused. The visual
+  editor sends `root` for a complex element as it does for the other kinds of add. A refused
+  insert writes no translation, and `insertSnippet` checks its `targetNodeId` as the others do.
+  When a structure's last element is deleted, the editor reloads so its placeholder appears at
+  once, and the placeholder names its structure (the page, the menu, the footer).
+- **A backup is whole or not kept, and holds what an export carries:** `config.php`,
+  `routes.php`, `config/` (never `members.json` or its lock), `templates/`, `translate/`,
+  `data/`, `snippets/` and `public/`, from one list the backup, the restore and the backup list
+  share. A restore replaces each item the backup holds and never touches who may use the
+  project. A backup that cannot copy something answers `500 backup.incomplete`, keeps nothing
+  and deletes no older backup; an older backup that cannot be fully deleted does not fail the one
+  just made, and is named. A pre-restore copy that cannot be made whole stops the restore before
+  it touches the project. The dashboard shows an incomplete backup in red until it is closed.
+- **Every write that adds a copy's worth of bytes is checked against the storage quota:** an
+  upload, an import, a backup, a restore, a clone, a build and a saved export. Each is charged to
+  the account that will own the bytes: a project's owner, and for a clone, as for an import, the
+  caller, who owns the new project. A backup, a restore and a saved export are charged their net
+  growth: what they add, less the older backups `max_backups` deletes, what the restore replaces,
+  the oldest archive past the last five. A restore that does not fit is refused, and names the
+  way that always fits: the new **"Delete this backup once it is restored"** (`delete_backup`),
+  which frees the backup's own space once the restore is complete. A build is checked once its
+  size is known and removed when it does not fit; a streamed export is not charged. An account
+  already over the ceiling cannot create a project: what a new project writes is a few kilobytes,
+  so it is the account's standing that decides. Each refusal names the write and what to do; an
+  upload's words are unchanged; and the dashboard's "My total space" warns, while the account is
+  over, what is refused and how to free space.
+- **The quota reads the disk for the project written to.** The check measures that project
+  afresh. Every checked write, and deleting a backup, drops its project's cached measurement after
+  it writes, so the owner's other projects read exactly too and the space overview moves at once.
+- **A link given to the delete as its root is removed as a link**, its target left whole, as one
+  inside the tree always was. And the legacy pieces go: the `global` snippet scope,
+  `listBackups`' `auto` type with its dashboard badge, and `WorkflowManager::getSpecsByCategory()`.
+
+**Reasoning**:
+
+**The root insert.** A page's structure is a list. Two of the four commands that insert at the
+root wrote a `children` key into it instead, turning the page into an object the renderer cannot
+read: the page showed an "unknown node type" comment, the insert was lost, and the command
+answered success. The visual editor reached it on an emptied page, whose placeholder is the root,
+and the command console on any page. The other two commands each carried their own copy of the
+right rule; four copies of one rule is how two of them came to differ, so there is one.
+
+**A backup.** A backup that failed to copy an item answered success, was listed like any other,
+and still deleted the oldest good backup to make room: repeated, it could replace every good
+backup with a broken one, and restoring one replaced whole items of the project with partial
+ones. Keeping a partial copy, even labelled, leaves that restore one click away. A backup also
+left out the project's config folder and its snippets, which an export carries, so a restore did
+not bring back route layouts, the sitemap's settings, custom JS functions or the project's own
+snippets.
+
+**The quota.** Only uploads and imports were checked, and the figure they read could be up to
+five minutes old after any other write. A backup, a restore of a heavy backup into a light
+project, a clone of a large project made again and again: each could pass any ceiling. A backup
+that keeps `max_backups` grows the disk by almost nothing, so charging its whole size would
+refuse the routine backup of an owner near the ceiling; charging the net leaves the total over
+the ceiling only while the copy is written, before what it replaces is removed. A restore is the
+write a person most needs when something went wrong, so one that does not fit names a way that
+always fits, the backup's own space, besides freeing space elsewhere. Measuring the written
+project afresh costs one walk of it, about 6 µs a file on Linux, which a backup, a restore or a
+clone pays anyway; the owner's other projects stay cached, so the cache keeps serving the
+overview.
+
+**The delete.** It judged every entry inside the tree but not the folder it was given: given a
+link, it emptied the folder the link pointed to.
+
+**Alternatives considered**:
+- **Fixing the two broken commands only** (rejected — two copies of the rule were right and two
+  wrong; one rule cannot drift).
+- **Keeping an incomplete backup, flagged** (rejected — restoring it replaces whole items with
+  partial ones).
+- **Charging a backup its whole size** (rejected — at `max_backups` it refuses a backup that grows
+  nothing).
+- **Deleting the oldest backup before copying, so the ceiling is never crossed** (rejected — a
+  copy that then fails has cost a good backup).
+- **Never refusing a restore** (rejected — restoring a heavy backup into a light project grows the
+  disk by the backup's size, and across projects passes any ceiling).
+- **Re-measuring every project the owner has at each check** (rejected — the cost lands on every
+  upload, and the written project is the one whose size a write changes).
+- **Keeping `global` as an alias, or reading an unknown scope as `project`** (rejected — there is
+  no legacy data, and a snippet meant for its author's own library would be shown to every member
+  of the project).
+
+**Source**: Sangio's rulings during beta.12: 2026-10-03 (one root insert, a backup that does not
+fully succeed says so, a link given to the delete, a backup checked against the quota, the legacy
+pieces) and 2026-10-04 (the restore's quota and its delete box, a backup holds what an export
+carries, the project written to measured afresh, clone, build and saved export checked), after a
+flag that the visual editor corrupted a page. Code: `secure/src/classes/NodeNavigator.php`,
+`secure/src/functions/projectBackup.php`, `quota.php`, `spaceUsage.php`, `FileSystem.php`; the
+commands `insertSnippet`, `addComponentToNode`, `addNode`, `addComplexElement`, `backupProject`,
+`restoreBackup`, `listBackups`, `deleteBackup`, `cloneProject`, `build`, `exportProject`,
+`uploadAsset`, `createProject`, `createSnippet`; the editor's `preview.js` and
+`preview-iframe-inject.js`. Behaviour: their entries of `help`.

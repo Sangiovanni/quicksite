@@ -343,6 +343,7 @@ $GLOBALS['__help_commands'] = [
 '409.conflict.already_exists' => 'This project already has a build - delete it first with deleteBuild',
             '409.conflict.operation_in_progress' => 'Another build is already running',
             '413.validation.size_limit_exceeded' => 'Build exceeds MAX_BUILD_SIZE_MB',
+            '507.quota.storage_exceeded' => 'A storage quota is configured and the finished build would put the project owner over it. The build is checked once its size is known and removed like any failed build (data.partial_build_removed).',
             '500.server.file_write_failed' => 'Failed to create build directory or copy files',
             '500.server.internal_error' => 'Build compilation failed, OR the finished build cannot serve requests and was discarded (data.problems names what is missing)',
             '404.file.not_found' => 'The project is mono-language and its default.json translation file is missing, so the build cannot resolve any text. The build is aborted and rolled back.',
@@ -3068,7 +3069,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.file_write_failed' => 'Failed to write structure file.',
             '500.server.internal_error' => 'The structure file on disk is not valid JSON; the decoder message is returned.'
         ],
-        'notes' => 'TAG mode adds a tag element that comes in EMPTY by default; the legacy auto-generated placeholder textKey was removed (it was the cause of span-in-span nesting when authoring bound elements). Pass an explicit `textKey` to attach a translation-key text child at add-time, or leave empty and use the dedicated TEXT mode + the Text-mode inline editor (Text tool) afterwards. TEXT mode adds a bare `{textKey:...}` text node — set `textRaw=true` + `textValue` for a literal, or pass an explicit `textKey` (the visual editor\'s text-key picker handles key creation + translation write via setTranslationKeys before calling addNode). Position "inside" moves existing text children of the target into the new tag node; this move logic is skipped for TEXT inserts. For components, use addComponentToNode. **Component node paths**: For type=component, root is "" (empty) and children are "0", "1", etc. (differs from pages where root elements start at "0").'
+        'notes' => 'TAG mode adds a tag element that comes in EMPTY by default; the legacy auto-generated placeholder textKey was removed (it was the cause of span-in-span nesting when authoring bound elements). Pass an explicit `textKey` to attach a translation-key text child at add-time, or leave empty and use the dedicated TEXT mode + the Text-mode inline editor (Text tool) afterwards. TEXT mode adds a bare `{textKey:...}` text node — set `textRaw=true` + `textValue` for a literal, or pass an explicit `textKey` (the visual editor\'s text-key picker handles key creation + translation write via setTranslationKeys before calling addNode). Position "inside" moves existing text children of the target into the new tag node; this move logic is skipped for TEXT inserts. For components, use addComponentToNode. **Component node paths**: For type=component, root is "" (empty) and children are "0", "1", etc. (differs from pages where root elements start at "0"). targetNodeId "root" inserts at the structure\'s root, by the one rule every command that inserts there shares: a structure whose root is a list of nodes (every page, menu and footer) takes the new node as its first entry; one whose root is a single node (a component) takes it as its first child; either way its id is "0". A root that cannot hold children (a component call, a text node) is refused.'
     ],
 
     'addComplexElement' => [
@@ -3145,7 +3146,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.file_write_failed' => 'Failed to write structure file.',
             '500.server.internal_error' => 'Builder failed unexpectedly. See server log. Invalid JSON.'
         ],
-        'notes' => 'After save, the emitted subtree is INDISTINGUISHABLE from a hand-built one — same JSON shape, same renderer, editable with the regular visual-editor tools. Wizard is build-time only; nothing at render time knows the element came from here. Builders live in <secure>/src/classes/complexElements/*.php as ComplexElementBuilder subclasses and are auto-discovered by the dispatcher. Drop a new builder file + a matching <public>/admin/.../contextual-complex/complex-<kind>.js wizard to add a kind — zero registration. Reuses addNode\'s insertion helper for non-root targets (same atomicity). For targetNodeId="root", detects page (list-shape root) vs component (object-shape root) and splices accordingly.'
+        'notes' => 'After save, the emitted subtree is INDISTINGUISHABLE from a hand-built one — same JSON shape, same renderer, editable with the regular visual-editor tools. Wizard is build-time only; nothing at render time knows the element came from here. Builders live in <secure>/src/classes/complexElements/*.php as ComplexElementBuilder subclasses and are auto-discovered by the dispatcher. Drop a new builder file + a matching <public>/admin/.../contextual-complex/complex-<kind>.js wizard to add a kind — zero registration. Reuses addNode\'s insertion helper for non-root targets (same atomicity). targetNodeId "root" inserts at the structure\'s root, by the one rule every command that inserts there shares: a structure whose root is a list of nodes (every page, menu and footer) takes the new node as its first entry; one whose root is a single node (a component) takes it as its first child; either way its id is "0". A root that cannot hold children (a component call, a text node) is refused with 400 operation.failed.'
     ],
 
     'duplicateNode' => [
@@ -3317,13 +3318,13 @@ $GLOBALS['__help_commands'] = [
             'targetNodeId' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Reference node ID for positioning',
+                'description' => 'Reference node ID for positioning, or the literal "root" for the structure\'s root',
                 'example' => '0.2'
             ],
             'position' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Where to insert: before, after, or inside',
+                'description' => 'Where to insert: before, after, or inside (forced to inside when targetNodeId is "root")',
                 'example' => 'after'
             ],
             'component' => [
@@ -3375,7 +3376,7 @@ $GLOBALS['__help_commands'] = [
             '500.error.fileWrite' => 'Failed to save structure file.',
             '500.error.invalidJson' => 'Component has invalid JSON. Structure file has invalid JSON.'
         ],
-        'notes' => 'Auto-generates textKeys as {struct}.{component}{N}.{var}. Creates empty translations. Returns rendered HTML for live DOM insertion. System placeholders (__ prefix) are filtered out.'
+        'notes' => 'Auto-generates textKeys as {struct}.{component}{N}.{var}. Creates empty translations, only once the insert passes every check, so a refused insert writes nothing. Returns rendered HTML for live DOM insertion. System placeholders (__ prefix) are filtered out. targetNodeId "root" inserts at the structure\'s root, by the one rule every command that inserts there shares: a structure whose root is a list of nodes (every page, menu and footer) takes the new node as its first entry; one whose root is a single node (a component) takes it as its first child; either way its id is "0". A root that cannot hold children (a component call, a text node) is refused with 400 operation.failed.'
     ],
     
     'editComponentToNode' => [
@@ -3644,7 +3645,8 @@ $GLOBALS['__help_commands'] = [
             '400.validation.unsupported_language' => 'The code is not in the installation\'s language list (getLanguageList returns it)',
             '409.resource.already_exists' => 'Project already exists',
             '500.server.directory_create_failed' => 'Failed to create project structure.',
-            '500.server.file_write_failed' => 'Failed to create config.php. Failed to create routes.php. Failed to initialise project membership.'
+            '500.server.file_write_failed' => 'Failed to create config.php. Failed to create routes.php. Failed to initialise project membership.',
+            '507.quota.storage_exceeded' => 'A storage quota is configured and the caller\'s projects are already over it, so no new project can be created. Nothing was written.'
         ],
         'notes' => 'Creates complete project structure: config.php, routes.php, templates/, translate/, etc. with basic home page template and an empty stylesheet. A create that fails part-way removes what it wrote: no project folder is left behind.'
     ],
@@ -3701,7 +3703,8 @@ $GLOBALS['__help_commands'] = [
             '404.resource.not_found' => 'The source project folder does not exist.',
             '409.resource.already_exists' => 'A project with that name already exists. data.existing_path reports where.',
             '500.server.operation_failed' => 'The recursive copy failed; anything already copied is removed first.',
-            '500.server.file_write_failed' => 'The clone\'s membership file could not be created. The whole clone is deleted rather than left ownerless.'
+            '500.server.file_write_failed' => 'The clone\'s membership file could not be created. The whole clone is deleted rather than left ownerless.',
+            '507.quota.storage_exceeded' => 'A storage quota is configured and the clone would put the caller over it. A clone is a new project owned by the caller, so it is charged to the caller - as an import is - for everything it copies (the source without its backups). Checked before the clone exists; nothing was written.'
         ],
         'notes' => 'The clone does NOT inherit the source\'s roster: its membership file is written fresh with the caller as sole owner, no members, no pending invitations, visibility private and joining closed. A clone is an independent project — re-invite collaborators explicitly. The backups folder is skipped, so a clone starts with no backup history; everything else, including config, templates, translations, data and public assets, is copied. A link inside the project is not followed: what it points to is not copied. The clone\'s site name is derived from the new project name, and any site.name entry in its translation files is rewritten to match. data.files_copied counts the files present in the clone after the copy.'
     ],
@@ -4288,7 +4291,8 @@ $GLOBALS['__help_commands'] = [
             '500.server.missing_extension' => 'PHP ZIP extension not available',
             '500.server.zip_create_failed' => 'Could not create the archive',
             '500.server.zip_error' => 'The archive failed to finalise',
-            '500.server.move_failed' => 'save=true, but the archive could not be written into the exports folder'
+            '500.server.move_failed' => 'save=true, but the archive could not be written into the exports folder',
+            '507.quota.storage_exceeded' => 'save=true and a storage quota is configured: keeping the archive would put the project owner over it, counting the archive less the oldest one the five-export limit drops for it. The archive was not kept. A streamed export (save=false) is never charged: it lives in the system\'s temporary folder for the download only.'
         ],
         'notes' => 'Project-scoped: the exported project is the one in the URL marker; a name/project in the request is optional and must match. Export format v2.0-secure - PHP files are NOT included, they are rebuilt from JSON on import. The archive carries the project\'s settings (site name, languages, multilingual mode, theme mode, favicon and build size limit) and the routes as config.json and routes.json, config/*.json except members.json, its page, component, menu and footer structures, its own snippets, its translations and data, and - unless include_public=false - public/assets and public/style. It never carries builds, backups or earlier exports. Its config.json always names the project\'s languages: its list, or, when its configuration lists none, its default language (en when it has none either), because an import refuses an archive that names no language. Saved exports live in that project\'s own folder (<secure>/projects/<id>/exports/), are auto-cleaned (keeps the last 5), and are reachable only through their own project\'s marker via downloadExport.'
     ],
@@ -4437,12 +4441,14 @@ $GLOBALS['__help_commands'] = [
                     'size' => 1234567,
                     'size_formatted' => '1.18 MB',
                     'files' => 42,
-                    'items' => ['config.php', 'routes.php', 'templates', 'translate', 'data', 'public'],
+                    'items' => ['config.php', 'routes.php', 'config', 'templates', 'translate', 'data', 'snippets', 'public'],
                     'created' => '2026-01-03_14-30-00'
                 ],
                 'total_backups' => 3,
                 'max_backups' => 5,
-                'deleted_old_backups' => []
+                'deleted_old_backups' => [],
+                'prune_failed' => [],
+                'errors' => []
             ]
         ],
         'error_responses' => [
@@ -4453,9 +4459,11 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_format' => 'Invalid project name.',
             '500.backup.create_failed' => 'Failed to create backup directory.',
             '500.backup.folder_create_failed' => 'Failed to create backups directory.',
-            '500.backup.no_files_copied' => 'Failed to create backup - no files copied.'
+            '500.backup.no_files_copied' => 'No item could be copied. Nothing was kept and no older backup was deleted; the project is untouched (data.project_intact). data.errors says why.',
+            '500.backup.incomplete' => 'An item could not be copied completely: data.failed_items names it, data.errors the paths, relative to the project. Nothing was kept - the incomplete copy is removed (data.backup_kept is false; data.leftover names it in the rare case it could not be) - and no older backup was deleted. The project is untouched (data.project_intact); fix the cause and back it up again.',
+            '507.quota.storage_exceeded' => 'A storage quota is configured and this backup would put the project owner over it: what the backup copies, less the older backups max_backups deletes for it. Nothing was written. Delete an older backup first.'
         ],
-        'notes' => 'Backups are stored in project/backups/ folder. Old backups are auto-deleted when max_backups is exceeded. A link inside the project is not followed: what it points to is not copied into the backup. For sharing projects externally, use exportProject instead (JSON-only, secure).'
+        'notes' => 'A backup holds what an export carries: config.php, routes.php, config/ (never config/members.json or its lock), templates/, translate/, data/, snippets/ and public/ - never builds, exports or other backups. Backups are stored in the project\'s backups/ folder. Once a backup is made whole, the oldest backups past max_backups are deleted; one that cannot be fully deleted does not fail the backup (the message and data.prune_failed name it). A backup that cannot be made completely is not kept and deletes nothing older (500 backup.incomplete): restoring a partial copy would replace whole items of the project with it. With a storage quota configured, the backup is checked before anything is written, against the project OWNER\'s quota, and refused (507) when what it copies less what it deletes would not fit; while it is written, before the older backups go, the total can exceed the ceiling by the backups it then deletes. A link inside the project is not followed: what it points to is not copied into the backup. For sharing projects externally, use exportProject instead (JSON-only, secure).'
     ],
     
     'listBackups' => [
@@ -4482,7 +4490,7 @@ $GLOBALS['__help_commands'] = [
                         'size' => 1234567,
                         'size_formatted' => '1.18 MB',
                         'files' => 42,
-                        'contents' => ['config.php', 'routes.php', 'templates', 'translate', 'data', 'public'],
+                        'contents' => ['config.php', 'routes.php', 'config', 'templates', 'translate', 'data', 'snippets', 'public'],
                         'created' => 1704291000,
                         'created_formatted' => '2026-01-03 14:30:00',
                         'created_relative' => '2 hours ago'
@@ -4501,7 +4509,7 @@ $GLOBALS['__help_commands'] = [
             '200.backup.list_success' => 'The backup list, newest first. An empty list is still a 200 — no backups is not an error.',
             '400.validation.invalid_format' => 'Invalid project name.'
         ],
-        'notes' => 'Backup types, read from the folder name: "pre-restore" (the snapshot restoreBackup takes when create_backup is asked), "auto" (a name starting with auto_), "manual" (every other, backupProject\'s).'
+        'notes' => 'Backup types, read from the folder name: "pre-restore" (the snapshot restoreBackup takes when create_backup is asked) and "manual" (every other, backupProject\'s). contents lists the items the backup holds (see backupProject).'
     ],
     
     'restoreBackup' => [
@@ -4523,8 +4531,14 @@ $GLOBALS['__help_commands'] = [
             'create_backup' => [
                 'required' => false,
                 'type' => 'boolean',
-                'description' => 'Take a pre-restore snapshot before overwriting. The snapshot captures the project\'s CURRENT state (config.php, routes.php, templates, translate, data, public) into a new backup named pre-restore_<timestamp>, so the restore can be undone by restoring that snapshot. Default: false - no snapshot is taken and the current state is lost.',
+                'description' => 'Take a pre-restore snapshot before overwriting. The snapshot captures the project\'s CURRENT state - everything a backup holds (see backupProject) - into a new backup named pre-restore_<timestamp>, so the restore can be undone by restoring that snapshot. A snapshot that cannot be made completely stops the restore before anything is overwritten (500 backup.prerestore_failed). Default: false - no snapshot is taken and the current state is lost.',
                 'example' => true
+            ],
+            'delete_backup' => [
+                'required' => false,
+                'type' => 'boolean',
+                'description' => 'Delete the restored backup once the restore is complete, freeing the space it takes (data.backup_deleted). A restore that is not complete keeps it. The storage quota counts the space it frees. Default: false.',
+                'example' => false
             ]
         ],
         'example_post' => 'POST /management/p/<projectId>/restoreBackup with body: {"backup": "2026-01-03_14-30-00", "create_backup": true}',
@@ -4536,8 +4550,9 @@ $GLOBALS['__help_commands'] = [
                 'project' => 'quicksite',
                 'restored_backup' => '2026-01-03_14-30-00',
                 'pre_restore_backup' => 'pre-restore_2026-01-03_16-45-22',
-                'restored_items' => ['config.php', 'routes.php', 'templates', 'translate', 'data', 'public'],
-                'pre_restore_items' => ['config.php', 'routes.php', 'templates', 'translate', 'data', 'public'],
+                'restored_items' => ['config.php', 'routes.php', 'config', 'templates', 'translate', 'data', 'snippets', 'public'],
+                'pre_restore_items' => ['config.php', 'routes.php', 'config', 'templates', 'translate', 'data', 'snippets', 'public'],
+                'backup_deleted' => false,
                 'errors' => []
             ]
         ],
@@ -4548,13 +4563,14 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_format' => 'Backup name or project name is not a valid identifier',
             '404.project.not_found' => 'Project not found',
             '404.backup.not_found' => 'Backup not found',
-            '500.backup.prerestore_failed' => 'create_backup=true was requested but the pre-restore snapshot folder could not be created - nothing was overwritten',
+            '500.backup.prerestore_failed' => 'create_backup=true was requested but the pre-restore snapshot could not be made completely, or its folder could not be created: data.failed_items names what could not be copied. Nothing was overwritten and the incomplete snapshot was removed',
+            '507.quota.storage_exceeded' => 'A storage quota is configured and the restore would put the project owner over it: what it brings back and the snapshot, less what they replace and, with delete_backup, the backup itself. Nothing was touched. Free space, or restore with delete_backup=true',
             '500.restore.no_files_restored' => 'No file could be restored; data.errors lists why, data.failed_items the items, data.pre_restore_backup names the snapshot if one was taken. The backup is untouched (data.backup_intact) and can be restored again',
             '500.restore.incomplete' => 'Part of the backup was restored and part could not be: data.failed_items names the items not restored completely, data.restored_items the ones that were, data.errors the paths that failed. The project now mixes the two states. The backup is untouched (data.backup_intact) and can be restored again once the cause is fixed'
         ],
-        'notes' => 'DESTRUCTIVE: config.php, routes.php, templates/, translate/, data/ and public/ are overwritten from the chosen backup. There is NO automatic safety net - pass create_backup=true to snapshot the current state first (data.pre_restore_backup then names it, and restoring that snapshot undoes this restore). Omit it and data.pre_restore_backup is null and the state being overwritten is not recoverable from within QuickSite. The admin panel asks before it restores and sends create_backup according to the answer; a direct API caller gets no such prompt. A restore keeps going past a failure, so that as much as possible comes back, and answers 500 restore.incomplete when anything could not be restored completely: it never answers success for a partial restore. The backup is only read, never changed, so it can be restored again. Each item is removed before it is restored as deleteProject removes a tree: a link is removed and never followed, a read-only file is removed. A link inside the backup is not followed either: what it points to is not restored.'
+        'notes' => 'DESTRUCTIVE: every item the chosen backup holds (config.php, routes.php, config/, templates/, translate/, data/, snippets/, public/) is overwritten from it; an item it does not hold is left as it is, and config/members.json and its lock are never touched, so a restore never changes who may use the project. There is NO automatic safety net- pass create_backup=true to snapshot the current state first (data.pre_restore_backup then names it, and restoring that snapshot undoes this restore). Omit it and data.pre_restore_backup is null and the state being overwritten is not recoverable from within QuickSite. The admin panel asks before it restores and sends create_backup according to the answer; a direct API caller gets no such prompt. A restore keeps going past a failure, so that as much as possible comes back, and answers 500 restore.incomplete when anything could not be restored completely: it never answers success for a partial restore. The backup is only read, never changed, so it can be restored again. Each item is removed before it is restored as deleteProject removes a tree: a link is removed and never followed, a read-only file is removed. A link inside the backup is not followed either: what it points to is not restored. With delete_backup=true the backup is deleted once the restore is complete (data.backup_deleted); an incomplete restore keeps it. With a storage quota configured, the restore is checked before anything is touched, against the project OWNER\'s quota (507 when it would not fit).'
     ],
-    
+
     'deleteBackup' => [
         'description' => 'Deletes a specific backup',
         'method' => 'DELETE',
@@ -6361,7 +6377,7 @@ $GLOBALS['__help_commands'] = [
             'scope' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => "Where the snippet is stored. 'project' (default) puts it in the marker project's own snippets folder, visible to every member of that project. 'personal' puts it in the CALLER'S OWN library (<secure>/snippets/custom/<userId>/), which they can reuse in any project they are a member of and which no other user can list, read, insert or delete. 'global' is accepted as a legacy alias of 'personal'.",
+                'description' => "Where the snippet is stored. 'project' (default) puts it in the marker project's own snippets folder, visible to every member of that project. 'personal' puts it in the CALLER'S OWN library (<secure>/snippets/custom/<userId>/), which they can reuse in any project they are a member of and which no other user can list, read, insert or delete. Any other value is refused with 400 validation.invalid_value.",
                 'example' => 'personal'
             ]
         ],
@@ -6390,6 +6406,7 @@ $GLOBALS['__help_commands'] = [
             '400.snippets.name_required' => 'Snippet name is required.',
             '400.snippets.structure_required' => 'Snippet structure is required.',
             '400.validation.blocked_tag' => 'Tag is not allowed (security restriction).',
+            '400.validation.invalid_value' => 'scope is neither project nor personal. errors[0].allowed lists the two values.',
             '409.snippets.already_exists' => 'A snippet with this ID already exists.',
             '500.snippets.save_failed' => 'The snippet passed validation but could not be written to the project. The underlying reason is returned in the message.'
         ]
@@ -6499,7 +6516,7 @@ $GLOBALS['__help_commands'] = [
             'targetNodeId' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Target node ID (dot-separated path like 0.2.1)',
+                'description' => 'Target node ID (dot-separated path like 0.2.1), or the literal "root" for the structure\'s root',
                 'example' => '0.2'
             ],
             'position' => [
@@ -6533,7 +6550,7 @@ $GLOBALS['__help_commands'] = [
             '400.project.mismatch' => 'The project named in the body does not match the project in the URL marker. The marker decides; a disagreeing echo is refused rather than ignored.',
             '400.project.required' => 'No project marker on the request. This command is project-scoped: target a project with /management/p/<projectId>/.',
             '400.snippets.no_structure' => 'Snippet has no structure defined.',
-            '400.validation.invalid_format' => 'Structure too deeply nested (max 50 levels).',
+            '400.validation.invalid_format' => 'targetNodeId is neither a dot-separated node ID nor "root". Structure too deeply nested (max 50 levels).',
             '400.validation.invalid_position' => 'Position must be: before, after, or inside.',
             '400.validation.invalid_type' => 'Invalid structure type. Must be: page, menu, footer, or component.',
             '400.validation.name_required' => 'Name is required for page/component structures.',
@@ -6544,7 +6561,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.file_write_failed' => 'Failed to write structure file.',
             '500.structure.invalid' => 'Invalid structure JSON.'
         ],
-        'notes' => 'Each inserted node gets a unique textKey (e.g., text_abc12345) to prevent conflicts. Translations from the snippet are mapped to new keys and added to all project language files.'
+        'notes' => 'Each inserted node gets a unique textKey (e.g., text_abc12345) to prevent conflicts. Translations from the snippet are mapped to new keys and added to all project language files - only once the insert passes every check, so a refused insert writes nothing. targetNodeId "root" inserts at the structure\'s root, by the one rule every command that inserts there shares: a structure whose root is a list of nodes (every page, menu and footer) takes the new node as its first entry; one whose root is a single node (a component) takes it as its first child; either way its id is "0". A root that cannot hold children (a component call, a text node) is refused with 400 operation.failed.'
     ],
 
     'injectSnippetCss' => [

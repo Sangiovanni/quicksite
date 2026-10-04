@@ -36,6 +36,8 @@ require_once SECURE_FOLDER_PATH . '/src/functions/filePolicy.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/LockManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/buildSiteRuntime.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/spaceUsage.php'; // qs_invalidate_space_cache
 
 // Get optional parameters for renaming folders in build
 // Defaults are standard names (public/secure/''), NOT the QuickSite installation's own folder names
@@ -307,6 +309,8 @@ function abort_build(ApiResponse $response) {
     if (isset($buildFullPath) && $buildFullPath !== '' && is_dir($buildFullPath)) {
         $removed = deleteDirectory($buildFullPath) && !is_dir($buildFullPath);
     }
+    // What the build wrote, and removed, is measured again at the next read.
+    qs_invalidate_space_cache((string) PROJECT_NAME);
 
     // withData() REPLACES; merge so the caller's own diagnosis survives.
     if ($removed === false) {
@@ -1235,6 +1239,21 @@ if ($buildSizeMB > $maxBuildSizeMB) {
     );
 }
 
+// The storage quota, once the build's size is known: charged to the project's
+// owner, and a build that does not fit is removed like any other failed one.
+if (qs_quota_storage_limited()) {
+    $quotaCallerId = (string)(getCurrentUser()['id'] ?? '');
+    $quotaBreach = qs_quota_check_storage(qs_quota_storage_owner((string) PROJECT_NAME, $quotaCallerId),
+        $buildSizeBytes, $quotaCallerId, ['project' => (string) PROJECT_NAME, 'kind' => 'build', 'landed' => true]);
+    if ($quotaBreach !== null) {
+        abort_build(
+            ApiResponse::create(507, 'quota.storage_exceeded')
+                ->withMessage($quotaBreach['message'])
+                ->withData($quotaBreach['data'])
+        );
+    }
+}
+
 // === CAN THIS BUILD SERVE A REQUEST? ===
 //
 // Asked before success is reported, because "the build completed" and "the
@@ -1284,6 +1303,7 @@ if (!empty($servabilityProblems)) {
 
 // Release lock before sending response
 release_build_lock();
+qs_invalidate_space_cache((string) PROJECT_NAME);
 
 // Count page events compiled
 $pageEventsCount = 0;

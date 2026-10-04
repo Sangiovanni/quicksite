@@ -130,7 +130,8 @@ function copyDirectory(string $source, string $dest): bool {
  * A LINK IS REMOVED, NEVER FOLLOWED. An entry that leads somewhere other than
  * where it sits — a symlink, or a Windows junction, which PHP does not report as
  * a link — is removed as the link it is, and whatever it points to is left
- * alone, so a link cannot walk the delete out of the tree.
+ * alone, so a link cannot walk the delete out of the tree. The same holds for
+ * `$dir` itself: a root that is a link is removed as one entry, its target whole.
  *
  * A READ-ONLY FILE IS REMOVED, as Linux removes one from a folder it may write
  * to. Windows refuses to delete a file marked read-only, so the mark is cleared
@@ -157,6 +158,21 @@ function copyDirectory(string $source, string $dest): bool {
  */
 function qs_delete_tree(string $dir, array $deferLast = []): array {
     $report = ['ok' => false, 'files' => 0, 'dirs' => 0, 'survived' => [], 'retained' => []];
+    // Without a trailing separator, which would make the link checks read its target.
+    $root = rtrim($dir, '/\\') === '' ? $dir : rtrim($dir, '/\\');
+    // Judged from the disk, not from a stat a caller made of it, and is_dir() before
+    // any is_link(): on Windows, PHP 8.1 and later answer is_dir() false for a
+    // junction after an is_link() on it, until the stat cache is cleared.
+    clearstatcache();
+    if ((is_dir($root) && qs_delete_tree_leads_elsewhere(dirname($root), basename($root), $root)) || is_link($root)) {
+        if (@unlink($root) || @rmdir($root)) {
+            $report['files']++;
+            $report['ok'] = true;
+        } else {
+            qs_delete_tree_note($report, '.');
+        }
+        return $report;
+    }
     if (!is_dir($dir)) {
         return $report;
     }

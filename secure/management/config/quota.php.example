@@ -38,10 +38,12 @@
  *
  * ── DELETING SPACE AND RETRYING ──────────────────────────────────────────────
  *
- * Sizes come from a 5-minute measurement cache, so immediately after deleting a
- * backup the total can still read high and the refusal can outlive the problem.
- * The dashboard's refresh control re-measures on the spot; the refusal message
- * tells the user this.
+ * The project a write lands in is measured afresh by the check, and deleting a
+ * backup re-measures its project at once. Other sizes come from a 5-minute
+ * measurement cache, so right after deleting an export, a build or a project
+ * the total can still read high and a refusal can outlive the problem. The
+ * dashboard's refresh control re-measures on the spot; the upload refusal tells
+ * the user this.
  */
 
 return [
@@ -49,7 +51,13 @@ return [
     // ── Axis 1: total bytes ──────────────────────────────────────────────────
     // Ceiling on the combined size of everything an account owns. An upload is
     // refused when current usage PLUS the incoming file would cross it, so the
-    // number is a ceiling and not a threshold that gets overshot.
+    // number is a ceiling and not a threshold that gets overshot. The same check
+    // runs for every write that adds a copy's worth of bytes: an import, a
+    // backup, a restore, a clone, a build and a saved export; and an account
+    // already over the ceiling cannot create a project. A backup, a restore
+    // and a saved export are charged their NET growth (what they add less what
+    // they remove), so while one runs the total can pass the ceiling by what it
+    // is about to remove.
     //
     // Refusal: HTTP 507, code `quota.storage_exceeded`, with the used / quota /
     // remaining figures in the response data.

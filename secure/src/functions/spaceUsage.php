@@ -161,17 +161,18 @@ function qs_project_space(string $project, bool $refresh = false): array {
 /**
  * Drop ONE project's measurement, so the next read re-walks it.
  *
- * Called by the write paths that a quota is enforced against. A ceiling read
- * from a cached measurement is a ceiling a burst of uploads walks straight
- * through: five minutes of writes would all compare against the same
- * pre-burst number. Invalidating after a write costs one directory walk on the
- * NEXT check — the same walk `refresh=true` would have cost — but only when
- * something actually changed, so reads keep hitting the cache.
+ * Called by every write the storage quota is checked for — an upload, a
+ * backup, a restore, a clone, a build, a saved export — after it writes, and
+ * by deleting a backup. The check itself measures the project it writes to
+ * afresh (quota.php); this keeps the owner's OTHER projects exact too, and makes
+ * the space overview move at once. Invalidating costs one directory walk on the
+ * next read, and only when something actually changed, so reads keep hitting
+ * the cache.
  *
- * This is a growth concern only. A shrink elsewhere (a deleted backup, export
- * or project) still ages out on the TTL, which leaves a total stale-HIGH: a
- * quota briefly stricter than reality, never looser. `refresh=true` on
- * The account space report's refresh flag is the user-facing escape hatch for that.
+ * A shrink elsewhere (a deleted export, build or project) still ages out on the
+ * TTL, which leaves a total stale-HIGH: a quota briefly stricter than reality,
+ * never looser. The account space report's refresh flag (`refresh=true`) is the
+ * user-facing escape hatch for that.
  */
 function qs_invalidate_space_cache(string $project): void {
     if ($project === '') {
