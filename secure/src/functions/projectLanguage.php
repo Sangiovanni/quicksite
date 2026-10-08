@@ -40,6 +40,7 @@
  *   qs_project_language_codes()       its languages, whatever the mode
  *   qs_project_languages()            the supported codes ([] when it is not)
  *   qs_is_project_language($segment)  is this URL segment one of them?
+ *   qs_path_without_base($path)       a request path with the site's base taken off, once
  *   qs_project_language_from_path()   the language this REQUEST's URL names
  *   qs_resolve_project_language()     ← THE answer. Everything else feeds it.
  */
@@ -135,17 +136,48 @@ function qs_is_project_language(string $segment): bool
 }
 
 /**
+ * A request path with the site's base taken off: the part the router reads, with no leading or
+ * trailing slash.
+ *
+ * The base is taken off ONCE, by the rule of the surface serving the request:
+ *   - a built site, and every other entry point: the URL space (PUBLIC_FOLDER_SPACE);
+ *   - surface B (`/p/<projectId>/`): everything up to and including the first `p` segment and the
+ *     one after it, which is how surface B binds the project — the space, if any, is part of it.
+ *     Surface B then rewrites REQUEST_URI to the part after the marker, and from that point there
+ *     is nothing left to take off. Taking the space off again by name would take a page's own first
+ *     segment when it is spelled like the space: under the space `web`, `/web/p/<id>/web/x` is the
+ *     page `web/x`.
+ *
+ * Every reader of the request path asks this, so the router, the alias rewrite, the language
+ * reader and the system placeholders agree on where the page part starts.
+ */
+function qs_path_without_base(string $path): string
+{
+    $path = trim($path, '/');
+    if (defined('QS_SURFACE_B')) {
+        if (!empty($GLOBALS['__qs_sb']['rewritten'])) {
+            return $path;
+        }
+        $parts = array_values(array_filter(explode('/', $path), static fn($p) => $p !== ''));
+        $count = count($parts);
+        for ($i = 0; $i < $count - 1; $i++) {
+            if ($parts[$i] === 'p') {
+                return implode('/', array_slice($parts, $i + 2));
+            }
+        }
+        return $path;
+    }
+    $space = defined('PUBLIC_FOLDER_SPACE') ? trim((string) PUBLIC_FOLDER_SPACE, '/') : '';
+    return $space !== '' ? removePrefix($path, $space . '/') : $path;
+}
+
+/**
  * The language the CURRENT request's URL names, or null when it names none.
  *
- * Reads the same path TrimParameters reads, normalised the same way:
- *   - the optional PUBLIC_FOLDER_SPACE prefix is removed
- *   - on surface B, the `/p/<projectId>` marker is removed
- *
- * The marker matters because surface B rewrites REQUEST_URI part-way through
- * the request: code running before the rewrite sees `/p/<id>/fr/home`, code
- * running after sees `/fr/home`. Stripping the marker when it is there makes
- * this function give the same answer at both points, which is the entire
- * reason for having one function.
+ * Reads the same path TrimParameters reads, with the base taken off the same way
+ * (qs_path_without_base()). Surface B rewrites REQUEST_URI part-way through the request: code
+ * running before the rewrite sees `/p/<id>/fr/home`, code running after sees `/fr/home`, and both
+ * get the same answer.
  *
  * @param string|null $requestUri Override for testing; defaults to the live request.
  */
@@ -159,20 +191,8 @@ function qs_project_language_from_path(?string $requestUri = null): ?string
     if ($path === null || $path === false) {
         return null;
     }
-    $path = trim($path, '/');
 
-    $space = defined('PUBLIC_FOLDER_SPACE') ? PUBLIC_FOLDER_SPACE : '';
-    if ($space !== '') {
-        $path = removePrefix($path, trim($space, '/') . '/');
-    }
-
-    $parts = array_values(array_filter(explode('/', $path), static fn($p) => $p !== ''));
-
-    // Surface B: drop the `/p/<projectId>` marker when it is still on the path.
-    if (defined('QS_SURFACE_B_PROJECT')
-        && count($parts) >= 2 && $parts[0] === 'p' && $parts[1] === QS_SURFACE_B_PROJECT) {
-        $parts = array_slice($parts, 2);
-    }
+    $parts = array_values(array_filter(explode('/', qs_path_without_base($path)), static fn($p) => $p !== ''));
 
     return (!empty($parts) && qs_is_project_language($parts[0])) ? $parts[0] : null;
 }

@@ -49,58 +49,15 @@ if (!is_string($route)) {
         ->send();
 }
 
-// Check for path traversal in route
-if (strpos($route, '..') !== false || strpos($route, '/') !== false || strpos($route, '\\') !== false || strpos($route, "\0") !== false) {
-    ApiResponse::create(400, 'validation.invalid_format')
-        ->withMessage('route contains invalid characters')
-        ->withData([
-            'field' => 'route',
-            'reason' => 'Path traversal characters not allowed'
-        ])
-        ->send();
+// The one page-name rule every command shares (qs_page_name_refusal()): a nested page
+// ('guides/installation') and a parameter route's page ('products/:slug') have a title too,
+// read by the page as page.titles.<route path>.
+$refusal = qs_page_name_refusal($route, 'route');
+if ($refusal !== null) {
+    $refusal->send();
 }
-
-// Validate route length
-if (strlen($route) > 100) {
-    ApiResponse::create(400, 'validation.invalid_length')
-        ->withMessage('route is too long')
-        ->withData([
-            'field' => 'route',
-            'max_length' => 100,
-            'received_length' => strlen($route)
-        ])
-        ->send();
-}
-
-// Validate route format (alphanumeric, hyphens, underscores)
-if (!RegexPatterns::match('identifier_alphanum', $route)) {
-    ApiResponse::create(400, 'validation.invalid_format')
-        ->withMessage('route contains invalid characters')
-        ->withErrors([
-            'field' => 'route',
-            'allowed' => RegexPatterns::getDescription('identifier_alphanum'),
-            'examples' => RegexPatterns::getExamples('identifier_alphanum')
-        ])
-        ->send();
-}
-
-// Special pages that exist but are not in ROUTES (error pages, etc.)
-$specialPages = ['404', '500', '403', '401'];
-
-// Validate route exists in ROUTES or is a special page.
-// routeExists(), NOT in_array(): ROUTES holds route names as KEYS ('home' => [...]),
-// so in_array searched the VALUES and was false for every real route — the command
-// refused every ordinary page it documents and only ever succeeded on the special pages.
-if (!routeExists($route, ROUTES) && !in_array($route, $specialPages, true)) {
-    ApiResponse::create(404, 'validation.invalid_route')
-        ->withMessage('Route does not exist')
-        ->withData([
-            'provided_route' => $route,
-            'available_routes' => ROUTES,
-            'special_pages' => $specialPages
-        ])
-        ->send();
-}
+// The key the page reads has no leading or trailing slash.
+$route = trim($route, '/');
 
 // Validate lang parameter is present
 if (empty($lang)) {
@@ -220,34 +177,27 @@ if (json_last_error() !== JSON_ERROR_NONE) {
         ->send();
 }
 
-// Ensure page.titles structure exists
-if (!isset($translations['page'])) {
-    $translations['page'] = [];
-}
-if (!isset($translations['page']['titles'])) {
-    $translations['page']['titles'] = [];
-}
-
-// Update the title
-$translations['page']['titles'][$route] = $title;
-
-// Write back to file with pretty formatting
-$updatedJson = json_encode($translations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-if ($updatedJson === false) {
-    ApiResponse::create(500, 'server.json_encode_failed')
-        ->withMessage('Failed to encode translation data')
-        ->withData([
-            'language' => $lang
-        ])
-        ->send();
-}
-
-if (file_put_contents($translationFile, $updatedJson) === false) {
+// The shared translation writer (translationHelpers.php), as setTranslationKeys uses: it
+// writes the language's file and keeps default.json in step. A single-language site reads
+// default.json, so a title written to <lang>.json alone never reached its pages.
+require_once SECURE_FOLDER_PATH . '/src/functions/translationHelpers.php';
+$writeResult = writeTranslationsToFile($lang, ['page' => ['titles' => [$route => $title]]]);
+if (!$writeResult['ok']) {
+    if ($writeResult['reason'] === 'collisions') {
+        ApiResponse::create(400, 'validation.invalid_format')
+            ->withMessage($writeResult['collisions'][0]['suggestion'])
+            ->withErrors($writeResult['collisions'])
+            ->send();
+    }
+    if ($writeResult['reason'] === 'json_encode_failed') {
+        ApiResponse::create(500, 'server.json_encode_failed')
+            ->withMessage('Failed to encode translation data')
+            ->withData(['language' => $lang])
+            ->send();
+    }
     ApiResponse::create(500, 'server.file_write_failed')
         ->withMessage('Failed to write translation file')
-        ->withData([
-            'language' => $lang
-        ])
+        ->withData(['language' => $lang])
         ->send();
 }
 

@@ -417,23 +417,6 @@ if (($copyError = qs_safe_copy($entryPointSource, $publicContentPath . '/index.p
     );
 }
 
-// The parameters the entry point reads. PROJECT_NAME is the REAL project id:
-// it names this site's browser-storage namespace (`qsp_<PROJECT_NAME>_<key>`)
-// and its theme key, so a built site claiming a different identity from the
-// same project at /p/<id>/ would read back none of the visitor's stored state.
-$siteConfigPhp = qs_site_config_php(
-    (string) PROJECT_NAME,
-    $buildPublicName,
-    $buildSecureName,
-    $buildPublicSpace
-);
-if (file_put_contents($publicContentPath . '/qs-site.php', $siteConfigPhp) === false) {
-    abort_build(
-        ApiResponse::create(500, 'server.file_write_failed')
-            ->withMessage('Failed to write the site parameters (qs-site.php)')
-    );
-}
-
 // The funnel, beside the content it serves.
 if (file_put_contents($publicContentPath . '/.htaccess', qs_site_htaccess($buildPublicSpace)) === false) {
     abort_build(
@@ -475,6 +458,34 @@ if (!qs_copy_publishable_directory(PUBLIC_CONTENT_PATH . '/assets', $publicConte
     abort_build(
         ApiResponse::create(500, 'server.file_write_failed')
             ->withMessage("Failed to copy /assets/ directory")
+    );
+}
+
+// The parameters the entry point reads. PROJECT_NAME is the REAL project id:
+// it names this site's browser-storage namespace (`qsp_<PROJECT_NAME>_<key>`)
+// and its theme key, so a built site claiming a different identity from the
+// same project at /p/<id>/ would read back none of the visitor's stored state.
+//
+// Written AFTER the copy above, because two of them are decided here, once for
+// the build, and a built page makes no check of its own: the `?v=` number every
+// page writes after the files it links (the time of this build, so a browser
+// fetches them again after a new build is deployed), and the icon (linked only
+// when the build carries its file — a link to a missing file fails on every
+// page view).
+require_once SECURE_FOLDER_PATH . '/src/functions/runtimeHandoff.php';
+$siteIcon = qs_page_icon_path();
+$siteConfigPhp = qs_site_config_php(
+    (string) PROJECT_NAME,
+    $buildPublicName,
+    $buildSecureName,
+    $buildPublicSpace,
+    time(),
+    qs_page_icon_linked($siteIcon, $publicContentPath) ? $siteIcon : null
+);
+if (file_put_contents($publicContentPath . '/qs-site.php', $siteConfigPhp) === false) {
+    abort_build(
+        ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage('Failed to write the site parameters (qs-site.php)')
     );
 }
 
@@ -894,10 +905,10 @@ if (!$apiManager->writeCompiledJs($apiConfigPath)) {
     );
 }
 
-// Step 4.6: Compile routes schema to JavaScript (beta.8 A1 Build Slice 1).
-// qs.js's client-side path matcher (Build Slice 2) consumes this on every
-// page load so deployed sites know which segments are :params. routeHelpers
-// is loaded via utilsManagement which build.php already depends on.
+// Step 4.6: Compile routes schema to JavaScript: window.QS_ROUTES, the
+// project's route table (every pattern and its :params). The page's own route
+// reaches the browser separately, as window.QS_ROUTE. routeHelpers is loaded
+// via utilsManagement which build.php already depends on.
 $routesMetaPath = $scriptsDir . '/qs-route-schema.js';
 if (!writeRoutesMetaFile(ROUTES, $routesMetaPath)) {
     abort_build(

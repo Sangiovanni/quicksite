@@ -182,13 +182,94 @@ if (!function_exists('qs_translated_call_argument')) {
     }
 }
 
+// ---------------------------------------------------------------------------
+// What a page's head and its script tags link: the icon, and the `?v=` number
+// after each file. Here because both page shells (PageManagement on /p/, Page in
+// a build) and the build command need them, and a build already carries this
+// file.
+// ---------------------------------------------------------------------------
+
+if (!function_exists('qs_asset_version')) {
+    /**
+     * The `?v=` number a page writes after a file it links: the file's date.
+     *
+     * A browser keeps a file under its whole address, query included. When the
+     * file changes its date changes, the address is new, and the browser fetches
+     * it once and keeps that copy as before. Without a number a redeployed site
+     * can go on running the copy a visitor's browser kept.
+     *
+     * On /p/ every page reads it, because the files change while the author
+     * works. A build writes ONE number, the time it was made, into its parameters
+     * (qs-site.php), and its pages use that: they make no check of their own.
+     * A file that is not there gets the current time, as style.css always has.
+     */
+    function qs_asset_version(string $file): string
+    {
+        return (string) (is_file($file) ? filemtime($file) : time());
+    }
+}
+
+if (!function_exists('qs_page_icon_path')) {
+    /**
+     * The icon a page of this project names: CONFIG['FAVICON_PATH'], else the
+     * conventional /assets/images/favicon.png. Whether a page LINKS it is
+     * qs_page_icon_linked()'s question.
+     */
+    function qs_page_icon_path(): string
+    {
+        return (defined('CONFIG') && isset(CONFIG['FAVICON_PATH']) && is_string(CONFIG['FAVICON_PATH'])
+                && CONFIG['FAVICON_PATH'] !== '')
+            ? CONFIG['FAVICON_PATH']
+            : '/assets/images/favicon.png';
+    }
+}
+
+if (!function_exists('qs_page_icon_linked')) {
+    /**
+     * Whether a page links its icon: an absolute URL (https?://, //, data:) always,
+     * a path on the site only when the file is in $contentPath (the folder holding
+     * assets/). A link to a file that is not there costs a request that fails on
+     * every page view, which is what a new project's default path did.
+     *
+     * Asked on /p/ by every page, and by the build once, for the copy it made: a
+     * built page links what the build found and makes no check of its own.
+     */
+    function qs_page_icon_linked(string $iconPath, string $contentPath): bool
+    {
+        if (preg_match('#^(https?:)?//|^data:#i', $iconPath) === 1) {
+            return true;
+        }
+        return $contentPath !== '' && is_file($contentPath . '/' . ltrim($iconPath, '/'));
+    }
+}
+
+if (!function_exists('qs_page_icon_href')) {
+    /**
+     * The icon link's href: an absolute URL as written, a path on the site joined
+     * with the base the page composes against (it ends with '/').
+     */
+    function qs_page_icon_href(string $iconPath, string $base): string
+    {
+        return preg_match('#^(https?:)?//|^data:#i', $iconPath) === 1
+            ? $iconPath
+            : $base . ltrim($iconPath, '/');
+    }
+}
+
 if (!function_exists('qs_runtime_handoff')) {
     /**
      * Emit the whole handoff for one page.
      *
      * @param array $ctx {
-     *   base:               string  URL prefix for script srcs, trailing slash
+     *   base:               string  URL prefix for script srcs, trailing slash —
+     *                               the base the page is served under, which
+     *                               QS_ROUTE also hands the browser
      *   contentPath:        string  filesystem dir holding scripts/
+     *   runtimeFile:        ?string the file `scripts/qs.js` serves, when it is
+     *                               not the one in contentPath (on /p/, the
+     *                               engine's own copy)
+     *   assetVersion:       ?string a build's one `?v=` number; null on /p/,
+     *                               where each script carries its file's date
      *   projectKey:         string  PROJECT_NAME — the browser-storage namespace
      *   route:              ?array  the route this request resolved, from the
      *                               router call the page was rendered with:
@@ -212,11 +293,17 @@ if (!function_exists('qs_runtime_handoff')) {
         $contentPath = (string) ($ctx['contentPath'] ?? '');
         $projectKey  = (string) ($ctx['projectKey'] ?? 'default');
 
+        // Every script this page loads carries a `?v=` number (qs_asset_version()).
+        $fixedVersion = isset($ctx['assetVersion']) ? (string) $ctx['assetVersion'] : null;
+        $v = static function (string $file) use ($fixedVersion): string {
+            return '?v=' . ($fixedVersion ?? qs_asset_version($file));
+        };
+
         $out = '';
 
         // 1. Route schema — window.QS_ROUTES, the project's route table.
         if ($contentPath !== '' && file_exists($contentPath . '/scripts/qs-route-schema.js')) {
-            $out .= '<script src="' . $base . 'scripts/qs-route-schema.js"></script>';
+            $out .= '<script src="' . $base . 'scripts/qs-route-schema.js' . $v($contentPath . '/scripts/qs-route-schema.js') . '"></script>';
         }
 
         // 2. Storage namespace. It MUST come from the server: at /p/<id>/ the id
@@ -235,18 +322,25 @@ if (!function_exists('qs_runtime_handoff')) {
         //    winning route; a second router in qs.js would have to agree with it
         //    on all of that. A route that was not found carries no path and no
         //    params, and the params are always written as an object.
+        //
+        //    It also carries the base the page is served under (`/p/<id>/`, a
+        //    URL space, `/`): qs.js composes the one target the server never sees
+        //    as an argument — the magic-link `?return=` — against it, and exposes
+        //    it as QS.basePath to code an author writes by hand.
         $routeCtx = is_array($ctx['route'] ?? null) ? $ctx['route'] : [];
         $found = ($routeCtx['found'] ?? false) === true;
         $route = [
             'path'   => $found && is_string($routeCtx['path'] ?? null) ? $routeCtx['path'] : null,
             'params' => (object) ($found && is_array($routeCtx['params'] ?? null) ? $routeCtx['params'] : []),
             'found'  => $found,
+            'base'   => $base,
         ];
         $out .= '<script>window.QS_PROJECT=' . qs_inline_script_json($projectKey)
               . ';window.QS_ROUTE=' . qs_inline_script_json($route) . ';</script>';
 
         // 3. The library.
-        $out .= '<script src="' . $base . 'scripts/qs.js"></script>';
+        $runtimeFile = is_string($ctx['runtimeFile'] ?? null) ? $ctx['runtimeFile'] : $contentPath . '/scripts/qs.js';
+        $out .= '<script src="' . $base . 'scripts/qs.js' . $v($runtimeFile) . '"></script>';
 
         // 4. Consent map — drives qs.js write-gating. Emitting nothing means
         //    "no layer configured", which is why the payload must be passed in
@@ -265,10 +359,10 @@ if (!function_exists('qs_runtime_handoff')) {
         if ($contentPath !== ''
             && file_exists($contentPath . '/scripts/qs-api-config.js')
             && filesize($contentPath . '/scripts/qs-api-config.js') > 100) {
-            $out .= '<script src="' . $base . 'scripts/qs-api-config.js"></script>';
+            $out .= '<script src="' . $base . 'scripts/qs-api-config.js' . $v($contentPath . '/scripts/qs-api-config.js') . '"></script>';
         }
         if ($contentPath !== '' && file_exists($contentPath . '/scripts/qs-enums.js')) {
-            $out .= '<script src="' . $base . 'scripts/qs-enums.js"></script>';
+            $out .= '<script src="' . $base . 'scripts/qs-enums.js' . $v($contentPath . '/scripts/qs-enums.js') . '"></script>';
         }
 
         // 6b. Count-sentence strings, in THIS page's language.

@@ -665,6 +665,17 @@ item_space() {
             echo -e "  ${RED}✗ Error: space path too deep (max 5 levels)${NC}"
             return 0
         fi
+        # Every segment is a folder name: an empty one, '.' or '..' names no folder of its own.
+        if echo "$DESIRED_SPACE" | grep -q '//' || echo "$DESIRED_SPACE" | grep -Eq '(^|/)\.{1,2}(/|$)'; then
+            echo -e "  ${RED}✗ Error: every segment of a space is a folder name (no empty segment, no . or ..)${NC}"
+            return 0
+        fi
+        # No segment may be 'p': /p/<projectId>/ takes the project from the segment after the
+        # FIRST 'p' in the address, so a space holding one would bind the wrong project.
+        if echo "$DESIRED_SPACE" | grep -Eq '(^|/)p(/|$)'; then
+            echo -e "  ${RED}✗ Error: a space cannot hold a segment named p — /p/ is where each project is served${NC}"
+            return 0
+        fi
         if [ -d "$PUBLIC_DIR/$DESIRED_SPACE" ]; then
             echo -e "  ${RED}✗ Error: directory '$DESIRED_SPACE' already exists${NC}"
             return 0

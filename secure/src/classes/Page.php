@@ -36,12 +36,19 @@ class Page {
         $pageEventsScript = $this->pageEventsScript;
         $stateStores = $this->stateStores;
         $spacePrefix = PUBLIC_FOLDER_SPACE !== '' ? PUBLIC_FOLDER_SPACE . '/' : '';
-        $stylePath = (defined('PUBLIC_CONTENT_PATH') ? PUBLIC_CONTENT_PATH : dirname(__DIR__, 3) . '/' . (defined('PUBLIC_FOLDER_NAME') ? PUBLIC_FOLDER_NAME : 'public')) . '/style/style.css';
-        $cssVersion = file_exists($stylePath) ? filemtime($stylePath) : time();
 
-        // The inline-script encoder (the theme script below) and the runtime
-        // handoff (the end of the body) both live here.
+        // The inline-script encoder (the theme script below), the runtime
+        // handoff (the end of the body) and the head's icon and `?v=` helpers
+        // all live here.
         require_once SECURE_FOLDER_PATH . '/src/functions/runtimeHandoff.php';
+
+        // The `?v=` number every file this page links carries, and the icon it
+        // links: both decided when the site was built and read from its
+        // parameters (qs-site.php, through index.php), so a page served from a
+        // build makes no check of its own. A new build writes a new number, so a
+        // visitor's browser fetches each file once after a redeploy.
+        $assetVersion = defined('QS_BUILD_VERSION') ? (string) QS_BUILD_VERSION : '';
+        $iconPath = defined('QS_BUILD_ICON') ? QS_BUILD_ICON : null;
 
         // ── Theme resolution ──────────────────────────────────────────────
         $themeEnabled  = defined('THEME_MODE_ENABLED') && THEME_MODE_ENABLED;
@@ -75,26 +82,10 @@ class Page {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($title, ENT_QUOTES | ENT_HTML5, 'UTF-8') ?></title>
-    <?php
-    // Favicon: prefer CONFIG['FAVICON_PATH'] (project-configurable).
-    // Accepts: an absolute URL (https?:// or data:) emitted as-is,
-    // or a path starting with `/` (treated as relative to the
-    // site root; respects PUBLIC_FOLDER_SPACE via $spacePrefix).
-    // Default falls back to the project's conventional assets path
-    // (the old hardcoded path here was buggy — missing `images/`
-    // — which caused fresh pages to 404 on /assets/favicon.png).
-    $faviconPath = (defined('CONFIG') && isset(CONFIG['FAVICON_PATH']) && CONFIG['FAVICON_PATH'] !== '')
-        ? CONFIG['FAVICON_PATH']
-        : '/assets/images/favicon.png';
-    if (preg_match('#^(https?:)?//|^data:#i', $faviconPath)) {
-        $faviconHref = $faviconPath;
-    } else {
-        // Treat as root-relative; honour the optional PUBLIC_FOLDER_SPACE.
-        $faviconHref = '/' . $spacePrefix . ltrim($faviconPath, '/');
-    }
-    ?>
-    <link rel="icon" href="<?= htmlspecialchars($faviconHref, ENT_QUOTES | ENT_HTML5, 'UTF-8') ?>">
-    <link rel="stylesheet" href="/<?= $spacePrefix ?>style/style.css?v=<?= $cssVersion ?>">
+<?php if (is_string($iconPath)): ?>
+    <link rel="icon" href="<?= htmlspecialchars(qs_page_icon_href($iconPath, '/' . $spacePrefix), ENT_QUOTES | ENT_HTML5, 'UTF-8') ?>">
+<?php endif; ?>
+    <link rel="stylesheet" href="/<?= $spacePrefix ?>style/style.css?v=<?= htmlspecialchars($assetVersion, ENT_QUOTES | ENT_HTML5, 'UTF-8') ?>">
     <?= $themeScript ?>
 </head>
 <body>
@@ -163,6 +154,7 @@ class Page {
     echo qs_runtime_handoff([
         'base'               => '/' . $spacePrefix,
         'contentPath'        => defined('PUBLIC_CONTENT_PATH') ? PUBLIC_CONTENT_PATH : '',
+        'assetVersion'       => $assetVersion,
         'projectKey'         => $projectKey,
         'route'              => $__route,
         'themeEnabled'       => $themeEnabled,

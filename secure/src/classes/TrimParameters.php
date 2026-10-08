@@ -37,6 +37,11 @@ class TrimParameters {
 
     /** @var bool Whether the route was found in routes.php */
     private bool $routeFound = false;
+
+    /** @var string The matched part of the address as the visitor wrote it (still encoded):
+     *              'products/red-vase' where routePath is 'products/:slug'. Empty at the root
+     *              and when no route was found. */
+    private string $requestedPath = '';
     
     /** @var array Supported languages from config */
     private static array $supportedLangs = [];
@@ -79,14 +84,10 @@ class TrimParameters {
             return;
         }
         
-        $path = trim($parsedPath, '/');
-        
-        // Remove PUBLIC_FOLDER_SPACE prefix if present
-        $folder = defined('PUBLIC_FOLDER_SPACE') ? PUBLIC_FOLDER_SPACE : '';
-        if ($folder) {
-            $path = removePrefix($path, trim($folder, '/') . '/');
-        }
-        
+        // The site's base, taken off once (the URL space in a build; on /p/,
+        // surface B already took it off with the /p/<projectId> marker).
+        $path = qs_path_without_base($parsedPath);
+
         // Split into segments, filter empty
         $parts = array_values(array_filter(explode('/', $path), fn($p) => $p !== ''));
         
@@ -110,6 +111,7 @@ class TrimParameters {
             $this->params = $resolved['params'];
             $this->routeParams = $resolved['routeParams'] ?? [];
             $this->routeFound = $resolved['found'];
+            $this->requestedPath = $resolved['requested'] ?? '';
         }
 
         // Beta.8 A2 — editor emulation override. When public/index.php
@@ -140,6 +142,7 @@ class TrimParameters {
         $current = $routes;
         $depth = 0;
         $routeParams = [];
+        $requested = [];
 
         while (!empty($remaining) && $depth < self::MAX_DEPTH) {
             $segment = $remaining[0];
@@ -153,6 +156,7 @@ class TrimParameters {
             if (isset($current[$segment])) {
                 array_shift($remaining);
                 $matched[] = $segment;
+                $requested[] = $segment;
                 $current = $current[$segment];
                 $depth++;
                 continue;
@@ -160,12 +164,19 @@ class TrimParameters {
 
             $paramKey = self::findParamKey($current);
             if ($paramKey !== null) {
+                // Decoded in the matcher, so consumers see 'red vase', not 'red%20vase'.
+                $value = urldecode($segment);
+                // A value that is not valid UTF-8 names no page: the route is not
+                // found, and the address is answered 404, rather than a page being
+                // rendered around a value nothing downstream can show or encode.
+                if (preg_match('//u', $value) !== 1) {
+                    break;
+                }
                 array_shift($remaining);
                 $matched[] = $paramKey;                          // pattern key e.g. ':slug'
+                $requested[] = $segment;
                 $paramName = substr($paramKey, 1);               // strip leading ':'
-                // urldecode in the matcher per locked Q2 — consumers see
-                // 'red vase', not 'red%20vase'.
-                $routeParams[$paramName] = urldecode($segment);
+                $routeParams[$paramName] = $value;
                 $current = $current[$paramKey];
                 $depth++;
                 continue;
@@ -191,7 +202,8 @@ class TrimParameters {
             'route' => $matched,
             'params' => [],            // all segments matched
             'routeParams' => $routeParams,
-            'found' => true
+            'found' => true,
+            'requested' => implode('/', $requested)
         ];
     }
 
@@ -347,10 +359,12 @@ class TrimParameters {
             $url .= $targetLang;
         }
         
-        // Add route path (skip 'home' for cleaner URLs)
+        // Add the page's address (skip 'home' for cleaner URLs): as the visitor wrote it,
+        // so a parameter route's page keeps its value ('products/red-vase', never the
+        // pattern 'products/:slug').
         if (!$this->isHome()) {
             $separator = (defined('MULTILINGUAL_SUPPORT') && MULTILINGUAL_SUPPORT) ? '/' : '';
-            $url .= $separator . $this->routePath;
+            $url .= $separator . ($this->requestedPath !== '' ? $this->requestedPath : $this->routePath);
         } else {
             // For home, just ensure trailing slash if multilingual
             if (defined('MULTILINGUAL_SUPPORT') && MULTILINGUAL_SUPPORT) {

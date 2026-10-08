@@ -73,21 +73,16 @@ class PageManagement {
         $header .= '<html lang="' . htmlspecialchars($this->lang) . '"' . $themeAttr . '>';
         $header .="<head>";
         $header .= "<title>" . htmlspecialchars($this->title) . "</title>";
-        // Favicon: prefer CONFIG['FAVICON_PATH'] (project-configurable).
-        // Accepts an absolute URL (https?:// or data:) emitted as-is, or a
-        // root-relative path (joined with the public base). Default falls back
-        // to the project's conventional assets path. Kept in sync with the
-        // built-page renderer in src/classes/Page.php.
-        $faviconPath = (defined('CONFIG') && isset(CONFIG['FAVICON_PATH']) && CONFIG['FAVICON_PATH'] !== '')
-            ? CONFIG['FAVICON_PATH']
-            : '/assets/images/favicon.png';
-        $faviconHref = preg_match('#^(https?:)?//|^data:#i', $faviconPath)
-            ? $faviconPath
-            : ($base . ltrim($faviconPath, '/'));
-        $header .= '<link rel="icon" href="' . htmlspecialchars($faviconHref, ENT_QUOTES | ENT_HTML5, 'UTF-8') . '">';
-        $stylePath = PUBLIC_CONTENT_PATH . '/style/style.css';
-        $cssVersion = file_exists($stylePath) ? filemtime($stylePath) : time();
-        $header .= '<link rel="stylesheet" href="' . $base . 'style/style.css?v=' . $cssVersion . '">';
+        // The icon (CONFIG['FAVICON_PATH'], else the conventional assets path),
+        // linked only when its file is in the project's public folder: a link to
+        // a file that is not there fails on every page view. Checked here on
+        // every view, because the author adds files while working; a build
+        // decides once (Page.php).
+        $iconPath = qs_page_icon_path();
+        if (qs_page_icon_linked($iconPath, PUBLIC_CONTENT_PATH)) {
+            $header .= '<link rel="icon" href="' . htmlspecialchars(qs_page_icon_href($iconPath, $base), ENT_QUOTES | ENT_HTML5, 'UTF-8') . '">';
+        }
+        $header .= '<link rel="stylesheet" href="' . $base . 'style/style.css?v=' . qs_asset_version(PUBLIC_CONTENT_PATH . '/style/style.css') . '">';
         if (!empty($this->links)) {
             foreach ($this->links as $rel => $href) {
                 $header .= '<link rel="' . htmlspecialchars($rel) . '" href="' . htmlspecialchars($href) . '">';
@@ -210,6 +205,9 @@ class PageManagement {
         $body .= qs_runtime_handoff([
             'base'               => $base,
             'contentPath'        => PUBLIC_CONTENT_PATH,
+            // /p/ serves scripts/qs.js from the engine's own copy (surface B), so
+            // its `?v=` number is that file's date.
+            'runtimeFile'        => SECURE_FOLDER_PATH . '/src/runtime/qs.js',
             'projectKey'         => $projectKey,
             // The route this page was rendered for, so qs.js reads the router's
             // answer instead of matching its own address (which starts with the

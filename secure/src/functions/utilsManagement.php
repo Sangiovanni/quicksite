@@ -796,8 +796,63 @@ function routeExists(string $routePath, array $routes): bool {
         }
         $current = $current[$segment];
     }
-    
+
     return true;
+}
+
+/**
+ * Why a command cannot take $name as the name of one of the project's pages, as the refusal it
+ * sends, or null when it can.
+ *
+ * A page is named by its route path: 'home', 'guides/installation', 'products/:slug'. Every
+ * command that checks a page name asks this, so a page one command opens is a page the others
+ * open too; the visual editor works on one page through several of them. The answers, in order:
+ *
+ *   400 validation.invalid_length  more than 200 bytes
+ *   400 validation.invalid_format  a '..', a backslash or a NUL byte (reason path_traversal_attempt),
+ *                                  or a segment that is neither letters, digits, hyphens and
+ *                                  underscores nor ':' and a parameter name — the shape
+ *                                  paramRoutePathToFs() maps to the page's folder on disk
+ *   404 route.not_found            neither a route of the project nor one of SPECIAL_PAGES
+ *
+ * Whether the page's structure file exists is the caller's next question (resolvePageJsonPath()).
+ *
+ * @param string $name  the page name as received (a numeric name already cast to a string)
+ * @param string $field the parameter the refusal names
+ */
+function qs_page_name_refusal(string $name, string $field = 'name'): ?ApiResponse
+{
+    require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+    require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
+
+    if (strlen($name) > 200) {
+        return ApiResponse::create(400, 'validation.invalid_length')
+            ->withMessage("The {$field} parameter must not exceed 200 characters.")
+            ->withErrors([['field' => $field, 'value' => $name, 'max_length' => 200]]);
+    }
+    if (strpos($name, '..') !== false || strpos($name, '\\') !== false || strpos($name, "\0") !== false) {
+        return ApiResponse::create(400, 'validation.invalid_format')
+            ->withMessage('Name contains invalid path characters')
+            ->withErrors([['field' => $field, 'reason' => 'path_traversal_attempt']]);
+    }
+    foreach (array_filter(explode('/', $name), fn($s) => $s !== '') as $segment) {
+        if (!RegexPatterns::match('identifier_alphanum', $segment)
+            && preg_match('/^:[a-zA-Z_][a-zA-Z0-9_]*$/D', $segment) !== 1) {
+            return ApiResponse::create(400, 'validation.invalid_format')
+                ->withMessage("Invalid segment '{$segment}'. Each segment of a page name is letters, digits, hyphens and underscores, or ':' and a parameter name (products/:slug)")
+                ->withErrors([[
+                    'field' => $field,
+                    'value' => $segment,
+                    'expected' => 'letters, digits, hyphens and underscores; or ":" then a letter or underscore, then letters, digits or underscores',
+                ]]);
+        }
+    }
+    if (!routeExists($name, ROUTES) && !in_array($name, SPECIAL_PAGES, true)) {
+        return ApiResponse::create(404, 'route.not_found')
+            ->withMessage("Page '{$name}' does not exist")
+            ->withData(['available_routes' => flattenRoutes(ROUTES), 'special_pages' => SPECIAL_PAGES]);
+    }
+    return null;
 }
 /**
  * Validate that params array does not contain reserved data-qs-* attributes

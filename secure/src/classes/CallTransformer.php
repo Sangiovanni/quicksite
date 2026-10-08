@@ -10,10 +10,10 @@ require_once __DIR__ . '/../functions/runtimeHandoff.php';
  * CallTransformer — single source of truth for {{call:verb:args}} -> QS.*()
  * transformation + handler validation. Consumed by BOTH JsonToHtmlRenderer
  * (render) and JsonToPhpCompiler (compile), plus PageManagement (page-event
- * chains), so the two engines can't drift (beta.10 R-6 — the CallTransformer
- * twin of UrlPolicy). It replaces two hand-mirrored copies that HAD drifted
- * (compiler lacked the async-chain wrapper, `\,` comma-escaping, and
- * translatable keyword-args).
+ * chains), so the two engines can't drift (the CallTransformer twin of
+ * UrlPolicy). It replaces two hand-mirrored copies that HAD drifted (compiler
+ * lacked the async-chain wrapper, `\,` comma-escaping, and translatable
+ * keyword-args).
  *
  * Fixes folded in at extraction:
  *   - F-e: isValidHandler() uses a structural, quote-and-paren-aware scan, so a
@@ -28,6 +28,15 @@ require_once __DIR__ . '/../functions/runtimeHandoff.php';
  * each route once, so it takes the chain as segments (transformSegments()) and
  * writes each translatable argument as a lookup the built page makes when it is
  * served.
+ *
+ * A target on this site — an argument the catalogue marks `siteUrl` whose value
+ * starts with one '/' — is composed the way a link to the same place is: the
+ * site's base, and for a page the request's language. The base is where the page
+ * is served (`/p/<projectId>/`, a URL space), which only the surface serving it
+ * knows, so the target travels as a segment too: the live render composes it
+ * with the renderer's own URL function (the composer handed to transform() /
+ * resolveSegments()), and a build writes a call to the compiled page's, made
+ * each time the page is served.
  */
 class CallTransformer
 {
@@ -44,26 +53,35 @@ class CallTransformer
 
     private static array $translatablePositionalCache = [];
 
+    private static array $siteUrlPositionalCache = [];
+
     /** Allowed verbs: catalog + the not-yet-cataloged applyAuthState. */
     public static function allowedFunctions(): array
     {
         return array_merge(qsVerbNames(), ['applyAuthState']);
     }
 
-    /** Transform every {{call:...}} in $value into QS.*() JS (chain-aware). */
-    public static function transform(string $value): string
+    /**
+     * Transform every {{call:...}} in $value into QS.*() JS (chain-aware).
+     *
+     * @param callable|null $composeTarget (string $url, string $kind) → string: a target on
+     *                                     this site as the caller composes a link to it
+     *                                     ('page' or 'resource'); null writes it as authored
+     */
+    public static function transform(string $value, ?callable $composeTarget = null): string
     {
-        return self::resolveSegments(self::transformSegments($value));
+        return self::resolveSegments(self::transformSegments($value), $composeTarget);
     }
 
     /**
      * transform(), with each translatable argument left for the caller to look
-     * up: a list of JavaScript strings and ['arg' => <key>, 'keyword' => <name>
-     * or null] entries, in order. One walk of the chain for both uses, so the
-     * live render and a build cannot write different JavaScript around the
-     * argument.
+     * up and each target on this site left for it to compose: a list of
+     * JavaScript strings, ['arg' => <key>, 'keyword' => <name> or null] entries
+     * and ['target' => <url>, 'kind' => 'page'|'resource'] entries, in order. One
+     * walk of the chain for both uses, so the live render and a build cannot write
+     * different JavaScript around the argument.
      *
-     * @return array<int, string|array{arg: string, keyword: ?string}>
+     * @return array<int, string|array{arg: string, keyword: ?string}|array{target: string, kind: string}>
      */
     public static function transformSegments(string $value): array
     {
@@ -123,15 +141,22 @@ class CallTransformer
 
     /**
      * Segments joined into JavaScript, each translatable argument looked up now,
-     * in this request's language.
+     * in this request's language, and each target composed by $composeTarget (as
+     * authored when there is none).
      */
-    public static function resolveSegments(array $segments): string
+    public static function resolveSegments(array $segments, ?callable $composeTarget = null): string
     {
         $js = '';
         foreach ($segments as $segment) {
-            $js .= is_string($segment)
-                ? $segment
-                : qs_translated_call_argument($segment['arg'], $segment['keyword']);
+            if (is_string($segment)) {
+                $js .= $segment;
+            } elseif (isset($segment['target'])) {
+                $js .= qs_call_argument_js($composeTarget !== null
+                    ? (string) $composeTarget($segment['target'], $segment['kind'])
+                    : $segment['target']);
+            } else {
+                $js .= qs_translated_call_argument($segment['arg'], $segment['keyword']);
+            }
         }
         return $js;
     }
@@ -176,11 +201,21 @@ class CallTransformer
 
         $translatableKwargs = self::TRANSLATABLE_KEYWORD_ARGS[$fn] ?? [];
         $translatablePositions = self::getTranslatablePositionalIndices($fn);
+        $siteUrlPositions = self::getSiteUrlPositions($fn);
+        // A fetch takes a URL only in direct-URL mode (a method first). In registry
+        // mode (@api/endpoint first) its second argument is an option.
+        if ($fn === 'fetch' && strpos($args[0] ?? '', '@') === 0) {
+            $siteUrlPositions = [];
+        }
 
         $segments = ["QS.{$fn}("];
         foreach ($args as $i => $arg) {
             if ($i > 0) {
                 $segments[] = ', ';
+            }
+            if (isset($siteUrlPositions[$i]) && self::isSiteTarget($arg)) {
+                $segments[] = ['target' => $arg, 'kind' => $siteUrlPositions[$i]];
+                continue;
             }
             $segments[] = self::argumentSegment($arg, $i, $translatableKwargs, $translatablePositions);
         }
@@ -210,6 +245,35 @@ class CallTransformer
             return ['arg' => $arg, 'keyword' => null];
         }
         return qs_call_argument_js($arg);
+    }
+
+    /**
+     * A target on this site: one '/' and then not a second '/' or a backslash (a
+     * browser reads both of those as the start of another host). '//host',
+     * 'https://…', '#…', '?…' and a relative 'page' are written as authored.
+     */
+    private static function isSiteTarget(string $arg): bool
+    {
+        return preg_match('#^/(?![/\\\\])#', $arg) === 1;
+    }
+
+    /** The positions the catalogue marks `siteUrl`, as position => 'page'|'resource'. */
+    private static function getSiteUrlPositions(string $fn): array
+    {
+        if (isset(self::$siteUrlPositionalCache[$fn])) {
+            return self::$siteUrlPositionalCache[$fn];
+        }
+        $positions = [];
+        foreach (qsVerbCatalog() as $entry) {
+            if (($entry['name'] ?? '') !== $fn) continue;
+            foreach (($entry['args'] ?? []) as $i => $arg) {
+                if (in_array($arg['siteUrl'] ?? null, ['page', 'resource'], true)) {
+                    $positions[$i] = $arg['siteUrl'];
+                }
+            }
+            break;
+        }
+        return self::$siteUrlPositionalCache[$fn] = $positions;
     }
 
     private static function getTranslatablePositionalIndices(string $fn): array

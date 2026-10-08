@@ -30,10 +30,9 @@ if (!defined('QS_SURFACE_B_PROJECT')) {
 qs_load_project_context(QS_SURFACE_B_PROJECT, true);
 qs_surface_b_finish();
 
-// C15 15.4 — tier-2 render bootstrap. Required ONLY by this renderer (tier 1 = init.php's
-// install-wide constants, shared by every entry point). Resolves the PUBLIC BASE once
-// (QS_PUBLIC_BASE_URL env → request-derived) and defines QS_PUBLIC_BASE (root-relative
-// form every in-page URL composes against, R1) + QS_PUBLIC_BASE_ABS (sitemap/spec form).
+// The render bootstrap. Required ONLY by this renderer (init.php holds the install-wide
+// constants, shared by every entry point). Defines QS_PUBLIC_BASE: the root-relative base
+// every in-page URL composes against, always the /p/<projectId>/ this request is served under.
 require_once SECURE_FOLDER_PATH . '/src/functions/renderBootstrap.php';
 
 // --- Component Preview Mode (for Visual Editor) ---
@@ -73,6 +72,9 @@ if (isset($_GET['_component']) && isset($_GET['_editor']) && $_GET['_editor'] ==
     
     // Render component in isolation
     $componentHtml = $renderer->renderComponent($componentName, [], $emulateOverrides);
+
+    // The inline-script encoder and the `?v=` number (each linked file's date).
+    require_once SECURE_FOLDER_PATH . '/src/functions/runtimeHandoff.php';
     
     // Output minimal HTML wrapper with component
     ?><!DOCTYPE html>
@@ -81,8 +83,7 @@ if (isset($_GET['_component']) && isset($_GET['_editor']) && $_GET['_editor'] ==
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Component: <?= htmlspecialchars($componentName) ?></title>
-    <?php $cssVersion = file_exists(PUBLIC_CONTENT_PATH . '/style/style.css') ? filemtime(PUBLIC_CONTENT_PATH . '/style/style.css') : time(); ?>
-    <link rel="stylesheet" href="<?= QS_PUBLIC_BASE ?>style/style.css?v=<?= $cssVersion ?>">
+    <link rel="stylesheet" href="<?= QS_PUBLIC_BASE ?>style/style.css?v=<?= qs_asset_version(PUBLIC_CONTENT_PATH . '/style/style.css') ?>">
     <style>
         /* Component preview container */
         body {
@@ -121,10 +122,9 @@ if (isset($_GET['_component']) && isset($_GET['_editor']) && $_GET['_editor'] ==
         <?= $componentHtml ?>
     </div>
     <?php // Storage-namespace handoff (see PageManagement::render) — the component
-          // preview shares the project's origin, so it must share its key prefix.
-          require_once SECURE_FOLDER_PATH . '/src/functions/runtimeHandoff.php'; ?>
+          // preview shares the project's origin, so it must share its key prefix. ?>
     <script>window.QS_PROJECT=<?= qs_inline_script_json(defined('PROJECT_NAME') ? PROJECT_NAME : 'default') ?>;</script>
-    <script src="<?= QS_PUBLIC_BASE ?>scripts/qs.js"></script>
+    <script src="<?= QS_PUBLIC_BASE ?>scripts/qs.js?v=<?= qs_asset_version(SECURE_FOLDER_PATH . '/src/runtime/qs.js') ?>"></script>
 </body>
 </html><?php
     exit;

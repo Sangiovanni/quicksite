@@ -134,7 +134,7 @@ re-run, so changing one setting later never means answering the others again:
 |---|---|---|
 | **1** | Rename the public folder | match your vhost DocumentRoot (e.g. `www`, `public_html`, `www.example.com`). Only needed when your host *forces* a document-root name — if you can edit the vhost, just point `root` at `public/` and skip this |
 | **2** | Rename the secure folder | obscure the backend, optionally nest it (e.g. `backend`, `app`, `backends/project1`) |
-| **3** | Change the URL space | serve from a subdirectory of the domain (e.g. `mysite` → `http://domain.com/mysite/`) |
+| **3** | Change the URL space | serve from a subdirectory of the domain (e.g. `mysite` → `http://domain.com/mysite/`). Each segment is a folder name, and none may be `p`: `/p/` is where each project is served |
 | **4** | Switch environment | `production` (default) or `development` — see below |
 | **5** | Self-registration on / off | may visitors create their own accounts at `/admin/register`? Default off |
 | **6** | Show my setup token | reads the first-run credential off disk once it exists |
@@ -526,7 +526,7 @@ The setup scripts (`setup.sh` / `setup.bat`) handle all folder customization:
 |------|-------------|--------|
 | **1. Public folder** | Renames `public/` to match your vhost DocumentRoot. Updates `init.php`. | `public_html`, `www`, `www.example.com` |
 | **2. Secure folder** | Renames `secure/` for obscurity, supports nesting. Updates `init.php`. | `backend`, `app`, `backends/project1` |
-| **3. URL space** | Moves files into a subdirectory, adjusts `.htaccess`, nginx config, and `init.php`. | `mysite` → `http://domain/mysite/` |
+| **3. URL space** | Moves files into a subdirectory, adjusts `.htaccess`, nginx config, and `init.php`. Refuses an empty segment, `.`, `..` and a segment named `p`. | `mysite` → `http://domain/mysite/` |
 
 All steps support renaming, nesting, un-nesting, and are re-runnable. On nginx, changing the space regenerates `secure/nginx/dynamic_routes.conf` and attempts an automatic reload. On Apache, `.htaccess` changes take effect immediately.
 

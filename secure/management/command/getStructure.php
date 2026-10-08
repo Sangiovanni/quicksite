@@ -132,43 +132,39 @@ function __command_getStructure(array $params = [], array $urlParams = []): ApiR
                 ]);
         }
         
-        // Length validation - max 200 characters for route path
-        if (strlen($name) > 200) {
-            return ApiResponse::create(400, 'validation.invalid_length')
-                ->withMessage("The name parameter must not exceed 200 characters.")
-                ->withErrors([
-                    ['field' => 'name', 'value' => $name, 'max_length' => 200]
-                ]);
-        }
-        
-        // Check for path traversal attempts in name (BEFORE other validations)
-        // Allow forward slashes for nested routes, but block dangerous patterns
-        if (strpos($name, '..') !== false || 
-            strpos($name, '\\') !== false ||
-            strpos($name, "\0") !== false) {
-            return ApiResponse::create(400, 'validation.invalid_format')
-                ->withMessage('Name contains invalid path characters')
-                ->withErrors([
-                    ['field' => 'name', 'reason' => 'path_traversal_attempt']
-                ]);
-        }
-        
-        // Validate each segment of the route path
-        $segments = array_filter(explode('/', $name), fn($s) => $s !== '');
-        foreach ($segments as $segment) {
-            if (!RegexPatterns::match('identifier_alphanum', $segment)) {
-                return ApiResponse::create(400, 'validation.invalid_format')
-                    ->withMessage("Invalid segment '$segment'. Use only alphanumeric, hyphens, and underscores")
-                    ->withErrors([RegexPatterns::validationError('identifier_alphanum', 'name', $segment)]);
+        if ($type === 'page') {
+            // The one page-name rule every command shares, so a parameter route's page
+            // ('products/:slug') opens here as it does in addNode.
+            $refusal = qs_page_name_refusal($name);
+            if ($refusal !== null) {
+                return $refusal;
             }
-        }
-        
-        // Validate page exists (only for pages, not components)
-        // Allow special pages (404, 500, etc.) even if not in ROUTES
-        if ($type === 'page' && !routeExists($name, ROUTES) && !in_array($name, $specialPages, true)) {
-            return ApiResponse::create(404, 'route.not_found')
-                ->withMessage("Page '{$name}' does not exist")
-                ->withData(['available_routes' => flattenRoutes(ROUTES), 'special_pages' => $specialPages]);
+        } else {
+            // Length validation - max 200 characters
+            if (strlen($name) > 200) {
+                return ApiResponse::create(400, 'validation.invalid_length')
+                    ->withMessage("The name parameter must not exceed 200 characters.")
+                    ->withErrors([
+                        ['field' => 'name', 'value' => $name, 'max_length' => 200]
+                    ]);
+            }
+
+            // Check for path traversal attempts in name (BEFORE other validations)
+            if (strpos($name, '..') !== false ||
+                strpos($name, '\\') !== false ||
+                strpos($name, "\0") !== false) {
+                return ApiResponse::create(400, 'validation.invalid_format')
+                    ->withMessage('Name contains invalid path characters')
+                    ->withErrors([
+                        ['field' => 'name', 'reason' => 'path_traversal_attempt']
+                    ]);
+            }
+
+            if (!RegexPatterns::match('identifier_alphanum', $name)) {
+                return ApiResponse::create(400, 'validation.invalid_format')
+                    ->withMessage("Invalid segment '$name'. Use only alphanumeric, hyphens, and underscores")
+                    ->withErrors([RegexPatterns::validationError('identifier_alphanum', 'name', $name)]);
+            }
         }
         
         // Build file path based on type

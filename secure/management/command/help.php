@@ -716,9 +716,9 @@ $GLOBALS['__help_commands'] = [
             'route' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Route name to update title for (must exist in ROUTES)',
+                'description' => 'The page whose title is set, by its route path: nested and parameter routes included (guides/installation, products/:slug). A leading or trailing slash is dropped.',
                 'example' => 'home',
-                'validation' => 'Max 100 chars, alphanumeric/hyphens/underscores only, must be existing route, path traversal blocked'
+                'validation' => 'The rule every page command shares: each segment letters, digits, hyphens and underscores, or ":" and a parameter name (products/:slug); an existing route or a special page (404, 500, 403, 401); at most 200 bytes; no "..", backslash or NUL byte'
             ],
             'lang' => [
                 'required' => true,
@@ -750,9 +750,9 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.validation.missing_field' => 'Missing route, lang, or title parameter',
             '400.validation.invalid_type' => 'route, lang, or title must be a string',
-            '400.validation.invalid_format' => 'Invalid characters in route or lang (path traversal blocked)',
-            '400.validation.invalid_length' => 'route too long (>100), lang too long (>10) or title too long (>200 chars)',
-            '404.validation.invalid_route' => 'Route does not exist in ROUTES',
+            '400.validation.invalid_format' => 'Invalid characters in lang (path traversal blocked); a route with "..", a backslash or a NUL byte (reason path_traversal_attempt), or a segment that is neither letters, digits, hyphens and underscores nor ":" and a parameter name; or the title key collides with a translation of another shape',
+            '400.validation.invalid_length' => 'route too long (>200 bytes), lang too long (>10) or title too long (>200 chars)',
+            '404.route.not_found' => 'The route is neither a route of the project nor a special page',
             '404.file.not_found' => 'Translation file not found for language',
             '500.server.file_read_failed' => 'Failed to read translation file',
             '500.server.file_write_failed' => 'Failed to write updated translation file',
@@ -761,7 +761,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.invalid_json' => 'Translation file contains invalid JSON.',
             '500.server.json_encode_failed' => 'Failed to encode translation data.'
         ],
-        'notes' => 'Updates ONE language at a time for single route. Updates page.titles.{route} key in the specified language translation file. Creates nested page.titles object if it doesn\'t exist. Used by Page.php: $translator->translate("page.titles.{$route}"). Route must exist in ROUTES constant, and the language must be one of the project\'s.'
+        'notes' => 'Updates ONE language at a time for single route. Updates page.titles.{route} key in the specified language translation file, and keeps translate/default.json in step, as setTranslationKeys does: a single-language site reads default.json. Creates nested page.titles object if it doesn\'t exist. A page reads the key page.titles.<route path>, so a nested page and a parameter route\'s page have a title of their own (one title for all of a parameter route\'s values). The route must exist, and the language must be one of the project\'s.'
     ],
     
     'getRoutes' => [
@@ -935,9 +935,9 @@ $GLOBALS['__help_commands'] = [
             '{name}' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => 'Name (required for page/component, optional for menu/footer)',
+                'description' => 'Name (required for page/component, optional for menu/footer). A page is named by its route path, nested and parameter routes included: guides/installation, products/:slug.',
                 'example' => 'home',
-                'validation' => 'Must be an existing route (for pages) or component name'
+                'validation' => 'A page: each segment letters, digits, hyphens and underscores, or ":" and a parameter name (products/:slug); an existing route or a special page (404, 500, 403, 401); at most 200 bytes; no "..", backslash or NUL byte (the rule every page command shares). A component: one segment of letters, digits, hyphens and underscores.'
             ],
             '{option}' => [
                 'required' => false,
@@ -962,8 +962,8 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '400.validation.required' => 'Missing type or name in URL',
-            '400.validation.invalid_format' => 'Invalid type or option format',
-            '404.route.not_found' => 'Page does not exist',
+            '400.validation.invalid_format' => 'Invalid type or option format; a page name with "..", a backslash or a NUL byte (reason path_traversal_attempt), or a segment that is neither letters, digits, hyphens and underscores nor ":" and a parameter name',
+            '404.route.not_found' => 'Page does not exist: neither a route of the project nor a special page',
             '404.file.not_found' => 'Structure file not found',
             '404.node.not_found' => 'Node not found at specified identifier',
             '500.server.file_write_failed' => 'Failed to read structure file',
@@ -989,9 +989,9 @@ $GLOBALS['__help_commands'] = [
             'name' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => 'Name (required for page/component)',
+                'description' => 'Name (required for page/component). A page is named by its route path, nested and parameter routes included: guides/installation, products/:slug.',
                 'example' => 'home',
-                'validation' => 'Must be existing route (pages) or alphanumeric/hyphens/underscores (components)'
+                'validation' => 'A page: each segment letters, digits, hyphens and underscores, or ":" and a parameter name (products/:slug); an existing route or a special page (404, 500, 403, 401); at most 200 bytes; no "..", backslash or NUL byte (the rule every page command shares). A component: letters, digits, hyphens and underscores, no slash.'
             ],
             'structure' => [
                 'required' => true,

@@ -877,8 +877,9 @@ class JsonToHtmlRenderer {
         // Block raw JS, but allow {{call:...}} syntax which gets transformed to safe QS.* calls
         if (preg_match('/^on[a-z]+$/i', $name)) {
             if (is_string($value) && strpos($value, '{{call:') !== false) {
-                // Transform {{call:...}} to QS.* function calls (shared R-6 helper)
-                $transformedValue = CallTransformer::transform($value);
+                // Transform {{call:...}} to QS.* function calls (the shared helper); a target
+                // on this site is composed as a link to it is
+                $transformedValue = CallTransformer::transform($value, fn(string $url, string $kind) => $this->composeCallTarget($url, $kind));
                 // Double-check the result doesn't contain suspicious patterns
                 if (CallTransformer::isValidHandler($transformedValue)) {
                     $escapedValue = htmlspecialchars($transformedValue, ENT_QUOTES | ENT_HTML5, 'UTF-8');
@@ -1005,7 +1006,18 @@ class JsonToHtmlRenderer {
      * @return string Transformed JavaScript code
      */
     public function transformCallSyntaxPublic(string $value): string {
-        return CallTransformer::transform($value);
+        return CallTransformer::transform($value, fn(string $url, string $kind) => $this->composeCallTarget($url, $kind));
+    }
+
+    /**
+     * A call's target on this site (a value starting with one '/'), composed as a link to
+     * the same place is: a page through processUrl() — the base this render composes
+     * against, and the page's language on a multilingual project — and a resource (a
+     * fetch's URL) against the base alone. A built page makes the same composition with
+     * the compiled processUrl() when it is served.
+     */
+    private function composeCallTarget(string $url, string $kind): string {
+        return $kind === 'page' ? $this->processUrl($url) : $this->publicBase . ltrim($url, '/');
     }
 
 

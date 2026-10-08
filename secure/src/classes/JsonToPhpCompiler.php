@@ -221,20 +221,26 @@ class JsonToPhpCompiler {
      * argument translated now would be served in the build's language to every
      * language of the site. qs_translated_call_argument() is the function the
      * live render calls, so a built page writes the argument exactly as the
-     * preview does, in the visitor's language.
+     * preview does, in the visitor's language. A single-language build has one
+     * answer, so it writes the argument now.
      *
-     * A single-language build has one answer, so it keeps writing the argument
-     * now, and compiles exactly as it did.
+     * ⚠ EVERY build writes a target on this site (a value starting with one '/')
+     * as a composition the page makes when it is served (callTargetPhp()): the
+     * base is where the site is deployed and the language is the request's, the
+     * same two things its links are composed with. A chain with neither compiles
+     * to one literal, exactly as it did.
      *
      * @param callable $quote string → the PHP literal the caller has always used
      */
     private function callSegmentsToPhp(array $segments, callable $quote): string {
-        if (!(defined('MULTILINGUAL_SUPPORT') && MULTILINGUAL_SUPPORT)) {
-            return $quote(CallTransformer::resolveSegments($segments));
-        }
+        $multilingual = defined('MULTILINGUAL_SUPPORT') && MULTILINGUAL_SUPPORT;
         $parts = [];
         $pending = null;
         foreach ($segments as $segment) {
+            if (!is_string($segment) && !isset($segment['target']) && !$multilingual) {
+                // A single-language build has one answer for a translation: written now.
+                $segment = CallTransformer::resolveSegments([$segment]);
+            }
             if (is_string($segment)) {
                 $pending = ($pending ?? '') . $segment;
                 continue;
@@ -243,14 +249,29 @@ class JsonToPhpCompiler {
                 $parts[] = $quote($pending);
                 $pending = null;
             }
-            $parts[] = 'qs_translated_call_argument(' . var_export($segment['arg'], true)
-                     . ', ' . var_export($segment['keyword'], true) . ')';
+            $parts[] = isset($segment['target'])
+                ? 'qs_call_argument_js(' . $this->callTargetPhp($segment['target'], $segment['kind']) . ')'
+                : 'qs_translated_call_argument(' . var_export($segment['arg'], true)
+                    . ', ' . var_export($segment['keyword'], true) . ')';
             $this->needsRuntimeHandoff = true;
         }
         if ($pending !== null || empty($parts)) {
             $parts[] = $quote($pending ?? '');
         }
         return implode(' . ', $parts);
+    }
+
+    /**
+     * A call's target on this site, as the PHP a built page evaluates when it is
+     * served: a page through the compiled processUrl() — the build's base and the
+     * request's language, as its links have — and a resource (a fetch's URL)
+     * against the base alone. The live render composes the same way
+     * (JsonToHtmlRenderer::composeCallTarget()).
+     */
+    private function callTargetPhp(string $url, string $kind): string {
+        return $kind === 'page'
+            ? 'processUrl(' . var_export($url, true) . ', $__lang)'
+            : "(defined('BASE_URL') ? BASE_URL : '/') . " . var_export(ltrim($url, '/'), true);
     }
 
     /**

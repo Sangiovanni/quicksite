@@ -29,6 +29,8 @@ URL shape, so a client can read it per command rather than against this list —
 
 `public/management/index.php` authenticates the request, dispatches to a command handler in `<secure>/management/command/`, and returns a uniform JSON response.
 
+A URL segment is percent-decoded before a command reads it. A segment that is not valid UTF-8 once decoded makes the request malformed: it is answered `400 validation.invalid_format` before any command runs.
+
 **These commands develop a project.** Anything about the installation itself, your account, your access to projects, or the admin panel's own state is deliberately *not* here: the panel serves those from its own endpoints (`/admin/api`, `/admin/state`, `/admin/self`), so a script driving this API gets a surface that is about websites and nothing else. If you are looking for one of those, see *What is deliberately not a command* below.
 
 ## Self-documenting

@@ -48,18 +48,26 @@ if (!function_exists('qs_site_config_php')) {
      * the space by the relative-path check), but a generator is the wrong place
      * to rely on a caller's validation still holding.
      *
-     * @param string $project The real project id — becomes PROJECT_NAME.
-     * @param string $public  Public folder name/path.
-     * @param string $secure  Secure folder name/path.
-     * @param string $space   URL space, or '' for none.
+     * @param string      $project The real project id — becomes PROJECT_NAME.
+     * @param string      $public  Public folder name/path.
+     * @param string      $secure  Secure folder name/path.
+     * @param string      $space   URL space, or '' for none.
+     * @param int         $version The `?v=` number every page of this build writes
+     *                             after the files it links: the time the build
+     *                             was made.
+     * @param string|null $icon    The icon every page links (a path on the site,
+     *                             or an absolute URL), or null when the build
+     *                             carries none.
      */
-    function qs_site_config_php(string $project, string $public, string $secure, string $space): string
+    function qs_site_config_php(string $project, string $public, string $secure, string $space, int $version, ?string $icon): string
     {
         $values = [
             'project' => $project,
             'public'  => $public,
             'secure'  => $secure,
             'space'   => $space,
+            'version' => $version,
+            'icon'    => $icon,
         ];
 
         $lines = '';
@@ -78,6 +86,10 @@ if (!function_exists('qs_site_config_php')) {
  *   public   the folder that IS the document root
  *   secure   the sibling folder holding the engine, pages and translations
  *   space    the URL path this site is mounted under, or '' for the root
+ *   version  the `?v=` number each page writes after the files it links (the
+ *            time the site was built), so a browser fetches them again after
+ *            a new build is deployed
+ *   icon     the icon each page links, or null when the build carried none
  *
  * index.php reads this. A direct request for it is a 404: it names the secure
  * folder, and that name is what keeps the engine out of reach of anyone

@@ -157,7 +157,9 @@ window.PreviewConfig = {
     // AI tools panel — pre-resolved workflow metadata. Role-filtered
     // (matches /admin/workflows). One entry per visible workflow.
     aiToolsWorkflows: <?= json_encode($__previewAiToolsWorkflows) ?>,
-    projectStyleUrl: <?= json_encode(rtrim(BASE_URL, '/') . '/style/style.css') ?>,
+    // The edited project's own stylesheet, where /p/<id>/ serves it (the snippet
+    // preview's "with the project's style"). The install root has no stylesheet.
+    projectStyleUrl: <?= json_encode($router->projectSiteBase($__previewProject) . '/style/style.css') ?>,
     // The per-session token, same value as QUICKSITE_CONFIG.token — the editor's
     // hand-built fetch sites read it from here. It authorizes nothing on its own;
     // the session cookie is the credential (see AuthManagement).

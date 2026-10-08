@@ -13046,3 +13046,139 @@ commands `insertSnippet`, `addComponentToNode`, `addNode`, `addComplexElement`, 
 `restoreBackup`, `listBackups`, `deleteBackup`, `cloneProject`, `build`, `exportProject`,
 `uploadAsset`, `createProject`, `createSnippet`; the editor's `preview.js` and
 `preview-iframe-inject.js`. Behaviour: their entries of `help`.
+
+### A page is named by its route path everywhere, the site's base is taken off once, a call target is composed like a link, and a page links a file only when it is there, with a number that changes with it (locked 2026-10-08)
+
+**Amends**: *The public base URL is resolved per request and never stored per project* (locked
+2026-07-24). Its chain now decides the ABSOLUTE base only, the one a sitemap is written with; the
+base in-page URLs compose against is always derived from the request. *An editor fragment
+composes URLs against the project, not the installation* (locked 2026-08-16). Its decision
+stands; its closing statement that the declared variable gives `/…` "on a mapped domain" no
+longer holds: the variable moves no in-page URL. *The favicon is a pointer, not a copy* (locked
+2026-08-23). The pointer and its lifecycle stand; the alternative it rejected, checking whether
+the file exists when a page is rendered, is now taken, for the reasons below.
+**Extends**: *The browser reads the route the server resolved…* (locked 2026-10-02):
+`window.QS_ROUTE` also carries the base the page is served under, exposed as `QS.basePath`.
+*QS.redirect enforces a scheme allowlist at the sink* (locked 2026-08-15): the `?return=`
+fallback is further limited to a path on this site.
+
+**Decision**: nine changes, made together.
+
+- **A page is named by its route path, and one rule checks the name** for the commands that
+  check one (`qs_page_name_refusal()`): at most 200 bytes; no `..`, backslash or NUL byte; each
+  segment letters, digits, hyphens and underscores, or `:` and a parameter name; an existing
+  route or a special page. `getStructure`, `editStructure` and `editTitle` follow it, so a
+  parameter route's page (`products/:slug`) and a nested page are opened, edited and given a
+  title, as `addNode` already let them be filled. `editTitle` writes through the shared
+  translation writer, which keeps `default.json`, the file a single-language site reads, in step.
+- **The site's base is taken off a request's path once** (`qs_path_without_base()`): the URL
+  space in a build; on `/p/<projectId>/`, everything up to and including the project marker,
+  which takes the space with it. The router, the alias rewrite, the language reader and the
+  system placeholders all ask it. Setup refuses a URL space holding a segment named `p`, or one
+  that names no folder of its own (empty, `.`, `..`).
+- **The preview's in-page base is always the request's.** On `/p/`, `QS_PUBLIC_BASE` is
+  `/p/<projectId>/` whatever the vhost declares; `QS_PUBLIC_BASE_URL` gives only the absolute base
+  a sitemap is written with. The two constants nothing read are gone.
+- **A call target on this site is composed by the server, as a link to it is.** In the arguments
+  the verb catalogue marks `siteUrl` (`redirect`'s URL, both magic-link `returnTo`s, a direct-URL
+  `fetch`'s URL), a value starting with one `/` gets the base and, for a page, the request's
+  language, from the same function as an `href`; a fetch's URL gets the base alone. A build
+  composes it each time the page is served. The `?return=` fallback, which the server never sees,
+  is followed only when it is a path on this site, and `qs.js` composes it against
+  `QS.basePath`.
+- **A page links its icon only when the file is there.** On `/p/` every view checks; a build
+  decides once, for the files it copied, and records the answer in its parameters
+  (`qs-site.php`).
+- **Every script carries a `?v=` number, as the stylesheet does.** On `/p/` it is each file's
+  date (`qs.js`'s is the engine copy `/p/` serves). A build writes one number, the time it was
+  made, into `qs-site.php`, for its stylesheet and its scripts; a built page reads nothing else.
+- **An address whose decoded value is not valid UTF-8 names no page**: 404, on `/p/` and in a
+  build. On the management API it is a malformed request, answered 400 before any command reads
+  it.
+- **The language switch names the address the visitor is on**, `…/fr/products/red-vase`, not
+  the route's pattern.
+- **What the route schema file and `exchangeMagicLink`'s description say about the browser**
+  is what it does: `window.QS_ROUTES` is the route table, and the page's own route arrives as
+  `window.QS_ROUTE`; nothing in the browser matches an address.
+
+**Reasoning**:
+
+**One page-name rule.** Twenty commands name a page. Seventeen asked only for its file, through
+the one path function that maps `:slug` to the `__slug` folder; three added a character check of
+their own, written before parameter routes existed, so the visual editor could add a card to
+`products/:slug` but not edit its text, save it as a snippet or set its title. A rule in three
+places had already drifted three ways; one helper holds it. The name must be an existing route
+anyway, which is what decides; the character rule only keeps a path out, so it widens to the
+shape `addRoute` writes and narrows nothing an older page used. `editTitle` had a second fault in
+the same few lines: it wrote `<lang>.json` alone, and a single-language site reads `default.json`,
+so its titles never showed.
+
+**The base, once.** Surface B binds the project from the segment after the first `p` and
+rewrites the address to what follows it, so the URL space was already gone when the router, the
+alias rewrite, the language reader and the placeholders each took it off again by name. A page
+whose first segment is spelled like the space was not served on `/p/`. Only a build, which has no
+marker, takes the space off by name. A space holding a segment named `p` would make the preview
+bind the wrong project, so setup refuses it; an empty, `.` or `..` segment names no folder and
+only ever made a confusing layout.
+
+**The preview's base.** The variable names where a site will be deployed, which a sitemap needs
+and the preview is not: with it set, a `/p/` page loaded its scripts and stylesheet from the
+domain root and linked out of its own project. The constant the in-page URLs compose against is
+now a fact about the request, and nothing declared elsewhere can move it.
+
+**Call targets on the server.** The server already composes every URL attribute against the base
+and the language; a call argument was written as authored, so a `{{call:redirect:/thanks}}` left
+the preview and any URL space, and the panel's route picker writes exactly that shape. Composing
+the argument with the attribute's own function makes a link and a redirect to the same page land
+in the same place, the language included, with no second copy of the language rule. `?return=`
+is written by whoever wrote the link, not by the author, so it is followed only within the site;
+any other target let a valid sign-in link send its visitor elsewhere.
+
+**The icon.** A new project has no icon file, so every page of it asked for one that was not
+there: a failing request on every page view. The check this entry's predecessor rejected costs
+one file test; the stylesheet's date already costs the same on every `/p/` view. A build is a
+fixed artifact, so it decides once and its pages make no check: an icon added to a deployed site
+by hand is linked after the next build.
+
+**The `?v=` number.** A browser keeps a file under its whole address. Without a number a
+redeployed site could go on running the `qs.js` a visitor's browser had kept, which looked like a
+build that needed doing twice. The file's date is the stylesheet's rule and costs nothing to
+read on `/p/`; a build's own number changes with every build and costs a built page nothing.
+
+**Not UTF-8.** A segment that is not text rendered its page around a value that nothing could
+show, encode or send to an API. No page is named by such bytes, so the router does not find one;
+the API calls the request malformed before a command can echo the value into an answer it could
+not encode.
+
+**Alternatives considered**: applying `addRoute`'s literal rule exactly (rejected: it narrows the
+names an older page may hold, and existence decides anyway); moving the seventeen other page
+commands onto the helper now (deferred: they already resolve a name the same way, so it would
+change no answer). Forbidding a page whose first segment matches the space (rejected: a rule
+authors would have to know). Keeping the declared variable on `/p/` (rejected as above). Composing
+call targets in the browser (rejected: either the base alone, so a redirect from a French page
+lands on the default language, or a third copy of the language rule). Writing a default icon at
+creation (rejected: the link would still fail for a project whose icon is removed by hand).
+Checking the icon and the files' dates on every view of a build too (rejected: a build is fixed,
+and its pages need not touch the disk). A content hash for the number (rejected: it reads the
+whole file on every `/p/` view, or needs a list written at build time, where a date or a build
+number already changes when the file does). Rendering a value that is not UTF-8 with U+FFFD in
+its place (kept only as the inline-script encoder's guard: it is not a page).
+
+**Source**: Sangio's rulings during beta.12: 2026-10-03 (a parameter route's page in the
+editor, the space taken off once, the preview's base, call targets, the icon, the route schema's
+words, the 404 for an address that is not UTF-8, the scripts' number) and 2026-10-08 (where a
+call target is composed, the number's value and when a build fixes it, when the icon is checked,
+the API's 400, setup's segments, the language switch, `editTitle`). The files:
+`secure/src/functions/utilsManagement.php` (`qs_page_name_refusal`),
+`secure/management/command/getStructure.php`, `editStructure.php`, `editTitle.php`;
+`secure/src/functions/projectLanguage.php` (`qs_path_without_base`), `surfaceB.php`,
+`secure/src/classes/TrimParameters.php`, `secure/src/functions/aliasRouting.php`,
+`runtimePlaceholders.php`, `setup.sh`, `setup.bat`; `secure/src/functions/renderBootstrap.php`;
+`secure/src/classes/CallTransformer.php`, `JsonToHtmlRenderer.php` (`composeCallTarget`),
+`JsonToPhpCompiler.php` (`callTargetPhp`), `secure/src/functions/qsVerbCatalog.php`,
+`secure/src/runtime/qs.js`; `secure/src/functions/runtimeHandoff.php` (`qs_asset_version`,
+`qs_page_icon_*`), `secure/src/classes/Page.php`, `PageManagement.php`,
+`secure/src/functions/buildSiteRuntime.php`, `secure/management/command/build.php`,
+`secure/src/runtime/site/index.php`; `secure/src/classes/TrimParametersManagement.php`;
+`secure/src/functions/routeHelpers.php`. Behaviour: ARCHITECTURE.md §6.3, §7 and §9.5, and the
+`help` entries of the three page commands.

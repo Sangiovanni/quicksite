@@ -3079,6 +3079,8 @@ Clicking marks the card immediately and then reconciles against the server's ans
 
 `editFavicon` stores a **pointer** — it writes the asset's path into the project config and copies nothing. Renaming the chosen asset follows the pointer; deleting it clears the pointer. So the grid can never show a favicon that is no longer there, and choosing one does not leave duplicate or backup images cluttering the library.
 
+A page links its icon only when the icon's file exists: the chosen asset, or `assets/images/favicon.png` when none is chosen. The preview checks on every view, so an icon added while you work shows on the next one; a build decides once, for the files it copies, and a built page makes no check of its own.
+
 ### 9.16 Builds (/admin/builds)
 
 Where a project becomes a site you can put on a server: build it, download the archive, delete it when you are done.

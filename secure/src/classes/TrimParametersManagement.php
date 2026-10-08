@@ -25,6 +25,18 @@ class TrimParametersManagement{
     // any param route. (Note: $_GET is auto-decoded by PHP, so query-string
     // params don't need this — only the path segments do.)
     $parts = array_map('rawurldecode', $parts);
+    // A segment that is not valid UTF-8 is a malformed request, answered 400 here,
+    // before any command reads it: a command that names the value in its answer
+    // could not encode it and would answer 500 instead. (The site's router answers
+    // the same bytes in a page address 404: a page that does not exist.)
+    foreach ($parts as $part) {
+      if (preg_match('//u', $part) !== 1) {
+        require_once __DIR__ . '/ApiResponse.php';
+        ApiResponse::create(400, 'validation.invalid_format')
+          ->withMessage('A segment of the address is not valid UTF-8')
+          ->send();
+      }
+    }
     //shift management folder
     array_shift($parts);
     // C7 — peel the optional project marker: '/management/p/<projectId>/<command>'.

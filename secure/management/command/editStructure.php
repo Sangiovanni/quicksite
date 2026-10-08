@@ -418,67 +418,59 @@ if ($type === 'page' || $type === 'component') {
             ->send();
     }
     
-    // Length validation - max 200 characters for route paths
-    if (strlen($name) > 200) {
-        ApiResponse::create(400, 'validation.invalid_length')
-            ->withMessage("The name parameter must not exceed 200 characters.")
-            ->withErrors([
-                ['field' => 'name', 'value' => $name, 'max_length' => 200]
-            ])
-            ->send();
-    }
-    
-    // Check for path traversal attempts in name
-    // Allow forward slashes for nested page routes
-    if (strpos($name, '..') !== false || 
-        strpos($name, '\\') !== false ||
-        strpos($name, "\0") !== false) {
-        ApiResponse::create(400, 'validation.invalid_format')
-            ->withMessage('Name contains invalid path characters')
-            ->withErrors([
-                ['field' => 'name', 'reason' => 'path_traversal_attempt']
-            ])
-            ->send();
-    }
-    
-    // For components, block slashes entirely
-    if ($type === 'component' && strpos($name, '/') !== false) {
-        ApiResponse::create(400, 'validation.invalid_format')
-            ->withMessage('Component name cannot contain slashes')
-            ->withErrors([
-                ['field' => 'name', 'reason' => 'invalid_character']
-            ])
-            ->send();
-    }
-    
-    // Validate page exists (only for pages, not components - components can be created)
-    // Allow special pages (404, 500, etc.) even if not in ROUTES
-    if ($type === 'page' && !routeExists($name, ROUTES) && !in_array($name, SPECIAL_PAGES, true)) {
-        ApiResponse::create(404, 'route.not_found')
-            ->withMessage("Page '{$name}' does not exist")
-            ->withData(['available_routes' => flattenRoutes(ROUTES), 'special_pages' => SPECIAL_PAGES])
-            ->send();
-    }
-    
-    // Validate each segment of the name
-    $segments = array_filter(explode('/', $name), fn($s) => $s !== '');
-    foreach ($segments as $segment) {
-        if (!RegexPatterns::match('identifier_alphanum', $segment)) {
+    if ($type === 'page') {
+        // The one page-name rule every command shares, so a parameter route's page
+        // ('products/:slug') is edited here as it is by addNode.
+        $refusal = qs_page_name_refusal($name);
+        if ($refusal !== null) {
+            $refusal->send();
+        }
+    } else {
+        // Length validation - max 200 characters
+        if (strlen($name) > 200) {
+            ApiResponse::create(400, 'validation.invalid_length')
+                ->withMessage("The name parameter must not exceed 200 characters.")
+                ->withErrors([
+                    ['field' => 'name', 'value' => $name, 'max_length' => 200]
+                ])
+                ->send();
+        }
+
+        // Check for path traversal attempts in name
+        if (strpos($name, '..') !== false ||
+            strpos($name, '\\') !== false ||
+            strpos($name, "\0") !== false) {
             ApiResponse::create(400, 'validation.invalid_format')
-                ->withMessage("Invalid segment '$segment'. Use only alphanumeric, hyphens, and underscores")
-                ->withErrors([RegexPatterns::validationError('identifier_alphanum', 'name', $segment)])
+                ->withMessage('Name contains invalid path characters')
+                ->withErrors([
+                    ['field' => 'name', 'reason' => 'path_traversal_attempt']
+                ])
+                ->send();
+        }
+
+        // A component name is one segment: no slashes at all
+        if (strpos($name, '/') !== false) {
+            ApiResponse::create(400, 'validation.invalid_format')
+                ->withMessage('Component name cannot contain slashes')
+                ->withErrors([
+                    ['field' => 'name', 'reason' => 'invalid_character']
+                ])
+                ->send();
+        }
+
+        if (!RegexPatterns::match('identifier_alphanum', $name)) {
+            ApiResponse::create(400, 'validation.invalid_format')
+                ->withMessage("Invalid segment '$name'. Use only alphanumeric, hyphens, and underscores")
+                ->withErrors([RegexPatterns::validationError('identifier_alphanum', 'name', $name)])
                 ->send();
         }
     }
-    
+
     // Build file path
     if ($type === 'page') {
-        // Use helper to resolve JSON path (supports folder structure)
-        $json_file = resolvePageJsonPath($name);
-        if ($json_file === null) {
-            // For new pages that don't exist yet, use folder structure
-            $json_file = getNewPagePath($name, 'json');
-        }
+        // Use helper to resolve JSON path (supports folder structure). An existing route's page
+        // with no structure file is answered 404 below; nothing is created for it.
+        $json_file = resolvePageJsonPath($name) ?? getNewPagePath(paramRoutePathToFs($name), 'json');
     } else { // component
         $json_file = PROJECT_PATH . '/templates/model/json/components/' . $name . '.json';
     }

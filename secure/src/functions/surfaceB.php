@@ -306,8 +306,11 @@ function qs_surface_b_finish(): void {
 
     // Rewrite REQUEST_URI so TrimParameters + the whole pipeline see a clean path
     // (the optional-space + p + id marker stripped; sub-route + query preserved).
+    // The space went with the marker, so nothing after this point takes it off
+    // again: qs_path_without_base() reads the flag set here.
     $query = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_QUERY);
     $_SERVER['REQUEST_URI'] = '/' . $subpath . ($query ? '?' . $query : '');
+    $GLOBALS['__qs_sb']['rewritten'] = true;
     // return → public/index.php continues its normal render pipeline.
 }
 

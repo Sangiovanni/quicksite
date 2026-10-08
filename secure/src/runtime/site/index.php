@@ -130,9 +130,17 @@ if (!is_array($qsSite)
     || !is_string($qsSite['public'])  || $qsSite['public']  === ''
     || !is_string($qsSite['secure'])  || $qsSite['secure']  === ''
     || !is_string($qsSite['space'] ?? '')
+    || !is_int($qsSite['version'] ?? null) || $qsSite['version'] < 1
+    || !array_key_exists('icon', $qsSite) || !($qsSite['icon'] === null || is_string($qsSite['icon']))
 ) {
     qs_site_fail('qs-site.php is missing or malformed', $qsSiteConfigFile);
 }
+
+// The `?v=` number every page writes after the files it links, and the icon it
+// links: decided when the site was built (build.php), so a page served from it
+// makes no check of its own. Page.php reads both.
+define('QS_BUILD_VERSION', $qsSite['version']);
+define('QS_BUILD_ICON', $qsSite['icon']);
 
 // ---------------------------------------------------------------------------
 // 2. Where everything is

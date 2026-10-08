@@ -58,14 +58,13 @@ if (!function_exists('qs_apply_alias_routing')) {
             return null;
         }
 
-        // The path the visitor asked for, with the URL space peeled off — the
-        // same normalisation TrimParameters::parseUrl() performs, so the two
+        // The path the visitor asked for, with the site's base taken off — the
+        // same qs_path_without_base() TrimParameters::parseUrl() calls, so the two
         // agree about what "the page part" of a URL is.
-        $rawPath = trim((string) (parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?? ''), '/');
-        $space   = defined('PUBLIC_FOLDER_SPACE') ? trim(PUBLIC_FOLDER_SPACE, '/') : '';
-        if ($space !== '') {
-            $rawPath = removePrefix($rawPath, $space . '/');
-        }
+        $rawPath = qs_path_without_base((string) (parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?? ''));
+        // What the router takes off the rewritten address again: the URL space, except
+        // on /p/, where surface B already took it off and nothing is taken off twice.
+        $space   = (!defined('QS_SURFACE_B') && defined('PUBLIC_FOLDER_SPACE')) ? trim(PUBLIC_FOLDER_SPACE, '/') : '';
 
         $parts = array_values(array_filter(explode('/', $rawPath), static fn($p) => $p !== ''));
 
@@ -103,9 +102,9 @@ if (!function_exists('qs_apply_alias_routing')) {
         //              exactly what QS_PUBLIC_BASE is for, and it is what every
         //              other link on the page already uses.
         //   rewrite  → a value the ROUTER will read back out of REQUEST_URI,
-        //              and the router strips only PUBLIC_FOLDER_SPACE. Giving
-        //              it the public base would put a prefix in front of the
-        //              path that nothing downstream removes.
+        //              and the router takes off only the URL space (nothing on
+        //              /p/). Giving it the public base would put a prefix in
+        //              front of the path that nothing downstream removes.
         //
         // They coincide in a build, which is why only the renderer showed it:
         // an alias there redirected out of the project's own namespace.

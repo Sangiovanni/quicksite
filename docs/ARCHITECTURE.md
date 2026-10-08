@@ -524,12 +524,14 @@ its own. `TrimParameters::lang()` reports `null` on a monolingual project,
 because such a site's URLs carry no language segment and there is nothing to
 report.
 
-The path it reads is normalised the way `TrimParameters` normalises it: the
-optional `PUBLIC_FOLDER_SPACE` prefix is removed, and on `/p/<projectId>/`
-serving the project marker is removed too. The marker matters because that
-surface rewrites `REQUEST_URI` part-way through a request — without the strip,
-the same request would resolve to different languages depending on when the
-question was asked.
+The path it reads has the site's base taken off the way `TrimParameters` takes
+it off — once, by `qs_path_without_base()`: the optional URL space
+(`PUBLIC_FOLDER_SPACE`) in a build; on `/p/<projectId>/` serving, everything up
+to and including the project marker, the space with it, and nothing more once
+that surface has rewritten `REQUEST_URI` to the page part. The marker matters
+because the rewrite happens part-way through a request — without the strip, the
+same request would resolve to different languages depending on when the question
+was asked.
 
 **This is the author's site's language, not the admin panel's.** The panel runs
 a separate system — `AdminTranslation`, files under
@@ -584,12 +586,12 @@ qs_load_project_context(<projectId>)
   └── binds PUBLIC_CONTENT_PATH to that project's own public/
   │
 renderBootstrap
-  └── resolves the PUBLIC BASE once — QS_PUBLIC_BASE_URL env var, else
-        derived from the request — into QS_PUBLIC_BASE (root-relative form
-        all in-page URLs compose against) + QS_PUBLIC_BASE_ABS (sitemap).
-        The same resolution answers on the management path, where the
-        editor renders page FRAGMENTS (see below); only the two constants
-        are specific to this entry point
+  └── defines QS_PUBLIC_BASE, the root-relative base all in-page URLs
+        compose against: always derived from the request (/p/<projectId>/).
+        The QS_PUBLIC_BASE_URL env var feeds only the absolute form a
+        sitemap is written with. The same derivation answers on the
+        management path, where the editor renders page FRAGMENTS (see
+        below); only the constant is specific to this entry point
   │
 public/p/index.php
   ├── a request for a static file is served here and the request ends
@@ -715,12 +717,12 @@ Worked example — three registered routes: `shop/sale/clearance`, `shop/sale/:i
 | `/shop/sale/red-vase` | `shop`, `sale` literal; no literal child for `red-vase`, so `:item` captures it | `shop/sale/:item` |
 | `/shop/winter/jacket` | `shop` literal; no `winter` child, so `:cat` captures it, then `:item` | `shop/:cat/:item` |
 
-Captured values are URL-decoded before exposure, matching PHP's `$_GET` convention: `/products/red%20vase` exposes `slug = 'red vase'`.
+Captured values are URL-decoded before exposure, matching PHP's `$_GET` convention: `/products/red%20vase` exposes `slug = 'red vase'`. A value that is not valid UTF-8 once decoded names no page: the address is a 404, on `/p/` and in a build alike.
 
 #### How captured params flow
 
 - **Server (PHP)** — `Page::render()` injects each captured value as a template variable named after the param. Inside a page's PHP template, `$slug`, `$id`, etc. sit alongside `$translator` and other request-scoped variables. Inside JSON pages a `{{param:NAME}}` placeholder is substituted in raw text, translated text and attributes, on both the served site and a build (§4.2). The literal `param:` prefix is required so it doesn't collide with component-variable patterns.
-- **Client (qs.js)** — The page hands `qs.js` the route the server resolved for it: the runtime handoff (§9.5) writes `window.QS_ROUTE` — the matched pattern, the captured values and whether a route was found — from the same router call the page was rendered with. qs.js's synchronous IIFE exposes it on load as three globals: `QS.routeParams` (a dict of captured values), `QS.routePath` (the matched pattern), `QS.routeFound` (a boolean; when it is false the other two are `null` and empty). The browser does no matching of its own, so it agrees with the server under any base the page is served at — the `/p/<projectId>/` preview, an installation's URL space, a build's space — and on everything the rules above decide, a multilingual site's language segment and internal aliases included. State stores can initialise a field from `init: 'param:slug'` — a fifth source kind alongside the existing `query:` / `localStorage:` / `sessionStorage:` / literal. The project's own `public/scripts/qs-route-schema.js` (`window.QS_ROUTES`) lists every route's pattern + param shape; for a deeper URL → live data loop (server-rendered authed pages, SEO) the server data resolver builds on the same schema.
+- **Client (qs.js)** — The page hands `qs.js` the route the server resolved for it: the runtime handoff (§9.5) writes `window.QS_ROUTE` — the matched pattern, the captured values and whether a route was found — from the same router call the page was rendered with. qs.js's synchronous IIFE exposes it on load as three globals: `QS.routeParams` (a dict of captured values), `QS.routePath` (the matched pattern), `QS.routeFound` (a boolean; when it is false the other two are `null` and empty). The browser does no matching of its own, so it agrees with the server under any base the page is served at — the `/p/<projectId>/` preview, an installation's URL space, a build's space — and on everything the rules above decide, a multilingual site's language segment and internal aliases included. `window.QS_ROUTE` also carries the base the page is served under (`/p/<projectId>/`, a URL space, `/`), exposed as `QS.basePath`. State stores can initialise a field from `init: 'param:slug'` — a fifth source kind alongside the existing `query:` / `localStorage:` / `sessionStorage:` / literal. The project's own `public/scripts/qs-route-schema.js` (`window.QS_ROUTES`) lists every route's pattern + param shape; for a deeper URL → live data loop (server-rendered authed pages, SEO) the server data resolver builds on the same schema.
 
 #### Conflict detection
 
@@ -784,7 +786,8 @@ Two per-vhost variables remain, and neither selects a project:
   are generated against. A sitemap has to name the URL the site will be *deployed* at, which the
   authoring install cannot derive from the request it is answering, so the deployer declares it.
   It also covers sub-path mounts and reverse proxies, where the request-derived origin would be
-  wrong. In-page links are root-relative and need no declaration.
+  wrong. In-page links, scripts and stylesheets are root-relative, need no declaration and are
+  never moved by one: a page composes them against the base it is served under.
 - `QS_TRUSTED_HOSTS` (optional) pins the Host header: a request presenting any other host has
   its URLs composed against the first listed host instead.
 
@@ -915,6 +918,8 @@ Beyond the `{{call:…}}` verbs, the auth-flows runtime adds **declarative bindi
 **Browser storage is namespaced per project.** Storage is scoped by origin and a path is not part of an origin, so every project served at `/p/<projectId>/` on one host shares a single `localStorage`. `qs.js` therefore writes and reads each key as `qsp_<projectId>_<key>` — the storage verbs, the `data-storage-*` / `data-auth-source` bindings and a state store's `localStorage:` / `sessionStorage:` init source all resolve through the same helper, so they always address the same slot. Everything an author writes names the bare key; the prefix exists only inside `qs.js`. The project id arrives from the server as `window.QS_PROJECT`, emitted before `qs.js` by `PageManagement::render()` (live) and `Page::render()` (built): at `/p/<projectId>/` the id is a URL segment, but a deployed build is served from its own root and the path carries no id at all, so deriving it client-side would give development and production different prefixes. The prefix is never stripped at build time — the two must agree on key names. `qsp_` is deliberately outside the admin reservation (`quicksite_`/`quicksite-`/`qs_`/`qs-`, enforced by `secure/src/functions/reservedStorageKeys.php`), which is what keeps a project page from addressing panel state.
 
 **`QS.redirect` enforces a scheme allowlist** (`http`, `https`, `mailto`, `tel` — the same set as the server-side `UrlPolicy` that guards URL *attributes*), refusing anything else with a `console.warn`. Assigning a `javascript:` URL to `location.href` executes in the page's own origin, and the surface-B CSP cannot prevent it because engine pages require `script-src 'unsafe-inline'` for their own handlers. Three callers reach the sink with values the page did not choose: the `redirect` verb, the magic-link verbs' `returnTo` argument, and the `?return=` query parameter they fall back to.
+
+**A call target on this site is composed by the server, as a link to it is.** In the arguments the verb catalogue marks `siteUrl` — `redirect`'s URL, both magic-link `returnTo`s, and a direct-URL `fetch`'s URL — a value starting with one `/` names this site: a page gets the base and, on a multilingual site, the page's language (the same function as an `href`), a fetch's URL the base alone. The live render composes it as it renders; a build writes a call that composes it each time the page is served, against the base the site is deployed under. Anything else (`https://…`, `//…`, `#…`, a relative path) is written as authored. The `?return=` fallback, which the server never sees, is followed only when it is a path on this site, and `qs.js` composes it against `QS.basePath`; code an author writes by hand composes its own targets the same way.
 
 `QS.filter` accepts a polymorphic `matchAttr` (3rd arg): omit it (or pass `textContent`) to match the element's text; pass a `data-*` name to match an attribute; pass a CSS selector starting with `.`, `#`, `>` or space to match the concatenated `textContent` of one or more **descendant** elements (e.g. `.cmd-name, .cmd-description` for "search across both"). The descendant-text and textContent modes also highlight matches in place via an XSS-safe DOM walk (skipped above a 500-node budget).
 
@@ -1225,7 +1230,7 @@ PHP and the browser runtime:
 | Block | Carries |
 |---|---|
 | `qs-route-schema.js` | `window.QS_ROUTES` — the project's route table: every pattern and its params |
-| `window.QS_PROJECT`, `window.QS_ROUTE` | the project id every browser-storage key is prefixed with; the route the server resolved for this request (pattern, captured values, found), which `qs.js` exposes as `QS.routePath` / `QS.routeParams` / `QS.routeFound` (§6.3) |
+| `window.QS_PROJECT`, `window.QS_ROUTE` | the project id every browser-storage key is prefixed with; the route the server resolved for this request (pattern, captured values, found) and the base the page is served under, which `qs.js` exposes as `QS.routePath` / `QS.routeParams` / `QS.routeFound` / `QS.basePath` (§6.3) |
 | `qs.js` | the runtime itself |
 | `window.QS_CONSENT` | the key→category map that gates storage writes |
 | theme wiring | `[data-theme-toggle]` behaviour, keyed per project |
@@ -1236,6 +1241,8 @@ PHP and the browser runtime:
 | `window.QS_RESOLVED` | store-keyed resolver values, so a hydrated store skips its first fetch |
 | `window.QS_RESOLVED_BY_INDEX` | the same values under the `r0` / `r1` addresses templates use |
 | page events | the compiled `onload` / `onresize` / `onscroll` chain |
+
+**Every script carries a `?v=` number**, as the stylesheet does, so a browser fetches a file again once it changes and keeps the copy otherwise. On `/p/` it is each file's date, read on every view (`qs.js`'s is the engine's own copy, the file `/p/` serves); a build writes one number, the time it was made, into its parameters (`qs-site.php`), for its stylesheet and its scripts, and its pages read nothing else.
 
 **Order is part of the contract.** The storage namespace and the route go
 before `qs.js`, because its IIFE reads them synchronously at load. The state
@@ -1431,13 +1438,16 @@ Before the lock:
 Then:
 
 6. Create the build directory and its skeleton.
-7. **Emit the entry point** — copy `src/runtime/site/index.php`, write
-   `qs-site.php`, write the `.htaccess` that funnels requests into it, and,
-   when a URL space is set, a second `.htaccess` at the document root so the
-   root is not browsable.
+7. **Emit the entry point** — copy `src/runtime/site/index.php`, write the
+   `.htaccess` that funnels requests into it, and, when a URL space is set, a
+   second `.htaccess` at the document root so the root is not browsable.
 8. Copy `style/` and `assets/` through the **publish allowlist** — the boundary
    where a file stops being project data and becomes something a web server
-   hands to the public.
+   hands to the public. Then write `qs-site.php`, the parameters the entry point
+   reads — among them the `?v=` number every page writes after the files it
+   links (the time of this build), and the icon, recorded only when the copy
+   just made carries its file. A built page makes no check of its own; an icon
+   added to a deployed site by hand is linked after the next build.
 9. Copy `LICENSE`, and `sitemap.txt` when the project has one.
 10. Copy `routes.php` and `config.php`, the runtime classes and function files
     (§11.2), the translations (all languages when the project is multilingual,

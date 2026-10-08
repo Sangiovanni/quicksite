@@ -21,8 +21,8 @@
      * The route this page was served for, as the server resolved it.
      *
      * The server writes it before this file loads, in the runtime handoff:
-     * window.QS_ROUTE = { path, params, found }, from the same router call the
-     * page was rendered with. Nothing here reads the page's own address. The
+     * window.QS_ROUTE = { path, params, found, base }, from the same router call
+     * the page was rendered with. Nothing here reads the page's own address. The
      * page may be served under a base the router removed first (the
      * /p/<projectId>/ preview, an installation's URL space, a build's space),
      * and the router also decides the language segment of a multilingual site,
@@ -34,13 +34,23 @@
      *   QS.routePath   — the matched pattern, e.g. 'products/:slug'
      *   QS.routeFound  — true when a route matched, false otherwise
      *                    (then routePath is null and routeParams empty)
+     *   QS.basePath    — the base the page is served under, with both slashes:
+     *                    '/p/<projectId>/' on the preview, '/<space>/' under a
+     *                    URL space, '/' at a site's root. The server composes
+     *                    every target an author writes in a {{call:...}}; code
+     *                    written by hand composes its own: QS.basePath + 'about'.
      */
     QS.routeParams = {};
     QS.routePath   = null;
     QS.routeFound  = false;
+    QS.basePath    = '/';
     (function readServedRoute() {
         const route = window.QS_ROUTE;
-        if (!route || typeof route !== 'object' || route.found !== true) return;
+        if (!route || typeof route !== 'object') return;
+        if (typeof route.base === 'string' && /^\/(?:[^/\\]|$)/.test(route.base) && route.base.slice(-1) === '/') {
+            QS.basePath = route.base;
+        }
+        if (route.found !== true) return;
         const params = route.params;
         QS.routePath   = typeof route.path === 'string' ? route.path : null;
         QS.routeParams = (params && typeof params === 'object' && !Array.isArray(params))
@@ -2380,11 +2390,21 @@
             })
             .then(function(data) {
                 QS._lastFetchResult = data;
-                // Resolve returnTo: explicit arg → ?return= query → null.
+                // Resolve returnTo: explicit arg → ?return= query → null. The
+                // argument is the author's, composed by the server like a link.
+                // ?return= is whoever wrote the link's: it is followed only when
+                // it is a path on this site (one '/', then neither a second '/'
+                // nor a backslash, which a browser reads as another host), and it
+                // is composed against the base here, because the server never
+                // sees it.
                 var target = (returnTo !== undefined && returnTo !== null && returnTo !== '') ? returnTo : null;
                 if (!target) {
                     var queryReturn = new URLSearchParams(location.search).get('return');
-                    if (queryReturn) target = queryReturn;
+                    if (queryReturn && /^\/(?![/\\])/.test(queryReturn)) {
+                        target = QS.basePath + queryReturn.slice(1);
+                    } else if (queryReturn) {
+                        console.warn('[QS] exchangeMagicLink: ?return= is not a path on this site, not followed:', queryReturn);
+                    }
                 }
                 if (target) QS.redirect(target);
                 return data;

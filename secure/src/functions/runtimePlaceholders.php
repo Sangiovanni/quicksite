@@ -157,13 +157,9 @@ if (!function_exists('qs_system_placeholders')) {
      */
     function qs_system_placeholders(array $ctx = []): array
     {
-        $currentPage = trim((string) (parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?? ''), '/');
-
-        // The URL space, when the site is mounted under one.
-        $space = defined('PUBLIC_FOLDER_SPACE') ? trim(PUBLIC_FOLDER_SPACE, '/') : '';
-        if ($space !== '') {
-            $currentPage = removePrefix($currentPage, $space . '/');
-        }
+        // The page part of the address: the site's base taken off once, as the router
+        // takes it off (the URL space in a build; on /p/, the marker surface B removed).
+        $currentPage = qs_path_without_base((string) (parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?? ''));
 
         // The language segment, asked of the single detection point rather than
         // matched against an interpolated list. A mono-language project answers
