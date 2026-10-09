@@ -71,9 +71,9 @@ if (!empty($buildCustomName)) {
 
 // Validate public folder name parameter.
 // `isset`, not `!empty`: an explicit `public: ''` (or `'0'`) is a value the
-// caller chose and it used to skip BOTH this format check and the containment
-// guard below, reaching the build with an empty name — the same hole as
-// `public: '.'` spelled differently (beta.11 S3.10c).
+// caller chose, and `!empty` would skip BOTH this format check and the
+// containment guard below, reaching the build with an empty name — the same
+// hole as `public: '.'` spelled differently.
 if (isset($params['public'])) {
     // Type validation
     if (!is_string($params['public'])) {
@@ -170,11 +170,11 @@ if (!empty($params['space'])) {
 
 // Security validation: the secure folder must not end up inside the public one.
 //
-// This used to compare only the FIRST PATH SEGMENT of each name, which answers a
-// different question from the one the explanation below asks. `public='.'`
-// passed it — and `.` makes the public content path the build ROOT, so the whole
-// secure folder became a child of the deployed document root, which is exactly
-// what that explanation promises cannot happen (beta.11 S3.10c, audit F2).
+// Comparing only the FIRST PATH SEGMENT of each name answers a different
+// question from the one the explanation below asks: `public='.'` passes it —
+// and `.` makes the public content path the build ROOT, so the whole secure
+// folder would become a child of the deployed document root, which is exactly
+// what that explanation promises cannot happen.
 // qs_build_paths_conflict() answers the real question (containment) and keeps
 // the shared-root rule the example_invalid below documents.
 // Unconditional: the names always have values (the defaults), the default pair
@@ -241,13 +241,12 @@ if ($existingBuild !== null) {
         ])
         ->send();
 }
-// beta.10 C13 13.6b: the auto name is second-resolution, and it used to be
-// mkdir'd with no existence check — so two builds inside the same second made
-// the second one answer 500 server.directory_create_failed on an operation that
-// is perfectly legitimate. Disambiguate with a suffix instead. At N = 1 the
-// refusal above already guarantees an empty qs_build/, so this loop is belt and
-// braces against a stray same-second directory rather than the load-bearing
-// guard it was when builds accumulated.
+// The auto name is second-resolution: mkdir'd with no existence check, two
+// builds inside the same second would make the second one answer 500
+// server.directory_create_failed on an operation that is perfectly legitimate.
+// Disambiguate with a suffix instead. At N = 1 the refusal above already
+// guarantees an empty qs_build/, so this loop is belt and braces against a
+// stray same-second directory.
 if ($buildCustomName !== '') {
     $buildFolderName = $buildCustomName;
 } else {
@@ -438,7 +437,7 @@ if ($buildPublicSpace !== ''
     );
 }
 
-// SECURITY (C11 11.0) — the PUBLISH boundary. These two copies are the point
+// SECURITY — the PUBLISH boundary. These two copies are the point
 // where a file stops being project data and becomes something a web server
 // hands to the public, so this is where the publish allowlist applies. They
 // used to go through FileSystem.php's generic copyDirectory(), which recurses
@@ -931,10 +930,10 @@ if (!($enumsSyncResult['ok'] ?? false)) {
 }
 
 // Copy qs.js (required for all interaction/event functionality).
-// C15 15.2: read the shared ENGINE runtime from its engine-owned home, NOT from the
+// Read the shared ENGINE runtime from its engine-owned home, NOT from the
 // project's own public/ (PUBLIC_CONTENT_PATH). A non-served project's PUBLIC_CONTENT_PATH
-// is its own public/, which has no qs.js — so building a non-served project silently
-// shipped a build with no qs.js. Sourcing the engine copy fixes that.
+// is its own public/, which has no qs.js — so reading it there would silently
+// ship a build with no qs.js.
 $qsJsSource = SECURE_FOLDER_PATH . '/src/runtime/qs.js';
 if (file_exists($qsJsSource)) {
     if (($copyError = qs_safe_copy($qsJsSource, $scriptsDir . '/qs.js', 'build')) !== null) {
@@ -1025,7 +1024,7 @@ foreach ($allRoutes as $route) {
     }
     
     // Use route name as title (capitalize first letter of last segment).
-    // Beta.8 A1 — `:slug` segment as the leaf would give a useless title
+    // A `:slug` segment as the leaf would give a useless title
     // like ':slug'; titles for param routes are handled at request time
     // anyway (the per-route .php file looks up page.titles.<routePath>).
     $routeName = basename($route);
@@ -1038,7 +1037,7 @@ foreach ($allRoutes as $route) {
     $pagePhp = $compiler->compilePage($pageJson, $route, $pageLayout['menu'], $pageLayout['footer'], $routeEvents, $routeStores);
 
     // Create folder structure in build: route/route.php
-    // Beta.8 A1 — sanitise `:slug` → `__slug` for the build output path
+    // Sanitise `:slug` → `__slug` for the build output path
     // (NTFS reserves ':'). Matches the source-side convention used by
     // resolvePageJsonPath. Helper in routeHelpers.php (already required
     // via utilsManagement.php which build.php depends on).
@@ -1336,20 +1335,19 @@ ApiResponse::create(201, 'operation.success')
         'skipped_pages' => $skippedPages,
         'skipped_count' => count($skippedPages),
         // Files present in the project's public/ but refused by the publish
-        // allowlist, so they never reach a web-served directory (C11 11.0).
+        // allowlist, so they never reach a web-served directory.
         'skipped_unpublishable' => $skippedUnpublishable,
         'skipped_unpublishable_count' => count($skippedUnpublishable),
         'page_events_compiled' => $pageEventsCount,
         'public_folder_name' => $buildPublicName,
         'secure_folder_name' => $buildSecureName,
         'public_folder_space' => $buildPublicSpace,
-        // `config_sanitized` was reported here and was never true: config.php is
-        // copied verbatim and no sanitisation exists anywhere in this command
-        // (beta.11 S3.10c, audit F4). The field is gone rather than made true —
-        // an allowlist of travelling config keys was weighed and declined,
-        // because today's schema holds only benign settings and a list that must
-        // be updated for every new key fails closed in the silent direction.
-        // The command no longer claims a property it does not have.
+        // No `config_sanitized` field: config.php is copied verbatim and no
+        // sanitisation exists anywhere in this command, so the field could only
+        // claim a property the command does not have. An allowlist of travelling
+        // config keys was weighed and declined, because today's schema holds only
+        // benign settings and a list that must be updated for every new key fails
+        // closed in the silent direction.
 // The site's own front controller, its parameters and its request
         // funnel — all three verified present and consistent before this
         // response was allowed to be a success.

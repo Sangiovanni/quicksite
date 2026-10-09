@@ -50,7 +50,7 @@ class WorkflowManager {
      * When set, fetchDataRequirements will verify each command is allowed
      * for the user's role before executing via CommandRunner.
      * 
-     * @param array $tokenInfo Resolved user from validateBearerToken() — must have 'id' (C5)
+     * @param array $tokenInfo Resolved user from validateBearerToken() — must have 'id'
      */
     public function setTokenInfo(array $tokenInfo): void {
         $this->tokenInfo = $tokenInfo;
@@ -61,7 +61,7 @@ class WorkflowManager {
      *
      * Workflows are SHIPPED, not authored: only `core/` is read. The custom
      * workflow feature (author-written specs in `custom/`, saved + deleted
-     * through the admin AJAX helper) was removed in beta.10 C8 — it was an
+     * through the admin AJAX helper) was removed — it was an
      * unused artifact that had become a flaw vector: an ungated save arm let
      * any authenticated caller author a spec whose `dataRequirements` named
      * arbitrary CommandRunner-allowlisted commands, then execute it.
@@ -155,7 +155,6 @@ class WorkflowManager {
      * inline-substitution path — useful for `default: "Hello {{param.name}}"`.
      *
      * Mutates the workflow in place. Idempotent (safe to call twice).
-     * Schema addition for beta.9 Phase C+.
      *
      * @param array $workflow The workflow (modified in place)
      * @param array $data     Fetched dataRequirements keyed by id
@@ -265,7 +264,7 @@ class WorkflowManager {
             $extract = $req['extract'] ?? null;
             
             // Role-based permission check: if tokenInfo is set, verify the user can run this command.
-            // C7 — hasPermission is project-scoped for project commands; authorize against the loaded
+            // hasPermission is project-scoped for project commands; authorize against the loaded
             // project context (PROJECT_NAME). WorkflowManager always runs inside a resolved project
             // (admin/api or the dispatcher), so a workflow's data commands are checked against it.
             if ($this->tokenInfo !== null && function_exists('hasPermission')) {
@@ -837,8 +836,6 @@ class WorkflowManager {
         //   "forEach": "data.langData.languages",
         //   "filter": "{{$value}} not_in {{param.languages}}",
         //   "command": "deleteLang", "params": { "code": "{{$value}}" }
-        //
-        // Added in beta.9 Phase C+ (workflow framework upgrades).
         if (preg_match('/^(.+?)\s+(in|not_in)\s+(.+)$/', $expr, $matches)) {
             $leftRaw = trim($matches[1]);
             $operator = $matches[2];
@@ -1161,11 +1158,11 @@ class WorkflowManager {
         // Reset per-render help cache and seed it with already-fetched help data
         $this->helpCache = $commandsContext;
         
-        // Phase 3 — Auto-inject pins / warnings as partial references at the top of the template,
+        // Auto-inject pins / warnings as partial references at the top of the template,
         // unless meta.suppressPinsHeader is true. The resolver below inlines them.
         $template = $this->prependPinsWarnings($template, $workflow);
         
-        // Phase 1/2/4 — Resolve {{> name}}, {{> command.X}}, {{> command.$relatedCommands}},
+        // Resolve {{> name}}, {{> command.X}}, {{> command.$relatedCommands}},
         // {{> pin.X}}, {{> warning.X}}, {{> example.X}} BEFORE conditionals/loops, so the
         // inlined block content participates in the regular template passes.
         $template = $this->resolvePartials($template, $workflow);
@@ -1581,7 +1578,7 @@ class WorkflowManager {
             }
         }
         
-        // Validate pins / warnings (Phase 3) — must be string arrays whose IDs map to existing files.
+        // Validate pins / warnings — must be string arrays whose IDs map to existing files.
         $warnings = [];
         foreach (['pins' => 'pins', 'warnings' => 'warnings'] as $field => $folder) {
             if (!isset($workflow[$field])) continue;

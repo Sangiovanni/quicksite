@@ -1,6 +1,6 @@
 <?php
 /**
- * approveJoinRequest Command (C8 8.3b)
+ * approveJoinRequest Command
  *
  * Authority's "yes" on a `direction:'request'` entry — with the CONSENT
  * LEDGER rule: membership materializes exactly when BOTH consents exist.
@@ -23,8 +23,8 @@
  * one does not). Dead entries are pruned + refused (409 request.void) — grants
  * never materialize on dead parties.
  *
- * Optional role at approve (C8 8.3c — supersedes the 8.3b "no role override"
- * rule): the approver MAY name the `role` to grant, defaulting to the stored
+ * Optional role at approve: the approver MAY name the `role` to grant,
+ * defaulting to the stored
  * role (viewer for a self-request, the sponsor's suggestion for a proposal).
  * The rank check runs against whatever role is granted, so an approver can
  * never mint a role at/above their own — the same authority `changeMemberRole`
@@ -52,7 +52,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
  * @return ApiResponse
  */
 function __command_approveJoinRequest(array $params = [], array $urlParams = []): ApiResponse {
-    // C8 containment: marker-only targeting.
+    // Project containment: marker-only targeting.
     if (!defined('PROJECT_NAME') || PROJECT_NAME === '') {
         return ApiResponse::create(400, 'project.required')
             ->withMessage('This command is project-scoped. Target a project with /management/p/<projectId>/approveJoinRequest');
@@ -73,7 +73,7 @@ function __command_approveJoinRequest(array $params = [], array $urlParams = [])
             ->withErrors(['user_id' => 'Required field']);
     }
 
-    // Optional role override (C8 8.3c). Validated up front like inviteMember /
+    // Optional role override. Validated up front like inviteMember /
     // changeMemberRole; null = keep the stored role. The in-lock rank check
     // (below) is what actually gates it against the approver's current rank.
     $roleOverride = null;

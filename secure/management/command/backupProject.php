@@ -55,7 +55,7 @@ function __command_backupProject(array $params = [], array $urlParams = []): Api
     // Get parameters
     $maxBackups = isset($params['max_backups']) ? (int)$params['max_backups'] : 5;
 
-    // C8 8.4 CONTAINMENT (confused-deputy / F6): the target is BOUND to the URL
+    // CONTAINMENT (confused deputy): the target is BOUND to the URL
     // marker (PROJECT_NAME, authorized by the dispatcher — project.data, admin+ —
     // before this runs). A body `name` that disagrees is refused; body is optional
     // (advisory). You cannot back up a project you did not target/authorize.
@@ -66,7 +66,7 @@ function __command_backupProject(array $params = [], array $urlParams = []): Api
     $projectName = $bound['project'];
 
     // Reject a traversal payload before the backup source/dest path is built
-    // (beta.10 C3 F1-e). The active-project fallback is trusted.
+    // The active-project fallback is trusted.
     if (!is_valid_project_name((string)$projectName)) {
         return ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage('Invalid project name')

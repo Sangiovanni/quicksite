@@ -21,7 +21,7 @@
  *                                   placeholder updates to the picked
  *                                   attribute's valuePlaceholder so
  *                                   the user knows what to type
- *     opts       Object             reserved for slice 5+ extensions
+ *     opts       Object             reserved for extensions
  *
  *   QSComplexWizard.ensureDataAttrCatalog() → Promise<Array>
  *     Resolves to the user-facing catalog entries. Cached project-
@@ -309,7 +309,7 @@
         hideDropdown();
     }
 
-    // ─── Companion quick-add (slice 7) ──────────────────────────────
+    // ─── Companion quick-add ────────────────────────────────────────
     //
     // Programmatically add a new custom-param row pre-picked with the
     // given attribute name. Triggered from "+ data-X" buttons in the
@@ -469,7 +469,6 @@
         // row (e.g. once they've read the description and want screen
         // space back). The row's own × (preview.js handler) still does
         // double-duty via the capture-phase hook in attachPicker.
-        // Slice 7 polish, 2026-06-02.
         var dismiss = document.createElement('button');
         dismiss.type = 'button';
         dismiss.setAttribute('aria-label', 'Dismiss hint');
@@ -512,7 +511,7 @@
             box.appendChild(vh);
         }
 
-        // Companion quick-add buttons (slice 7). Each "+ data-X" button
+        // Companion quick-add buttons. Each "+ data-X" button
         // adds a new custom-param row pre-picked with the companion
         // attribute, so the user can wire pairs (data-auth-show +
         // data-auth-source, data-state-list + data-bind, etc.) in two
@@ -554,16 +553,15 @@
             box.appendChild(ch);
         }
 
-        // Smart value-field widget rendering moved INTO the row
-        // (slice 5 final shape, 2026-06-02). See pickEntry +
-        // installWidgetInRow above. The description box now contains
-        // description / valueShape hint / companions only.
+        // Smart value-field widget rendering lives IN the row. See
+        // pickEntry + installWidgetInRow above. The description box
+        // contains description / valueShape hint / companions only.
 
         // Insert after the row
         currentRow.parentNode.insertBefore(box, currentRow.nextSibling);
     }
 
-    // ─── Smart value-field widgets (slice 5) ────────────────────────
+    // ─── Smart value-field widgets ──────────────────────────────────
     //
     // Dispatcher: pick the right widget based on entry.valueShape.
     // Returns the widget element (or null if no widget applies — value
@@ -849,8 +847,8 @@
         function compose() {
             // Always run validation to keep the warning UI in sync, but
             // ALWAYS compose the value too — even when the key is
-            // reserved. The server-side check (slice 5b,
-            // reservedStorageKeys.php) is the real defence; clearing
+            // reserved. The server-side check
+            // (reservedStorageKeys.php) is the real defence; clearing
             // valueInput here used to cause a silent-delete bug in the
             // Edit-Params flow (the diff read the cleared value as "the
             // user removed this param" and the server happily applied
@@ -901,8 +899,8 @@
     //
     // SECURITY NOTE: this is the client-side check (UX). Defence in
     // depth requires the SERVER to refuse the same patterns when
-    // writing structure params — see secure/src/functions/reservedStorageKeys.php
-    // (sub-slice 5b, planned). Without the server check, a user with a
+    // writing structure params — see secure/src/functions/reservedStorageKeys.php.
+    // Without the server check, a user with a
     // valid token can POST directly to addNode/editStructure and bypass
     // this picker entirely.
 
@@ -967,7 +965,6 @@
         // description box that sits below it. Capture-phase so we run
         // BEFORE preview.js's `() => row.remove()` handler (otherwise
         // the row is already gone and row.nextElementSibling is null).
-        // Slice 7 polish, 2026-06-02.
         if (row) {
             var removeBtn = row.querySelector('.preview-contextual-form__remove-param');
             if (removeBtn && removeBtn.dataset.dataAttrPickerRemoveHook !== '1') {
@@ -1090,11 +1087,11 @@
         return fetchCatalog().then(function (c) { return c.entries; });
     };
     window.QSComplexWizard.invalidateDataAttrCatalog = invalidateCatalog;
-    // Slice 5: state stores feed the store-field-ref widget. The State
+    // State stores feed the store-field-ref widget. The State
     // stores panel (preview-js-interactions.js) should call this after
     // any setStateStores write so subsequent picks see fresh stores.
     window.QSComplexWizard.invalidateDataAttrStoresCache = invalidateStoresCache;
-    // Edit-Params (slice 2 polish): install widget + placeholder for a
+    // Edit-Params: install widget + placeholder for a
     // pre-populated row without opening the dropdown.
     window.QSComplexWizard.prefillDataAttrRow = prefillRow;
 })();

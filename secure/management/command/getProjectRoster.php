@@ -1,6 +1,6 @@
 <?php
 /**
- * getProjectRoster Command (C8 8.3c)
+ * getProjectRoster Command
  *
  * The reduced roster of the TARGET project for EVERY member rank: active
  * members only — {user_id, name, role, rank, is_owner}, rank-descending.
@@ -9,7 +9,7 @@
  * editor/designer/developer can still see "who is on this project with me"
  * (category project.roster, granted to all member roles).
  *
- * PRIVACY (C8 8.0b): users are referenced as {user_id, name} — the public
+ * PRIVACY: users are referenced as {user_id, name} — the public
  * display name and the opaque id. The PRIVATE username never appears here.
  *
  * @method GET
@@ -30,7 +30,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
  * @return ApiResponse
  */
 function __command_getProjectRoster(array $params = [], array $urlParams = []): ApiResponse {
-    // C8 containment: the target project is EXCLUSIVELY the authorized URL
+    // Project containment: the target project is EXCLUSIVELY the authorized URL
     // marker (PROJECT_NAME, bound by the dispatcher after the category +
     // membership check). No marker → nothing was authorized.
     if (!defined('PROJECT_NAME') || PROJECT_NAME === '') {

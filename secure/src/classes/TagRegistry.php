@@ -36,7 +36,7 @@ class TagRegistry
      * Why it is not usable: `<dialog>` is `display:none` until it is opened,
      * and opening one properly means calling `showModal()` / `show()`. Authors
      * cannot run JavaScript (`<script>` is blocked, `on*` handlers are refused
-     * server-side, the custom-JS feature was removed in beta.3), and no QS.*
+     * server-side, and there is no custom-JS feature), and no QS.*
      * verb calls either method — so the tag renders as nothing an author can
      * ever reveal by the means the product gives them.
      */
@@ -168,15 +168,15 @@ class TagRegistry
      * `<audio src="…">` with nothing else has no intrinsic size at all — it
      * renders as literally nothing. Neither is recoverable by the author:
      * `<script>` is blocked, `on*` handlers are refused, and the custom-JS
-     * feature was removed in beta.3, so there is no code path from an authored
+     * feature does not exist, so there is no code path from an authored
      * page to `play()`. `controls` is the only thing that makes the element
      * usable, and the editor was not emitting it.
      *
      * ⚠ VALUES ARE STRINGS, NOT `true`. The renderer emits a PHP boolean as a
      * bare attribute (`controls`) while the build compiler runs it through
      * `var_export` + `htmlspecialchars` and emits `controls="1"` — same meaning
-     * to a browser, but a preview/build difference of exactly the kind beta.10
-     * spent a release removing. `'controls'` as a string produces identical
+     * to a browser, but a preview/build difference of exactly the kind the
+     * shared policies exist to remove. `'controls'` as a string produces identical
      * markup from both, and HTML explicitly permits a boolean attribute to
      * carry its own name as its value.
      */
@@ -186,11 +186,9 @@ class TagRegistry
     ];
 
     /**
-     * (Removed, S2.9) TAGS_WITH_ALT. It named the tags whose `alt` got a
-     * server-generated translation key — a behaviour that no longer exists,
-     * and its last two readers (addNode, editNode) are gone. What replaces it
-     * is TRANSLATION_KEY_PARAMS below, which says which param on which tag,
-     * rather than assuming the param is always `alt`.
+     * No TAGS_WITH_ALT: no tag's `alt` gets a server-generated translation
+     * key. TRANSLATION_KEY_PARAMS below says which param on which tag is a
+     * translation key, rather than assuming the param is always `alt`.
      */
 
     /**
@@ -256,7 +254,7 @@ class TagRegistry
     /**
      * Single "may this tag be emitted at all?" gate — the shared policy both
      * the renderer AND the compiler enforce so preview and build agree
-     * (beta.10 F-g/F-h). Renderable iff the name is well-formed, the tag is
+     * Renderable iff the name is well-formed, the tag is
      * NOT blocked, AND it is on the allowlist.
      */
     public static function isRenderable(string $tag): bool

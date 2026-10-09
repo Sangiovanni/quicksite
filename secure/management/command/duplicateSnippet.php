@@ -31,14 +31,14 @@ require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
  * @return ApiResponse
  */
 function __command_duplicateSnippet(array $params = [], array $urlParams = []): ApiResponse {
-    // qs_param_string: an ARRAY here reached a string-typed sink as a TypeError (F-C13-11).
+    // qs_param_string: an ARRAY here would reach a string-typed sink as a TypeError.
     $sourceId = qs_param_string($params, 'id');
     $newId = $params['newId'] ?? null;
     $newName = $params['newName'] ?? null;
-    // C8 8.5 CONTAINMENT: both the source read and the duplicate WRITE are BOUND
+    // CONTAINMENT: both the source read and the duplicate WRITE are BOUND
     // to the URL marker the dispatcher authorized; a body `project` is an optional
-    // echo that must match (F-C8-8.5-1 — it used to select the target freely,
-    // falling back to an installation-wide default project).
+    // echo that must match (never a free choice of target, nor a fall back to an
+    // installation-wide default project).
     $bound = qs_bind_marker_project($params, 'duplicateSnippet');
     if ($bound['refusal'] !== null) {
         return $bound['refusal'];
@@ -80,8 +80,8 @@ function __command_duplicateSnippet(array $params = [], array $urlParams = []): 
     }
     
     // Check if new ID already exists in the project or in the caller's OWN
-    // personal library (13.6b — this used to search one flat installation-wide
-    // directory, which made it an existence oracle over every user's snippets).
+    // personal library (not one flat installation-wide directory, which would
+    // make it an existence oracle over every user's snippets).
     $existing = findSnippetInPath($newId, getProjectSnippetsPath($projectName), 'project');
     if ($existing === null) {
         $personalSnippetsPath = getPersonalSnippetsPath();

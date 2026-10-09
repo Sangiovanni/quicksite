@@ -4188,7 +4188,7 @@ $GLOBALS['__help_commands'] = [
     ],
 
     'reconcileMemberships' => [
-        'description' => 'Heals every user\'s users.php membership cache for the TARGET project against its AUTHORITATIVE members.json. The cache is only a mirror (members.json is the sole grant authority); drift comes from a members.json hand-edit, a failed cascade cache-write, or pre-8.3a legacy entries. admin/owner (project.members).',
+        'description' => 'Heals every user\'s users.php membership cache for the TARGET project against its AUTHORITATIVE members.json. The cache is only a mirror (members.json is the sole grant authority); drift comes from a members.json hand-edit, a failed cascade cache-write, or legacy entries with no status. admin/owner (project.members).',
         'method' => 'POST',
         'parameters' => [],
         'example_post' => 'POST /management/p/<projectId>/reconcileMemberships',
@@ -5331,7 +5331,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_value' => 'unsupported kind, language not in project config, or rows malformed',
             '400.validation.invalid_format' => 'structureId does not match HTML id format',
             '404.route.not_found' => 'page JSON file does not exist for the route',
-            '404.structure.not_found' => 'no <table data-qs-complex-id=X> found on the page (table may pre-date the marker — see BETA7_TABLE_TRANSLATION_CSV.md)',
+            '404.structure.not_found' => 'no <table data-qs-complex-id=X> found on the page (table may predate the marker: re-create it with the Table wizard, then delete the old one)',
             '422.validation.dimension_mismatch' => 'pasted grid dimensions do not match the existing table — response data carries the expected vs got diff',
             '500.server.file_read_failed' => 'page JSON file unreadable',
             '500.server.file_write_failed' => 'translation file write failed',
@@ -5503,7 +5503,7 @@ $GLOBALS['__help_commands'] = [
             ]
         ],
         'error_responses' => [],
-        'notes' => 'Sources: "admin" (engine catalogue at <secure>/admin/config/oauth-presets.json), "project" (project-only at <secure>/projects/<active>/data/oauth-presets.json), "project-override" (project overrides an admin entry). Per the Slice 2.5 lookup order locked 2026-06-15, project entries replace admin entries at PROVIDER level (full-entry replace, not field-level merge). Each provider entry includes preset, credentials_status (set/missing), resolver_count (route-resolvers explicitly referencing this provider id), and setup (per-provider route existence).'
+        'notes' => 'Sources: "admin" (engine catalogue at <secure>/admin/config/oauth-presets.json), "project" (project-only at <secure>/projects/<active>/data/oauth-presets.json), "project-override" (project overrides an admin entry). Per the lookup order, project entries replace admin entries at PROVIDER level (full-entry replace, not field-level merge). Each provider entry includes preset, credentials_status (set/missing), resolver_count (route-resolvers explicitly referencing this provider id), and setup (per-provider route existence).'
     ],
     'addOAuthProvider' => [
         'description' => 'Add a new OAuth provider preset and (optionally) its credentials at admin or per-project scope. Writes to oauth-presets.json + oauth-secrets.{php,json}. Drives the /admin/oauth-providers page\'s Add modal.',
@@ -5525,7 +5525,7 @@ $GLOBALS['__help_commands'] = [
             '409.oauth.provider.duplicate' => 'An entry with this id already exists at the target scope; use editOAuthProvider',
             '500.server.operation_failed' => 'The provider presets file could not be written at the requested scope ("admin" or "project"), or the preset was written but its secrets file could not be. The scope is named in the message.'
         ],
-        'notes' => 'Admin-tier only — handles client_secret. Cross-scope duplicates (e.g., same id in both admin and project) are allowed and are the per-project override pattern locked in Slice 2.5.'
+        'notes' => 'Admin-tier only — handles client_secret. Cross-scope duplicates (e.g., same id in both admin and project) are allowed and are the per-project override pattern, by design.'
     ],
     'editOAuthProvider' => [
         'description' => 'Update an existing OAuth provider preset and (optionally) credentials. Supports rename (newId) and cross-scope move (newScope). Replace-all semantic on the preset object — read the current entry first if you want field-level updates.',
@@ -5658,7 +5658,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.required' => 'Storage item id is required.',
             '500.server.operation_failed' => 'Failed to write the storage registry.'
         ],
-        'notes' => 'Does not check in-use references yet — the scan/reconcile slice surfaces dangling reads. Also clears the item description key from translate/.'
+        'notes' => 'Does not check in-use references yet — scanStorageUsage surfaces dangling reads. Also clears the item description key from translate/.'
     ],
     'setStorageDescLang' => [
         'description' => 'Change the language storage descriptions are authored in (registry-level descLang on data/storage.json). MOVES every item description from the current language to the target in the translate files (true move — source cleared), OVERWRITING any existing target-language values. Two-step: call without confirm to preview (409 needsConfirm with moved/overwrites counts), then re-call with confirm:true to execute. Descriptions are page content (textKeys) so the move is live — no regenerate needed.',

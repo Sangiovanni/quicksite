@@ -97,7 +97,7 @@ window.QuickSiteUtils = (function() {
      * This is a TEXT escaper: it neutralises & < > but deliberately leaves quotes
      * alone, which is correct and sufficient for `>${escapeHtml(x)}<`. It is NOT
      * safe for attribute values — a quote in `x` closes the attribute. For
-     * `attr="${...}"` use escapeAttr(). (F-C13-3.)
+     * `attr="${...}"` use escapeAttr().
      * @param {string} text - Text to escape
      * @returns {string} Escaped HTML string
      */
@@ -113,7 +113,6 @@ window.QuickSiteUtils = (function() {
      * cannot close the attribute and inject further markup or an event handler.
      * Prefer building DOM with createElement + element.value / setAttribute where
      * practical; use this where an innerHTML template is genuinely the right tool.
-     * (F-C13-3.)
      * @param {string} text - Value to place inside a quoted attribute
      * @returns {string} Attribute-safe string
      */

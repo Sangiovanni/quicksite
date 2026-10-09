@@ -140,7 +140,7 @@ function getCommandCategories(): array {
             'icon' => 'folder-tree',
             'commands' => ['listProjects', 'createProject', 'cloneProject', 'deleteProject', 'exportProject', 'importProject', 'downloadExport', 'clearExports', 'backupProject', 'listBackups', 'restoreBackup', 'deleteBackup']
         ],
-        // C8 8.3a/8.3b — membership consent model. Marker-scoped roster
+        // Membership consent model. Marker-scoped roster
         // management, request adjudication + the join-policy knob + the
         // any-member sponsor lane…
         'member_management' => [
@@ -150,7 +150,7 @@ function getCommandCategories(): array {
         ],
         // The caller's OWN membership surface used to sit here as a
         // 'my_memberships' section. It is gone — not emptied — because all nine
-        // of its entries stopped being commands in beta.11 S6: joining a project,
+        // of its entries stopped being commands: joining a project,
         // leaving one, and looking somebody up in order to invite them are
         // operations on an ACCOUNT, not steps in developing a project. They are
         // served by /admin/self and reached from the My Memberships page. An
@@ -166,15 +166,15 @@ function getCommandCategories(): array {
             'icon' => 'history',
             'commands' => ['getCommandHistory', 'clearCommandHistory']
         ],
-        // C5b session lifecycle. (This slot previously held the removed
+        // Session lifecycle. (This slot previously held the removed
         // generateToken/listTokens/revokeToken trio under a duplicate
         // 'authentication' key that the OAuth block below silently clobbered —
         // the trio never actually rendered. Unique keys now.)
         'auth_session' => [
             'label' => 'Authentication / Session',
             'icon' => 'key',
-            // changePassword / deleteMyAccount left the command surface in
-            // beta.11 S6 — managing the login you sign in with is not project
+            // changePassword / deleteMyAccount are not commands — managing
+            // the login you sign in with is not project
             // development. Both are served by /admin/self and reached from
             // the Account page. login/logoutSession/register stay: a CLI that
             // cannot authenticate is not headlessly usable.

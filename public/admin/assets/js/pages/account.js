@@ -1,8 +1,8 @@
 /**
- * My Account page (beta.11 S1.3) — the signed-in account's own self-service.
+ * My Account page — the signed-in account's own self-service.
  *
  * Writes: the password change and the account deletion go to /admin/self
- * (they are account self-service, not commands — beta.11 S6); logoutSession
+ * (they are account self-service, not commands); logoutSession
  * {everywhere} is still a command. All three act only on the caller and
  * re-verify the current password server-side — the client-side checks here
  * exist to give a fast, honest answer, never as the gate.
@@ -27,7 +27,7 @@
         return admin.apiRequest(cmd, 'POST', body);
     }
 
-    // The password change and the account deletion are NOT commands (S6) — they
+    // The password change and the account deletion are NOT commands — they
     // go to /admin/self. Same {ok, status, data} shape as api(), so the
     // callers below are unchanged apart from which door they knock on.
     function account(route, body) {

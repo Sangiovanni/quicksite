@@ -43,11 +43,12 @@ function __command_createSnippet(array $params = [], array $urlParams = []): Api
     $description = $params['description'] ?? '';
     $structure = $params['structure'] ?? null;
     $translations = $params['translations'] ?? [];
-    // C8 8.5 CONTAINMENT: the project WRITTEN TO is BOUND to the URL marker the
+    // CONTAINMENT: the project WRITTEN TO is BOUND to the URL marker the
     // dispatcher authorized; a body `project` is an optional echo that must match.
-    // (F-C8-8.5-1: it used to select the write target freely and fall back to an
-    // installation-wide default project, so an editor authorized on one project could
-    // plant, overwrite and delete snippets in a project they were not a member of.)
+    // (A body that selected the write target freely, falling back to an
+    // installation-wide default project, would let an editor authorized on one
+    // project plant, overwrite and delete snippets in a project they are not a
+    // member of.)
     $bound = qs_bind_marker_project($params, 'createSnippet');
     if ($bound['refusal'] !== null) {
         return $bound['refusal'];
@@ -94,7 +95,7 @@ function __command_createSnippet(array $params = [], array $urlParams = []): Api
         $category = 'other';
     }
 
-    // SECURITY (beta.10 C13 13.5, F2 write side): the structure arrives verbatim
+    // SECURITY (the write side): the structure arrives verbatim
     // from the request, so this command is where a non-renderable tag can ENTER
     // stored data — and from here insertSnippet copies it into a page. Enforce the
     // same TagRegistry gate the renderer, the compiler and editStructure use. The
@@ -107,7 +108,7 @@ function __command_createSnippet(array $params = [], array $urlParams = []): Api
             ->withErrors([['field' => 'structure', 'reason' => 'blocked_tag', 'value' => $badTag]]);
     }
 
-    // The same gate for component REFERENCES (beta.11 S3.10c). A snippet's tree
+    // The same gate for component REFERENCES. A snippet's tree
     // is copied into a page by insertSnippet, so a reference stored here is a
     // reference the readers will resolve later.
     $badRef = qs_first_invalid_component_reference($structure);
@@ -129,8 +130,7 @@ function __command_createSnippet(array $params = [], array $urlParams = []): Api
     // Check if snippet ID already exists in the project or in the caller's own
     // personal library. It is deliberately NOT checked against other users'
     // personal snippets: doing so would answer "does user X own a snippet called
-    // Y" to anyone who can guess an id — the existence oracle C10 spent a slice
-    // closing elsewhere.
+    // Y" to anyone who can guess an id — an existence oracle.
     $existingSnippet = findSnippetInPath($snippetId, getProjectSnippetsPath($projectName), 'project');
     if ($existingSnippet === null) {
         $personalSnippetsPath = getPersonalSnippetsPath();

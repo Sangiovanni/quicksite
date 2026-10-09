@@ -108,7 +108,7 @@ function __command_addInteraction(array $params = [], array $urlParams = []): Ap
     }
 
     // ==========================================================================
-    // PER-VERB ARG VALIDATION (Slice 5 follow-up)
+    // PER-VERB ARG VALIDATION
     // ==========================================================================
     // Defense-in-depth — the client-side validator should catch this first.
     // Catches: direct API callers, batch imports, client regressions.

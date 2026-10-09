@@ -133,7 +133,7 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
             ->withData(['error_code' => $result]);
     }
 
-    // SECURITY (C11 11.0) — resource limits, enforced from the archive's own
+    // SECURITY — resource limits, enforced from the archive's own
     // central directory BEFORE a single byte is extracted. getFromIndex()
     // reads an entry fully into memory, so without a cap an uploaded archive
     // is an unbounded allocation and an unbounded number of files on disk.
@@ -290,7 +290,7 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
             ->withErrors($validation['errors']);
     }
     
-    // C8 8.4 BIRTH-WRITE: an imported archive's config/members.json is UNTRUSTED
+    // BIRTH-WRITE: an imported archive's config/members.json is UNTRUSTED
     // input — it could name any owner and any roster (a membership-hijack plant),
     // or be absent entirely (an ownerless, inaccessible project). Discard whatever
     // the ZIP carried (log it for audit) and mint a fresh trust file: the IMPORTER
@@ -305,7 +305,7 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
         $dOwner   = $discarded['owner'] ?? '(none)';
         $dMembers = is_array($discarded['members'] ?? null) ? count($discarded['members']) : 0;
         $dInv     = is_array($discarded['invitations'] ?? null) ? count($discarded['invitations']) : 0;
-        error_log("importProject: discarded archive members.json for '{$projectName}' (owner='{$dOwner}', members={$dMembers}, invitations={$dInv}) — importer '{$importerId}' set as sole owner (C8 8.4 containment)");
+        error_log("importProject: discarded archive members.json for '{$projectName}' (owner='{$dOwner}', members={$dMembers}, invitations={$dInv}) — importer '{$importerId}' set as sole owner (containment)");
     }
     if (!qs_project_birth_write_members($projectPath, $importerId)) {
         qs_delete_tree_rollback($projectPath, 'importProject');
@@ -351,9 +351,9 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
     ];
     
     // Register the import in the importer's project index + move ONLY their
-    // per-user editing target with switch_to (C9 fixed-main — a command NEVER
-    // repoints what a deployment serves; the old tail here did, the same
-    // pre-C9 leftover createProject dropped in 8.0). Edited at /p/<id>/.
+    // per-user editing target with switch_to (the fixed-main model — a command
+    // NEVER repoints what a deployment serves, as in createProject). Edited at
+    // /p/<id>/.
     if ($importerId !== null) {
         $siteName = $projectInfo['site_name'] ?? $projectName;
         $written = qs_users_mutate(function (array &$cfg) use ($importerId, $projectName, $siteName, $switchTo) {
@@ -533,7 +533,7 @@ function extractProjectFromZipSecure(ZipArchive $zip, string $prefix, string $de
             continue;
         }
 
-        // SECURITY (C11 11.2) — no HIDDEN segment anywhere in the path. An
+        // SECURITY — no HIDDEN segment anywhere in the path. An
         // archive carries a website, not a working tree: `.git/`, `.svn/` and
         // `.idea/` are tooling leftovers, and a published `.git/` discloses the
         // whole source history. The extension allowlist alone did not stop them
@@ -545,7 +545,7 @@ function extractProjectFromZipSecure(ZipArchive $zip, string $prefix, string $de
             continue;
         }
 
-        // SECURITY (C11 11.0) — ALLOWLIST. Anything whose extension is not
+        // SECURITY — ALLOWLIST. Anything whose extension is not
         // explicitly permitted is refused, so a spelling nobody predicted
         // ('.phtm', 'web.config') and a case variant of one that was
         // ('.HTACCESS') are both refused by default rather than by enumeration.
@@ -1212,14 +1212,14 @@ function rebuildPageWrappers(string $jsonDir, string $phpDir, array &$stats, str
 /**
  * Generate the development page wrapper PHP code.
  *
- * SECURITY (C13 F-C13-2): `$routePath`/`$pageName` are ARCHIVE ENTRY NAMES —
+ * SECURITY: `$routePath`/`$pageName` are ARCHIVE ENTRY NAMES —
  * `rebuildPageWrappers()` derives them from `scandir()` of the just-extracted
  * upload, so they are fully attacker-authored. The former body interpolated the
  * name into an `<<<PHP` (interpolating) heredoc inside a single-quoted literal
  * (`renderPage('$routePath')`); an entry named `x');<php>;#.json` closed the
  * literal and the tail became live PHP in a wrapper that `public/p/index.php`
  * later `require_once`s — authenticated RCE, reachable via the any-auth
- * importProject. The C11 import gates check an entry's path/extension/content
+ * importProject. The import gates check an entry's path/extension/content
  * but never its name's character set, and a name never becomes content, so none
  * of them caught it.
  *
@@ -1228,7 +1228,7 @@ function rebuildPageWrappers(string $jsonDir, string $phpDir, array &$stats, str
  * to the single canonical generator (`generate_page_template`, the one
  * createProject uses), which is a nowdoc that interpolates NOTHING. This also
  * retires a stale second copy: importProject's old inline form predated the
- * Beta.8 route-agnostic bootstrap and omitted the renderer options array.
+ * route-agnostic bootstrap and omitted the renderer options array.
  * `$routePath`/`$pageName` are intentionally unused now (the canonical generator
  * ignores its argument); the signature is kept so the two call sites are
  * untouched.

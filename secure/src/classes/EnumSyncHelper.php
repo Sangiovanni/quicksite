@@ -43,7 +43,7 @@ require_once __DIR__ . '/../functions/opcacheHygiene.php';
  * Hooked from:
  *   - editApi (after a successful writeCompiledJs).
  *   - the serve-time freshness/backfill pass for /p/<id>/ (qs_regenerate_project_scripts).
- *   - Future component CRUD commands (none ship in beta.7).
+ *   - Future component CRUD commands (none ship yet).
  */
 
 class EnumSyncHelper {

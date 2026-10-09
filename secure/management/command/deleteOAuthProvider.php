@@ -19,7 +19,7 @@
  * matching literal `provider`) or page structure JSON (oauth-button
  * elements rendered with the matching CSS modifier class). The
  * response carries a structured `usage` summary so the UI can show
- * "remove these consumers first" guidance. Locked design — see
+ * "remove these consumers first" guidance. By design — see
  * DESIGN_DECISIONS.md "OAuth providers admin page shape".
  *
  * When scope='admin' and a project-scope override exists for the same
@@ -27,7 +27,7 @@
  * for that provider — defensible: the project author intentionally
  * created the override).
  *
- * Admin-tier only — handles credentials. Beta.9 A1 Slice 8.
+ * Admin-tier only — handles credentials.
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';

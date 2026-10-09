@@ -192,7 +192,7 @@ function __command_editComponentToNode(array $params = [], array $urlParams = []
     $currentData = $targetNode['data'] ?? [];
     
     // Load component definition to get variable types
-    // beta.11 S3.10c: this reference comes from the STORED node, not the
+    // This reference comes from the STORED node, not the
     // request, so it is jailed by the shared resolver.
     $componentPath = qs_resolve_component_path($componentName, PROJECT_PATH . '/templates/model/json/components');
     if ($componentPath === null) {
@@ -246,7 +246,7 @@ function __command_editComponentToNode(array $params = [], array $urlParams = []
         // data-auth-source param, the substituted value would leak
         // into the rendered page. Check any string value that
         // PARSES as a storage spec — non-storage-spec values are
-        // unaffected (extractor returns null). (Slice 5b.)
+        // unaffected (extractor returns null).
         if (is_string($value) && $value !== '') {
             $rkExtracted = extractStorageKeyFromValue($value);
             if ($rkExtracted !== null && isReservedStorageKey($rkExtracted)) {
@@ -309,7 +309,7 @@ function __command_editComponentToNode(array $params = [], array $urlParams = []
     
     $updatedStructure = $updateResult['structure'];
     
-    // SECURITY (F-C13-13): depth-check the RESULT of the component edit.
+    // SECURITY: depth-check the RESULT of the component edit.
     if (!qs_structure_depth_ok($updatedStructure)) {
         return ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage("Structure too deeply nested (max 50 levels)")

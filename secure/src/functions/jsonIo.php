@@ -18,7 +18,7 @@
  * Encode $data as JSON and write it to $path — refusing to write at all when the
  * encode fails. THE one place in the tree that pairs json_encode with a write.
  *
- * Why this exists (beta.10 C13 F-C13-12): json_encode() returns FALSE on malformed
+ * Why this exists: json_encode() returns FALSE on malformed
  * UTF-8 (and on depth > 512), and file_put_contents($path, false) writes the empty
  * string and returns int(0). Since 0 !== false, every `if (file_put_contents(...)
  * === false)` guard in the tree PASSES — so the command answers 200 while the
@@ -55,7 +55,7 @@ function qs_json_write(string $path, $data, int $jsonFlags = 0, int $fileFlags =
     }
     // Warnings are suppressed and reported through error_log instead: a raw
     // file_put_contents warning carries an absolute path and, with display_errors
-    // on, prints it into the response body (the F9 class C12 closed elsewhere).
+    // on, prints it into the response body (path disclosure).
     $bytes = @file_put_contents($path, $json . $trailer, $fileFlags);
     if ($bytes === false) {
         error_log('qs_json_write: write failed for ' . $path);

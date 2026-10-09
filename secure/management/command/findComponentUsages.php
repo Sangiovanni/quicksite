@@ -139,9 +139,9 @@ function __command_findComponentUsages(array $params = [], array $urlParams = []
             ->withData(['missing' => 'component']);
     }
     
-    // beta.11 S3.10c: this parameter had NO format check - only the existence
-    // test below, which a traversal answered for any readable .json on the
-    // server. The shared rule now decides what a reference is.
+    // A format check before the existence test below, which a traversal would
+    // answer for any readable .json on the server: the shared rule decides what
+    // a reference is.
     if (!qs_is_valid_component_reference($componentName)) {
         return ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage('Invalid component name format')

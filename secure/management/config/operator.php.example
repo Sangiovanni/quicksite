@@ -1,6 +1,6 @@
 <?php
 /**
- * Operator notices — WHO SEES THEM  (v1.0.0-beta.11)
+ * Operator notices — WHO SEES THEM
  *
  * Copy this file to operator.php to change who sees operator-facing notices in
  * the admin panel (today: "a QuickSite update is available"). QuickSite writes

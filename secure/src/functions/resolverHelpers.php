@@ -1,7 +1,7 @@
 <?php
 /**
  * resolverHelpers.php — Sidecar storage + validation for per-route
- * data resolvers (beta.8 A2).
+ * data resolvers.
  *
  * Storage shape:
  *   secure/projects/<project>/data/route-resolvers.json
@@ -11,8 +11,8 @@
  *           "endpoint": "@apiId/endpointId",  // required
  *           "inputs":   {"<name>": "<source spec>"},  // optional
  *           "expose":   {"<varName>": "<dot.path>"},  // optional
- *           "cacheTTL": 300,                  // optional, seconds, Slice 4
- *           "onMiss":   "render-empty"        // optional, Slice 6
+ *           "cacheTTL": 300,                  // optional, seconds
+ *           "onMiss":   "render-empty"        // optional
  *       }
  *   }
  *
@@ -23,10 +23,10 @@
  *   in routeExists and the matcher, OR migrating the whole shape to a
  *   richer record form. The sidecar keeps routes.php untouched and
  *   keeps the resolver concern isolated. Migration to inline records
- *   stays available as a beta.9+ refactor.
+ *   stays available as a refactor.
  *
  * Source-spec convention for inputs:
- *   "param:<name>"   → URL path param from QS.routeParams (beta.8 A1)
+ *   "param:<name>"   → URL path param from QS.routeParams
  *   "query:<name>"   → URL query string param
  *   "session:<name>" → server-side session field (depends on Tier 3
  *                      server session wiring)
@@ -84,13 +84,13 @@ function saveResolversSidecar(array $resolvers): bool {
 }
 
 /**
- * Beta.8 A2 Slice 7.5 — sidecar storage now supports BOTH shapes per
+ * Sidecar storage supports BOTH shapes per
  * route (backward-compat with single-resolver entries):
  *
  *   - SCALAR (associative array, has 'endpoint' key directly):
  *       {"products/:slug": {"endpoint": "...", "inputs": {...}, ...}}
  *     Single-resolver route. Written when a route has exactly ONE
- *     resolver. Backward-compat — existing sidecars from Slices 1-7
+ *     resolver. Backward-compat — existing single-resolver sidecars
  *     keep their on-disk shape.
  *
  *   - ARRAY (sequential numeric-indexed array of associative configs):
@@ -134,9 +134,8 @@ function _normalizeResolverEntry($entry): array {
  *
  * This is the canonical accessor for downstream code (DataResolver,
  * renderer, hydration handoff) — both single- and multi-resolver
- * routes look identical from the caller's perspective. Slice 7.5
- * onward; existing callers from Slices 1-7 still use
- * getResolverForRoute (backward-compat wrapper below).
+ * routes look identical from the caller's perspective. Older callers
+ * still use getResolverForRoute (backward-compat wrapper below).
  */
 function getResolversForRoute(string $routePath): array {
     return qs_resolvers_for_route($routePath);
@@ -147,7 +146,7 @@ function getResolversForRoute(string $routePath): array {
  * empty array to clear. Otherwise pass an array of resolver configs:
  *
  *   - 1 element → written as SCALAR shape on disk (backward-compat
- *     readers from Slices 1-7 keep working)
+ *     single-resolver readers keep working)
  *   - 2+ elements → written as ARRAY shape on disk
  *
  * Idempotent: clearing a route that has no resolver is a no-op
@@ -162,8 +161,8 @@ function setResolversForRoute(string $routePath, ?array $configs): bool {
         }
         unset($all[$routePath]);
     } else {
-        // Storage shape (locked decision):
-        //   scalar when single resolver (back-compat with Slices 1-7)
+        // Storage shape (by design):
+        //   scalar when single resolver (back-compat with single-resolver readers)
         //   array  when multiple resolvers
         $list = array_values($configs);
         $all[$routePath] = count($list) === 1 ? $list[0] : $list;
@@ -174,16 +173,14 @@ function setResolversForRoute(string $routePath, ?array $configs): bool {
 /**
  * Backward-compat single-resolver accessor — returns the FIRST
  * resolver of the route (or null when none). Used by existing
- * callsites in public/index.php, PageManagement.php, deleteRoute.php
- * until they migrate to getResolversForRoute (incremental in
- * subsequent Slice 7.5 sub-slices).
+ * callsites (deleteRoute.php) until they migrate to getResolversForRoute.
  *
  * Multi-resolver routes silently return only the first entry through
  * this function — that's the price of keeping the existing contract.
  * Callers that need ALL resolvers MUST switch to getResolversForRoute.
  *
- * @deprecated since Slice 7.5 — prefer getResolversForRoute. Kept for
- *             backward compatibility with pre-7.5 callers; removed in
+ * @deprecated prefer getResolversForRoute. Kept for
+ *             backward compatibility with single-resolver callers; removed in
  *             a future cleanup once all callsites migrate.
  */
 function getResolverForRoute(string $routePath): ?array {
@@ -196,10 +193,8 @@ function getResolverForRoute(string $routePath): ?array {
  * with the single config (or clears with null). Multi-resolver entries
  * are clobbered to a single resolver if called.
  *
- * @deprecated since Slice 7.5 — prefer setResolversForRoute. Kept for
- *             backward compatibility (setRouteResolver command uses it
- *             until the command grows the multi-resolver `index` param
- *             in Slice 7.5.B).
+ * @deprecated prefer setResolversForRoute. Kept for
+ *             backward compatibility.
  */
 function setResolverForRoute(string $routePath, ?array $config): bool {
     if ($config === null) {
@@ -213,7 +208,7 @@ function deleteResolverForRoute(string $routePath): bool {
 }
 
 /**
- * Per-request stash of resolved template variables (beta.8 A2 Slice 3).
+ * Per-request stash of resolved template variables.
  *
  * Populated by public/index.php after firing DataResolver for the matched
  * route. Read by JsonToHtmlRenderer's {{resolved:NAME}} substitution and
@@ -231,7 +226,7 @@ function getResolvedVars(): array {
 }
 
 /**
- * Beta.8 A2 Track 2d — generate sample default values for a resolver's
+ * Generate sample default values for a resolver's
  * `expose` mapping, derived from the endpoint's responseSchema.
  *
  * The editor's emulation panel uses these as initial input values when
@@ -373,10 +368,9 @@ function _sampleValueFromSchemaNode($schema, string $varName) {
  * its runtime path tight.
  */
 /**
- * Allowed resolver kinds. Beta.8 shipped only data-fetch resolvers (kind
- * was implicit); beta.9 A1 Slice 2b introduces side-effect kinds
- * (oauth-start, oauth-callback) that short-circuit the render with a
- * redirect + optional session cookie. Slice 2e adds oauth-logout. Future
+ * Allowed resolver kinds: data-fetch resolvers (the implicit default) and
+ * side-effect kinds (oauth-start, oauth-callback, oauth-logout) that
+ * short-circuit the render with a redirect + optional session cookie. Future
  * side-effect kinds (e.g. 'redirect') extend this list + the dispatcher
  * in public/index.php.
  */
@@ -385,8 +379,8 @@ const RESOLVER_ALLOWED_KINDS = ['data', 'oauth-start', 'oauth-callback', 'oauth-
 function validateResolverConfig(array $config, ?ApiEndpointManager $apiManager = null): array {
     $errors = [];
 
-    // Kind dispatch (beta.9 A1 Slice 2b). Default 'data' preserves
-    // backward-compat with beta.8 configs (no kind field = data resolver).
+    // Kind dispatch. Default 'data' preserves backward-compat with
+    // configs that predate the kind field (no kind field = data resolver).
     $kind = $config['kind'] ?? 'data';
     if (!is_string($kind) || $kind === '') {
         return [[
@@ -427,8 +421,8 @@ function validateResolverConfig(array $config, ?ApiEndpointManager $apiManager =
             $isPlaceholder = (bool) preg_match('/^\{:\w+\}$/D', $provider);
             if (!$isPlaceholder) {
                 // Literal provider — must exist either in the per-project
-                // oauth-presets.json OR the admin catalogue. Slice 2.5
-                // (2026-06-15): per-project overrides take precedence at
+                // oauth-presets.json OR the admin catalogue. Per-project
+                // overrides take precedence at
                 // runtime, but for save-time validation we accept the
                 // union (the resolver only needs the provider id to be
                 // resolvable somewhere; OAuthHandler picks which file).
@@ -570,7 +564,7 @@ function validateResolverConfig(array $config, ?ApiEndpointManager $apiManager =
                     ];
                     continue;
                 }
-                // Beta.8 A2 Slice 7 — character validation. Input names
+                // Character validation. Input names
                 // map to endpoint param keys (URL/query/body); hyphens
                 // ARE allowed (kebab-case APIs like `api-key`,
                 // `content-type` are common). Special chars (quotes,
@@ -594,7 +588,7 @@ function validateResolverConfig(array $config, ?ApiEndpointManager $apiManager =
                     ];
                     continue;
                 }
-                // Beta.8 A2 Slice 7 server backstop — empty + malformed
+                // Server backstop — empty + malformed
                 // source specs. The admin UI blocks these at form-fill
                 // time, but direct POST callers (curl, scripts) need
                 // the same protection so a malformed config can't slip
@@ -646,7 +640,7 @@ function validateResolverConfig(array $config, ?ApiEndpointManager $apiManager =
                     ];
                     continue;
                 }
-                // Beta.8 A2 Slice 7 — character validation. Expose names
+                // Character validation. Expose names
                 // become $<name> PHP template variables — anything that
                 // isn't a valid PHP identifier silently breaks the
                 // template at render time. STRICT rule: letters, digits,
@@ -674,7 +668,7 @@ function validateResolverConfig(array $config, ?ApiEndpointManager $apiManager =
         }
     }
 
-    // cacheTTL — optional non-negative integer (Slice 4 implements; just validate shape).
+    // cacheTTL — optional non-negative integer (serverFetch caches; just validate shape).
     if (array_key_exists('cacheTTL', $config)) {
         if (!is_int($config['cacheTTL']) || $config['cacheTTL'] < 0) {
             $errors[] = [
@@ -685,7 +679,7 @@ function validateResolverConfig(array $config, ?ApiEndpointManager $apiManager =
         }
     }
 
-    // onMiss — optional enum. Beta.8 A2 Slice 7 Step 5 tightens to a
+    // onMiss — optional enum, held to a
     // strict allowed list so typos like 'render-empy' are caught at
     // save time instead of silently falling through to default at
     // request time. Future onMiss values (e.g. 'redirect:<url>') are
@@ -715,11 +709,11 @@ function validateResolverConfig(array $config, ?ApiEndpointManager $apiManager =
 }
 
 /**
- * Beta.8 A2 Slice 7.5 — multi-resolver validator. Walks an array of
+ * Multi-resolver validator. Walks an array of
  * resolver configs, runs validateResolverConfig on each (collecting
  * per-config errors with the array index baked into the field path),
  * then runs the collision check: expose key names must be unique
- * across all resolvers in the array (locked decision: flat-namespace
+ * across all resolvers in the array (by design: flat-namespace
  * collisions are rejected at
  * save time, authors disambiguate by renaming OR by using the
  * always-available $r0/$r1 namespaced form in the template).
@@ -768,7 +762,7 @@ function validateResolverConfigs(array $configs, ?ApiEndpointManager $apiManager
         }
     }
 
-    // Phase 2 — all-same-kind check (beta.9 A1 Slice 2b). Mixing data +
+    // Phase 2 — all-same-kind check. Mixing data +
     // side-effect resolvers on one route is incoherent: side-effect kinds
     // (oauth-start, oauth-callback, oauth-logout) short-circuit the render
     // with a 302; data resolvers expect the render to proceed with their exposed
@@ -790,7 +784,7 @@ function validateResolverConfigs(array $configs, ?ApiEndpointManager $apiManager
     }
 
     // Phase 3 — flat-namespace collision detection (data resolvers only).
-    // Locked decision: when two data
+    // By design: when two data
     // resolvers in the same route expose a key with the same name, the
     // save is REJECTED. Authors disambiguate by renaming, OR by accessing
     // the colliding values through the always-available namespaced form

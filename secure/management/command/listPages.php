@@ -117,7 +117,7 @@ function __command_listPages(array $params = [], array $urlParams = []): ApiResp
             // Include but mark as invalid
             $pages[] = [
                 'name' => $name,
-                'file' => $file,   // rendered project-relative by ApiResponse (C12 12.5)
+                'file' => $file,   // rendered project-relative by ApiResponse
                 'valid' => false,
                 'error' => 'Invalid JSON: ' . json_last_error_msg(),
                 'has_route' => in_array($name, $flatRoutes),
@@ -138,7 +138,7 @@ function __command_listPages(array $params = [], array $urlParams = []): ApiResp
         
         $pages[] = [
             'name' => $name,
-            'file' => $file,   // rendered project-relative by ApiResponse (C12 12.5)
+            'file' => $file,   // rendered project-relative by ApiResponse
             'valid' => true,
             'has_route' => in_array($name, $flatRoutes),
             'route_url' => in_array($name, $flatRoutes) ? '/' . $name : null,

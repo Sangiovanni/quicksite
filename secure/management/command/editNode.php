@@ -140,7 +140,7 @@ function __command_editNode(array $params = [], array $urlParams = []): ApiRespo
             ->withErrors([['field' => 'addParams.' . $reservedQsParam, 'reason' => 'reserved_attribute']]);
     }
 
-    // SECURITY (beta.10, widened beta.11 S3.10b): reject a malformed attribute
+    // SECURITY: reject a malformed attribute
     // NAME, a raw on* handler, and a dangerous URL scheme on write — the
     // renderer and the compiler enforce the same at render/build time
     // (reject-on-store companion).
@@ -153,7 +153,7 @@ function __command_editNode(array $params = [], array $urlParams = []): ApiRespo
 
     // SECURITY: Reject reserved-namespace storage keys in
     // data-storage-* / data-auth-source values (admin-token theft
-    // prevention — slice 5b). Same regex as the JS picker; defence in
+    // prevention). Same regex as the JS picker; defence in
     // depth (a token-bearing client can bypass the picker entirely).
     $rkErrors = findReservedKeysInParams($addParams);
     if (!empty($rkErrors)) {
@@ -178,7 +178,7 @@ function __command_editNode(array $params = [], array $urlParams = []): ApiRespo
     // did the client serializer glitch? Either way, the explicit
     // removeParams field is the right surface for "drop this key".
     // Mirrors the client-side `_collectEditFormParams` convention
-    // (empty value = ignore the row). Slice 3 add-on, 2026-06-03.
+    // (empty value = ignore the row).
     $emptyValueParams = [];
     foreach ($addParams as $key => $value) {
         if ($value === '' || $value === null) {
@@ -312,7 +312,7 @@ function __command_editNode(array $params = [], array $urlParams = []): ApiRespo
         $finalParams[$key] = $value;
     }
 
-    // Tag defaults (S2.5) — applied ONLY when the tag actually changes. Turning
+    // Tag defaults — applied ONLY when the tag actually changes. Turning
     // a node into a <video> should give a working player for the same reason
     // creating one does. Applying them on every edit would instead re-add a
     // `controls` the author had just removed, which is the opposite of a
@@ -357,13 +357,12 @@ function __command_editNode(array $params = [], array $urlParams = []): ApiRespo
             ->withErrors([['field' => 'params', 'missing' => $missingMandatory, 'tag' => $finalTag]]);
     }
     
-    // (Removed, S2.9) Auto-generation of an alt translation key. `alt` is an
-    // OPTIONAL translation-key param (TagRegistry::TRANSLATION_KEY_PARAMS) the
-    // author picks in the editor, and it arrives in addParams like any other.
-    // Generating one here invented a key the author never chose, created an
-    // empty translation entry for it, and disagreed with addNode — which wrote
-    // a literal empty string for the same attribute. One attribute, one
-    // behaviour, and the author is the one who decides it.
+    // No auto-generated alt translation key. `alt` is an OPTIONAL
+    // translation-key param (TagRegistry::TRANSLATION_KEY_PARAMS) the author
+    // picks in the editor, and it arrives in addParams like any other.
+    // Generating one here would invent a key the author never chose, create an
+    // empty translation entry for it, and disagree with addNode. One attribute,
+    // one behaviour, and the author is the one who decides it.
 
     // Apply changes to the node
     $nodeIndices = array_map('intval', explode('.', $nodeId));
@@ -376,7 +375,7 @@ function __command_editNode(array $params = [], array $urlParams = []): ApiRespo
     
     $structure = $editResult['structure'];
     
-    // SECURITY (F-C13-13): depth-check the RESULT of the edit.
+    // SECURITY: depth-check the RESULT of the edit.
     if (!qs_structure_depth_ok($structure)) {
         return ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage("Structure too deeply nested (max 50 levels)")

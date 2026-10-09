@@ -190,8 +190,8 @@ function __command_addComponentToNode(array $params = [], array $urlParams = [])
             ->withErrors([['field' => 'position', 'value' => $position, 'allowed' => $allowedPositions]]);
     }
     
-    // Validate component name format. beta.11 S3.10c: one shared rule, the
-    // same one the renderer and the compiler enforce — this was a private copy.
+    // Validate component name format: one shared rule, the same one the
+    // renderer and the compiler enforce — not a private copy.
     if (!qs_is_valid_component_reference($componentName)) {
         return ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage("Invalid component name format")
@@ -356,7 +356,7 @@ function __command_addComponentToNode(array $params = [], array $urlParams = [])
             $sanitized[$k] = $v;
         }
         // SECURITY: Reject reserved-namespace storage keys in
-        // data-storage-* / data-auth-source values (slice 5b — admin-
+        // data-storage-* / data-auth-source values (admin-
         // token theft prevention). Mirrors the JS picker; defence in
         // depth against direct POSTs that bypass the picker.
         $rkErrors = findReservedKeysInParams($sanitized);
@@ -394,7 +394,7 @@ function __command_addComponentToNode(array $params = [], array $urlParams = [])
     
     $updatedStructure = $result['structure'];
 
-    // SECURITY (F-C13-13): depth-check the RESULT of the component insert.
+    // SECURITY: depth-check the RESULT of the component insert.
     if (!qs_structure_depth_ok($updatedStructure)) {
         return ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage("Structure too deeply nested (max 50 levels)")

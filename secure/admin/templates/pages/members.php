@@ -1,9 +1,9 @@
 <?php
 /**
- * Project Members page (C8 8.3c).
+ * Project Members page.
  *
  * The membership management surface for the EDITED project (the header
- * picker's project — R4: the page banner re-states which project is being
+ * picker's project — the page banner re-states which project is being
  * worked on). Audience is EVERY member rank: all ranks see the roster
  * (getProjectRoster) and may propose (proposeMember); the queue / invite /
  * join-policy zones render for admin+owner, the transfer zone for the owner
@@ -155,7 +155,7 @@ window.QS_MEMBERS_I18N = <?= json_encode([
     <p class="admin-page-header__subtitle"><?= __admin('members.subtitle', 'Roster, invitations and join requests of the project you are editing.') ?></p>
 </div>
 
-<!-- R4: which project is being worked on — restated loudly, follows the header picker -->
+<!-- Which project is being worked on — restated loudly, follows the header picker -->
 <div class="members-banner" role="note">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18" aria-hidden="true">
         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>

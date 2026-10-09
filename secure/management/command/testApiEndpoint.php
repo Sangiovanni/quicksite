@@ -97,7 +97,7 @@ function __command_testApiEndpoint(array $params = [], array $urlParams = []): A
         $url .= (strpos($url, '?') !== false ? '&' : '?') . http_build_query($queryParams);
     }
 
-    // SSRF guard (beta.10 C4 / F8): the endpoint baseUrl + path/query params
+    // SSRF guard: the endpoint baseUrl + path/query params
     // are author-controlled, so validate the FINAL url before fetching — block
     // non-http(s) schemes and loopback/private/metadata addresses, and pin the
     // resolved IP so DNS can't rebind. Redirects are not followed (below).

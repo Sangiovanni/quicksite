@@ -179,8 +179,8 @@
         
         <!-- Personal-library scope option. The copy said "all projects", and the
              storage matched it literally: one installation-wide directory any
-             project could read from and delete from, including other users'
-             (beta.10 C13 13.6b). It is the author's OWN library now, so the
+             project could read from and delete from, including other users'.
+             It is the author's OWN library now, so the
              label says whose. The element id is unchanged — it is referenced by
              preview.js and by the admin CSS. -->
         <div class="preview-contextual-form__field preview-contextual-form__field--inline">

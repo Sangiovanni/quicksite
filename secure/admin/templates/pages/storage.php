@@ -1,6 +1,6 @@
 <?php
 /**
- * Storage registry admin page (beta.9 — storage registry, slice 2).
+ * Storage registry admin page.
  *
  * Lean PHP shell — header + toolbar + list + modal root + script include.
  * All rendering of the item cards, the add/edit modal, and CRUD

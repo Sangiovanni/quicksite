@@ -27,7 +27,7 @@
  * WHY ONE FUNCTION. The same four lines were inlined at more than twenty sites
  * across commands, `src/functions/` and `src/classes/` — some suppressed, some
  * not — and the reasoning above lived in three of them and nowhere else
- * (beta.11 S3.10c). One home, one behaviour, one place to change if a future
+ * One home, one behaviour, one place to change if a future
  * PHP alters the semantics.
  *
  * WHY `src/functions/` AND NOT `utilsManagement.php`: `environment.php` is one

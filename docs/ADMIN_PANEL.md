@@ -1788,7 +1788,7 @@ after the code exchange. The browser receives a first-party
 `HttpOnly; Secure; SameSite=Lax` session cookie (`qs_oauth_user`)
 mapping to a server-side session record. Provider tokens never reach
 JavaScript — closes the XSS exfil surface that
-browser-localStorage-stored OAuth tokens create. Locked design (see
+browser-localStorage-stored OAuth tokens create. By design (see
 DESIGN_DECISIONS.md "OAuth token custody"); the IETF "OAuth 2.0 for
 Browser-Based Apps" BCP and every major provider recommend this
 pattern for confidential web-server clients.

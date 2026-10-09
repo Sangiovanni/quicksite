@@ -93,7 +93,7 @@ function __command_editPageEvent(array $params = [], array $urlParams = []): Api
     }
 
     // ==========================================================================
-    // PER-VERB ARG VALIDATION (Slice 5 follow-up)
+    // PER-VERB ARG VALIDATION
     // ==========================================================================
     // Defense-in-depth — symmetric with addInteraction. See
     // interactionHelpers.php validateInteractionArgs() for rationale.

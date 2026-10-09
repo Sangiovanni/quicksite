@@ -193,7 +193,7 @@
                 </div>
             </div>
             
-            <!-- Animation Sections (Phase 10.3) -->
+            <!-- Animation Sections -->
             <div class="transition-editor__animations">
                 <div class="transition-editor__animations-info">
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">

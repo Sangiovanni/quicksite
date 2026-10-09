@@ -1,6 +1,6 @@
 <?php
 /**
- * serverFetch — Server-side equivalent of QS.fetch (beta.8 A2).
+ * serverFetch — Server-side equivalent of QS.fetch.
  *
  * Resolves an endpoint reference against the project's API registry
  * (the same `api-endpoints.json` that drives the client-side QS.fetch),
@@ -10,14 +10,14 @@
  *
  * Used by:
  *   - secure/src/classes/DataResolver.php — per-route resolvers that
- *     populate template variables before render (the headline A2 use).
- *   - Future: OAuth callback handlers (beta.9), webhook responders,
+ *     populate template variables before render (the headline use).
+ *   - Future: OAuth callback handlers, webhook responders,
  *     any server-side code that needs to call a registered API.
  *
  *
  * Refusing client-only endpoints:
  *
- *   Endpoints carry a `callableFrom` marker (beta.8 Track A4 — see
+ *   Endpoints carry a `callableFrom` marker (see
  *   qs_api_effective_callable_from). Endpoints whose effective
  *   value is `client` cannot be invoked here — serverFetch returns
  *   ok=false with a clear error. This is the server-side mirror of the
@@ -39,7 +39,7 @@
  *   - `bearer` → uses the user's session token from $context['session']
  *                ['token']. Without that, the call goes auth-less and
  *                will likely 401 — Tier 3 server-side session wiring
- *                (beta.8 A3 → A2 integration slice) populates this.
+ *                populates this.
  *   - `cookie` → passes through the user's Cookie header (from
  *                $context['cookieHeader'] or $_SERVER['HTTP_COOKIE']).
  *                The auth API and the user's site must share an origin
@@ -106,7 +106,7 @@ require_once __DIR__ . '/../classes/OutboundUrlPolicy.php';
  *                            'cacheTTL' => <int>,
  *                            'cacheStatus' => 'miss'|'skip'|'disabled']
  *
- * Beta.8 A2 Slice 7.5.C — extracted from serverFetch's single-curl
+ * Extracted from serverFetch's single-curl
  * implementation so serverFetchMulti can prepare N requests, hit the
  * cache for the ones with usable entries, and only fire curl_multi_*
  * for genuine misses.
@@ -209,7 +209,7 @@ function _serverFetchPrepare(string $endpointRef, array $inputs, array $context)
         }
     }
 
-    // SSRF guard (beta.10 C4 / F8): baseUrl comes from the project's API
+    // SSRF guard: baseUrl comes from the project's API
     // registry (author-controlled), so validate the final URL before fetching
     // — block non-http(s) schemes + loopback/private/metadata addresses and
     // pin the resolved IP so DNS can't rebind. Checked before the cache read
@@ -283,7 +283,7 @@ function _serverFetchPrepare(string $endpointRef, array $inputs, array $context)
         // here. Keeping the v1 surface narrow until a real need surfaces.
     } elseif ($authType === 'bearer') {
         // The user's session bearer token. Provided by the caller via
-        // $context['session']['token'] — beta.8 Tier 3 server-side session
+        // $context['session']['token'] — Tier 3 server-side session
         // wiring populates this from the cookie/header on the incoming
         // request. Without it the call goes auth-less and will likely 401
         // — that's a clearer signal than silently calling unauthed.
@@ -292,7 +292,7 @@ function _serverFetchPrepare(string $endpointRef, array $inputs, array $context)
             $headers[] = 'Authorization: Bearer ' . $token;
         }
     } elseif ($authType === 'cookie') {
-        // Pattern X (beta.7) — pass the user's Cookie header straight
+        // Pass the user's Cookie header straight
         // through. Same as the client's `credentials: 'include'`. The
         // auth API and the QuickSite site need a shared origin (or
         // explicit cross-origin cookie config on both ends).
@@ -319,14 +319,13 @@ function _serverFetchPrepare(string $endpointRef, array $inputs, array $context)
         }
     }
 
-    // TODO: telemetry hook (post-1.0).
+    // TODO: telemetry hook.
     // The right place for a per-call observe(start, endpoint, callableFrom)
     // before curl_exec + observe(end, status, durationMs, cacheHit) after.
 
-    // Beta.8 A2 Slice 4 — cache read attempt (cacheStatus reporting
-    // moved up to the caller in Slice 7.5.C so multi-resolver callers
-    // get a per-resolver status array instead of a single $GLOBALS
-    // value clobbered by whichever call ran last).
+    // Cache read attempt (cacheStatus reporting is the caller's, so
+    // multi-resolver callers get a per-resolver status array instead of a
+    // single $GLOBALS value clobbered by whichever call ran last).
     //
     // Eligibility: cacheTTL>0 + auth type doesn't carry per-user identity.
     // The auth-cacheable rule (LOCKED): only `none` and `apiKey` —
@@ -406,7 +405,7 @@ function _serverFetchParseResponse(string $responseBody, int $httpCode): array {
 
 /**
  * Single-endpoint synchronous fetch. Thin wrapper around the prepare /
- * curl_exec / parse trio; preserves the pre-7.5.C contract for callers
+ * curl_exec / parse trio; keeps the single-endpoint contract for callers
  * (signature unchanged, `$GLOBALS['__qs_resolver_cache_status']` still
  * set for back-compat with public/index.php's single-resolver path).
  */
@@ -444,7 +443,7 @@ function serverFetch(string $endpointRef, array $inputs = [], array $context = [
     $result = _serverFetchParseResponse($responseBody, $httpCode);
 
     // Cache write on success only — failures aren't cached so re-trying
-    // soon is the right behaviour (Slice 4 reasoning, unchanged).
+    // soon is the right behaviour.
     if ($prep['cacheable'] && $result['ok']) {
         writeResolverCache('@' . $prep['endpointRef'], $prep['inputs'], $result, $prep['cacheTTL']);
     }
@@ -453,7 +452,7 @@ function serverFetch(string $endpointRef, array $inputs = [], array $context = [
 }
 
 /**
- * Parallel multi-endpoint fetch (beta.8 A2 Slice 7.5.C).
+ * Parallel multi-endpoint fetch.
  *
  * Accepts an array of fetch specs and fires them concurrently via
  * curl_multi_*. Each spec gets its OWN preparation pass (cache lookup,

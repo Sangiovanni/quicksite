@@ -1,5 +1,5 @@
 /**
- * QSEasingPicker — cubic-bezier easing curve picker (Motion Slice 3).
+ * QSEasingPicker — cubic-bezier easing curve picker.
  *
  * Self-contained popover. SVG curve canvas with two draggable handles +
  * preset chips + numeric inputs for x1, y1, x2, y2. Confirm returns a

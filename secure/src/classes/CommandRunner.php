@@ -24,7 +24,7 @@ class CommandRunner {
      * are NOT allowed — they must go through the Management API which enforces
      * per-user role permissions via the Bearer token.
      *
-     * TIER RULE (beta.10 C10 F-C10-1): because this list bypasses hasPermission,
+     * TIER RULE: because this list bypasses hasPermission,
      * a command here is reachable by the LOWEST membership tier (viewer). So it
      * must be inside the viewer grant (content.read) or a global 'any' category —
      * NOTHING admin-tier. getCommandHistory (history) + listBackups (project.data)
@@ -123,9 +123,9 @@ class CommandRunner {
         try {
             return $functionName($params, $urlParams);
         } catch (\Throwable $e) {
-            // C12 (F9): this used to return the exception's FILE and LINE in
-            // `errors`, and its raw message in `message`, unconditionally — the
-            // sharpest path-disclosure site in the engine. Both now go to the
+            // Never the exception's FILE and LINE in `errors`, nor its raw
+            // message in `message`, unconditionally — that would be the sharpest
+            // path-disclosure site in the engine. Both go to the
             // error log; the caller gets the command name (which it supplied)
             // and a fixed message, or the real detail if the install has
             // declared itself development.

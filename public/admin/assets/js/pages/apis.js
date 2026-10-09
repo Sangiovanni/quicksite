@@ -840,9 +840,8 @@
      * API edit form, which is a separate modal and not open while
      * the endpoint modal is) and applies the same derivation rule as
      * ApiEndpointManager::deriveCallableFrom server-side: 'apiKey' →
-     * 'server'; everything else → 'both'. Per the locked design
-     * of 2026-06-04 for the `callableFrom` marker.
-     * Beta.8 Track A4.
+     * 'server'; everything else → 'both'. By design: DESIGN_DECISIONS.md
+     * "`callableFrom` auto-derive from auth type".
      */
     function updateCallableFromAutoPreview() {
         const select  = document.getElementById('endpoint-callable-from');
@@ -1012,7 +1011,7 @@
             name: name,
             path: path,
             description: description,
-            // Beta.8 A2 Slice 4 follow-up: send the explicit picker value,
+            // Send the explicit picker value,
             // including 'none'. Previously 'none' was collapsed to '' which
             // the backend's normalizer strips entirely, making "explicit
             // public" indistinguishable from "auth field absent" (which
@@ -1025,7 +1024,7 @@
             parameters: parameters,
             requestSchema: requestSchema || '',
             responseSchema: responseSchema || '',
-            // beta.8 Track A4 — empty string = auto-derive (backend
+            // Empty string = auto-derive (backend
             // drops the key); explicit 'client'/'server'/'both' persists.
             callableFrom: document.getElementById('endpoint-callable-from').value || ''
         };

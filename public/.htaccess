@@ -1,10 +1,10 @@
-# C15 15.2 — the web ROOT is deliberately FREE: no FallbackResource, so a request that is
+# The web ROOT is deliberately FREE: no FallbackResource, so a request that is
 # not a real file is NOT funnelled into QuickSite. A user's own hand-made site can live at
 # the root and QuickSite never squats the domain. The engine's namespaces each keep their
 # own per-directory .htaccess: /p/ (the project renderer), /admin/, /admin/api/, /management/.
 RewriteEngine On
 
-# C15 15.4 (E6) — never expose an auto-generated directory listing at the free root.
+# Never expose an auto-generated directory listing at the free root.
 # Only forbids the AUTO-INDEX: a user index.php/index.html dropped at the root is served
 # normally by DirectoryIndex, and real files stay directly reachable. Without an index
 # file a bare "/" answers 403 instead of listing the install's folders.

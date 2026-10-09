@@ -40,7 +40,7 @@
                         <option value="ease-out">ease-out</option>
                         <option value="ease-in-out">ease-in-out</option>
                     </select>
-                    <!-- A3-companion Motion Slice 3 — opens QSEasingPicker with
+                    <!-- Opens QSEasingPicker with
                          the select's current value pre-loaded; confirm adds the
                          resulting cubic-bezier as a new option + selects it. -->
                     <button type="button"

@@ -1,4 +1,4 @@
-<!-- Add-Transition Wizard Modal (A3-companion Motion Slice 4)
+<!-- Add-Transition Wizard Modal
      Opened from the "+ Add transition" button at the top of the Transitions
      group in the Motion tab. Picks a selector, a property, duration, easing
      (via QSEasingPicker), and delay; writes the `transition:` declaration

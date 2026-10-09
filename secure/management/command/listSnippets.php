@@ -25,11 +25,11 @@ require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
  * @return ApiResponse
  */
 function __command_listSnippets(array $params = [], array $urlParams = []): ApiResponse {
-    // C8 8.5 CONTAINMENT: the project read is BOUND to the URL marker the
+    // CONTAINMENT: the project read is BOUND to the URL marker the
     // dispatcher authorized. A body `project` is an optional echo that must match.
-    // (Before: `project` selected the target freely and fell back to an
-    // installation-wide default project, so an authorized marker on one project could
-    // read another project's snippets — F-C8-8.5-1.)
+    // (A `project` that selected the target freely, falling back to an
+    // installation-wide default project, would let an authorized marker on one
+    // project read another project's snippets.)
     $bound = qs_bind_marker_project($params, 'listSnippets');
     if ($bound['refusal'] !== null) {
         return $bound['refusal'];
@@ -40,8 +40,8 @@ function __command_listSnippets(array $params = [], array $urlParams = []): ApiR
     $coreSnippetsPath = getCoreSnippetsPath();
     $coreSnippets = listSnippetsFromPath($coreSnippetsPath, 'core');
     
-    // Load the CALLER'S OWN personal snippets. On the flat pre-13.6b layout this
-    // listed every user's, from any project marker (beta.10 C13 13.6b).
+    // Load the CALLER'S OWN personal snippets. A flat layout would list every
+    // user's, from any project marker.
     $personalSnippets = [];
     $personalSnippetsPath = getPersonalSnippetsPath();
     if ($personalSnippetsPath !== null) {

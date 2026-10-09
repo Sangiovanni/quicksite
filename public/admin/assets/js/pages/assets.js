@@ -28,7 +28,7 @@
     let currentlyPlaying = null; // Audio element currently playing
     let editingAsset = null;     // Asset currently being edited
     let fontStyleElements = {};  // Track injected @font-face style elements
-    // S2.5 — the SERVER's ceilings, fetched once at init. Null until they
+    // The SERVER's ceilings, fetched once at init. Null until they
     // arrive; every read below treats null as "do not block", so a failed fetch
     // degrades to the previous behaviour (server refuses, honestly, on POST)
     // rather than refusing everything client-side.
@@ -81,7 +81,7 @@
         } catch (e) { /* non-critical */ }
     }
 
-    // S2.5 — say the size ceiling BEFORE a user finds it by hitting it. The
+    // Say the size ceiling BEFORE a user finds it by hitting it. The
     // numbers come from the server on every page load because both PHP
     // directives behind them are per-directory settings a deployer can change
     // without QuickSite knowing.
@@ -408,7 +408,7 @@
             QuickSiteAdmin.showToast(t('media.unsupportedType', { name: name }), 'warning');
             return;
         }
-        // S2.5 — refuse an over-sized file HERE, where we can name it, rather
+        // Refuse an over-sized file HERE, where we can name it, rather
         // than letting it be queued and rejected one round-trip later. Only for
         // 'file': a URL download is fetched server-side and its size is not
         // knowable until then, so it has no client-side answer.

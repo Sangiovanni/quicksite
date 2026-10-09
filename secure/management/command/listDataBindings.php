@@ -9,8 +9,7 @@
  * attributes the runtime recognises instead of having to read the docs.
  *
  * The catalog itself lives in secure/src/functions/qsDataAttributeCatalog.php
- * — single source of truth (mirrors the qsVerbCatalog.php pattern shipped
- * beta.7 commit 142c277).
+ * — single source of truth (mirrors the qsVerbCatalog.php pattern).
  *
  * @method GET
  * @url /management/listDataBindings           (user-facing entries only)

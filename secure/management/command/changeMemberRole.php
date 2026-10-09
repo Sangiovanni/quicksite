@@ -1,8 +1,8 @@
 <?php
 /**
- * changeMemberRole Command (C8 8.3a)
+ * changeMemberRole Command
  *
- * Changes an existing member's role. Rank rule (L9/F6, in-lock): the actor
+ * Changes an existing member's role. Rank rule (in-lock): the actor
  * must outrank the member's CURRENT role AND the NEW role (an admin can
  * neither touch another admin nor mint one; the owner manages everything
  * below rank 6). The owner's role is immutable here — transferOwnership is
@@ -32,7 +32,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
  * @return ApiResponse
  */
 function __command_changeMemberRole(array $params = [], array $urlParams = []): ApiResponse {
-    // C8 containment: marker-only targeting.
+    // Project containment: marker-only targeting.
     if (!defined('PROJECT_NAME') || PROJECT_NAME === '') {
         return ApiResponse::create(400, 'project.required')
             ->withMessage('This command is project-scoped. Target a project with /management/p/<projectId>/changeMemberRole');

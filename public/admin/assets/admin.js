@@ -103,7 +103,7 @@ const QuickSiteAdmin = {
         
         // "Not logged in" ONLY when there is genuinely no session (no token /
         // failed load). An authenticated user with role null is simply a
-        // member of no project (C8 — e.g. freshly registered): show who they
+        // member of no project (e.g. freshly registered): show who they
         // are with a "no project" chip instead.
         if (!this.permissions.loaded || (!this.permissions.role && !this.permissions.tokenName)) {
             nameEl.textContent = this.t('nav.notLoggedIn');
@@ -369,7 +369,7 @@ const QuickSiteAdmin = {
      * Initialize form handling
      */
     initForms() {
-        // Login form: plain server-side POST (C5b username+password — the router
+        // Login form: plain server-side POST (username+password — the router
         // verifies credentials and holds the session; no JS pre-validation).
 
         // Command execution forms
@@ -980,8 +980,8 @@ const QuickSiteAdmin = {
      * The markup this replaced listed `g s → Structure` and `g t → Settings`;
      * the switch has no `t` case at all, and its `s` case goes to /settings. So
      * the panel documented one shortcut that does nothing and mislabelled
-     * another. Documentation corrected to match behaviour — changing the
-     * bindings instead would be a behaviour change, which this slice is not.
+     * another. The documentation follows the behaviour, not the other way
+     * round: the bindings are as initKeyboardShortcuts has them.
      *
      * @returns {HTMLElement}
      */

@@ -11,9 +11,9 @@ require_once __DIR__ . '/../functions/qsVerbCatalog.php';
 // The single point for the project's language set — processUrl() asks it which
 // codes count as a language rather than carrying its own list.
 require_once __DIR__ . '/../functions/projectLanguage.php';
-// Beta.8 A1 — paramRoutePathToFs for sanitising ':slug' → '__slug' in file lookup
+// paramRoutePathToFs for sanitising ':slug' → '__slug' in file lookup
 require_once __DIR__ . '/../functions/routeHelpers.php';
-// S2.8 — qs_render_public_base(): the base relative URLs compose against, in
+// qs_render_public_base(): the base relative URLs compose against, in
 // EVERY context this class renders in (surface B, and /management/ fragments).
 // Requiring this file defines no constants outside a surface-B request.
 require_once __DIR__ . '/../functions/renderBootstrap.php';
@@ -73,7 +73,7 @@ class JsonToHtmlRenderer {
         // fragment render of the same node compose against one value.
         $this->publicBase = qs_render_public_base();
 
-        // S2.8 — and against one LANGUAGE. processUrl() prefixes non-asset URLs
+        // And against one LANGUAGE. processUrl() prefixes non-asset URLs
         // with the current language on a multilingual project, so a render that
         // arrives with no language emits `/about` where the served page emits
         // `/en/about` — the same insert-vs-reload divergence wearing a second
@@ -121,7 +121,7 @@ class JsonToHtmlRenderer {
         // Support both flat name ('home') and path ('guides/getting-started')
         // Convention: ALL pages use folder structure - page/page.json
         $routePath = trim($pageName, '/');
-        // Beta.8 A1 — param-route segments (':slug') sanitised to '__slug'
+        // Param-route segments (':slug') sanitised to '__slug'
         // for filesystem lookup. Routes.php key stays ':slug' (matches
         // doc URL syntax). See routeHelpers.php for the canonical helper.
         $fsRoutePath = paramRoutePathToFs($routePath);
@@ -553,7 +553,7 @@ class JsonToHtmlRenderer {
      */
     /**
      * Substitute `{{param:NAME}}` placeholders with values from
-     * $this->context['routeParams']. Beta.8 A1 — text-level template
+     * $this->context['routeParams']. Text-level template
      * substitution for URL path-params (e.g., :slug from /products/:slug).
      *
      * - Fast path: returns unchanged when no routeParams in context OR
@@ -583,8 +583,7 @@ class JsonToHtmlRenderer {
 
     /**
      * Substitute `{{resolved:NAME}}` and `{{resolved:NAME.dot.path}}`
-     * placeholders with values from the server-side data resolver
-     * (beta.8 A2 Slice 3).
+     * placeholders with values from the server-side data resolver.
      *
      * Source resolution order:
      *   1. $this->context['resolved'] when explicitly passed by the
@@ -631,10 +630,10 @@ class JsonToHtmlRenderer {
         // as a translation key. Without this, raw text has no selection handle.
         if (strpos($textKey, '__RAW__') === 0 || strpos($textKey, '__LIT__') === 0) {
             $rawText = substr($textKey, 7); // strip the 7-char __RAW__/__LIT__ prefix
-            // Beta.8 A1 — substitute `{{param:NAME}}` placeholders from the
+            // Substitute `{{param:NAME}}` placeholders from the
             // captured URL path-params (e.g., :slug from /products/:slug)
             // BEFORE htmlspecialchars so the substituted value gets escaped.
-            // Beta.8 A2 — also substitute `{{resolved:NAME[.dot.path]}}`
+            // Also substitute `{{resolved:NAME[.dot.path]}}`
             // from the server-side data resolver. resolved first so a
             // routeParam value containing a literal {{resolved:...}} can't
             // accidentally inject a real placeholder.
@@ -671,11 +670,11 @@ class JsonToHtmlRenderer {
         }
 
         // Get translated text
-        // Beta.8 A1 — substitute `{{param:NAME}}` placeholders from the
+        // Substitute `{{param:NAME}}` placeholders from the
         // captured URL path-params AFTER translation lookup, BEFORE
         // htmlspecialchars. Translations can author the placeholder; e.g.
         // an EN string "Welcome, {{param:slug}}!" renders as the URL value.
-        // Beta.8 A2 — also substitute `{{resolved:NAME[.dot.path]}}` from
+        // Also substitute `{{resolved:NAME[.dot.path]}}` from
         // the server-side data resolver, applied first (see applyResolved).
         // Same order as the raw branch above: params last.
         $translatedRaw = $this->applySystemPlaceholders($this->translator->translate($textKey));
@@ -722,7 +721,7 @@ class JsonToHtmlRenderer {
             return "<!-- Blocked tag -->";
         }
 
-        // SECURITY (beta.10 F-g): only ALLOWED tags render — non-allowed tags
+        // SECURITY: only ALLOWED tags render — non-allowed tags
         // (e.g. raw SVG <rect>/<text>/<set>, <foreignObject>) are dropped, so
         // the renderer, the compiler, and the writers all agree. SVG stays a
         // decorative-only container.
@@ -1308,9 +1307,9 @@ class JsonToHtmlRenderer {
             return $url;
         }
         
-        // It's a relative URL - build the full URL. C15 15.4 (R1): the base is
+        // It's a relative URL - build the full URL. The base is
         // the root-relative path form with exactly one trailing slash, so links
-        // stay host- and scheme-agnostic. S2.8: resolved at construction for
+        // stay host- and scheme-agnostic. Resolved at construction for
         // whichever request is rendering, so an editor fragment and the served
         // page compose against the same value instead of the install root.
         $fullUrl = $this->publicBase;

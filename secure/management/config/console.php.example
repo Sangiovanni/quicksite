@@ -1,6 +1,6 @@
 <?php
 /**
- * Command console switch  (beta.11)
+ * Command console switch
  *
  * Copy this file to console.php and set allow_console to false (the line at
  * the bottom) to remove the admin panel's generic command console from this

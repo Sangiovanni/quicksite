@@ -1,4 +1,4 @@
-<!-- TRANSLATION MODE Content (Beta.9 A4 — Translation Manager panel) -->
+<!-- TRANSLATION MODE Content (Translation Manager panel) -->
 <div class="preview-contextual-section preview-contextual-section--translation" id="contextual-translation" data-mode="translation" style="display: none;">
 
     <!-- Top toolbar: language picker + scope picker + coverage summary -->

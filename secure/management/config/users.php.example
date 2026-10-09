@@ -2,8 +2,8 @@
 /**
  * User Registry — stable userId => identity. Engine plumbing (PHP).
  *
- * Copy this file to users.php. Login is USERNAME + PASSWORD (C5b; username
- * identity C8 8.0b): the login command / admin login page verify the password
+ * Copy this file to users.php. Login is USERNAME + PASSWORD: the login
+ * command / admin login page verify the password
  * against `password_hash` and issue a short-lived session (see auth.php
  * `session` knobs). The username is PRIVATE (login-only — never shown to
  * other users); public identity is the display `name` + the user id. There
@@ -50,7 +50,7 @@
  *   projects         status MIRROR of "my projects" (never authoritative —
  *                    access always re-checks the project's members.json).
  *                    Each entry carries a `status`: 'member' (missing =
- *                    member, pre-8.3a entries), 'pending_invite' /
+ *                    member, legacy entries), 'pending_invite' /
  *                    'pending_request' (awaiting consent — never grants
  *                    access), or a terminal notice 'refused' / 'removed' /
  *                    'deleted' (dismissable from the memberships page).

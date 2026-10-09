@@ -1,5 +1,5 @@
 /**
- * Project Members page (C8 8.3c) — roster / queue / invite / propose /
+ * Project Members page — roster / queue / invite / propose /
  * visibility / join-policy / transfer for the EDITED project.
  *
  * Reads: getProjectRoster (every member rank) + listMembers (admin/owner —
@@ -84,7 +84,7 @@
     }
 
     // Roles a proposal may suggest: below owner AND no higher than MY own rank
-    // (C8 8.3c — a member vouches at most for a peer; the validator re-gates at
+    // (a member vouches at most for a peer; the validator re-gates at
     // approve). `<= myRank` also lets a viewer propose a viewer.
     function proposableRoles() {
         var out = [];
@@ -354,7 +354,7 @@
     }
 
     function openApproveModal(q) {
-        // Role-at-approve (C8 8.3c): grant straight to a chosen role instead of
+        // Role-at-approve: grant straight to a chosen role instead of
         // approve-then-changeMemberRole. Options = strictly below my rank; the
         // default is the requested/proposed role (which the approve button
         // already required me to outrank), so leaving it untouched = the old
@@ -584,7 +584,7 @@
                 return;
             }
             findBtn.disabled = true;
-            // The directory lookup is NOT a command (S6) — it identifies a
+            // The directory lookup is NOT a command — it identifies a
             // person, it does not develop a project. Same response shape.
             window.QuickSiteAdmin.accountRequest('find-user', 'POST', { name: name }).then(function (res) {
                 findBtn.disabled = false;

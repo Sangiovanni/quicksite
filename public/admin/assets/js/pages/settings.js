@@ -59,7 +59,7 @@
     };
 
     // ========================================================================
-    // Render helpers — each returns ONE Element (CLAUDE.md, ruling 8)
+    // Render helpers — each returns ONE Element (CLAUDE.md)
     // ========================================================================
 
     /**

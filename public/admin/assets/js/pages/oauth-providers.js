@@ -1,12 +1,12 @@
 /**
  * OAuth providers admin page — list + add/edit modal + delete with
- * in-use block + override-in-project pre-fill (beta.9).
+ * in-use block + override-in-project pre-fill.
  *
  * Calls listOAuthProviders / addOAuthProvider / editOAuthProvider /
  * deleteOAuthProvider via QuickSiteAdmin.apiRequest.
  *
- * Visual design (locked 2026-06-15, DESIGN_DECISIONS.md "OAuth
- * providers admin page shape"). All styling lives in
+ * Visual design (by design, DESIGN_DECISIONS.md "OAuth providers admin
+ * page"). All styling lives in
  * public/admin/assets/css/oauth-admin.css — this file is structure +
  * behaviour only. Classes follow the BEM-ish convention:
  *   oauth-provider-card, oauth-provider-card__row,

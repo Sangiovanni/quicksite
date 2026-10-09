@@ -148,9 +148,9 @@ window.QuickSiteAPI = (function() {
     }
 
     // ============================================
-    // Project scope transport (C8 8.W)
+    // Project scope transport
     // ============================================
-    // C7 requires the '/management/p/<projectId>/<cmd>' marker for project-scoped
+    // The server requires the '/management/p/<projectId>/<cmd>' marker for project-scoped
     // commands; global commands stay '/management/<cmd>'. This module decides which
     // is which and builds the path accordingly. The authoritative scope set and the
     // default project both come from the server (QUICKSITE_CONFIG, emitted from
@@ -217,9 +217,9 @@ window.QuickSiteAPI = (function() {
     // panel against 18 that read `.error` — so a client-side refusal printed each
     // caller's generic fallback and the real reason never surfaced. That is how
     // "getSizeInfo failed: Unknown error" reached the dashboard console at zero
-    // membership with no hint that the cause was a missing project (beta.10 C13
-    // 13.6b). Both keys are emitted: `message` so the common path works, `error`
-    // so the 18 existing readers keep working.
+    // membership with no hint that the cause was a missing project. Both keys are
+    // emitted: `message` so the common path works, `error` so the 18 existing
+    // readers keep working.
     function clientError(code, text, status) {
         return {
             ok: false,
@@ -310,13 +310,13 @@ window.QuickSiteAPI = (function() {
              + 'It came from the web server or a proxy rather than from QuickSite itself.';
     }
 
-    // C8 8.4: the project-manager fence is LIFTED. Every project.data command
-    // (backup/restore/clone/export/deleteBackup/listBackups) is now marker-contained
+    // No project-manager fence here. Every project.data command
+    // (backup/restore/clone/export/deleteBackup/listBackups) is marker-contained
     // server-side (target bound to PROJECT_NAME, body mismatch → 400 project.mismatch)
     // and the dashboard targets each call with an explicit opts.project = the selected
-    // project (marker == target). importProject became GLOBAL (create-from-archive,
-    // caller = owner) so it needs no marker at all. deleteProject was lifted earlier
-    // (8.0 round 5) on the same pattern.
+    // project (marker == target). importProject is GLOBAL (create-from-archive,
+    // caller = owner) so it needs no marker at all. deleteProject follows the same
+    // pattern as the project.data commands.
 
     // ============================================
     // Core API Methods
@@ -365,7 +365,7 @@ window.QuickSiteAPI = (function() {
             return clientError('client.no_token', 'No authentication token', 401);
         }
 
-        // Build URL — project-scoped commands carry the C7 '/p/<projectId>/' marker;
+        // Build URL — project-scoped commands carry the '/p/<projectId>/' marker;
         // opts.project targets a specific project for this call (else the panel default).
         const commandPath = buildCommandPath(command, opts.project);
         if (commandPath === null) {
@@ -430,7 +430,7 @@ window.QuickSiteAPI = (function() {
 
             // A 401 with auth.invalid_credentials is a COMMAND-level credential
             // check (e.g. the account password change's current password) — the session
-            // itself is alive, so surface it to the caller (C8). Any other 401
+            // itself is alive, so surface it to the caller. Any other 401
             // means the session is over (signed out, idle, or ended elsewhere)
             // → login. An embedding platform that plugged its own token source
             // gets one transparent retry through it first.
@@ -587,7 +587,7 @@ window.QuickSiteAPI = (function() {
             return clientError('client.no_token', 'No authentication token', 401);
         }
 
-        // Project-scoped commands (uploadAsset) carry the C7 '/p/<projectId>/' marker (8.W)
+        // Project-scoped commands (uploadAsset) carry the '/p/<projectId>/' marker
         const commandPath = buildCommandPath(command);
         if (commandPath === null) {
             return noProjectError(command);
@@ -673,7 +673,7 @@ window.QuickSiteAPI = (function() {
      * fetchHelper uses it, and the pages that hand-build a helper URL against
      * their own base (preview AI tools, translations) call it too.
      *
-     * C8 8.X: the helper endpoint authorizes each arm's underlying command
+     * The helper endpoint authorizes each arm's underlying command
      * against THIS project and binds its context, so a project-scoped arm reads
      * the project you are EDITING rather than the one the site happens to serve.
      * Emitted unconditionally when a project is known — arms that expose no
@@ -768,7 +768,7 @@ window.QuickSiteAPI = (function() {
      * NOT commands. The command surface is a CLI for developing a project;
      * managing the login you sign in with, getting into or out of a project, and
      * looking a person up in order to invite them are operations on an ACCOUNT,
-     * so they are served here instead (beta.11 S6).
+     * so they are served here instead.
      *
      * Resolves with the same {ok, status, data} shape request() uses, so a
      * caller branches on `res.ok` and reads `res.data.data` / `res.data.message`
@@ -855,7 +855,7 @@ window.QuickSiteAPI = (function() {
         refreshAccessToken,
         setTokenSource,
 
-        // Project scope (C8 8.W)
+        // Project scope
         getCurrentProject,
         setCurrentProject,
         isProjectScoped,

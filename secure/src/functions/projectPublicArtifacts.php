@@ -1,12 +1,11 @@
 <?php
 /**
- * projectPublicArtifacts.php (beta.10 C9) — per-project generated public artifacts.
+ * projectPublicArtifacts.php — per-project generated public artifacts.
  *
  * Each project's OWN `secure/projects/<id>/public/` is authoritative and is served live
  * at `/p/<id>/`. The generated client artifacts (qs-api-config.js / qs-enums.js /
  * qs-route-schema.js) live in the PROJECT'S own `public/scripts/`, and that is the only
- * copy: no project is privileged, so nothing is mirrored anywhere else (C15 15.3 deleted
- * the served-base dual-write along with the served project itself).
+ * copy: no project is privileged, so nothing is mirrored anywhere else.
  *
  * Entry points:
  *   - qs_public_artifact_targets($relPath) / qs_write_public_artifact($relPath,$content):
@@ -85,7 +84,7 @@ function qs_copy_public_artifact(string $sourceFile, string $relPath): bool {
 
 /**
  * Delete an artifact from every target for $relPath — the counterpart of
- * qs_copy_public_artifact (C8 8.1), so an asset removed through a command cannot survive
+ * qs_copy_public_artifact, so an asset removed through a command cannot survive
  * in a copy the command did not know about.
  *
  * Tolerant by design: a target that does not exist is not a failure.
@@ -105,7 +104,7 @@ function qs_delete_public_artifact(string $relPath): bool {
 /**
  * Event-driven emitters. A command that changes a project's API / routes / enums calls
  * these instead of writing a hard-coded path — the artifact lands in the bound project's
- * own public/, whichever project that is. Under C7 the command's PROJECT_PATH is the
+ * own public/, whichever project that is. The command's PROJECT_PATH is the
  * project the request targeted, so this is correct for every project uniformly.
  */
 function qs_emit_api_config(ApiEndpointManager $manager): bool {

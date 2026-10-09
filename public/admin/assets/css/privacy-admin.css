@@ -1,4 +1,4 @@
-/* Privacy helper admin page (beta.9). Colors via --admin-* variables (theme-aware).
+/* Privacy helper admin page. Colors via --admin-* variables (theme-aware).
    Mirrors storage-admin.css conventions. */
 
 .privacy-header-icon { width: 28px; height: 28px; flex-shrink: 0; }

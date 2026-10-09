@@ -112,7 +112,7 @@ function _measureTableDimensions(array $tableNode): ?array {
 }
 
 // Translation flat-to-nested + deep-merge plumbing is shared via
-// src/functions/translationHelpers.php (C9). Use
+// src/functions/translationHelpers.php. Use
 // convertDotNotationToNested + mergeTranslations directly below.
 
 /**
@@ -205,7 +205,7 @@ function __command_importStructureTranslations(array $params = [], array $urlPar
     $tableNode = _scanForComplexStructure($structure, $kind, $structureId);
     if ($tableNode === null) {
         return ApiResponse::create(404, 'structure.not_found')
-            ->withMessage("No <table data-qs-complex='table' data-qs-complex-id='$structureId'> found on page '$route'. The table may have been created before this concern shipped — use the 'twin + delete' workaround documented in BETA7_TABLE_TRANSLATION_CSV.md, or re-create with the Table wizard so the markers get stamped.");
+            ->withMessage("No <table data-qs-complex='table' data-qs-complex-id='$structureId'> found on page '$route'. The table may predate these markers — re-create it with the Table wizard so the markers get stamped, then delete the old one.");
     }
 
     // ---- validate dimensions ---------------------------------------------

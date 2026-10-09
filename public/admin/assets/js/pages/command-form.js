@@ -523,7 +523,7 @@ const FIELD_PICKERS = {
     // are documented as taking a `data-qs-node` value like "hero/cta-button";
     // that documentation is stale. data-qs-node CARRIES the dot path, and all
     // four resolve their id through NodeNavigator::getNode, which parses
-    // nothing else. See NOTES/tests/beta12/s4e_nodeid_shape_probe.php.
+    // nothing else.
     //
     // `allowRoot` prepends the literal "root", which is a documented value that
     // is NOT a node - true for every structure type, or an array naming the
@@ -692,9 +692,8 @@ function _placeholder(select, text, opts) {
  *
  * Safe to move: the URL is built from fields marked `data-url-param`, which is
  * set only for parameters help.php writes in braces, and no command this is
- * used on has one — so no request changes shape. Every pair is checked in
- * NOTES/tests/beta12/s4e_urlparam_order.php, which counts them so a pair
- * cannot be added without being checked.
+ * used on has one — so no request changes shape. A pair added here must keep
+ * that true: neither of its fields may be a URL parameter.
  *
  * @param {HTMLElement} anchorEl  the field to sit after
  * @param {HTMLElement} movedEl   the field to move
@@ -1453,8 +1452,7 @@ async function _initStructurePicker(form, cfg) {
             // the advanced bucket comes from ADVANCED_EVENTS, which is in
             // NEITHER. Measured by calling the command with each offered
             // event: every advanced one answers 400, on every tag that has
-            // such a bucket, with zero overlap with the accepted set
-            // (NOTES/tests/beta12/s4f_event_acceptance.php). Offering them
+            // such a bucket, with zero overlap with the accepted set. Offering them
             // would be the exact defect this picker work exists to avoid.
             //
             // Dropping the BUCKET rather than filtering against a copy of

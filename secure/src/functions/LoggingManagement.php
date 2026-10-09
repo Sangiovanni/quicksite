@@ -7,19 +7,19 @@ require_once __DIR__ . '/utilsManagement.php'; // qs_json_write
  * Handles logging API commands to daily JSON files
  */
 
-require_once __DIR__ . '/PathManagement.php'; // is_valid_project_name (F1 gate)
+require_once __DIR__ . '/PathManagement.php'; // is_valid_project_name (the project-name gate)
 
 if (!defined('LOGS_PATH')) {
     define('LOGS_PATH', SECURE_FOLDER_PATH . '/logs');
 }
 
 /**
- * The command log is PER-PROJECT (beta.10 C10 10.1b, Sangio's ruling).
+ * The command log is PER-PROJECT (by design).
  *
  *   secure/logs/p/<projectId>/commands_<date>.json   project-scoped commands
  *   secure/logs/_global/commands_<date>.json         global-scoped commands
  *
- * WHY DIRECTORIES, NOT A `project` FIELD PER ENTRY (F-C10-2 / F-C10-3):
+ * WHY DIRECTORIES, NOT A `project` FIELD PER ENTRY:
  * the store previously had no project dimension at all while `history` was
  * DECLARED project-scoped in categories.php. Since any authenticated user can
  * create a project and is its owner, that mismatch let anyone read — and clear —
@@ -28,9 +28,9 @@ if (!defined('LOGS_PATH')) {
  * a containment fix that introduces a cross-project write. With directories,
  * clearing is an unlink inside the caller's own directory, and a reader must
  * construct another project's path to see another project's data — structural,
- * not filter-dependent (the same fail-closed idiom as the L11 serving jail).
+ * not filter-dependent (the same fail-closed idiom as surface B's static-file jail).
  *
- * The `_global` bucket is WRITTEN but served to nobody in beta.10: global
+ * The `_global` bucket is WRITTEN but served to nobody: global
  * commands (account + membership self-service) belong to no project, and there
  * is no operator tier to show them to (superadmin was retired). Recording them
  * keeps the forensic trail for account deletion / invitation acceptance instead
@@ -48,7 +48,7 @@ const QS_LOG_GLOBAL_BUCKET = '_global';
  *
  * @param string|null $project Validated projectId, or null/'' for global.
  * @return string|null Absolute directory path, or NULL when the projectId fails
- *                     the F1 shape gate (fail-closed: the caller must not log
+ *                     the project-name shape gate (fail-closed: the caller must not log
  *                     rather than log to a guessed location).
  */
 function qs_log_dir(?string $project = null): ?string {
@@ -56,7 +56,7 @@ function qs_log_dir(?string $project = null): ?string {
         return LOGS_PATH . '/' . QS_LOG_GLOBAL_BUCKET;
     }
     // Defence in depth: the dispatcher already validated this, but the value
-    // becomes a directory selector here (F1). No separators can survive.
+    // becomes a directory selector here. No separators can survive.
     if (!is_valid_project_name($project)) {
         return null;
     }
@@ -77,7 +77,7 @@ function ensureLogsDirectory(?string $dir = null): bool {
 /**
  * Get the log file path for a specific date, within a project (or global).
  *
- * @return string|null NULL when the projectId fails the F1 gate.
+ * @return string|null NULL when the projectId fails the project-name gate.
  */
 function getLogFilePath(?string $date = null, ?string $project = null): ?string {
     $date = $date ?? date('Y-m-d');
@@ -93,7 +93,7 @@ function generateLogId(): string {
 }
 
 /**
- * Commands whose request body is NEVER logged, in any form (beta.10 C10 10.1b).
+ * Commands whose request body is NEVER logged, in any form.
  * The entry itself still records the command, the publisher and the result — so
  * "this user changed their password at 14:02" stays auditable — but the body
  * carries only credentials and adds nothing an auditor needs.
@@ -104,7 +104,7 @@ function generateLogId(): string {
  * staying true.
  */
 /*
- * changePassword / deleteMyAccount stopped being commands in beta.11 S6 —
+ * changePassword / deleteMyAccount are not commands —
  * managing the login you sign in with is not project development, so both are
  * served by /admin/self, which does not run this logger at all. Their entries
  * are KEPT rather than pruned: a deny-list that names something unreachable
@@ -118,7 +118,7 @@ const QS_LOG_SKIP_BODY_COMMANDS = [
 
 /**
  * Global-scope commands whose records are DROPPED instead of written to the
- * `_global` bucket (beta.11 S6.6).
+ * `_global` bucket.
  *
  * ⚠ THIS IS ABOUT SIGNAL, NOT SECRECY. Nothing here is sensitive; these are
  * reads. The `_global` bucket has no reader — `getCommandHistory` requires an
@@ -211,12 +211,12 @@ function qs_log_redact_secrets(array $body, int $depth = 0): array {
 }
 
 /**
- * Sanitize a request body for logging — DENY BY DEFAULT (beta.10 C10 10.1b).
+ * Sanitize a request body for logging — DENY BY DEFAULT.
  *
  * This used to be an allowlist keyed by COMMAND with `default: return $body`, so
  * every command not explicitly named logged its body verbatim and a NEW command
  * carrying a credential was exposed the moment it shipped — no edit here, no
- * warning. That is how cleartext passwords reached the command log (C10 §8).
+ * warning. That is how cleartext passwords reached the command log.
  *
  * The rule is now inverted and command-independent: credential-shaped keys are
  * redacted for EVERY command, always, at every depth. The per-command cases below
@@ -258,7 +258,7 @@ function sanitizeLogBody(string $command, array $body): ?array {
 }
 
 /**
- * Sanitize a command's REQUEST PARAMETERS for logging (beta.11 S6.6).
+ * Sanitize a command's REQUEST PARAMETERS for logging.
  *
  * ⚠ WHY THIS EXISTS. Until now the log recorded only the JSON body, and a large
  * part of the command surface does not use one. `getStructure/pages/home` takes
@@ -322,7 +322,7 @@ function createLogEntry(
 ): array {
     $duration = round((microtime(true) - $startTime) * 1000, 2);
 
-    // Publisher identity (C5): the resolved user — the token no longer carries a
+    // Publisher identity: the resolved user — the token no longer carries a
     // name, so we record the stable userId + display name.
     return [
         'id' => generateLogId(),
@@ -455,7 +455,7 @@ function logCommand(
         return true;
     }
 
-    // A global-scope READ headed for the reader-less `_global` bucket (S6.6).
+    // A global-scope READ headed for the reader-less `_global` bucket.
     // ⚠ Gated on the bucket, not on the name alone: if one of these ever became
     // project-scoped, its records would belong in a project's history — which a
     // person actually reads — and dropping them there would be a silent loss.
@@ -475,8 +475,8 @@ function logCommand(
     // `auth.permission_denied`, none of which exists anywhere in the tree — so
     // no refusal was ever recorded while the API documentation promised they
     // were. A rename introduces that silently: nothing errors, a branch simply
-    // stops being taken. `qs_authz_logged_codes()` is asserted against the
-    // emitting sites by the S5.g probe.
+    // stops being taken. `qs_authz_logged_codes()` exists so the list can be
+    // checked against the emitting sites.
     //
     // `auth.unauthorized` is deliberately NOT here: an unauthenticated caller
     // has no user and no project, so the command log has no bucket for it that
@@ -591,8 +591,8 @@ function getCommandHistory(array $filters = [], string $project = ''): array {
  * Clear ONE project's command history before a specific date.
  *
  * Scoped by DIRECTORY, so the deletion can only ever touch the caller's own
- * project (F-C10-3: this used to unlink across the whole installation, letting
- * any self-minted project owner erase the entire audit log).
+ * project (an unlink across the whole installation would let any self-minted
+ * project owner erase the entire audit log).
  *
  * @param string $project The AUTHORIZED projectId. Empty → deletes nothing.
  */

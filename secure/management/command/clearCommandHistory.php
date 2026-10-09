@@ -17,9 +17,9 @@
 require_once SECURE_FOLDER_PATH . '/src/functions/LoggingManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 
-// C10 10.1b — clearing is PER-PROJECT. The project is the dispatcher's authorized
+// Clearing is PER-PROJECT. The project is the dispatcher's authorized
 // URL marker (PROJECT_NAME), never a body parameter. Scoped by directory, so this
-// deletion can only ever reach the caller's own project (F-C10-3).
+// deletion can only ever reach the caller's own project.
 $project = defined('PROJECT_NAME') ? (string)PROJECT_NAME : '';
 if ($project === '') {
     ApiResponse::create(400, 'project.required')
@@ -73,7 +73,7 @@ if (empty($body['confirm']) || $body['confirm'] !== true) {
     $totalSize = array_sum(array_column($toDelete, 'size_bytes'));
     
     // ⚠ `stored_days` is every day the project HAS, not only the ones this call
-    // would remove (beta.11 S6.6). Without it a caller who is told "0 files"
+    // would remove. Without it a caller who is told "0 files"
     // cannot tell whether they picked the wrong date or simply have nothing
     // older — and the answer matters, because deletion is DAY-GRANULAR: the day
     // comes from the FILE NAME, never from a record's own timestamp, so an

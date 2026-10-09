@@ -2,9 +2,9 @@
 /**
  * reservedStorageKeys.php — Server-side admin-namespace storage-key guard.
  *
- * Mirrors the JS-side check shipped late beta.7 in
- * public/admin/assets/js/pages/preview/contextual-complex/data-attr-picker.js
- * (slice 5). The admin panel and the user's site share the browser's
+ * Mirrors the JS-side check in
+ * public/admin/assets/js/pages/preview/contextual-complex/data-attr-picker.js.
+ * The admin panel and the user's site share the browser's
  * storage origin: if a user authors `data-storage-value="localStorage:X"`
  * where X collides with an admin key (auth tokens, AI settings, etc.),
  * the rendered page can READ or CLEAR the admin's state.

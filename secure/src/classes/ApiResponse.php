@@ -1,6 +1,6 @@
 <?php
 
-// beta.10 C12 12.5 (F-C12-4, F-C13-18). Every path that leaves a command leaves
+// Every path that leaves a command leaves
 // through one of the setters below, so the install layout is stripped HERE
 // rather than at the ~48 sites that build one. A per-site fix is one whose
 // completeness cannot be proven — the static scan for those sites produced both
@@ -268,7 +268,7 @@ class ApiResponse {
         // to one exit path and not the other.
         $response = $this->envelope();
 
-        // beta.10 C13 F-C13-14(b): SERIALISE FIRST, WRITE SECOND.
+        // SERIALISE FIRST, WRITE SECOND.
         //
         // The status and Content-Type used to be sent before json_encode ran. On a
         // large payload the encode is exactly where the memory ceiling is reached,

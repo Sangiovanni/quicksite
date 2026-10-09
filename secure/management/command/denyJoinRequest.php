@@ -1,16 +1,16 @@
 <?php
 /**
- * denyJoinRequest Command (C8 8.3b)
+ * denyJoinRequest Command
  *
  * Authority's "no" on a `direction:'request'` entry. The note is MANDATORY —
- * a refusal always carries its reason (locked R3).
+ * a refusal always carries its reason (by design).
  *
  * Rank rule — identical to approveJoinRequest and cancelInvitation's
  * no-carve-out discipline: the denier must outrank the requested role
  * (canManageRole). Nobody may veto what they could not grant — an admin
  * cannot kill a proposal-for-admin before the owner sees it.
  *
- * Tombstones follow the R4 principle (other-initiated termination):
+ * Tombstones follow the other-initiated-termination principle:
  *   - SELF-REQUEST: the requester asked and gets answered — a dismissable
  *     `refused` notice (with the reason) lands in THEIR cache. Its display
  *     name inherits the privacy-correct name from their pending entry
@@ -43,7 +43,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
  * @return ApiResponse
  */
 function __command_denyJoinRequest(array $params = [], array $urlParams = []): ApiResponse {
-    // C8 containment: marker-only targeting.
+    // Project containment: marker-only targeting.
     if (!defined('PROJECT_NAME') || PROJECT_NAME === '') {
         return ApiResponse::create(400, 'project.required')
             ->withMessage('This command is project-scoped. Target a project with /management/p/<projectId>/denyJoinRequest');
@@ -58,7 +58,7 @@ function __command_denyJoinRequest(array $params = [], array $urlParams = []): A
     }
 
     $targetId = trim((string)($params['user_id'] ?? ''));
-    // C11 11.3 — the note-encoding guard, shared with every roster writer.
+    // The note-encoding guard, shared with every roster writer.
     if (qs_note_encoding_invalid($params['note'] ?? null)) {
         return ApiResponse::create(400, 'validation.unencodable')
             ->withMessage('The note is not valid UTF-8 text')

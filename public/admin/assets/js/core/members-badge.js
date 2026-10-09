@@ -1,5 +1,5 @@
 /**
- * Membership counts + nav badge (C8 8.3c).
+ * Membership counts + nav badge.
  *
  * Computes, asynchronously, the numbers the Members nav badge and the
  * dashboard memberships card show — derived ENTIRELY from existing reads
@@ -40,7 +40,7 @@
             total: 0,
         };
 
-        // The membership inbox is an ACCOUNT surface, not a command (S6).
+        // The membership inbox is an ACCOUNT surface, not a command.
         var inboxP = API.accountRequest('invitations', 'GET').then(function (res) {
             var d = (res && res.ok && res.data && res.data.data) || {};
             counts.invitations = d.invitation_count || 0;

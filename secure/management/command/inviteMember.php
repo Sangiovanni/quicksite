@@ -1,6 +1,6 @@
 <?php
 /**
- * inviteMember Command (C8 8.3a)
+ * inviteMember Command
  *
  * Offers project membership to an existing account — CONSENT model: the
  * invitation goes into the project's members.json `invitations` block (a
@@ -14,7 +14,7 @@
  * membership target (a username-targeted invite would be an existence oracle
  * on the login identifier).
  *
- * Rank rule (model A delegation, L9): the actor may offer only roles of
+ * Rank rule (delegation): the actor may offer only roles of
  * STRICTLY LOWER rank than their own (canManageRole), checked in-lock against
  * the actor's CURRENT role. 'owner' is never assignable — transferOwnership.
  *
@@ -40,7 +40,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
  * @return ApiResponse
  */
 function __command_inviteMember(array $params = [], array $urlParams = []): ApiResponse {
-    // C8 containment: the target project is EXCLUSIVELY the authorized URL
+    // Project containment: the target project is EXCLUSIVELY the authorized URL
     // marker. Body project/name keys are ignored by design.
     if (!defined('PROJECT_NAME') || PROJECT_NAME === '') {
         return ApiResponse::create(400, 'project.required')
@@ -57,7 +57,7 @@ function __command_inviteMember(array $params = [], array $urlParams = []): ApiR
 
     $targetId = trim((string)($params['user_id'] ?? ''));
     $role     = trim((string)($params['role'] ?? ''));
-    // C11 11.3 — the note-encoding guard, shared with every roster writer.
+    // The note-encoding guard, shared with every roster writer.
     // The note is OPTIONAL here, which is exactly
     // why this cannot be folded into qs_clean_note: a null return would silently
     // drop the note instead of telling the caller it was unstorable.
@@ -87,7 +87,7 @@ function __command_inviteMember(array $params = [], array $urlParams = []): ApiR
     }
 
     // Target must be an existing account. user_id is a 128-bit opaque id —
-    // an honest 404 here is not a practical existence oracle (C8 8.3a R1).
+    // an honest 404 here is not a practical existence oracle.
     $usersCfg = loadUsersConfig();
     $target = $usersCfg['users'][$targetId] ?? null;
     if ($target === null) {
@@ -138,7 +138,7 @@ function __command_inviteMember(array $params = [], array $urlParams = []): ApiR
             ->withMessage('This user is already a member of the project');
     }
     if ($error === 'invitation.already_pending') {
-        // 8.3b: the blocker may be a join request/proposal — those are
+        // The blocker may be a join request/proposal — those are
         // adjudicated, not cancelled.
         return ApiResponse::create(409, 'invitation.already_pending')
             ->withMessage($pendingDirection === 'request'

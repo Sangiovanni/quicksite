@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/utilsManagement.php'; // qs_json_write
 /**
- * Owner space usage — per-project disk measurement + a TTL cache (beta.10 C8).
+ * Owner space usage — per-project disk measurement + a TTL cache.
  *
  * Backs GET /admin/self/space-usage: "how much disk do the projects I OWN consume", so an
  * owner sees their whole footprint without the command ever reporting a project
@@ -10,9 +10,9 @@ require_once __DIR__ . '/utilsManagement.php'; // qs_json_write
  * ── Two rules make the cache safe ────────────────────────────────────────────
  *
  * 1. **The project SET is never cached.** `qs_owned_projects()` is recomputed on
- *    every call from the authoritative `members.json` (L5), never from the derived
+ *    every call from the authoritative `members.json`, never from the derived
  *    `users.php` projects cache — that derived cache is exactly what produced the
- *    C5 stale-pointer bug. Resolving the set costs a few small JSON reads; only the
+ *    stale-pointer bug. Resolving the set costs a few small JSON reads; only the
  *    recursive directory walk is expensive, and only that is cached. So creating,
  *    deleting, importing or transferring a project is reflected IMMEDIATELY, and a
  *    stale entry can only ever make a byte count slightly old — never show you a
@@ -88,8 +88,8 @@ function qs_count_glob(string $pattern): int {
 
 /**
  * Measure ONE project. Never returns names of anything inside it — sizes and
- * counts only. (C8 8.5 removed backup-name disclosure from the project-scoped
- * report; an aggregate is not the place to reintroduce it.)
+ * counts only. (Backup names are not disclosed by the project-scoped report
+ * either; an aggregate is not the place to introduce them.)
  *
  * @param string $project Validated project id
  * @return array{total:int,content:int,backups:array,exports:array,builds:array}
@@ -194,8 +194,6 @@ function qs_prune_space_cache(): void {
     }
 }
 
-// qs_format_size() moved to utilsManagement.php (required at the top of this
-// file) when uploadLimits.php became a second caller. It was never specific to
-// space measurement, and a second copy is how the three formatBytes()
-// duplicates elsewhere in the tree came about — those were collapsed onto
-// qs_format_size in S2.9.
+// qs_format_size() lives in utilsManagement.php (required at the top of this
+// file): uploadLimits.php calls it too, and it was never specific to space
+// measurement. A second copy is how duplicate formatBytes() helpers come about.

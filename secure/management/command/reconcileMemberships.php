@@ -1,13 +1,13 @@
 <?php
 /**
- * reconcileMemberships Command (C8 8.4)
+ * reconcileMemberships Command
  *
  * Heals every user's users.php `projects` status-mirror cache for THIS project
- * against the project's AUTHORITATIVE members.json (L5). The cache is only a
+ * against the project's AUTHORITATIVE members.json. The cache is only a
  * mirror — members.json is the sole grant authority — but a drifted cache pollutes
  * the editing picker, the memberships page, and the inbox. Drift comes from a
  * members.json hand-edit, a failed cascade cache-write (deleteProject/removeMember
- * log-and-continue), or pre-8.3a legacy entries.
+ * log-and-continue), or legacy entries with no status.
  *
  * Category: project.members (admin + owner) — the same tier that manages the
  * roster; it writes OTHER members' cache entries (only their key for THIS project).
@@ -43,7 +43,7 @@ const RECONCILE_TOMBSTONES = ['refused', 'removed', 'deleted'];
  * @return ApiResponse
  */
 function __command_reconcileMemberships(array $params = [], array $urlParams = []): ApiResponse {
-    // C8 containment: marker-only targeting (authority is THIS project's members.json).
+    // Project containment: marker-only targeting (authority is THIS project's members.json).
     if (!defined('PROJECT_NAME') || PROJECT_NAME === '') {
         return ApiResponse::create(400, 'project.required')
             ->withMessage('This command is project-scoped. Target a project with /management/p/<projectId>/reconcileMemberships');
@@ -75,7 +75,7 @@ function __command_reconcileMemberships(array $params = [], array $urlParams = [
 
     // Build the DESIRED cache entry per user from authority: member, then the
     // engaged pending states. A SPONSORED proposal target (direction 'request',
-    // by != target) is NOT engaged (8.3b) — it gets NO mirror, so it is absent
+    // by != target) is NOT engaged — it gets NO mirror, so it is absent
     // from $desired and treated like any other non-listed user (tombstone-preserve
     // or stale-prune).
     $desired = []; // uid => cache entry array

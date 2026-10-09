@@ -28,19 +28,19 @@ function __command_downloadExport(array $params = [], array $urlParams = []): Ap
     // Merge query parameters for GET requests
     $params = array_merge($_GET, $params);
 
-    // C8 8.5 CONTAINMENT (F-C8-8.5-2): the archive is read from the PROJECT'S OWN
-    // exports directory, bound to the URL marker the dispatcher authorized. This
-    // used to read a shared installation-wide secure/exports, where the traversal
-    // guard below still held but the directory was not partitioned by project — so
-    // an admin on any project could name and stream another project's full archive
-    // (which carries its data/ tree, api-endpoints.json included).
+    // CONTAINMENT: the archive is read from the PROJECT'S OWN exports directory,
+    // bound to the URL marker the dispatcher authorized. A shared
+    // installation-wide exports folder, even behind the traversal guard below, is
+    // not partitioned by project — an admin on any project could name and stream
+    // another project's full archive (which carries its data/ tree,
+    // api-endpoints.json included).
     $bound = qs_bind_marker_project($params, 'downloadExport');
     if ($bound['refusal'] !== null) {
         return $bound['refusal'];
     }
     $projectName = $bound['project'];
 
-    // qs_param_string: `?file[]=x` reached trim() as a TypeError (F-C13-11).
+    // qs_param_string: `?file[]=x` would reach trim() as a TypeError.
     $filename = trim(qs_param_string($params, 'file', ''));
 
     if (empty($filename)) {

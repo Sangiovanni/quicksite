@@ -28,7 +28,7 @@
  * derived base — a config typo degrades a sitemap, it never takes a render down.
  */
 
-require_once __DIR__ . '/projectContext.php'; // qs_request_origin (R6)
+require_once __DIR__ . '/projectContext.php'; // qs_request_origin
 
 if (!function_exists('qs_public_base_normalize')) {
     /**
@@ -38,7 +38,7 @@ if (!function_exists('qs_public_base_normalize')) {
      *   - absolute http(s) URL  → ['abs' => scheme://host/path/, 'path' => /path/]
      *   - root-relative path    → ['abs' => null,               'path' => /path/]
      * Both forms come back with EXACTLY one trailing slash on every component —
-     * the invariant that kills §15.1.1's two measured silent-failure modes
+     * the invariant that kills two silent-failure modes
      * (no-leading-slash relative links, glued-host absolutes) and the
      * pre-existing `//` in emitted asset URLs.
      *

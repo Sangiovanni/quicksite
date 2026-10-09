@@ -16,7 +16,7 @@ require_once __DIR__ . '/../functions/runtimeHandoff.php';
  * keyword-args).
  *
  * Fixes folded in at extraction:
- *   - F-e: isValidHandler() uses a structural, quote-and-paren-aware scan, so a
+ *   - isValidHandler() uses a structural, quote-and-paren-aware scan, so a
  *     legitimate selector arg containing ')' (e.g. QS.hide('input:not(.x)'))
  *     validates instead of being dropped by the old /QS\.[a-zA-Z]+\([^)]*\)/.
  *   - every argument is written as a complete single-quoted literal
@@ -298,7 +298,7 @@ class CallTransformer
      * Structural validation: the handler must be ONLY our-generated tokens —
      * QS.<verb>(...) calls, console.warn(...) notices, the async chain wrapper,
      * and ';'/whitespace/await between them. Quote- and paren-aware, so a
-     * selector arg containing ')' validates (fixes F-e); a foreign identifier
+     * selector arg containing ')' validates; a foreign identifier
      * (alert, eval, …) still fails.
      */
     public static function isValidHandler(string $handler): bool

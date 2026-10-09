@@ -4,20 +4,19 @@
  * UrlPolicy — single source of truth for URL-attribute scheme SAFETY.
  *
  * Consumed by BOTH JsonToHtmlRenderer (render path) and the pages emitted by
- * JsonToPhpCompiler (deploy path), so the two can't drift (beta.10 R-6).
+ * JsonToPhpCompiler (deploy path), so the two can't drift.
  *
  * Two responsibilities are deliberately kept SEPARATE:
  *   - SCHEME SAFETY (this class): a value-based ALLOWLIST applied to any
- *     attribute a browser resolves as a URL. Closes F-b (dangerous scheme on
- *     attributes outside the old fixed list, e.g. xlink:href / ping) and F-d
- *     (leading/embedded ASCII-control-char scheme dodge).
+ *     attribute a browser resolves as a URL. Closes a dangerous scheme on
+ *     attributes outside a fixed list (e.g. xlink:href / ping) and the
+ *     leading/embedded ASCII-control-char scheme dodge.
  *   - URL REWRITING (BASE_URL / language prefix): stays in each engine's
  *     processUrl(), scoped to the classic rewritable set. This class does NOT
  *     rewrite — it only makes a value scheme-safe.
  *
- * Allowlist locked beta.10 (Sangio 2026-07-03): http, https, mailto, tel only.
+ * Allowlist (by design): http, https, mailto, tel only.
  * data:/blob:/javascript:/vbscript:/file:/everything-else -> neutralised to '#'.
- * (data: was already blocked on the classic URL attrs pre-fix, so no regression.)
  */
 class UrlPolicy
 {
@@ -64,7 +63,7 @@ class UrlPolicy
      * scheme or any ASCII control character. Does NOT do BASE_URL rewriting.
      *
      *   - strips leading whitespace/control a browser ignores before scheme
-     *     detection (closes the F-d leading-char dodge)
+     *     detection (closes the leading-char dodge)
      *   - rejects any value containing an embedded ASCII control char, so
      *     "java<TAB>script:" can't sneak through either
      *   - an explicit scheme not in ALLOWED_SCHEMES -> '#'

@@ -1,13 +1,13 @@
 <?php
 /**
- * listMembers Command (C8 8.3a)
+ * listMembers Command
  *
  * The roster of the TARGET project: active members (rank-descending) plus the
  * pending invitations block. Project-scoped on the URL marker
  * ('/management/p/<projectId>/listMembers' — category project.members,
  * admin/owner); the body carries no project parameter.
  *
- * PRIVACY (C8 8.0b): users are referenced as {user_id, name} — the public
+ * PRIVACY: users are referenced as {user_id, name} — the public
  * display name and the opaque id. The PRIVATE username never appears here.
  *
  * @method GET
@@ -28,7 +28,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
  * @return ApiResponse
  */
 function __command_listMembers(array $params = [], array $urlParams = []): ApiResponse {
-    // C8 containment: the target project is EXCLUSIVELY the authorized URL
+    // Project containment: the target project is EXCLUSIVELY the authorized URL
     // marker (PROJECT_NAME, bound by the dispatcher after the category +
     // membership check). No marker → nothing was authorized.
     if (!defined('PROJECT_NAME') || PROJECT_NAME === '') {
@@ -73,7 +73,7 @@ function __command_listMembers(array $params = [], array $urlParams = []): ApiRe
             'invited_by' => isset($inv['by']) ? qs_public_user_ref((string)$inv['by'], $usersCfg) : null,
             'at'         => $inv['at'] ?? null,
         ];
-        // 8.3b: an approved proposal keeps its sponsor for attribution
+        // An approved proposal keeps its sponsor for attribution
         // ("invited by <approver>, proposed by <sponsor>").
         if (isset($inv['sponsor']) && is_string($inv['sponsor'])) {
             $row['sponsored_by'] = qs_public_user_ref($inv['sponsor'], $usersCfg);

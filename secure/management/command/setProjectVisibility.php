@@ -1,6 +1,6 @@
 <?php
 /**
- * setProjectVisibility Command (C8 8.4)
+ * setProjectVisibility Command
  *
  * Flips the project's `visibility` in members.json — the knob surface-B reads to
  * decide whether the project is served to the PUBLIC internet ('public') or only
@@ -40,7 +40,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
  * @return ApiResponse
  */
 function __command_setProjectVisibility(array $params = [], array $urlParams = []): ApiResponse {
-    // C8 containment: marker-only targeting (the project is the authorized URL
+    // Project containment: marker-only targeting (the project is the authorized URL
     // marker; there is no body project param to confuse it with).
     if (!defined('PROJECT_NAME') || PROJECT_NAME === '') {
         return ApiResponse::create(400, 'project.required')

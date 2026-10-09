@@ -48,7 +48,7 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
     // Merge query parameters for GET requests
     $params = array_merge($_GET, $params);
 
-    // C8 8.4 CONTAINMENT (confused-deputy / F6): the exported project is BOUND to
+    // CONTAINMENT (confused deputy): the exported project is BOUND to
     // the URL marker (PROJECT_NAME, authorized by the dispatcher — project.data,
     // admin+ — before this runs). A query `name`/`project` that disagrees is
     // refused; it is optional. You cannot export a project you did not
@@ -59,8 +59,7 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
     }
     $projectName = $bound['project'];
 
-    // Reject a traversal payload before the export source path is built
-    // (beta.10 C3 F1-f).
+    // Reject a traversal payload before the export source path is built.
     if (!is_valid_project_name($projectName)) {
         return ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage('Invalid project name')
@@ -88,11 +87,10 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
             ->withData(['hint' => 'Install php-zip extension']);
     }
     
-    // C15 15.3 — no pre-export "pull the live public/ into the project folder" step. The
+    // No pre-export "pull the live public/ into the project folder" step. The
     // project's own public/ IS its live dir, so the export below already carries the current
-    // styles and assets. The old step existed only for the served main, whose live copy sat
-    // at the web root; it was also the source of the 8.4 contamination bug (exporting any
-    // project could pick up the served project's assets).
+    // styles and assets. A pull from a shared live copy would also let exporting any
+    // project pick up another project's assets.
 
     // Create temp directory for export
     $tempDir = sys_get_temp_dir();
@@ -120,7 +118,7 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
         exportRoutesAsJson($zip, $projectPath, $projectName, $stats);
         
         // 3. Export config/*.json (project settings) — but NEVER members.json
-        // (C8 8.4 privacy): it holds the membership graph + owner id + private
+        // (privacy): it holds the membership graph + owner id + private
         // invitation notes. Import discards any archived members.json and
         // birth-writes the importer as sole owner, so shipping it would be a pure
         // leak. (The members.json.lock sidecar is not .json — already skipped.)
@@ -171,23 +169,23 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
         
         $zip->close();
     } catch (Throwable $e) {
-        // beta.10 C13 F-C13-16: this used to catch `Exception`, and an `Error`
-        // (TypeError from a malformed routes.php, the max_execution_time timeout,
-        // any other engine-level failure) is NOT an Exception. It escaped, so
-        // neither close() nor unlink() ran — and the ZipArchive destructor still
-        // MATERIALISED the half-built archive at request shutdown. The result was
-        // a full copy of the project's data tree left in the service temp dir,
-        // owned by the Apache service account, with no product route to remove it.
-        // `Throwable` is the only catch that covers both hierarchies.
+        // `Throwable`, not `Exception`: an `Error` (TypeError from a malformed
+        // routes.php, the max_execution_time timeout, any other engine-level
+        // failure) is NOT an Exception. It would escape, so neither close() nor
+        // unlink() would run — and the ZipArchive destructor still MATERIALISES
+        // the half-built archive at request shutdown: a full copy of the project's
+        // data tree left in the service temp dir, owned by the Apache service
+        // account, with no product route to remove it. `Throwable` is the only
+        // catch that covers both hierarchies.
         $zip->close();
         if (file_exists($zipPath)) {
             @unlink($zipPath);
         }
         return ApiResponse::create(500, 'server.zip_error')
             ->withMessage('Error creating ZIP archive')
-            // C12/F9: PHP's own messages embed absolute paths ("... called in
+            // PHP's own messages embed absolute paths ("... called in
             // C:\wamp64\...\exportProject.php on line 419"), so the raw message
-            // published the install layout. Development still sees it; production
+            // would publish the install layout. Development still sees it; production
             // gets a fixed string and the detail goes to the error log.
             ->withData(['error' => qs_safe_error_message($e, 'exportProject')]);
     }
@@ -196,11 +194,11 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
     $zipSize = filesize($zipPath);
     
     // If save=true, store in the PROJECT'S OWN exports folder for later download.
-    // C8 8.5 (F-C8-8.5-2/3): exports used to share one installation-wide
-    // secure/exports directory, which made every archive addressable from ANY
-    // authorized marker — downloadExport could stream another project's archive and
-    // clearExports could delete it. Per-project storage removes the shared namespace
-    // instead of filtering it, so the containment is structural.
+    // One installation-wide exports directory would make every archive
+    // addressable from ANY authorized marker — downloadExport could stream another
+    // project's archive and clearExports could delete it. Per-project storage
+    // removes the shared namespace instead of filtering it, so the containment is
+    // structural.
     if ($save) {
         $exportDir = qs_ensure_project_exports_dir($projectName);
         if ($exportDir === null) {
@@ -325,7 +323,7 @@ function exportRoutesAsJson(ZipArchive $zip, string $projectPath, string $projec
 
 /**
  * Add only JSON files from a directory (no PHP). $excludeNames = basenames to
- * skip at THIS level (C8 8.4: members.json is excluded from the config export).
+ * skip at THIS level (members.json is excluded from the config export).
  */
 function addJsonFilesOnly(ZipArchive $zip, string $dir, string $zipBase, array &$stats, array $excludeNames = []): void {
     $items = scandir($dir);
@@ -462,9 +460,8 @@ function createExportMetadata(string $projectName, string $projectPath, array $s
     }
 
     // Count routes recursively. countRoutesRecursive() is typed `array`, so a
-    // scalar here raised a TypeError that the old `catch (Exception)` did not
-    // catch — F-C13-16's carrier. The guard removes the carrier; the Throwable
-    // catch above covers every other one.
+    // scalar here would raise a TypeError. The guard removes that carrier; the
+    // Throwable catch above covers every other one.
     $routesCount = 0;
     $routesFile = $projectPath . '/routes.php';
     if (file_exists($routesFile)) {
@@ -575,9 +572,6 @@ function formatExportBytes(int $bytes): string {
     
     return round($bytes / pow(1024, $exp), 2) . ' ' . $units[$exp];
 }
-
-// (exportCopyDirectory / exportDeleteDirectory removed with the live-public sync they
-//  existed for — C15 15.3.)
 
 // Execute command if called directly via API (not internal call)
 if (!defined('COMMAND_INTERNAL_CALL')) {

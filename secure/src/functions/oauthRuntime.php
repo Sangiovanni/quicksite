@@ -78,7 +78,7 @@ if (!function_exists('qs_run_oauth_route')) {
                 }
             }
 
-            // Slice 2e: oauth-logout takes a different path to derive the
+            // oauth-logout takes a different path to derive the
             // provider id. start/callback get the provider from the config
             // (URL-driven); logout auto-detects from the active session,
             // because the user might have logged in via Meta and now hit a
@@ -145,10 +145,10 @@ if (!function_exists('qs_run_oauth_route')) {
                     header('Location: ' . ($_GET['return'] ?? '/'), true, 302);
                     exit;
                 }
-                // C12 (F9): this is the PUBLIC site. It used to echo the raw
-                // exception message plus the names of the secret files to any
-                // anonymous visitor who hit a misconfigured OAuth route. The
-                // operator's diagnosis now goes to the error log; the visitor gets
+                // This is the PUBLIC site: never echo the raw exception message
+                // or the names of the secret files to an anonymous visitor who
+                // hits a misconfigured OAuth route. The
+                // operator's diagnosis goes to the error log; the visitor gets
                 // the fact that it is misconfigured and nothing about the server.
                 require_once SECURE_FOLDER_PATH . '/src/functions/errorHygiene.php';
                 $__oauthSafe = qs_safe_error_message($__oauthErr, 'oauth:' . $routePath);

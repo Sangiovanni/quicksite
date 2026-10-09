@@ -113,7 +113,7 @@ $newTranslations = convertDotNotationToNested($newTranslations);
 $newTranslations = sanitizePlaceholderKeys($newTranslations);
 
 // Hand off to the shared writer (load existing → collision check →
-// merge → write → optional default.json sync). C9: every helper used
+// merge → write → optional default.json sync). Every helper used
 // here lives in src/functions/translationHelpers.php so future
 // translation-writing commands get the same plumbing for free.
 $writeResult = writeTranslationsToFile($language, $newTranslations, $replaceMode);

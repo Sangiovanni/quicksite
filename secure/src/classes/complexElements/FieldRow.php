@@ -41,7 +41,7 @@ class FieldRowBuilder extends ComplexElementBuilder {
 
     /**
      * HTML input types we accept verbatim. Anything else → reject.
-     * Matches the visual editor's Group A picker (beta.6).
+     * Matches the visual editor's <input> type picker.
      */
     private const ACCEPTED_TYPES = [
         'text', 'email', 'tel', 'url', 'number', 'password', 'search',

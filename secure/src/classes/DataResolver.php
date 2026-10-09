@@ -1,13 +1,13 @@
 <?php
 /**
- * DataResolver — Per-route server-side data resolver (beta.8 A2).
+ * DataResolver — Per-route server-side data resolver.
  *
  * Bridges a route's `resolver` config (declared in routes.php) with the
  * server-side fetch (serverFetch.php), then maps the response into
  * template-scope variables for the renderer to consume.
  *
  *
- * Lifecycle position (locked design):
+ * Lifecycle position (by design, DESIGN_DECISIONS.md "Resolver lifecycle position"):
  *
  *   AFTER the auth gate (yes/no decision) but BEFORE template render.
  *   The gate is hard-wired framework middleware; the resolver is the
@@ -22,7 +22,7 @@
  *       'endpoint' => '@products-api/get-product',  // registry ref
  *       'inputs'   => [
  *           // endpoint placeholder/body input → source spec
- *           'id'        => 'param:slug',     // from QS.routeParams (A1)
+ *           'id'        => 'param:slug',     // from QS.routeParams
  *           'lang'      => 'query:lang',     // from URL query string
  *           'userId'    => 'session:userId', // from server session
  *           'tag'       => 'featured',       // literal value
@@ -32,15 +32,15 @@
  *           'product' => 'data.product',
  *           'related' => 'data.related',
  *       ],
- *       'cacheTTL' => 300,        // optional, seconds — handled in Slice 4
- *       'onMiss'   => 'render-empty',  // optional fallback — Slice 6
+ *       'cacheTTL' => 300,        // optional, seconds
+ *       'onMiss'   => 'render-empty',  // optional fallback
  *   ]
  *
  *
  * Source-spec resolution:
  *
  *   Inputs accept the same prefixed-source convention used by client-side
- *   state stores' `init` (beta.8 A1 Build Slice 3) — `param:NAME`,
+ *   state stores' `init` — `param:NAME`,
  *   `query:NAME`, `session:NAME`, plus bare literals. A missing source
  *   resolves to `null`; the resolver lets that propagate to serverFetch
  *   (which leaves missing path placeholders literal so the upstream 404
@@ -48,11 +48,10 @@
  *   defaults.
  *
  *
- * Out of scope for this slice:
+ * Not done here:
  *
- *   - Caching (Slice 4)
- *   - Hydration handoff to client (Slice 5)
- *   - onMiss render-empty path (Slice 6)
+ *   - Caching (serverFetch caches, from the cacheTTL forwarded below)
+ *   - Hydration handoff to the client
  *   - Authed-resolver session population (depends on Tier 3 server session
  *     wiring — context passes through, but the calling code is responsible
  *     for putting the session token in $context['session']['token']).
@@ -88,7 +87,7 @@ class DataResolver {
      */
     public function resolve(array $config, array $context = []): array {
         // Validate config minimally — the routes.php schema validator
-        // (Slice 2) is the canonical check; this is defence in depth.
+        // is the canonical check; this is defence in depth.
         if (!isset($config['endpoint']) || $config['endpoint'] === '') {
             return [
                 'ok' => false,
@@ -113,8 +112,8 @@ class DataResolver {
             }
         }
 
-        // 2. Call serverFetch with the resolved inputs. Beta.8 A2 Slice 4
-        //    — forward the resolver's cacheTTL (if any) via the fetch
+        // 2. Call serverFetch with the resolved inputs. Forward the
+        //    resolver's cacheTTL (if any) via the fetch
         //    context so serverFetch can cache before / after curl.
         //    Default 0 = no caching (per-request fetch every time).
         $fetchContext = $context;
@@ -150,7 +149,7 @@ class DataResolver {
 
     /**
      * Resolve a single input source spec. Mirrors the client-side
-     * state-store init conventions added in beta.8 A1 Build Slice 3:
+     * state-store init conventions:
      *
      *   'param:slug'    → $context['routeParams']['slug']
      *   'query:lang'    → $context['query']['lang']
@@ -219,7 +218,7 @@ class DataResolver {
     }
 
     /**
-     * Beta.8 A2 Slice 7.5.C — resolve an array of resolver configs
+     * Resolve an array of resolver configs
      * concurrently via serverFetchMulti. Replaces the per-resolver
      * loop the single-config caller would otherwise need to roll, and
      * preserves per-resolver `onMiss` semantics.
@@ -250,7 +249,8 @@ class DataResolver {
      *                                     // {error, status, resolverIndex}
      *   ]
      *
-     * Failure semantics (locked design):
+     * Failure semantics (by design, DESIGN_DECISIONS.md "Failure handling —
+     * per-resolver `onMiss`, page-level short-circuit"):
      *   - Per-resolver onMiss applies independently to its exposed vars.
      *   - Any resolver failure WITHOUT onMiss='render-empty' short-circuits
      *     the whole page (ok=false; caller emits 404/500 with firstError).

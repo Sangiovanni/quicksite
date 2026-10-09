@@ -1,5 +1,5 @@
 /**
- * preview-translation.js — Translation Manager panel (Beta.9 A4)
+ * preview-translation.js — Translation Manager panel
  *
  * Mounted as a sibling to PreviewJsInteractions. Manages the in-editor
  * Translation Manager panel: per-language view, scope filter (whole site /
@@ -21,7 +21,7 @@
 window.PreviewTranslation = (function () {
     'use strict';
 
-    // C8 8.X — the /admin/api helper endpoint is project-scoped: it authorizes each
+    // The /admin/api helper endpoint is project-scoped: it authorizes each
     // arm against the marker project and binds that context. QuickSiteAPI.helperPath
     // is the single owner of the marker convention; this delegates so the URL shape
     // lives in ONE place. Falls back to the bare action if core/api.js is absent —
@@ -44,17 +44,17 @@ window.PreviewTranslation = (function () {
     var _currentScope = 'site';   // 'site' | 'page:<name>' | 'component:<name>'
     var _statusFilter = { used: true, unset: true, unused: true };
     var _substringFilter = '';
-    var _expandedKey = null;   // Slice 5/6: which row currently has an expanded panel
-    var _expandedMode = null;  // Slice 6: 'edit' | 'delete' — what kind of panel
-    var _busyKey = null;       // Slice 5/6: key whose row action (save/delete) is in flight
-    var _actionError = null;   // Slice 5/6: { key, message } for the active row action
+    var _expandedKey = null;   // which row currently has an expanded panel
+    var _expandedMode = null;  // 'edit' | 'delete' — what kind of panel
+    var _busyKey = null;       // key whose row action (save/delete) is in flight
+    var _actionError = null;   // { key, message } for the active row action
 
-    // Slice 6: bulk remove-unused confirm state.
+    // Bulk remove-unused confirm state.
     var _bulkConfirm = false;  // true → confirm view replaces row list
     var _bulkBusy = false;     // delete in flight
     var _bulkError = null;     // string | null
 
-    // Slice 6+: multi-language delete checkbox state. Reset on each panel open.
+    // Multi-language delete checkbox state. Reset on each panel open.
     // Per-row default OFF (you're usually editing one language's value).
     // Bulk default ON (orphaned keys are orphaned everywhere).
     var _deleteAllLangs = false;
@@ -154,7 +154,7 @@ window.PreviewTranslation = (function () {
         // stale language), wire a refresh hook here.
     }
 
-    // ──────────────────────────── Slice 3: Data fetch ───────────────────
+    // ──────────────────────────── Data fetch ────────────────────────────
 
     /**
      * Initial data load on first enter(). Fetches language list + the
@@ -392,7 +392,7 @@ window.PreviewTranslation = (function () {
     function _render() {
         if (!_grouped) return;
 
-        // Slice 7: chip counts + coverage are scope-aware (also substring-aware).
+        // Chip counts + coverage are scope-aware (also substring-aware).
         // The pool here is "entries after scope + substring filters" — status
         // is excluded because each chip IS the status filter, so its count
         // would otherwise depend on its own checked state.
@@ -404,7 +404,7 @@ window.PreviewTranslation = (function () {
             else if (e.status === 'unset') unsetCount++;
             else if (e.status === 'unused') unusedCount++;
         });
-        // Coverage = used / (used + unset). Per Q2 lock — unused doesn't
+        // Coverage = used / (used + unset). By design, unused doesn't
         // distort the denominator. 0/0 → 100% (no work to do).
         var denominator = usedCount + unsetCount;
         var coveragePct = denominator > 0
@@ -447,7 +447,7 @@ window.PreviewTranslation = (function () {
         }
         _showLoading(false);
         _showEmpty(false);
-        // Slice 6: also disable while bulk confirm is open or bulk delete is in flight.
+        // Also disable while bulk confirm is open or bulk delete is in flight.
         if (_removeUnusedBtn) {
             _removeUnusedBtn.disabled = siteUnusedCount === 0 || _bulkConfirm || _bulkBusy;
         }
@@ -456,7 +456,7 @@ window.PreviewTranslation = (function () {
     }
 
     /**
-     * Slice 7 helper — apply scope + substring filters (NOT status) to
+     * Apply scope + substring filters (NOT status) to
      * an entry list. Used to compute chip counts + coverage % so they
      * reflect the user's drill-down view without depending on the chips'
      * own checked state.
@@ -477,7 +477,7 @@ window.PreviewTranslation = (function () {
         });
     }
 
-    // ──────────────────────────── Slice 4: Row rendering ────────────────
+    // ──────────────────────────── Row rendering ─────────────────────────
 
     var _VALUE_TRUNCATE_AT = 100;
 
@@ -490,7 +490,7 @@ window.PreviewTranslation = (function () {
         if (!_rowsContainer) return;
         _rowsContainer.textContent = '';
 
-        // Slice 6: bulk-confirm view replaces the row list entirely.
+        // Bulk-confirm view replaces the row list entirely.
         if (_bulkConfirm) {
             _rowsContainer.appendChild(_renderBulkConfirm());
             return;
@@ -512,7 +512,7 @@ window.PreviewTranslation = (function () {
         var frag = document.createDocumentFragment();
         filtered.forEach(function (entry) {
             frag.appendChild(_renderRow(entry));
-            // Slice 5/6: expanded panel for the currently-active row.
+            // Expanded panel for the currently-active row.
             if (entry.key === _expandedKey) {
                 if (_expandedMode === 'delete') {
                     frag.appendChild(_renderDeleteConfirm(entry));
@@ -729,7 +729,7 @@ window.PreviewTranslation = (function () {
         _renderRows();
     }
 
-    // ──────────────────────────── Slice 5: Inline editor ────────────────
+    // ──────────────────────────── Inline editor ─────────────────────────
 
     /**
      * Build the inline editor panel for an expanded row. Sits directly
@@ -838,7 +838,7 @@ window.PreviewTranslation = (function () {
 
         // Success: refetch + close editor. The refetch repopulates _grouped
         // so the just-saved key flips groups naturally (the "stale-sibling
-        // sweep" — Slice 5 lock language).
+        // sweep").
         _busyKey = null;
         _expandedKey = null;
         _expandedMode = null;
@@ -853,7 +853,7 @@ window.PreviewTranslation = (function () {
         return tpl.replace('{error}', msg);
     }
 
-    // ──────────────────────────── Slice 6: Delete flows ─────────────────
+    // ──────────────────────────── Delete flows ──────────────────────────
 
     /**
      * Inline delete-confirm panel for a single row. Mirrors the editor
@@ -1038,7 +1038,7 @@ window.PreviewTranslation = (function () {
 
     /**
      * "Remove all unused" button handler — enters the list-first confirm
-     * view (per Q4 lock — no bare confirm).
+     * view (by design — no bare confirm).
      */
     function _handleRemoveUnused() {
         if (!_grouped || !(_grouped.unused || []).length) return;
@@ -1125,7 +1125,7 @@ window.PreviewTranslation = (function () {
 
     /**
      * Render the bulk-delete confirm view that REPLACES the row list
-     * (per Q4 lock: list-first, dry-run style). Shows every unused key
+     * (by design: list-first, dry-run style). Shows every unused key
      * (with value preview) so the user reviews before pulling the trigger.
      */
     function _renderBulkConfirm() {

@@ -44,7 +44,7 @@ class SvgSanitizer
      * (attributeName href/xlink:href or on*) — which would inject a
      * javascript: navigation or an event handler at render time, after the
      * static attribute sweep. Legit animations (opacity, transform, colour…)
-     * are kept. (beta.10 C4 / F15)
+     * are kept.
      */
     private const ANIMATION_ELEMENTS = [
         'animate',
@@ -58,7 +58,6 @@ class SvgSanitizer
      * Every other data: variant (image/svg+xml, text/html, application/*)
      * is blocked together with javascript:/vbscript:. Lets legit inline
      * images (common in exported SVGs) through without reopening the hole.
-     * (beta.10 C4 / F15)
      */
     private const SAFE_DATA_IMAGE_RE = '#^data:image/(png|jpe?g|gif|webp|bmp)[;,]#';
 
@@ -94,7 +93,7 @@ class SvgSanitizer
         // Suppress DOMDocument warnings for malformed markup
         $prev = libxml_use_internal_errors(true);
 
-        // Block XXE (beta.10 C4 / F15). LIBXML_NONET stops NETWORK entity
+        // Block XXE. LIBXML_NONET stops NETWORK entity
         // fetches but NOT file:// ones, and LIBXML_NOENT would then
         // substitute a DOCTYPE's external SYSTEM entity into the output —
         // a local-file-disclosure. Install a null external-entity loader
@@ -189,7 +188,7 @@ class SvgSanitizer
                     $value = preg_replace('/[\x00-\x20]+/', '', $value);
                     // Passive raster data-URIs (inline images) are allowed;
                     // all other data: variants fall through to the block list
-                    // alongside javascript:/vbscript:. (beta.10 C4 / F15)
+                    // alongside javascript:/vbscript:.
                     if (preg_match(self::SAFE_DATA_IMAGE_RE, $value)) {
                         continue;
                     }
@@ -197,10 +196,10 @@ class SvgSanitizer
                         if (str_starts_with($value, $scheme)) {
                             $attrsToRemove[] = $attr;
                             // continue the ATTRIBUTES loop (level 2), not the
-                            // elements loop. The prior `continue 3` skipped
-                            // past the removeAttributeNode block below, so the
-                            // whole javascript:/data:/vbscript: filter was dead
-                            // code — the value survived. (beta.10 C4 / F15)
+                            // elements loop. A `continue 3` would skip past
+                            // the removeAttributeNode block below, making the
+                            // whole javascript:/data:/vbscript: filter dead
+                            // code — the value would survive.
                             continue 2;
                         }
                     }
@@ -212,7 +211,6 @@ class SvgSanitizer
             // so removeAttribute('href') would NOT drop the namespaced node
             // and the dangerous value (javascript:/data:) would survive.
             // removeAttributeNode handles both plain + namespaced attrs.
-            // (beta.10 C4 / F15)
             foreach ($attrsToRemove as $attr) {
                 $element->removeAttributeNode($attr);
             }
@@ -225,7 +223,6 @@ class SvgSanitizer
      * injects the dangerous value at render time, after the static attribute
      * sweep has run — so it must be dropped here. Animations of safe
      * attributes (opacity, transform, colour, …) are preserved.
-     * (beta.10 C4 / F15)
      */
     private static function removeAnimationInjectors(DOMDocument $dom): void
     {
@@ -252,7 +249,6 @@ class SvgSanitizer
      * pull in remote SVG that bypasses sanitization; external <image> is an
      * SSRF-on-view / tracking beacon when the stored SVG is served. Local /
      * fragment / relative refs and inline data:image URIs are kept.
-     * (beta.10 C4 / F15 — broadened from <use>-only to <use>+<image>)
      */
     private static function removeExternalResourceRefs(DOMDocument $dom): void
     {
@@ -277,7 +273,7 @@ class SvgSanitizer
      * Remove <style> elements that reference an external resource via
      * @import or url(http(s)://…) / url(//…). External CSS is a privacy /
      * exfil vector, and @import can pull in remote rules. Internal <style>
-     * with local url(#frag) / relative refs is kept. (beta.10 C4 / F15)
+     * with local url(#frag) / relative refs is kept.
      */
     private static function removeExternalStyleRefs(DOMDocument $dom): void
     {

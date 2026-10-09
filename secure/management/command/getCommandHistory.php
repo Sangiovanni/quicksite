@@ -32,7 +32,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
  * @return ApiResponse
  */
 function __command_getCommandHistory(array $params = [], array $urlParams = []): ApiResponse {
-    // C10 10.1b — history is PER-PROJECT. The project is the dispatcher's
+    // History is PER-PROJECT. The project is the dispatcher's
     // authorized URL marker (PROJECT_NAME), never a body parameter: the caller
     // passed the `history` category check for exactly this project. Without a
     // bound project there is nothing to show — there is no installation-wide view.

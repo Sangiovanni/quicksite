@@ -53,7 +53,7 @@
         </div>
     </div>
 
-    <!-- Runner view (populated in A4 when a tool is picked) -->
+    <!-- Runner view (populated when a tool is picked) -->
     <div class="preview-contextual-ai-tools__runner-view" id="ai-tools-runner-view" style="display: none;">
     </div>
 </div>

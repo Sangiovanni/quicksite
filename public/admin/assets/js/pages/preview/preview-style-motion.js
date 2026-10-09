@@ -349,7 +349,7 @@
             });
         });
 
-        // Slice 2b — "used by N" badge toggles the inline user list.
+        // "used by N" badge toggles the inline user list.
         keyframesList.querySelectorAll('.preview-keyframe-item__used-by').forEach(badge => {
             badge.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -361,7 +361,7 @@
             });
         });
 
-        // Slice 2b — ✕ button on each user row removes the animation from
+        // ✕ button on each user row removes the animation from
         // that selector via setStyleRule + removeProperties.
         keyframesList.querySelectorAll('.preview-keyframe-item__user-remove').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -425,7 +425,7 @@
             const transitions = animatedSelectorsData.transitions || [];
             transitionsCount.textContent = transitions.length;
 
-            // Slice 4 — "+ Add transition" button prepended to the list so it
+            // "+ Add transition" button prepended to the list so it
             // shows whether the group has existing transitions or not, and
             // hides naturally when the group is collapsed (same parent).
             const addBtnHtml = `
@@ -764,7 +764,7 @@
             }
         });
         
-        // A3-companion Motion Slice 3 — wire "Custom curve…" button to the
+        // Wire "Custom curve…" button to the
         // QSEasingPicker. Pre-loads the picker with the select's current
         // value; on confirm, adds the resulting cubic-bezier as an <option>
         // (if not already present) + selects it + dispatches change so the
@@ -1614,7 +1614,7 @@
         }
     }
 
-    // ==================== Apply-keyframe-to-selector (Motion Slice 2) ====================
+    // ==================== Apply-keyframe-to-selector ====================
     // Modal that lists every selector in style.css (sourced from
     // PreviewSelectorBrowser's cache, same data the Selectors tab uses),
     // filtered by substring. On confirm, writes `animation: <name> 1s ease;`
@@ -1836,7 +1836,7 @@
         }
     }
 
-    // ==================== Used-by + remove (Motion Slice 2b) ====================
+    // ==================== Used-by + remove ====================
     // The Apply flow has an inverse: from a keyframe, see which selectors
     // are using it and remove the `animation:` property from any of them.
     // The data is already in `animatedSelectorsData.animations`
@@ -1917,7 +1917,7 @@
         }
     }
 
-    // ==================== Transition Wizard (Motion Slice 4) ====================
+    // ==================== Transition Wizard ====================
     // "+ Add transition" → modal. Pick a selector, a property (preset chips
     // + free-text), duration, easing (via QSEasingPicker), delay. Submit
     // writes `transition: <prop> <dur>ms <ease> <delay>ms` via setStyleRule.

@@ -1,6 +1,6 @@
 <?php
 /**
- * OAuth Providers admin page (beta.9 A1 Slice 8).
+ * OAuth Providers admin page.
  *
  * Lean PHP shell — header + toolbar + container + script include.
  * All rendering of the provider cards, the add/edit modal, and the
@@ -8,8 +8,7 @@
  * listOAuthProviders / addOAuthProvider / editOAuthProvider /
  * deleteOAuthProvider).
  *
- * Locked design 2026-06-15, DESIGN_DECISIONS.md "OAuth providers
- * admin page shape".
+ * By design: DESIGN_DECISIONS.md "OAuth providers admin page".
  */
 
 $baseUrl = rtrim(BASE_URL, '/');

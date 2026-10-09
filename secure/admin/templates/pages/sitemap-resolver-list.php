@@ -1,12 +1,11 @@
 <?php
 /**
- * Sitemap — Resolver list-view modal (beta.8 A2 Slice 7.5.D)
+ * Sitemap — Resolver list-view modal
  *
  * Opens from the sitemap row's context menu (⋮ → "Configure resolver").
- * Replaces the direct per-config modal mount from Slice 7 — the list
- * view is now the entry point for ALL resolver authoring (single AND
- * multi). The existing per-config modal (sitemap-resolver.php) becomes
- * the per-resolver editor REACHED FROM the list view.
+ * The list view is the entry point for ALL resolver authoring (single
+ * AND multi). The per-config modal (sitemap-resolver.php) is the
+ * per-resolver editor REACHED FROM the list view.
  *
  * UX flow:
  *   1. Context menu → list view opens with the route's resolvers (or
@@ -24,13 +23,13 @@
  *
  * Backward compat: single-resolver routes (scalar shape on disk) show
  * in the list view with ONE entry. Editing routes through the per-
- * config modal exactly like Slice 7, just one extra click through the
+ * config modal like any other entry, just one extra click through the
  * list view. Removing the only resolver clears the sidecar entry
  * entirely (back to scalar-with-no-route).
  *
  * Wired by: public/admin/assets/js/pages/sitemap.js (search for
  * `openResolverListModal`). Submits via `setRouteResolver` POSTs with
- * the locked-decision body shapes for multi-resolver routes.
+ * the body shapes setRouteResolver defines for multi-resolver routes.
  */
 ?>
 <div class="sitemap-resolver-list-modal" id="sitemap-resolver-list-modal" style="display: none;">

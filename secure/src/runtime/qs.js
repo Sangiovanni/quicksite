@@ -1245,7 +1245,7 @@
     }
 
     // =========================================================================
-    // CONSENT — GDPR write-gating (beta.9 Phase 2)
+    // CONSENT — GDPR write-gating
     //
     // Reads the `consent_prefs` cookie + window.QS_CONSENT (the key→category map,
     // emitted server-side ONLY when the project enabled the consent layer). When
@@ -1278,7 +1278,7 @@
     };
 
     /**
-     * Persist the visitor's consent choice (used by the banner — slice 7).
+     * Persist the visitor's consent choice (used by the banner).
      * 180-day life, Path=/, SameSite=Lax, Secure on https. Fires
      * `qs:consent:changed` so the banner/gated UI can react.
      * @param {{functional?:boolean, analytics?:boolean, marketing?:boolean}} prefs
@@ -1304,7 +1304,7 @@
      * Dormant (always true) unless the project enabled the consent layer
      * (window.QS_CONSENT). Then: essential always passes; a declared non-
      * essential key needs consent; an UNDECLARED key is fail-closed (blocked) —
-     * GDPR-safe per the locked design.
+     * GDPR-safe by design.
      */
     function _consentAllowsWrite(key) {
         var cfg = window.QS_CONSENT;
@@ -1331,7 +1331,7 @@
         }
     }
 
-    // ---- Banner + popup controller (slice 7) ------------------------------
+    // ---- Banner + popup controller ----------------------------------------
     // Wires the generated consent-banner / consent-popup structures (reserved
     // ids + data-consent-action / data-consent-toggle). The structures carry
     // the markup (styleable/editable); this drives behaviour.
@@ -2156,7 +2156,7 @@
     QS._lastFetchResult = null;
 
     // =========================================================================
-    // AUTH TOKEN PERSISTENCE  (BETA7_AUTH_FLOWS Tier 1)
+    // AUTH TOKEN PERSISTENCE  (Tier 1)
     // =========================================================================
     // Read a value from QS._lastFetchResult (last successful fetch's data)
     // and stash it in localStorage / sessionStorage, so subsequent
@@ -2287,7 +2287,7 @@
     };
 
     // =========================================================================
-    // MAGIC-LINK EXCHANGE  (beta.8 A3 — Tier 3 auth)
+    // MAGIC-LINK EXCHANGE  (Tier 3 auth)
     // =========================================================================
     /**
      * Exchange a single-use magic-link code for a real session token.
@@ -2361,7 +2361,7 @@
             return Promise.resolve();
         }
 
-        // Beta.8 A3 — dispatch the 'started' lifecycle event before the
+        // Dispatch the 'started' lifecycle event before the
         // fetch fires. Drives data-auth-show="connecting" visibility in
         // the magic-link-handler component. Subsequent qs:auth:saved (from
         // chained saveToken) or qs:auth:exchange-failed (from the catch
@@ -2413,7 +2413,7 @@
                 console.warn('[QS] exchangeMagicLink: exchange failed:', err);
                 // Leave QS._lastFetchResult untouched so chained saveToken
                 // doesn't pick up stale data from an earlier fetch.
-                // Beta.8 A3 — dispatch the 'failed' lifecycle event so the
+                // Dispatch the 'failed' lifecycle event so the
                 // magic-link-handler component's data-auth-show="failed"
                 // element becomes visible. Cleared on the next qs:auth:saved
                 // (retry succeeded) or qs:auth:cleared (logout).
@@ -2713,8 +2713,8 @@
     }
 
     // Transient exchange-state cursor — set by qs:auth:exchange-started and
-    // qs:auth:exchange-failed (dispatched by QS.exchangeMagicLink in beta.8
-    // A3). Drives the 'connecting' / 'failed' modes of data-auth-show. Stays
+    // qs:auth:exchange-failed (dispatched by QS.exchangeMagicLink). Drives the
+    // 'connecting' / 'failed' modes of data-auth-show. Stays
     // in-memory only — refresh resets to null so a fresh page always shows
     // the appropriate state from the verb's lifecycle, not a stale phase.
     //   null         → no exchange in flight; 'connecting' / 'failed'
@@ -2730,8 +2730,7 @@
      * Apply declarative auth/storage-state bindings across the document:
      *   data-auth-show="in" | "out"          → show by token presence (Tier 1)
      *   data-auth-show="connecting"          → show while a magic-link / OAuth
-     *                                          exchange is in flight (beta.8
-     *                                          A3 Tier 3)
+     *                                          exchange is in flight (Tier 3)
      *   data-auth-show="failed"              → show after the exchange's catch
      *                                          fires; cleared on next success
      *                                          or explicit clearToken
@@ -2834,7 +2833,7 @@
     document.addEventListener('qs:consent:changed', function () {
         applyAuthState();
     });
-    // Beta.8 A3 — exchange lifecycle events dispatched by
+    // Exchange lifecycle events dispatched by
     // QS.exchangeMagicLink. The cursor drives 'connecting' / 'failed'
     // visibility; the welcome path goes via qs:auth:saved (above) which
     // also clears the cursor before applyAuthState runs.
@@ -2870,7 +2869,7 @@
     //   from   : response dot-path for received fields
     //   append : received list fields append instead of replace
     // Live values live in QS._stores[id].state. Runtime-agnostic by design:
-    // beta.8's server data-resolver will read the same definition shape.
+    // the server data-resolver reads the same definition shape.
 
     QS._stores = {};
 
@@ -2953,7 +2952,7 @@
             el.hidden = !truthy;
         });
 
-        // Beta.8 A2 Slice 6 — inverse of data-state-show: visible when
+        // Inverse of data-state-show: visible when
         // the referenced state field is FALSY (null / undefined / '' / 0 /
         // false / empty array). Used by routes with the resolver's
         // `onMiss: 'render-empty'` config so the template can carry a
@@ -3268,7 +3267,7 @@
     // Build live stores from the per-page definitions, seed initial values,
     // render scalars, and fire fetchOnLoad stores.
     //
-    // Beta.8 A2 Slice 5 — hydration handoff. When the server-side resolver
+    // Hydration handoff. When the server-side resolver
     // fired against the same endpoint a store is bound to, window.QS_RESOLVED
     // arrives populated as { storeId: { fieldName: value, ... } }. Stores
     // that have hydration data:

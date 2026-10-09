@@ -252,7 +252,7 @@ link.qs-has-interaction {
     box-shadow: 0 4px 12px #0000004d;
 }
 
-/* ===== SELECTOR BROWSER HIGHLIGHT STYLES (Phase 8.4) ===== */
+/* ===== SELECTOR BROWSER HIGHLIGHT STYLES ===== */
 .qs-selector-hover {
     outline: 2px dashed #e67e22 !important;
     outline-offset: 2px !important;

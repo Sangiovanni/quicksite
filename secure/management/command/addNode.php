@@ -82,7 +82,7 @@ function __command_addNode(array $params = [], array $urlParams = []): ApiRespon
     $nodeParams = $params['params'] ?? [];
 
     // Reject reserved-namespace storage keys in data-storage-* / data-auth-source
-    // values (admin-token theft prevention — slice 5b). Mirrors the JS picker's
+    // values (admin-token theft prevention). Mirrors the JS picker's
     // client-side block; this is the security layer (a token-bearing client can
     // POST directly here and skip the picker entirely).
     if (is_array($nodeParams)) {
@@ -119,7 +119,7 @@ function __command_addNode(array $params = [], array $urlParams = []): ApiRespon
     // SECURITY: Strip sandbox attribute on embed tags — system enforces its own at render time
     IframeSandbox::sanitizeNodeParams($tag, $nodeParams);
 
-    // SECURITY (beta.10, widened beta.11 S3.10b): reject a malformed attribute
+    // SECURITY: reject a malformed attribute
     // NAME, a raw on* handler, and a dangerous URL scheme on write — the
     // renderer and the compiler enforce the same at render/build time; this is
     // the reject-on-store companion so stored JSON stays clean.
@@ -194,15 +194,15 @@ function __command_addNode(array $params = [], array $urlParams = []): ApiRespon
         }
     }
     
-    // (Removed, S2.9) The `alt = ''` placeholder. `alt` is an OPTIONAL
-    // translation-key param now (TagRegistry::TRANSLATION_KEY_PARAMS), chosen
-    // by the author through the editor's key picker and passed in `params`
-    // like any other. It used to be written here as a literal empty string
-    // while editNode generated a translation key for the same attribute — one
-    // attribute, two meanings, neither of them asked for. Nothing is invented
-    // on the author's behalf any more: no alt chosen means no alt attribute.
+    // No `alt = ''` placeholder. `alt` is an OPTIONAL translation-key param
+    // (TagRegistry::TRANSLATION_KEY_PARAMS), chosen by the author through the
+    // editor's key picker and passed in `params` like any other. A literal empty
+    // string written here, while editNode generates a translation key for the
+    // same attribute, would give one attribute two meanings, neither of them
+    // asked for. Nothing is invented on the author's behalf: no alt chosen means
+    // no alt attribute.
 
-    // Tag defaults (S2.5): params a new node needs to be USABLE, as opposed to
+    // Tag defaults: params a new node needs to be USABLE, as opposed to
     // valid. <video src="…"> is valid HTML and renders as a blank rectangle
     // with no play button; <audio src="…"> renders as nothing at all. Merged
     // only where the author supplied nothing, so this never overrides a choice.
@@ -210,7 +210,7 @@ function __command_addNode(array $params = [], array $urlParams = []): ApiRespon
         $nodeParams[$defaultName] = $defaultValue;
     }
 
-    // <input> wizard (Group A, beta.6): require `name` for any input
+    // <input> wizard: require `name` for any input
     // type that participates in form submission. Submit/reset/button
     // are user-action triggers; hidden values are programmatic — all
     // four are exempt.
@@ -351,7 +351,7 @@ function __command_addNode(array $params = [], array $urlParams = []): ApiRespon
     $structure = $insertResult['structure'];
     $newNodeId = $insertResult['newNodeId'];
     
-    // SECURITY (F-C13-13): depth-check the RESULT, not the request — one node per
+    // SECURITY: depth-check the RESULT, not the request — one node per
     // request means a request-side check never fires while the page still walks
     // past the limit.
     if (!qs_structure_depth_ok($structure)) {
@@ -407,7 +407,7 @@ function __command_addNode(array $params = [], array $urlParams = []): ApiRespon
         'html' => $renderedHtml
     ];
     
-    // (No alt-key block here, and none in editNode either since S2.9. `alt` is
+    // (No alt-key block here, and none in editNode either. `alt` is
     // an optional translation-key param the author picks; no command invents
     // one, so neither has a key to report.)
 

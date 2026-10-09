@@ -4,9 +4,9 @@
  *
  * The command index, and the per-command form when one is selected.
  *
- * Command HISTORY used to be a second tab here. It moved to its own page at
- * /admin/history in S6.6 — an audit trail should not be a sub-view of the thing
- * it audits, and S6.5 had made this page something an operator can switch off.
+ * Command HISTORY has its own page at /admin/history, not a tab here — an audit
+ * trail should not be a sub-view of the thing it audits, and this page is
+ * something an operator can switch off.
  * AdminRouter redirects the old ?tab=history URL there, so nothing that linked
  * to the tab is broken.
  *
@@ -15,13 +15,13 @@
 
 $selectedCommand = $router->getCommand();
 
-// S6.5 — the console is an install-time choice (console.php; ABSENT MEANS ON,
+// The console is an install-time choice (console.php; ABSENT MEANS ON,
 // see consolePolicy.php). When the operator has said no, the runner is not
 // built: neither the index nor the per-command form.
 //
 // ⚠ THIS IS NOT A PERMISSION. The commands stay reachable at /management/ for
 // every caller whose role allows them; what goes away is a page that lists and
-// drives them. Since S6.6 the history page is genuinely independent of this
+// drives them. The history page is genuinely independent of this
 // gate — it is its own route with its own role gate — rather than a tab kept
 // alive by a special case here.
 $consoleEnabled = $router->isConsoleEnabled();
@@ -50,7 +50,7 @@ $baseUrl = rtrim(BASE_URL, '/');
          page misdescribes the structure — history has its own nav entry. */ ?>
 
 <?php if (!$consoleEnabled): ?>
-<!-- ==================== CONSOLE TURNED OFF (S6.5) ==================== -->
+<!-- ==================== CONSOLE TURNED OFF ==================== -->
 <!-- Said plainly rather than answered with a 404. The page exists, it is in the
      router's page list, and its template is on disk — a 404 here would send the
      next person to debug routing. It is also not a secret: the gate removes

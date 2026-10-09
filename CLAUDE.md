@@ -83,7 +83,7 @@ The `docs/` files are **user-facing**. Their reader is somebody trying to unders
 - **Pointers to the maintainer's local planning notes** — those live in a gitignored working directory. A reader who cloned the repository cannot open them, so a `docs/` file must never cite one by path or by filename. The same applies to any tracked file: **if a pointer's target is not itself tracked, the pointer is dead for everyone but its author.** State the rule or the reasoning inline instead, and let the citation go.
 - **Roadmap notes** — `> _Roadmap note:_ this will grow when beta.X ships` is committee-meeting language.
 
-**Code comments follow the same rule.** A comment says what the code does and why, never how it was built: no slice, track or phase ids (`(S6h)`, `beta.9 A4 Slice 6`, `C15 15.3`) and no pointers to planning notes; git history holds that. When you change code whose comment carries one, drop it there. Don't hunt for the others.
+**Code comments follow the same rule.** A comment says what the code does and why, never how it was built: no slice, track or phase ids (`(S6h)`, `beta.9 A4 Slice 6`, `C15 15.3`) and no pointers to planning notes; git history holds that. None remain in the tracked tree; never add one.
 
 **`docs/DESIGN_DECISIONS.md` is special**: append-only history of locked design decisions. Each entry has Decision + Reasoning + Alternatives + Source. Its purity rules:
 - Allowed time tag: `beta.X` (git tags are stable anchors); `(locked YYYY-MM-DD)` dates in headings (the timestamping convention).

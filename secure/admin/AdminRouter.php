@@ -16,10 +16,10 @@ class AdminRouter {
     /**
      * The admin URL namespace — the ONLY first segments that are pages.
      *
-     * beta.10 C13 (F-C13-19): this list was declared here and never read, so the
-     * real router was `templates/pages/{segment}.php` + `file_exists`. Every file
-     * in that directory was therefore a URL, and six of them are PARTIALS meant to
-     * be included by a parent view — they rendered as top-level pages with their
+     * This list is read: without it the router would be
+     * `templates/pages/{segment}.php` + `file_exists`, every file in that
+     * directory would be a URL, and six of them are PARTIALS meant to be
+     * included by a parent view — they would render as top-level pages with their
      * parent's variables undefined (one of them fatally). They are not pages with
      * an unmet precondition, so there is no page to redirect to and no state to
      * explain; the honest answer is that the URL does not exist. Reading the list
@@ -48,11 +48,11 @@ class AdminRouter {
      */
     private array $validPages = [
         'login',       // Authentication page
-        'register',    // Self-registration page (C8; renders only when auth.php allows it)
-        'setup',       // First-run page (C14; renders only while the user registry is empty)
+        'register',    // Self-registration page (renders only when auth.php allows it)
+        'setup',       // First-run page (renders only while the user registry is empty)
         'dashboard',   // Main admin panel after login
         'command',     // Individual command pages
-        'history',     // Command history — its own page since S6.6, so the audit
+        'history',     // Command history — its own page, so the audit
                        //   trail does not live inside the console it audits (and
                        //   does not vanish with it). ⚠ There is no `history`
                        //   directory under public/admin/ — one would shadow this
@@ -64,11 +64,11 @@ class AdminRouter {
         'embed-security', // Embed Security (iframe sandbox)
         'preview',     // Visual Editor (route kept as 'preview' for URL compatibility)
         'apis',        // External API Registry
-        'oauth-providers', // OAuth Provider catalogue + per-project overrides (beta.9 A1 Slice 8)
-        'storage',     // Storage registry — GDPR / cookie-consent data layer (beta.9)
-        'privacy',     // Privacy helper — data-sharing / API surface (beta.9)
-        'memberships', // My Memberships — inbox / requests / proposals / notices (C8 8.3c; any authenticated user)
-        'members',     // Project Members — roster / queue / invite / policy for the EDITED project (C8 8.3c)
+        'oauth-providers', // OAuth Provider catalogue + per-project overrides
+        'storage',     // Storage registry — GDPR / cookie-consent data layer
+        'privacy',     // Privacy helper — data-sharing / API surface
+        'memberships', // My Memberships — inbox / requests / proposals / notices (any authenticated user)
+        'members',     // Project Members — roster / queue / invite / policy for the EDITED project
         'account',     // My Account — password, sign out everywhere, delete account (any authenticated user)
         'media',       // Asset Management page. ⚠ NOT 'assets' — see the
                        //   reserved-segment note above.
@@ -179,7 +179,7 @@ class AdminRouter {
     }
 
     /**
-     * The panel's session model (beta.11 S1): the PHP session IS the session.
+     * The panel's session model: the PHP session IS the session.
      * You log in on arrival and the browser session holds the login — there is
      * no access token, no refresh token and no rotation. The panel resolves
      * itself straight from the session cookie (qs_session_auth); the only thing
@@ -242,7 +242,7 @@ class AdminRouter {
     /**
      * Is self-registration currently allowed (auth.php
      * registration.allow_self_registration)? Drives the register page's
-     * existence and the login page's register link (C8).
+     * existence and the login page's register link.
      */
     public function isRegistrationOpen(): bool {
         require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
@@ -252,7 +252,7 @@ class AdminRouter {
     /**
      * Does this installation offer the command console (console.php
      * allow_console)? Drives the /admin/command page's runner and the panel's
-     * nav entry for it (S6.5). Absent config means YES — see consolePolicy.php
+     * nav entry for it. Absent config means YES — see consolePolicy.php
      * for why that is inverted from the deploy gate.
      *
      * ⚠ It is NOT a permission. The console runs commands through the same
@@ -267,7 +267,7 @@ class AdminRouter {
     }
 
     /**
-     * Has this install been bootstrapped — i.e. does ANY account exist? (C14)
+     * Has this install been bootstrapped — i.e. does ANY account exist?
      *
      * The test is the REGISTRY BEING EMPTY, not users.php existing: a file that
      * is present but holds no users is the same dead end, and loadUsersConfig()
@@ -473,7 +473,7 @@ class AdminRouter {
     }
 
     /**
-     * Get the effective role of the currently authenticated user (C6).
+     * Get the effective role of the currently authenticated user.
      * Resolves the session -> user -> role on the project the
      * panel actually acts as: `resolveEffectiveRole` = the selected project when
      * that membership is real, ELSE the first project the user is genuinely a
@@ -502,12 +502,12 @@ class AdminRouter {
      *
      * "Switching project" (header picker AND the dashboard) means switching which project
      * you EDIT — this value — written through `/admin/state/selected-project` (panel
-     * state, not a command: beta.11 S6). The editor marker, badge and
+     * state, not a command). The editor marker, badge and
      * preview follow it; every project is authored and previewed at its own /p/<id>/.
-     * A UX pointer only — the dispatcher re-authorizes every request against members.json
-     * (C7).
+     * A UX pointer only — the dispatcher re-authorizes every request against
+     * members.json.
      *
-     * C15 R3: an account that is a member of NOTHING gets `null`, not a fallback project.
+     * An account that is a member of NOTHING gets `null`, not a fallback project.
      * There is no installation-wide project to fall back to, and inventing one would hand
      * a non-member somebody else's project id. null means "show the empty state".
      *
@@ -520,7 +520,7 @@ class AdminRouter {
             $proj = resolveDefaultProject($auth['user']);
             if ($proj !== null && $proj !== '') return $proj;
         }
-        return null; // 0-membership: the panel's empty state (C15 R3)
+        return null; // 0-membership: the panel's empty state
     }
 
     /**
@@ -560,7 +560,7 @@ class AdminRouter {
     }
 
     /**
-     * The management API base carrying the C7 project marker —
+     * The management API base carrying the project marker —
      * `<base>/management/p/<id>/`, or a bare `<base>/management/` when no project is
      * resolvable. A different URL family from projectSiteBase() (that one is where the
      * SITE is; this one is where its COMMANDS are), and the second thing admin templates
@@ -597,7 +597,7 @@ class AdminRouter {
         // because those three live in the `build` category (developer+). A
         // non-member has no role at all and bounces, like every other page.
         'builds'         => ['getBuild'],
-        // S6.6 — the `history` category is granted to admin and owner only, so
+        // The `history` category is granted to admin and owner only, so
         // this is a REAL gate rather than chrome-hiding: a lower rank never
         // receives the page. The nav entry is filtered separately client-side,
         // which only hides what is already there; this is what makes the page
@@ -612,9 +612,9 @@ class AdminRouter {
         'storage'        => ['listStorageItems'],
         'privacy'        => ['getPrivacyStatus'],
         'embed-security' => ['getIframeSandbox'],
-        // C8 8.3c — Project Members page: any member rank passes (all roles hold
+        // Project Members page: any member rank passes (all roles hold
         // getProjectRoster/proposeMember); non-members of the edited project
-        // (incl. the 0-membership served-project fallback) bounce to dashboard.
+        // (an account that is a member of nothing included) bounce to dashboard.
         // 'memberships' is deliberately ABSENT: the self-service inbox must work
         // for every authenticated account, 0-membership included.
         'members'        => ['listMembers', 'getProjectRoster', 'proposeMember'],
@@ -745,12 +745,12 @@ class AdminRouter {
             $this->redirect($this->isAuthenticated() ? 'dashboard' : 'login');
         }
 
-        // Legacy: ai-settings -> ai-connections (Phase 3 rename).
+        // Legacy: ai-settings -> ai-connections (the page was renamed).
         if ($this->page === 'ai-settings') {
             $this->redirect('ai-connections');
         }
 
-        // C14 — FIRST RUN. With an empty user registry there is nobody to log in
+        // FIRST RUN. With an empty user registry there is nobody to log in
         // as, so every admin URL lands on the first-run page instead of a login
         // form that cannot work. The moment an account exists the page is dead:
         // /admin/setup redirects to login, and the underlying gate refuses
@@ -773,13 +773,13 @@ class AdminRouter {
             $this->redirect('dashboard');
         }
 
-        // C8: the register page exists ONLY while self-registration is allowed
+        // The register page exists ONLY while self-registration is allowed
         // (server-side gate — the command enforces the same flag independently).
         if ($this->page === 'register' && !$this->isRegistrationOpen()) {
             $this->redirect('login');
         }
 
-        // S6.6 — history moved off the command console onto its own page. The old
+        // History has its own page, off the command console. The old
         // tab URL is kept working rather than broken: the dashboard links to it,
         // and so does anyone's bookmark. Placed BEFORE the permission check so
         // the redirect target is what gets authorised, not the page being left.
@@ -792,8 +792,8 @@ class AdminRouter {
             $this->redirect('dashboard?denied=1');
         }
 
-        // C13 — the visual editor needs a project to edit. An account that is a
-        // member of NOTHING resolves no project (C15 R3), and the page then points
+        // The visual editor needs a project to edit. An account that is a
+        // member of NOTHING resolves no project, and the page then points
         // its iframe at the install base, which is not a QuickSite URL: on a
         // default deployment the web root has no index and Apache answers the
         // editor's own iframe with its 403 page. Send that account to the one
@@ -816,7 +816,7 @@ class AdminRouter {
             $this->formToken();
         }
 
-        // C13 (F-C13-19) — anything outside the declared namespace is not a page.
+        // Anything outside the declared namespace is not a page.
         // Placed AFTER the authentication gate on purpose: an unauthenticated
         // caller keeps getting the same redirect to /admin/login for every
         // segment, so this cannot become a pre-auth oracle for which page names
@@ -836,10 +836,10 @@ class AdminRouter {
      * Render the current page
      */
     private function render(): void {
-        // C5b: admin pages embed the short-lived access token (and the login
-        // page is a credential form) — they must never come out of a cache.
-        // Also prevents a stale pre-C5b login form (old token field) being
-        // resurrected by the browser and posting empty username/password.
+        // Admin pages embed the per-session token (and the login page is a
+        // credential form) — they must never come out of a cache. Also
+        // prevents a stale login form from an older version (old token field)
+        // being resurrected by the browser and posting empty username/password.
         if (!headers_sent()) {
             header('Cache-Control: no-store');
         }
@@ -859,7 +859,7 @@ class AdminRouter {
         
         // Workflows: nothing is authored here. The browser and per-spec runner are
         // subsumed by the in-editor AI tools mode at /admin/preview, and the custom
-        // workflow EDITOR was removed in beta.10 C8 (the feature was an unused
+        // workflow EDITOR was removed (the feature was an unused
         // artifact whose ungated save/delete arms were a flaw vector — see
         // WorkflowManager::listWorkflows). Every /admin/workflows* URL, including
         // bookmarks to the old editor, lands on the AI tools panel.

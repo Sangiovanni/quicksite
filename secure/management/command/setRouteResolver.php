@@ -1,13 +1,13 @@
 <?php
 /**
  * setRouteResolver Command — Set / clear / patch server-side data
- * resolver(s) for a route (beta.8 A2 + Slice 7.5).
+ * resolver(s) for a route.
  *
  * @method POST
  * @route /management/setRouteResolver
  * @auth required (write permission)
  *
- * Body shapes (locked decision):
+ * Body shapes (by design):
  *
  *   1. {route, resolver}                     → REPLACE whole entry with
  *                                              ONE resolver (scalar shape
@@ -51,8 +51,8 @@
  *       "endpoint": "@apiId/endpointId",   required
  *       "inputs":   {"<name>": "<spec>"},  optional (param:/query:/session:/literal)
  *       "expose":   {"<var>": "<path>"},   optional (response dot-paths)
- *       "cacheTTL": 300,                   optional, seconds (Slice 4)
- *       "onMiss":   "render-empty"         optional (Slice 6)
+ *       "cacheTTL": 300,                   optional, seconds
+ *       "onMiss":   "render-empty"         optional
  *   }
  *
  * Why one idempotent command instead of separate add/edit/delete:
@@ -78,7 +78,7 @@
  *       {"endpoint":"@books-api/get-content", "inputs":{"id":"param:id"},
  *        "expose":{"chapters":"data.chapters"}, "cacheTTL":60}
  *   ]}
- *   →  saves both resolvers (parallel execution per Slice 7.5.C)
+ *   →  saves both resolvers (executed in parallel)
  *
  *   {"route":"book/:id","resolver":{"endpoint":"@books-api/get-book",...},
  *    "index":0}

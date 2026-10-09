@@ -20,7 +20,7 @@ if (!defined('SECURE_FOLDER_PATH')) {
 //   - lessCommon : remaining standard non-deprecated events
 //   - advanced   : touch / contextmenu / clipboard / focusin-out
 //
-// Removed in beta.6 (deprecated/duplicates - DO NOT re-add):
+// Left out (deprecated/duplicates - DO NOT re-add):
 //   onkeypress (deprecated), onunload (deprecated),
 //   onmouseover (use onmouseenter), onmouseout (use onmouseleave)
 
@@ -223,7 +223,7 @@ if (!function_exists('generateCallSyntax')) {
 }
 
 /**
- * Beta.9 A2 Slice 5 follow-up — extract the :param names declared on a
+ * Extract the :param names declared on a
  * page slug. The in-memory + over-the-wire slug carries the literal
  * `:name` form straight from routes.php (e.g. "auth/magic/:key" →
  * ["key"], "user/:id/posts/:postid" → ["id", "postid"]). The NTFS-safe
@@ -257,12 +257,12 @@ if (!function_exists('routeParamsForPageSlug')) {
 }
 
 /**
- * Beta.9 A2 Slice 5 follow-up — validate that a verb's required positional
+ * Validate that a verb's required positional
  * args are present (non-empty) in the supplied params array AND that
  * inputType-specific values match their contract.
  *
  * Without the required-arg check, a client serializer that compacts empties
- * (which preview-js-interactions.js did before this slice) could land
+ * (as preview-js-interactions.js once did) could land
  * later args in the slots of earlier ones — e.g. exchangeMagicLink with
  * only returnTo filled would persist as
  *   {{call:exchangeMagicLink:/dashboard}}

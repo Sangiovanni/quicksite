@@ -1,16 +1,16 @@
 <?php
 /**
- * removeMember Command (C8 8.3a)
+ * removeMember Command
  *
  * Removes a member from the project. Other-initiated termination → the
- * removed user's cache keeps a dismissable 'removed' notice (R4 principle:
+ * removed user's cache keeps a dismissable 'removed' notice (the principle:
  * self-initiated exits leave no tombstone, other-initiated ones do). The
  * optional note travels with the notice (control-stripped, capped).
  *
  * Rank rule (in-lock): canManageRole(actor, target's current role). The owner
  * is un-removable (transferOwnership first); self-removal is refused —
  * Leaving voluntarily is the self-service door, and it is an account
- * operation rather than a command since beta.11 S6.
+ * operation rather than a command.
  *
  * @method POST
  * @route /management/p/<projectId>/removeMember
@@ -33,7 +33,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
  * @return ApiResponse
  */
 function __command_removeMember(array $params = [], array $urlParams = []): ApiResponse {
-    // C8 containment: marker-only targeting.
+    // Project containment: marker-only targeting.
     if (!defined('PROJECT_NAME') || PROJECT_NAME === '') {
         return ApiResponse::create(400, 'project.required')
             ->withMessage('This command is project-scoped. Target a project with /management/p/<projectId>/removeMember');
@@ -48,7 +48,7 @@ function __command_removeMember(array $params = [], array $urlParams = []): ApiR
     }
 
     $targetId = trim((string)($params['user_id'] ?? ''));
-    // C11 11.3 — the note-encoding guard, shared with every roster writer.
+    // The note-encoding guard, shared with every roster writer.
     // Optional note here: this reason lands in the
     // users.php cache notice (var_export, which cannot fail), but the check is
     // kept uniform so every note-carrying command answers identically.

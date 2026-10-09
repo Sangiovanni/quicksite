@@ -262,7 +262,7 @@
         // the button is disabled while any field has a name typed (user
         // must clear first to overwrite). All createElement-based per
         // CLAUDE.md HTML-in-JS hygiene (the surrounding wizard still uses
-        // innerHTML — pre-existing tech debt filed in BACKLOG).
+        // innerHTML).
         const autoseedGroup = document.createElement('div');
         autoseedGroup.style.marginTop = '8px';
         autoseedGroup.style.padding = '6px 8px';
@@ -309,10 +309,9 @@
         //      use it directly. Non-standard per JSON Schema spec, but
         //      matches what users intuitively type into a free-text
         //      schema editor ("I want a password field, so type=password").
-        //      Filed in BACKLOG: improve the API schema editor to push
-        //      users toward `type: string, format: password` (standard
-        //      JSON Schema); this branch is the autoseed reader's
-        //      backstop until then.
+        //      The standard form is `type: string, format: password`
+        //      (JSON Schema); this branch is the autoseed reader's
+        //      backstop for the alias.
         //   C. Standard string + format / signals:
         //      Password detection (strongest → weakest):
         //        1. `format: 'password'` — OpenAPI 3 extension; explicit.
@@ -406,7 +405,7 @@
             // Destructive-replace confirmation when there's anything to clobber.
             // `window.confirm` matches how `deletePageEvent` already prompts
             // for destructive actions in the same admin layer — keeps the
-            // wizard zero-dependency. A pretty modal is in BACKLOG.
+            // wizard zero-dependency.
             const namedCount = _currentNamedFieldCount();
             if (namedCount > 0) {
                 const ok = window.confirm(

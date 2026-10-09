@@ -125,7 +125,7 @@ function __command_editInteraction(array $params = [], array $urlParams = []): A
     }
 
     // ==========================================================================
-    // PER-VERB ARG VALIDATION (Slice 5 follow-up)
+    // PER-VERB ARG VALIDATION
     // ==========================================================================
     // Defense-in-depth — symmetric with addInteraction. See
     // interactionHelpers.php validateInteractionArgs() for rationale.

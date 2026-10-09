@@ -1,10 +1,10 @@
 <?php
-// C15 15.2 — QuickSite project RENDERER, relocated to public/p/ so it owns ONLY the
+// QuickSite project RENDERER. It lives in public/p/ so it owns ONLY the
 // /p/<projectId>/ namespace (public/p/.htaccess funnels /p/ here). The web ROOT is now
 // free — no FallbackResource — so a user's own hand-made site can live there and
 // QuickSite never squats the domain root.
 //
-// C9 surface B — the `/p/<projectId>/` gate. The DISPATCH lives in init.php, because this
+// Surface B — the `/p/<projectId>/` gate. The DISPATCH lives in init.php, because this
 // file cannot name secure/ itself: both that folder's NAME and this file's depth below the
 // web root move (setup renames the folders, and a URL space nests the install), and nothing
 // here knows either yet. init.php does — so this entry point does what /admin/ and
@@ -17,7 +17,7 @@
 define('QS_SURFACE_B_ENTRY', true);
 require_once __DIR__ . '/../init.php';
 
-// C15 15.3 — no project, no render. A request that reaches this file without resolving to
+// No project, no render. A request that reaches this file without resolving to
 // a project named a `/p/` path with no id after the marker. There is no served project left
 // to fall back on (that fallback WAS the served-project privilege), and every constant
 // below this line is project-scoped, so answer and stop.
@@ -25,7 +25,7 @@ if (!defined('QS_SURFACE_B_PROJECT')) {
     qs_sb_deny(404, 'This site is not available.');
 }
 
-// C9 surface B — bind the /p/ project (PROJECT_PATH + PUBLIC_CONTENT_PATH together), then
+// Surface B — bind the /p/ project (PROJECT_PATH + PUBLIC_CONTENT_PATH together), then
 // finish (serve a static asset, or set up the HTML render).
 qs_load_project_context(QS_SURFACE_B_PROJECT, true);
 qs_surface_b_finish();
@@ -50,7 +50,7 @@ if (isset($_GET['_component']) && isset($_GET['_editor']) && $_GET['_editor'] ==
     require_once SECURE_FOLDER_PATH . '/src/classes/JsonToHtmlRenderer.php';
     $renderer = new JsonToHtmlRenderer($translator, [
         'editorMode' => true,
-        'baseUrl' => QS_PUBLIC_BASE, // C15 15.4 (R1) — root-relative render base
+        'baseUrl' => QS_PUBLIC_BASE, // root-relative render base
         'lang' => $lang,
     ]);
     
@@ -147,7 +147,7 @@ $routeFound = $trimParameters->routeFound();
 // Handle 404 — a route that does not exist inside this project. Reaching here means the
 // project resolved AND the visitor passed surface B's visibility/membership gate, so the
 // project's own styled error page is the right thing to show. (A REFUSED /p/<id>/ never
-// gets this far: surface B answers a generic engine page and exits — C15 15.3.)
+// gets this far: surface B answers a generic engine page and exits.)
 if (!$routeFound || $routePath === '404') {
     http_response_code(404);
     $candidates = [
@@ -174,7 +174,7 @@ if (!$routeFound || $routePath === '404') {
 //   - Route without children: guides/installation → guides/installation.php
 //   - Route with children: guides → guides/guides.php (because it has children)
 //
-// Beta.8 A1 — param-route segments live in routes.php as ':name' for
+// Param-route segments live in routes.php as ':name' for
 // readability + URL pattern match, but NTFS reserves ':' in path
 // components. paramRouteSegmentToFs / paramRoutePathToFs (canonical
 // helpers in routeHelpers.php) sanitise to '__name' for filesystem use.
@@ -216,12 +216,11 @@ if (!file_exists($templateFile)) {
     if (file_exists($notFoundFile)) {
         require_once $notFoundFile;
     } else {
-        // beta.10 C12 12.5. Same defect class as F-C12-4, on the PUBLIC surface:
-        // the str_replace here misses whenever PROJECT_PATH's DIRECTORY_SEPARATOR
-        // disagrees with the "/" these paths are built with, and an anonymous
-        // visitor to a site with a missing template then gets the absolute server
-        // path. Sibling of the OAuth error 12.3 fixed a few hundred lines below;
-        // this one uses the shared renderer because it is not an ApiResponse.
+        // The shared scrubber, not a str_replace: a str_replace misses whenever
+        // PROJECT_PATH's DIRECTORY_SEPARATOR disagrees with the "/" these paths are
+        // built with, and an anonymous visitor to a site with a missing template
+        // would then get the absolute server path. The shared renderer, because
+        // this is not an ApiResponse.
         require_once SECURE_FOLDER_PATH . '/src/functions/publicPaths.php';
         echo '<h1>404 - Page Not Found</h1>';
         echo '<p>Template file not found: ' . htmlspecialchars(qs_scrub_path_string($templateFile)) . '</p>';
@@ -230,14 +229,15 @@ if (!file_exists($templateFile)) {
 }
 
 // ============================================================================
-// SERVER-SIDE DATA RESOLVER (beta.8 A2)
+// SERVER-SIDE DATA RESOLVER
 // ============================================================================
 
 
-// Lifecycle position (locked design): AFTER the
-// route/auth gate, BEFORE the page template runs. Templates pick up the
-// exposed vars via JsonToHtmlRenderer's {{resolved:NAME}} substitution
-// or by calling getResolvedVars() directly in PHP scope.
+// Lifecycle position (by design: DESIGN_DECISIONS.md "Resolver lifecycle
+// position"): AFTER the route/auth gate, BEFORE the page template runs.
+// Templates pick up the exposed vars via JsonToHtmlRenderer's
+// {{resolved:NAME}} substitution or by calling getResolvedVars() directly
+// in PHP scope.
 //
 // Only routes with a sidecar config in data/route-resolvers.json fire the
 // resolver — overhead is one file read + one missing-key check for routes
@@ -250,14 +250,14 @@ require_once SECURE_FOLDER_PATH . '/src/functions/resolverHelpers.php';
 // site's front controller, which runs the identical sequence.
 require_once SECURE_FOLDER_PATH . '/src/functions/resolverRuntime.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/oauthRuntime.php';
-// Beta.8 A2 Slice 7.5.A — array-aware accessor. Routes with no
+// Array-aware accessor. Routes with no
 // resolver return []; single-resolver routes return a 1-element
 // array; multi-resolver routes return N elements. DataResolver's
 // resolveMany handles all three cases identically via serverFetchMulti.
 $__resolverConfigs = getResolversForRoute($routePath);
 
 // ----------------------------------------------------------------------------
-// Editor preview emulation (beta.8 A2 Track 2a)
+// Editor preview emulation
 // ----------------------------------------------------------------------------
 // The visual editor previews param routes + resolver-bound pages WITHOUT
 // firing the real resolver — production data is request-specific and
@@ -278,10 +278,10 @@ $__resolverConfigs = getResolversForRoute($routePath);
 //
 // Emulation values default to empty when ?_emulate is absent — the page
 // renders with literal {{param:NAME}} / {{resolved:NAME}} placeholders
-// visible, which the editor's inputs panel (Track 2c) lets the author
+// visible, which the editor's inputs panel lets the author
 // fill in.
 $__editorMode = isset($_GET['_editor']) && $_GET['_editor'] === '1';
-// Beta.8 A2 Track 2e — live-data toggle. When the editor's emulation
+// Live-data toggle. When the editor's emulation
 // panel switches to "Use Live Data", the iframe URL adds _live=1. In that
 // mode the REAL resolver fires (instead of being skipped), but the
 // emulated routeParams still override the URL-captured ones — so the
@@ -330,7 +330,7 @@ if ($__editorMode && !$__editorLiveMode && $__emulateResolved !== null) {
 }
 
 // In editor mode the production resolver is skipped UNLESS the editor
-// explicitly requested live data (_live=1). Track 2e.
+// explicitly requested live data (_live=1).
 if ($__editorMode && !$__editorLiveMode) {
     $__resolverConfigs = [];
 }

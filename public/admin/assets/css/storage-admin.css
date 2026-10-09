@@ -1,4 +1,4 @@
-/* Storage registry admin page (beta.9). Structure mirrors oauth-admin.css.
+/* Storage registry admin page. Structure mirrors oauth-admin.css.
    All colors use the --admin-* variables defined in admin.css (theme-aware). */
 
 .storage-header-icon { width: 28px; height: 28px; flex-shrink: 0; }
@@ -176,7 +176,7 @@
     font-size: 13px;
 }
 
-/* Scan / reconcile panel (slice 5 Stage B) */
+/* Scan / reconcile panel */
 .storage-scan {
     border: 0.5px solid var(--admin-border);
     border-radius: 10px;
@@ -304,7 +304,7 @@
 .qs-response-path-picker__select,
 .qs-response-path-picker__custom { width: 100%; box-sizing: border-box; }
 
-/* storageKey picker — in the interactions editor (slice 3) */
+/* storageKey picker — in the interactions editor */
 .qs-storage-key-picker { display: flex; flex-direction: column; gap: 6px; }
 .qs-storage-key-picker__create {
     display: flex;
@@ -344,7 +344,7 @@
 .admin-project-badge { font-weight: 600; }
 .admin-project-badge .admin-btn__icon { color: var(--admin-accent); }
 
-/* ── Key field: the non-editable qsp_<project>_ prefix chip (S2.5) ──────────
+/* ── Key field: the non-editable qsp_<project>_ prefix chip ──────────
    The chip and the input read as ONE field, so the author sees the whole
    physical key while typing the part they actually own. The chip is a <span>,
    never an input — nothing here is submitted, and the registry stores only

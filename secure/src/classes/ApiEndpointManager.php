@@ -43,7 +43,7 @@ class ApiEndpointManager {
     // `credentials: 'include'` to fetch options. No tokenSource needed.
     private array $validAuthTypes = ['none', 'bearer', 'apiKey', 'basic', 'cookie'];
 
-    /** @var array Valid `callableFrom` values (beta.8 Track A4). */
+    /** @var array Valid `callableFrom` values. */
     // The marker declares whether an endpoint can be invoked from
     // the client (browser via QS.fetch), the server (PHP via the
     // data resolver), or both.
@@ -52,7 +52,7 @@ class ApiEndpointManager {
     public const VALID_CALLABLE_FROM = ['client', 'server', 'both'];
 
     /**
-     * Auto-derive callableFrom from an auth type (beta.8 Track A4).
+     * Auto-derive callableFrom from an auth type.
      *
      * Rationale: most auth shapes carry no server-side secret —
      * bearer tokens live in client storage, cookies are
@@ -66,7 +66,7 @@ class ApiEndpointManager {
      * derived value (see effectiveCallableFrom() below). Use this
      * helper only when the endpoint has no explicit value.
      *
-     * Locked design 2026-06-04 for the "callableFrom" marker.
+     * By design: DESIGN_DECISIONS.md "`callableFrom` auto-derive from auth type".
      */
     public static function deriveCallableFrom(string $authType): string {
         // One definition, in apiRegistry.php — a build carries that file and
@@ -839,7 +839,7 @@ class ApiEndpointManager {
             ];
         }
 
-        // Validate callableFrom (beta.8 Track A4) — optional; when
+        // Validate callableFrom — optional; when
         // present, must be one of client/server/both. Absent = auto-
         // derived at read time from auth type.
         if (isset($endpoint['callableFrom'])
@@ -1085,7 +1085,7 @@ class ApiEndpointManager {
                     $endpointId = $endpoint['id'] ?? null;
                     if (!$endpointId) continue;
 
-                    // beta.8 Track A4 — callableFrom filter. Endpoints
+                    // callableFrom filter. Endpoints
                     // whose effective callableFrom is 'server' never reach
                     // the client config (would either leak a secret-keyed
                     // endpoint's path OR mislead QS.fetch into thinking
@@ -1171,10 +1171,10 @@ class ApiEndpointManager {
         return $js;
     }
 
-    // (Removed, beta.11) transformBindingsForCompile(). It resolved a
-    // count-sentence binding's translation keys into zeroStr / oneStr /
-    // manyStr and deleted the keys — at COMPILE time, into a file that has no
-    // language. See the note at the responseBindings passthrough above.
+    // No transformBindingsForCompile(): resolving a count-sentence binding's
+    // translation keys into zeroStr / oneStr / manyStr and deleting the keys at
+    // COMPILE time would write them into a file that has no language. See the
+    // note at the responseBindings passthrough above.
 
     /**
      * Write compiled JS to a file

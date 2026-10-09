@@ -10,8 +10,6 @@
  * Wired by: public/admin/assets/js/pages/sitemap.js (search for
  * `editTitleModal`). Submits via `setTranslationKeys` per changed lang.
  *
- * Design: BACKLOG entry "Sitemap: inline edit of route's title
- * translation" — closed by this concern in pre-tag polish.
  */
 ?>
 <div class="sitemap-edit-title-modal" id="sitemap-edit-title-modal" style="display: none;">

@@ -65,7 +65,7 @@ function __command_addApi(array $params = [], array $urlParams = []): ApiRespons
     }
     
     // Regenerate qs-api-config.js into the project's OWN public/ (+ base mirror when
-    // editing the reserved base) so /p/<id>/ serves it. C9 D2 — projectPublicArtifacts.php.
+    // editing the reserved base) so /p/<id>/ serves it — projectPublicArtifacts.php.
     require_once SECURE_FOLDER_PATH . '/src/functions/projectPublicArtifacts.php';
     qs_emit_api_config($manager);
     

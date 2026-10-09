@@ -1,6 +1,6 @@
 <?php
 
-// Beta.8 A1 — paramRoutePathToFs / paramRouteSegmentToFs live here.
+// paramRoutePathToFs / paramRouteSegmentToFs live here.
 // utilsManagement uses them in resolvePageJsonPath / resolvePagePhpPath.
 require_once __DIR__ . '/routeHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/opcacheHygiene.php';
@@ -42,7 +42,7 @@ if (!function_exists('array_is_list')) {
  * `?name[]=x` (and its JSON equivalent) delivers an ARRAY where a command expects
  * a string, and the array then reaches trim() / strtolower() / preg_match() /
  * file_exists(), each of which is typed for a string: TypeError → 500
- * (beta.10 C13 F-C13-11, 18 sites across 16 commands). Every one of those sites
+ * across the commands. Every one of those sites
  * was in early validation, so nothing was half-written — but a 500 is the wrong
  * answer to a malformed parameter, and it is reachable before authentication on
  * the public commands.
@@ -177,7 +177,7 @@ function varExportNested(array $array, int $indent = 0): string {
  * @return string The complete PHP page template content
  */
 function generate_page_template(string $route): string {
-    // Beta.8 A1 — emit a route-agnostic bootstrap. Pulling page +
+    // Emit a route-agnostic bootstrap. Pulling page +
     // routeParams from TrimParameters at request time means the same
     // template works for static AND param routes:
     //   - static route 'home' → routePath() === 'home', routeParams() === []
@@ -274,9 +274,9 @@ function validateStructureDepth($node, $depth = 0, $maxDepth = 50): bool {
  *
  * Call it on the RESULT of an insert, never on the request: each request adds one
  * level, so a request-side check sees nothing and the page still walks past the
- * limit one call at a time (beta.10 C13 F-C13-13 — 254 × addNode(position=inside)
- * each returned 200, and the page then exceeded JSON's own 512-level read bound
- * and became unreadable by anything).
+ * limit one call at a time (254 × addNode(position=inside) would each return 200,
+ * and the page would then exceed JSON's own 512-level read bound and become
+ * unreadable by anything).
  *
  * Deliberately NOT applied to purely-removing writers (deleteNode): the check is
  * on the result, so guarding a shrink operation would make an already-too-deep
@@ -306,7 +306,7 @@ function qs_structure_depth_ok($structure, int $maxDepth = 50): bool {
 // transitively, so qs_first_unrenderable_tag() works from any caller.
 require_once SECURE_FOLDER_PATH . '/src/classes/TagRegistry.php';
 // componentPolicy is the same arrangement for component REFERENCES, which the
-// tag walker below never inspected (beta.11 S3.10c).
+// tag walker below never inspects.
 require_once SECURE_FOLDER_PATH . '/src/functions/componentPolicy.php';
 
 /**
@@ -323,7 +323,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/componentPolicy.php';
  * author gets an immediate error instead of a node that silently never appears.
  *
  * Use it on whatever a writer is about to persist. Note the distinction that
- * decides whether a given writer wants it at all (beta.10 C13 13.5):
+ * decides whether a given writer wants it at all:
  *   - a writer that takes a tag/structure FROM THE REQUEST can INTRODUCE a bad tag,
  *     and a gate there PREVENTS;
  *   - a writer that only copies or moves tags already in the store (moveNode,
@@ -380,10 +380,10 @@ function qs_first_unrenderable_tag_node($node): ?string {
  *
  * The write-side twin of the jail in qs_resolve_component_path(), and the exact
  * mirror of qs_first_unrenderable_tag() above: same two stored shapes, same
- * recursion, same belt-and-braces intent. Until beta.11 S3.10c nothing inspected
+ * recursion, same belt-and-braces intent. Without it nothing inspects
  * `component` on write at all — the tag walker looks at `tag`, the param policy
- * looks at `params` — so a reference reached the readers unexamined and `../`
- * walked out of the components directory.
+ * looks at `params` — so a reference would reach the readers unexamined and `../`
+ * would walk out of the components directory.
  *
  * The READ side is the load-bearing gate, because existing projects already hold
  * references nothing ever checked and only the resolver protects a render or a
@@ -585,8 +585,8 @@ function loadJsonStructure(string $filePath): ?array {
 }
 
 /**
- * Guard a page ROUTE path against traversal before it becomes a filesystem path
- * (beta.10 C3 F1 cluster D). Legit page routes are lowercase alnum/hyphen segments
+ * Guard a page ROUTE path against traversal before it becomes a filesystem path.
+ * Legit page routes are lowercase alnum/hyphen segments
  * (see addRoute) and never contain '..'; reject any '..' (incl. its Windows
  * backslash form). Shared by the three page-path resolvers below so every caller
  * is covered in one place — a traversal route now resolves to null (→404) instead
@@ -611,7 +611,7 @@ function resolvePageJsonPath(string $routePath, ?string $projectPath = null): ?s
     $basePath = $projectPath . '/templates/model/json/pages';
 
     $routePath = trim($routePath, '/');
-    // Beta.8 A1 — sanitise ':slug' → '__slug' for filesystem lookup.
+    // Sanitise ':slug' → '__slug' for filesystem lookup.
     // See routeHelpers.php for the canonical helper used everywhere.
     $fsPath = paramRoutePathToFs($routePath);
     $segments = explode('/', $fsPath);
@@ -647,7 +647,7 @@ function resolvePagePhpPath(string $routePath, ?string $projectPath = null): ?st
     $basePath = $projectPath . '/templates/pages';
 
     $routePath = trim($routePath, '/');
-    // Beta.8 A1 — same `:slug` → `__slug` sanitisation as resolvePageJsonPath.
+    // Same `:slug` → `__slug` sanitisation as resolvePageJsonPath.
     $fsPath = paramRoutePathToFs($routePath);
     $segments = explode('/', $fsPath);
     $leafName = end($segments);
@@ -734,7 +734,7 @@ function scanAllPageJsonFiles(?string $projectPath = null): array {
                 }
             }
 
-            // Beta.8 A1 — reverse the `:slug` → `__slug` sanitisation so the
+            // Reverse the `:slug` → `__slug` sanitisation so the
             // route identity returned matches what's in routes.php (and what
             // the admin UI / URL pattern expect). E.g., disk 'test/__slug'
             // becomes route 'test/:slug'.
@@ -915,7 +915,7 @@ function findReservedQsParamInStructure($node, int $depth = 0, int $maxDepth = 5
  * Lives here rather than beside any one caller: it started in spaceUsage.php,
  * gained a second caller in uploadLimits.php, and a second copy is exactly how
  * the three formatBytes() duplicates elsewhere in the tree happened. Those were
- * collapsed onto this function in S2.9 — deleteProject, listProjects and
+ * collapsed onto this function — deleteProject, listProjects and
  * public/admin/api/index.php now all call it. ⚠ THIS IS THE ONLY ONE. A new
  * local copy is how the last three started.
  */

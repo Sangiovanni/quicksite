@@ -1,5 +1,5 @@
 /**
- * Dashboard memberships card (C8 8.3c) — fills the six stat values whenever
+ * Dashboard memberships card — fills the six stat values whenever
  * core/members-badge.js publishes fresh counts (the
  * 'quicksite:membership-counts-updated' event).
  *

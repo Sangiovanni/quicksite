@@ -1,5 +1,5 @@
 /**
- * Members / My Memberships pages + nav badge + dashboard card (C8 8.3c).
+ * Members / My Memberships pages + nav badge + dashboard card.
  * Leans on admin.css primitives (admin-card, admin-btn, admin-modal,
  * admin-stat…); this file only adds the membership-specific pieces.
  */
@@ -25,7 +25,7 @@
    count drops to 0 keeps showing its stale number. */
 .admin-nav__count-badge[hidden] { display: none; }
 
-/* ---- R4 banner: which project is being worked on ---- */
+/* ---- Banner: which project is being worked on ---- */
 .members-banner {
     display: flex;
     align-items: center;

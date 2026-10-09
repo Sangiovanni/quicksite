@@ -6,9 +6,8 @@
  * sent a full policy; a built site sent none at all — not `object-src`, not
  * `base-uri`, not `frame-ancestors`, and no `script-src` restriction of any
  * kind. So the artifact a visitor actually reaches was the less protected of
- * the two, and the difference survived a slice whose whole subject was
- * preview-versus-build parity, because that slice's harness compared rendered
- * DOM and never compared response headers.
+ * the two, and a preview-versus-build parity check that compares rendered DOM
+ * never sees it: the difference is in the response headers.
  *
  * ⚠ A POLICY THAT BLOCKS A SHIPPED FEATURE IS A BUG, NOT A HARDENING. The
  * preview's policy was `default-src 'self'` with `img-src 'self' data:`, and

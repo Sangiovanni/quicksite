@@ -1,7 +1,7 @@
 <?php
 /**
  * oauthProviderHelpers.php — CRUD primitives for the admin OAuth
- * providers page (beta.9 A1 Slice 8).
+ * providers page.
  *
  * These helpers operate on a SPECIFIC scope ('admin' or 'project')
  * rather than the runtime "project-first / admin-fallback" lookup
@@ -20,7 +20,7 @@
  *   - Project presets: secure/projects/<active>/data/oauth-presets.json (JSON)
  *   - Project secrets: secure/projects/<active>/data/oauth-secrets.json (JSON)
  *
- * Locked design 2026-06-15, DESIGN_DECISIONS.md "OAuth providers
+ * By design: DESIGN_DECISIONS.md "OAuth providers
  * admin page shape".
  */
 

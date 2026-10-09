@@ -54,7 +54,7 @@ function qs_operator_path(): string {
  * THIS GRANTS NOTHING. It decides whether a notice RENDERS, and nothing else —
  * every command keeps the permissions it already had, and no code path may use
  * this list to authorize an action. That is what keeps it a display preference
- * instead of the installation-wide principal beta.10 deliberately removed.
+ * instead of an installation-wide principal, which the model deliberately lacks.
  *
  * ══════════════════════════════════════════════════════════════════════════════
  * ⚠ THE CONSTRAINT, WRITTEN WHERE SOMEONE ABOUT TO BREAK IT WILL READ IT
@@ -65,7 +65,7 @@ function qs_operator_path(): string {
  * The moment ANY action is gated on it — a command, a route, a button that
  * actually does something, a `hasPermission` special case, a "only operators may
  * run the sweep" check — it stops being a display preference and becomes the
- * installation-wide role beta.10 deleted on purpose. Not something like it: the
+ * installation-wide role the model leaves out on purpose. Not something like it: the
  * same thing, reintroduced under a different name.
  *
  * ⚠ IT WILL NOT LOOK LIKE THAT WHEN IT HAPPENS. It will arrive as a small
@@ -80,12 +80,12 @@ function qs_operator_path(): string {
  * global access:'any' category, so any signed-in account can mint ownership of a
  * project; the moment an installation-wide principal exists again, the path from
  * "ordinary account" to "the account that gates installation-wide actions" is
- * back, and beta.10 spent a release closing exactly that (a `system.admin`
- * access:'owner' that resolved to "owns ANY project").
+ * back — exactly the path a `system.admin` access:'owner', resolving to "owns
+ * ANY project", once opened.
  *
  * IF AN ACTION NEEDS AN OPERATOR, IT DOES NOT BELONG ON THE HTTP SURFACE. The
  * operator is whoever has filesystem access to the server — that is the design
- * (§2.3 of the S2 concern), and it is why applying an update is the operator's
+ * (by design), and it is why applying an update is the operator's
  * own `git pull` and the session sweep a script the operator runs
  * (secure/tools/), never a routed command. A thing only an operator may do is a
  * thing a shell does.
@@ -213,7 +213,7 @@ function qs_first_run_unowned_projects(): array {
  * their users.php project cache exactly as createProject does.
  *
  * The roster is written FIRST and the cache second, in that order deliberately:
- * members.json is authoritative (L5) and the cache is derived, so a crash
+ * members.json is authoritative and the cache is derived, so a crash
  * between them leaves a project that works and a picker entry that is missing —
  * recoverable — rather than a picker entry pointing at a project nobody owns.
  *
@@ -255,7 +255,7 @@ function qs_first_run_adopt_projects(string $userId): array {
             }
             foreach ($adopted as $id) {
                 // Cache only — no role key. The role is authoritative in
-                // members.json (L5/C5), exactly as createProject leaves it.
+                // members.json, exactly as createProject leaves it.
                 $cfg['users'][$userId]['projects'][$id] = [
                     'name'    => $names[$id],
                     'created' => $today,

@@ -106,7 +106,7 @@ function __command_editApi(array $params = [], array $urlParams = []): ApiRespon
     }
     
     // Regenerate qs-api-config.js into the project's OWN public/ (+ base mirror when
-    // editing the reserved base) so /p/<id>/ serves it. C9 D2 — projectPublicArtifacts.php.
+    // editing the reserved base) so /p/<id>/ serves it — projectPublicArtifacts.php.
     require_once SECURE_FOLDER_PATH . '/src/functions/projectPublicArtifacts.php';
     qs_emit_api_config($manager);
 
@@ -118,8 +118,8 @@ function __command_editApi(array $params = [], array $urlParams = []): ApiRespon
     // bad binding doesn't block the save.
     $enumSync = qs_emit_enums();
 
-    // Beta.8 A2 Slice 4 — auto-clear the resolver response cache for
-    // this API (locked design). Any cached
+    // Auto-clear the resolver response cache for
+    // this API (by design). Any cached
     // response was issued against the previous endpoint config; the
     // config just changed, so honour-the-edit means dropping stale
     // entries. Common case: author tweaked the endpoint URL or response

@@ -1,6 +1,6 @@
 <?php
 /**
- * My Memberships page (C8 8.3c).
+ * My Memberships page.
  *
  * The caller's OWN membership surface — works for EVERY authenticated account,
  * 0-membership included (the freshly-registered flow lands here to accept its

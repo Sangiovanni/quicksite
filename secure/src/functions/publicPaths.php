@@ -1,12 +1,12 @@
 <?php
 /**
- * Install-layout removal from response bodies (beta.10 C12 F-C12-4, C13 F-C13-18).
+ * Install-layout removal from response bodies.
  *
  * A response that names a file is useful. A response that names
  * `C:\wamp64\www\template_vitrinne\secure\projects\p\...` also hands the caller
  * the install location, the OS, the account the server runs as and usually the
- * web root. C12 removed exactly that string from FATALS; it was still going out
- * in ordinary 200s from thirteen endpoints.
+ * web root. The fatal handler removes it from FATALS; this removes it from
+ * ordinary responses.
  *
  * THE RULE — a response never publishes the install layout:
  *   1. under the current project -> relative to the project root
@@ -18,8 +18,8 @@
  *      left alone. It is not the install layout, and deciding by shape alone
  *      that a leading "/" is a filesystem path would rewrite every URL the
  *      product returns — route paths, asset paths and API endpoint paths all
- *      start with "/". The C12 suite asserts no response carries such a path,
- *      so a future one is caught there rather than silently mangled here.
+ *      start with "/". No response may carry such a path; one that does is a
+ *      defect to fix at its source, not a value to mangle here.
  * Separators are normalised to "/" inside the rewritten token only.
  *
  * NOT gated on qs_is_development(). An exception message is diagnostics and is

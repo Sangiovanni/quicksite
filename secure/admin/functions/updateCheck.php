@@ -2,10 +2,10 @@
 /**
  * Update discovery — is a newer QuickSite released than the one installed?
  *
- * NOT A COMMAND. It reports on THE INSTALLATION, not on any project, so under
- * the beta.11 rule (the command surface is a CLI for developing a project) it
- * has no place in `secure/management/command/`. It was `checkForUpdates` until
- * that rule was applied; the panel reaches it as the `update-check` arm of
+ * NOT A COMMAND. It reports on THE INSTALLATION, not on any project, and the
+ * command surface is a CLI for developing a project (by design), so it has no
+ * place in `secure/management/command/` (it used to be the `checkForUpdates`
+ * command). The panel reaches it as the `update-check` arm of
  * `public/admin/api/index.php`.
  *
  * DISCOVERY, NOT ACTION. Nothing here applies anything. Applying an update

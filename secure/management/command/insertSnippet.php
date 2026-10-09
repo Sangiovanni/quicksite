@@ -197,7 +197,7 @@ function processSnippetStructure(array $node, string $prefix, int &$itemCounter,
             $processed['data'] = [];
             
             // Load component definition to detect variable types
-            // beta.11 S3.10c: stored reference, jailed by the shared resolver.
+            // Stored reference, jailed by the shared resolver.
             $componentPath = qs_resolve_component_path($node['component'], PROJECT_PATH . '/templates/model/json/components');
             $componentVars = [];
             if ($componentPath !== null) {
@@ -459,12 +459,12 @@ function __command_insertSnippet(array $params = [], array $urlParams = []): Api
             ->withMessage('Snippet ID is required');
     }
     
-    // C8 8.5 CONTAINMENT (F-C8-8.5-5): source the snippet from the project this
-    // request is authorized for — the URL marker — NOT from an installation-wide
-    // default project. The insert itself already writes into the marker
-    // (PROJECT_PATH), so reading the source from a different project made one
-    // operation straddle two: every editor on every project read the same snippet
-    // library, and the command silently misbehaved for every other project.
+    // CONTAINMENT: source the snippet from the project this request is
+    // authorized for — the URL marker — NOT from an installation-wide default
+    // project. The insert itself already writes into the marker (PROJECT_PATH),
+    // so reading the source from a different project would make one operation
+    // straddle two: every editor on every project would read the same snippet
+    // library, and the command would silently misbehave for every other project.
     $bound = qs_bind_marker_project($params, 'insertSnippet');
     if ($bound['refusal'] !== null) {
         return $bound['refusal'];
@@ -545,7 +545,7 @@ function __command_insertSnippet(array $params = [], array $urlParams = []): Api
     $structure = $insertResult['structure'];
     $newNodeId = $insertResult['newNodeId'];
     
-    // SECURITY (F-C13-13): depth-check the RESULT of the snippet insert.
+    // SECURITY: depth-check the RESULT of the snippet insert.
     if (!qs_structure_depth_ok($structure)) {
         return ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage('Structure too deeply nested (max 50 levels)')

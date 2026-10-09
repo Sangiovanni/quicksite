@@ -1,6 +1,6 @@
 <?php
 /**
- * Route helpers — shared utilities for parameterised routes (beta.8 A1).
+ * Route helpers — shared utilities for parameterised routes.
  *
  * Param routes use ':name' segments (e.g., 'products/:slug') in
  * routes.php for readability AND to match the doc's URL pattern syntax.
@@ -16,7 +16,7 @@
  * consolidating — see public/index.php and the bug-fix path in
  * JsonToHtmlRenderer::renderPage).
  *
- * Locked design 2026-06-04.
+ * By design.
  */
 
 if (!function_exists('paramRoutePathToFs')) {
@@ -127,8 +127,7 @@ if (!function_exists('_flattenRoutesForMeta')) {
             $key = (string) $key;
             $path = $prefix === '' ? $key : $prefix . '/' . $key;
 
-            // Extract :name segments as params. Default type is 'string';
-            // type-aware route schema is a beta.9 enhancement.
+            // Extract :name segments as params. Default type is 'string'.
             $params = [];
             foreach (explode('/', $path) as $segment) {
                 if (strlen($segment) > 1 && $segment[0] === ':') {
@@ -215,7 +214,7 @@ if (!function_exists('substituteRouteParams')) {
      *   'no-placeholders-here'                → 'no-placeholders-here'
      *   '{:missing}'                          → ''
      *
-     * Locked design 2026-06-14, DESIGN_DECISIONS.md "OAuth handleStart shape".
+     * By design: DESIGN_DECISIONS.md "OAuth handleStart shape".
      *
      * @param string                $str
      * @param array<string, string> $routeParams

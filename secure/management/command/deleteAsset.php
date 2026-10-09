@@ -120,11 +120,11 @@ function validateAndDeleteAsset(string $filename, AssetMetadataManager $metaMana
         return ['success' => false, 'filename' => $filename, 'category' => $category, 'error' => 'Failed to delete file'];
     }
 
-    // C9 D2 mirror (wired C8 8.1) — remove the project-folder copy too. Deleting
-    // while editing the SERVED project unlinks from the BASE live public/ only; the
-    // copy in the project's own folder (authoritative since C9) would survive and
-    // resurrect the asset on the next serve/switch. Tolerant: a missing mirror is
-    // not an error (pre-8.1 assets may never have had one).
+    // The mirror — remove the project-folder copy too. Deleting while editing the
+    // SERVED project unlinks from the BASE live public/ only; the copy in the
+    // project's own folder (the authoritative one) would survive and resurrect the
+    // asset on the next serve/switch. Tolerant: a missing mirror is not an error
+    // (an older asset may never have had one).
     qs_delete_public_artifact('assets/' . $category . '/' . $filename);
 
     // Remove metadata

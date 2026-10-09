@@ -20,7 +20,7 @@ $baseUrl = rtrim(BASE_URL, '/');
 </div>
 
 <?php
-// C13 — why you are here: the visual editor was asked for, and this account is a
+// Why you are here: the visual editor was asked for, and this account is a
 // member of no project yet, so there is nothing for it to edit (AdminRouter
 // redirects rather than opening an editor bound to nothing). isset() only, never
 // a string comparison: the parameter is attacker-controlled and can arrive as an
@@ -33,8 +33,8 @@ if (isset($_GET['noproject'])): ?>
 <?php endif; ?>
 
 <?php
-// C13 — the role gate bounces here with ?denied=1 and, until now, said nothing:
-// you asked for a page and silently arrived somewhere else. The copy is
+// The role gate bounces here with ?denied=1; without a notice you would ask for
+// a page and silently arrive somewhere else. The copy is
 // deliberately generic and never names the page that was refused — telling an
 // account which pages exist is the thing a permission gate is there to avoid.
 if (isset($_GET['denied'])): ?>
@@ -346,7 +346,7 @@ if (isset($_GET['denied'])): ?>
     </div>
 </section>
 
-<!-- Memberships summary (C8 8.3c) — numbers filled by dashboard-memberships.js
+<!-- Memberships summary — numbers filled by dashboard-memberships.js
      from the shared QSMembershipCounts promise (members-badge.js). Visible to
      every authenticated user; a 0-membership account sees zeros + the links. -->
 <section class="admin-section" id="dashboard-memberships">

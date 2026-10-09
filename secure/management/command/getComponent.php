@@ -28,7 +28,7 @@ function expandComponentForPreview(array $node, string $componentsDir, int $dept
         $componentName = $node['component'];
         $componentData = $node['data'] ?? [];
         
-        // beta.11 S3.10c: a nested reference comes from STORED data, so it is
+        // A nested reference comes from STORED data, so it is
         // jailed by the shared resolver rather than concatenated.
         $componentPath = qs_resolve_component_path($componentName, $componentsDir);
         if ($componentPath !== null) {
@@ -150,7 +150,7 @@ function loadComponentTranslations(array $textKeys, string $projectPath): array 
  * @return ApiResponse
  */
 function __command_getComponent(array $params = [], array $urlParams = []): ApiResponse {
-    // qs_param_string: an ARRAY here reached a string-typed sink as a TypeError (F-C13-11).
+    // qs_param_string: an ARRAY here would reach a string-typed sink as a TypeError.
     $componentName = qs_param_string($params, 'name');
     
     if (!$componentName) {
@@ -159,8 +159,8 @@ function __command_getComponent(array $params = [], array $urlParams = []): ApiR
     }
     
     // Sanitize name: only allow alphanumeric, dash, underscore
-    // beta.11 S3.10c: one rule, shared with the renderer, the compiler and
-    // every other command — this used to be a private copy.
+    // One rule, shared with the renderer, the compiler and
+    // every other command — not a private copy.
     if (!qs_is_valid_component_reference($componentName)) {
         return ApiResponse::create(400, 'components.invalid_name')
             ->withMessage('Invalid component name');

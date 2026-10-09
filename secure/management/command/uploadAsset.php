@@ -52,7 +52,7 @@ function downloadUrlToTemp(string $url, int $maxSize, string $tmpDir): array
             return ['error' => 'URL has no hostname'];
         }
 
-        // SSRF guard (beta.10 C4 / F8): block loopback/private/metadata and
+        // SSRF guard: block loopback/private/metadata and
         // pin the resolved IP so curl connects to exactly the address we
         // validated — this closes the DNS-rebind gap the old code had (it
         // validated gethostbyname() but then handed curl the hostname to

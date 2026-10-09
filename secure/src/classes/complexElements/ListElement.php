@@ -27,8 +27,7 @@
  *     PHP — declaring `class List` fails to parse. The `kind()` stays
  *     `'list'` so the JS wizard and the rest of the system don't care.
  *   - The MVP only emits per-item textKeys (no raw text, no nested
- *     lists, no <a> children inside <li>). Those land in a follow-up
- *     sprint if needed.
+ *     lists, no <a> children inside <li>).
  *   - `start` and `reversed` are silently dropped on <ul> (browsers
  *     ignore them, and we don't want a stray `start="3"` attribute
  *     leaking into a <ul>). The wizard hides those fields when ul is

@@ -4,7 +4,7 @@
  *
  * NOT commands. The command surface is a CLI for DEVELOPING A PROJECT; getting
  * into a project, or out of one, is not project development, so these live here
- * and are served by /admin/self (beta.11 S6).
+ * and are served by /admin/self.
  *
  * These were the eight `membership.self` commands: listMyInvitations,
  * acceptInvitation, declineInvitation, leaveProject, dismissProjectNotice,
@@ -53,7 +53,7 @@ function qs_membership_resolve(array $params, ?string &$project, ?string &$userI
             ->withMessage('project is required')
             ->withErrors(['project' => 'Required field']);
     }
-    // F1 — the value becomes a directory selector downstream.
+    // The project-name shape check — the value becomes a directory selector downstream.
     if (!is_valid_project_name($project)) {
         return ApiResponse::create(400, 'project.invalid')
             ->withMessage('Invalid project identifier');
@@ -108,7 +108,7 @@ function qs_membership_list_invitations(): ApiResponse {
         $status = $entry['status'] ?? 'member';
 
         if ($status === 'pending_invite' || $status === 'pending_request') {
-            // Defensive F1 guard before the path read (cache keys are
+            // Defensive shape guard before the path read (cache keys are
             // server-written, but this file is hand-editable).
             if ($projectId === '' || strpbrk($projectId, "/\\") !== false || strpos($projectId, '..') !== false) {
                 continue;
@@ -466,7 +466,7 @@ function qs_membership_leave(array $params): ApiResponse {
  *
  * Pure cache operation: no members.json involved (for a 'deleted' notice the
  * project — and its members.json — no longer exists; that is the point). The
- * project id is shape-checked only (F1), never existence-checked.
+ * project id is shape-checked only, never existence-checked.
  *
  * @param array $params project
  * @return ApiResponse
@@ -571,7 +571,7 @@ function qs_membership_request_join(array $params): ApiResponse {
                 'note'    => $note === null ? 'Required field' : null,
             ]);
     }
-    // F1 — the value becomes a directory selector downstream.
+    // The project-name shape check — the value becomes a directory selector downstream.
     if (!is_valid_project_name($project)) {
         return ApiResponse::create(400, 'project.invalid')
             ->withMessage('Invalid project identifier');

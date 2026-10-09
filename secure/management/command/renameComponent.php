@@ -208,8 +208,8 @@ function __command_renameComponent(array $params = [], array $urlParams = []): A
     }
     
     // Validate names don't contain path characters (/, \, or ..). On Windows a
-    // backslash is a separator, so a /-only check let `oldName=..\..\x` traverse
-    // out of the components/ dir (beta.10 C3 F1-n).
+    // backslash is a separator, so a /-only check would let `oldName=..\..\x` traverse
+    // out of the components/ dir.
     if (strpos($oldName, '/') !== false || strpos($newName, '/') !== false ||
         strpos($oldName, '\\') !== false || strpos($newName, '\\') !== false ||
         strpos($oldName, '..') !== false || strpos($newName, '..') !== false) {

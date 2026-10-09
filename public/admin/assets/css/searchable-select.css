@@ -1,8 +1,7 @@
 /*
  * QSSearchableSelect — combobox that wraps a native <select>.
- * Used by the JS-function picker (beta.9 A2 Slice 2) and any future
- * surface that wants the search-inline-in-dropdown pattern (A2 Slice 5
- * route picker, etc.).
+ * Used by the JS-function picker, the route picker and any other
+ * surface that wants the search-inline-in-dropdown pattern.
  *
  * Theme: --admin-* variables (admin is dark-themed).
  */

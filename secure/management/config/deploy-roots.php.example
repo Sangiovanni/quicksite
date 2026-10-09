@@ -1,6 +1,6 @@
 <?php
 /**
- * Deploy Roots Allowlist  (beta.10 C4 / F8 — deploy-target containment)
+ * Deploy Roots Allowlist  (deploy-target containment)
  *
  * Copy this file to deploy-roots.php to permit `deployBuild` to write the
  * build output to locations OUTSIDE the QuickSite install directory.

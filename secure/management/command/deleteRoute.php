@@ -23,7 +23,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/opcacheHygiene.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/String.php';
-// Beta.8 A1 — routeHelpers is already loaded by utilsManagement,
+// routeHelpers is already loaded by utilsManagement,
 // kept explicit here for clarity (paramRouteSegmentToFs use below).
 require_once SECURE_FOLDER_PATH . '/src/functions/routeHelpers.php';
 
@@ -68,8 +68,8 @@ if (strlen($routePath) < 1 || strlen($routePath) > 200) {
 $segments = array_filter(explode('/', $routePath), fn($s) => $s !== '');
 $segments = array_values($segments);
 
-// Validate segments. Accept both literal and `:name` param shapes
-// (beta.8 A1). The param regex here is slightly more permissive than
+// Validate segments. Accept both literal and `:name` param shapes.
+// The param regex here is slightly more permissive than
 // addRoute's strict lowercase: this lets deleteRoute clean up orphans
 // created via earlier too-loose validation (e.g., ':UPPER'). The real
 // existence check is routePathExists() below — segment validation just
@@ -132,7 +132,7 @@ $filesToDelete = [];
 $dirsToDelete = [];
 
 foreach ($routesToDelete as $routeSegments) {
-    // Beta.8 A1 — sanitise ':slug' → '__slug' for filesystem ops.
+    // Sanitise ':slug' → '__slug' for filesystem ops.
     // routes.php key stays ':slug'; files on disk use '__slug'.
     // Without this, file_exists() silently returns false for any
     // param-route file and the cascade leaves ghost folders behind.
@@ -174,7 +174,7 @@ $failedFiles = [];
 
 foreach ($filesToDelete as $file) {
     if (file_exists($file)) {
-        // beta.10 C12 12.5: rendering these project-relative is ApiResponse's job now.
+        // Rendering these project-relative is ApiResponse's job.
         if (@unlink($file)) {
             $deletedFiles[] = $file;
         } else {
@@ -216,8 +216,8 @@ if (file_put_contents(ROUTES_PATH, $routesContent, LOCK_EX) === false) {
 // Invalidate opcache
 qs_opcache_invalidate(ROUTES_PATH);
 
-// Beta.8 A1 Build Slice 1 — regenerate the client-side routes schema
-// so qs.js (Slice 2) drops the deleted route immediately without a
+// Regenerate the client-side routes schema
+// so qs.js drops the deleted route immediately without a
 // full rebuild. Same pattern as addRoute above.
 require_once SECURE_FOLDER_PATH . '/src/functions/projectPublicArtifacts.php';
 qs_emit_route_schema($newRoutes);
@@ -277,7 +277,7 @@ foreach ($routesToDelete as $routeSegments) {
 }
 
 // ============================================================================
-// CLEAN UP RESOLVERS (beta.8 A2)
+// CLEAN UP RESOLVERS
 // ============================================================================
 // Drop the per-route resolver sidecar entry for every deleted route so the
 // resolver runtime doesn't fire against routes that no longer exist on

@@ -95,8 +95,8 @@ function qs_site_fail(string $reason, string $absPath): void
 //   - the display_errors suppression immediately after it covers the one window
 //     the fatal handler cannot: a fatal raised before, or inside, the require
 //     that locates the secure folder, which is where the handler itself lives.
-//     Same reasoning as the suppression inside qs_register_fatal_handler()
-//     (beta.10 C13): where the handler cannot repair the response, at least
+//     Same reasoning as the suppression inside qs_register_fatal_handler():
+//     where the handler cannot repair the response, at least
 //     nothing about the filesystem is printed into it.
 //   - qs_is_development() memoises its answer on first call and prefers an
 //     ENVIRONMENT constant over any config file. Registering the handler while
@@ -250,9 +250,9 @@ define('PROJECT_NAME', $qsSite['project']);
 //
 // A built site used to send NO policy at all — no object-src, no base-uri, no
 // frame-ancestors and no script-src restriction — which made the deployed
-// artifact strictly less protected than its own preview. That survived a slice
-// about preview/build parity because the harness compared rendered DOM and
-// never compared response headers.
+// artifact strictly less protected than its own preview — and a parity check
+// that compares rendered DOM never sees it: the difference is in the response
+// headers.
 require_once SECURE_FOLDER_PATH . '/src/functions/contentSecurityPolicy.php';
 qs_send_content_security_policy(PROJECT_PATH);
 

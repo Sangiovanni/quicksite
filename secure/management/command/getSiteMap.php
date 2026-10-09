@@ -15,7 +15,7 @@
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
-require_once SECURE_FOLDER_PATH . '/src/functions/renderBootstrap.php'; // qs_resolve_public_base (C15 15.4)
+require_once SECURE_FOLDER_PATH . '/src/functions/renderBootstrap.php'; // qs_resolve_public_base
 require_once SECURE_FOLDER_PATH . '/src/functions/sitemapHelpers.php';  // shared config read/apply
 require_once SECURE_FOLDER_PATH . '/src/functions/languageRegistry.php';
 
@@ -52,11 +52,11 @@ function __command_getSiteMap(array $params = [], array $urlParams = []): ApiRes
             ->withData(['requested_format' => $format, 'valid_formats' => ['text', 'json']]);
     }
 
-    // The sitemap base — ABSOLUTE by spec (R1 keeps the absolute form exactly here).
-    // C15 15.4 chain, first non-empty wins: the per-call `baseUrl` param (the author's
-    // word at generation time, unchanged since beta.8) → QS_PUBLIC_BASE_URL server env →
-    // derived (install base + p/<id>/ — BASE_URL alone stopped being a project URL when
-    // the webroot mirror died in 15.3, which is why it is no longer the default).
+    // The sitemap base — ABSOLUTE by spec (the absolute form is kept exactly here).
+    // First non-empty wins: the per-call `baseUrl` param (the author's word at
+    // generation time) → QS_PUBLIC_BASE_URL server env → derived (install base +
+    // p/<id>/ — BASE_URL alone is not a project URL, which is why it is not the
+    // default).
     $baseUrl = rtrim(qs_resolve_public_base()['abs'], '/');
     if (!empty($params['baseUrl'])) {
         $customBase = filter_var($params['baseUrl'], FILTER_VALIDATE_URL);
@@ -162,7 +162,7 @@ function __command_getSiteMap(array $params = [], array $urlParams = []): ApiRes
     }
     $sitemapData['routeLayouts'] = $routeLayouts;
 
-    // Beta.8 A2 Slice 7 — per-route resolver configs (sparse map: only
+    // Per-route resolver configs (sparse map: only
     // routes that have a sidecar entry are present). Powers two things in
     // the sitemap UI:
     //   1. The 'resolver' badge in _renderRoutePath (presence check).

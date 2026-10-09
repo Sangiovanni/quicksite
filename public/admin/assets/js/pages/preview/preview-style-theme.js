@@ -277,7 +277,7 @@
     
     // ==================== Render Functions ====================
     
-    // ── DOM builders (F-C13-3) ──────────────────────────────────────────────
+    // ── DOM builders ────────────────────────────────────────────────────────
     // Theme variable NAMES and VALUES are attacker-controllable (they come out of
     // the project stylesheet via getRootVariables), so they must never be glued
     // into an HTML string. These helpers build one element each with createElement
@@ -632,7 +632,7 @@
         if (themeResetBtn) themeResetBtn.disabled = true;
         loadThemeVariables();
 
-        // A3 slice 6 — any open quick-add forms now show a stale scope
+        // Any open quick-add forms now show a stale scope
         // banner. Easiest correct behaviour: close them. Refreshing the
         // banners mid-edit is also possible but risks the user submitting
         // against the wrong scope they intended.
@@ -752,7 +752,7 @@
         });
     }
 
-    // ==================== Quick-add variable (A3 slice 6) ====================
+    // ==================== Quick-add variable ====================
     // Each Theme section (Colors / Fonts / Spacing) carries an inline
     // `.preview-theme-add` container with a toggle + form. Clicking the
     // toggle opens the form, which is scope-aware (banner reflects the
@@ -943,14 +943,14 @@
         themeSaveBtn.addEventListener('click', saveThemeVariables);
     }
 
-    // A3 slice 6 — wire all `.preview-theme-add` toggles + forms.
+    // Wire all `.preview-theme-add` toggles + forms.
     initThemeAddForms();
 
     // ==================== Public API ====================
     
     /**
      * Mark the in-memory cache stale so the next view triggers a fresh
-     * fetch. Used by Source (A3 slice 6 fix) when its save / cancel
+     * fetch. Used by Source when its save / cancel
      * rewrites style.css — without this, the Theme tab would keep
      * showing the variables it loaded before the Source write.
      */

@@ -7,8 +7,8 @@
  * with inline search on top of it.
  *
  * Used by:
- *   - beta.9 A2 Slice 2: JS-function picker (preview-js-interactions.js)
- *   - beta.9 A2 Slice 5: route inputType picker (planned)
+ *   - the JS-function picker (preview-js-interactions.js)
+ *   - the route inputType picker
  *   - future surfaces where the existing tag/property picker pattern
  *     applies but a fully custom DOM stack would be overkill
  *
@@ -171,8 +171,7 @@
 
             // Width matches the trigger exactly (both min + max). Without
             // a max-width, long item descriptions push the dropdown past
-            // the trigger's container — surfaced in Slice 2 verification
-            // ("takes the whole width of the page").
+            // the trigger's container, across the whole width of the page.
             const rect = this.triggerEl.getBoundingClientRect();
             this.dropdownEl.style.width = rect.width + 'px';
             this.dropdownEl.style.maxWidth = rect.width + 'px';
@@ -195,10 +194,9 @@
                 this._renderList(e.target.value.trim().toLowerCase());
                 // Re-anchor after content change so flip-up mode hugs
                 // the trigger when filtering shrinks the dropdown.
-                // Slice 2 verification feedback: with only 1 visible
-                // item the dropdown was "really far away from the
-                // selector" because the anchor used the stale (full
-                // list) height.
+                // Without it, with only 1 visible item the dropdown sits
+                // far away from the selector, because the anchor uses the
+                // stale (full list) height.
                 this._positionDropdown(this.triggerEl.getBoundingClientRect());
             });
             this.searchInputEl.addEventListener('keydown', (e) => this._handleSearchKey(e));
@@ -232,9 +230,9 @@
          * get).
          *
          * Called after the dropdown is appended to the DOM so we can
-         * read its rendered height. Slice 2 verification feedback
-         * ("when the function is already really low on the page" it
-         * should open upward like the preview-toggle popover does).
+         * read its rendered height. When the trigger is already low on
+         * the page, the dropdown opens upward, like the preview-toggle
+         * popover does.
          *
          * Three measurements keep it inside the visible page:
          *   - the height it WANTS is measured under the stylesheet's own

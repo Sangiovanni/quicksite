@@ -53,7 +53,7 @@ window.PreviewAiTools = (function () {
 
     // DOM refs — bound on init().
 
-    // C8 8.X — the /admin/api helper endpoint is project-scoped: it authorizes each
+    // The /admin/api helper endpoint is project-scoped: it authorizes each
     // arm against the marker project and binds that context. QuickSiteAPI.helperPath
     // is the single owner of the marker convention; this delegates so the URL shape
     // lives in ONE place. Falls back to the bare action if core/api.js is absent —

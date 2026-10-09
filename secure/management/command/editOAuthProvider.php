@@ -33,9 +33,10 @@
  * the existing one in full. Authors who want field-level updates must
  * read the current preset first (listOAuthProviders) and merge client-
  * side. This matches the "override is at provider level, full-entry
- * replace" rule locked in Slice 2.5.
+ * replace" rule (by design: DESIGN_DECISIONS.md "OAuth presets + secrets —
+ * per-project override over admin fallback").
  *
- * Admin-tier only — handles credentials. Beta.9 A1 Slice 8.
+ * Admin-tier only — handles credentials.
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';

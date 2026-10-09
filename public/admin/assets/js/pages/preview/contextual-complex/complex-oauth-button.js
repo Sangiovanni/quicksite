@@ -14,8 +14,8 @@
  *
  * Steps 1-4 fire in preSubmit (new optional wizard hook in preview.js
  * addComplexNode). When routes already exist the UX warns the author
- * the wizard will reuse them — see DESIGN_DECISIONS "OAuth-button
- * Complex Element shape" Q5.
+ * the wizard will reuse them (skip-with-warn, by design: DESIGN_DECISIONS.md
+ * "OAuth-button Complex Element").
  *
  * Server-side builder: secure/src/classes/complexElements/OAuthButton.php
  * Provider listing:    secure/management/command/listOAuthProviders.php
@@ -295,7 +295,7 @@
             returnSelect.disabled = false;
         });
 
-        // ---- third-party cookie note (Slice 6) ------------------------
+        // ---- third-party cookie note ----------------------------------
         // BFF cookies are first-party in the standard OAuth flow (page →
         // provider → callback all hit the QuickSite-built site directly,
         // so the cookies set on the QuickSite origin are first-party from

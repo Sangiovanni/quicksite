@@ -44,7 +44,7 @@
  * - The target is NOT an arbitrary absolute path. It must be SERVER_ROOT or a
  *   root the operator listed in deploy-roots.php; anything else is refused 403.
  *   A default installation, which has no such file, deploys to itself and
- *   nowhere else. (beta.10 C4/F8 — before that it did write anywhere.)
+ *   nowhere else.
  * - Path traversal attempts (..) are blocked before the allowlist is consulted.
  * - The gates above are what a leaked deploy token runs into: it can redeploy
  *   this install's own site, and it cannot write generated PHP to another vhost.
@@ -164,7 +164,7 @@ if (!$isAbsolute) {
         ->send();
 }
 
-// === CONFINE DEPLOY TARGET TO AN ALLOWLISTED ROOT (beta.10 C4 / F8) ===
+// === CONFINE DEPLOY TARGET TO AN ALLOWLISTED ROOT ===
 // The build contains generated PHP; under the CONTAIN model a leaked/low-
 // trust deploy token must not write it to an arbitrary absolute path
 // (another vhost, a startup folder, a system dir) or overwrite unrelated
@@ -234,10 +234,10 @@ if (isLocked($buildLockId)) {
 }
 
 // The build lives at secure/projects/<id>/qs_build/<name>/ — outside public/,
-// where no URL reaches it. This command read PUBLIC_CONTENT_PATH . '/build'
-// until beta.11 S3.8, a directory that stopped existing when the output moved,
-// so every deploy answered "Build not found" no matter what was on disk.
-// qs_build_path() is the single derivation every caller shares.
+// where no URL reaches it. qs_build_path() is the single derivation every
+// caller shares: a private one (PUBLIC_CONTENT_PATH . '/build', a directory
+// that does not exist) would answer every deploy "Build not found" no matter
+// what is on disk.
 $buildFolder = qs_build_path($buildName);
 
 if (!is_dir($buildFolder)) {
@@ -719,7 +719,7 @@ function deploy_copyDirectory(string $source, string $dest, bool $overwrite, arr
     // The jail root, canonicalised ONCE: every entry below must resolve inside
     // it. Without this the walk follows a reparse point out of the build and
     // copies whatever it finds — RecursiveDirectoryIterator reports a junction
-    // as an ordinary directory (beta.11 S3.10c, audit F6). Defence in depth:
+    // as an ordinary directory. Defence in depth:
     // the source is a build QuickSite generated with mkdir/copy and no command
     // plants a link, so no remote vector was found. It is here so this boundary
     // and the publish copier make the SAME decision instead of differing

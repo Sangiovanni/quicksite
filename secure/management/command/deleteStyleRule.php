@@ -17,7 +17,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/utilsStyleManagement.php';
 $params = $trimParametersManagement->params();
 
 // Validate required parameter. qs_param_string, not isset: `?selector[]=x` is
-// SET but is an array, and reached trim() as a TypeError (beta.10 C13 F-C13-11).
+// SET but is an array, and would reach trim() as a TypeError.
 // A non-string now reads as absent and takes this same 400.
 $selectorParam = qs_param_string($params, 'selector');
 if ($selectorParam === null) {

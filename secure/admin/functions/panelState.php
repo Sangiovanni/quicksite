@@ -2,7 +2,7 @@
 /**
  * The admin panel's own per-user state.
  *
- * NOT COMMANDS. Under the beta.11 rule the command surface is a CLI for
+ * NOT COMMANDS. By design the command surface is a CLI for
  * DEVELOPING a project; which project a person's panel happens to have open is
  * a fact about the panel, not about any project, so it is served here and
  * reached at `/admin/state/…` rather than through `/management`.

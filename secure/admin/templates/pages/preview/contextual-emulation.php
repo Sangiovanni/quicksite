@@ -39,7 +39,7 @@
             </svg>
             <?= __admin('preview.emulationApply') ?? 'Apply Preview' ?>
         </button>
-        <!-- Beta.8 A2 Track 2e — live-data toggle. Visible only for page-edit
+        <!-- Live-data toggle. Visible only for page-edit
              mode; component emulation has no resolver to go live against.
              preview.js shows/hides per currentEditType. -->
         <button type="button" class="admin-btn admin-btn--sm admin-btn--outline" id="emulation-live-btn" style="display: none;" data-active="false">

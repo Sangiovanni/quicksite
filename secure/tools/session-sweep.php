@@ -10,7 +10,7 @@
  * WHY THIS IS A SCRIPT AND NOT A COMMAND. Clearing the session store is
  * installation-wide and has no principal to authorize it. QuickSite's
  * permissions are per-project — a role cannot express "sign out everyone on
- * this server" — and beta.10 removed every installation-wide tier on purpose,
+ * this server" — and there is no installation-wide tier, on purpose,
  * because a global permission plus an account-creation path is an escalation
  * ladder. The credential for an installation-wide action is filesystem access
  * to the server, which is strictly more power than any role could grant. So the

@@ -1,7 +1,7 @@
 <?php
-// C7 — the action's project is the per-request projectId peeled from the URL, resolved
+// The action's project is the per-request projectId peeled from the URL, resolved
 // + validated + membership-checked below, then bound via qs_load_project_context() — which
-// binds PROJECT_PATH *and* PUBLIC_CONTENT_PATH together (C15 15.3). Nothing binds a project
+// binds PROJECT_PATH *and* PUBLIC_CONTENT_PATH together. Nothing binds a project
 // before that point, so this file no longer needs to pre-empt init.php with an early
 // PUBLIC_CONTENT_PATH override: init.php defines only the install-wide constants.
 
@@ -26,11 +26,10 @@ $commandStartTime = microtime(true);
 // ============================================================================
 // Fatal Error Handler - Catches parse errors and other fatal errors
 // ============================================================================
-// C12: this was an inline copy. It now shares one implementation with the
-// admin-api dispatcher, which had NO fatal handling at all and answered the
-// same fatal with HTTP 200 and an absolute filesystem path. Two copies of the
-// same decision is the drift shape C11 spent a slice removing; the debug block
-// is also gated in exactly one place now.
+// One implementation, shared with the admin-api dispatcher, which would otherwise
+// have NO fatal handling at all and answer the same fatal with HTTP 200 and an
+// absolute filesystem path. Two copies of the same decision drift apart; shared,
+// the debug block is gated in exactly one place.
 qs_register_fatal_handler(QS_FATAL_SHAPE_ENVELOPE);
 
 // ============================================================================
@@ -82,7 +81,7 @@ $segments = array_values(array_filter(explode('/', $uriPath)));
 $earlyCommand = null;
 foreach ($segments as $i => $seg) {
     if ($seg === 'management' && isset($segments[$i + 1])) {
-        // C7 — skip the optional project marker '/management/p/<projectId>/<command>'
+        // Skip the optional project marker '/management/p/<projectId>/<command>'
         // so a public command (help) is recognised whether or not it carries one.
         if ($segments[$i + 1] === 'p' && isset($segments[$i + 3])) {
             $earlyCommand = $segments[$i + 3];
@@ -133,7 +132,7 @@ if (!$authResult['valid']) {
 $currentUser = $authResult['user'];
 
 // ============================================================================
-// Did PHP throw this request's body away? (S2.5)
+// Did PHP throw this request's body away?
 // ============================================================================
 // A body over `post_max_size` never reaches the command: PHP empties $_POST and
 // $_FILES and says nothing, so every command downstream sees a request with no
@@ -169,8 +168,8 @@ if(!defined('ROUTES_MANAGEMENT_PATH')){
     define('ROUTES_MANAGEMENT_PATH', SERVER_ROOT . '/' . SECURE_FOLDER_NAME . '/management/routes.php');
 }
 if (!file_exists(ROUTES_MANAGEMENT_PATH)) {
-    // C12 (F9): the absolute path used to ride out in `data.expected_path`.
-    // A caller cannot act on it; an operator reads it from the error log.
+    // The absolute path goes to the error log, never into the response: a caller
+    // cannot act on it; an operator reads it from the log.
     error_log('QuickSite: routes management file not found at ' . ROUTES_MANAGEMENT_PATH);
     ApiResponse::create(500, 'file.not_found')
         ->withMessage('Routes management file not found')
@@ -186,12 +185,12 @@ $trimParametersManagement = new TrimParametersManagement();
 if(in_array($trimParametersManagement->command(), ROUTES_MANAGEMENT)){
     $command = $trimParametersManagement->command();
 } else {
-    // C12 (F9): this used to answer an unknown command with the ENTIRE routable
-    // command list — all 177 names, to any authenticated caller regardless of
+    // An unknown command is NOT answered with the routable command list: that
+    // would hand the full catalogue to any authenticated caller regardless of
     // role or membership. `help` already exposes the commands a caller is
-    // actually permitted to run, which is the answer they are entitled to; this
-    // handed over the full catalogue. The requested name is echoed back because
-    // the caller supplied it and it makes a typo diagnosable.
+    // actually permitted to run, which is the answer they are entitled to. The
+    // requested name is echoed back because the caller supplied it and it makes
+    // a typo diagnosable.
     ApiResponse::create(404, 'route.not_found')
         ->withMessage('Command not found')
         ->withData([
@@ -201,11 +200,11 @@ if(in_array($trimParametersManagement->command(), ROUTES_MANAGEMENT)){
 }
 
 // ============================================================================
-// Per-request project scoping + permission check (C7)
+// Per-request project scoping + permission check
 // ============================================================================
 // The action's project comes from the URL ('/management/p/<projectId>/<command>'),
-// NEVER from selected_project. A project-scoped command is validated as an F1 path
-// input, then authorized against the project's AUTHORITATIVE members.json (L5)
+// NEVER from selected_project. A project-scoped command's projectId is shape-checked
+// as a path input, then authorized against the project's AUTHORITATIVE members.json
 // before the command runs. Global commands do not authorize against a project.
 $requestedProject = $trimParametersManagement->project();
 $commandCategory  = getCommandCategory($command);
@@ -227,11 +226,11 @@ $commandScope     = $categoriesConfig[$commandCategory]['scope'] ?? 'project';
 // SCALAR body ('5', '"s"', 'true', '1.5') decodes to a non-null NON-array, which
 // then reached logCommand()'s `array $body` parameter as a TypeError — a fatal
 // raised inside ApiResponse's beforeSend callback, i.e. on the way OUT of an
-// otherwise-successful request (beta.10 C13 F-C13-10, second carrier).
+// otherwise-successful request.
 $decodedBody = json_decode(REQUEST_BODY_RAW, true);
 $requestBody = is_array($decodedBody) ? $decodedBody : [];
 
-// The command log is PER-PROJECT (C10 10.1b). The bucket comes from the command's
+// The command log is PER-PROJECT. The bucket comes from the command's
 // SCOPE, never from PROJECT_NAME: a global command is given a benign working
 // context from the caller's UX-default project below, so PROJECT_NAME would
 // mis-file global actions into whichever project the user happens to have
@@ -239,7 +238,7 @@ $requestBody = is_array($decodedBody) ? $decodedBody : [];
 // which logCommand routes to the write-only `_global` bucket.
 $logProject = ($commandScope === 'project') ? $requestedProject : null;
 
-// The command's REQUEST PARAMETERS, which are not in the body (beta.11 S6.6).
+// The command's REQUEST PARAMETERS, which are not in the body.
 // Much of the surface takes arguments as URL path segments
 // (`getStructure/pages/home`) or as a query string
 // (`getCommandHistory?start_date=…`), and until now neither reached the log —
@@ -273,7 +272,7 @@ if ($commandScope === 'project') {
             ->withMessage('This command is project-scoped. Target a project with /management/p/<projectId>/' . $command)
             ->send();
     }
-    // F1 — the projectId is request-controlled and becomes a directory selector.
+    // The projectId is request-controlled and becomes a directory selector.
     if (!is_valid_project_name($requestedProject)) {
         ApiResponse::create(400, 'project.invalid')
             ->withMessage('Invalid project identifier')

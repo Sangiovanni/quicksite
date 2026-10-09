@@ -1,13 +1,13 @@
 <?php
 /**
- * Project CONTAINMENT helpers (beta.10 C8).
+ * Project CONTAINMENT helpers.
  *
  * A project-scoped command is authorized by the dispatcher against the project
  * marker in the URL ('/management/p/<projectId>/<command>', see
  * public/management/index.php) BEFORE the command runs. The command must then act
  * on THAT project and no other — otherwise the marker is authorized and ignored,
  * and a request-body value silently retargets the action at a project the caller
- * was never authorized for (the confused-deputy class closed across C8).
+ * was never authorized for (the confused-deputy class).
  *
  * These helpers are the single implementation of that rule, plus the per-project
  * storage derivation that keeps generated archives from sharing one namespace.
@@ -70,7 +70,7 @@ function qs_bind_marker_project(array $params, string $command, array $fields = 
  * an archive is reachable only through its own project's marker. A shared folder
  * made every export addressable from any authorized marker, which turned
  * downloadExport into a cross-project read and clearExports into a cross-project
- * delete (C8 8.5 findings 2 and 3).
+ * delete.
  *
  * Callers must pass a project id already validated by is_valid_project_name().
  *

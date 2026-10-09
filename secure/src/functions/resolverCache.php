@@ -2,7 +2,7 @@
 require_once __DIR__ . '/jsonIo.php'; // qs_json_write — NOT the whole utility drawer: this file runs on every served page, built ones included
 /**
  * resolverCache.php — File-based response cache for the server-side
- * data resolver (beta.8 A2 Slice 4).
+ * data resolver.
  *
  * Per-route opt-in via resolver.cacheTTL (seconds). Per-request default
  * = no cache. Keeps the no-deps rule — no Redis, no Memcached, just
@@ -25,20 +25,20 @@ require_once __DIR__ . '/jsonIo.php'; // qs_json_write — NOT the whole utility
  *   - `apiKey` → cacheable (server-side shared secret, not per-user)
  *   - `bearer` / `cookie` / `basic` → NOT cacheable. The response is
  *     scoped to whoever's session was authenticated; sharing across
- *     users would cross-leak data. Per-user-bucket caching is beta.9+.
+ *     users would cross-leak data.
  *
  * Invalidation in v1:
  *   - TTL (entries expire after their TTL window passes; lazy-deleted
  *     on read miss + actively swept by cleanResolverCache command)
- *   - Auto-clear on editApi (locked Q1): when an endpoint's config
+ *   - Auto-clear on editApi (by design): when an endpoint's config
  *     changes, walk the cache + delete entries for that endpoint /
  *     API so authors don't see stale data.
  *   - Manual: cleanResolverCache command (all / before-timestamp / expired).
  *
  * Broader invalidation hooks (mutation broadcast, related-data
- * triggers, etc.) are filed as beta.9.
+ * triggers, etc.) are not implemented.
  *
- * Per-call observability seam (locked in design): writes
+ * Per-call observability seam (by design): writes
  * $GLOBALS['__qs_resolver_cache_status'] to one of:
  *   'hit'       — cache satisfied the request
  *   'miss'      — eligible to cache but no entry; will fetch + write

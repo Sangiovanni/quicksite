@@ -24,7 +24,7 @@ if ($langCode === null) {
 }
 
 // Type validation - must be a string, checked before anything reads it as one
-// (an array reached strtolower() as a TypeError, beta.10 C13 F-C13-11).
+// (an array would reach strtolower() as a TypeError).
 if (!is_string($langCode)) {
     ApiResponse::create(400, 'validation.invalid_format')
         ->withMessage("Invalid parameter type")

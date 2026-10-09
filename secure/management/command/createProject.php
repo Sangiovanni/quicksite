@@ -39,7 +39,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/spaceUsage.php'; // qs_invalid
  */
 function __command_createProject(array $params = [], array $urlParams = []): ApiResponse {
     // Validate project name
-    // qs_param_string: `?name[]=x` reached trim() as a TypeError (F-C13-11).
+    // qs_param_string: `?name[]=x` would reach trim() as a TypeError.
     $projectName = trim(qs_param_string($params, 'name', ''));
     
     if (empty($projectName)) {
@@ -221,15 +221,15 @@ HTACCESS;
     // An empty style.css
     createEmptyStylesheet($projectPath);
 
-    // --- Membership (C5): the creator becomes the project's sole owner ---
-    // No project may exist without a members.json (L9). Requires AuthManagement.
+    // --- Membership: the creator becomes the project's sole owner ---
+    // No project may exist without a members.json. Requires AuthManagement.
     if (!function_exists('getCurrentUser')) {
         require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
     }
     $creator   = getCurrentUser();
     $creatorId = $creator['id'] ?? null;
 
-    // Birth-write the trust file via the single canonical path (C8 8.4) — creator
+    // Birth-write the trust file via the single canonical path — creator
     // as sole owner. A create with no resolvable owner is invalid (an ownerless,
     // inaccessible project); fail loudly rather than mint one.
     if (!qs_project_birth_write_members($projectPath, $creatorId)) {
@@ -238,11 +238,11 @@ HTACCESS;
     }
 
     // Update the creator's derived project index (users.php) — cache only, NO
-    // role key (role is authoritative in members.json — L5/C5). With switch_to,
+    // role key (role is authoritative in members.json). With switch_to,
     // ONLY the creator's selected_project (their per-user EDITING target) moves
     // to the new project — a command never repoints what a deployment serves;
     // the site root keeps serving the fixed main and the new project is edited
-    // at /p/<id>/ (C9 fixed-main model).
+    // at /p/<id>/ (the fixed-main model).
     $selectedProjectSet = false;
     if ($creatorId !== null) {
         $written = qs_users_mutate(function (array &$cfg) use ($creatorId, $projectName, $siteName, $switchTo) {

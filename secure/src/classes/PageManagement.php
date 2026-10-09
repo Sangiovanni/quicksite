@@ -62,7 +62,7 @@ class PageManagement {
         }
         // ─────────────────────────────────────────────────────────────────
 
-        // C15 15.4 (R1): the base every emitted URL composes against. On the render
+        // The base every emitted URL composes against. On the render
         // path this is QS_PUBLIC_BASE (root-relative path form, exactly one trailing
         // slash — which is also what kills the old `//` in these joins); the BASE_URL
         // fallback keeps non-render callers behaving exactly as before.
@@ -117,7 +117,7 @@ class PageManagement {
             'route' => $trimParameters->route(),           // ['guides', 'installation']
             'routePath' => $trimParameters->routePath(),   // 'guides/installation' OR 'products/:slug' for param routes
             'params' => $trimParameters->params(),
-            // Beta.8 A1 — captured URL path-param values for `:name` route segments.
+            // Captured URL path-param values for `:name` route segments.
             // E.g., for /products/red-vase matching route 'products/:slug':
             //   routeParams === ['slug' => 'red-vase']
             // Empty when the matched route has no `:name` segments.

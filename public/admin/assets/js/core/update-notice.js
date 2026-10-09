@@ -17,7 +17,8 @@
  * happening. The list grants nothing: the update-check endpoint stays callable
  * by any authenticated account exactly as before, and this module calls nothing
  * else. It is a display preference, and treating it as anything more would
- * reintroduce the installation-wide principal beta.10 removed.
+ * make it an installation-wide principal, which the role model deliberately
+ * does not have.
  *
  * IT IS NOT A COMMAND. The update check reports on the INSTALLATION, not on any
  * project, so it is an arm of the panel's own helper API (/admin/api) rather

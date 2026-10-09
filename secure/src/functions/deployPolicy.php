@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/opcacheHygiene.php';
 /**
- * The self-deploy gate (beta.11 S3.8).
+ * The self-deploy gate.
  *
  * ONE question, asked from one place: may this installation deploy a build
  * onto a filesystem path at all?

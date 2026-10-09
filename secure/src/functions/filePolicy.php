@@ -665,7 +665,7 @@ function qs_copy_publishable_directory(
 
         // The jail check. Canonicalise, then require the result to sit under
         // the copy root. The predicate is shared with the deploy copier so both
-        // boundaries make the same decision (beta.11 S3.10c).
+        // boundaries make the same decision.
         if (!qs_path_is_within($sourcePath, $root)) {
             $skipped[] = $relative . ' (resolves outside the project)';
             continue;

@@ -1,6 +1,6 @@
 <?php
 /**
- * Session Lifecycle Management — the PHP session IS the session (beta.11 S1).
+ * Session Lifecycle Management — the PHP session IS the session.
  *
  * You log in on arrival and the browser session holds the login. There is no
  * access token, no refresh token, no rotation, no family, and no server-side
@@ -528,15 +528,15 @@ function qs_session_touch(): void {
 
 // ============================================================================
 // Session store sweep — QuickSite collects on ITS OWN rule (see the file
-// header for why PHP's GC cannot). Two entries, per the S2 design:
+// header for why PHP's GC cannot). Two entries, by design:
 //   - opportunistically after a LOGIN has been answered, on a 1-in-N die
 //     (qs_session_sweep_maybe);
 //   - explicitly from the operator's script (secure/tools/session-sweep.php).
 //
 // NOT a routed command, deliberately. Clearing the session store is
 // installation-wide and has no principal to authorize it: a per-project role
-// cannot mean "sign out everyone on this server", and beta.10 removed every
-// installation-wide tier on purpose. The credential for this is filesystem
+// cannot mean "sign out everyone on this server", and there is no
+// installation-wide tier, on purpose. The credential for this is filesystem
 // access, which is strictly more power than any role could grant.
 // ============================================================================
 
@@ -1066,7 +1066,7 @@ function qs_login_throttle_clear(string $identifier): void {
 }
 
 // ============================================================================
-// Registration policy + flood control (C8) — the knobs live in auth.php
+// Registration policy + flood control — the knobs live in auth.php
 // `authentication.registration`; the counters in registration-throttle.json
 // (same flock + temp/rename discipline, hashed IP keys — the raw address never
 // sits in the state file).

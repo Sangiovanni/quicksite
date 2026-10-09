@@ -27,8 +27,8 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiEndpointManager.php';
  * @return ApiResponse
  */
 function __command_listApiEndpoints(array $params = [], array $urlParams = []): ApiResponse {
-    // A non-string apiId reached isset($apis[$apiId]) — "Cannot access offset of
-    // type array" (F-C13-11). Both sources are normalised to string-or-null.
+    // A non-string apiId would reach isset($apis[$apiId]) — "Cannot access offset of
+    // type array". Both sources are normalised to string-or-null.
     $apiId = is_string($urlParams[0] ?? null) ? $urlParams[0] : qs_param_string($params, 'apiId');
     
     $manager = new ApiEndpointManager();
@@ -73,8 +73,8 @@ function __command_listApiEndpoints(array $params = [], array $urlParams = []): 
                 'responseSchema' => $endpoint['responseSchema'] ?? null,
                 'responseBindings' => $endpoint['responseBindings'] ?? [],
                 'hasResponseBindings' => !empty($endpoint['responseBindings']),
-                // Beta.8 A2 Slice 7 — surface the effective callableFrom
-                // (raw OR auto-derived from auth type per Track A4) so
+                // Surface the effective callableFrom
+                // (raw OR auto-derived from auth type) so
                 // admin pickers like the resolver modal can filter out
                 // endpoints they can't call. Computing the effective
                 // value here means callers don't need to replicate the

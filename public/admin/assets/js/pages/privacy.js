@@ -1,8 +1,8 @@
 /**
- * Privacy helper admin page (beta.9). Read-only view of getPrivacyStatus:
- * coverage summary, collected data, host classification, endpoint atoms, and the
- * OAuth/magic-link auto-seed. CRUD + mapping + host classification land in later
- * slices.
+ * Privacy helper admin page. Shows getPrivacyStatus (coverage summary, collected
+ * data, host classification, endpoint atoms, the OAuth/magic-link auto-seed) and
+ * edits it: collected data, host classification, field mapping, the policy page
+ * and its cookie section.
  *
  * Built with createElement + textContent + named _render* helpers per the
  * CLAUDE.md HTML-in-JS hygiene rule (no innerHTML string-glueing). Styling lives
@@ -436,7 +436,7 @@
         } else if (s.cookie && s.cookie.policyRoute && s.cookie.policyRouteExists) {
             note.textContent = 'Cookie policy detected at ' + s.cookie.policyRoute + ' — the privacy page will link to it.';
         } else {
-            note.textContent = 'No cookie-policy page yet. You may want to generate one in Storage, or mark cookies as not applicable (a later slice).';
+            note.textContent = 'No cookie-policy page yet. You may want to generate one in Storage, or mark cookies as not applicable.';
         }
         return note;
     }

@@ -1,6 +1,6 @@
 <?php
 /**
- * OAuthHandler — Server-side OAuth 2.0 Authorization Code + PKCE flow (beta.9 A1).
+ * OAuthHandler — Server-side OAuth 2.0 Authorization Code + PKCE flow.
  *
  * Drives the two halves of the OAuth login flow:
  *
@@ -19,14 +19,14 @@
  *     spec for the resolver to apply.
  *
  *
- * Architecture decisions (see docs/DESIGN_DECISIONS.md, locked 2026-06-14):
+ * Architecture decisions (see docs/DESIGN_DECISIONS.md):
  *
  *   - **Token custody = BFF** (provider tokens stay server-side; browser
- *     gets a first-party HttpOnly session cookie). Aligns with the beta.10
+ *     gets a first-party HttpOnly session cookie). Aligns with the
  *     XSS threat model; matches IETF "OAuth 2.0 for Browser-Based Apps"
  *     BCP recommendation.
  *   - **Callback + start hooks = route-resolver kinds** (`oauth-callback`,
- *     `oauth-start`). Reuses beta.8's resolver-attachment UX; routes stay
+ *     `oauth-start`). Reuses the resolver-attachment UX; routes stay
  *     user-authored.
  *   - **State + session storage = PHP sessions behind a thin abstraction**
  *     (oauthStateStore.php). Swap-to-file is a one-file change later if
@@ -50,14 +50,6 @@
  *                      'samesite' => 'Lax', 'path' => '/'],
  *     ],
  *   ]
- *
- *
- * Slice status:
- *
- *   - Resolver-kind registration in resolverHelpers (Slice 2b — DONE)
- *   - Start-flow logic (Slice 2c — DONE)
- *   - Callback-flow logic (Slice 2d — DONE)
- *   - Logout + session-helpers (Slice 2e — DONE)
  */
 
 require_once __DIR__ . '/OutboundUrlPolicy.php';
@@ -70,10 +62,9 @@ class OAuthHandler
 {
     /**
      * Default post-auth session lifetime (14 days). Matches the test.oauth
-     * fixture's refresh-token TTL and is a common SaaS-app default. Per
-     * the locked decision, configurable later via per-API auth config
-     * (same knob as resolver cacheTTL precedent); hardcoded constant for
-     * 2d MVP.
+     * fixture's refresh-token TTL and is a common SaaS-app default. A
+     * hardcoded constant, by design (DESIGN_DECISIONS.md "OAuth handleCallback
+     * shape", which names the 14d TTL).
      */
     private const SESSION_TTL_SECONDS = 14 * 86400;
 
@@ -204,8 +195,8 @@ class OAuthHandler
      *      qs_oauth_user, value: sessionId, options: ...]]`.
      *
      * Token custody: provider tokens NEVER reach the browser. They live
-     * in the server-side session record only (BFF pattern locked
-     * 2026-06-14). The browser carries an opaque sessionId in the
+     * in the server-side session record only (the BFF pattern, by
+     * design). The browser carries an opaque sessionId in the
      * qs_oauth_user cookie; the server looks up the user record from
      * there.
      *
@@ -489,7 +480,7 @@ class OAuthHandler
     // ====================================================================
     // Loaders — preset + secret resolution.
     //
-    // Lookup order (Slice 2.5 — "per-project config" locked 2026-06-15):
+    // Lookup order ("per-project config", by design):
     //
     //   1. Project file (secure/projects/<active>/data/oauth-{presets,secrets}.json)
     //      — primary lookup. Each project owns its own credentials and
@@ -706,7 +697,7 @@ class OAuthHandler
         if (preg_match('#^https?://#i', $url)) {
             return $url;
         }
-        // C12: the host is the VALIDATED one, never the raw header.
+        // The host is the VALIDATED one, never the raw header.
         //
         // This builds the OAuth `redirect_uri` (see handleStart), so a poisoned
         // Host used to put an attacker-chosen origin into it. Whether the
@@ -757,8 +748,7 @@ class OAuthHandler
      *      like //evil.com/foo)
      *   3. Must match a registered route in ROUTES (rejects typo'd
      *      and made-up paths; eliminates the "what if a phishing
-     *      route gets injected somehow" surface — locked 2026-06-15
-     *      following Slice 8 verification feedback)
+     *      route gets injected somehow" surface, by design)
      *
      * Anything that fails returns null so the callback handler falls
      * back to '/' (homepage — always valid). Query string + fragment
@@ -847,7 +837,7 @@ class OAuthHandler
      */
     private static function httpRequest(string $method, string $url, ?string $body, array $headers): ?array
     {
-        // SSRF guard (beta.10 C4 / F8): provider token/userinfo/revoke URLs
+        // SSRF guard: provider token/userinfo/revoke URLs
         // come from the provider preset (author/admin config). Validate the
         // back-channel URL — block non-http(s) + loopback/private/metadata,
         // pin the resolved IP. A block is surfaced as a transport failure

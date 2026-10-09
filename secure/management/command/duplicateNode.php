@@ -333,7 +333,7 @@ function __command_duplicateNode(array $params = [], array $urlParams = []): Api
             $structure['children'][] = $clonedChild;
         }
         
-        // SECURITY (F-C13-13): depth-check the RESULT of the duplicate.
+        // SECURITY: depth-check the RESULT of the duplicate.
         if (!qs_structure_depth_ok($structure)) {
             return ApiResponse::create(400, 'validation.invalid_format')
                 ->withMessage('Structure too deeply nested (max 50 levels)')
@@ -414,7 +414,7 @@ function __command_duplicateNode(array $params = [], array $urlParams = []): Api
             ->withMessage("Failed to insert duplicated node: " . ($insertResult['error'] ?? 'Unknown error'));
     }
     
-    // SECURITY (F-C13-13): depth-check the RESULT of the duplicate.
+    // SECURITY: depth-check the RESULT of the duplicate.
     if (!qs_structure_depth_ok($insertResult['structure'])) {
         return ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage("Structure too deeply nested (max 50 levels)")

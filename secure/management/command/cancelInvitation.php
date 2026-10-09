@@ -1,15 +1,15 @@
 <?php
 /**
- * cancelInvitation Command (C8 8.3a)
+ * cancelInvitation Command
  *
  * Withdraws a pending invitation before the invitee answers. Plain removal on
  * both sides — a withdrawn offer leaves NO tombstone in the invitee's cache
- * (R4 principle: it is not a decision against them).
+ * (it is not a decision against them).
  *
  * Rank rule: cancelling an offer is managing that role — the actor must
  * outrank the OFFERED role (canManageRole, in-lock, no inviter carve-out).
  *
- * Direction gate (C8 8.3b): this command withdraws INVITES only. A
+ * Direction gate: this command withdraws INVITES only. A
  * `direction:'request'` entry (join request / proposal) is answered through
  * approveJoinRequest / denyJoinRequest — cancelling one here would be a
  * silent deny that dodges the mandatory refusal note.
@@ -34,7 +34,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
  * @return ApiResponse
  */
 function __command_cancelInvitation(array $params = [], array $urlParams = []): ApiResponse {
-    // C8 containment: marker-only targeting.
+    // Project containment: marker-only targeting.
     if (!defined('PROJECT_NAME') || PROJECT_NAME === '') {
         return ApiResponse::create(400, 'project.required')
             ->withMessage('This command is project-scoped. Target a project with /management/p/<projectId>/cancelInvitation');

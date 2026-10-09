@@ -3,7 +3,7 @@
  * Admin Panel State Endpoint
  *
  * The panel's own per-user state — what the person editing has open, not
- * anything about a project's content. Under the beta.11 rule the command
+ * anything about a project's content. By design the command
  * surface is a CLI for DEVELOPING a project and the panel is a tool that USES
  * it; panel state is therefore not a command and is served here.
  *

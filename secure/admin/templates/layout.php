@@ -39,8 +39,8 @@ $isLoginPage = in_array($router->getPage(), ['login', 'register', 'setup'], true
 $isPreviewPage = $router->getPage() === 'preview';
 $currentPage = $router->getPage();
 
-// C8 (8.W) — client transport wiring. The admin client must (a) know which
-// commands are project-scoped (to prepend the C7 '/management/p/<id>/' marker) and
+// Client transport wiring. The admin client must (a) know which
+// commands are project-scoped (to prepend the '/management/p/<id>/' marker) and
 // (b) know which project it is working with. Both come from the authoritative
 // server source: the scope set from categories.php, and the EDITED project
 // (getCurrentProject = the caller's own selected_project) — the same project the
@@ -119,7 +119,7 @@ $langNames = [
         var stored = localStorage.getItem('quicksite_admin_lang');
         // json_encode, not hand-written quotes: this is a JS string literal, and
         // the value ultimately comes from ?lang=. Its shape is gated now
-        // (AdminTranslation::isValidLanguage, C13 F-C13-23), so nothing can break
+        // (AdminTranslation::isValidLanguage), so nothing can break
         // out — this is the escaping that makes that a belt rather than the only
         // brace, and it is the correct escaper for the context either way.
         var current = <?= json_encode($currentLang) ?>;
@@ -144,9 +144,9 @@ $langNames = [
     <link rel="stylesheet" href="<?= $versionedAsset('/css/preview-ai-tools.css') ?>">
     <!-- Storage key registry — must load before any page script that references QuickSiteStorageKeys -->
     <script src="<?= $versionedAsset('/js/core/storage-keys.js') ?>"></script>
-    <!-- Shared DOM factory (C8 8.3c) — must load before any page script that references QSDom -->
+    <!-- Shared DOM factory — must load before any page script that references QSDom -->
     <script src="<?= $versionedAsset('/js/core/dom.js') ?>"></script>
-    <!-- Reusable searchable combobox (beta.9 A2 Slice 2). Wraps a native <select> — page scripts construct QSSearchableSelect after locating their select element. -->
+    <!-- Reusable searchable combobox. Wraps a native <select> — page scripts construct QSSearchableSelect after locating their select element. -->
     <script src="<?= $versionedAsset('/js/core/searchable-select.js') ?>"></script>
 </head>
 <body class="admin-body<?= $isLoginPage ? ' admin-body--login' : '' ?>" data-page="<?= adminEscape($currentPage) ?>">
@@ -167,7 +167,7 @@ $langNames = [
         
         <?php
             // Determine which nav group should be highlighted
-            // API Endpoints moved Settings → Build (N1): it's an authoring
+            // API Endpoints sit under Build, not Settings: it's an authoring
             // surface used constantly during build (fetch picker, interactions,
             // component-list bindings), not a config setting.
             $buildPages = ['workflows', 'command', 'history', 'preview', 'apis', 'builds'];
@@ -213,7 +213,7 @@ $langNames = [
                         </svg>
                         <span><?= __admin('nav.visualEditor') ?></span>
                     </a>
-                    <?php /* S6.5 — an installation can decline to offer the command console
+                    <?php /* An installation can decline to offer the command console
                              (console.php; absent means it is offered). Gated here on the
                              SERVER so the entry is never emitted: the panel's own
                              data-requires-command filter only ever hides elements it finds,
@@ -230,7 +230,7 @@ $langNames = [
                         <span><?= __admin('nav.commands') ?></span>
                     </a>
                     <?php endif; ?>
-                    <?php /* S6.6 — command history, its own page since it stopped being a
+                    <?php /* Command history — its own page, not a
                              tab on the console. Not gated on the console: the trail is
                              independent of the runner, and stays reachable when the
                              operator turns the console off. data-requires-command hides
@@ -297,7 +297,7 @@ $langNames = [
                 <span><?= __admin('nav.authentication') ?></span>
             </a>
 
-            <!-- Members Group (C8 8.3c) — My Memberships (any authenticated user) + Project Members
+            <!-- Members Group — My Memberships (any authenticated user) + Project Members
                  (any member rank of the EDITED project; link hidden without proposeMember).
                  The group toggle deliberately targets the ALWAYS-accessible memberships page.
                  No data-requires-command on the group: a 0-membership user still has an inbox. -->
@@ -338,7 +338,7 @@ $langNames = [
                 </div>
             </div>
 
-            <!-- Compliance Group - Storage + Privacy (beta.9 — data layer + data sharing) -->
+            <!-- Compliance Group - Storage + Privacy (data layer + data sharing) -->
             <div class="admin-nav__group<?= $isComplianceActive ? ' admin-nav__group--has-active' : '' ?>" data-nav-group="compliance" data-requires-command="listStorageItems">
                 <a href="<?= $router->url('storage') ?>" class="admin-nav__group-toggle" data-requires-command="listStorageItems">
                     <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -382,7 +382,7 @@ $langNames = [
             <!-- Settings Group - Click goes to Project Settings -->
             <!-- No data-requires-command on this group. It used to name getMyPermissions,
                  which was a global any-auth command every signed-in account held, so the
-                 gate never hid anything; that command left the surface in beta.11 S6
+                 gate never hid anything; that command left the surface
                  (reading your own role is an ACCOUNT fact, served by /admin/self), and
                  keeping the attribute would have hidden Settings from everyone. The
                  entries inside carry their own gates where they need one. -->
@@ -457,7 +457,7 @@ $langNames = [
             // "Back to site" opens the project you're EDITING at its own /p/<id>/ view,
             // which resolves that project's default language itself.
             //
-            // C13 — hidden outright when there is no edited project. It used to fall back
+            // Hidden outright when there is no edited project. It used to fall back
             // to the install base on the reasoning that "the web root is free, it belongs
             // to whatever the deployment put there" — but on a default deployment nothing
             // is there, so an account with no membership got Apache's own 403 in a new
@@ -565,11 +565,10 @@ $langNames = [
             apiBase: '<?= $router->getApiUrl() ?>',
             adminBase: '<?= $router->getBaseUrl() ?>',
             baseUrl: '<?= rtrim(BASE_URL, '/') ?>',
-            // C8 8.1 — where the EDITED project's own public/ is served: the site root
-            // when it IS the served main, else its surface-B view '/p/<id>'. Any panel
-            // code that links to PROJECT content (assets, style, uploads) must build on
-            // THIS, not baseUrl — baseUrl always points at the served main, so it shows
-            // the wrong project's files (or a broken image) while editing another one.
+            // Where the EDITED project's own public/ is served: its surface-B view
+            // '/p/<id>'. Any panel code that links to PROJECT content (assets, style,
+            // uploads) must build on THIS, not baseUrl — baseUrl is the install base,
+            // which serves no project's files.
             projectContentBase: '<?= adminEscape($router->getProjectContentBase()) ?>',
             publicSpace: '<?= defined('PUBLIC_FOLDER_SPACE') ? PUBLIC_FOLDER_SPACE : '' ?>',
             // The PER-SESSION TOKEN. Not a credential on its own — it grants
@@ -581,7 +580,7 @@ $langNames = [
             // admin.js fires loadPermissions() at parse time, both BEFORE any
             // later script block runs.
             token: '<?= adminEscape((string)$router->getToken()) ?>',
-            // C8 (8.W) — project transport. currentProject = the EDITED project
+            // Project transport. currentProject = the EDITED project
             // (selected_project), the same one preview + the dashboard use; globalCommands =
             // the categories.php scope==='global' set. The client prepends the
             // '/management/p/<currentProject>/' marker for any command NOT in
@@ -772,7 +771,7 @@ $langNames = [
     <script src="<?= $versionedAsset('/js/core/api.js') ?>"></script>
     <script src="<?= $versionedAsset('/js/core/utils.js') ?>"></script>
     <?php if (!$isLoginPage): ?>
-    <!-- Membership counts + nav badge (C8 8.3c) — async, derived from existing reads -->
+    <!-- Membership counts + nav badge — async, derived from existing reads -->
     <script src="<?= $versionedAsset('/js/core/members-badge.js') ?>"></script>
     <?php endif; ?>
 
@@ -793,10 +792,9 @@ $langNames = [
 
     <script>
     (function () {
-        // C9 — the header project picker switches which project you EDIT. It does NOT
-        // change the main/served project (quicksite stays at the site root). The
-        // dashboard's project switch calls the same thing. Editing the main → the site
-        // root; editing any other project → surface B (/p/<id>/). setSelectedProject
+        // The header project picker switches which project you EDIT; the
+        // dashboard's project switch calls the same thing. Every project is edited
+        // at its own surface B (/p/<id>/). setSelectedProject
         // RESOLVES with a {ok, status, data} object (it does NOT reject on non-2xx) —
         // branch on ok. It is panel state, not a command, so it goes to /admin/state.
         var picker = document.getElementById('admin-project-picker');

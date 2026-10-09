@@ -21,7 +21,7 @@
     const loading = document.getElementById('preview-loading');
     const targetSelect = document.getElementById('preview-target');  // Unified page/component dropdown
 
-    // Beta.9 A2 Slice 4 follow-up: wrap the edit-target select with the
+    // Wrap the edit-target select with the
     // searchable combobox so authors can filter by typing instead of
     // scrolling the layout/pages/components optgroups. Idempotent —
     // QSSearchableSelect has its own double-wrap guard on the native
@@ -59,7 +59,7 @@
     const nodeTextKeyEl = document.getElementById('node-textkey');
     const nodeDeleteBtn = document.getElementById('node-delete');
     
-    // Contextual area elements (Phase 8)
+    // Contextual area elements
     const contextualArea = document.getElementById('preview-contextual-area');
     const contextualToggle = document.getElementById('preview-contextual-toggle');
     const contextualSections = document.querySelectorAll('.preview-contextual-section');
@@ -149,7 +149,7 @@
     const emulationPanelActions = document.getElementById('emulation-panel-actions');
     const emulationApplyBtn = document.getElementById('emulation-apply-btn');
     const emulationResetBtn = document.getElementById('emulation-reset-btn');
-    // Beta.8 A2 Track 2e — live-data toggle button (page emulation only).
+    // Live-data toggle button (page emulation only).
     const emulationLiveBtn  = document.getElementById('emulation-live-btn');
     const ctxNodeEmulation = document.getElementById('ctx-node-emulation');
     
@@ -216,7 +216,7 @@
     const globalInfoNodeComponentRow = document.getElementById('info-node-component-row');
     const globalInfoNodeComponent = document.getElementById('info-node-component');
     
-    // Theme panel elements (Phase 8.3)
+    // Theme panel elements
     const styleTabs = document.getElementById('contextual-style-tabs');
     const styleContent = document.getElementById('contextual-style-content');
     const themePanel = document.getElementById('theme-panel');
@@ -231,7 +231,7 @@
     const themeSaveBtn = document.getElementById('theme-save-btn');
     const selectorsPanel = document.getElementById('selectors-panel');
     
-    // Selector browser elements (Phase 8.4)
+    // Selector browser elements
     const selectorSearchInput = document.getElementById('selector-search-input');
     const selectorSearchClear = document.getElementById('selector-search-clear');
     const selectorCount = document.getElementById('selector-count');
@@ -254,7 +254,7 @@
     const selectorEditBtn = document.getElementById('selector-edit-btn');
     const selectorAnimateBtn = document.getElementById('selector-animate-btn');
     
-    // Style Editor elements (Phase 8.5)
+    // Style Editor elements
     const styleEditor = document.getElementById('style-editor');
     const styleEditorBack = document.getElementById('style-editor-back');
     const styleEditorLabel = document.getElementById('style-editor-label');
@@ -284,11 +284,11 @@
     const animationsList = document.getElementById('animations-list');
     const animatedEmpty = document.getElementById('animated-empty');
 
-    // Source panel elements (Beta.9 A3 — sidebar scaffold + role gate)
+    // Source panel elements (sidebar scaffold + role gate)
     const sourcePanel       = document.getElementById('source-panel');
     const sourceAdvancedRow = document.getElementById('contextual-style-advanced');
     const sourceBtn         = document.getElementById('contextual-style-source-btn');
-    // Source canvas (A3 slice 2 — full-CSS editor host in the main area)
+    // Source canvas (full-CSS editor host in the main area)
     const sourceCanvas      = document.getElementById('preview-source-canvas');
     const previewContainer  = document.getElementById('preview-container');
 
@@ -304,7 +304,7 @@
     const keyframeCancelBtn = document.getElementById('keyframe-cancel');
     const keyframeSaveBtn = document.getElementById('keyframe-save');
     
-    // Component Warning Banner (Phase 2E)
+    // Component Warning Banner
     const componentWarning = document.getElementById('preview-component-warning');
     const componentWarningText = document.getElementById('preview-component-warning-text');
     const deleteComponentBtn = document.getElementById('preview-delete-component');
@@ -314,7 +314,7 @@
     const iframeWarningClose = document.getElementById('preview-iframe-warning-close');
     let iframeWarningDismissed = false;
 
-    // Sidebar Add Form Elements (Phase 8 - Add Mode)
+    // Sidebar Add Form Elements (Add Mode)
     const contextualAddDefault = document.getElementById('contextual-add-default');
     const contextualAddForm = document.getElementById('contextual-add-form');
     const addTypeTabs = document.getElementById('add-type-tabs');
@@ -373,7 +373,7 @@
     const addCustomParamsList = document.getElementById('add-custom-params-list');
     const addAnotherParamBtn = document.getElementById('add-another-param');
     const addTextKeyInfo = document.getElementById('add-textkey-info');
-    // Text-node tab refs (Text-authoring concern, 2026-05-25)
+    // Text-node tab refs
     const addTextField = document.getElementById('add-text-field');
     const addTextValueInput = document.getElementById('add-text-value');
     const addGeneratedTextKeyPreview = document.getElementById('add-generated-textkey-preview');
@@ -393,7 +393,7 @@
     const addTypeField = document.getElementById('add-type-field');
     const addFormTitleText = document.getElementById('add-form-title-text');
     const addConfirmLabel = document.getElementById('add-confirm-label');
-    // Complex Element tab (added in beta.7) — kind picker + wizard body.
+    // Complex Element tab — kind picker + wizard body.
     // The kind dropdown is populated from window.QSComplexWizard.registry,
     // and each kind module owns rendering inside addComplexBody via its
     // own renderWizard(container) factory.
@@ -404,8 +404,8 @@
     
     // Configuration
     const baseUrl = PreviewConfig.baseUrl;
-    // C9/C5b — the base the preview iframe navigates under: site root for the
-    // SERVED project, '/p/<id>' (surface B) for any other edited project.
+    // The base the preview iframe navigates under: the edited project's own
+    // '/p/<id>' view (surface B).
     // (No parse-time authToken capture here: the access token is short-lived
     // and renewed in place — modules read PreviewConfig.authToken at call time.)
     const previewBase = PreviewConfig.previewBase || PreviewConfig.baseUrl;
@@ -894,7 +894,7 @@
     }
     
     /**
-     * QSValueInput - Reusable CSS value input component (Phase 10.3)
+     * QSValueInput - Reusable CSS value input component
      * Creates appropriate input controls based on CSS property type:
      * - range: Slider with value display
      * - length: Number input + unit dropdown
@@ -1470,7 +1470,7 @@
                 url += getCurrentLang() + '/';
             }
             if (editName) {
-                // Beta.8 A2 — param routes (route names containing ':')
+                // Param routes (route names containing ':')
                 // need a concrete URL segment per param OR the public
                 // 404 fires before the resolver / template can run.
                 // Substitute each ':name' with the emulated value if
@@ -1494,12 +1494,12 @@
             }
             // Always add _editor=1 for editor mode
             url += (url.includes('?') ? '&' : '?') + '_editor=1';
-            // Beta.8 A2 — append page-emulation payload from localStorage
+            // Append page-emulation payload from localStorage
             // when present. Encoded as base64(JSON({routeParams, resolved})).
             // Server-side public/index.php decodes + overrides routeParams
             // / resolved before the template renders.
             //
-            // Track 2e — when the panel is in "Use Live Data" mode, add
+            // When the panel is in "Use Live Data" mode, add
             // _live=1 so the real resolver fires server-side. In that
             // case the _emulate payload carries only routeParams (the
             // resolved overrides would defeat the purpose of going live).
@@ -1527,7 +1527,7 @@
     }
 
     /**
-     * Beta.8 A2 — read the editor's saved page-emulation values for a
+     * Read the editor's saved page-emulation values for a
      * route. Storage key is namespaced (qs_emulate_page_*) so it can't
      * collide with the component-emulation pattern (qs_emulate_*).
      *
@@ -1546,7 +1546,7 @@
             return {
                 routeParams: (parsed.routeParams && typeof parsed.routeParams === 'object') ? parsed.routeParams : {},
                 resolved:    (parsed.resolved    && typeof parsed.resolved    === 'object') ? parsed.resolved    : {},
-                // Track 2e — live-data toggle. true → editor preview
+                // Live-data toggle. true → editor preview
                 // fires the real resolver instead of using the resolved
                 // overrides. Default false. Persists per page in
                 // localStorage alongside the rest of the emulation state.
@@ -1558,7 +1558,7 @@
     }
 
     /**
-     * Beta.8 A2 — derive the list of variables that the editor's
+     * Derive the list of variables that the editor's
      * emulation panel should offer fields for, given a route path:
      *   - Route params: extract ':name' segments from the route pattern.
      *   - Resolved vars: read the resolver's `expose` keys from
@@ -2112,14 +2112,14 @@
     
     // ==================== Editor Mode ====================
     
-    // Store preselection data for style mode (Phase 8.2)
+    // Store preselection data for style mode
     let styleModePreselect = null;
     let isSwitchingMode = false; // Debounce flag to prevent rapid mode switching
 
     function setMode(mode, preselect = null) {
         // Debounce rapid mode switches to prevent layout thrashing
         if (isSwitchingMode) return;
-        // Beta.9 A3 slice 4: dirty guard for Source. If leaving style mode
+        // Dirty guard for Source. If leaving style mode
         // while Source is active and has unsaved edits, prompt the user.
         // canLeave() returns false if the user cancels the prompt.
         if (currentMode === 'style' && mode !== 'style'
@@ -2167,11 +2167,11 @@
         // tools in the rail — without round-tripping through select mode.
         sendToIframe('setMode', { mode: mode === 'ai-tools' ? 'select' : mode });
         
-        // Store preselection for style mode (used in Phase 8.4+)
+        // Store preselection for style mode (for the selector browser)
         if (mode === 'style' && preselect) {
             styleModePreselect = preselect;
             console.log('[Preview] Style mode preselection:', preselect);
-            // TODO Phase 8.4: Auto-select the selector in the selector browser
+            // TODO: Auto-select the selector in the selector browser
         } else if (mode !== 'style') {
             styleModePreselect = null;
         }
@@ -2216,7 +2216,7 @@
             }
         }
 
-        // Beta.9 A4 — Translation Manager. enter() is idempotent + lazy;
+        // Translation Manager. enter() is idempotent + lazy;
         // first entry triggers data load, subsequent entries are no-op
         // unless a refresh is requested. leave() keeps the cache.
         if (mode === 'translation' && window.PreviewTranslation) {
@@ -2240,7 +2240,7 @@
         });
     }
     
-    // ==================== Contextual Area (Phase 8) ====================
+    // ==================== Contextual Area ====================
     
     function updateContextualSection(mode) {
         // Hide all sections
@@ -2274,11 +2274,11 @@
             resetTextModeInfo();
         }
         
-        // Phase 8.3: Show/hide style tabs and content when in style mode
+        // Show/hide style tabs and content when in style mode
         if (mode === 'style') {
             if (styleTabs) styleTabs.style.display = '';
             if (styleContent) styleContent.style.display = '';
-            // Beta.9 A3: advanced row (Source button) appears alongside the
+            // Advanced row (Source button) appears alongside the
             // tabs. admin.js filterByPermissions has already hidden it if
             // the role lacks editStyles.
             if (sourceAdvancedRow) sourceAdvancedRow.style.display = '';
@@ -2292,7 +2292,7 @@
             if (styleTabs) styleTabs.style.display = 'none';
             if (styleContent) styleContent.style.display = 'none';
             if (sourceAdvancedRow) sourceAdvancedRow.style.display = 'none';
-            // Beta.9 A3: leaving style mode also resets Source state — next
+            // Leaving style mode also resets Source state — next
             // entry lands on the tab view, not Source. The active tab's
             // panel will be restored by the Source deactivation path.
             if (window.PreviewStyleSource && PreviewStyleSource.isActive()) {
@@ -2633,15 +2633,15 @@
         hideGlobalElementInfo();
     }
     
-    // ==================== Theme Variables (Phase 8.3) ====================
+    // ==================== Theme Variables ====================
     // Theme variable editing is now handled by preview-style-theme.js module
     // See: public/admin/assets/js/pages/preview/preview-style-theme.js
 
-    // ==================== Source Tab (Beta.9 A3) ====================
-    // Slice 1: sidebar scaffold + role gate. The Source button sits in
+    // ==================== Source Tab ====================
+    // Sidebar scaffold + role gate. The Source button sits in
     // the advanced top row above the regular tabs and toggles a Source
-    // panel that hides the three regular tabs. The actual code editor
-    // mounts inside #source-panel in slice 2.
+    // panel that hides the three regular tabs. The code editor itself
+    // mounts in the source canvas (#preview-source-canvas-mount).
 
     function activateSource() {
         if (!sourcePanel || !window.PreviewStyleSource) return;
@@ -2653,10 +2653,8 @@
         if (animationsPanel) animationsPanel.style.display = 'none';
         sourcePanel.style.display = '';
         ensureI18nPanel('source');
-        // Slice 2: swap the main canvas — hide the iframe container,
-        // show the source canvas where the code editor mounts. Slice 5
-        // will revisit this to keep a small live-preview iframe pane
-        // visible alongside the editor.
+        // Swap the main canvas — hide the iframe container,
+        // show the source canvas where the code editor mounts.
         if (previewContainer) previewContainer.style.display = 'none';
         if (sourceCanvas) sourceCanvas.style.display = '';
         PreviewStyleSource.enter();
@@ -2668,7 +2666,7 @@
         PreviewStyleSource.leave();
         if (sourceBtn) sourceBtn.classList.remove('preview-contextual-style-source-btn--active');
         sourcePanel.style.display = 'none';
-        // Slice 2: restore the iframe canvas.
+        // Restore the iframe canvas.
         if (sourceCanvas) sourceCanvas.style.display = 'none';
         if (previewContainer) previewContainer.style.display = '';
         // Restore the tabs row + the previously active tab's panel. Only
@@ -2681,7 +2679,7 @@
         if (selectorsPanel) selectorsPanel.style.display = activeStyleTab === 'selectors' ? '' : 'none';
         if (animationsPanel) animationsPanel.style.display = activeStyleTab === 'animations' ? '' : 'none';
 
-        // A3 slice 6 fix: when the Source button is used to toggle off,
+        // When the Source button is used to toggle off,
         // we don't go through the tab-click handler — so the reload-on-
         // stale check there is skipped. Source's save / cancel may have
         // invalidated the active tab's cache via invalidateStructuredTabs();
@@ -2705,7 +2703,7 @@
         sourceBtn.addEventListener('click', () => {
             if (!window.PreviewStyleSource) return;
             if (PreviewStyleSource.isActive()) {
-                // A3 slice 4: dirty guard — confirm before discarding edits.
+                // Dirty guard — confirm before discarding edits.
                 if (!PreviewStyleSource.canLeave()) return;
                 deactivateSource();
             } else {
@@ -2724,9 +2722,9 @@
         tabs.forEach(tab => {
             tab.addEventListener('click', () => {
                 const tabName = tab.dataset.tab;
-                // Beta.9 A3: clicking a tab while Source is active returns to
+                // Clicking a tab while Source is active returns to
                 // the structured editor surface. Deactivate Source first so
-                // the tab panel becomes visible. Slice 4: prompt if Source
+                // the tab panel becomes visible. Prompt if Source
                 // has unsaved edits — user can cancel and stay.
                 if (window.PreviewStyleSource && PreviewStyleSource.isActive()) {
                     if (!PreviewStyleSource.canLeave()) return;
@@ -2736,7 +2734,7 @@
                 // Merge panel-specific i18n keys (cheap + idempotent).
                 ensureI18nPanel(tabName);
 
-                // Beta.9 A3 slice 6 fix: reload-on-stale check must run
+                // Reload-on-stale check must run
                 // BEFORE the `tabName === activeStyleTab` early return.
                 // After exiting Source, the user is typically clicking
                 // back to the same tab they were on — activeStyleTab is
@@ -2787,7 +2785,7 @@
         // Handled by PreviewStyleMotion module during init
     }
     
-    // ==================== Selector Browser (Phase 8.4) ====================
+    // ==================== Selector Browser ====================
     // Selector browser functionality has been extracted to preview-style-selectors.js
     // See: /admin/assets/js/pages/preview/preview-style-selectors.js
     // Public API: PreviewSelectorBrowser.init(), .load(), .loadData(), .isLoaded()
@@ -2962,7 +2960,7 @@
             if (nodeTextKeyRow) nodeTextKeyRow.style.display = 'none';
         }
         
-        // Phase 8: Update contextual area info
+        // Update contextual area info
         showContextualInfo(data);
 
         // Toggle the Translate-from-CSV button (visible only for tables
@@ -3374,7 +3372,7 @@
             PreviewNavigation.updateButtons();
         }
         
-        // Phase 8: Hide contextual info
+        // Hide contextual info
         hideContextualInfo();
         
         sendToIframe('clearSelection', {});
@@ -3681,7 +3679,6 @@
             // span while siblings stay stale (looks like inconsistent
             // state until the iframe reloads). The rendered page is
             // always correct — this is purely an editor-view sync.
-            // Discovered during beta.7 #11 testing.
             try {
                 const iframeDoc = iframe && (iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document));
                 if (iframeDoc) {
@@ -4274,7 +4271,7 @@
         ctxNodeDuplicate.addEventListener('click', duplicateSelectedNode);
     }
     
-    // ==================== Contextual Area Event Listeners (Phase 8) ====================
+    // ==================== Contextual Area Event Listeners ====================
     
     function initContextualBindings() {
         // Toggle collapse/expand
@@ -4296,8 +4293,8 @@
 
         // Edit Params button — opens the Add Element form in 'edit' mode,
         // pre-populated from the selected node's saved params. Reuses the
-        // Mandatory / Class / Advanced sections (the picker shipped in
-        // late beta.7 auto-attaches to pre-populated custom rows too).
+        // Mandatory / Class / Advanced sections (the data-attr picker
+        // auto-attaches to pre-populated custom rows too).
         if (ctxNodeEditParams) {
             ctxNodeEditParams.addEventListener('click', function() {
                 showSidebarEditParamsForm();
@@ -4421,7 +4418,7 @@
         if (emulationResetBtn) {
             emulationResetBtn.addEventListener('click', resetEmulation);
         }
-        // Beta.8 A2 Track 2e — live-data toggle. Clicking flips the
+        // Live-data toggle. Clicking flips the
         // useLive flag in localStorage and reloads the preview with
         // _live=1 so the real resolver fires server-side instead of the
         // emulated `resolved` overrides being used. Page-edit only —
@@ -4508,7 +4505,7 @@
     initSelectorBrowser();
 
 
-    // ==================== Sidebar Add/Edit Forms (Phase 8 - Mode Refactoring) ====================
+    // ==================== Sidebar Add/Edit Forms ====================
     
     // State for sidebar add form
     let sidebarAddNodeType = 'tag';
@@ -4518,7 +4515,7 @@
     // 'edit', certain sections (type tabs, tag selector, position
     // picker) are hidden, the form is pre-populated from the selected
     // node's saved params, and the Confirm button becomes Save. The
-    // snapshot lets slice 3 compute the addParams/removeParams diff.
+    // snapshot lets Save (editParamsNode) compute the addParams/removeParams diff.
     let contextualAddMode = 'add';            // 'add' | 'edit'
     let contextualAddOriginalParams = null;   // snapshot of params on edit-open
     let contextualAddOriginalTag = null;      // locked tag of the node being edited
@@ -4705,8 +4702,8 @@
      * to its existing widget. Custom rows go through _renderCustomParamRow
      * so the data-attr picker auto-attaches.
      *
-     * Slice 2: pre-populate only. The Confirm button shows a toast
-     * pointing at slice 3 and does NOT call editNode yet.
+     * It only pre-populates; Save (editParamsNode) diffs the widgets against
+     * the snapshot taken here and calls editNode.
      */
     async function showSidebarEditParamsForm() {
         if (!contextualAddForm || !contextualAddDefault) return;
@@ -4733,10 +4730,10 @@
             showToast('Select a child element — the page root is a list and has no editable params on its own', 'warning');
             return;
         }
-        // Component reference + text nodes: no slice-2 support yet.
+        // Component reference + text nodes: no editable params here.
         if (!nodeData.tag) {
             if (nodeData.component) {
-                showToast('Editing component-call params lands in a later slice', 'info');
+                showToast('Editing component-call params is not available yet', 'info');
             } else if (nodeData.textKey !== undefined) {
                 showToast('Text nodes have no editable params', 'info');
             } else {
@@ -4748,7 +4745,7 @@
         const tag = nodeData.tag;
         const params = nodeData.params || {};
 
-        // Snapshot for slice 3's diff calculation + safe Save target.
+        // Snapshot for Save's diff calculation + safe Save target.
         // Selection-on-canvas can shift while the form is open; using a
         // live read of selectedStruct/Node at Save-time would write to
         // the wrong node. Snapshots resolve that race.
@@ -4975,8 +4972,8 @@
     /**
      * "Are we in edit mode with unsaved changes?" — used by Cancel + Back
      * handlers to prompt before discarding. Returns false in Add mode (Add
-     * has never had an unsaved-changes prompt; keeping that behaviour
-     * unchanged so this slice 4 polish doesn't bleed into Add).
+     * has no unsaved-changes prompt, and this one does not extend to
+     * it).
      */
     function _isEditModeDirty() {
         if (contextualAddMode !== 'edit') return false;
@@ -4993,7 +4990,7 @@
      * reselection mid-edit can't cross-write to a different node.
      *
      * Server validations we propagate as toasts:
-     *  - Reserved data-qs-* / admin-namespace storage keys (slice 5b)
+     *  - Reserved data-qs-* / admin-namespace storage keys
      *  - Cannot remove a mandatory param
      *  - Missing mandatory param after the diff applies
      * On any 4xx/5xx the form stays open so the user can correct.
@@ -5126,9 +5123,9 @@
         'source': null  // any category
     };
     
-    // Group A (beta.6): full HTML <input type=…> list. Meta-types
+    // Full HTML <input type=…> list. Meta-types
     // "select" / "textarea" deliberately omitted here — those are
-    // separate tags reachable from the tag picker (Group B work).
+    // separate tags reachable from the tag picker.
     const INPUT_TYPES_GROUP_A = [
         'text', 'email', 'tel', 'url', 'number', 'password', 'search',
         'date', 'time', 'datetime-local', 'month', 'week', 'color',
@@ -5154,7 +5151,7 @@
         addMandatoryParams.style.display = 'block';
         addMandatoryParamsContainer.innerHTML = '';
 
-        // ---- Special case: <input> wizard (Group A) ------------------
+        // ---- Special case: <input> wizard ----------------------------
         // 'type' becomes a <select>, and we always render a 'name' row
         // (required unless type is in the exempt set).
         if (tag === 'input') {
@@ -5198,7 +5195,7 @@
         });
     }
 
-    // ---- Translation-key params (S2.9) -----------------------------
+    // ---- Translation-key params ------------------------------------
     // Optional params whose value is a translation KEY rather than free text:
     // `alt` on img/area, `title` on iframe. The renderer already translates
     // these attributes when the value looks like a key; this is the author's
@@ -5282,7 +5279,7 @@
         return out;
     }
 
-    // ---- Input wizard (Group A, beta.6) ----------------------------
+    // ---- Input wizard ----------------------------------------------
     // Renders the mandatory-params block for tag=<input>:
     //   1) 'type' as a <select> populated with INPUT_TYPES_GROUP_A
     //   2) 'name' as a text field, required unless type is exempt.
@@ -7308,7 +7305,7 @@
             if (err) { showToast(err, 'error'); return; }
         }
 
-        // Optional pre-submit hook (beta.9 A1 Slice 4): lets a wizard
+        // Optional pre-submit hook: lets a wizard
         // perform multi-step setup (route + resolver creation, etc.)
         // BEFORE the final addComplexElement call. Used by oauth-button
         // to call addRoute x2 + setRouteResolver x2 before the button
@@ -7375,7 +7372,7 @@
             if (field.value) params[paramName] = field.value;
         });
 
-        // Input wizard (Group A): client-side validate that 'name' is
+        // Input wizard: client-side validate that 'name' is
         // present unless the chosen type is in the exempt set.
         if (tag === 'input') {
             const typeVal = params.type || '';
@@ -9728,7 +9725,7 @@
      */
     async function showEmulationPanel() {
         // Component-edit path uses the structure-parsing flow below.
-        // Page-edit path (beta.8 A2) takes the dedicated page branch.
+        // Page-edit path takes the dedicated page branch.
         if (!emulationPanel) return;
         if (currentEditType !== 'component' && currentEditType !== 'page'
             && currentEditType !== undefined && currentEditType !== null) {
@@ -9751,7 +9748,7 @@
         if (emulationPanelFields) emulationPanelFields.innerHTML = '';
         if (emulationPanelActions) emulationPanelActions.style.display = 'none';
 
-        // ── Page emulation branch (beta.8 A2 Slice 3 Track 2c) ──
+        // ── Page emulation branch ──
         // Page emulation fields come from two sources: ':name' segments
         // in the route pattern (route params) and the resolver's `expose`
         // keys (resolved vars from PreviewConfig). No server fetch
@@ -9772,7 +9769,7 @@
                 const saved = _getPageEmulationData(currentEditName) || { routeParams: {}, resolved: {}, useLive: false };
                 const hasAnySaved = Object.keys(saved.routeParams).length > 0
                                  || Object.keys(saved.resolved).length > 0;
-                // Track 2d — fetch schema-driven defaults from
+                // Fetch schema-driven defaults from
                 // PreviewConfig (computed server-side from each
                 // endpoint's responseSchema). Used to pre-fill resolved
                 // inputs on FIRST OPEN (no saved emulation yet). After
@@ -9808,7 +9805,7 @@
                         );
                     });
                 }
-                // Track 2e — show the live-data toggle (page-only) and
+                // Show the live-data toggle (page-only) and
                 // sync its visual state to the saved useLive flag. The
                 // button toggles class --active when live mode is on so
                 // the user sees the current state at a glance.
@@ -9991,7 +9988,7 @@
     }
 
     /**
-     * Beta.8 A2 — Create a single emulation field for page-edit mode.
+     * Create a single emulation field for page-edit mode.
      * Mirrors createEmulationField's structural output (same CSS classes
      * for the row + label + input + reset button) so the panel chrome is
      * indistinguishable from the component case, but carries a small
@@ -10048,7 +10045,7 @@
     function applyEmulation() {
         if (!emulationPanelFields) return;
 
-        // Page-edit branch (beta.8 A2). Detect by either the explicit
+        // Page-edit branch. Detect by either the explicit
         // edit type OR the data-page-section marker on the first field.
         const isPageEmulation = (currentEditType === 'page'
             || currentEditType === undefined
@@ -10065,7 +10062,7 @@
                 data[section][varName] = value;
                 hasValues = true;
             });
-            // Track 2e — preserve the live-data flag if it was set. We
+            // Preserve the live-data flag if it was set. We
             // don't toggle it here; Apply just persists the current
             // emulation values + whatever live-mode state is already
             // active. The user clicks "Use Live Data" to change the
@@ -10136,7 +10133,7 @@
             });
         }
 
-        // Track 2e — Reset also clears the live-data flag. The full
+        // Reset also clears the live-data flag. The full
         // "everything wiped" semantics matches the button label "Reset All".
         if (emulationLiveBtn) {
             _syncLiveBtnState(false, false);
@@ -10147,7 +10144,7 @@
     }
 
     /**
-     * Beta.8 A2 Track 2e — toggle live-data mode for the current page.
+     * Toggle live-data mode for the current page.
      * Persists the flag in localStorage alongside the emulation values
      * and rebuilds the preview URL. When live mode is ON the iframe URL
      * gains _live=1; public/index.php sees that and fires the REAL
@@ -10199,7 +10196,7 @@
     }
 
     /**
-     * Beta.8 A2 Track 2e — sync the live-data button's visual state to
+     * Sync the live-data button's visual state to
      * the persisted useLive flag. Adds the --active class when ON so
      * the user sees the current mode at a glance + flips the label.
      * Optional disabled flag for the empty-resolved case (no resolved

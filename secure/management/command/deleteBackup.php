@@ -53,7 +53,7 @@ function __command_deleteBackup(array $params = [], array $urlParams = []): ApiR
             ->withMessage('Backup name is required');
     }
 
-    // C8 8.4 CONTAINMENT (confused-deputy / F6): the target is BOUND to the URL
+    // CONTAINMENT (confused deputy): the target is BOUND to the URL
     // marker (PROJECT_NAME, authorized by the dispatcher — project.data, admin+).
     // A body `name` that disagrees is refused; body is optional. You cannot delete
     // a backup of a project you did not target/authorize.
@@ -64,7 +64,7 @@ function __command_deleteBackup(array $params = [], array $urlParams = []): ApiR
     $projectName = $bound['project'];
 
     // Reject traversal payloads before the backup path is built + deleted
-    // (beta.10 C3 F1-b). The active-project fallback is trusted.
+    // The active-project fallback is trusted.
     if (!is_valid_backup_name((string)$backupName)) {
         return ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage('Invalid backup name')

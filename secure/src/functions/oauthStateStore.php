@@ -1,9 +1,9 @@
 <?php
 /**
- * oauthStateStore.php — Server-side storage for the OAuth flow (beta.9 A1).
+ * oauthStateStore.php — Server-side storage for the OAuth flow.
  *
  * Thin abstraction layer over the chosen storage medium. Current
- * implementation: PHP sessions (decision locked 2026-06-14 — see
+ * implementation: PHP sessions (by design — see
  * docs/DESIGN_DECISIONS.md "OAuth state + session storage"). The
  * interface is intentionally tiny so a future swap to a file-based or
  * encrypted-at-rest backend stays a one-file change.
@@ -20,8 +20,8 @@
  *     Created after a successful callback. Maps an opaque sessionId
  *     (the value in the user's HttpOnly cookie) to the user record +
  *     provider tokens kept server-side. Tokens never reach JavaScript —
- *     this is the BFF (Backend-For-Frontend) custody pattern locked in
- *     Q1 of the OAuth design round.
+ *     this is the BFF (Backend-For-Frontend) custody pattern, by design
+ *     (DESIGN_DECISIONS.md "OAuth token custody").
  *
  *
  * Lazy session_start():
@@ -109,10 +109,10 @@ function _oauthIsHttps(): bool {
  * to rest entirely on each site reading only its own project-namespaced cookie
  * (`qsp_<id>_qs_oauth`): isolation by lookup key, never verified against the
  * record. Stamping the owner into the record and checking it on read gives that
- * boundary a second, explicit check (beta.11 S3.10c, audit F3).
+ * boundary a second, explicit check.
  *
- * Path-scoping the cookie instead was considered and rejected in an earlier
- * design round: a built site lives at `/`, so a path scope would only ever work
+ * Path-scoping the cookie instead was considered and rejected: a built site
+ * lives at `/`, so a path scope would only ever work
  * on the preview surface and would reintroduce a preview/production split.
  */
 function _oauthProjectId(): string {
@@ -232,8 +232,6 @@ function clearOAuthSession(string $sessionId): void {
  * Cheap to call repeatedly within a request — only loads the PHP
  * session once (lazy _oauthEnsureSession). Returns false on missing
  * cookie, missing record, or expired record.
- *
- * Slice 2e (locked 2026-06-15).
  */
 function isOAuthLoggedIn(): bool {
     // Namespaced per project — see qs_project_cookie_name().
@@ -249,7 +247,7 @@ function isOAuthLoggedIn(): bool {
  * Template/PHP-side helper: return the logged-in user's identity
  * fields, or null if no active OAuth session.
  *
- * **Identity-only exposure** — locked design 2026-06-15. The returned
+ * **Identity-only exposure** — by design. The returned
  * array contains ONLY the fields a template legitimately needs to
  * render personalisation (`provider`, `sub`, `email`, `name`). The
  * access_token, refresh_token, token_expires_at, and scope are STRIPPED
@@ -258,8 +256,6 @@ function isOAuthLoggedIn(): bool {
  * need to act on the user's behalf (call a provider API, etc.) request
  * the action via a server-side endpoint that uses the token directly —
  * the token never has to leave the server.
- *
- * Slice 2e (locked 2026-06-15).
  *
  * @return array{provider:string,sub:string,email:?string,name:?string}|null
  */

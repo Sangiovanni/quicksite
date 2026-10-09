@@ -1,5 +1,5 @@
 /**
- * Storage registry admin page — list + add/edit modal + delete (beta.9).
+ * Storage registry admin page — list + add/edit modal + delete.
  *
  * Calls listStorageItems / addStorageItem / editStorageItem /
  * deleteStorageItem via QuickSiteAdmin.apiRequest. The registry is the
@@ -550,7 +550,7 @@
         if (!dialog) return;
 
         var body = QSDom.el('div');
-        body.appendChild(_renderHint('Removes this key from the registry. It does not touch any code that reads or writes the key — the scan slice will flag a now-undeclared key if it is still referenced.'));
+        body.appendChild(_renderHint('Removes this key from the registry. It does not touch any code that reads or writes the key — the storage scan will flag a now-undeclared key if it is still referenced.'));
         var errPanel = QSDom.el('div', { class: 'storage-modal-actions__error' });
         errPanel.hidden = true;
         body.appendChild(errPanel);
@@ -795,7 +795,7 @@
     }
 
     // ====================================================================
-    // Generate consent layer (slice 7)
+    // Generate consent layer
     // ====================================================================
 
     function _declaredNonEssentialCategories() {

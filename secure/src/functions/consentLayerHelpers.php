@@ -1,7 +1,6 @@
 <?php
 /**
- * consentLayerHelpers.php — generate + render the consent banner + popup
- * (beta.9 Phase 2, slice 7).
+ * consentLayerHelpers.php — generate + render the consent banner + popup.
  *
  * The banner/popup are ordinary QuickSite structures (templates/model/json/
  * consent-banner.json + consent-popup.json), seeded from the registry, rendered

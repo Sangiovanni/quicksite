@@ -14,7 +14,7 @@
  *   2. Add a catalog entry here — picker, renderer allowlist, and build
  *      allowlist all pick it up automatically.
  *
- * Before this file existed (pre-beta.7), the catalog was duplicated across
+ * Before this file existed, the catalog was duplicated across
  * three files. Adding a verb required editing three places; missing one
  * caused the verb to be silently dropped at render or build time. See git
  * history for the consolidation.
@@ -43,8 +43,7 @@ if (!defined('SECURE_FOLDER_PATH')) {
  *                multilingual site (the same function as an href)
  *   'resource' = the site's base alone (a fetch's URL in direct-URL mode)
  *
- * category hints (consumed by the admin picker — beta.9 A2 Slice 1,
- * locked 2026-06-17):
+ * category hints (consumed by the admin picker, by design):
  *   'dom-toggle'  = show/hide/class manipulation
  *   'form'        = form-targeted (validate, future submit helpers)
  *   'fetch'       = network calls

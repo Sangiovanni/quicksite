@@ -1,9 +1,9 @@
 /**
- * My Memberships page (C8 8.3c) — the caller's own membership surface.
+ * My Memberships page — the caller's own membership surface.
  *
  * Calls the listProjects command, plus the account endpoint for the inbox, the
  * proposals list and the self-service verbs (accept/decline/leave/withdraw/
- * dismiss/request-to-join). Only the first is a command: since beta.11 S6 the
+ * dismiss/request-to-join). Only the first is a command: the
  * command surface is a CLI for DEVELOPING a project, and getting into or out of
  * one is an operation on your account's access, served by /admin/self. Both
  * doors answer any authenticated caller, so a 0-membership account gets a clean
@@ -37,7 +37,7 @@
         return admin.apiRequest(cmd, method, body);
     }
 
-    // Membership self-service is NOT a command surface (beta.11 S6): joining a
+    // Membership self-service is NOT a command surface: joining a
     // project, leaving one, and answering an invitation are operations on your
     // ACCOUNT's access, so they go to /admin/self. Same {ok, status, data}
     // shape as api(), so every caller below is unchanged apart from the door.
@@ -290,7 +290,7 @@
                         // (nav links, PAGE_PERMISSIONS, the project picker) — a soft
                         // refreshAll() leaves stale tabs that only correct themselves on
                         // the next click. Reload instead; no notifyMembershipChange first
-                        // (its fetches would be cancelled by the reload — 8.3c round 2).
+                        // (its fetches would be cancelled by the reload).
                         window.location.href = window.location.pathname + '?t=' + Date.now();
                     } else {
                         toast(serverMessage(res), 'error');

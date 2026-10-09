@@ -34,7 +34,7 @@
  * with the given id already exists at the target scope (author must
  * use editOAuthProvider to update). 400 on validation errors.
  *
- * Admin-tier only — handles credentials. Beta.9 A1 Slice 8.
+ * Admin-tier only — handles credentials.
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
@@ -54,9 +54,8 @@ function __command_addOAuthProvider(array $params = [], array $urlParams = []): 
     $credentials = isset($params['credentials']) && is_array($params['credentials']) ? $params['credentials'] : null;
 
     // Reject duplicate at target scope. (Cross-scope duplication is
-    // expected — that's the per-project override pattern locked in
-    // Slice 2.5 — but two entries for the same id at the SAME scope
-    // would silently overwrite.)
+    // expected — that's the per-project override, by design — but two
+    // entries for the same id at the SAME scope would silently overwrite.)
     $existing = oauthProviderReadPresetsFile($scope);
     if (isset($existing[$id])) {
         return ApiResponse::create(409, 'oauth.provider.duplicate')

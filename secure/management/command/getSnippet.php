@@ -32,7 +32,7 @@ function expandSnippetForPreview(array $node, string $projectPath): array {
         $componentName = $node['component'];
         $componentData = $node['data'] ?? [];
         
-        // beta.11 S3.10c: stored reference, jailed by the shared resolver.
+        // Stored reference, jailed by the shared resolver.
         $componentPath = qs_resolve_component_path($componentName, $projectPath . '/templates/model/json/components');
         if ($componentPath !== null) {
             $compContent = @file_get_contents($componentPath);
@@ -177,13 +177,13 @@ function structureHasComponent(array $node): bool {
  * @return ApiResponse
  */
 function __command_getSnippet(array $params = [], array $urlParams = []): ApiResponse {
-    // qs_param_string: an ARRAY here reached a string-typed sink as a TypeError (F-C13-11).
+    // qs_param_string: an ARRAY here would reach a string-typed sink as a TypeError.
     $snippetId = qs_param_string($params, 'id');
 
-    // C8 8.5 CONTAINMENT: the project read is BOUND to the URL marker the
+    // CONTAINMENT: the project read is BOUND to the URL marker the
     // dispatcher authorized; a body `project` is an optional echo that must match
-    // (F-C8-8.5-1 — it used to select the target freely, falling back to an
-    // installation-wide default project).
+    // (never a free choice of target, nor a fall back to an installation-wide
+    // default project).
     $bound = qs_bind_marker_project($params, 'getSnippet');
     if ($bound['refusal'] !== null) {
         return $bound['refusal'];

@@ -1,6 +1,6 @@
 <?php
 /**
- * First-run setup token (C14) — the bootstrap credential for creating the very
+ * First-run setup token — the bootstrap credential for creating the very
  * first account on an install whose user registry is empty.
  *
  * THE MODEL. QuickSite ships no default credential, so a fresh install has

@@ -3,7 +3,6 @@
  * Visual Preview Page
  * 
  * Live preview of the website with responsive controls.
- * Phase 1 & 2 of the Visual Editor feature.
  * 
  * Refactored: Split into partial files for maintainability.
  * 
@@ -42,7 +41,7 @@ if ($isMultilingual) {
 }
 // `_t` = a per-page-load cache-buster so the preview iframe always loads FRESH content for
 // the current project — never a stale/bfcached page from a previous project (which would
-// desync the iframe DOM from the editor's marker and mis-target edits). C9.
+// desync the iframe DOM from the editor's marker and mis-target edits).
 $siteUrl .= '?_editor=1&_t=' . time();
 
 // Get available routes for navigation (from the EDITED project)
@@ -124,7 +123,7 @@ if (is_dir($componentsDir)) {
         <!-- ADD MODE Content -->
         <?php include __DIR__ . '/preview/contextual-add.php'; ?>
 
-        <!-- TRANSLATION MODE Content (Beta.9 A4) -->
+        <!-- TRANSLATION MODE Content -->
         <?php include __DIR__ . '/preview/contextual-translation.php'; ?>
 
         <!-- AI TOOLS MODE Content -->

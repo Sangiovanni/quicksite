@@ -1,6 +1,6 @@
 <?php
 /**
- * transferOwnership Command (C8 8.3a)
+ * transferOwnership Command
  *
  * Rotates project ownership to an EXISTING member — transfer is a role
  * rotation, never an implicit add (invite + accept first). The whole rotation
@@ -8,7 +8,7 @@
  * backstop + temp/rename): owner field → new owner, new owner's role →
  * 'owner', old owner → old_owner_role (default 'admin'). There is no
  * read-back-reverse pass — the atomic swap plus the backstop (exactly one
- * owner, owner field ⇔ owner role) IS the integrity guarantee (ruled R3).
+ * owner, owner field ⇔ owner role) IS the integrity guarantee (by design).
  *
  * The target must also still resolve in users.php at transfer time (the
  * cross-file existence check) — ownership never lands on a ghost account.
@@ -37,7 +37,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
  * @return ApiResponse
  */
 function __command_transferOwnership(array $params = [], array $urlParams = []): ApiResponse {
-    // C8 containment: marker-only targeting.
+    // Project containment: marker-only targeting.
     if (!defined('PROJECT_NAME') || PROJECT_NAME === '') {
         return ApiResponse::create(400, 'project.required')
             ->withMessage('This command is project-scoped. Target a project with /management/p/<projectId>/transferOwnership');

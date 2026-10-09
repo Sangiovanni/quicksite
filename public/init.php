@@ -117,7 +117,7 @@ if (!is_dir(SECURE_FOLDER_PATH)) {
 }
 
 // ============================================================================
-// SURFACE B: the /p/<projectId>/ gate  (C9)
+// SURFACE B: the /p/<projectId>/ gate
 // ============================================================================
 // Runs HERE, and only for the /p/ entry point. Here because SECURE_FOLDER_PATH is
 // resolved by now — so surfaceB.php is found whatever the folders were renamed to, and
@@ -329,7 +329,8 @@ if (file_exists($nginxSetupPending) && stripos($serverSoftware, 'nginx') !== fal
 // ============================================================================
 // There is no installation-wide "current project". Nothing here reads a pointer:
 // each entry point calls qs_load_project_context() itself with the project the
-// request actually targets, AFTER validating it (F1) and checking membership.
+// request actually targets, AFTER shape-checking it (is_valid_project_name) and
+// checking membership.
 //
 //   - public/p/index.php           the project peeled from /p/<projectId>/
 //   - public/management/index.php  the projectId peeled from the URL marker
@@ -339,7 +340,7 @@ if (file_exists($nginxSetupPending) && stripos($serverSoftware, 'nginx') !== fal
 // This file only makes the loader reachable from all four.
 require_once SECURE_FOLDER_PATH . '/src/functions/projectContext.php';
 
-// BASE_URL = where this INSTALL (panel + management API) is. C15 15.4 (R6): derived
+// BASE_URL = where this INSTALL (panel + management API) is. Derived
 // through qs_request_origin() — validated Host, optional QS_TRUSTED_HOSTS pin — never
 // the raw attacker-controllable header. The PUBLIC base a rendered project's links
 // compose against is a SEPARATE render-scoped value (renderBootstrap.php).
@@ -360,7 +361,7 @@ if (!defined('BASE_URL')) {
 // path code can also require_once it without double-declare; loading
 // here just makes the helpers reachable from any page template.
 //
-// Beta.9 A1 Slice 2e: isOAuthLoggedIn() / getOAuthUser() — templates
+// isOAuthLoggedIn() / getOAuthUser() — templates
 // use these for "Sign in" vs "Welcome, <name>" conditional renders.
 require_once SECURE_FOLDER_PATH . '/src/functions/oauthStateStore.php';
 

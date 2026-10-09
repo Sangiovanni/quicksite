@@ -13,7 +13,7 @@
  *   </a>
  *
  * Real anchor, full-page navigation — matches the redirect-not-popup
- * OAuth UX locked in Slice 2c/2d. Provider-specific CSS class
+ * OAuth UX, by design. Provider-specific CSS class
  * (`qs-oauth-button--<provider>`) lets designers theme per-provider
  * without re-emitting structure.
  *
@@ -39,8 +39,6 @@
  *                                    site paths starting with '/' (not
  *                                    '//') are honoured. Omit to land on
  *                                    `/` (default in handleStart).
- *
- * Beta.9 A1 Slice 4 (locked 2026-06-15).
  */
 
 require_once __DIR__ . '/../ComplexElementBuilder.php';

@@ -21,7 +21,7 @@ require_once __DIR__ . '/../functions/utilsManagement.php'; // qs_json_write
  *   }
  * }
  *
- * Runtime-agnostic by design: the definition is plain data so beta.8's
+ * Runtime-agnostic by design: the definition is plain data so the
  * server-side data-resolver can read the same shape.
  */
 class StateStoreManager {

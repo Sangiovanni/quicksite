@@ -1,15 +1,15 @@
 <?php
 /**
- * Project-context loader (beta.10 C7).
+ * Project-context loader.
  *
  * Defines the per-request PROJECT_* / CONFIG / ROUTES constants for ONE project.
  * There is no installation-wide "current project": every entry point names the
  * project the request actually targets, and calls this with it.
  *
  *   - Renderer (`public/p/index.php`): the project peeled from `/p/<id>/`.
- *   - Management dispatcher (C7) + admin-api dispatcher: the per-request projectId
+ *   - Management dispatcher + admin-api dispatcher: the per-request projectId
  *     peeled from the URL marker, AFTER it has been validated
- *     (is_valid_project_name — F1) and membership-checked.
+ *     (is_valid_project_name) and membership-checked.
  *   - Admin panel: the caller's own EDITED project (selected_project), non-strict
  *     so an account that is a member of nothing still boots into the empty state.
  *
@@ -19,12 +19,12 @@
  * @param string $projectName  Project folder name under secure/projects/.
  *                             MUST already be validated by the caller when it
  *                             comes from request input (this function only
- *                             builds paths; it does not re-validate — F1 is the
+ *                             builds paths; it does not re-validate — that is the
  *                             dispatcher's job before membership is confirmed).
  * @param bool   $strict       true  → a missing config.php / routes.php is a
  *                                     fatal install error (die with a diagnostic
  *                                     page) — the served-site + project-command
- *                                     behaviour, identical to pre-C7 init.php.
+ *                                     behaviour.
  *                             false → tolerate a missing/blank project: define
  *                                     safe empty CONFIG/ROUTES and return. Used
  *                                     for GLOBAL commands whose UX-default
@@ -38,7 +38,7 @@ function qs_load_project_context(string $projectName, bool $strict = true): void
         define('PROJECT_NAME', $projectName);
     }
 
-    // C15 15.3 — PUBLIC_CONTENT_PATH is bound HERE, with the project, and nowhere else.
+    // PUBLIC_CONTENT_PATH is bound HERE, with the project, and nowhere else.
     // Every project serves from its own public/; no project is privileged, so there is no
     // installation-wide value left to fall back to. Binding it beside PROJECT_PATH is what
     // let the three pre-init "override the base before init.php defines it" dances
@@ -101,10 +101,10 @@ function qs_load_project_context(string $projectName, bool $strict = true): void
 /**
  * The install-error page for a project that cannot be loaded. Never returns.
  *
- * C12 (F9): both call sites used to print the ABSOLUTE path of the missing file
- * plus SECURE_FOLDER_PATH, to whoever asked. This is reachable from the PUBLIC
- * `/p/<id>/` renderer, so an anonymous visitor to a half-deleted project got the
- * server's directory layout. The diagnosis a deployer needs is which FILE is
+ * Never the ABSOLUTE path of the missing file, nor SECURE_FOLDER_PATH: this is
+ * reachable from the PUBLIC `/p/<id>/` renderer, so an anonymous visitor to a
+ * half-deleted project would get the server's directory layout. The diagnosis
+ * a deployer needs is which FILE is
  * missing from which PROJECT — the project id is already in the URL they typed,
  * and the file name is a fixed string — so the page keeps every bit of that and
  * drops only the part that was never actionable. The absolute path goes to the

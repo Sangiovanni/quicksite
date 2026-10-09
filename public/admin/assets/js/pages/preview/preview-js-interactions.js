@@ -15,12 +15,12 @@
     let currentJsContext = null;
     let availableFunctions = [];
     let availableApiEndpoints = [];
-    // Slice 5: project routes (loaded via getRoutes; stored WITHOUT
+    // Project routes (loaded via getRoutes; stored WITHOUT
     // leading "/"). Used by the route inputType picker.
     let availableRoutes = [];
-    let availableStorageItems = [];  // storage registry items — storageKey picker (slice 3)
+    let availableStorageItems = [];  // storage registry items — storageKey picker
     let currentAvailableEvents = [];
-    // Bucketed events from listInteractions (beta.6+):
+    // Bucketed events from listInteractions:
     //   { common: [...], lessCommon: [...], advanced: [...] }
     // Falls back to a single 'common' bucket built from currentAvailableEvents
     // if the API didn't ship the grouped shape.
@@ -48,7 +48,7 @@
     let jsFormFunction = null;
     let jsFormFunctionShowAll = null;
     let jsFormFunctionDetails = null;
-    // Beta.9 A2 Slice 2 — searchable combobox wrappers around the two
+    // Searchable combobox wrappers around the two
     // native function <select>s. The native selects stay in the DOM
     // (hidden) as data stores; the wrappers render the trigger button +
     // dropdown with inline search. Refresh() called after every
@@ -77,7 +77,7 @@
     let jsFormToastErrorPicker = null;
     let jsFormActionsList = null;
     let jsFormActionsAdd = null;
-    // Auth helper hint (AUTH_FLOWS Tier 1) — shown when endpoint
+    // Auth helper hint (Tier 1) — shown when endpoint
     // responseSchema declares a token-shaped field.
     let jsFormAuthHint = null;
     // Post-fetch action state — one entry per row.
@@ -138,7 +138,7 @@
     let ssFormPreview = null;
     let ssFormSave = null;
     let ssFormCancel = null;
-    // Import-from-another-page picker (BETA7_STORE_WIZARD_POLISH item 3):
+    // Import-from-another-page picker:
     // duplicate (not link) an existing store from a different route.
     let ssImportBtn = null;
     let ssImportPicker = null;
@@ -176,7 +176,7 @@
         jsFormFunctionShowAll = document.getElementById('js-form-function-show-all');
         jsFormFunctionDetails = document.getElementById('js-form-function-details');
 
-        // Slice 2: wrap the function select with the searchable combobox.
+        // Wrap the function select with the searchable combobox.
         // Idempotent — load-guard on the class itself prevents double-wrap.
         if (jsFormFunction && window.QSSearchableSelect && !jsFnPicker) {
             try {
@@ -232,7 +232,7 @@
         peFormFunction = document.getElementById('js-page-event-function');
         peFormFunctionShowAll = document.getElementById('js-page-event-function-show-all');
 
-        // Slice 2: wrap the page-event function select with the
+        // Wrap the page-event function select with the
         // searchable combobox (same pattern as jsFnPicker).
         if (peFormFunction && window.QSSearchableSelect && !peFnPicker) {
             try {
@@ -330,7 +330,7 @@
         // Body input change
         if (jsFormApiBody) {
             jsFormApiBody.addEventListener('input', updatePreview);
-            // Slice 6 item 6 — selector autocomplete on the body source
+            // Selector autocomplete on the body source
             // input. Suggests `#id` and `.class` selectors from the page's
             // form-like elements so the author doesn't have to remember
             // exact ids. Re-populated each time the user opens the fetch
@@ -376,7 +376,7 @@
         }
         
         // Event dropdown change — also re-filters the function dropdown
-        // (V12: each verb's qsVerbCatalog `events` field is the gate).
+        // (each verb's qsVerbCatalog `events` field is the gate).
         if (jsFormEvent) {
             jsFormEvent.addEventListener('change', function() {
                 populateFunctionDropdown();
@@ -608,7 +608,7 @@
         }
         
         try {
-            // managementUrl carries BOTH the URL space and the C7 /p/<projectId>/ marker
+            // managementUrl carries BOTH the URL space and the /p/<projectId>/ marker
             // (preview-config.php bakes them in), which a root-absolute path has neither of:
             // listInteractions is project-scoped, so without the marker the dispatcher
             // refuses it outright, and under a URL space the path does not exist at all.
@@ -836,7 +836,7 @@
         }
         populateFunctionDropdown();
 
-        // Slice 4: ensure the API endpoint catalogue is loaded BEFORE we
+        // Ensure the API endpoint catalogue is loaded BEFORE we
         // dispatch the function-change event below — the apiEndpoint/api
         // inputType pickers (refresh, exchangeMagicLink, requestMagicLink,
         // logoutServer) render their options synchronously from
@@ -846,7 +846,7 @@
             await fetchApiEndpoints();
         }
 
-        // Slice 5: same eagerness for project routes — the route picker
+        // Same eagerness for project routes — the route picker
         // (redirect, exchangeMagicLink.returnTo, requestMagicLink.returnTo)
         // populates options synchronously from availableRoutes during
         // _createArgRow.
@@ -982,7 +982,7 @@
                 const params = interaction.params || [];
                 paramInputs.forEach((input, i) => {
                     if (params[i] !== undefined) {
-                        // Slice 5: route picker — delegate to setValue so
+                        // Route picker — delegate to setValue so
                         // an external URL auto-swaps the row to custom mode
                         // (and an unknown internal route gets the legacy
                         // option injection inside the picker).
@@ -993,7 +993,7 @@
                                 return;
                             }
                         }
-                        // Slice 6: translationKey picker — hidden input is
+                        // translationKey picker — hidden input is
                         // the form-input target; the wrapper carries the
                         // _qsTranslationKeyPicker handle. Delegate so an
                         // unknown / free-text saved value auto-swaps to
@@ -1030,7 +1030,7 @@
                         // <select> listeners (including QSSearchableSelect's
                         // trigger-label sync) bind to 'change', not 'input';
                         // the browser only fires 'change' on programmatic
-                        // value-set if we dispatch it ourselves. Slice 4.
+                        // value-set if we dispatch it ourselves.
                         input.dispatchEvent(new Event(input.tagName === 'SELECT' ? 'change' : 'input'));
                     }
                 });
@@ -1079,7 +1079,7 @@
         await fetchApiEndpoints();
         populateApiDropdown();
 
-        // Slice 5: routes are rarely edited mid-session so a cache check
+        // Routes are rarely edited mid-session so a cache check
         // suffices (vs. apiEndpoints' always-refetch). Lazy enough that
         // first-open after a route add via /admin/sitemap may show stale
         // options until the editor reloads — acceptable trade.
@@ -1397,7 +1397,7 @@
     }
 
     // -----------------------------------------------------------------
-    // Auth helper hint (AUTH_FLOWS Tier 1)
+    // Auth helper hint (Tier 1)
     // -----------------------------------------------------------------
     // When the endpoint's responseSchema declares a token-shaped field,
     // surface a one-click "+ Add saveToken" button that drops a pre-
@@ -1907,7 +1907,7 @@
             // State-store arg: a dropdown of the current page's stores.
             row.appendChild(_renderStoreArgSelect(arg, paramIndex, updateFn));
         } else if (inputType === 'apiEndpoint' || inputType === 'api') {
-            // Slice 4: registry-backed picker for auth verbs.
+            // Registry-backed picker for auth verbs.
             // apiEndpoint = @api/ep cascade (exchangeMagicLink, requestMagicLink,
             // logoutServer); api = @api alone (refresh.apiRef).
             var apiSel = inputType === 'apiEndpoint'
@@ -1916,26 +1916,25 @@
             row.appendChild(apiSel);
             _mountApiPickerWrap(apiSel, inputType);
         } else if (inputType === 'route') {
-            // Slice 5: route picker. Strict QSSearchableSelect by default;
+            // Route picker. Strict QSSearchableSelect by default;
             // when arg.allowExternal is true (redirect.url), a 'Custom URL…'
             // sentinel swaps the row to a free-text input + back button.
             var routeWrap = _renderRouteArgRow(arg, paramIndex, updateFn);
             row.appendChild(routeWrap);
             routeWrap._qsRoutePicker.mount();
         } else if (inputType === 'routeParam') {
-            // Slice 5 follow-up: :param picker for verbs that read QS.routeParams.
+            // :param picker for verbs that read QS.routeParams.
             // Options come from currentPageName's __X-sanitised segments.
             var rpSel = _renderRouteParamArgSelect(arg, paramIndex, updateFn);
             row.appendChild(rpSel);
             _mountRouteParamPickerWrap(rpSel);
         } else if (inputType === 'enum') {
-            // Slice 6 — fixed-option select. Catalog declares 'options: [...]';
-            // saveToken.storage / clearToken.storage carried this metadata
-            // pre-Slice-6 but no JS handler existed (rendered as plain text).
-            // scrollTo.behavior + toast.type added in Slice 6.
+            // Fixed-option select. Catalog declares 'options: [...]'
+            // (saveToken.storage / clearToken.storage, scrollTo.behavior,
+            // toast.type); without this branch they render as plain text.
             row.appendChild(_renderEnumArgSelect(arg, paramIndex, updateFn));
         } else if (inputType === 'translationKey') {
-            // Slice 6 — translation-key picker. Reuses QSComplexWizard.createTextKeyPicker.
+            // Translation-key picker. Reuses QSComplexWizard.createTextKeyPicker.
             // When arg.allowFreeText is true (toast.message), a 'Custom text…'
             // sentinel swaps the row to a free-text input + back button.
             var tkWrap = _renderTranslationKeyArgRow(arg, paramIndex, updateFn);
@@ -2010,7 +2009,7 @@
     }
 
     /**
-     * Beta.9 A2 Slice 4: populate the apiEndpoint-inputType <select> with
+     * Populate the apiEndpoint-inputType <select> with
      * one option per registered endpoint. Option value is the @api/ep ref
      * that gets persisted; textContent stays compact so the trigger label
      * (set from textContent by QSSearchableSelect) fits the form column.
@@ -2047,7 +2046,7 @@
     }
 
     /**
-     * Slice 4: populate the api-inputType <select> with one option per
+     * Populate the api-inputType <select> with one option per
      * UNIQUE API (deduplicated from availableApiEndpoints). Only refresh
      * uses this today — apiRef takes @apiId alone, no endpoint segment.
      * The endpoint count + sample names land in data-description so
@@ -2087,7 +2086,7 @@
     }
 
     /**
-     * Slice 4: wrap an apiEndpoint/api <select> with QSSearchableSelect.
+     * Wrap an apiEndpoint/api <select> with QSSearchableSelect.
      * Called from _createArgRow AFTER the select is in the DOM (the
      * wrapper's constructor inserts its trigger via parentNode.insertBefore
      * — needs the select mounted first).
@@ -2128,7 +2127,7 @@
     }
 
     /**
-     * Slice 5: detect whether a saved value is "not a registered route" —
+     * Detect whether a saved value is "not a registered route" —
      * either a true external URL (http/https/protocol-relative/mailto/etc.)
      * or something that doesn't start with '/'. Used by the route picker's
      * setValue to decide whether to swap to custom-URL mode on edit pre-fill.
@@ -2142,7 +2141,7 @@
     }
 
     /**
-     * Slice 5: populate the route-inputType <select>. Layout:
+     * Populate the route-inputType <select>. Layout:
      *   - placeholder ('— Select a route —')
      *   - '__custom__' sentinel (only when allowExternal)
      *   - '/' home shortcut
@@ -2185,7 +2184,7 @@
     }
 
     /**
-     * Slice 5: build a route-picker row — a hybrid combobox that's a
+     * Build a route-picker row — a hybrid combobox that's a
      * strict QSSearchableSelect by default, with an opt-in "Custom URL…"
      * sentinel (when arg.allowExternal === true) that swaps the row to a
      * free-text input + back-to-picker button.
@@ -2337,7 +2336,7 @@
     }
 
     /**
-     * Slice 5 follow-up — routeParam inputType.
+     * routeParam inputType.
      *
      * Reads the current page's route from currentPageName (a slash-separated
      * slug like "auth/magic/:key") and extracts every ":name" segment as a
@@ -2425,16 +2424,15 @@
     }
 
     /**
-     * Slice 6 — render an enum-typed arg as a native <select> populated from
+     * Render an enum-typed arg as a native <select> populated from
      * arg.options. Default to arg.default if present, else the placeholder.
      * No QSSearchableSelect wrap — enums are small fixed lists where search
      * adds nothing (3-4 items). Mirrors the 'store' picker shape.
      *
      * Today's users: scrollTo.behavior (smooth/instant/auto),
      * toast.type (info/success/error/warning), saveToken.storage +
-     * clearToken.storage (localStorage/sessionStorage — these carried the
-     * 'enum' inputType metadata pre-Slice-6 but no JS handler existed;
-     * Slice 6 is the first time their pickers actually render as a select).
+     * clearToken.storage (localStorage/sessionStorage). Without this
+     * handler an 'enum' arg renders as plain text.
      */
     function _renderEnumArgSelect(arg, paramIndex, updateFn) {
         var sel = document.createElement('select');
@@ -2471,11 +2469,11 @@
     }
 
     /**
-     * Slice 6 — translation-key picker for verb args that name a key in
+     * Translation-key picker for verb args that name a key in
      * the project's translation file. Today's lone user: toast.message
      * (with allowFreeText: true for back-compat with raw-string toasts).
      *
-     * The hybrid shape mirrors the route picker (Slice 5):
+     * The hybrid shape mirrors the route picker:
      * - Default mode shows QSComplexWizard.createTextKeyPicker (the same
      *   primitive the complex-wizard variables panel uses), which
      *   includes the "Create new key" inline form for adding missing
@@ -2623,7 +2621,7 @@
     }
 
     /**
-     * Slice 6 item 6 — attach a <datalist> of page selectors to an
+     * Attach a <datalist> of page selectors to an
      * existing <input>, idempotently. Caller passes the input element and
      * the desired datalist id. We replace the datalist's options on every
      * mount + on every input focus, so newly-authored form ids surface
@@ -2854,7 +2852,7 @@
     }
 
     /**
-     * Slice 5: fetch project routes for the `route` inputType picker.
+     * Fetch project routes for the `route` inputType picker.
      * getRoutes returns flat_routes as dot/slash paths WITHOUT leading
      * "/" (e.g. ["test/complex-element", "documentation/commands"]).
      * We cache them as-stored — the picker prepends "/" at render time
@@ -2884,7 +2882,7 @@
         }
     }
 
-    // ==================== Storage registry (slice 3 storageKey picker) ====================
+    // ==================== Storage registry (storageKey picker) ====================
 
     /**
      * Lazy-load the project storage registry into availableStorageItems.
@@ -3317,7 +3315,7 @@
     /**
      * Build the bucketed shape from a flat list when the API only returned
      * the legacy availableEvents field. Lets the picker keep working against
-     * a pre-beta.6 backend (or a stale cache).
+     * a backend that predates the buckets (or a stale cache).
      */
     function bucketsFromFlat(flat) {
         return { common: Array.isArray(flat) ? flat.slice() : [], lessCommon: [], advanced: [] };
@@ -3362,7 +3360,7 @@
      * Hide verbs that aren't meant for the chosen event. Each verb in
      * qsVerbCatalog declares `events: ['onclick', ...]`; without this
      * filter the picker shipped `onScrollFetchState` for `onclick` — a
-     * setup verb hooked to the wrong event was the beta.7 silent break.
+     * setup verb hooked to the wrong event breaks silently.
      * Show-all overrides for the rare cases where the catalog hasn't
      * been updated to declare a verb for an unusual event.
      */
@@ -3395,7 +3393,7 @@
         }
         _populateVerbSelect(jsFormFunction, fnsToShow, placeholderText);
 
-        // Slice 2 combobox: sync the wrapper now that the native select
+        // Combobox: sync the wrapper now that the native select
         // has been rebuilt. No-op if the wrapper isn't mounted yet.
         if (jsFnPicker) jsFnPicker.refresh();
     }
@@ -3548,7 +3546,7 @@
             typingInput.autocomplete = 'off';
             typingInput.placeholder = PreviewConfig.i18n?.matchTargetHint || 'textContent, .child-class, or data-attr';
         } else if (inputType === 'selector') {
-            // Selector vs class hint (V12 sibling fix): the two look alike
+            // Selector vs class hint: the two look alike
             // in a chain (`QS.hide('.foo', 'foo')`) but the picker treats
             // them differently — selectors keep their `.`/`#`/`[` prefix
             // (handed to querySelector); class names lose it (handed to
@@ -4044,12 +4042,12 @@
     }
 
     /**
-     * Slice 5 follow-up — required-arg validation + positional serializer.
+     * Required-arg validation + positional serializer.
      *
-     * Before this slice, handleSave / handlePageEventSave collected params
-     * via `if (input.value.trim()) params.push(...)` which compacts empty
+     * Collecting params in handleSave / handlePageEventSave via
+     * `if (input.value.trim()) params.push(...)` would compact empty
      * slots. For a verb like exchangeMagicLink(endpoint, paramName, returnTo?)
-     * where only returnTo got filled, this produced
+     * where only returnTo is filled, that produces
      *   {{call:exchangeMagicLink:/dashboard}}
      * with "/dashboard" mis-bound to the `endpoint` arg.
      *
@@ -4214,7 +4212,7 @@
                 return;
             }
 
-            // Slice 5 follow-up: per-verb required-arg validation BEFORE
+            // Per-verb required-arg validation BEFORE
             // collecting positional params. Renders inline error chips on
             // offending fields + toasts a summary. See the helper docstring
             // above for the bug this fixes (compacted-empty serializer
@@ -4583,7 +4581,7 @@
                 var savedParams = entry.params || [];
                 paramInputs.forEach(function (input, idx) {
                     if (savedParams[idx] === undefined) return;
-                    // Slice 5: route picker — delegate to setValue (same
+                    // Route picker — delegate to setValue (same
                     // logic as editInteraction).
                     if (input.tagName === 'SELECT' && input.dataset.inputType === 'route') {
                         var rp = input.parentElement && input.parentElement._qsRoutePicker;
@@ -4592,7 +4590,7 @@
                             return;
                         }
                     }
-                    // Slice 6: translationKey picker — same delegation.
+                    // translationKey picker — same delegation.
                     if (input.type === 'hidden' && input.dataset.inputType === 'translationKey') {
                         var tkp = input.parentElement && input.parentElement._qsTranslationKeyPicker;
                         if (tkp) {
@@ -4617,7 +4615,7 @@
                     input.value = savedParams[idx];
                     // <select> listeners (incl. QSSearchableSelect trigger
                     // label) bind to 'change'; dispatch it explicitly so
-                    // pre-fill updates the wrapped trigger label. Slice 4.
+                    // pre-fill updates the wrapped trigger label.
                     input.dispatchEvent(new Event(input.tagName === 'SELECT' ? 'change' : 'input'));
                 });
                 updatePageEventPreview();
@@ -4835,7 +4833,7 @@
                 if (showToastFn) showToastFn('Select a function', 'error');
                 return;
             }
-            // Slice 5 follow-up: same required-arg validation as handleSave.
+            // Same required-arg validation as handleSave.
             var peParamInputs = peFormParams?.querySelectorAll('.preview-contextual-js-form-input') || [];
             var peValidation = _validateRequiredArgs(fnName, peParamInputs);
             if (!peValidation.ok) {
@@ -4921,8 +4919,8 @@
     
     // ==================== State Stores ====================
 
-    // Direction options for a store field (glyphs match the §8 UX sketch;
-    // the words are translatable via PreviewConfig.i18n).
+    // Direction options for a store field (the glyphs are fixed; the
+    // words are translatable via PreviewConfig.i18n).
     var SS_DIRECTIONS = [
         { value: 'request',  label: '→ ' + (PreviewConfig.i18n?.stateStoreDirRequest  || 'request (sent)') },
         { value: 'response', label: '← ' + (PreviewConfig.i18n?.stateStoreDirResponse || 'response (received)') },
@@ -5104,7 +5102,6 @@
             // will refetch and see the just-written change. Otherwise
             // the user has to hard-refresh the editor to see a new /
             // imported / deleted store in the picker dropdown.
-            // (Late beta.7 polish, 2026-06-03.)
             if (window.QSComplexWizard && window.QSComplexWizard.invalidateDataAttrStoresCache) {
                 window.QSComplexWizard.invalidateDataAttrStoresCache();
             }
@@ -5518,9 +5515,9 @@
     // ==================== Import store from another page ====================
     // The Import picker is a thin alternative to the New-store wizard: it
     // *duplicates* an existing store from another route into this page
-    // (independent copy — future edits don't propagate). The "live-shared
-    // cross-page store" variant is bigger (runtime emit + sidecar schema +
-    // lifecycle questions) and stays out of beta.7. The picker uses the
+    // (independent copy — future edits don't propagate). A "live-shared
+    // cross-page store" variant would be bigger (runtime emit + sidecar schema +
+    // lifecycle questions) and does not exist. The picker uses the
     // existing setStateStores command (read-modify-write); zero backend
     // changes.
 
@@ -5709,7 +5706,6 @@
             // will refetch and see the just-written change. Otherwise
             // the user has to hard-refresh the editor to see a new /
             // imported / deleted store in the picker dropdown.
-            // (Late beta.7 polish, 2026-06-03.)
             if (window.QSComplexWizard && window.QSComplexWizard.invalidateDataAttrStoresCache) {
                 window.QSComplexWizard.invalidateDataAttrStoresCache();
             }
@@ -5786,7 +5782,6 @@
             // will refetch and see the just-written change. Otherwise
             // the user has to hard-refresh the editor to see a new /
             // imported / deleted store in the picker dropdown.
-            // (Late beta.7 polish, 2026-06-03.)
             if (window.QSComplexWizard && window.QSComplexWizard.invalidateDataAttrStoresCache) {
                 window.QSComplexWizard.invalidateDataAttrStoresCache();
             }
@@ -7106,7 +7101,7 @@
         placeholderOpt.textContent = placeholderText;
         selectEl.appendChild(placeholderOpt);
 
-        // Beta.9 A2 Slice 1: category-based grouping (mirrors the same
+        // Category-based grouping (mirrors the same
         // change in populateFunctionDropdown — kept in sync). category is
         // OPTIONAL; missing falls into "Uncategorized" (defensive
         // bucket); 'general' is the intentional cross-cutting bucket.
@@ -7157,7 +7152,7 @@
             selectEl.appendChild(optgroup);
         });
 
-        // Slice 2 combobox: sync whichever picker wraps this selectEl.
+        // Combobox: sync whichever picker wraps this selectEl.
         // Today only peFnPicker wraps a select handled by this routine;
         // future callers can register more pickers via the same shape.
         if (peFnPicker && selectEl === peFormFunction) peFnPicker.refresh();

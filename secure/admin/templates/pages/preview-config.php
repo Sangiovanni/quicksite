@@ -6,17 +6,17 @@
  * This file is included by preview.php to separate config from template
  */
 
-// Beta.8 A2 — route resolvers sidecar exposed to PreviewConfig so the
+// Route resolvers sidecar exposed to PreviewConfig so the
 // editor knows which routes have a resolver (and what variables they
 // expose) when building the emulation panel. Small payload — only
 // routes WITH a resolver are present.
-// C9/C5b — read from the EDITED project ($editProjectPath, computed by
-// preview.php which includes this file), not the served one PROJECT_PATH
-// is bound to. Defensive fallbacks in case of a different inclusion context.
+// Read from the EDITED project ($editProjectPath, computed by preview.php
+// which includes this file). Defensive fallbacks in case of a different
+// inclusion context.
 require_once SECURE_FOLDER_PATH . '/src/functions/resolverHelpers.php';
 $__previewRouteResolvers = loadResolversSidecar($editProjectPath ?? null);
 
-// S2.9 — tag classification comes from TagRegistry, the single source of
+// Tag classification comes from TagRegistry, the single source of
 // truth. preview.js used to carry a hand-written copy that had drifted from
 // the server (it offered blocked tags and demanded params the server never
 // required). Adding a tag or a param is now one edit, in TagRegistry.
@@ -96,7 +96,7 @@ try {
     error_log('[PreviewAiTools] Failed to load workflow list: ' . $__aiToolsErr->getMessage());
 }
 
-// Beta.8 A2 Track 2d — per-route schema-driven default values for the
+// Per-route schema-driven default values for the
 // emulation panel. For each resolver-bound route, walk the endpoint's
 // responseSchema (if defined in /admin/apis) and generate sample values
 // per `expose` mapping. The editor uses these to pre-fill the panel
@@ -112,15 +112,14 @@ if (!empty($__previewRouteResolvers)) {
     }
 }
 
-// C8 (8.W) — the project this panel works with (getCurrentProject = the caller's own
+// The project this panel works with (getCurrentProject = the caller's own
 // selected_project, same as the editor marker + the preview iframe, so edit and preview
 // never diverge). The visual-editor STYLE panels (preview-style-*/transition) hand-build
-// fetch(managementUrl + cmd) for project-scoped commands, so the C7 '/management/p/<id>/'
+// fetch(managementUrl + cmd) for project-scoped commands, so the '/management/p/<id>/'
 // marker is baked into managementUrl here (every command reached this way is
 // project-scoped). No edited project → no marker, so those calls fall back to
 // '/management/' and the dispatcher refuses them as project-scoped, which is correct:
-// a caller with no project has nothing to edit. (Cleanup chip tracks routing those calls
-// through QuickSiteAdmin.apiRequest.)
+// a caller with no project has nothing to edit.
 $__previewProject  = $router->getCurrentProject();
 $__previewMgmtBase = $router->projectManagementBase($__previewProject);
 ?>
@@ -129,7 +128,7 @@ $__previewMgmtBase = $router->projectManagementBase($__previewProject);
 window.PreviewConfig = {
     // URLs and settings
     baseUrl: <?= json_encode(rtrim(BASE_URL, '/')) ?>,
-    // C9/C5b — the base the preview IFRAME navigates under: the edited project's own
+    // The base the preview IFRAME navigates under: the edited project's own
     // '/p/<id>' view. buildUrl() must use THIS (not baseUrl) or picking a page in the
     // toolbar silently navigates the iframe out of the project being edited.
     previewBase: <?= json_encode($router->projectSiteBase($__previewProject)) ?>,
@@ -142,12 +141,12 @@ window.PreviewConfig = {
     // preview.js reads this as TAG_INFO and keeps NO list of its own.
     tagInfo: <?= qs_inline_script_json(TagRegistry::editorPayload()) ?>,
 
-    // Beta.8 A2 — per-route resolver sidecar (only routes with a resolver).
+    // Per-route resolver sidecar (only routes with a resolver).
     // Used by the editor's emulation panel to know which variables exist
     // per page (resolver.expose keys → editable inputs).
     routeResolvers: <?= json_encode($__previewRouteResolvers ?: new stdClass()) ?>,
 
-    // Beta.8 A2 Track 2d — schema-driven sample defaults for resolver
+    // Schema-driven sample defaults for resolver
     // variables. Used by the emulation panel to pre-fill first-time
     // inputs with realistic placeholders derived from the endpoint's
     // responseSchema. Empty per-route map when the endpoint has no
@@ -349,7 +348,7 @@ window.PreviewConfig = {
         selectEventAndFunction: <?= json_encode(__admin('preview.selectEventAndFunction', 'Please select an event and function')) ?>,
         selectEventApiEndpoint: <?= json_encode(__admin('preview.selectEventApiEndpoint', 'Please select an event, API, and endpoint')) ?>,
         selectFunction: <?= json_encode(__admin('preview.selectFunction', 'Select function')) ?>,
-        // ── Beta.6: bucketed events picker + function details + input wizard ──
+        // ── Bucketed events picker + function details + input wizard ──
         eventsCommonFor: <?= json_encode(__admin('preview.eventsCommonFor', 'Common for')) ?>,
         eventsLessCommon: <?= json_encode(__admin('preview.eventsLessCommon', 'Less common')) ?>,
         eventsAdvanced: <?= json_encode(__admin('preview.eventsAdvanced', 'Advanced')) ?>,
@@ -481,7 +480,7 @@ window.PreviewConfig = {
             variableCollisionHint: <?= json_encode(__admin('preview.variableCollisionHint', 'These variables exist in both parent and child:')) ?>,
             variableDuplicate: <?= json_encode(__admin('preview.variableDuplicate', 'Duplicate variable!')) ?>,
             variableDuplicateHint: <?= json_encode(__admin('preview.variableDuplicateHint', 'already exists in this component.')) ?>,
-            // A3 slice 6 — Theme quick-add
+            // Theme quick-add
             themeAddVariable: <?= json_encode(__admin('preview.themeAddVariable', 'Add variable')) ?>,
             themeAddVariableNameLabel: <?= json_encode(__admin('preview.themeAddVariableNameLabel', 'Name')) ?>,
             themeAddVariableValueLabel: <?= json_encode(__admin('preview.themeAddVariableValueLabel', 'Value')) ?>,
@@ -549,7 +548,7 @@ window.PreviewConfig = {
             saveKeyframeFailed: <?= json_encode(__admin('preview.saveKeyframeFailed', 'Failed to save keyframe')) ?>,
             states: <?= json_encode(__admin('preview.states', 'States')) ?>,
             toggleStates: <?= json_encode(__admin('preview.toggleStates', 'Toggle States')) ?>,
-            // Motion Slice 2 — apply-keyframe-to-selector
+            // Apply-keyframe-to-selector
             applyKeyframeToSelector: <?= json_encode(__admin('preview.applyKeyframeToSelector', 'Apply to selector…')) ?>,
             applyKeyframeTitle: <?= json_encode(__admin('preview.applyKeyframeTitle', 'Apply')) ?>,
             applyKeyframeTitleTo: <?= json_encode(__admin('preview.applyKeyframeTitleTo', 'to selector')) ?>,
@@ -558,18 +557,18 @@ window.PreviewConfig = {
             applyKeyframeNoMatch: <?= json_encode(__admin('preview.applyKeyframeNoMatch', 'No selector matches.')) ?>,
             applyKeyframeAdded: <?= json_encode(__admin('preview.applyKeyframeAdded', '{name} applied to {selector}')) ?>,
             applyKeyframeError: <?= json_encode(__admin('preview.applyKeyframeError', 'Failed to apply: {error}')) ?>,
-            // Motion Slice 2b — keyframe used-by + remove
+            // Keyframe used-by + remove
             keyframeUsedByCount: <?= json_encode(__admin('preview.keyframeUsedByCount', 'used by {n}')) ?>,
             keyframeUsedByTitle: <?= json_encode(__admin('preview.keyframeUsedByTitle', 'Show selectors using this keyframe')) ?>,
             keyframeRemoveFromSelector: <?= json_encode(__admin('preview.keyframeRemoveFromSelector', 'Remove animation from this selector')) ?>,
             keyframeRemoveConfirm: <?= json_encode(__admin('preview.keyframeRemoveConfirm', 'Remove animation from {selector}?')) ?>,
             keyframeRemoved: <?= json_encode(__admin('preview.keyframeRemoved', 'Animation removed from {selector}')) ?>,
             keyframeRemoveError: <?= json_encode(__admin('preview.keyframeRemoveError', 'Failed to remove: {error}')) ?>,
-            // Motion Slice 3 — easing picker (top-level keys for the lib)
+            // Easing picker (top-level keys for the lib)
             easingPickerTitle: <?= json_encode(__admin('preview.easingPickerTitle', 'Easing curve')) ?>,
             easingPickerReplay: <?= json_encode(__admin('preview.easingPickerReplay', '▶ Replay')) ?>,
             easingPickerCustom: <?= json_encode(__admin('preview.easingPickerCustom', 'Custom…'))   ?>,
-            // Motion Slice 4 — transition wizard
+            // Transition wizard
             addTransition: <?= json_encode(__admin('preview.addTransition', 'Add transition')) ?>,
             addTransitionTitle: <?= json_encode(__admin('preview.addTransitionTitle', 'Add transition')) ?>,
             addTransitionSelector: <?= json_encode(__admin('preview.addTransitionSelector', 'Selector')) ?>,
@@ -594,7 +593,7 @@ window.PreviewConfig = {
         source: {
             styleSource: <?= json_encode(__admin('preview.styleSource', 'Source')) ?>,
             styleSourceHint: <?= json_encode(__admin('preview.styleSourceHint', 'Edit the full style.css source')) ?>,
-            styleSourceComingSoon: <?= json_encode(__admin('preview.styleSourceComingSoon', 'Source editor coming in the next slice')) ?>,
+            styleSourceComingSoon: <?= json_encode(__admin('preview.styleSourceComingSoon', 'Source editor coming soon')) ?>,
             styleSourceRefine: <?= json_encode(__admin('preview.styleSourceRefine', 'Refine in CSS Refiner')) ?>,
             styleSourceFile: <?= json_encode(__admin('preview.styleSourceFile', 'File')) ?>,
             styleSourceEditInCanvas: <?= json_encode(__admin('preview.styleSourceEditInCanvas', 'Edit style.css in the canvas')) ?>,
@@ -719,7 +718,7 @@ window.PreviewConfig = {
             copyFailedToast: <?= json_encode(__admin('preview.aiToolsCopyFailedToast', 'Could not auto-copy — use the Copy button or Ctrl+C')) ?>
         },
 
-        // ── Translation manager panel (preview-translation.js — Beta.9 A4) ──
+        // ── Translation manager panel (preview-translation.js) ──
         translation: {
             translationScopeSite: <?= json_encode(__admin('preview.translationScopeSite', 'Whole site')) ?>,
             translationScopePages: <?= json_encode(__admin('preview.translationScopePages', 'Pages')) ?>,
@@ -757,10 +756,10 @@ window.PreviewConfig = {
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-style-motion.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/preview-style-motion.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-style-selectors.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/preview-style-selectors.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-style-editor.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/preview-style-editor.js') ?>"></script>
-<!-- A3 lib/code-editor — order matters: core widget first, tokenizers register on top -->
+<!-- lib/code-editor — order matters: core widget first, tokenizers register on top -->
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/lib/code-editor/code-editor.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/lib/code-editor/code-editor.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/lib/code-editor/css-tokenizer.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/lib/code-editor/css-tokenizer.js') ?>"></script>
-<!-- A3-companion Motion Slice 3 lib — cubic-bezier easing picker -->
+<!-- lib/easing-picker — cubic-bezier easing picker -->
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/lib/easing-picker/easing-picker.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/lib/easing-picker/easing-picker.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-style-source.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/preview-style-source.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/preview-js-interactions.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/preview-js-interactions.js') ?>"></script>

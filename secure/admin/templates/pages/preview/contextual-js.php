@@ -372,7 +372,7 @@
                     <div class="preview-contextual-js-form-path-params-rows" id="js-form-path-params-rows"></div>
                 </div>
 
-                <!-- Auth helper hint (AUTH_FLOWS Tier 1).
+                <!-- Auth helper hint (Tier 1).
                      Detected when the endpoint's responseSchema has a
                      token-shaped field. Click the button to drop a
                      pre-filled saveToken row into the post-fetch
@@ -398,7 +398,7 @@
                     </summary>
                     <div class="preview-contextual-js-form-advanced-body">
 
-                        <!-- Toast messages (Step 4c).
+                        <!-- Toast messages.
                              textKey pickers are mounted by JS into the
                              *-mount slots. Silent checkboxes opt out of
                              the toast entirely for that side. -->

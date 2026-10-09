@@ -162,7 +162,7 @@
             if (e.data.action === 'applyLiveStyle') {
                 applyLiveStyle(e.data.struct, e.data.nodeId, e.data.property, e.data.value);
             }
-            // Phase 8.4: Selector-based highlighting
+            // Selector-based highlighting
             if (e.data.action === 'highlightBySelector') {
                 highlightBySelector(e.data.selector);
             }
@@ -1013,7 +1013,6 @@
         // entirely (its handler targets [data-qs-textkey] directly), so
         // this change doesn't affect text editing. JS mode previously
         // duplicated this walk inline; that copy is now redundant.
-        // Beta.9 A1 Slice 8 verification feedback (2026-06-17).
         if (el.hasAttribute('data-qs-textonly')) {
             const realTag = el.parentElement
                 ? el.parentElement.closest('[data-qs-node]:not([data-qs-textonly])')
@@ -2319,11 +2318,10 @@
             // that needs the click (drag, preview), so anchors / form
             // submits stay selectable in all authoring modes.
             //
-            // History: text mode got the exception during beta.7 #11
-            // (anchor text was unreachable in Text mode); beta.9 A1
-            // Slice 8 verification surfaced the same shape for select
-            // mode (oauth-button <a> couldn't be selected because the
-            // nav guard ate the click before the select handler ran).
+            // Why: without that, anchor text is unreachable in Text mode,
+            // and in select mode an <a> (an oauth-button) cannot be
+            // selected because the nav guard eats the click before the
+            // select handler runs.
             // The fix generalises: don't stop immediate propagation in
             // any mode whose downstream click listener lives in this
             // file. preventDefault + stopPropagation are enough to
@@ -2449,9 +2447,9 @@
         if (currentMode === 'js') {
             e.stopImmediatePropagation();
 
-            // text-only walk-up moved into getSelectableTarget itself
-            // (Slice 8 verification fix) — same logic now benefits
-            // select / style / drag / add modes uniformly.
+            // The text-only walk-up lives in getSelectableTarget itself —
+            // the same logic serves select / style / drag / add modes
+            // uniformly.
             let target = getSelectableTarget(e.target, e.clientX, e.clientY);
             if (target) {
                 // Remove previous selection

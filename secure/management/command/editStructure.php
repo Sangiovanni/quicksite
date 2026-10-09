@@ -106,8 +106,8 @@ function findComponentUsagesInternal(string $componentName): array {
 /**
  * Recursively validate structure for blocked tags + unsafe params.
  *
- * The TAG half moved to qs_first_unrenderable_tag() in utilsManagement.php
- * (beta.10 C13 13.5) so the other structure writers can enforce the identical
+ * The TAG half lives in qs_first_unrenderable_tag() in utilsManagement.php
+ * so the other structure writers can enforce the identical
  * rule without copying this walk — CLAUDE.md centralize-shared-logic. The gate
  * itself is unchanged: TagRegistry::isRenderable, the same policy the renderer
  * and the compiler apply, and it still runs BEFORE the param check at the call
@@ -214,8 +214,8 @@ if ($action !== 'delete' && !is_array($structure)) {
 }
 
 // SECURITY: walk the incoming structure recursively for reserved-namespace
-// storage keys in data-storage-* / data-auth-source values (slice 5b —
-// admin-token theft prevention). Each command that writes structure params
+// storage keys in data-storage-* / data-auth-source values (admin-token
+// theft prevention). Each command that writes structure params
 // has its own hook; this is the catch-all for whole-tree writes.
 if ($structure !== null && is_array($structure)) {
     $rkErrors = findReservedKeysInStructure($structure);
@@ -324,9 +324,9 @@ if ($structure !== null && is_array($structure)) {
             ->send();
     }
 
-    // Then component REFERENCES. Nothing inspected them before beta.11 S3.10c:
-    // the tag walk trips on `tag`, the param walk below inspects `params`, and a
-    // `component` value passed both untouched into a path concatenation. The
+    // Then component REFERENCES: the tag walk trips on `tag`, the param walk
+    // below inspects `params`, and a `component` value would pass both untouched
+    // into a path concatenation. The
     // readers' jail is what actually protects a render or a build; this is the
     // author-facing half, so a bad reference is an error here rather than a node
     // that silently never appears.

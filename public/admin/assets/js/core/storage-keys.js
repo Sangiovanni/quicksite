@@ -30,7 +30,7 @@ window.QuickSiteStorageKeys = Object.freeze({
     aiAutoPreview:       'quicksite_ai_auto_preview',
     aiAutoExecute:       'quicksite_ai_auto_execute',
 
-    // Visual editor — Source tab draft (A3 slice 4). Persists unsaved
+    // Visual editor — Source tab draft. Persists unsaved
     // edits so the user can recover if they navigate away or refresh
     // before saving. Cleared on successful save or explicit discard.
     styleSourceDraft:    'qs_style_source_draft',

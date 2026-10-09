@@ -1,6 +1,6 @@
 <?php
 /**
- * Self-deploy switch  (beta.11)
+ * Self-deploy switch
  *
  * Copy this file to deploy.php and set allow_deploy to true (the line at the
  * bottom) to let this installation deploy a build onto the server it is

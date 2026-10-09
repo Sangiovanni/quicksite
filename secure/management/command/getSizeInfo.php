@@ -40,8 +40,8 @@ if (!function_exists('sizeinfo_formatSize')) {
 if (!function_exists('sizeinfo_getFolderInfo')) {
     function sizeinfo_getFolderInfo($path, $name = null) {
         $size = getDirectorySize($path);
-        // NOTE: the absolute filesystem `path` is deliberately NOT returned (C8 8.5)
-        // — it disclosed the install layout to every authenticated caller.
+        // NOTE: the absolute filesystem `path` is deliberately NOT returned
+        // — it would disclose the install layout to every authenticated caller.
         return [
             'name' => $name ?? basename($path),
             'exists' => is_dir($path),
@@ -60,7 +60,7 @@ if (!function_exists('sizeinfo_getFolderInfo')) {
  * @return ApiResponse
  */
 function __command_getSizeInfo(array $params = [], array $urlParams = []): ApiResponse {
-    // C8 8.5: the report is scoped to the project this request was authorized for.
+    // The report is scoped to the project this request was authorized for.
     $bound = qs_bind_marker_project($params, 'getSizeInfo');
     if ($bound['refusal'] !== null) {
         return $bound['refusal'];
@@ -111,10 +111,10 @@ function __command_getSizeInfo(array $params = [], array $urlParams = []): ApiRe
     $secureFolders = [
         'admin' => sizeinfo_getFolderInfo($secureRoot . '/admin', 'admin'),
         'config' => sizeinfo_getFolderInfo($secureRoot . '/config', 'config'),
-        // Exports moved under each project in C8 8.5, so this reports THIS
+        // Exports live under each project, so this reports THIS
         // project's archives rather than an installation-wide shared folder.
         'exports' => sizeinfo_getFolderInfo($secureRoot . '/projects/' . $markerProject . '/exports', 'exports'),
-        // C10 10.1b — the command log is per-project (secure/logs/p/<id>/), so this
+        // The command log is per-project (secure/logs/p/<id>/), so this
         // reports THIS project's audit trail, not the installation's. The `_global`
         // bucket (account/membership actions, which belong to no project) is
         // deliberately excluded: it is not this project's consumption.
@@ -126,15 +126,13 @@ function __command_getSizeInfo(array $params = [], array $urlParams = []): ApiRe
     // ========================================
     // PROJECT BREAKDOWN — THE MARKER PROJECT ONLY
     // ========================================
-    // C8 8.5 CONTAINMENT (F-C8-8.5-4): this used to glob secure/projects/* and
-    // report EVERY project on the installation — name, size, file count, the
-    // served-main flag and each project's BACKUP NAMES — to any caller holding
-    // content.read, which is `viewer`, the lowest role in the model. That is an
-    // enumeration surface across tenants, and it contradicted both the listProjects
-    // membership filter and the decision to drop listUsers for the same reason.
-    // The report is now scoped to the single project this request was authorized
-    // for, and the served-main flag is gone (it named a project the caller may have
-    // no relationship with).
+    // CONTAINMENT: the report covers the single project this request was
+    // authorized for. A glob of secure/projects/* would report EVERY project on
+    // the installation — name, size, file count and each project's BACKUP NAMES
+    // — to any caller holding content.read, which is `viewer`, the lowest role
+    // in the model: an enumeration surface across tenants, contradicting both
+    // the listProjects membership filter and the decision to drop listUsers for
+    // the same reason.
     $projectDir   = $secureRoot . '/projects/' . $markerProject;
     $projectSize  = getDirectorySize($projectDir);
     $projectsData = [
@@ -235,9 +233,9 @@ function __command_getSizeInfo(array $params = [], array $urlParams = []): ApiRe
     $managementSpace = $publicFolders['management']['size'] 
                      + $secureFolders['management']['size'];
     
-    // Core/System: secure/src + secure/config + root files. The command log left
-    // this bucket in C10 10.1b — it is per-project now, so it is the PROJECT's
-    // consumption, not the installation's core.
+    // Core/System: secure/src + secure/config + root files. Not the command log:
+    // it is per-project, so it is the PROJECT's consumption, not the
+    // installation's core.
     $coreSpace = $secureFolders['src']['size']
                + $secureFolders['config']['size']
                + $publicRootFilesSize
@@ -249,7 +247,7 @@ function __command_getSizeInfo(array $params = [], array $urlParams = []): ApiRe
     // Command log: this project's audit trail (secure/logs/p/<id>/)
     $logsSpace = $secureFolders['logs']['size'];
 
-    // Backups for THIS project (the report is single-project since C8 8.5)
+    // Backups for THIS project (the report is single-project)
     $totalBackupsSize = 0;
     foreach ($projectsData['projects'] as $project) {
         $totalBackupsSize += $project['backups']['total']['size'];
@@ -308,9 +306,8 @@ function __command_getSizeInfo(array $params = [], array $urlParams = []): ApiRe
                 'description' => 'Core system files (src, config)'
             ]
         ],
-        // Was 'active_project' — the globally SERVED main, which named a project the
-        // caller may have no relationship with. It is now simply the project this
-        // report covers: the authorized marker (C8 8.5).
+        // The project this report covers: the authorized marker (never a globally
+        // served project, which could name one the caller has no relationship with).
         'project' => [
             'name' => $markerProject,
             'size' => $projectsData['projects'][$markerProject]['total']['size'] ?? 0,

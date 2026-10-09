@@ -1,7 +1,7 @@
 <?php
 /**
  * cleanResolverCache Command — Manual cleanup for the server-side
- * data-resolver response cache (beta.8 A2 Slice 4).
+ * data-resolver response cache.
  *
  * @method POST
  * @route /management/cleanResolverCache

@@ -1,6 +1,6 @@
 <?php
 /**
- * Command CATEGORIES — the trust-coherent authorization map (beta.10 C6).
+ * Command CATEGORIES — the trust-coherent authorization map.
  *
  * This is the single source of truth for "which commands live in which capability
  * bucket". Roles (roles.php) grant *categories*, not individual commands; the
@@ -8,7 +8,7 @@
  *   command -> category -> scope -> (role grant | global access rule).
  *
  * Engine plumbing → stays PHP (CLAUDE.md: internal admin config the engine consumes;
- * NOT author-extended — there are no custom roles/categories, L8). Every command in
+ * NOT author-extended — there are no custom roles/categories). Every command in
  * routes.php belongs to exactly ONE category (verified 1:1). Adding a new command =
  * add its name to exactly one category here (see MAINTAINING.md "Adding a new command").
  *
@@ -44,7 +44,7 @@ return [
         ],
     ],
 
-    // Integration config metadata (secrets ALWAYS redacted regardless of role, F7).
+    // Integration config metadata (secrets ALWAYS redacted regardless of role).
     // Not "content" — a read-only viewer should not enumerate your integrations. editor+.
     'config.read' => [
         'scope' => 'project',
@@ -89,7 +89,7 @@ return [
         'commands' => ['setRouteResolver'],
     ],
 
-    // Assets + favicon. editor+ (SSRF via uploadAsset URL mode is guarded in C4).
+    // Assets + favicon. editor+ (uploadAsset's URL mode is guarded against SSRF).
     'asset.write' => [
         'scope' => 'project',
         'commands' => ['uploadAsset', 'editAsset', 'deleteAsset', 'editFavicon'],
@@ -157,7 +157,7 @@ return [
         ],
     ],
 
-    // Command history — logs may hold secret request bodies (F7). admin+.
+    // Command history — logs may hold secret request bodies. admin+.
     'history' => [
         'scope' => 'project',
         'commands' => ['getCommandHistory', 'clearCommandHistory'],
@@ -169,14 +169,14 @@ return [
         'commands' => ['deleteProject'],
     ],
 
-    // Project-level settings knobs (C8 8.3b; 8.4 adds setProjectVisibility, …).
+    // Project-level settings knobs.
     // setJoinPolicy opens/closes the self-service request lane. admin+.
     'project.settings' => [
         'scope' => 'project',
         'commands' => ['setJoinPolicy'],
     ],
 
-    // Membership management (C8 8.3a/8.3b) — consent model: invitations +
+    // Membership management — consent model: invitations +
     // join-request adjudication, never direct adds. Rank rules (canManageRole
     // strictly-below) enforced in-command, in-lock. Targeting is by user_id
     // only. admin+.
@@ -185,7 +185,7 @@ return [
         'commands' => ['listMembers', 'inviteMember', 'cancelInvitation', 'changeMemberRole', 'removeMember', 'approveJoinRequest', 'denyJoinRequest', 'reconcileMemberships'],
     ],
 
-    // Owner-only project exposure (C8 8.4). setProjectVisibility flips surface-B
+    // Owner-only project exposure. setProjectVisibility flips surface-B
     // public/private serving — the gravest exposure a project carries (public =
     // anyone on the internet reads the site), so it sits at the delete/transfer
     // tier, NOT the admin-tier project.settings that setJoinPolicy uses.
@@ -194,16 +194,16 @@ return [
         'commands' => ['setProjectVisibility'],
     ],
 
-    // Reduced roster for EVERY member rank (C8 8.3c): active members only —
+    // Reduced roster for EVERY member rank: active members only —
     // {user_id, name, role} rows, NO pending queue (adjudication data stays
     // admin+ via project.members/listMembers). Exists so any member can see
-    // "who is on this project with me" (the R4 page requirement).
+    // "who is on this project with me".
     'project.roster' => [
         'scope' => 'project',
         'commands' => ['getProjectRoster'],
     ],
 
-    // The sponsor lane (C8 8.3b, model A): ANY member — viewer included — may
+    // The sponsor lane: ANY member — viewer included — may
     // VOUCH an outsider (direction:'request' entry, mandatory note, no
     // engagement of the target). Authority stays with approveJoinRequest:
     // a proposal grants nothing and notifies nobody until validated.
@@ -229,7 +229,7 @@ return [
         'commands' => ['help'],
     ],
 
-    // Session lifecycle (C5b) + self-registration (C8). Served pre-auth
+    // Session lifecycle + self-registration. Served pre-auth
     // (index.php PUBLIC_COMMANDS) — each command is SELF-authenticating /
     // self-gating (email+password / the refresh token itself / the
     // registration flag + flood controls), so hasPermission never actually
@@ -241,7 +241,7 @@ return [
     ],
 
     // NOTE — account self-service, membership self-service and the two directory
-    // lookups are NOT commands (beta.11 S6). The command surface is a CLI for
+    // lookups are NOT commands. The command surface is a CLI for
     // DEVELOPING A PROJECT; managing your login, getting into or out of a
     // project, and looking a person up in order to invite them are none of those
     // things. Four categories held them and were deleted with their last command
@@ -253,9 +253,9 @@ return [
     // All four were global + access 'any', so hasPermission contributed
     // authentication and nothing else — which the shared admin gate establishes.
 
-    // "My projects" surface (OUTPUT filtered to memberships by C7/C8; the command
-    // itself is any-auth). getMySpaceUsage sat here until beta.11 S6 — a quota is
-    // a fact about an account, not about a project being developed — and is now
+    // "My projects" surface (OUTPUT filtered to memberships; the command
+    // itself is any-auth). Not getMySpaceUsage: a quota is a fact about an
+    // account, not about a project being developed — it is
     // GET /admin/self/space-usage.
     'projects.list' => [
         'scope' => 'global',
@@ -267,8 +267,8 @@ return [
     // importProject is create-from-archive: it mints a NEW project (no marker can
     // exist for a project that does not exist yet), birth-writes the importer as
     // sole owner, and discards any archived roster — so it is GLOBAL like
-    // createProject, not the project-scoped admin-tier project.data it used to sit
-    // in (C8 8.4). The deep ZIP-internal path/zip-slip sweep stays C11.
+    // createProject, not the project-scoped admin-tier project.data. The deep
+    // ZIP-internal path/zip-slip sweep is importProject's own.
     // getLanguageList reads the installation's language list, which a new
     // project's first language must come from: it belongs to no project, and a
     // caller creating their first one has no project to name.
@@ -279,16 +279,16 @@ return [
     ],
 
     // NOTE — there is deliberately NO owner-gated global category. The former
-    // 'system.admin' (access 'owner') was retired in C8 8.5 along with the rule
+    // 'system.admin' (access 'owner') was retired along with the rule
     // itself: hasPermission resolved it as "owns ANY project anywhere",
     // target-independent, while projects.create is access 'any' — so any account
-    // minted that ownership in one call (the F-C8-8.1-1 mechanism). Its last member
+    // minted that ownership in one call. Its last member
     // applied updates; that is now `git pull` on the server, which has no HTTP
     // surface at all, so no token can reach the code that updates the installation.
-    // (The generateToken/listTokens/revokeToken trio was REMOVED in C5b; switchProject
-    // was deleted in C15 along with the served-project concept it existed to repoint.)
+    // (The generateToken/listTokens/revokeToken trio went with the lifetime bearer
+    // token; switchProject with the served-project concept it existed to repoint.)
     //
-    // ALSO GONE, beta.11 S6: 'system.read' (checkForUpdates) and 'projects.select'
+    // ALSO GONE: 'system.read' (checkForUpdates) and 'projects.select'
     // (setSelectedProject). The command surface is a CLI for DEVELOPING a project;
     // an update check is about the installation and an editing pointer is panel
     // state, so neither is a command. Both still work — the panel reaches them at
@@ -298,7 +298,7 @@ return [
     // left empty: the routes.php <-> categories.php 1:1 invariant cannot see an
     // empty category and the /admin/command UI cannot use one.
     //
-    // AND WITH THEM, beta.11 S6: the 'disabled' category and the three commands it held
+    // AND WITH THEM: the 'disabled' category and the three commands it held
     // (createRole / editRole / deleteRole). The role set is FIXED — roles.php.example
     // says so in its own header — so custom-role management implemented a feature that
     // had been withdrawn. The category declared access 'none' and no role granted it,

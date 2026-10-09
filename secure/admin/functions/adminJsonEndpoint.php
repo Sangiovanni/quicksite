@@ -4,7 +4,7 @@
  *
  * THE PANEL IS A TOOL THAT USES THE CLI; IT IS NOT PART OF IT. Anything about
  * the installation, the account, or the panel's own state is not a command
- * (beta.11 S6). Those surfaces live here instead — but they still have to
+ * (by design). Those surfaces live here instead — but they still have to
  * authenticate exactly as `/management` does, because they run engine code on
  * the caller's behalf.
  *

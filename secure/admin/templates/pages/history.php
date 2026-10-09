@@ -2,10 +2,10 @@
 /**
  * Admin Command History page (/admin/history)
  *
- * WHY THIS IS ITS OWN PAGE (beta.11 S6.6). History used to be a tab on
- * /admin/command. That made the audit trail a feature of the command console —
- * and S6.5 made the console something an operator can switch off, which left
- * the trail reachable only through a special case in command.php and a single
+ * WHY THIS IS ITS OWN PAGE. As a tab on /admin/command, the audit trail would
+ * be a feature of the command console — and the console is something an
+ * operator can switch off, which would leave the trail reachable only through
+ * a special case in command.php and a single
  * dashboard link. An audit trail should not be a sub-view of the thing it
  * audits, so it has its own route, its own nav entry, and its own server-side
  * role gate (AdminRouter::PAGE_PERMISSIONS => getCommandHistory, which the

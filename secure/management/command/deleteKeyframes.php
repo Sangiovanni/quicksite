@@ -14,7 +14,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/utilsStyleManagement.php';
 $params = $trimParametersManagement->params();
 
 // Validate required parameter. qs_param_string, not isset: `?name[]=x` is SET
-// but is an array, and reached trim() as a TypeError (beta.10 C13 F-C13-11).
+// but is an array, and would reach trim() as a TypeError.
 $nameParam = qs_param_string($params, 'name');
 if ($nameParam === null) {
     ApiResponse::create(400, 'validation.required')

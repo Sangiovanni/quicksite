@@ -1,6 +1,6 @@
 <?php
 /**
- * OutboundUrlPolicy — SSRF guard for server-side outbound fetches (beta.10 C4 / F8).
+ * OutboundUrlPolicy — SSRF guard for server-side outbound fetches.
  *
  * Every server-side fetcher runs check() on the destination URL BEFORE
  * handing it to curl. It closes the SSRF class in three layers:
@@ -152,12 +152,11 @@ class OutboundUrlPolicy
     /**
      * Development mode lifts the internal-range block only.
      *
-     * C12: this used to resolve the environment itself, with an `@require` that
-     * could not suppress a ParseError (a deployer's typo fatally ended every
-     * request reaching this class) and a `SECURE_FOLDER_PATH` dependency that
-     * silently answered "production" whenever the constant was not yet defined.
-     * Both are now the shared gate's problem, and every other caller gets the
-     * same answer this one does.
+     * It asks the shared gate rather than resolving the environment itself: an
+     * own `@require` could not suppress a ParseError (a deployer's typo would
+     * fatally end every request reaching this class), and a `SECURE_FOLDER_PATH`
+     * dependency would silently answer "production" whenever the constant is not
+     * yet defined. Through the shared gate, every caller gets the same answer.
      */
     private static function isDevelopment(): bool
     {

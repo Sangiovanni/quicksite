@@ -4,7 +4,7 @@
  *
  * NOT commands. The command surface is a CLI for DEVELOPING A PROJECT; managing
  * the account you sign in with is not project development, so it lives here and
- * is served by /admin/self (beta.11 S6).
+ * is served by /admin/self.
  *
  * These were `changePassword`, `deleteMyAccount`, `getMySpaceUsage` and
  * `getMyPermissions`. The logic is unchanged: every authorization each one

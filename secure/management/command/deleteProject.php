@@ -33,10 +33,10 @@ require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php'; // qs_delete_
  */
 function __command_deleteProject(array $params = [], array $urlParams = []): ApiResponse {
     // Validate project name
-    // qs_param_string: `?name[]=x` reached trim() as a TypeError (F-C13-11).
+    // qs_param_string: `?name[]=x` would reach trim() as a TypeError.
     $projectName = trim(qs_param_string($params, 'name', ''));
 
-    // C8 CONTAINMENT (confused-deputy / F6): a project-scoped command is
+    // CONTAINMENT (confused deputy): a project-scoped command is
     // AUTHORIZED against the URL marker project (PROJECT_NAME, bound by the
     // dispatcher after the owner-only members.json check). The destructive
     // target MUST be that same project — never a different one named only in
@@ -49,7 +49,7 @@ function __command_deleteProject(array $params = [], array $urlParams = []): Api
     }
     $projectName = $bound['project'];
 
-    // Reject a traversal payload before it reaches the delete sink (beta.10 C3 F1-a).
+    // Reject a traversal payload before it reaches the delete sink.
     if (!is_valid_project_name($projectName)) {
         return ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage('Invalid project name')
@@ -75,14 +75,14 @@ function __command_deleteProject(array $params = [], array $urlParams = []): Api
             ->withData(['searched_path' => SECURE_FOLDER_NAME . '/projects/' . $projectName]);
     }
 
-    // C15 15.3 — no project is "the active one" installation-wide any more, so there is no
+    // No project is "the active one" installation-wide, so there is no
     // active-project guard and no `force` escape hatch for it. Deleting a project is gated
     // by ownership of THAT project (project.delete) and by confirm=true, nothing else.
 
     // Count what we're about to delete
     $stats = countProjectFiles($projectPath);
 
-    // C8 8.3a membership cascade — capture BEFORE the directory (and the
+    // Membership cascade — capture BEFORE the directory (and the
     // members.json inside it) is destroyed: who must be notified, and the
     // project's display name for the notices.
     $cascadeMembers = null;
@@ -127,12 +127,11 @@ function __command_deleteProject(array $params = [], array $urlParams = []): Api
     $removal = qs_delete_tree($projectPath, ['config', 'config.php', 'routes.php']);
 
     if (!$removal['ok']) {
-        // beta.10 C13 F-C13-18. This returned `path` => the absolute project
-        // directory, ungated. The central scrub in ApiResponse would render it
-        // "secure/projects/<id>", but the id is something the caller just named
-        // and the folder convention adds nothing — so say what actually failed
-        // and send the path where the person who can act on it is looking. Same
-        // treatment C12 gave qs_project_context_die().
+        // No `path` => the absolute project directory. The central scrub in
+        // ApiResponse would render it "secure/projects/<id>", but the id is
+        // something the caller just named and the folder convention adds nothing
+        // — so say what actually failed and send the path where the person who
+        // can act on it is looking. Same treatment as qs_project_context_die().
         //
         // `survived` is PROJECT-RELATIVE for the same reason (qs_delete_tree
         // builds it that way): the person reading the response asked to delete
@@ -161,7 +160,7 @@ function __command_deleteProject(array $params = [], array $urlParams = []): Api
             ]);
     }
 
-    // C10 10.1b — destroy this project's command log with it. The log lives in
+    // Destroy this project's command log with it. The log lives in
     // secure/logs/p/<id>/ (deliberately OUTSIDE the project folder, so exports,
     // clones and backups never carry it). A project id is a folder NAME and can
     // therefore be re-used: without this purge, a newly created project of the
@@ -177,16 +176,16 @@ function __command_deleteProject(array $params = [], array $urlParams = []): Api
     }
 
 
-    // C8 8.3a membership cascade — the project is gone; update every affected
+    // Membership cascade — the project is gone; update every affected
     // user's status-mirror cache in ONE users.php write. The DELETING owner's
     // own entry is plainly removed (self-initiated exits leave no tombstone);
     // every other member AND every ENGAGED pending party gets a dismissable
-    // 'deleted' notice (Sangio R3: they must know the project died — they
+    // 'deleted' notice (they must know the project died — they
     // were not refused). Engaged = an invitee (direction 'invite') or a
     // self-requester (direction 'request', by == themselves). A SPONSORED,
-    // not-yet-validated proposal target (8.3b) was never engaged — never told
+    // not-yet-validated proposal target was never engaged — never told
     // anything — so the cascade must not conjure a notice for a project they
-    // never knew existed. Cache failure is silent by ruling (error_log only):
+    // never knew existed. Cache failure is silent by design (error_log only):
     // access is already correct — the authority died with the folder.
     $cascade = ['members_notified' => 0, 'invitees_notified' => 0, 'self_removed' => false];
     if ($cascadeMembers !== null) {

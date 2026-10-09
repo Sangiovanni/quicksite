@@ -1,15 +1,16 @@
 /**
- * QuickSite Admin — AI Caller (browser-direct, non-streaming for Phase 1)
+ * QuickSite Admin — AI Caller (browser-direct)
  *
  * Single entry point all AI callers use. Performs a `fetch()` directly
  * against the provider endpoint resolved from the connection. No PHP
- * proxy hop. Streaming is added in Phase 2 (see stream-parsers.js).
+ * proxy hop. Streams through stream-parsers.js when the connection has
+ * `streaming` on and the provider supports it; otherwise reads once.
  *
  *   const result = await QSAiCall.call({
  *     connection, model, messages,
  *     options: { max_tokens, temperature },
  *     signal,            // AbortSignal for cancellation
- *     onChunk            // ignored in Phase 1; reserved for Phase 2
+ *     onChunk            // called per streamed delta; unused when not streaming
  *   });
  *   // result = { content, usage, viaStream:false, raw, model, providerType }
  *

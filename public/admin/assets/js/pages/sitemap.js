@@ -108,7 +108,7 @@
     }
 
     /**
-     * Beta.8 A1 — Render the route path with param-segment styling +
+     * Render the route path with param-segment styling +
      * a trailing param-count badge.
      *
      * Splits the path on '/' and wraps any ':name' segment in a span
@@ -117,7 +117,7 @@
      * "<N> param[s]" badge so the user can spot variable routes at a
      * glance.
      *
-     * Beta.8 A2 Slice 7 — also appends a "resolver" badge when the
+     * Also appends a "resolver" badge when the
      * route has a server-side data resolver configured. Presence is
      * passed in by the caller (renderRouteTree) reading
      * `sitemapData.routeResolvers[routeName]` from the getSiteMap
@@ -168,10 +168,9 @@
         }
 
         if (resolverConfig && typeof resolverConfig === 'object') {
-            // Beta.8 A2 Slice 7.5.D — handle both scalar AND array shapes.
+            // Handle both scalar AND array shapes.
             // Sidecar entry can be either:
-            //   - object  → single resolver, show "resolver" badge (same as
-            //               pre-7.5 behaviour)
+            //   - object  → single resolver, show "resolver" badge
             //   - array   → N resolvers, show "resolver × N" counter
             const isArrayShape = Array.isArray(resolverConfig);
             const configs = isArrayShape ? resolverConfig : [resolverConfig];
@@ -272,7 +271,7 @@
         const fragment = document.createDocumentFragment();
         const entries = Object.entries(tree).filter(([key]) => key !== '_route');
         const layouts = sitemapData?.routeLayouts || {};
-        // Beta.8 A2 Slice 7 — sparse map of routePath → resolver config.
+        // Sparse map of routePath → resolver config.
         // Routes without a resolver are absent (not present with a null).
         // _renderRoutePath receives undefined → no resolver badge.
         const resolvers = sitemapData?.routeResolvers || {};
@@ -753,7 +752,7 @@
 
         nameInput.focus();
 
-        // Beta.8 A1 — segment validation matches the server-side rules in
+        // Segment validation matches the server-side rules in
         // addRoute.php. Two valid shapes:
         //   1. Literal: lowercase letters / digits / hyphens (no leading/
         //      trailing hyphen).
@@ -807,7 +806,7 @@
                     }
                     QuickSiteAdmin.showToast(t('routeCreated', 'Route created successfully'), 'success');
 
-                    // Beta.8 A1 — surface server-side conflict warnings as
+                    // Surface server-side conflict warnings as
                     // toasts. Each warning carries 'type' (i18n key for future
                     // localisation) + EN 'message' fallback we display today.
                     // Future polish could render inline beneath the form.
@@ -908,7 +907,7 @@
             iconSvg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>',
         }));
 
-        // Beta.8 A2 Slice 7 — Configure-resolver opens the per-route data
+        // Configure-resolver opens the per-route data
         // resolver editor (route-resolvers.json sidecar). Server-rack icon
         // signals "server-side data fetch" — distinct from edit-title's
         // pencil (content) and the layout-toggle hamburger/footer icons.
@@ -1159,7 +1158,7 @@
                 openEditTitleModal(route);
                 break;
             case 'configure-resolver':
-                // Beta.8 A2 Slice 7.5.D — always go through the list view.
+                // Always go through the list view.
                 // For single-resolver routes the list shows ONE entry +
                 // "+ Add resolver"; for multi it shows them all. The
                 // per-resolver modal opens FROM the list (Edit / + Add).
@@ -1212,8 +1211,7 @@
             // admin chrome that triggers a page reload (observed during
             // testing: clicking inputs caused the sitemap to reload
             // before this guard was added). The actual offender isn't
-            // identified — see BACKLOG "Mystery admin click handler
-            // navigates on clicks inside fixed-position panels". The
+            // identified. The
             // backdrop sits OUTSIDE the content, so backdrop clicks
             // still close the modal (via the listener above).
             const content = _editTitleRefs.modal.querySelector('.sitemap-edit-title-modal__content');
@@ -1413,11 +1411,11 @@
     }
 
     // ========================================================================
-    // Configure-resolver modal (beta.8 A2 Slice 7)
+    // Configure-resolver modal
     // ========================================================================
     // Opens from sitemap context menu (⋮ → "Configure resolver"). Authors
     // the per-route resolver sidecar (route-resolvers.json) through a
-    // structured form: endpoint picker + (Steps 3-5) inputs / expose /
+    // structured form: endpoint picker + inputs / expose /
     // cacheTTL / onMiss editors. Submits via setRouteResolver — same
     // idempotent set/clear endpoint used by direct callers.
     //
@@ -1432,7 +1430,7 @@
     let _resolverCurrentRoute = null;        // route key the modal is editing
     let _resolverCurrentConfig = null;       // pre-edit snapshot of the resolver block
 
-    // Beta.8 A2 Slice 7 Step 4 — character validation for names.
+    // Character validation for names.
     // Two different rules because the fields end up in different places:
     //
     //   - Input name: becomes an endpoint param key (URL path / query /
@@ -1599,7 +1597,7 @@
      * Endpoint-level auth wins over API-level auth; missing /
      * 'inherit' fields fall through to API-level, then to 'none' as
      * final fallback. Used by the cacheTTL section to drive the
-     * shared-cache-safe badge (locked design — TTL is enforced
+     * shared-cache-safe badge (by design — TTL is enforced
      * disabled for bearer/cookie/basic).
      */
     function _findCurrentEndpointAuth() {
@@ -1684,7 +1682,6 @@
                 }
             });
             // Same admin-chrome-click-eater guard as edit-title — see the
-            // BACKLOG "Mystery admin click handler" note in the
             // _ensureEditTitleRefs comment above for context. Stop clicks
             // on the content card from bubbling to the mystery listener
             // that page-reloads the sitemap.
@@ -1827,7 +1824,7 @@
             refs.endpointMeta.style.color = '';
         }
 
-        // Beta.8 A2 Slice 7 Step 4 — refresh every expose row's path
+        // Refresh every expose row's path
         // cell when the endpoint changes. Different endpoints have
         // different responseSchema → different paths → maybe a
         // different cell type (select ↔ input). Each row's
@@ -1855,7 +1852,7 @@
             noSchemaHint.style.display = newPaths.length > 0 ? 'none' : '';
         }
 
-        // Beta.8 A2 Slice 7 Step 4 follow-up — refresh inputs row name
+        // Refresh inputs row name
         // fields based on the new endpoint's declared parameters. Same
         // refresh-in-place pattern as the expose path cell, with the
         // same value preservation + orphan-option handling.
@@ -1874,7 +1871,7 @@
             noParamsHint.style.display = newParams.length > 0 ? 'none' : '';
         }
 
-        // Beta.8 A2 Slice 7 Step 5 — refresh the cache badge AND TTL
+        // Refresh the cache badge AND TTL
         // input disabled state based on the new endpoint's auth. The
         // typed value persists across the swap (disabled preserves
         // it) so the author isn't punished for switching to peek at
@@ -2252,7 +2249,7 @@
     }
 
     // ====================================================================
-    // Expose editor (beta.8 A2 Slice 7 Step 4)
+    // Expose editor
     // ====================================================================
     // Mirror of inputs editor structurally: `[varName] ← [dotPath] [×]`
     // rows in the #sitemap-resolver-expose-section slot. Two differences
@@ -2512,7 +2509,7 @@
     }
 
     // ====================================================================
-    // Cache TTL section (beta.8 A2 Slice 7 Step 5)
+    // Cache TTL section
     // ====================================================================
     // Number input (seconds) + shared-cache-safe badge. The badge is a
     // read-only surface for the server-side rule: caching is force-
@@ -2629,7 +2626,7 @@
     }
 
     // ====================================================================
-    // onMiss section (beta.8 A2 Slice 7 Step 5)
+    // onMiss section
     // ====================================================================
     // Single-select for the failure-mode behaviour. Two options now
     // (default + render-empty); future values (redirect:<url> etc.)
@@ -2686,7 +2683,7 @@
     /**
      * Open the per-resolver config modal.
      *
-     * Beta.8 A2 Slice 7.5.D — now always invoked from the list view.
+     * Always invoked from the list view.
      * The optional `options` second arg carries:
      *   - config:    the resolver config to pre-populate from (NEW: pass
      *                explicitly; we no longer read from sitemapData here
@@ -2740,7 +2737,7 @@
         const apis = await _loadApiEndpointsForResolver();
         _populateResolverEndpointPicker(apis, (_resolverCurrentConfig && _resolverCurrentConfig.endpoint) || '');
 
-        // Beta.8 A2 Slice 7 Step 3 — render the inputs editor into its
+        // Render the inputs editor into its
         // placeholder slot. paramSegments comes from the route path
         // (e.g. `user/:id/posts/:postid` → ['id','postid']) and drives
         // the kind=param value picker. endpointParams comes from the
@@ -2754,7 +2751,7 @@
             endpointParams
         );
 
-        // Beta.8 A2 Slice 7 Step 4 — render the expose editor into its
+        // Render the expose editor into its
         // placeholder slot. Schema-paths come from the picked endpoint's
         // responseSchema. When no schema is declared, the walker is
         // called with null (NOT {} — that'd still produce a single
@@ -2768,10 +2765,9 @@
             schemaPaths
         );
 
-        // Beta.8 A2 Slice 7 Step 5 — render cacheTTL + onMiss sections.
-        // After this lands, the modal fully surfaces every resolver
-        // config field — the snapshot carry-over in submitResolverModal
-        // can drop its remaining cacheTTL/onMiss preservation block.
+        // Render cacheTTL + onMiss sections. With them the modal
+        // surfaces every resolver config field, and submitResolverModal
+        // collects each one from its own section.
         const authType = _findCurrentEndpointAuth();
         _renderResolverCacheSection(
             (_resolverCurrentConfig && typeof _resolverCurrentConfig.cacheTTL === 'number')
@@ -2912,7 +2908,7 @@
         refs.status.style.color = '';
 
         try {
-            // Beta.8 A2 Slice 7.5.D — when opened from the list view,
+            // When opened from the list view,
             // include `index` in the POST so the command patches/appends
             // that specific slot instead of replacing the whole entry.
             const body = {
@@ -2995,7 +2991,7 @@
     }
 
     // ========================================================================
-    // Resolver list-view modal (beta.8 A2 Slice 7.5.D)
+    // Resolver list-view modal
     // ========================================================================
     // The entry point for ALL resolver authoring. Opens from the sitemap
     // context menu (⋮ → "Configure resolver") with a row per resolver
@@ -3174,8 +3170,8 @@
         row.appendChild(removeBtn);
 
         // Drag-and-drop handlers — native HTML5. Reorder applies
-        // immediately on drop (no separate "Save order" button — locked
-        // UX decision per Slice 7.5.D kickoff).
+        // immediately on drop (no separate "Save order" button, by
+        // design).
         row.addEventListener('dragstart', (e) => {
             _resolverListDragSrcIndex = idx;
             row.classList.add('sitemap-resolver-list-row--dragging');

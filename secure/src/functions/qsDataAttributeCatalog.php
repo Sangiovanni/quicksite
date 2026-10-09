@@ -3,13 +3,13 @@
  * qsDataAttributeCatalog.php — Single source of truth for the QuickSite-
  * runtime `data-*` attributes used in page authoring.
  *
- * Read by (as of late beta.7):
+ * Read by:
  *   - secure/management/command/listDataBindings.php (admin payload for
  *     the in-editor autocomplete + reference docs)
  *
  * Read by (future):
  *   - The Add Element wizard's Advanced custom-params autocomplete
- *     (beta.7.1 — fed from listDataBindings)
+ *     (fed from listDataBindings)
  *   - docs/ADMIN_PANEL.md §10 (referenced; manually-curated prose links
  *     here for the canonical attribute list)
  *   - (stretch) JsonToHtmlRenderer console.warn for unknown data-qs-*
@@ -23,13 +23,13 @@
  *   3. The picker, the docs reference, and any future renderer
  *      validation pick it up automatically.
  *
- * Pattern mirrors qsVerbCatalog.php (shipped beta.7, commit 142c277) —
+ * Pattern mirrors qsVerbCatalog.php —
  * same justification: avoid duplicated allowlists drifting from each
  * other.
  *
- * Convention note (late beta.7): descriptions are inline English,
- * matching qsVerbCatalog's convention. i18n keys (per the original
- * design doc) were deferred to keep the catalog file readable + match
+ * Convention note: descriptions are inline English,
+ * matching qsVerbCatalog's convention. i18n keys were left out to keep
+ * the catalog file readable + match
  * the existing project pattern. French translation can come later via
  * a wrapping translator if needed.
  */
@@ -73,7 +73,7 @@ if (!defined('SECURE_FOLDER_PATH')) {
  */
 function qsDataAttributeCatalog(): array {
     return [
-        // ─── STATE STORE BINDINGS (beta.7 #9 — 1ac06d6, bc5b0f3, 5eb3ce2) ───
+        // ─── STATE STORE BINDINGS ───
         [
             'name' => 'data-state-value',
             'description' => 'Bind an element\'s textContent to a state-store scalar field. Updates on init / setState / fetchState.',
@@ -192,7 +192,7 @@ function qsDataAttributeCatalog(): array {
             'since' => 'v1.0.0-beta.7'
         ],
 
-        // ─── AUTH-STATE BINDINGS (beta.7 Tier 2 — 1c884ab) ───
+        // ─── AUTH-STATE BINDINGS ───
         [
             'name' => 'data-auth-show',
             'description' => 'Show this element only when logged IN or OUT. Auth sugar over data-storage-show (presence of a token). Requires data-auth-source on this element or an ancestor.',
@@ -219,7 +219,7 @@ function qsDataAttributeCatalog(): array {
             'since' => 'v1.0.0-beta.7'
         ],
 
-        // ─── GENERIC STORAGE BINDINGS (beta.7 Tier 2 — 1c884ab) ───
+        // ─── GENERIC STORAGE BINDINGS ───
         [
             'name' => 'data-storage-show',
             'description' => 'Generic presence-based show/hide on any localStorage / sessionStorage key. Format: "has:storage:key" (show when present) or "missing:storage:key" (show when absent). Re-applies on qs:auth:saved / qs:auth:cleared / qs:storage:changed.',
@@ -243,7 +243,7 @@ function qsDataAttributeCatalog(): array {
             'since' => 'v1.0.0-beta.7'
         ],
 
-        // ─── TEMPLATE / BINDING PRIMITIVES (predates beta.7; still load-bearing) ───
+        // ─── TEMPLATE / BINDING PRIMITIVES ───
         [
             'name' => 'data-bind',
             'description' => 'Per-item template field. Inside a data-state-list or componentList template, the descendant\'s textContent gets set to the named field from each data item.',
@@ -281,7 +281,7 @@ function qsDataAttributeCatalog(): array {
             'since' => 'pre-beta.7'
         ],
 
-        // ─── FORM VALIDATION (predates beta.7) ───
+        // ─── FORM VALIDATION ───
         [
             'name' => 'data-error-for',
             'description' => 'Container for QS.validate error messages. Set the value to the input\'s `name` attribute. On invalid submit, QS.validate writes the browser\'s validation message into this element.',
@@ -294,7 +294,7 @@ function qsDataAttributeCatalog(): array {
             'since' => 'pre-beta.7'
         ],
 
-        // ─── COMPLEX ELEMENT MARKERS (beta.7 — 8129b26) ───
+        // ─── COMPLEX ELEMENT MARKERS ───
         [
             'name' => 'data-qs-complex',
             'description' => 'Marker on the root of a complex-element subtree. Tells the editor "this subtree is a complex element of kind X" — enables features like the Translate-from-CSV workflow (Table only today; future kinds opt in by stamping the same pair).',

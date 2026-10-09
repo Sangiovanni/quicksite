@@ -6,8 +6,8 @@
  * Sits naturally alongside text inputs inside a Form Scaffold and
  * picks up the same QS.validate hooks.
  *
- * MVP scope (per COMPLEX_ELEMENTS.txt with deferred items captured):
- *   - Flat option list (no optgroups — defer to a follow-up sprint).
+ * Scope:
+ *   - Flat option list (no optgroups).
  *   - Plain text option `value` (no raw-vs-textKey toggle).
  *   - Boolean required / multiple.
  *   - Optional first-option placeholder textKey.

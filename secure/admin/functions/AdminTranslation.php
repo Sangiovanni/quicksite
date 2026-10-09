@@ -44,8 +44,8 @@ class AdminTranslation {
         // a session to write it into. This runs on EVERY admin page render,
         // including anonymous ones: booting for write unconditionally minted a
         // session — file, cookie and all — for every visitor who so much as
-        // loaded the login page, which is one half of the accumulation S2.2
-        // exists to stop. Reading a preference needs no session of its own.
+        // loaded the login page, which is one half of how anonymous sessions
+        // pile up on disk. Reading a preference needs no session of its own.
         $switching = !empty($_GET['lang']) && is_string($_GET['lang'])
                      && $this->isValidLanguage($_GET['lang']);
         if ($switching || qs_session_present()) {
@@ -58,7 +58,7 @@ class AdminTranslation {
         // is_string: a query parameter arrives as whatever the caller sent, and
         // `?lang[]=x` is an ARRAY. Passing it to isValidLanguage(string) raised an
         // uncaught TypeError — a fatal on every admin page, this one included,
-        // i.e. reachable with no credentials at all (beta.10 C13 F-C13-22).
+        // i.e. reachable with no credentials at all.
         if (!empty($_GET['lang']) && is_string($_GET['lang'])) {
             $requestedLang = $_GET['lang'];
             if ($this->isValidLanguage($requestedLang)) {
@@ -71,7 +71,7 @@ class AdminTranslation {
         // Then check session. Re-validated rather than trusted: it is only ever
         // written from a checked value above, but a session written BEFORE that
         // check existed would otherwise keep its bad value alive for the life of
-        // the session (F-C13-23).
+        // the session.
         if (!empty($_SESSION['admin_lang']) && is_string($_SESSION['admin_lang'])
             && $this->isValidLanguage($_SESSION['admin_lang'])) {
             $this->currentLang = $_SESSION['admin_lang'];
@@ -120,7 +120,7 @@ class AdminTranslation {
     /**
      * Check if language is available.
      *
-     * SHAPE FIRST, EXISTENCE SECOND (beta.10 C13 F-C13-23). This value is
+     * SHAPE FIRST, EXISTENCE SECOND. This value is
      * concatenated into a filesystem path, and it used to go in unexamined — so
      * `?lang=../../projects/<id>/config/members` resolved out of the translations
      * directory, `file_exists` said yes, and loadTranslations() read that file
@@ -316,7 +316,7 @@ function __adminJs(string $key, array $params = []): string {
  * Helper to resolve workflow translation keys.
  *
  * Workflows are SHIPPED (core only) since the custom workflow feature was
- * removed in beta.10 C8, so every key resolves directly through __admin().
+ * removed, so every key resolves directly through __admin().
  *
  * @param array $spec  The workflow spec (unused; kept for call-site stability)
  * @param string $key  Translation key

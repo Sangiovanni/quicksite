@@ -1,22 +1,22 @@
 <?php
 /**
- * proposeMember Command (C8 8.3b)
+ * proposeMember Command
  *
- * The sponsor lane (model A, locked round 4): ANY member — viewer included —
+ * The sponsor lane (by design): ANY member — viewer included —
  * may vouch an outsider for membership. The proposal lands in the
  * `invitations` block as `direction:'request'` with `by` = the sponsor and a
  * MANDATORY note (the vouch), and needs admin/owner validation
  * (approveJoinRequest) before the outsider is even ENGAGED: no mirror entry,
  * no inbox row, nothing on the target until authority converts it into a
  * real invitation. The sponsor names the role, but MAY NOT propose a role
- * higher than their OWN rank (C8 8.3c — supersedes the 8.3b "sponsor names any
- * role" rule): a viewer vouches for viewers, an editor up to editors. `<=` (not
+ * higher than their OWN rank: a viewer vouches for viewers, an editor up to
+ * editors. `<=` (not
  * strictly-below) is also the only workable bound — a viewer must be able to
  * propose SOMEONE, which strictly-below would forbid. The validator's rank
  * still gates the role again at approve (canManageRole).
  *
  * join_policy does NOT gate proposals: the knob closes the self-service
- * front door (the self-service knock, an account operation since beta.11 S6);
+ * front door (the self-service knock, an account operation);
  * member-vouched proposals always reach the
  * admin queue.
  *
@@ -43,7 +43,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
  * @return ApiResponse
  */
 function __command_proposeMember(array $params = [], array $urlParams = []): ApiResponse {
-    // C8 containment: the target project is EXCLUSIVELY the authorized URL
+    // Project containment: the target project is EXCLUSIVELY the authorized URL
     // marker. Body project/name keys are ignored by design.
     if (!defined('PROJECT_NAME') || PROJECT_NAME === '') {
         return ApiResponse::create(400, 'project.required')
@@ -60,7 +60,7 @@ function __command_proposeMember(array $params = [], array $urlParams = []): Api
 
     $targetId = trim((string)($params['user_id'] ?? ''));
     $role     = trim((string)($params['role'] ?? ''));
-    // C11 11.3 — the note-encoding guard, shared with every roster writer.
+    // The note-encoding guard, shared with every roster writer.
     if (qs_note_encoding_invalid($params['note'] ?? null)) {
         return ApiResponse::create(400, 'validation.unencodable')
             ->withMessage('The note is not valid UTF-8 text')
@@ -88,7 +88,7 @@ function __command_proposeMember(array $params = [], array $urlParams = []): Api
     }
 
     // Target must be an existing account (opaque 128-bit id — an honest 404
-    // is not a practical existence oracle, same reasoning as inviteMember R1).
+    // is not a practical existence oracle, same reasoning as inviteMember).
     $usersCfg = loadUsersConfig();
     if (!isset($usersCfg['users'][$targetId])) {
         return ApiResponse::create(404, 'user.not_found')

@@ -16,7 +16,7 @@
  * the `/p/<id>/` renderer, the JSON→PHP compiler, and eight commands. Before
  * this file each one concatenated the name into a path on its own, so `../`
  * walked out of `templates/model/json/components/` and reached any `.json` the
- * process could read, INCLUDING ANOTHER PROJECT'S (beta.11 S3.10c). Where the
+ * process could read, INCLUDING ANOTHER PROJECT'S. Where the
  * out-of-jail file happened to be component-shaped, its full content rendered
  * into the preview HTML and compiled into the built site. Three commands did
  * carry a jail, but each carried its OWN copy of a near-identical regex and two
@@ -36,7 +36,7 @@
  * A REFERENCE IS REFUSED, NOT REPAIRED. There is no rewriting of `../menu` that
  * means anything as a component name, so a malformed reference is dropped and
  * the reader reports "not found" — the same treatment the tag gate beside it
- * already gives a blocked tag (beta.11 S3.10b, "an identifier from project data
+ * already gives a blocked tag ("an identifier from project data
  * never becomes code").
  *
  * WHY `src/functions/` AND NOT `utilsManagement.php`. Same reason as

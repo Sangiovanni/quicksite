@@ -5,7 +5,7 @@
  * Lists the CALLER's projects — the scan of secure/projects/ is filtered to
  * the projects the authenticated user is a member of (authoritative
  * members.json), each annotated with the caller's role. There is no
- * all-projects API view (C8 / GAP A ruling): a project you are not a member
+ * all-projects API view (by design): a project you are not a member
  * of simply isn't listed.
  *
  * @method GET
@@ -66,7 +66,7 @@ function __command_listProjects(array $params = [], array $urlParams = []): ApiR
             ]);
     }
     
-    // Scan projects directory — MEMBERSHIP-FILTERED (C8/GAP A): only projects
+    // Scan projects directory — MEMBERSHIP-FILTERED: only projects
     // the caller is a member of are listed, role from the authoritative
     // members.json. No resolvable caller (e.g. an in-process run without a
     // request context) → empty list, fail-closed.
@@ -86,7 +86,7 @@ function __command_listProjects(array $params = [], array $urlParams = []): ApiR
         $projects[] = $projectInfo;
     }
     
-    // C15 15.3 — no project is privileged, so there is no "active first" ordering left
+    // No project is privileged, so there is no "active first" ordering
     // to apply: alphabetical is the only meaningful order.
     usort($projects, function($a, $b) {
         return strcasecmp($a['name'], $b['name']);
@@ -165,9 +165,6 @@ function getProjectInfo(string $projectPath, string $projectName): array {
     
     return $info;
 }
-
-// (Removed, S2.9) A local formatBytes(). qs_format_size() in
-// utilsManagement.php is the shared one — see the note in deleteProject.php.
 
 // Execute command if called directly via API (not internal call)
 if (!defined('COMMAND_INTERNAL_CALL')) {

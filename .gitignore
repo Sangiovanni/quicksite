@@ -102,7 +102,7 @@ secure/management/config/login-throttle.json
 secure/management/config/registration-throttle.json
 secure/management/config/upload-throttle.json
 
-# First-run setup token (C14) - the bootstrap credential for creating the very
+# First-run setup token - the bootstrap credential for creating the very
 # first account, written by the engine when the user registry is empty and
 # destroyed the moment it is used. Per-install and secret by construction:
 # reading it IS the authorisation, so it must never be committed.
@@ -116,7 +116,7 @@ secure/management/config/security-trail-key.txt*
 secure/management/config/*.json.lock
 secure/management/config/*.tmp*
 
-# SIDECARS OF EVERY SECRET ABOVE (beta.10 C13 13.6b).
+# SIDECARS OF EVERY SECRET ABOVE.
 # Each secret was ignored by EXACT NAME, so anything derived from it was
 # committable — and `users.php.bak-<timestamp>` carries the full user registry
 # WITH THE PASSWORD HASHES IN IT. That was hit for real on 2026-08-06: the file
@@ -147,15 +147,15 @@ secure/projects/quicksite/config/members.json.*
 !secure/management/config/*.example
 !secure/admin/config/*.example
 
-# Admin config - server-side secrets for data resolver (beta.8 A2) +
-# OAuth provider credentials (beta.9 A1).
+# Admin config - server-side secrets for data resolver +
+# OAuth provider credentials.
 # Gitignored by design — anyone with filesystem access to secure/ can
 # read these. Ship the .example sibling as the template; deployments
 # copy + rename to the live filename and populate.
 secure/admin/config/api-secrets.php
 secure/admin/config/oauth-secrets.php
 
-# Per-project OAuth credentials (beta.9 A1 Slice 2.5 — primary lookup
+# Per-project OAuth credentials (primary lookup
 # before falling back to the admin-level file above). The
 # secure/projects/* tree is already gitignored EXCEPT the quicksite
 # starter template; this re-ignores the secrets file inside the template
@@ -163,28 +163,28 @@ secure/admin/config/oauth-secrets.php
 # leak credentials at commit time.
 secure/projects/quicksite/data/oauth-secrets.json
 
-# Per-project membership/access file (C5). Install-local — references userIds
+# Per-project membership/access file. Install-local — references userIds
 # generated at migration/bootstrap, meaningless without the local users.php.
 # The secure/projects/* tree is gitignored EXCEPT the quicksite starter template,
 # so re-ignore the template's members.json explicitly (like oauth-secrets above).
-# The .lock sibling is qs_members_mutate's flock sidecar (C8 8.3a).
+# The .lock sibling is qs_members_mutate's flock sidecar.
 secure/projects/quicksite/config/members.json
 secure/projects/quicksite/config/members.json.lock
 
-# Resolver response cache (beta.8 A2 Slice 4). File-based TTL cache for
+# Resolver response cache. File-based TTL cache for
 # the server-side data resolver. Per-deployment runtime state — never
 # committed. cleanResolverCache command handles housekeeping; editApi
 # auto-clears on endpoint config change.
 secure/cache/resolver/
 
-# Owner space-usage cache (beta.10 C8 8.5b). Measured per-project disk sizes
+# Owner space-usage cache. Measured per-project disk sizes
 # behind the account space report. Per-deployment runtime state — never committed.
 # Entries expire on a TTL, are pruned when their project disappears, and
 # the account space report's refresh=true rewrites them.
 secure/cache/space/
 
-# Exports folder — legacy shared location. Exports moved under each project in
-# beta.10 C8 8.5 (secure/projects/<id>/exports/); both are runtime artifacts.
+# Exports folder — legacy shared location. Exports live under each project
+# (secure/projects/<id>/exports/); both are runtime artifacts.
 secure/exports/
 secure/projects/*/exports/
 

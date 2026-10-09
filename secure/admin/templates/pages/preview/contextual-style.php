@@ -6,7 +6,6 @@
         </svg>
         <span><?= __admin('preview.styleModeHint') ?? 'Click an element to edit its style, or use the sections below' ?></span>
     </div>
-    <!-- Style sections will be added in Phase 8.3+ -->
     <!-- Advanced top row: Source (raw stylesheet editor). Role-gated on
          editStyles — admin.js filterByPermissions adds .admin-hidden-permission
          when the user lacks the command. Hidden until Style mode activates
@@ -103,7 +102,7 @@
                     <div class="preview-theme-grid preview-theme-grid--colors" id="theme-colors-grid">
                         <!-- Color inputs populated by JS -->
                     </div>
-                    <!-- A3 slice 6 — quick-add variable -->
+                    <!-- Quick-add variable -->
                     <div class="preview-theme-add" data-section="colors">
                         <button type="button" class="preview-theme-add__toggle" data-action="toggle">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
@@ -152,7 +151,7 @@
                     <div class="preview-theme-grid preview-theme-grid--fonts" id="theme-fonts-grid">
                         <!-- Font inputs populated by JS -->
                     </div>
-                    <!-- A3 slice 6 — quick-add variable -->
+                    <!-- Quick-add variable -->
                     <div class="preview-theme-add" data-section="fonts">
                         <button type="button" class="preview-theme-add__toggle" data-action="toggle">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
@@ -201,7 +200,7 @@
                     <div class="preview-theme-grid preview-theme-grid--spacing" id="theme-spacing-grid">
                         <!-- Spacing inputs populated by JS -->
                     </div>
-                    <!-- A3 slice 6 — quick-add variable -->
+                    <!-- Quick-add variable -->
                     <div class="preview-theme-add" data-section="spacing">
                         <button type="button" class="preview-theme-add__toggle" data-action="toggle">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
@@ -271,7 +270,7 @@
             </div>
         </div>
         
-        <!-- Selectors Panel (Phase 8.4) -->
+        <!-- Selectors Panel -->
         <div class="preview-selectors-panel" id="selectors-panel" data-tab="selectors" style="display: none;">
             <!-- Selector Search -->
             <div class="preview-selectors-search">
@@ -535,7 +534,7 @@
             </div>
         </div>
         
-        <!-- Source Panel (A3 — sidebar controls). The actual code editor
+        <!-- Source Panel (sidebar controls). The actual code editor
              mounts in the canvas (#preview-source-canvas); this sidebar
              carries the metadata, Save/Cancel actions, dirty indicator,
              and Refine link. -->
@@ -580,7 +579,7 @@
                         <span><?= __admin('preview.styleSourceCancel', 'Cancel') ?></span>
                     </button>
                 </div>
-                <!-- Refine link navigates in the SAME tab (slice 4 review).
+                <!-- Refine link navigates in the SAME tab.
                      Opening in a new tab risked the user refining there + coming
                      back here with stale content unaware. JS click handler shows
                      the dirty-confirm prompt if needed; native beforeunload is
@@ -599,7 +598,7 @@
             </div>
         </div>
 
-        <!-- Style Editor Panel (Phase 8.5) - shows when editing a selector -->
+        <!-- Style Editor Panel - shows when editing a selector -->
         <div class="preview-style-editor" id="style-editor" style="display: none;">
             <div class="preview-style-editor__header">
                 <button type="button" class="preview-style-editor__back" id="style-editor-back" title="<?= __admin('common.back') ?? 'Back' ?>">

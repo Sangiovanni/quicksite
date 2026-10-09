@@ -45,10 +45,9 @@
        Aliased to --admin-bg-secondary so cards keep the same visual
        weight as the existing card backgrounds; project CSS can
        override for a distinct shade if needed.
-       Discovered during BETA7_TABLE_TRANSLATION_CSV testing — the
-       Translate-from-CSV modal looked washed-out against the editor
-       behind it. Fixing this root variable repairs every other
-       modal (add-node, keyframe, transform, …) in one stroke. */
+       Without it the Translate-from-CSV modal looks washed-out against
+       the editor behind it, and so does every other modal (add-node,
+       keyframe, transform, …). */
     --admin-card-bg: var(--admin-bg-secondary);
     --admin-surface: #3a322a;
     --admin-surface-hover: #453c32;
@@ -2184,12 +2183,10 @@ kbd {
     text-align: right;
 }
 
-/* Beta.8 A1 — Param routes: accent the ':name' segment + count badge so
+/* Param routes: accent the ':name' segment + count badge so
    variable routes (e.g. /products/:slug) read distinctly from static ones.
    Uses --admin-accent (the project's defined warm-copper accent token,
-   #c2703e) — NOT --admin-primary, which is referenced 100+ times across
-   this file but never defined, so all call sites silently fall back to
-   inherited color. See note in commit msg / PR for the broader cleanup. */
+   #c2703e) directly; --admin-primary is an alias of it. */
 .sitemap__route-path-segment--param {
     color: var(--admin-accent);
     font-weight: var(--font-weight-medium);
@@ -2208,7 +2205,7 @@ kbd {
     vertical-align: baseline;
 }
 
-/* Beta.8 A2 Slice 7 — server-side data resolver presence indicator.
+/* Server-side data resolver presence indicator.
    Uses the --admin-info palette to distinguish from the --params badge
    (accent palette): a route can have BOTH and the two need to be
    visually parseable at a glance. */
@@ -7240,7 +7237,7 @@ kbd {
 }
 
 /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   CONTEXTUAL AREA - Phase 8: Dynamic content area between toolbar and preview
+   CONTEXTUAL AREA - Dynamic content area between toolbar and preview
    â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 .preview-contextual-area {
@@ -7388,7 +7385,7 @@ code.preview-contextual-info__value {
     border: 1px solid #eab3084d;
 }
 
-/* Navigation Buttons (Phase 5) */
+/* Navigation Buttons */
 .preview-contextual-info__nav {
     display: flex;
     justify-content: center;
@@ -7440,7 +7437,7 @@ code.preview-contextual-info__value {
     font-size: var(--font-size-sm);
 }
 
-/* Style Mode — Source (advanced row above the tabs, Beta.9 A3) */
+/* Style Mode — Source (advanced row above the tabs) */
 .preview-contextual-style-advanced {
     margin-bottom: var(--space-xs);
 }
@@ -7479,7 +7476,7 @@ code.preview-contextual-info__value {
     padding: var(--space-sm) 0;
 }
 
-/* Sidebar layout when Source is active (A3 slice 2) */
+/* Sidebar layout when Source is active */
 .preview-source-sidebar {
     display: flex;
     flex-direction: column;
@@ -7508,7 +7505,7 @@ code.preview-contextual-info__value {
     border-radius: var(--radius-sm);
 }
 
-/* Dirty / clean indicator (A3 slice 4) */
+/* Dirty / clean indicator */
 .preview-source-sidebar__status {
     display: flex;
     align-items: center;
@@ -7587,7 +7584,7 @@ code.preview-contextual-info__value {
     border-color: var(--admin-text-muted);
 }
 
-/* Canvas-area host for the full-CSS editor (A3 slice 2). Replaces the
+/* Canvas-area host for the full-CSS editor. Replaces the
    iframe canvas while Source is active — preview.js toggles display on
    #preview-source-canvas vs #preview-container. */
 .preview-source-canvas {
@@ -7623,7 +7620,7 @@ code.preview-contextual-info__value {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
-/* Search bar (A3 slice 3) */
+/* Search bar */
 .preview-source-canvas__search {
     display: flex;
     align-items: center;
@@ -7699,7 +7696,7 @@ code.preview-contextual-info__value {
     cursor: not-allowed;
 }
 
-/* Restore-draft banner (A3 slice 4). Sits between the toolbar and the
+/* Restore-draft banner. Sits between the toolbar and the
    editor mount when a localStorage draft exists. */
 .preview-source-canvas__restore-banner {
     display: flex;
@@ -7923,7 +7920,7 @@ code.preview-contextual-info__value {
 
 /* Responsive adjustments */
 
-/* ==================== Theme Variables Editor (Phase 8.3) ==================== */
+/* ==================== Theme Variables Editor ==================== */
 
 .preview-theme-loading {
     display: flex;
@@ -7976,7 +7973,7 @@ code.preview-contextual-info__value {
     opacity: 0.6;
 }
 
-/* Theme quick-add variable (A3 slice 6) — sits below the grid in each
+/* Theme quick-add variable — sits below the grid in each
    of the Colors / Fonts / Spacing sections. Collapsed by default; the
    toggle button expands an inline form with scope-aware writes. */
 .preview-theme-add {
@@ -8336,7 +8333,7 @@ code.preview-contextual-info__value {
     color: var(--admin-text);
 }
 
-/* ===== Selectors Panel (Phase 8.4) ===== */
+/* ===== Selectors Panel ===== */
 .preview-selectors-panel,
 .preview-animations-panel {
     padding: var(--space-sm);
@@ -8444,8 +8441,8 @@ code.preview-contextual-info__value {
     text-align: left;
 }
 
-/* Info icon next to a group title (A3-companion Motion Slice 1 — used by
-   the Hover-state-only group; native tooltip on parent's title= attribute). */
+/* Info icon next to a group title (used by the Hover-state-only group;
+   native tooltip on parent's title= attribute). */
 .preview-animations-group__info {
     color: var(--admin-text-muted);
     opacity: 0.6;
@@ -8453,7 +8450,7 @@ code.preview-contextual-info__value {
     margin-right: 4px;
 }
 
-/* Apply-keyframe-to-selector modal (Motion Slice 2). Opens from any
+/* Apply-keyframe-to-selector modal. Opens from any
    keyframe row in the Keyframes library → picks a selector → writes
    `animation: <name> 1s ease;` via setStyleRule. Sits above the canvas. */
 .apply-keyframe-modal {
@@ -8627,7 +8624,7 @@ code.preview-contextual-info__value {
     pointer-events: none;
 }
 
-/* Keyframe "used by N" badge + inline user list (Motion Slice 2b). The
+/* Keyframe "used by N" badge + inline user list. The
    badge sits next to the keyframe name + frame count; clicking it toggles
    the expansion below the row, each user-line carries an ✕ remove button. */
 .preview-keyframe-item__used-by {
@@ -8714,7 +8711,7 @@ code.preview-contextual-info__value {
     background: rgba(217, 119, 102, 0.12);
 }
 
-/* QSEasingPicker — cubic-bezier easing picker (Motion Slice 3). */
+/* QSEasingPicker — cubic-bezier easing picker. */
 .qs-easing-picker {
     position: fixed;
     inset: 0;
@@ -8987,8 +8984,8 @@ code.preview-contextual-info__value {
     border-top: 1px solid var(--admin-border);
 }
 
-/* "+ Add transition" trigger button — prepended to the Transitions list
-   (Motion Slice 4). Sits inside .preview-animations-group__list so it
+/* "+ Add transition" trigger button — prepended to the Transitions list.
+   Sits inside .preview-animations-group__list so it
    inherits the collapse behaviour. */
 .preview-animations-group__add {
     display: flex;
@@ -9012,7 +9009,7 @@ code.preview-contextual-info__value {
     border-color: var(--admin-text-muted);
 }
 
-/* Add-transition wizard modal (Motion Slice 4). Mirrors the apply-keyframe
+/* Add-transition wizard modal. Mirrors the apply-keyframe
    modal structure but with form fields for property / duration / easing /
    delay. Easing slot opens QSEasingPicker. */
 .add-transition-modal {
@@ -9607,7 +9604,7 @@ code.preview-contextual-info__value {
     font-size: var(--font-size-sm);
 }
 
-/* ==================== Style Editor (Phase 8.5) ==================== */
+/* ==================== Style Editor ==================== */
 
 .preview-style-editor {
     display: flex;
@@ -10003,7 +10000,7 @@ code.preview-contextual-info__value {
     margin: 0;
 }
 
-/* Property Selector Dropdown (Phase 8.7) */
+/* Property Selector Dropdown */
 .preview-property-selector,
 .qs-property-selector {
     position: relative;
@@ -10122,7 +10119,7 @@ code.preview-contextual-info__value {
     margin-top: var(--space-xs);
 }
 
-/* QS Property Selector - Reusable Component (Phase 10.3) */
+/* QS Property Selector - Reusable Component */
 
 .qs-property-selector__dropdown {
     position: fixed;
@@ -10138,7 +10135,7 @@ code.preview-contextual-info__value {
     overflow: hidden;
 }
 
-/* QS Value Input - Reusable Component (Phase 10.3) */
+/* QS Value Input - Reusable Component */
 .qs-value-input {
     display: flex;
     align-items: center;
@@ -11118,7 +11115,7 @@ code.preview-contextual-info__value {
     word-break: break-all;
 }
 
-/* Inline Add Property (Phase 10.2) */
+/* Inline Add Property */
 .transition-editor__add-property {
     margin-top: auto;
     padding-top: var(--space-xs);
@@ -11237,7 +11234,7 @@ code.preview-contextual-info__value {
     color: var(--admin-danger);
 }
 
-/* Animation Sections (Phase 10.3) */
+/* Animation Sections */
 
 .transition-editor__animations-info {
     display: flex;
@@ -11784,7 +11781,7 @@ code.preview-contextual-info__value {
     border-left: 2px solid var(--admin-border);
 }
 
-/* Node Info Panel (DEPRECATED - Phase 8 moves to contextual area) */
+/* Node Info Panel (DEPRECATED - superseded by the contextual area) */
 .preview-node-panel {
     position: fixed;
     right: var(--space-lg);
@@ -12300,7 +12297,7 @@ code.preview-node-panel__value {
     box-shadow: 0 0 0 2px #f59e0b33;
 }
 
-/* Beta.9 A2 Slice 5 — route inputType hybrid picker.
+/* Route inputType hybrid picker.
    Wrapper holds two interchangeable widgets: a QSSearchableSelect
    (picker mode) and a text input + back button (custom-URL mode).
    At any moment ONE of {qs-searchable-select container, custom input}
@@ -12350,7 +12347,7 @@ code.preview-node-panel__value {
     box-shadow: 0 0 0 2px #f59e0b33;
 }
 
-/* Beta.9 A2 Slice 6 — translationKey hybrid picker.
+/* translationKey hybrid picker.
    Same shape as the route picker: a column-stacked picker host on top,
    sentinel button below, with custom-mode (text input + back) hidden
    until activated. Wider than the route picker because the inline
@@ -12418,7 +12415,7 @@ code.preview-node-panel__value {
     box-shadow: 0 0 0 2px #f59e0b33;
 }
 
-/* Beta.9 A2 Slice 5 follow-up — required-arg validation feedback.
+/* Required-arg validation feedback.
    Painted by _applyArgErrors when save is blocked. Class lifts as
    soon as the user starts editing the offending field (one-shot
    listener attached by _applyArgErrors). The :has() selector tints
@@ -12631,7 +12628,7 @@ code.preview-node-panel__value {
     font-weight: 500;
 }
 
-/* ──────────────────── auth helper hint (AUTH_FLOWS Tier 1) ──────────────────── */
+/* ──────────────────── auth helper hint (Tier 1) ──────────────────── */
 .preview-contextual-js-form-auth-hint {
     display: flex;
     align-items: center;
@@ -13389,7 +13386,7 @@ code.preview-node-panel__value {
     color: var(--admin-text);
 }
 
-/* Input wizard (Group A, beta.6): required-star + helper hint + error state */
+/* Input wizard: required-star + helper hint + error state */
 .preview-contextual-form__param-required {
     color: var(--admin-danger, #c0392b);
     margin-left: 2px;
@@ -15330,7 +15327,7 @@ code.preview-node-panel__value {
 }
 
 /* ========================================================================
-   AI Connections page (Phase 3) â€” connection cards, status dots, wizard
+   AI Connections page â€” connection cards, status dots, wizard
    ======================================================================== */
 .qsac-card {
     border: 1px solid var(--color-border, #e5e7eb);
@@ -17324,7 +17321,7 @@ body[data-page="preview"] .global-miniplayer {
 /* --- Responsive --- */
 
 
-/* ========== AI Phase 4: streaming counter + error ribbon ========== */
+/* ========== AI: streaming counter + error ribbon ========== */
 .ai-stream-counter {
     position: absolute; right: 10px; bottom: 10px;
     padding: 3px 8px;
@@ -17494,12 +17491,11 @@ body[data-page="preview"] .global-miniplayer {
     color: var(--admin-warning, #b3691e);
 }
 
-/* Beta.8 A2 Slice 7 — Configure-resolver modal.
+/* Configure-resolver modal.
    Geometry mirrors .sitemap-edit-title-modal__* (same modal shell), with
    a wider max-width (the form has more sections than the edit-title's
    single column of per-language inputs). Kept as a parallel class set
-   instead of consolidating to a shared .sitemap-modal__* base: that's a
-   beta.9+ refactor once a third modal makes the work worth it. */
+   instead of a shared .sitemap-modal__* base. */
 .sitemap-resolver-modal {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
     z-index: 10000;
@@ -17583,9 +17579,9 @@ body[data-page="preview"] .global-miniplayer {
     color: var(--admin-warning, #b3691e);
 }
 
-/* Beta.8 A2 Slice 7 Step 3 — inputs editor rows.
+/* Inputs editor rows.
    Layout: name = kind value × (in one flex line). The shared
-   .sitemap-resolver-rows wrap is reused by the expose editor (Step 4)
+   .sitemap-resolver-rows wrap is reused by the expose editor
    and any future row-style sub-editor. Row classes stay separate so
    inputs + expose can diverge if their fields end up needing different
    geometry (so far they don't, but the option's there). */
@@ -17600,10 +17596,9 @@ body[data-page="preview"] .global-miniplayer {
     align-items: center;
     gap: var(--space-xs);
 }
-/* Beta.8 A2 Slice 7 Step 4 follow-up — name field swapped to a
-   cell-wrapper pattern so the inner element can flip between <select>
-   (endpoint declares params) and <input> (no declared params), same
-   as the value cell and the expose path cell. */
+/* Name field — a cell-wrapper pattern so the inner element can flip
+   between <select> (endpoint declares params) and <input> (no declared
+   params), same as the value cell and the expose path cell. */
 .sitemap-resolver-input-row__name-cell { flex: 1 1 25%; min-width: 0; }
 .sitemap-resolver-input-row__name-cell > * { width: 100%; }
 .sitemap-resolver-input-row__sep {
@@ -17636,7 +17631,7 @@ body[data-page="preview"] .global-miniplayer {
     background: rgba(179, 38, 30, 0.06);
 }
 
-/* Beta.8 A2 Slice 7 Step 4 — expose editor rows.
+/* Expose editor rows.
    Layout: varName ← dotPath × (in one flex line). The varName field
    gets less width than inputs' name field because dot-paths are
    typically longer (data.product.images.0.url etc.). */
@@ -17669,7 +17664,7 @@ body[data-page="preview"] .global-miniplayer {
     background: rgba(179, 38, 30, 0.06);
 }
 
-/* Beta.8 A2 Slice 7 Step 5 — cacheTTL section.
+/* cacheTTL section.
    Layout: [number] seconds [auth-cacheable badge]. The badge is
    read-only and surfaces the server-side rule (caching is force-
    disabled for bearer/cookie/basic auth) so the author isn't
@@ -17702,15 +17697,14 @@ body[data-page="preview"] .global-miniplayer {
     color: var(--admin-warning);
 }
 
-/* Beta.8 A2 Slice 7 Step 5 — onMiss section. Single full-width
-   select; future onMiss values reserved per the design doc but only
-   render-empty + default are surfaced today. */
+/* onMiss section. Single full-width select; further onMiss values are
+   reserved, but only render-empty + default are surfaced today. */
 .sitemap-resolver-onmiss-select {
     width: 100%;
     margin-top: var(--space-xs);
 }
 
-/* Beta.8 A2 Slice 7.5.D — Resolver list-view modal.
+/* Resolver list-view modal.
    Same shell pattern as the per-config and edit-title modals; the
    list rows + drag-and-drop are the new bits. */
 .sitemap-resolver-list-modal {
@@ -17861,7 +17855,7 @@ body[data-page="preview"] .global-miniplayer {
     margin-top: var(--space-xs);
 }
 
-/* Paged-navigator complex element (BETA7 #11, beta.7 close).
+/* Paged-navigator complex element.
    Bound at runtime to a state-store via [data-state-pagenav]; the
    <nav>'s children are rebuilt by qs.js whenever the store updates.
    Styling kept minimal + theme-agnostic; project CSS can override. */
@@ -17901,7 +17895,7 @@ body[data-page="preview"] .global-miniplayer {
 }
 
 /* ─────────────────────────────────────────────────────────────────
-   Translation Manager panel (Beta.9 A4)
+   Translation Manager panel
    See preview-translation.js + contextual-translation.php.
    ───────────────────────────────────────────────────────────────── */
 
@@ -18153,7 +18147,7 @@ body[data-page="preview"] .global-miniplayer {
     justify-content: flex-end;
 }
 
-/* Slice 5 — inline row-expand editor */
+/* Inline row-expand editor */
 .preview-contextual-translation__row-editor {
     background: var(--admin-bg-secondary);
     border-left: 3px solid var(--admin-accent);
@@ -18199,7 +18193,7 @@ body[data-page="preview"] .global-miniplayer {
     align-items: center;
 }
 
-/* Slice 6 — per-row delete confirm (mirrors editor mechanism with a
+/* Per-row delete confirm (mirrors editor mechanism with a
    warning-tinted border instead of accent). */
 .preview-contextual-translation__row-confirm {
     background: var(--admin-bg-secondary);
@@ -18228,7 +18222,7 @@ body[data-page="preview"] .global-miniplayer {
     max-width: 100%;
 }
 
-/* Slice 6 — bulk delete confirm view (replaces the row list). */
+/* Bulk delete confirm view (replaces the row list). */
 .preview-contextual-translation__bulk-confirm {
     display: flex;
     flex-direction: column;
@@ -18293,7 +18287,7 @@ body[data-page="preview"] .global-miniplayer {
     border-top: 1px solid var(--admin-border);
 }
 
-/* Slice 6+ — "Delete from all N languages" opt-in checkbox.
+/* "Delete from all N languages" opt-in checkbox.
    Used in both per-row and bulk confirm panels. */
 .preview-contextual-translation__multi-lang {
     display: inline-flex;

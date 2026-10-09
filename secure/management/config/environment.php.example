@@ -1,6 +1,6 @@
 <?php
 /**
- * Runtime Environment  (beta.10 C4 / F8)
+ * Runtime Environment
  *
  * Copy this file to environment.php to change the environment. If the live
  * file is absent, QuickSite behaves as 'production' (the secure default).

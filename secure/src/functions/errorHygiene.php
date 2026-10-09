@@ -1,6 +1,6 @@
 <?php
 /**
- * Fatal-error hygiene for the request dispatchers (beta.10 C12, C13).
+ * Fatal-error hygiene for the request dispatchers.
  *
  * A PHP fatal happens outside every `try` an application can write: it is not
  * an exception, nothing catches it, and whatever the interpreter prints goes
@@ -16,12 +16,12 @@
  *     /management   500  {"status":500,"code":"server.internal_error",…}   0 paths
  *     /admin/api    200  <b>Parse error</b>: … in <b>C:\…\config.php</b>    1 path
  *
- * This is that logic, extracted rather than copied. C11 spent a slice unifying
- * seven hand-copied marker binds; adding an eighth copy of anything is the
- * shape that beta was fixing. One implementation, four response shapes, one
+ * This is that logic, extracted rather than copied: seven hand-copied marker
+ * binds were unified into one, and an eighth copy of anything would be the
+ * same drift. One implementation, four response shapes, one
  * place where the development gate is consulted.
  *
- * C13 added the third shape and the third caller: the admin PAGE surface
+ * The third shape is for the third caller: the admin PAGE surface
  * (`public/admin/index.php`) also had no fatal handling, so the identical
  * defect was live there — an admin page answering 200 with a stack trace and
  * absolute paths in its body. A page cannot answer with a JSON envelope, hence
@@ -69,7 +69,7 @@ function qs_register_fatal_handler(string $shape = QS_FATAL_SHAPE_ENVELOPE): voi
     }
     $registered = true;
 
-    // beta.10 C13 F-C13-14(a). The shutdown handler below deliberately bails once
+    // The shutdown handler below deliberately bails once
     // headers_sent() is true — after that point the status and Content-Type are on
     // the wire and nothing can be repaired. A fatal raised INSIDE that window is
     // therefore uncoverable, and with display_errors on the interpreter prints the
@@ -78,7 +78,7 @@ function qs_register_fatal_handler(string $shape = QS_FATAL_SHAPE_ENVELOPE): voi
     // the error still goes to the log, which is where it belongs in production.
     //
     // Lives here rather than in each dispatcher because both of them enter through
-    // this one call, and C11 spent a slice deleting hand-copied duplicates.
+    // this one call, and hand-copied duplicates drift.
     require_once __DIR__ . '/environment.php';
     if (!qs_is_development()) {
         ini_set('display_errors', '0');
@@ -311,8 +311,8 @@ function qs_safe_error_message(Throwable $e, string $context = ''): string
  * `copy()` emits a `Warning` carrying the absolute source path when it fails.
  * Callers that already test the return value still leak that warning wherever
  * display_errors is on — which is every development install, since
- * qs_register_fatal_handler only forces it off in production (beta.11 S3.10c,
- * audit F5). Suppressing the warning loses nothing: the failure is still
+ * qs_register_fatal_handler only forces it off in production. Suppressing the
+ * warning loses nothing: the failure is still
  * detected, and the reason now travels through the same redaction policy as
  * every other message that reaches a response body.
  *

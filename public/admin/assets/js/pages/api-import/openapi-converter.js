@@ -1,15 +1,15 @@
 /**
  * OpenAPI 3.x  →  QuickSite api-endpoints.json converter.
  *
- * Slice 1 — paths × methods → endpoint records, `{x}` → `:x` rewrite,
- *           path/query parameters, slugified IDs with collision suffix.
- * Slice 2 — $ref resolution (local refs), requestBody → requestSchema,
- *           2xx response → responseSchema, allOf inline, oneOf/anyOf skip,
- *           example stripping for credential-named properties, shape
- *           normalisation against QuickSite's validator rules.
- * Slice 3 — securitySchemes → API-level auth (apiKey / http-bearer /
- *           http-basic / oauth2 / openIdConnect / cookie); per-endpoint
- *           inherit/none/required derived from op.security vs global.
+ * - paths × methods → endpoint records, `{x}` → `:x` rewrite,
+ *   path/query parameters, slugified IDs with collision suffix.
+ * - $ref resolution (local refs), requestBody → requestSchema,
+ *   2xx response → responseSchema, allOf inline, oneOf/anyOf skip,
+ *   example stripping for credential-named properties, shape
+ *   normalisation against QuickSite's validator rules.
+ * - securitySchemes → API-level auth (apiKey / http-bearer /
+ *   http-basic / oauth2 / openIdConnect / cookie); per-endpoint
+ *   inherit/none/required derived from op.security vs global.
  *
  * Exposes window.QSApiImport.{detectOpenApi, convertOpenApi}.
  */
@@ -378,7 +378,7 @@
             const keyName = String(scheme.name || 'API-Key');
             const where = String(scheme.in || 'header').toLowerCase();
             if (where === 'cookie') {
-                // Q5 lock — best-effort map + warning. QuickSite's cookie
+                // By design: best-effort map + warning. QuickSite's cookie
                 // auth assumes Pattern X (same-origin session cookie owned
                 // by the browser); not all "cookie security" specs match.
                 notes.push('Security: scheme "' + schemeName + '" is apiKey-in-cookie (cookie: "' + keyName +

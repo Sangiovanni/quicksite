@@ -45,7 +45,7 @@ if (!function_exists('listbackups_formatSize')) {
  * @return ApiResponse
  */
 function __command_listBackups(array $params = [], array $urlParams = []): ApiResponse {
-    // C8 8.4 CONTAINMENT (confused-deputy / F6): the listed project is BOUND to
+    // CONTAINMENT (confused deputy): the listed project is BOUND to
     // the URL marker (PROJECT_NAME, authorized by the dispatcher — project.data,
     // admin+). A body `name` that disagrees is refused; body is optional. You
     // cannot enumerate the backups of a project you did not target/authorize.
@@ -56,7 +56,7 @@ function __command_listBackups(array $params = [], array $urlParams = []): ApiRe
     $projectName = $bound['project'];
 
     // Reject a traversal payload before the backups path is enumerated
-    // (beta.10 C3 F1 listBackups). The active-project fallback is trusted.
+    // The active-project fallback is trusted.
     if (!is_valid_project_name((string)$projectName)) {
         return ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage('Invalid project name')

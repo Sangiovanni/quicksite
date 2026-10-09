@@ -10,8 +10,8 @@
  * var, punct.
  *
  * This is a tokenizer, not a CSS parser — invalid CSS will still render,
- * just with some tokens classified loosely. That matches the lightened
- * A3 scope: the iframe is the validity feedback, not the editor.
+ * just with some tokens classified loosely. That is by design: the iframe
+ * is the validity feedback, not the editor.
  */
 (function () {
     'use strict';

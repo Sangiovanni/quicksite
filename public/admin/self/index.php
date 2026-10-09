@@ -3,7 +3,7 @@
  * Admin Panel Self-Service Endpoint
  *
  * The caller's own account, their own project ACCESS, and the two directory
- * lookups those flows need. Under the beta.11 rule the command surface is a CLI
+ * lookups those flows need. By design the command surface is a CLI
  * for DEVELOPING a project and the panel is a tool that USES it; none of this is
  * project development, so none of it is a command.
  *
@@ -45,7 +45,7 @@
  * Every route here replaces a command in a `scope: global`, `access: 'any'`
  * category, so hasPermission() contributed authentication and nothing else. The
  * real gates (the current-password re-check and the login backoff on the two
- * credential routes; the F1 project validation, the caller-owns-this-entry rule
+ * credential routes; the project-name validation, the caller-owns-this-entry rule
  * and the accept-time re-validation on the membership routes) are all in the
  * handlers and are unchanged.
  *

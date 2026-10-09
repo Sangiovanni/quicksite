@@ -1,10 +1,10 @@
 <?php
 /**
- * surfaceB.php (beta.10 C9) — `/p/<projectId>/` live project view + static passthrough.
+ * surfaceB.php — `/p/<projectId>/` live project view + static passthrough.
  *
- * Surface B (AUTH_REWORK §5.5): the live WIP site of a project, rendered from
+ * Surface B: the live WIP site of a project, rendered from
  * `secure/projects/<id>/public/` + templates by the existing engine, and served under
- * `/p/<id>/`. C15 15.2: EVERY project is reached this way — there is no privileged root
+ * `/p/<id>/`. EVERY project is reached this way — there is no privileged root
  * project any more, and the web root is free (the renderer lives at public/p/index.php).
  *
  * ONE ENTRY, ALWAYS. A project is reached at `/p/<id>/` and nowhere else. There
@@ -26,23 +26,22 @@
  *      Whether that id names a real project is NOT asked here — the gate decides,
  *      and it is the same decision for "private" and for "does not exist", which
  *      is what keeps the two indistinguishable (see qs_surface_b_gate).
- *      Sets BASE_URL before init.php would derive it. PUBLIC_CONTENT_PATH is NOT set here: C15 15.3 binds it
- *      beside PROJECT_PATH in qs_load_project_context(), so there is no longer a competing
+ *      Sets BASE_URL before init.php would derive it. PUBLIC_CONTENT_PATH is NOT set here: it is bound
+ *      beside PROJECT_PATH in qs_load_project_context(), so there is no competing
  *      definition to pre-empt.
  *   2. qs_surface_b_finish()        — runs AFTER init + qs_load_project_context(id).
- *      Enforces visibility + membership (L11/§8.4), then either serves a static asset
- *      through the L11 canonicalise+prefix-checked passthrough (secrets UNREACHABLE),
+ *      Enforces visibility + membership, then either serves a static asset
+ *      through the canonicalise+prefix-checked passthrough (secrets UNREACHABLE),
  *      or sets up the HTML live-render (freshness/backfill of qs-*.js, CSP header,
  *      REQUEST_URI rewrite) and returns so public/p/index.php's normal pipeline renders.
  *
- * L11: the static passthrough serves ONLY files inside `…/public/`; `config/`
+ * The static passthrough serves ONLY files inside `…/public/`; `config/`
  * (members.json), `data/` (api-endpoints.json), `routes.php`, `config.php`,
- * `templates/`, `translate/` are unreachable by construction. Proven by
- * scratchpad/c9_passthrough_poc.php (25/25) and the live check in this concern.
+ * `templates/`, `translate/` are unreachable by construction.
  */
 
 require_once __DIR__ . '/projectPublicArtifacts.php'; // QS_RESERVED_BASE + regen helpers
-require_once __DIR__ . '/projectContext.php';         // qs_request_origin (R6) — pre-init-safe
+require_once __DIR__ . '/projectContext.php';         // qs_request_origin — pre-init-safe
 
 /**
  * How big a file may be before its ETag stops being a content hash.
@@ -56,7 +55,7 @@ require_once __DIR__ . '/projectContext.php';         // qs_request_origin (R6) 
  * video on every conditional request would cost more than sending it.
  *
  * Neither form contains a path, an inode or anything else about the filesystem.
- * beta.10 removed absolute paths from responses on purpose, and an ETag is a
+ * Absolute paths are kept out of responses on purpose, and an ETag is a
  * response header like any other.
  */
 const QS_SB_ETAG_CONTENT_MAX = 1048576; // 1 MiB
@@ -65,15 +64,15 @@ const QS_SB_ETAG_CONTENT_MAX = 1048576; // 1 MiB
  *  enough that a 200 MB file never sits in memory. */
 const QS_SB_STREAM_CHUNK = 262144; // 256 KiB
 
-/** F1 id shape (replicated so this can run pre-init without PathManagement). */
+/** Project id shape (replicated so this can run pre-init without PathManagement). */
 function qs_sb_valid_id(string $id): bool {
     return $id !== '' && preg_match('/^[A-Za-z0-9_-]{1,64}$/D', $id) === 1;
 }
 
 /**
- * The surface-B visibility + membership gate (§8.4). PRE-INIT-safe: only needs
+ * The surface-B visibility + membership gate. PRE-INIT-safe: only needs
  * SECURE_FOLDER_PATH (defined here from the computed secure root when init.php
- * has not run yet) + members.json + the C5b session store.
+ * has not run yet) + members.json + the session store.
  *
  * EXISTENCE POSTURE: every refusal is 404, the SAME status an id that names no
  * project gets. A private project is therefore indistinguishable from one that
@@ -95,8 +94,8 @@ function qs_sb_valid_id(string $id): bool {
  * — which cannot exist without the project.
  *
  * That property is load-bearing and was learned the hard way. The oracle was
- * closed once in beta.10 by making the two refusals emit matching headers, and
- * beta.11's session rework reopened it: routing checked existence FIRST, so a
+ * closed once by making the two refusals emit matching headers, and a later
+ * session rework reopened it: routing checked existence FIRST, so a
  * real id ran this gate (starting a session, emitting PHP's `Expires` and
  * `Pragma` cache-limiter headers) while a ghost id was refused earlier and
  * emitted neither. Any caller holding ANY cookie could read the difference. The
@@ -203,21 +202,21 @@ function qs_surface_b_maybe_handle(): void {
         // deployment's own FallbackResource / try_files that carries no marker.
         // Nothing to gate, and no id whose existence could leak: public/p/index.php
         // answers the generic 404 below its own require of init.php. There is no
-        // privileged project to fall back to (C15 15.3).
+        // privileged project to fall back to.
         return;
     }
 
     $id = rawurldecode($segs[$idIndex + 1]);
 
-    // ---- visibility + membership gate (§8.4) — PRE-INIT deliberately ------------
+    // ---- visibility + membership gate — PRE-INIT deliberately -------------------
     // THE single decision point for every id this surface is asked about: private,
     // public, nonexistent and malformed all arrive here and are answered by the
     // same lines at the same moment in the request. A refused request answers a
     // generic, engine-owned status page and stops — it does not reach init.php,
     // and neither does a nonexistent one any more, so there is no longer a pair
     // of refusal paths whose responses have to be kept matching by hand.
-    // It used to fall through to the NORMAL pipeline so the MAIN served project could
-    // render ITS error page; C15 15.3 deleted the served project, so there is no other
+    // There is no served MAIN project whose error page the NORMAL pipeline could
+    // render, so there is no other
     // project to borrow a template from — and borrowing the REQUESTED project's own
     // template would hand a non-member that private project's styling and branding.
     // The generic page is byte-identical whatever the reason, so it adds no oracle.
@@ -234,7 +233,7 @@ function qs_surface_b_maybe_handle(): void {
     $subSegs    = array_slice($segs, $idIndex + 2);          // the rest (route or asset)
     $subpath    = implode('/', $subSegs);                    // RAW (kept encoded for the resolver)
 
-    // C15 15.4 (R6): validated origin, never the raw Host header.
+    // Validated origin, never the raw Host header.
     $baseUrl = qs_request_origin() . '/' . implode('/', $prefixSegs) . '/';
 
     $GLOBALS['__qs_sb'] = [
@@ -246,7 +245,7 @@ function qs_surface_b_maybe_handle(): void {
     ];
 
     // Override the base-derived URL BEFORE init.php derives it (all if(!defined())).
-    // PUBLIC_CONTENT_PATH is bound with the project by qs_load_project_context() (15.3).
+    // PUBLIC_CONTENT_PATH is bound with the project by qs_load_project_context().
     if (!defined('BASE_URL'))             define('BASE_URL', $baseUrl);
     if (!defined('QS_SURFACE_B_PROJECT')) define('QS_SURFACE_B_PROJECT', $id);
     if (!defined('QS_SURFACE_B'))         define('QS_SURFACE_B', true);
@@ -270,10 +269,10 @@ function qs_surface_b_finish(): void {
     // a denied request never reaches this function: it boots the MAIN site and
     // renders its error page instead. Reaching here = public project or member.)
 
-    // ---- static passthrough (L11) ------------------------------------------------
+    // ---- static passthrough ------------------------------------------------------
     if ($subpath !== '') {
         // qs.js is the shared ENGINE runtime, identical for every project — serve the
-        // canonical copy, never a per-project file (D4). C15 15.2: the canonical copy
+        // canonical copy, never a per-project file. The canonical copy
         // is engine-owned at secure/src/runtime/qs.js (unshadowable by a user file at
         // the now-free web root); it is reachable ONLY through this passthrough.
         if ($subpath === 'scripts/qs.js') {
@@ -292,8 +291,8 @@ function qs_surface_b_finish(): void {
     }
 
     // ---- HTML live-render setup --------------------------------------------------
-    // Freshness / backfill: the project's own qs-*.js may be missing (never generated
-    // per-project before C9) or stale. Regenerate in editor mode (preview must be
+    // Freshness / backfill: the project's own qs-*.js may be missing (an older
+    // project never had them) or stale. Regenerate in editor mode (preview must be
     // current) or when stale.
     $editor = isset($_GET['_editor']) && $_GET['_editor'] === '1';
     if ($editor || qs_project_scripts_stale($projectDir)) {
@@ -315,8 +314,7 @@ function qs_surface_b_finish(): void {
 }
 
 /**
- * L11 static resolver — the proven passthrough (scratchpad/c9_passthrough_poc.php,
- * 25/25 on PHP 8.0 + 8.4). Returns ['file'=>abs] to serve, or ['status'=>code] to refuse.
+ * Static resolver — the passthrough. Returns ['file'=>abs] to serve, or ['status'=>code] to refuse.
  *
  * @param string $publicRoot secure/projects/<id>/public
  * @param string $subpath     RAW path after /p/<id>/ (still URL-encoded)
@@ -326,9 +324,9 @@ function qs_surface_b_resolve_static(string $publicRoot, string $subpath): array
     if (strpos($decoded, "\0") !== false)          return ['status' => 400]; // null byte
     if (preg_match('#%2e|%2f|%5c#i', $subpath))     return ['status' => 400]; // encoded traversal token
 
-    // No HIDDEN segment anywhere in the path (C11 11.2). This used to inspect
-    // only basename(), which refused `style/.htaccess` but SERVED
-    // `.hidden/x.json` — a hidden DIRECTORY published everything inside it, and
+    // No HIDDEN segment anywhere in the path. Inspecting only basename() would
+    // refuse `style/.htaccess` but SERVE
+    // `.hidden/x.json` — a hidden DIRECTORY would publish everything inside it, and
     // `.git/` is the classic case (source history disclosure). A project's
     // public/ holds the website as it is; anything a deployment needs at a
     // hidden path (a `/.well-known/` TLS challenge, server config) is served
@@ -714,19 +712,19 @@ function qs_surface_b_send_headers(?string $projectPath = null): void {
 }
 
 /**
- * C15 15.4 (E3) — the DEPLOYMENT's own page for a given deny status, or null.
+ * The DEPLOYMENT's own page for a given deny status, or null.
  *
  * `SetEnv QS_ERROR_PAGE_404 /404.html` (per-vhost, or .htaccess on shared
  * hosting) lets a deployment back QuickSite's project-less status pages with
  * its own root-level files — the same declare-and-obey mechanism as
  * QS_PUBLIC_BASE_URL. Constraints, deliberately tight:
  *
- *   - root-relative path only, realpath-jailed to the DOCUMENT ROOT (the L11
- *     idiom) — a config value can never read outside the web root;
+ *   - root-relative path only, realpath-jailed to the DOCUMENT ROOT (the static
+ *     passthrough's idiom) — a config value can never read outside the web root;
  *   - .html / .htm only, served via readfile — NEVER an include, so a config
  *     value can never become an execution or source-disclosure primitive;
  *   - anything invalid → error_log + null, and the caller degrades to the
- *     built-in generic page (R4 posture: a typo never breaks the deny).
+ *     built-in generic page (a typo never breaks the deny).
  *
  * QuickSite ships NO files at the web root — "root stays free" holds; the
  * built-in page below remains the default when the deployment declares nothing.
@@ -768,7 +766,7 @@ function qs_sb_error_page_file(int $status): ?string {
 
 /**
  * Refuse a surface-B request, then exit. The deployment's own page wins when
- * declared and valid (QS_ERROR_PAGE_<status>, E3); the built-in minimal page
+ * declared and valid (QS_ERROR_PAGE_<status>); the built-in minimal page
  * is the default.
  *
  * EVERY REFUSAL THAT NAMES AN ID NOW HAPPENS PRE-INIT, through the one gate, so
@@ -784,8 +782,8 @@ function qs_sb_error_page_file(int $status): ?string {
  * own header() calls are idempotent).
  *
  * That header symmetry is a courtesy now, not the containment. Containment is
- * that "private" and "does not exist" are ONE code path — beta.10 relied on the
- * symmetry alone and the beta.11 session rework slipped straight past it, adding
+ * that "private" and "does not exist" are ONE code path — relying on the
+ * symmetry alone, a session rework slipped straight past it, adding
  * `Expires` and `Pragma` on one side only.
  *
  * A REFUSAL'S HEADERS DEPEND ON NOTHING BUT ITS STATUS. The cache trio below is

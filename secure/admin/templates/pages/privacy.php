@@ -1,6 +1,6 @@
 <?php
 /**
- * Privacy helper admin page (beta.9 — privacy / data-sharing surface).
+ * Privacy helper admin page (privacy / data-sharing surface).
  *
  * Lean PHP shell — header + hint host + content root + script include. All
  * rendering (collected-data, hosts, endpoint atoms, coverage) lives in

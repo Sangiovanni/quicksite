@@ -214,7 +214,7 @@ function __command_addComplexElement(array $params = [], array $urlParams = []):
             ->withMessage($err);
     }
 
-    // SECURITY (beta.10 C13 13.5, F2 write side): walk the emitted subtree for a
+    // SECURITY (the write side): walk the emitted subtree for a
     // tag the renderer and compiler would refuse. Every shipped builder pins its
     // tags to a closed world — the only two that read a tag from `config` are
     // ListElement (ul|ol) and FieldRow (ACCEPTED_TYPES), both proven live to
@@ -228,7 +228,7 @@ function __command_addComplexElement(array $params = [], array $urlParams = []):
             ->withErrors([['field' => 'config', 'reason' => 'blocked_tag', 'value' => $badTag]]);
     }
 
-    // Same arrangement for component REFERENCES (beta.11 S3.10c): the gate
+    // Same arrangement for component REFERENCES: the gate
     // belongs to the splice, not to each builder, so a future builder cannot
     // become the one writer that emits an unjailable reference unnoticed.
     $badRef = qs_first_invalid_component_reference($newNode);
@@ -239,7 +239,7 @@ function __command_addComplexElement(array $params = [], array $urlParams = []):
     }
 
     // SECURITY: walk the builder's emitted subtree for reserved-namespace
-    // storage keys (slice 5b). Builders consume user-supplied `config` and
+    // storage keys. Builders consume user-supplied `config` and
     // could propagate hostile values into emitted nodes; this is the
     // catch-all for that path. Treated as 400 (user-input rejected),
     // not 500 (builder bug) — the violation is in the config, not the
@@ -317,7 +317,7 @@ function __command_addComplexElement(array $params = [], array $urlParams = []):
             ->withMessage('Failed to insert subtree: ' . ($insertResult['error'] ?? 'unknown'));
     }
 
-    // SECURITY (F-C13-13): depth-check the RESULT of the subtree insert.
+    // SECURITY: depth-check the RESULT of the subtree insert.
     if (!qs_structure_depth_ok($insertResult['structure'])) {
         return ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage('Structure too deeply nested (max 50 levels)')

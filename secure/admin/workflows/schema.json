@@ -159,7 +159,7 @@
           "type": {
             "type": "string",
             "enum": ["text", "textarea", "select", "tag-select", "checkbox", "number", "nodeSelector", "selector", "hidden"],
-            "description": "Input type for the parameter. `selector` (beta.9 C+) auto-fills from the editor's current iframe selection — a read-only card showing tag/classes/struct/node. Workflow steps reference fields via {{param.X.tag}} etc."
+            "description": "Input type for the parameter. `selector` auto-fills from the editor's current iframe selection — a read-only card showing tag/classes/struct/node. Workflow steps reference fields via {{param.X.tag}} etc."
           },
           "labelKey": {
             "type": "string",
@@ -224,7 +224,7 @@
                   },
                   "filterFrom": {
                     "type": "string",
-                    "description": "Another parameter ID whose current value(s) restrict the available options. The filter only applies when the referenced param is currently visible (its own `condition` evaluates truthy) AND its value is non-empty. Otherwise the full optionsFrom list is used. Useful for cascading selects (e.g. 'defaultLanguage' restricted to languages picked in the multi-select 'languages'). Schema added in beta.9 B6."
+                    "description": "Another parameter ID whose current value(s) restrict the available options. The filter only applies when the referenced param is currently visible (its own `condition` evaluates truthy) AND its value is non-empty. Otherwise the full optionsFrom list is used. Useful for cascading selects (e.g. 'defaultLanguage' restricted to languages picked in the multi-select 'languages')."
                   }
                 }
               }
@@ -238,7 +238,7 @@
               "pattern": { "type": "string", "description": "Regex (JS) the value must match (text params)" },
               "min": { "type": "number", "description": "Minimum value for number params" },
               "max": { "type": "number", "description": "Maximum value for number params" },
-              "minItems": { "type": "integer", "description": "Minimum number of selected items for tag-select params. Validation is skipped when the param's own `condition` evaluates false (param is hidden). Schema added in beta.9 B6." },
+              "minItems": { "type": "integer", "description": "Minimum number of selected items for tag-select params. Validation is skipped when the param's own `condition` evaluates false (param is hidden)." },
               "maxItems": { "type": "integer", "description": "Maximum number of selected items for tag-select params. Same conditional-skip rule as minItems." }
             }
           },

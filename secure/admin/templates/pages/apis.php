@@ -298,7 +298,7 @@ window.QS_APIS_I18N = <?= json_encode($qsApisI18n, JSON_HEX_TAG | JSON_HEX_AMP |
                               placeholder=""></textarea>
                 </div>
 
-                <!-- beta.8 Track A4 — callableFrom marker. Auto-derive
+                <!-- callableFrom marker. Auto-derive
                      defaults from the API's auth type; explicit override
                      wins. Server-only endpoints never appear in
                      qs-api-config.js (filtered at build emit time). -->

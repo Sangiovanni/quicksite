@@ -27,13 +27,13 @@ require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
  * @return ApiResponse
  */
 function __command_deleteSnippet(array $params = [], array $urlParams = []): ApiResponse {
-    // qs_param_string: an ARRAY here reached a string-typed sink as a TypeError (F-C13-11).
+    // qs_param_string: an ARRAY here would reach a string-typed sink as a TypeError.
     $snippetId = qs_param_string($params, 'id');
 
-    // C8 8.5 CONTAINMENT: the project DELETED FROM is BOUND to the URL marker the
+    // CONTAINMENT: the project DELETED FROM is BOUND to the URL marker the
     // dispatcher authorized; a body `project` is an optional echo that must match
-    // (F-C8-8.5-1 — it used to select the delete target freely, falling back to
-    // an installation-wide default project).
+    // (never a free choice of delete target, nor a fall back to an
+    // installation-wide default project).
     $bound = qs_bind_marker_project($params, 'deleteSnippet');
     if ($bound['refusal'] !== null) {
         return $bound['refusal'];

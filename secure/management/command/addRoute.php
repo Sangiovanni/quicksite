@@ -41,8 +41,8 @@ $params = $trimParametersManagement->params();
 $routePath = $params['route'] ?? $params['name'] ?? null;
 
 // Check for parent parameter - prepend to route if provided.
-// qs_param_string, not `?? null`: `?parent[]=x` reached trim() and TypeError'd
-// (beta.10 C13 F-C13-11). A non-string reads as absent, so the existing
+// qs_param_string, not `?? null`: `?parent[]=x` would reach trim() as a
+// TypeError. A non-string reads as absent, so the existing
 // missing-parameter branch below handles it.
 $parent = qs_param_string($params, 'parent');
 if ($parent !== null && $parent !== '') {
@@ -106,7 +106,7 @@ foreach ($segments as $index => $segment) {
             ->send();
     }
 
-    // Format check. Two valid shapes (beta.8 A1):
+    // Format check. Two valid shapes:
     //   1. Literal segment: lowercase letters / digits / hyphens
     //      (no leading or trailing hyphen). Existing convention.
     //   2. Param segment: ':' + lowercase identifier
@@ -151,7 +151,7 @@ if (routePathExists($segments, $currentRoutes)) {
 }
 
 // ============================================================================
-// CONFLICT DETECTION (beta.8 A1)
+// CONFLICT DETECTION
 // Detects param-route sibling situations BEFORE saving so the warnings
 // reference the original routes structure (not one that includes the
 // new segment as its own sibling). Non-blocking — route still saves.
@@ -264,8 +264,8 @@ try {
     // Invalidate opcache
     qs_opcache_invalidate(ROUTES_PATH);
 
-    // Beta.8 A1 Build Slice 1 — regenerate the client-side routes
-    // schema so qs.js (Slice 2) sees the new route immediately
+    // Regenerate the client-side routes
+    // schema so qs.js sees the new route immediately
     // without a full rebuild. Mirrors editApi's qs-api-config.js
     // regen pattern. File is project-scoped public/scripts/qs-route-schema.js.
     require_once SECURE_FOLDER_PATH . '/src/functions/projectPublicArtifacts.php';
@@ -293,11 +293,11 @@ $responseData = [
     'route' => $routePath,
     'segments' => $segments,
     'depth' => count($segments),
-    // beta.10 C12 12.5: the str_replace that used to sit here is now ApiResponse's
-    // job. It was also wrong twice over — it left the leading separator on
+    // Scrubbing these paths is ApiResponse's job. A str_replace here would be
+    // wrong twice over — it would leave the leading separator on
     // ("\templates\model\...") and, because PROJECT_PATH is glued with
-    // DIRECTORY_SEPARATOR while these paths are built with "/", it missed
-    // outright whenever the two disagreed.
+    // DIRECTORY_SEPARATOR while these paths are built with "/", it would miss
+    // outright whenever the two disagree.
     'php_file' => $phpFilePath,
     'json_file' => $jsonFilePath,
 ];
@@ -306,10 +306,10 @@ if (!empty($cascadeCreated)) {
     $responseData['cascade_created'] = $cascadeCreated;
 }
 
-// Beta.8 A1 — surface non-blocking conflict warnings to the caller.
+// Surface non-blocking conflict warnings to the caller.
 // Each warning carries a `type` (i18n key for client localisation) plus
-// machine-readable details + an EN `message` fallback. Slice 3 (admin
-// form) will render these inline.
+// machine-readable details + an EN `message` fallback, for a client to
+// render inline.
 if (!empty($conflictWarnings)) {
     $responseData['warnings'] = $conflictWarnings;
 }
@@ -371,7 +371,7 @@ function addRouteToStructure(array $segments, array $routes): array {
 /**
  * Resolve PHP file path for new route
  * Convention: ALL routes use folder structure - route/route.php
- * Beta.8 A1 — ':slug' segments sanitised to '__slug' for filesystem.
+ * ':slug' segments sanitised to '__slug' for filesystem.
  */
 function resolveNewRoutePhpPath(array $segments, array $routes, string $pagesDir): string {
     $fsSegments = array_map('paramRouteSegmentToFs', $segments);
@@ -383,7 +383,7 @@ function resolveNewRoutePhpPath(array $segments, array $routes, string $pagesDir
 /**
  * Resolve JSON file path for new route
  * Convention: ALL routes use folder structure - route/route.json
- * Beta.8 A1 — ':slug' segments sanitised to '__slug' for filesystem.
+ * ':slug' segments sanitised to '__slug' for filesystem.
  */
 function resolveNewRouteJsonPath(array $segments, string $jsonDir): string {
     $fsSegments = array_map('paramRouteSegmentToFs', $segments);
@@ -395,7 +395,8 @@ function resolveNewRouteJsonPath(array $segments, string $jsonDir): string {
 /**
  * Detect conflicts when adding a param route at a level that already
  * has siblings. Returns structured warnings[] (NOT blocking — the route
- * still saves). Locked design 2026-06-04.
+ * still saves) — by design, DESIGN_DECISIONS.md "Sibling-exact + param
+ * conflict — WARN, don't BLOCK".
  *
  * Two warning shapes:
  *  - 'route.warning.param_shadows_exact_siblings' — when adding a

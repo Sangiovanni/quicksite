@@ -2,7 +2,7 @@
 /**
  * Admin Login Page
  *
- * Username + password authentication (C5b; username identity C8 8.0b). The
+ * Username + password authentication. The
  * form POSTs to this page; the router verifies the credentials through the
  * shared login gate and establishes the PHP session that IS the login. There
  * is no access token and no refresh token; "remember me" simply gives the

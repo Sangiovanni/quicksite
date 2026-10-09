@@ -4,7 +4,7 @@
  * Browses `getCommandHistory` for the currently edited project, exports what is
  * on screen as CSV, and clears the stored trail through `clearCommandHistory`.
  *
- * ⚠ REWRITTEN IN S6.6 FROM innerHTML STRING-GLUE TO createElement.
+ * ⚠ BUILT WITH createElement, NOT innerHTML STRING-GLUE.
  * Every row of this table is built from a LOG RECORD, and a log record is the
  * one thing on the page whose content came from somebody else's request. The
  * old version interpolated those values into HTML strings — mostly escaped, but
@@ -50,8 +50,9 @@
      *
      * QS_HISTORY_I18N is emitted by history.php. The layout's
      * QUICKSITE_CONFIG.translations carries only a few branches (common,
-     * dashboard, …) and never carried `history`, so before S6.6 every JS-built
-     * label here resolved to its fallback — a French panel showed English rows.
+     * dashboard, …) and does not carry `history`, so without the page bundle every
+     * JS-built label here would resolve to its fallback — a French panel would
+     * show English rows.
      * The layout lookup is kept second so `common.*` still resolves if the page
      * bundle ever stops carrying it.
      */
@@ -70,14 +71,14 @@
     }
 
     // =======================================================================
-    // Publisher — the field this slice exists to fix
+    // Publisher
     // =======================================================================
     /**
      * A record's publisher is `{user_id, token_name}`.
      *
      * ⚠ `token_name` IS THE USER'S DISPLAY NAME, not an API token's name. It is
      * written as `$tokenInfo['name'] ?? 'Unknown'`, and `$tokenInfo` is the
-     * resolved user — the token stopped carrying a name in beta.10. The key is a
+     * resolved user — the token carries no name. The key is a
      * leftover from when it did; it is read here for what it actually holds.
      *
      * The old renderer passed this object straight to escapeHtml, which assigns
@@ -203,7 +204,7 @@
         const consoleOn = window.QUICKSITE_CONFIG?.consoleEnabled !== false;
 
         // The command cell links into the console — but only when there IS a
-        // console. With it turned off (S6.5) that link goes to a page that
+        // console. With it turned off that link goes to a page that
         // renders a "turned off" notice, so the name is shown as plain text
         // instead of a link that leads nowhere useful.
         const nameNode = el('code', { text: entry.command });
@@ -320,8 +321,8 @@
 
         // ⚠ PARAMETERS COME BEFORE THE BODY, because for much of the command
         // surface they ARE the request: `getStructure/page/home` and
-        // `getRoutes?verbose=1` carry no body at all, and before S6.6 those
-        // records showed an empty body and nothing else. `params.url` is the
+        // `getRoutes?verbose=1` carry no body at all; without the parameters those
+        // records would show an empty body and nothing else. `params.url` is the
         // ordered path segments, `params.query` the query string. Rendered only
         // when there is something to show, so a body-only command does not grow
         // an empty section.

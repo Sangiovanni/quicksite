@@ -5,7 +5,7 @@
  * NOT commands. The command surface is a CLI for DEVELOPING A PROJECT; looking
  * a person up in order to invite them, and reading the fixed role catalogue,
  * are facts about the INSTALLATION rather than about any project's content, so
- * they live here and are served by /admin/self (beta.11 S6).
+ * they live here and are served by /admin/self.
  *
  * These were `findUser` (users.lookup) and `listRoles` (roles.read). Both
  * categories were `scope: global`, `access: 'any'` — so the only thing

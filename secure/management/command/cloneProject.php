@@ -35,7 +35,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/spaceUsage.php'; // qs_invalid
  * @return ApiResponse
  */
 function __command_cloneProject(array $params = [], array $urlParams = []): ApiResponse {
-    // C8 8.4 CONTAINMENT (confused-deputy / F6): the clone SOURCE is BOUND to the
+    // CONTAINMENT (confused deputy): the clone SOURCE is BOUND to the
     // URL marker (PROJECT_NAME, authorized by the dispatcher — project.data, admin+
     // on the source — before this runs). A body `source` that disagrees is refused;
     // it is optional. You cannot clone FROM a project you did not target/authorize.
@@ -46,7 +46,7 @@ function __command_cloneProject(array $params = [], array $urlParams = []): ApiR
     $sourceProject = $bound['project'];
 
     // Reject a traversal payload in the source name before the recursive copy
-    // reads from it (beta.10 C3 F1-c).
+    // reads from it.
     if (!is_valid_project_name($sourceProject)) {
         return ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage('Invalid source project name')
@@ -54,7 +54,7 @@ function __command_cloneProject(array $params = [], array $urlParams = []): ApiR
     }
 
     // Validate new project name
-    // qs_param_string: `?name[]=x` reached trim() as a TypeError (F-C13-11).
+    // qs_param_string: `?name[]=x` would reach trim() as a TypeError.
     $newName = trim(qs_param_string($params, 'name', ''));
     
     if (empty($newName)) {
@@ -154,8 +154,8 @@ function __command_cloneProject(array $params = [], array $urlParams = []): ApiR
         }
     }
     
-    // C8 8.4 BIRTH-WRITE: never inherit the source's members.json (the C10
-    // clone-hijack — the copy carried the source's old owner, every member at
+    // BIRTH-WRITE: never inherit the source's members.json (a clone hijack —
+    // the copy would carry the source's old owner, every member at
     // their role, and every pending invitation). Overwrite it with a fresh trust
     // file: the CLONER is the sole owner, no members, no invitations, private,
     // closed. The source roster is intentionally discarded (a clone is a new,
@@ -170,7 +170,7 @@ function __command_cloneProject(array $params = [], array $urlParams = []): ApiR
             ->withMessage('Failed to initialise cloned project membership');
     }
     @unlink($targetPath . '/config/members.json.lock'); // stale sidecar if it was copied
-    error_log("cloneProject: '{$newName}' birth-written to owner '{$clonerId}'; source '{$sourceProject}' roster NOT carried over (C8 8.4 containment)");
+    error_log("cloneProject: '{$newName}' birth-written to owner '{$clonerId}'; source '{$sourceProject}' roster NOT carried over (containment)");
 
     // A measurement left by an earlier project of the same name is not this one's.
     qs_invalidate_space_cache($newName);
@@ -192,9 +192,8 @@ function __command_cloneProject(array $params = [], array $urlParams = []): ApiR
     // Register the clone in the cloner's own project index (users.php cache) —
     // like createProject. With switch_to, ONLY the cloner's per-user editing
     // target (selected_project) moves to the new project; a command NEVER repoints
-    // any installation-wide pointer (the old switch_to tail here repointed one and
-    // synced the live public dir: the same pre-C9 leftover
-    // that createProject dropped in 8.0). The new project is edited at /p/<id>/.
+    // any installation-wide pointer, nor syncs the live public dir — as in
+    // createProject. The new project is edited at /p/<id>/.
     if ($clonerId !== null) {
         $written = qs_users_mutate(function (array &$cfg) use ($clonerId, $newName, $newSiteName, $switchTo) {
             if (!isset($cfg['users'][$clonerId])) {

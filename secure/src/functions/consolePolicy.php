@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/opcacheHygiene.php';
 /**
- * The command-console gate (beta.11 S6.5).
+ * The command-console gate.
  *
  * ONE question, asked from one place: does this installation offer the admin
  * panel's generic command console at /admin/command?

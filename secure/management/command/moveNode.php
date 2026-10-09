@@ -236,7 +236,7 @@ function __command_moveNode(array $params = [], array $urlParams = []): ApiRespo
     $structure = $insertResult['structure'];
     $newNodeId = implode('.', $insertIndices);
     
-    // SECURITY (F-C13-13): depth-check the RESULT. A move that goes SHALLOWER
+    // SECURITY: depth-check the RESULT. A move that goes SHALLOWER
     // still passes, so an over-deep page stays repairable.
     if (!qs_structure_depth_ok($structure)) {
         return ApiResponse::create(400, 'validation.invalid_format')

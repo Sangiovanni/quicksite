@@ -1,5 +1,5 @@
 /**
- * Builds page (beta.11 S3.8) — the project's ONE build.
+ * Builds page — the project's ONE build.
  *
  * Retention is N = 1, so everything here is singular: getBuild answers 404 when
  * there is none (the empty state, not an error), `build` REFUSES while one
@@ -507,7 +507,7 @@
 
         var res;
         try {
-            // Not a command since S6 — your own quota is an account fact.
+            // Not a command — your own quota is an account fact.
             res = await window.QuickSiteAdmin.accountRequest(
                 refresh ? 'space-usage?refresh=1' : 'space-usage', 'GET'
             );
@@ -718,7 +718,7 @@
      * Every co-tenancy refusal arrives with the ONE control that answers it.
      *
      * Each row is its own named refusal with its own opt-in, and none of them is
-     * `overwrite`. That separation is the point of the slice: a single blunt
+     * `overwrite`. That separation is the point: a single blunt
      * replace-everything checkbox is how a deployer destroys a site they did not
      * know was there, so the panel never lets one click stand for "yes" to a
      * question the deployer was never asked.

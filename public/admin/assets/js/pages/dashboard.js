@@ -34,11 +34,9 @@
      * consumes the result can only ever render an error. At zero membership that
      * is every project-scoped call on the page.
      *
-     * beta.10 C13 13.4(b) swept the admin PAGES and the /admin/api arms for "no
-     * arm assumes a bound project" and passed; it did not sweep a page's own
-     * client-side calls, which is why the dashboard kept firing getSizeInfo and
-     * logging "getSizeInfo failed: Unknown error" for an account that is a member
-     * of nothing. Gate on BOTH, in one place, so a future call inherits it.
+     * Without the second half, the dashboard fires getSizeInfo and logs
+     * "getSizeInfo failed: Unknown error" for an account that is a member of
+     * nothing. Gate on BOTH, in one place, so a future call inherits it.
      */
     function canRun(command) {
         const admin = window.QuickSiteAdmin;
@@ -498,7 +496,7 @@
 
     // The project the manager ACTS ON = the one chosen in the selector (falls back
     // to the edited project). Every project-manager command sends this as the URL
-    // marker (opts.project); the server binds + re-authorizes it (C8 8.4).
+    // marker (opts.project); the server binds + re-authorizes it.
     function getTargetProject() {
         const sel = document.getElementById('project-selector');
         return (sel && sel.value) ? sel.value : currentProject;
@@ -609,7 +607,7 @@
 
     // Only the project-SCOPED actions depend on having a project. `btn-create-project`
     // and `btn-import-project` are GLOBAL (create / create-from-archive) — a member of
-    // nothing must still be able to make or import their first project (C8 8.4).
+    // nothing must still be able to make or import their first project.
     function _setProjectActionsEnabled(enabled) {
         ['btn-clone-project', 'btn-backup-project', 'btn-restore-backup',
          'btn-export-project', 'btn-delete-project'].forEach(id => {
@@ -678,7 +676,7 @@
 
         try {
             // Your own quota is a fact about your ACCOUNT, not about a project
-            // being developed, so it comes from /admin/self (S6).
+            // being developed, so it comes from /admin/self.
             const result = await QuickSiteAdmin.accountRequest(
                 refresh ? 'space-usage?refresh=1' : 'space-usage', 'GET'
             );
@@ -820,7 +818,7 @@
             toggle.classList.toggle('manage-space__toggle--open', !isOpen);
             if (!isOpen && !manageSpaceLoaded) {
                 manageSpaceLoaded = true;
-                // Same rule as the load-time blocks (13.6b): all three panels are
+                // Same rule as the load-time blocks: all three panels are
                 // project-scoped, so with no project bound they would each fire a
                 // call api.js refuses client-side and then render "Error loading
                 // data" three times over. Gated at the CALL SITE rather than inside
@@ -1158,9 +1156,8 @@
             
             QSDom.setButtonBusy(this, common.loading || 'Switching...');
             try {
-                // C9 — the dashboard's project switch changes which project you EDIT,
-                // the SAME as the header picker; it does NOT change the served main
-                // (quicksite stays at the site root). Panel state, not a command.
+                // The dashboard's project switch changes which project you EDIT,
+                // the SAME as the header picker. Panel state, not a command.
                 const result = await QuickSiteAdmin.setSelectedProject(newProject);
                 if (result.ok) {
                     reloadWithMessage((proj.switched || 'Switched to project') + ': ' + newProject);
@@ -1336,9 +1333,9 @@
 
             try {
                 // exportProject streams a binary ZIP (can't go through request()), but
-                // it is project-scoped: it MUST carry the C7 '/p/<id>/' marker or the
+                // it is project-scoped: it MUST carry the '/p/<id>/' marker or the
                 // dispatcher answers 400 project.required. The command binds the marker
-                // as the target (C8 8.4 containment), so no ?name is needed.
+                // as the target (containment), so no ?name is needed.
                 const target = getTargetProject();
                 const response = await fetch(window.QUICKSITE_CONFIG.apiBase + '/p/' + encodeURIComponent(target) + '/exportProject', {
                     method: 'GET',
@@ -1527,7 +1524,7 @@
             try {
                 // Target the project being deleted via the URL marker (opts.project);
                 // the server authorizes THAT project (owner-only) and refuses if the
-                // body name disagrees (confused-deputy fix, C8).
+                // body name disagrees (confused-deputy guard).
                 const result = await QuickSiteAdmin.apiRequest('deleteProject', 'POST', {
                     name: projectToDelete,
                     confirm: true
@@ -1731,7 +1728,7 @@
 
         if (!typeSelect || !nameSelect || !loadBtn) return;
 
-        // 13.6b: the viewer's own calls (listPages / listComponents / getStructure)
+        // The viewer's own calls (listPages / listComponents / getStructure)
         // are project-scoped. This panel is user-TRIGGERED rather than load-time, so
         // it never showed up in the console — but with no project bound every one of
         // its buttons leads to a refusal. Disable the controls instead, the same way
@@ -2046,7 +2043,7 @@
         const hp = canRun;
 
         // Load dashboard data, skipping sections the current user lacks permission
-        // for OR that are project-scoped with no project bound (13.6b).
+        // for OR that are project-scoped with no project bound.
         await Promise.all([
             loadDashboardStats(),
             hp('getSiteMap')         ? loadSiteMap()         : Promise.resolve(),
@@ -2055,7 +2052,7 @@
             hp('getSizeInfo')        ? loadStorageOverview() : Promise.resolve(),
             // Owner-wide usage walks every owned project, so it loads alongside
             // rather than gating anything; it hides itself when you own nothing.
-            // No canRun() gate: it stopped being a command in S6, so there is no
+            // No canRun() gate: it is not a command, so there is no
             // permission to test — every authenticated account may ask for its
             // own quota, and the answer is empty when you own nothing.
             loadOwnerSpaceUsage(false)

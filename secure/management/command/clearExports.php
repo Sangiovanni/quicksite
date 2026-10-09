@@ -35,11 +35,11 @@ function __command_clearExports(array $params = [], array $urlParams = []): ApiR
             ->withErrors(['confirm' => 'Set confirm=true to proceed']);
     }
     
-    // C8 8.5 CONTAINMENT (F-C8-8.5-3): clearing is confined to the PROJECT'S OWN
-    // exports directory, bound to the URL marker the dispatcher authorized. This
-    // used to glob a shared installation-wide secure/exports — with no filter it
-    // deleted EVERY project's archives from any authorized marker, and the response
-    // then enumerated the filenames it had destroyed (a cross-project oracle).
+    // CONTAINMENT: clearing is confined to the PROJECT'S OWN exports directory,
+    // bound to the URL marker the dispatcher authorized. A glob of a shared
+    // installation-wide exports folder would, with no filter, delete EVERY
+    // project's archives from any authorized marker, and the response would then
+    // enumerate the filenames it had destroyed (a cross-project oracle).
     $bound = qs_bind_marker_project($params, 'clearExports');
     if ($bound['refusal'] !== null) {
         return $bound['refusal'];
@@ -55,7 +55,7 @@ function __command_clearExports(array $params = [], array $urlParams = []): ApiR
     // `project` survives only as a redundant echo of the marker: qs_bind_marker_project
     // above already refused any value that disagreed, so it can no longer widen or
     // redirect the glob. Both branches now stay inside this project's own directory.
-    // (The C3 F1-g traversal/glob-wildcard guard is kept — defence in depth, since
+    // (The traversal/glob-wildcard guard is kept — defence in depth, since
     // this value still reaches glob() + unlink().)
     $projectFilter = trim($params['project'] ?? '');
     if ($projectFilter !== '' && !is_valid_project_name($projectFilter)) {
@@ -98,12 +98,11 @@ function __command_clearExports(array $params = [], array $urlParams = []): ApiR
         'freed_space' => formatClearExportsBytes($totalSize)
     ];
 
-    // beta.10 C13 F-C13-17: the data payload was always honest, but the ENVELOPE
-    // was not. A run that failed to unlink an archive still answered HTTP 200
-    // operation.success with a message counting only the successes — so a caller
-    // checking status/code, which is what the envelope is for, believed every
-    // archive was gone while it was still on disk and still readable. Reproduced
-    // live in 13.4 against a genuinely undeletable file.
+    // The ENVELOPE must be as honest as the data payload. A run that fails to
+    // unlink an archive must not answer HTTP 200 operation.success with a message
+    // counting only the successes — a caller checking status/code, which is what
+    // the envelope is for, would believe every archive gone while it is still on
+    // disk and still readable.
     //
     // The shape follows the sibling sweep in this tree rather than inventing
     // its own: `cleanOrphanTranslations` answers 207 operation.partial_success

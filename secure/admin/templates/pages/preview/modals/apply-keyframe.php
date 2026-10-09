@@ -1,4 +1,4 @@
-<!-- Apply-Keyframe-to-Selector Modal (A3-companion Motion Slice 2)
+<!-- Apply-Keyframe-to-Selector Modal
      Opened from the Keyframes library row's "Apply to selector…" action.
      Lists all selectors (from PreviewSelectorBrowser's cache), filterable
      by substring; on confirm, writes the chosen keyframe's `animation:`

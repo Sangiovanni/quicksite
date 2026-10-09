@@ -63,26 +63,26 @@ function loadRolesConfig(): array {
  * else is denied by hasPermission — deliberately, so no future category can opt
  * into a target-independent global grant. ('none' is the explicit spelling of that
  * deny — a legal declaration that never grants. No category declares it today: the
- * `disabled` category that did was deleted in beta.11 S6 with the three role
+ * `disabled` category that did was deleted with the three role
  * commands it held. The deny is not a branch, it is this allowlist's fail-closed
  * default, so it still covers any category that declares a value by mistake.)
  *
- * RETIRED — 'owner' (C8 8.5). It resolved as resolveEffectiveRole($user) === 'owner',
+ * RETIRED — 'owner'. It resolved as resolveEffectiveRole($user) === 'owner',
  * which returns the role on the user's selected project or else the first cached
  * project where their membership is real — i.e. "owns ANY project anywhere",
  * TARGET-INDEPENDENT. Since `projects.create` is access 'any', any account minted
- * that ownership in a single call, which is the mechanism behind the F-C8-8.1-1
- * privilege escalation. Authority in this model is per-project only (AUTH_REWORK
- * L4/§2.2 — no superadmin, no global tier), so a global category can only sanely be
- * "any authenticated user" or "nobody"; anything installation-wide (applying an
- * update, the served-project pointer) is operator/CLI-side per GAP A — a shell on
+ * that ownership in a single call — a privilege escalation. Authority in this
+ * model is per-project only (no superadmin, no global tier), so a global category
+ * can only sanely be "any authenticated user" or "nobody"; anything
+ * installation-wide (applying an update, the served-project pointer) is
+ * operator/CLI-side — a shell on
  * the server is that side, and has no HTTP surface to gate. Do not reintroduce a
  * value here without a global authority PRINCIPAL to gate on — there isn't one.
  */
 const QS_GLOBAL_ACCESS_GRANTING = ['any'];
 
 /**
- * Load the command CATEGORY map (categories.php — the trust-coherent authz map). C6.
+ * Load the command CATEGORY map (categories.php — the trust-coherent authz map).
  * category => ['scope'=>'project'|'global', 'access'?=>'any'|'none', 'commands'=>[]].
  *
  * @return array
@@ -101,7 +101,7 @@ function loadCategoriesConfig(): array {
 }
 
 /**
- * Load the user registry (token identities). C5.
+ * Load the user registry (token identities).
  *
  * @return array ['users' => [ userId => record ]]
  */
@@ -119,8 +119,8 @@ function loadUsersConfig(): array {
 }
 
 /**
- * Load a project's members.json (AUTHORITATIVE for access — L5). C5.
- * Defensive single-segment guard on $project (F1); empty on anything unsafe.
+ * Load a project's members.json (AUTHORITATIVE for access).
+ * Defensive single-segment guard on $project; empty on anything unsafe.
  *
  * @return array ['owner'=>?string,'visibility'=>string,'members'=>[uid=>['role'=>..]]]
  */
@@ -138,7 +138,7 @@ function loadProjectMembers(string $project): array {
 
 /**
  * A user's authoritative role on a project (members.json, never the users.php
- * cache — L5). C5.
+ * cache).
  *
  * @return string|null role name, or null if the user is not a member
  */
@@ -149,9 +149,9 @@ function getUserRoleForProject(string $userId, string $project): ?string {
 
 /**
  * Does this users.php `projects` cache entry describe a REAL membership?
- * C8 8.3a status mirror: entries carry `status` (pending_invite | pending_request
+ * The status mirror: entries carry `status` (pending_invite | pending_request
  * | member | refused | removed | deleted). Only 'member' entries may feed the
- * membership iterators below; a missing status means a pre-8.3a entry, which is
+ * membership iterators below; a missing status means a legacy entry, which is
  * by definition a membership (readers default missing keys). This is a cheap
  * pre-filter only — the AUTHORITATIVE members.json check stays the real gate.
  */
@@ -162,7 +162,7 @@ function qs_cache_entry_is_member($entry): bool {
 /**
  * A project's public display name (config.php SITE_NAME), read directly so it
  * works in every context (dispatcher, internal, harness) — falls back to the
- * project id. F1-guarded like loadProjectMembers. C8 8.3a (cache mirror labels).
+ * project id. Shape-guarded like loadProjectMembers (cache mirror labels).
  */
 function qs_project_site_name(string $project): string {
     if ($project === '' || strpbrk($project, "/\\") !== false || strpos($project, '..') !== false) {
@@ -177,12 +177,12 @@ function qs_project_site_name(string $project): string {
 }
 
 /**
- * THE canonical members.json birth-write (C8 8.4) — mint a fresh trust file for a
+ * THE canonical members.json birth-write — mint a fresh trust file for a
  * just-created project directory with $ownerId as the SOLE owner: no other
  * members, no pending invitations, visibility 'private', join_policy closed (via
  * reader default). This is the SINGLE birth-write path shared by createProject,
  * cloneProject and importProject, so a cloned/imported project can NEVER inherit
- * or accept a foreign members.json (the C10 clone-hijack flaw): whatever roster
+ * or accept a foreign members.json (a clone hijack): whatever roster
  * an archive or source folder carried is discarded — the CALLER owns the copy.
  *
  * Distinct from qs_members_mutate: this CREATES the file (mutate aborts on a
@@ -214,7 +214,7 @@ function qs_project_birth_write_members(string $projectPath, ?string $ownerId): 
     // this today — it is checked anyway because a birth-write that silently
     // produced a one-byte roster would mint an inaccessible project, and two
     // boundaries making the same decision differently is where the next defect
-    // grows (the reasoning that closed F-C11-11.2-1).
+    // grows.
     $json = json_encode($membersData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
     if ($json === false) {
         error_log('qs_project_birth_write_members: refusing to mint an unencodable roster for '
@@ -229,7 +229,7 @@ function qs_project_birth_write_members(string $projectPath, ?string $ownerId): 
  * The PUBLIC reference for a user in shared output: `{user_id, name}` — and
  * NOTHING else. Every membership response that names a user builds the
  * reference through here, so the PRIVATE username structurally cannot leak
- * into output visible to other users (C8 8.0b privacy rule; C10 audit point).
+ * into output visible to other users (the privacy rule).
  * Unresolvable id (deleted account) → name null.
  *
  * @param array|null $usersCfg optional preloaded loadUsersConfig() (loop callers)
@@ -248,7 +248,7 @@ function qs_public_user_ref(?string $userId, ?array $usersCfg = null): array {
 }
 
 /**
- * Is this raw note something JSON cannot store? (C11 11.3)
+ * Is this raw note something JSON cannot store?
  *
  * members.json is JSON, and json_encode() returns false on invalid UTF-8. The
  * writer now refuses such a roster outright, but a 400 naming the offending
@@ -271,9 +271,9 @@ function qs_note_encoding_invalid($note): bool {
 /**
  * Membership notes (invitation note, removal reason, …): trim, strip control
  * bytes (same rule as display names — byte-wise strip is UTF-8-safe), cap at
- * 500 chars. Empty → null (callers omit the key entirely). C8 8.3a.
+ * 500 chars. Empty → null (callers omit the key entirely).
  *
- * NEVER RETURNS INVALID UTF-8 (C11 11.3). Callers should refuse such a note
+ * NEVER RETURNS INVALID UTF-8. Callers should refuse such a note
  * earlier via qs_note_encoding_invalid() so the caller learns which field was
  * at fault; this fails closed for any that do not, so the value cannot reach
  * json_encode. The control-strip alone was not enough: it removes bytes
@@ -294,7 +294,7 @@ function qs_clean_note($note): ?string {
 }
 
 /**
- * The members.json INVARIANT BACKSTOP (C8 8.3a) — the conditions that must hold
+ * The members.json INVARIANT BACKSTOP — the conditions that must hold
  * before qs_members_mutate is allowed to write. members.json IS access control;
  * a buggy caller must abort loudly rather than corrupt it.
  *
@@ -329,7 +329,7 @@ function qs_members_invariant_violation(array $data): ?string {
     if (!in_array($visibility, ['private', 'public'], true)) {
         return 'visibility must be private|public';
     }
-    // C8 8.3b: join_policy gates the self-service request lane. Absent = closed
+    // join_policy gates the self-service request lane. Absent = closed
     // (readers default); when present it must be a valid enum value.
     $joinPolicy = $data['join_policy'] ?? 'closed';
     if (!in_array($joinPolicy, ['closed', 'open'], true)) {
@@ -354,9 +354,9 @@ function qs_members_invariant_violation(array $data): ?string {
         if (!is_string($by) || $by === '') {
             return "invitation for '{$uid}' lacks its sponsor";
         }
-        // C8 8.3b: the mandatory-note rule is STRUCTURAL for the request
+        // The mandatory-note rule is STRUCTURAL for the request
         // direction — a join-request or member proposal always carries its
-        // reason/vouch (locked R3: mandatory note on join-request).
+        // reason/vouch (by design: a join-request carries a mandatory note).
         if (($inv['direction'] ?? null) === 'request') {
             $note = $inv['note'] ?? null;
             if (!is_string($note) || $note === '') {
@@ -369,12 +369,12 @@ function qs_members_invariant_violation(array $data): ?string {
 
 /**
  * Serialized read-modify-write on a project's members.json — THE members.json
- * writer (C8 8.3a; the membership mirror of qs_users_mutate). createProject's
+ * writer (the membership mirror of qs_users_mutate). createProject's
  * birth-write stays inline (file CREATION in a just-minted dir — different
  * contract); every LATER mutation comes through here.
  *
  * Contract:
- *  - F1 single-segment guard on $project (self-defending primitive).
+ *  - Single-segment guard on $project (self-defending primitive).
  *  - Per-project flock sidecar `members.json.lock`, fresh in-lock read.
  *  - ABORTS on missing/corrupt file — never conjures or clobbers the authority
  *    file (a broken members.json surfaces as an error, not a silent rebuild).
@@ -383,7 +383,7 @@ function qs_members_invariant_violation(array $data): ?string {
  *  - INVARIANT BACKSTOP before write (qs_members_invariant_violation) —
  *    violation = abort + error_log, never a silent repair.
  *  - ENCODE CHECK before write — an unrepresentable roster aborts rather than
- *    truncating the authority file (C11 11.3; see the check itself).
+ *    truncating the authority file (see the check itself).
  *  - temp + rename atomic swap; byte format identical to createProject's
  *    birth-write (JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES + trailing \n).
  *
@@ -437,8 +437,7 @@ function qs_members_mutate(string $project, callable $fn, ?string &$failure = nu
         // callback's value, and the caller reports success while members.json —
         // which IS access control — has been replaced by a newline. Every later
         // mutation then fails 'corrupt', so the roster cannot even be repaired
-        // through the API. (C11 11.3, F-C11-11.3-1. The sessions writer above
-        // already had this check; the membership writer did not.)
+        // through the API. (The sessions writer above has the same check.)
         $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
         if ($json === false) {
             error_log("qs_members_mutate: refusing to write members.json for '{$project}' — "
@@ -471,7 +470,7 @@ function qs_members_mutate(string $project, callable $fn, ?string &$failure = nu
 
 /**
  * Map a qs_members_mutate infrastructure $failure to an HTTP triple
- * [status, code, message] (C8 8.3a). Marker-scoped commands use it directly
+ * [status, code, message]. Marker-scoped commands use it directly
  * (the dispatcher already proved the project exists — a missing/corrupt file
  * there is an integrity fault). Self-service commands must translate
  * 'missing' to their UNIFORM not-found response BEFORE calling this (a
@@ -497,9 +496,9 @@ function qs_members_failure_http(?string $failure): array {
 /**
  * Write ONE entry of a user's `projects` cache (the status mirror) through the
  * users.php writer — the single mirror-write path for the membership commands
- * (C8 8.3a). $entry null = remove the entry. Mirror writes are SECONDARY: the
- * ruled failure mode is silent success + error_log at the caller (access stays
- * correct by construction — members.json already committed; 8.4
+ * $entry null = remove the entry. Mirror writes are SECONDARY: the failure
+ * mode, by design, is silent success + error_log at the caller (access stays
+ * correct by construction — members.json already committed;
  * reconcileMemberships heals).
  *
  * @return bool true when the cache write committed
@@ -520,12 +519,13 @@ function qs_membership_cache_set(string $userId, string $project, ?array $entry)
 }
 
 /**
- * Resolve a user's EFFECTIVE role for the transitional bridge (C5): their role on
+ * Resolve a user's EFFECTIVE role: their role on
  * the selected project, or — if that pointer is stale (project deleted / no longer
  * a member) — a graceful fallback to any project they are genuinely a member of.
  * Never lets a stale selected_project brick access (design requirement). Returns
  * null only when the user has no real membership anywhere. Role always comes from
- * the AUTHORITATIVE members.json (L5). Replaced in C7 by the per-request project.
+ * the AUTHORITATIVE members.json. Authorization uses the per-request project,
+ * not this.
  *
  * @return string|null role name, or null if the user has no membership
  */
@@ -545,7 +545,7 @@ function resolveEffectiveRole(array $user): ?string {
     // Fallback: first cached project where the membership actually exists
     foreach (($user['projects'] ?? []) as $project => $entry) {
         if (!qs_cache_entry_is_member($entry)) {
-            continue; // status mirror (8.3a): pending/terminal entries are not memberships
+            continue; // status mirror: pending/terminal entries are not memberships
         }
         $role = getUserRoleForProject($userId, (string)$project);
         if ($role !== null) {
@@ -556,7 +556,7 @@ function resolveEffectiveRole(array $user): ?string {
 }
 
 /**
- * Resolve a user's UX-DEFAULT project NAME (C7) — their selected_project when that
+ * Resolve a user's UX-DEFAULT project NAME — their selected_project when that
  * membership is still real, else the first cached project they are genuinely a
  * member of, else null. This is used ONLY to give GLOBAL commands a benign working
  * PROJECT_PATH context (never authz — global authz does not depend on a project,
@@ -576,7 +576,7 @@ function resolveDefaultProject(array $user): ?string {
     }
     foreach (($user['projects'] ?? []) as $project => $entry) {
         if (!qs_cache_entry_is_member($entry)) {
-            continue; // status mirror (8.3a): pending/terminal entries are not memberships
+            continue; // status mirror: pending/terminal entries are not memberships
         }
         if (getUserRoleForProject($userId, (string)$project) !== null) {
             return (string)$project;
@@ -586,10 +586,10 @@ function resolveDefaultProject(array $user): ?string {
 }
 
 /**
- * The project ids the user is genuinely a member of (authoritative members.json — L5):
+ * The project ids the user is genuinely a member of (authoritative members.json):
  * their users.php `projects` cache VERIFIED against members.json (a stale cache entry
  * never lists a project they can't access), plus selected_project. For the "my projects"
- * editing picker (C9). Sorted, deduped. Informational only — never an authz decision.
+ * editing picker. Sorted, deduped. Informational only — never an authz decision.
  *
  * @return string[] project ids
  */
@@ -601,7 +601,7 @@ function getUserProjectIds(array $user): array {
     $ids = [];
     foreach (($user['projects'] ?? []) as $project => $entry) {
         if (!qs_cache_entry_is_member($entry)) {
-            continue; // status mirror (8.3a): pending/terminal entries are not memberships
+            continue; // status mirror: pending/terminal entries are not memberships
         }
         if (getUserRoleForProject($userId, (string)$project) !== null) {
             $ids[(string)$project] = true;
@@ -632,7 +632,7 @@ function getAllCommands(): array {
 }
 
 /**
- * Reverse index: command name -> its category (from categories.php). C6.
+ * Reverse index: command name -> its category (from categories.php).
  * Unmapped command -> null (hasPermission treats that as DENY, fail-closed).
  *
  * @param string $command
@@ -649,11 +649,11 @@ function getCommandCategory(string $command): ?string {
 }
 
 /**
- * The set of GLOBAL-scoped command names (categories.php scope === 'global'). C8 (8.W).
+ * The set of GLOBAL-scoped command names (categories.php scope === 'global').
  *
  * The admin client uses this to choose transport: a global command is called at
  * '/management/<cmd>'; every OTHER (project-scoped) command must carry the
- * '/management/p/<projectId>/<cmd>' marker (C7). Emitting the set from THIS source
+ * '/management/p/<projectId>/<cmd>' marker. Emitting the set from THIS source
  * (categories.php) keeps client + server in agreement by construction, mirroring
  * the server's own default — hasPermission treats an unmapped command as 'project'
  * ('scope' ?? 'project') — so the client rule is: global IFF listed here, else project.
@@ -673,7 +673,7 @@ function getGlobalCommands(): array {
 }
 
 /**
- * Expand a role's granted CATEGORIES to its full PROJECT command list (C6).
+ * Expand a role's granted CATEGORIES to its full PROJECT command list.
  * Replaces the old flat roles.php['commands'] lookup; stable interface (callers
  * still receive a command array or null). Global commands (any-auth + the
  * owner-interim system.admin set) are layered on by getTokenPermissions, not here.
@@ -699,8 +699,8 @@ function getRoleCommands(string $roleName): ?array {
 }
 
 /**
- * A role's numeric rank (viewer 1 … owner 6) from roles.php. C6.
- * Drives the L9 manages-below hierarchy + the F6 self-escalation guard.
+ * A role's numeric rank (viewer 1 … owner 6) from roles.php.
+ * Drives the manages-below hierarchy + the self-escalation guard.
  *
  * @param string|null $roleName
  * @return int rank, or 0 for an unknown / invalid / null role
@@ -715,10 +715,10 @@ function roleRank(?string $roleName): int {
 
 /**
  * May an actor holding $actorRole grant/assign/manage a member at $targetRole?
- * Self-escalation guard (F6, L9): the target must be STRICTLY below the actor's own
- * rank — you can never grant or act on a role at or above your own. C6.
+ * Self-escalation guard: the target must be STRICTLY below the actor's own
+ * rank — you can never grant or act on a role at or above your own.
  *
- * This is the rank primitive only. The membership commands that consume it (C8)
+ * This is the rank primitive only. The membership commands that consume it
  * MUST ALSO require the actor to hold the relevant capability
  * (project.members = admin/owner; project.ownership = owner) via hasPermission —
  * so e.g. a developer (rank 4) manages no one despite rank alone allowing 1–3.
@@ -740,7 +740,7 @@ function canManageRole(string $actorRole, string $targetRole): bool {
  * @return bool
  */
 function isValidRole(string $roleName): bool {
-    // No superadmin / no '*' role (C6). A role is valid iff it exists in roles.php.
+    // No superadmin / no '*' role. A role is valid iff it exists in roles.php.
     $roles = loadRolesConfig();
     return isset($roles[$roleName]);
 }
@@ -792,7 +792,7 @@ function qs_user_bump_generation(string $userId): ?int {
  * Resolve the CALLER'S SESSION to a user — the cookie half of authentication.
  *
  * The session cookie names the session; the session names the user. The user
- * must still exist, must not be disabled (L10), and the generation stamped into
+ * must still exist, must not be disabled, and the generation stamped into
  * the session at login must still match the record (the kill switch). A session
  * idle longer than `idle_ttl` is refused and its idle window is otherwise slid
  * forward as the caller works.
@@ -829,7 +829,7 @@ function qs_session_auth(): array {
     if ($user === null) {
         return $refuse('Session does not resolve to a user');
     }
-    // L10: disabled user — every request of theirs is refused, on every
+    // Disabled user — every request of theirs is refused, on every
     // session, from the moment the status changes. Note this SUSPENDS rather
     // than REVOKES: the session file is refused, not destroyed, so flipping the
     // status back to 'active' lets a session that has not idled out resume.
@@ -904,7 +904,7 @@ function validateBearerToken(?string $authHeader): array {
 }
 
 /**
- * Username shape rule (C8 8.0b): 3–32 chars, lowercase a-z / 0-9 / '_' / '-'.
+ * Username shape rule: 3–32 chars, lowercase a-z / 0-9 / '_' / '-'.
  * The username is the PRIVATE login identifier (the email field was dropped —
  * a mailer-less system cannot verify or use one): it is never shown to other
  * users. Public identity = the display `name` + the opaque user id.
@@ -945,7 +945,7 @@ function qs_suggest_username(): string {
 }
 
 /**
- * Find a user by USERNAME (the private login identifier — C8 8.0b).
+ * Find a user by USERNAME (the private login identifier).
  * Case-insensitive; users without a username (externally managed ones) are
  * simply never matched. The returned record has its 'id' attached.
  *
@@ -1093,10 +1093,10 @@ function qs_auth_attempt_login(string $username, string $password): array {
 
 /**
  * Serialized read-modify-write on users.php — THE single users-registry writer
- * (C8): createProject, register, the account password change, and the panel's own
+ * — createProject, register, the account password change, and the panel's own
  * selected-project write (secure/admin/functions/panelState.php) all come
- * through here. flock sidecar (the pre-C8 inline writers were temp+rename
- * only, so two simultaneous writers could lose an update) + temp + rename
+ * through here. flock sidecar (temp+rename alone would let two simultaneous
+ * writers lose an update) + temp + rename
  * (atomic swap for lock-free readers) + opcache_invalidate (readers must see
  * the new file immediately).
  *
@@ -1119,7 +1119,7 @@ function qs_users_mutate(callable $fn) {
         if ($result === false) {
             return false;
         }
-        $content = "<?php\n/**\n * User Registry (C5) — stable userId => identity.\n * Engine plumbing (PHP). Atomic write (temp+rename).\n */\n\nreturn " . var_export($cfg, true) . ";\n";
+        $content = "<?php\n/**\n * User Registry — stable userId => identity.\n * Engine plumbing (PHP). Atomic write (temp+rename).\n */\n\nreturn " . var_export($cfg, true) . ";\n";
         $tmp = $path . '.tmp' . getmypid();
         if (file_put_contents($tmp, $content, LOCK_EX) === false) {
             @unlink($tmp);
@@ -1441,25 +1441,25 @@ function qs_auth_attempt_register(string $name, string $password): array {
 }
 
 /**
- * Check whether a USER may run a command — per-project category RBAC (C6/C7).
+ * Check whether a USER may run a command — per-project category RBAC.
  *
  *   command -> category (categories.php) -> scope:
  *     global         → granted iff the category's access rule is in
  *                      QS_GLOBAL_ACCESS_GRANTING (today: 'any' = any
  *                      authenticated user). Every other value DENIES.
  *     project        → the user's role ON THE PER-REQUEST PROJECT must grant that
- *                      category (owner short-circuits — owner is the top, L9)
+ *                      category (owner short-circuits — owner is the top)
  *   unmapped command → DENY (fail-closed). NO superadmin, NO '*'.
  *
- * C7 — the PROJECT-scoped decision now keys off $requestedProject (the projectId
+ * The PROJECT-scoped decision keys off $requestedProject (the projectId
  * peeled from the request URL, already validated + membership-checked by the
  * dispatcher), NOT the user's selected_project. selected_project is a UX default
  * ONLY and is never consulted here — that closes the "selected_project is never
  * authz" rule for actions. The role always comes from the AUTHORITATIVE
- * members.json (L5). GLOBAL scope no longer has any owner-gated rule: C8 8.5
- * retired global access:'owner' because it resolved target-independently as
- * "owns ANY project anywhere" (see QS_GLOBAL_ACCESS_GRANTING). Disabled users are
- * already rejected in validateBearerToken (L10), before this runs.
+ * members.json. GLOBAL scope has no owner-gated rule: a global access:'owner'
+ * would resolve target-independently as "owns ANY project anywhere" (see
+ * QS_GLOBAL_ACCESS_GRANTING). Disabled users are already rejected in
+ * validateBearerToken, before this runs.
  *
  * @param array       $user             Resolved user (from validateBearerToken; must have 'id')
  * @param string      $command          Command name being accessed
@@ -1482,11 +1482,11 @@ function hasPermission(array $user, string $command, ?string $requestedProject =
         // Global authz is project-INDEPENDENT, so the only sound grant is "any
         // authenticated (non-disabled) user". Every other declared value —
         // 'none', a typo, or a reintroduced 'owner' — falls through to deny.
-        // See QS_GLOBAL_ACCESS_GRANTING for why 'owner' was retired (C8 8.5).
+        // See QS_GLOBAL_ACCESS_GRANTING for why 'owner' was retired.
         return in_array($def['access'] ?? '', QS_GLOBAL_ACCESS_GRANTING, true);
     }
 
-    // project-scoped — role comes from the PER-REQUEST project (C7), never
+    // project-scoped — role comes from the PER-REQUEST project, never
     // selected_project. No projectId ⇒ no project to authorize against ⇒ DENY.
     if ($requestedProject === null || $requestedProject === '') {
         return false;
@@ -1496,7 +1496,7 @@ function hasPermission(array $user, string $command, ?string $requestedProject =
         return false; // not a member of THIS project → 403
     }
     if ($role === 'owner') {
-        return true; // owner-top (L9)
+        return true; // owner-top
     }
 
     $roles = loadRolesConfig();
@@ -1505,11 +1505,11 @@ function hasPermission(array $user, string $command, ?string $requestedProject =
 }
 
 /**
- * Get a USER's effective role + full command list for their current project (C6).
+ * Get a USER's effective role + full command list for their current project.
  * Feeds GET /admin/self/permissions (admin JS reads {role, commands} to gate the UI). Category
  * RBAC: any-auth globals ∪ the role's project commands. There is NO owner-only
- * global set to add — global access:'owner' was retired in C8 8.5. Project source
- * = selected_project (transitional; C7 swaps to the per-request URL project).
+ * global set to add — there is no global access:'owner'. Project source
+ * = selected_project (a UX view; authorization itself uses the per-request URL project).
  *
  * @param array $user Resolved user (must have 'id')
  * @return array ['role' => string|null, 'commands' => string[]]
@@ -1539,7 +1539,7 @@ function getTokenPermissions(array $user): array {
 
     // Project commands granted by the role (owner grants all project categories).
     // NOTE: there is deliberately no owner-only GLOBAL set to union in — the
-    // global access:'owner' rule was retired in C8 8.5 (see
+    // global access:'owner' rule was retired (see
     // QS_GLOBAL_ACCESS_GRANTING). Being an owner of some project confers nothing
     // installation-wide, so an owner's command list is exactly
     // "any-auth globals ∪ their role's project commands".
@@ -1574,7 +1574,7 @@ function handleCors(?string $origin): bool {
     
     // Same-origin check: if Origin matches the current host, it's not cross-origin.
     //
-    // C12: built from the VALIDATED origin, not the raw Host header. Both sides
+    // Built from the VALIDATED origin, not the raw Host header. Both sides
     // of this comparison used to come from the request, so a caller sending a
     // matching Host + Origin pair satisfied it and skipped the allowlist below.
     // Rated honestly, that was defence-in-depth rather than a live bypass — a
@@ -1662,7 +1662,7 @@ function getCurrentAuth(): ?array {
 }
 
 /**
- * Resolve the current request's USER from the Authorization header (C5).
+ * Resolve the current request's USER from the Authorization header.
  * For commands that need the caller's identity (e.g. createProject owner).
  * Returns null if unauthenticated / unresolved / disabled.
  *

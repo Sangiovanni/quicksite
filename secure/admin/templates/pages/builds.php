@@ -1,6 +1,6 @@
 <?php
 /**
- * Builds page (beta.11 S3.8).
+ * Builds page.
  *
  * The project's ONE build: make it, download it, delete it. Retention is N = 1,
  * so this page shows a single build or none — never a list.

@@ -1,6 +1,6 @@
 <?php
 /**
- * setJoinPolicy Command (C8 8.3b)
+ * setJoinPolicy Command
  *
  * Flips the project's `join_policy` in members.json — the knob that opens or
  * closes the SELF-SERVICE request lane — the knock an outsider makes from the
@@ -40,7 +40,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
  * @return ApiResponse
  */
 function __command_setJoinPolicy(array $params = [], array $urlParams = []): ApiResponse {
-    // C8 containment: marker-only targeting.
+    // Project containment: marker-only targeting.
     if (!defined('PROJECT_NAME') || PROJECT_NAME === '') {
         return ApiResponse::create(400, 'project.required')
             ->withMessage('This command is project-scoped. Target a project with /management/p/<projectId>/setJoinPolicy');

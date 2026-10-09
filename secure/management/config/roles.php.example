@@ -1,15 +1,15 @@
 <?php
 /**
- * Role Definitions — per-project RBAC (beta.10 C6).
+ * Role Definitions — per-project RBAC.
  *
  * Copy this file to roles.php. These are the FIXED built-in roles — there are no
- * custom roles (L8), so you should not need to edit this. Each role grants a set of
+ * custom roles, so you should not need to edit this. Each role grants a set of
  * trust-coherent CATEGORIES (defined in categories.php), expanded to per-command at
  * load time by AuthManagement::getRoleCommands(). Enforcement:
  *   command -> category (categories.php) -> role grant (here) | global access rule.
  *
- * `rank` (viewer 1 … owner 6) drives the L9 "manages strictly below" hierarchy and
- * the F6 self-escalation guard (AuthManagement::canManageRole): a granter may only
+ * `rank` (viewer 1 … owner 6) drives the "manages strictly below" hierarchy and
+ * the self-escalation guard (AuthManagement::canManageRole): a granter may only
  * assign/manage a role of STRICTLY LOWER rank than their own. There is NO superadmin
  * and NO '*' — `owner` (rank 6) is the top of each project. Per-project role
  * assignments live in each project's config/members.json, NOT here.

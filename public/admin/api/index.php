@@ -9,7 +9,7 @@
  */
 
 // ============================================================================
-// C8 8.X — per-request project scoping (F-C8-8.X-1)
+// Per-request project scoping
 // ============================================================================
 // This helper executes management commands IN-PROCESS. It used to inherit
 // init.php's GLOBAL served-project context, so every project-scoped arm read the
@@ -20,8 +20,8 @@
 // peel the project from the URL marker '/admin/api/p/<projectId>/<action>', then
 // authorize the arm's underlying command(s) against THAT project before binding it
 // via qs_load_project_context() — which binds PROJECT_PATH *and* PUBLIC_CONTENT_PATH
-// together (C15 15.3), so the assets / styles / builds arms self-scope. Same
-// discipline, same no-oracle 403.
+// together, so the assets / styles / builds arms self-scope. Same discipline,
+// same no-oracle 403.
 $__qsApiProject = null;
 {
     $__segs = array_values(array_filter(
@@ -32,7 +32,7 @@ $__qsApiProject = null;
         if ($__segs[$__i] === 'admin' && $__segs[$__i + 1] === 'api' && $__segs[$__i + 2] === 'p'
             && isset($__segs[$__i + 3])) {
             $__cand = rawurldecode($__segs[$__i + 3]);
-            // F1 shape only — membership is checked after auth, below.
+            // The project-name shape only — membership is checked after auth, below.
             if (preg_match('/^[A-Za-z0-9_-]{1,64}$/D', $__cand)) {
                 $__qsApiProject = $__cand;
             }
@@ -45,20 +45,20 @@ require_once __DIR__ . '/../../init.php';
 require_once SECURE_FOLDER_PATH . '/admin/functions/AdminHelper.php';
 
 // Fatal handling, the JSON headers, and the auth gate — shared with the panel's
-// other JSON endpoint (/admin/state) so the two cannot drift apart. C12 (F9):
-// this dispatcher used to have no fatal handling of any kind, and a fatal
-// anywhere below (a malformed project config.php is enough) left the status at
-// 200 with PHP's own error, absolute filesystem path included, as the body.
+// other JSON endpoint (/admin/state) so the two cannot drift apart. Without the
+// fatal handling, a fatal anywhere below (a malformed project config.php is
+// enough) would leave the status at 200 with PHP's own error, absolute
+// filesystem path included, as the body.
 // Authentication is the session cookie AND the per-session token, exactly as
 // /management: this helper runs management commands in-process, so it must not
 // be reachable on a weaker credential than the commands themselves.
 require_once SECURE_FOLDER_PATH . '/admin/functions/adminJsonEndpoint.php';
 $tokenInfo = qs_admin_json_boot();
 
-// is_valid_project_name — the F1 shape gate for the URL marker (the management
-// dispatcher requires this the same way).
+// is_valid_project_name — the project-name shape gate for the URL marker (the
+// management dispatcher requires this the same way).
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
-// qs_format_size — the shared byte formatter (S2.9). Required explicitly rather
+// qs_format_size — the shared byte formatter. Required explicitly rather
 // than relied on arriving through a command file, because the asset-list
 // endpoint formats sizes before any command is loaded.
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
@@ -74,7 +74,7 @@ foreach ($spaceSegments as $_) {
 }
 array_shift($parts); // admin
 array_shift($parts); // api
-// C8 8.X — optional project marker 'p/<projectId>' (see the header note).
+// Optional project marker 'p/<projectId>' (see the header note).
 if (($parts[0] ?? null) === 'p' && isset($parts[1])) {
     array_shift($parts); // p
     array_shift($parts); // <projectId>
@@ -83,7 +83,7 @@ $action = array_shift($parts) ?? '';
 $params = $parts;
 
 // ============================================================================
-// C8 8.X — authorize the arm, then bind its project (F-C8-8.X-1)
+// Authorize the arm, then bind its project
 // ============================================================================
 // Every arm that reads project data inherits the CATEGORY of the command it runs
 // — there is no parallel permission model here. An arm is authorized exactly as
@@ -93,8 +93,7 @@ $params = $parts;
 // AI-spec arms run their workflow's declared dataRequirements through
 // CommandRunner (a documented hasPermission bypass, contained by its own
 // read-only allowlist); every command the shipped core specs pull is in
-// content.read, so gating those arms on the same category is coherent — see the
-// C8 §8 8.X entry.
+// content.read, so gating those arms on the same category is coherent.
 const QS_API_ARM_COMMANDS = [
     'pages'                    => ['listPages'],
     'components'               => ['listComponents'],
@@ -130,8 +129,8 @@ const QS_API_ARM_COMMANDS = [
 // per-category caps — installation-wide configuration, identical for every
 // project and every caller, so it belongs here rather than with the
 // project-bound arms. 'update-check' is the same kind of fact about the
-// installation — it was the `checkForUpdates` command until beta.11 S6 ruled
-// that the command surface is a CLI for developing a PROJECT.)
+// installation — not a command, because the command surface is a CLI for
+// developing a PROJECT.)
 const QS_API_STATIC_ARMS = [
     'structure-types', 'asset-categories', 'asset-extensions', 'favicon-extensions',
     'alias-types', 'edit-actions', 'upload-limits', 'update-check',
@@ -359,7 +358,7 @@ switch ($action) {
         break;
 
     case 'upload-limits':
-        // S2.5 — the size ceilings, so the upload zone can state them BEFORE a
+        // The size ceilings, so the upload zone can state them BEFORE a
         // user discovers one by hitting it. Read live from PHP on every call
         // rather than cached: post_max_size and upload_max_filesize are both
         // PHP_INI_PERDIR, so a .htaccess or pool change takes effect without a
@@ -382,9 +381,9 @@ switch ($action) {
 
     case 'update-check':
         // Is a newer QuickSite released than the one installed? A fact about the
-        // INSTALLATION, not about any project — which is why it is not a command
-        // (beta.11 S6). Reports only; applying an update is `git pull` on the
-        // server and has no HTTP surface anywhere.
+        // INSTALLATION, not about any project — which is why it is not a command.
+        // Reports only; applying an update is `git pull` on the server and has no
+        // HTTP surface anywhere.
         //
         // Answers any authenticated caller, exactly as `checkForUpdates` did.
         // WHO SEES the resulting banner is decided in layout.php from
@@ -540,14 +539,14 @@ switch ($action) {
         // Flatten all existing keys
         $allKeys = flattenTranslationKeysForSelect($translationResult['data']['translations'] ?? []);
 
-        // Beta.9 A4 Slice 5: $missingKeys (from validateTranslations) treats
+        // $missingKeys (from validateTranslations) treats
         // empty-string leaves as "missing" (per keyExistsInTranslations_validate).
         // But the same key still appears in $allKeys (flattenTranslationKeysForSelect
         // returns ALL leaves, empty or not). Without this lookup, a key like
         // 'page.titles.test' = "" lands in BOTH $used (because it's not in
         // $unusedKeys) AND $unset (because validate flagged it missing).
-        // Surfaced by Slice 5 inline edit verification — saving a key to ""
-        // produced a duplicate 🟢+🔴 pair for the same key.
+        // Saving a key to "" (the inline editor does) would then produce a
+        // duplicate 🟢+🔴 pair for the same key.
         // The fix: skip keys that are in $missingKeys when partitioning, so
         // empty-value referenced keys live only in $unset.
         $missingLookup = array_flip($missingKeys);
@@ -753,7 +752,7 @@ switch ($action) {
         
         require_once SECURE_FOLDER_PATH . '/src/classes/WorkflowManager.php';
         $manager = new WorkflowManager();
-        // C10 F-C10-1(b): arm the per-command re-gate. fetchDataRequirements()
+        // Arm the per-command re-gate. fetchDataRequirements()
         // re-checks every data command with hasPermission ONLY when tokenInfo is
         // set; without this the CommandRunner allowlist would run unchecked.
         $manager->setTokenInfo($tokenInfo);
@@ -830,7 +829,7 @@ switch ($action) {
         
         require_once SECURE_FOLDER_PATH . '/src/classes/WorkflowManager.php';
         $manager = new WorkflowManager();
-        $manager->setTokenInfo($tokenInfo); // C10 F-C10-1(b): arm the per-command re-gate
+        $manager->setTokenInfo($tokenInfo); // arm the per-command re-gate
         $spec = $manager->loadWorkflow($params[0]);
         
         if (!$spec) {
@@ -874,16 +873,16 @@ switch ($action) {
         echo json_encode(['success' => true, 'data' => $response]);
         break;
     
-    // NOTE: the 'ai-spec-preview' arm was DELETED in beta.10 C10 (10.1b, F-C10-1).
-    // It was the last surface that accepted a CALLER-AUTHORED spec in the request
-    // body and ran its dataRequirements; validateWorkflow() only checks shape, so
-    // a spec could name any CommandRunner-allowlisted command. It was broken for
+    // NOTE: there is deliberately no 'ai-spec-preview' arm. Such an arm accepts a
+    // CALLER-AUTHORED spec in the request body and runs its dataRequirements;
+    // validateWorkflow() only checks shape, so a spec could name any
+    // CommandRunner-allowlisted command. The one this file had was broken for
     // every input (it called WorkflowManager::renderTemplateString(), a method
-    // that never existed — an Error, which the catch(Exception) here would not
-    // even have caught), and that missing method was the ONLY thing preventing
-    // unauthorized execution. Deleted rather than repaired so the next developer
-    // implementing that method cannot silently reopen the hole. It is the sibling
-    // of the custom-workflow feature removed in C8 8.X part 1. No client called it.
+    // that does not exist — an Error, which the catch(Exception) here would not
+    // even catch), and that missing method was the ONLY thing preventing
+    // unauthorized execution. It is gone rather than repaired so the next
+    // developer implementing that method cannot silently reopen the hole; the
+    // custom-workflow feature is absent for the same reason. No client calls it.
 
     case 'workflow-generate-steps':
         // Generate steps for a manual workflow
@@ -902,7 +901,7 @@ switch ($action) {
         
         require_once SECURE_FOLDER_PATH . '/src/classes/WorkflowManager.php';
         $manager = new WorkflowManager();
-        $manager->setTokenInfo($tokenInfo); // C10 F-C10-1(b): arm the per-command re-gate
+        $manager->setTokenInfo($tokenInfo); // arm the per-command re-gate
 
         $workflow = $manager->loadWorkflow($input['workflowId']);
         if (!$workflow) {
@@ -965,12 +964,11 @@ default:
         echo json_encode(['error' => 'Unknown action: ' . $action]);
 }
 
-// (Removed, S2.9) A local formatBytes(). qs_format_size() in
-// utilsManagement.php is the shared one — see the note in deleteProject.php.
-// It mattered more here than a duplicate usually does: makeInternalApiCall()
-// below `require_once`s a command file into THIS process, and two command
-// files declared a global formatBytes() of their own, so the two definitions
-// were one endpoint away from a fatal redeclare.
+// No local byte formatter: qs_format_size() in utilsManagement.php is the
+// shared one. It matters more here than a duplicate usually does:
+// makeInternalApiCall() below `require_once`s a command file into THIS
+// process, so a global helper declared here and one declared by a command file
+// would be one endpoint away from a fatal redeclare.
 
 /**
  * Execute a management command directly in-process (no HTTP call).
@@ -1032,11 +1030,11 @@ function makeInternalApiCall(string $endpoint): array {
             'error'   => $response->toArray()['message'] ?? 'Command error'
         ];
     } catch (\Throwable $e) {
-        // beta.10 C12 12.5. This relay is the one path-leak site that does NOT
+        // This relay is the one path-leak site that does NOT
         // go through ApiResponse, so the central scrub cannot see it — and PHP's
         // own messages routinely embed absolute paths
         // ("file_get_contents(C:\...\x.json): Failed to open stream"). Route it
-        // through the same gate 12.3 built for every other exception body: full
+        // through the gate every other exception body goes through: full
         // message in development, generic in production, real detail to the log.
         return ['success' => false, 'error' => qs_safe_error_message($e, 'admin-api:' . $command)];
     }
@@ -1093,13 +1091,13 @@ function flattenTranslationKeysForSelect(array $translations, string $prefix = '
             $keys = array_merge($keys, $childKeys);
         } else {
             // Leaf node - add truncated preview.
-            // Beta.9 A4: must be mb_substr / mb_strlen, NOT substr / strlen.
+            // Must be mb_substr / mb_strlen, NOT substr / strlen.
             // Byte-aware substr() on UTF-8 with multi-byte chars (e.g. French
             // é è à) can land mid-character at the 40-byte cut, producing
             // broken UTF-8. json_encode silently returns false on invalid
             // UTF-8 → the calling helper echoes nothing → the admin panel
             // (and command-form.js's translation-key callsites) get an
-            // empty 200 body. This silently broke FR for months pre-A4.
+            // empty 200 body, and French translations silently break.
             $strValue = is_string($value) ? $value : '';
             $preview = mb_substr($strValue, 0, 40, 'UTF-8');
             if (mb_strlen($strValue, 'UTF-8') > 40) $preview .= '...';

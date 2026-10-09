@@ -5,7 +5,7 @@
  * NOT commands. The command surface is a CLI for DEVELOPING A PROJECT; keeping
  * track of who you have worked with is not project development, which is the
  * same line that put account self-service, membership self-service and the two
- * directory lookups on /admin/self (beta.11 S6).
+ * directory lookups on /admin/self.
  *
  * WHY IT EXISTS. Inviting somebody requires their EXACT public display name —
  * qs_directory_find_user is exact-match only, deliberately — and display names

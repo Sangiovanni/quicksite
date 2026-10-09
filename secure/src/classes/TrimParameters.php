@@ -30,7 +30,7 @@ class TrimParameters {
     /** @var array Remaining URL segments after route resolution */
     private array $params = [];
 
-    /** @var array Beta.8 A1 — captured URL path-param values for `:name` route segments.
+    /** @var array Captured URL path-param values for `:name` route segments.
      *             E.g., for route 'products/:slug' matched against URL '/products/red-vase':
      *             routeParams === ['slug' => 'red-vase']. Empty when no `:` segments matched. */
     private array $routeParams = [];
@@ -114,7 +114,7 @@ class TrimParameters {
             $this->requestedPath = $resolved['requested'] ?? '';
         }
 
-        // Beta.8 A2 — editor emulation override. When public/index.php
+        // Editor emulation override. When public/index.php
         // detected _editor=1 + _emulate it stashed the desired routeParams
         // in a global. Every TrimParameters instance picks them up here
         // (per-route .php templates construct their own instances and
@@ -147,7 +147,8 @@ class TrimParameters {
         while (!empty($remaining) && $depth < self::MAX_DEPTH) {
             $segment = $remaining[0];
 
-            // Specificity rule (locked 2026-06-04): exact literal match wins
+            // Specificity rule (by design, DESIGN_DECISIONS.md "Specificity wins;
+            // ties broken by declaration order"): exact literal match wins
             // over any `:name` param sibling.
             // Try exact first; fall back to the first `:name` key at this level
             // when no literal match exists. Declaration order in routes.php
@@ -210,7 +211,7 @@ class TrimParameters {
     /**
      * Find the first `:name` key at a routes-tree level. Returns the key
      * (with leading colon, e.g., ':slug') or null when no param sibling
-     * exists. Beta.8 A1.
+     * exists.
      */
     private static function findParamKey(array $level): ?string {
         foreach (array_keys($level) as $key) {
@@ -254,7 +255,7 @@ class TrimParameters {
     }
 
     /**
-     * Get captured URL path-param values (beta.8 A1).
+     * Get captured URL path-param values.
      *
      * For a route like 'products/:slug' matched against URL '/products/red-vase',
      * returns ['slug' => 'red-vase']. Empty array when the matched route has no
@@ -267,7 +268,7 @@ class TrimParameters {
     }
 
     /**
-     * Override the captured route params (beta.8 A2 Slice 3 — editor
+     * Override the captured route params (editor
      * emulation). The visual editor previews a param route without
      * knowing what concrete URL the visitor will hit, so it injects
      * "preview values" via ?_emulate=... — public/index.php decodes
@@ -349,7 +350,7 @@ class TrimParameters {
      */
     public function samePageUrl(?string $lang = null): string {
         $targetLang = $lang ?? $this->lang;
-        // C15 15.4 (R1): render-scoped public base first (root-relative form);
+        // Render-scoped public base first (root-relative form);
         // BASE_URL fallback keeps non-render callers unchanged.
         $url = defined('QS_PUBLIC_BASE') ? QS_PUBLIC_BASE
             : (defined('BASE_URL') ? BASE_URL : '/');

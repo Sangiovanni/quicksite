@@ -11,7 +11,7 @@
  *   - admin  catalogue: secure/admin/config/oauth-presets.json
  *   - project overrides: secure/projects/<active>/data/oauth-presets.json
  *
- * Per the Slice 2.5 lookup order, per-project entries override admin
+ * Per the lookup order, per-project entries override admin
  * entries at PROVIDER level (full-entry replace, not field-level merge).
  * This endpoint mirrors that semantic for the wizard's picker: the
  * effective preset (whichever wins per provider) is what the wizard
@@ -21,8 +21,6 @@
  * the per-provider routes already exist in the active project's
  * routes.php. The oauth-button wizard uses this to drive its
  * "already-set-up" warning before reusing an existing setup.
- *
- * Beta.9 A1 Slice 4 (locked 2026-06-15).
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';

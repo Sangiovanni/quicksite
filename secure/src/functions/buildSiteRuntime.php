@@ -33,7 +33,7 @@ if (!function_exists('qs_site_runtime_source')) {
 
 if (!function_exists('qs_site_config_php')) {
     /**
-     * The generated `qs-site.php` — the four values that make one build
+     * The generated `qs-site.php` — the six values that make one build
      * different from another.
      *
      * PHP rather than JSON, deliberately: this file sits in the document root,
@@ -43,9 +43,10 @@ if (!function_exists('qs_site_config_php')) {
      * executed and never served as text, and the guard makes a direct request
      * answer 404 instead of a blank 200.
      *
-     * Values go through var_export. All four are already validated before a
-     * build starts (the project id by the F1 name check, the folder names and
-     * the space by the relative-path check), but a generator is the wrong place
+     * Values go through var_export. The four names are already validated before
+     * a build starts (the project id by the project-name check, the folder names
+     * and the space by the relative-path check), the version is an integer and
+     * the icon is the build's own decision, but a generator is the wrong place
      * to rely on a caller's validation still holding.
      *
      * @param string      $project The real project id — becomes PROJECT_NAME.
