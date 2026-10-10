@@ -13,7 +13,7 @@ QuickSite separates concerns into three top-level layers. Each one has a clear b
 | Layer | Folder | Audience | Purpose |
 |---|---|---|---|
 | **Project** | `public/p/` + `secure/projects/<projectId>/` | Site owner | The actual website data: routes, page structures (JSON), translations, components, interactions, styles, assets. The public half is a single entry point, `index.php`, through which every project is served. |
-| **Management** | `public/management/` + `secure/management/` | API client (admin panel, scripts) | The 151 commands that read or mutate project data. The public half is again a single entry point: every command enters through it. Session + role enforced. AI calls bypass this layer entirely (browser-direct). |
+| **Management** | `public/management/` + `secure/management/` | API client (admin panel, scripts) | The 149 commands that read or mutate project data. The public half is again a single entry point: every command enters through it. Session + role enforced. AI calls bypass this layer entirely (browser-direct). |
 | **Admin** | `public/admin/` + `secure/admin/` | Human operator | The browser UI that calls Management commands. Includes the visual editor, sitemap, theme editor, AI workspace, workflow runner. It also owns the things that are **not** about developing a project — the installation's update check, the panel's own per-user state, and everything to do with the signed-in account and its access to projects — which are served from its own JSON endpoints (`/admin/api`, `/admin/state`, `/admin/self`) rather than being commands. |
 
 ```
@@ -197,7 +197,7 @@ ApiResponse::create(201, 'route.created')
 
 **One command extends without new commands.** `addComplexElement` dispatches to a registry of **builders** auto-discovered from `secure/src/classes/complexElements/*.php` — each a `ComplexElementBuilder` subclass that turns a wizard config into a node spec (pure: config in, node out, no I/O), which the command splices into the structure under one lock using `addNode`'s insertion helper. A new wizard kind is therefore one PHP file drop: no `routes.php` / `roles.php` / `help.php` edit, no new command, because the dispatcher globs the directory at request time and registers each subclass by its declared `kind()`. What it emits is indistinguishable from a hand-built subtree, so nothing at render time knows the element came from a wizard. See [ADMIN_PANEL.md §8.7](ADMIN_PANEL.md#87-complex-element-wizard) for the per-kind catalogue and the client-side half.
 
-The full list of 151 commands is registered in `secure/management/routes.php`. See [COMMAND_API.md](COMMAND_API.md) for the catalogue and a per-command reference (also obtainable at runtime via `GET /management/help`).
+The full list of 149 commands is registered in `secure/management/routes.php`. See [COMMAND_API.md](COMMAND_API.md) for the catalogue and a per-command reference (also obtainable at runtime via `GET /management/help`).
 
 ### Response shape
 
@@ -312,7 +312,7 @@ The global set is deliberately small: `help`, `createProject`, `importProject`, 
 | `editor` | 2 | edit content, translations, routes, assets, interactions, privacy copy; read integration config |
 | `designer` | 3 | styles, CSS variables, animations, theme |
 | `developer` | 4 | builds + server-side route resolvers |
-| `admin` | 5 | deploy, API / OAuth config, backup / export, command history; manage members (invite, adjudicate join requests, join policy) |
+| `admin` | 5 | deploy, API config, the project's OAuth keys, backup / export, command history; manage members (invite, adjudicate join requests, join policy) |
 | `owner` | 6 | set the project's visibility; delete the project + transfer ownership; the single top of the project, cannot be removed by others |
 
 `rank` also governs role management: a granter may only assign a role strictly below their own, which is the self-escalation guard.
@@ -679,7 +679,7 @@ addRoute.php
   └── ApiResponse::create(201, 'route.created')->send()
 ```
 
-The same pattern — parse → validate → mutate files → `ApiResponse` — is used by all 151 commands.
+The same pattern — parse → validate → mutate files → `ApiResponse` — is used by all 149 commands.
 
 ### 6.3 Routing — exact and parameterised routes
 
@@ -1323,7 +1323,8 @@ your-server/
 └── <secure>/                  sibling, never web-accessible
     ├── config.php  routes.php  nginx_routes.conf
     ├── data/       aliases, route-resolvers, api-endpoints, embed-policy,
-    │               the precomputed consent payload, OAuth presets + secrets
+    │               the precomputed consent payload, the OAuth providers the
+    │               project uses and their build keys
     ├── src/classes/    render + route + translate, plus the server-side data
     │                   path: DataResolver, OutboundUrlPolicy, IframeSandbox,
     │                   OAuthHandler
@@ -1410,10 +1411,20 @@ call an internal address; in production it may not.
 **OAuth in a built site** is the AUTHOR's site's own sign-in, not QuickSite's. It
 needs PHP sessions, an outbound HTTPS call and a route to return to, and a built
 site has all three; it needs nothing from the management API or the admin panel,
-neither of which exists in a build. The client secret is read from the server
-first (`QS_OAUTH_<PROVIDER>_CLIENT_ID` / `_CLIENT_SECRET`) and from the shipped
-`data/oauth-secrets.json` second, so a deployer can keep the credential out of a
-build folder that `downloadBuild` hands over whole.
+neither of which exists in a build. The build carries the entries of the
+providers the project's sign-in routes use, copied from the installation's
+provider list, and the project's **build** keys — never its preview keys. The
+client secret is read from the server first (`QS_OAUTH_<PROVIDER>_CLIENT_ID` /
+`_CLIENT_SECRET`) and from the shipped `data/oauth-secrets.json` second, so a
+deployer can keep the credential out of a build folder that `downloadBuild` hands
+over whole. The installation itself never reads those variables: a server that
+hosts many projects would sign every one of them in with one registration.
+
+Every redirect the sign-in routes make from a `?return=` value lands on the site:
+the value is followed only when it is a path on this site — one `/`, then neither
+a second `/` nor a backslash, and no control character — naming one of its
+routes, and it is composed against the site's public base; anything else lands on
+the site's home. The same rule holds on `/p/<projectId>/` and in a build.
 
 The post-auth record and the pre-auth sign-in state both carry the id of the
 project that wrote them, and every read verifies it. Two built sites on one
@@ -1452,13 +1463,15 @@ Then:
 10. Copy `routes.php` and `config.php`, the runtime classes and function files
     (§11.2), the translations (all languages when the project is multilingual,
     `default.json` otherwise), and the project data a served page reads:
-    aliases, route resolvers, the API registry, and the OAuth presets — plus the
-    install-wide embed policy, bundled from the installation's own config rather
-    than the project, so a built site keeps the same iframe sandbox rules the
-    installation applies. The consent payload is PRECOMPUTED here rather than
-    copied, because deriving it is authoring work. OAuth **secrets** are copied
-    separately and reported separately — a build that carries them is a
-    credential, not just a website.
+    aliases, route resolvers and the API registry — plus the install-wide embed
+    policy, bundled from the installation's own config rather than the project,
+    so a built site keeps the same iframe sandbox rules the installation applies.
+    The consent payload is PRECOMPUTED here rather than copied, because deriving
+    it is authoring work. OAuth is written separately and reported separately:
+    the entries of the providers the project's sign-in routes use, from the
+    installation's provider list, and the project's build keys for them (a build
+    that carries them is a credential, not just a website); a provider carried
+    without build keys, or named by a route but no longer offered, is reported.
 11. Compile `menu.php`, `footer.php`, and the consent banner + popup.
 12. Write `qs-api-config.js`, `qs-route-schema.js` and `qs-enums.js`, and copy
     `qs.js`.

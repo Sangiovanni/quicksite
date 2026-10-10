@@ -5473,105 +5473,75 @@ $GLOBALS['__help_commands'] = [
         'notes' => 'APIs and endpoints are defined per-project in data/api-endpoints.json. Use {{call:fetch:@apiId/endpointId,...}} in interactions to call these endpoints.'
     ],
     'listOAuthProviders' => [
-        'description' => 'Lists available OAuth provider presets (the union of admin catalogue + per-project overrides) along with whether the per-provider routes are already set up. Drives the oauth-button wizard\'s provider picker.',
+        'description' => 'Lists the OAuth providers the installation offers, with this project\'s keys for each (the client id and whether a secret is stored, never the secret), the callback addresses each provider\'s console must know, and whether the routes the oauth-button wizard creates already exist. Drives the OAuth providers page and the oauth-button wizard\'s provider picker.',
         'method' => 'GET',
         'parameters' => [],
         'example_get' => 'GET /management/p/<projectId>/listOAuthProviders',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
-            'message' => '2 OAuth providers listed',
+            'message' => '1 OAuth provider listed',
             'data' => [
                 'providers' => [
                     [
-                        'id' => 'google',
-                        'name' => 'Google',
-                        'source' => 'admin',
-                        'scope' => 'openid email profile',
-                        'refresh_token_supported' => true,
-                        'has_revoke_url' => true,
+                        'id' => 'github',
+                        'name' => 'GitHub',
+                        'console_url' => 'https://github.com/settings/developers',
+                        'preset' => ['authorize_url' => 'https://github.com/login/oauth/authorize', 'token_url' => 'https://github.com/login/oauth/access_token', 'userinfo_url' => 'https://api.github.com/user', 'scope' => 'read:user user:email', 'userinfo_sub_path' => 'id', 'userinfo_email_path' => 'email'],
+                        'scope' => 'read:user user:email',
+                        'refresh_token_supported' => false,
+                        'has_revoke_url' => false,
+                        'credentials' => [
+                            'preview' => ['client_id' => 'Ov23liExample', 'secret_set' => true],
+                            'build' => ['client_id' => null, 'secret_set' => false]
+                        ],
+                        'credentials_status' => 'set',
+                        'callback' => [
+                            'preview_url' => 'https://<your-host>/p/<projectId>/auth/oauth/github/callback',
+                            'path' => '/auth/oauth/github/callback'
+                        ],
+                        'resolver_count' => 2,
                         'setup' => [
-                            'start_route_exists' => false,
-                            'callback_route_exists' => false,
-                            'fully_set_up' => false,
-                            'start_route_path' => 'auth/oauth/google/start',
-                            'callback_route_path' => 'auth/oauth/google/callback'
+                            'start_route_exists' => true,
+                            'callback_route_exists' => true,
+                            'fully_set_up' => true,
+                            'start_route_path' => 'auth/oauth/github/start',
+                            'callback_route_path' => 'auth/oauth/github/callback'
                         ]
                     ]
                 ],
-                'count' => 1
+                'count' => 1,
+                'can_manage' => true
             ]
         ],
         'error_responses' => [],
-        'notes' => 'Sources: "admin" (engine catalogue at <secure>/admin/config/oauth-presets.json), "project" (project-only at <secure>/projects/<active>/data/oauth-presets.json), "project-override" (project overrides an admin entry). Per the lookup order, project entries replace admin entries at PROVIDER level (full-entry replace, not field-level merge). Each provider entry includes preset, credentials_status (set/missing), resolver_count (route-resolvers explicitly referencing this provider id), and setup (per-provider route existence).'
+        'notes' => 'The providers belong to the installation: <secure>/management/config/oauth-providers.json when its operator has made that file, else the shipped oauth-providers.json.example beside it. No command writes either; the operator adds a provider by editing the file. An entry is offered only when its addresses are absolute https (http is accepted only in development) and its fields are well formed; a malformed entry is left out and the reason written to the PHP error log. The keys belong to the project, in two sets per provider (see setOAuthCredentials): "preview", which the sign-in uses on this installation, and "build", which a build carries to the deployed site. credentials.build is answered only to whoever may call setOAuthCredentials (the project\'s owner and admin); can_manage says which. credentials_status is "set" when the preview set holds a client id and a secret. callback.preview_url is the address to register in the provider\'s console for the preview; callback.path is the one to register on the deployed site\'s domain. resolver_count counts the routes whose OAuth resolver names this provider.'
     ],
-    'addOAuthProvider' => [
-        'description' => 'Add a new OAuth provider preset and (optionally) its credentials at admin or per-project scope. Writes to oauth-presets.json + oauth-secrets.{php,json}. Drives the /admin/oauth-providers page\'s Add modal.',
+    'setOAuthCredentials' => [
+        'description' => 'Sets or clears one of this project\'s two key sets for an OAuth provider the installation offers: "preview" (the sign-in on this installation) or "build" (carried by a build to the deployed site). Writes only the project\'s data/oauth-secrets.json. The answer never contains the secret.',
         'method' => 'POST',
+        'destructive' => true,
         'parameters' => [
-            'scope' => ['required' => true, 'type' => 'string', 'enum' => ['admin', 'project'], 'description' => 'Where to write the preset.'],
-            'id' => ['required' => true, 'type' => 'string', 'description' => 'Lowercase provider id (slug). /^[a-z][a-z0-9-]*$/.', 'example' => 'mycorp-sso'],
-            'preset' => ['required' => true, 'type' => 'object', 'description' => 'Full preset shape: authorize_url, token_url, userinfo_url, revoke_url (optional), scope, userinfo_sub_path, userinfo_email_path, userinfo_name_path (optional), extra_authorize_params (optional), refresh_token_supported.'],
-            'credentials' => ['required' => false, 'type' => 'object', 'description' => 'Optional {client_id, client_secret}. client_secret optional for public clients (PKCE-only).']
+            'provider' => ['required' => true, 'type' => 'string', 'description' => 'The id of a provider the installation offers (listOAuthProviders lists them).', 'example' => 'github'],
+            'set' => ['required' => true, 'type' => 'string', 'enum' => ['preview', 'build'], 'description' => '"preview": the keys the sign-in uses on this installation. "build": the keys a build carries to the deployed site.', 'example' => 'preview'],
+            'client_id' => ['required' => false, 'type' => 'string', 'description' => 'The client id from the provider\'s console. Required unless clear is true. At most 512 printable ASCII characters, no space.', 'example' => 'Ov23liExample'],
+            'client_secret' => ['required' => false, 'type' => 'string', 'description' => 'The client secret from the provider\'s console. Required the first time a set is saved; left out later, the stored secret is kept. At most 1024 printable ASCII characters, no space. Send it in the request body, never in the address.'],
+            'clear' => ['required' => false, 'type' => 'boolean', 'description' => 'true removes this set (client id and secret).', 'example' => 'false']
         ],
-        'example_post' => 'POST /management/p/<projectId>/addOAuthProvider with {"scope":"project","id":"mycorp-sso","preset":{...},"credentials":{"client_id":"abc","client_secret":"xyz"}}',
-        'success_response' => [
-            'status' => 201,
-            'code' => 'oauth.provider.created',
-            'data' => ['id' => 'mycorp-sso', 'scope' => 'project', 'credentials_status' => 'set']
-        ],
-        'error_responses' => [
-            '400.validation.failed' => 'Invalid body — see errors[] for per-field details',
-            '409.oauth.provider.duplicate' => 'An entry with this id already exists at the target scope; use editOAuthProvider',
-            '500.server.operation_failed' => 'The provider presets file could not be written at the requested scope ("admin" or "project"), or the preset was written but its secrets file could not be. The scope is named in the message.'
-        ],
-        'notes' => 'Admin-tier only — handles client_secret. Cross-scope duplicates (e.g., same id in both admin and project) are allowed and are the per-project override pattern, by design.'
-    ],
-    'editOAuthProvider' => [
-        'description' => 'Update an existing OAuth provider preset and (optionally) credentials. Supports rename (newId) and cross-scope move (newScope). Replace-all semantic on the preset object — read the current entry first if you want field-level updates.',
-        'method' => 'POST',
-        'parameters' => [
-            'scope' => ['required' => true, 'type' => 'string', 'enum' => ['admin', 'project']],
-            'id' => ['required' => true, 'type' => 'string'],
-            'preset' => ['required' => true, 'type' => 'object', 'description' => 'Full preset shape (replaces existing)'],
-            'credentials' => ['required' => false, 'type' => 'object', 'description' => 'When omitted, existing secret is left untouched. When client_secret is empty, only client_id is updated; the existing secret is preserved.'],
-            'newId' => ['required' => false, 'type' => 'string', 'description' => 'New provider id (rename). Must not collide at target scope.'],
-            'newScope' => ['required' => false, 'type' => 'string', 'enum' => ['admin', 'project'], 'description' => 'Move between scopes; copy-then-delete.']
-        ],
-        'example_post' => 'POST /management/p/<projectId>/editOAuthProvider with {"scope":"admin","id":"google","preset":{...},"newScope":"project"}',
+        'example_post' => 'POST /management/p/<projectId>/setOAuthCredentials with {"provider":"github","set":"preview","client_id":"Ov23liExample","client_secret":"<the secret>"}',
         'success_response' => [
             'status' => 200,
-            'code' => 'oauth.provider.updated',
-            'data' => ['id' => 'google', 'scope' => 'project', 'old_id' => null, 'old_scope' => 'admin']
+            'code' => 'oauth.credentials.saved',
+            'message' => 'The preview keys for \'github\' were saved',
+            'data' => ['provider' => 'github', 'set' => 'preview', 'client_id' => 'Ov23liExample', 'secret_set' => true]
         ],
         'error_responses' => [
-            '400.validation.failed' => 'Invalid body',
-            '404.oauth.provider.not_found' => 'Source entry not found at declared scope',
-            '409.oauth.provider.duplicate' => 'newId / newScope target already has an entry',
-            '500.server.operation_failed' => 'A write failed at one of the scopes involved ("admin" or "project"): the presets file at the current scope, the presets file at a new scope on a move, the removal from the source scope after a successful move (the message then names the deleteOAuthProvider call that cleans it up), or the secrets file.'
+            '400.validation.failed' => 'provider or set missing or invalid; client_id missing or malformed; client_secret malformed, or missing while no secret is stored for this set; or client_secret sent in the address — see errors[]',
+            '404.oauth.provider.not_offered' => 'The installation does not offer this provider',
+            '500.server.invalid_json' => 'The project\'s data/oauth-secrets.json is not a JSON object, so it is not written over',
+            '500.server.file_write_failed' => 'The project\'s data/oauth-secrets.json could not be written'
         ],
-        'notes' => 'Admin-tier only. Cross-scope move is copy-then-delete; on partial failure the entry exists in BOTH scopes (recoverable via deleteOAuthProvider).'
-    ],
-    'deleteOAuthProvider' => [
-        'description' => 'Remove an OAuth provider preset and credentials at the given scope. STRICT in-use block: refuses with 409 when route-resolvers or page-structure oauth-button elements still reference this provider. The response carries a usage summary so the UI can guide the author to remove consumers first.',
-        'method' => 'POST',
-        'parameters' => [
-            'scope' => ['required' => true, 'type' => 'string', 'enum' => ['admin', 'project']],
-            'id' => ['required' => true, 'type' => 'string']
-        ],
-        'example_post' => 'POST /management/p/<projectId>/deleteOAuthProvider with {"scope":"project","id":"mycorp-sso"}',
-        'success_response' => [
-            'status' => 200,
-            'code' => 'oauth.provider.deleted',
-            'data' => ['id' => 'mycorp-sso', 'scope' => 'project', 'was_override' => false, 'admin_entry_remains' => false]
-        ],
-        'error_responses' => [
-            '400.validation.failed' => 'Invalid body',
-            '404.oauth.provider.not_found' => 'No entry at the declared scope',
-            '409.oauth.provider.in_use' => 'Provider is referenced by route-resolvers or oauth-button elements; data.usage carries the per-site list',
-            '500.server.operation_failed' => 'The provider presets file could not be written at the requested scope ("admin" or "project"). The scope is named in the message.'
-        ],
-        'notes' => 'Removing a PROJECT-scope OVERRIDE (when an admin entry with the same id exists) skips the in-use check — the admin entry survives, so consumers still resolve. data.was_override = true in that case.'
+        'notes' => 'Answers oauth.credentials.cleared when clear is true. On this installation the sign-in reads the preview set only. A build carries the build set only, never the preview set; on the deployed server QS_OAUTH_<PROVIDER>_CLIENT_ID and QS_OAUTH_<PROVIDER>_CLIENT_SECRET come first (the provider id upper-cased, every other character folded to "_"). The installation itself never reads those variables. Each provider\'s console must know the callback address listOAuthProviders answers for the set.'
     ],
 
     'listStorageItems' => [

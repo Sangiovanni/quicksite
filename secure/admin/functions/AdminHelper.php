@@ -193,7 +193,7 @@ function getCommandCategories(): array {
         'oauth_providers' => [
             'label' => 'OAuth Providers',
             'icon' => 'shield',
-            'commands' => ['listOAuthProviders', 'addOAuthProvider', 'editOAuthProvider', 'deleteOAuthProvider']
+            'commands' => ['listOAuthProviders', 'setOAuthCredentials']
         ],
         'storage_registry' => [
             'label' => 'Storage Registry',

@@ -1,263 +1,436 @@
 <?php
 /**
- * oauthProviderHelpers.php — CRUD primitives for the admin OAuth
- * providers page.
+ * oauthProviderHelpers.php — which OAuth providers this installation offers, and the keys a
+ * project signs in with.
  *
- * These helpers operate on a SPECIFIC scope ('admin' or 'project')
- * rather than the runtime "project-first / admin-fallback" lookup
- * used by `OAuthHandler::loadPreset` / `loadSecret`. Two different
- * concerns:
+ * TWO OWNERS, TWO FILES.
  *
- *   - Runtime lookup (OAuthHandler): "which preset does this provider
- *     resolve to?" — picks the winning entry across scopes.
- *   - CRUD (this file): "modify the entry at THIS scope" — needs to
- *     target one specific file even when the other scope also has an
- *     entry (e.g., overriding admin's google with a project version).
+ *   - THE PROVIDERS belong to the installation. One file the operator edits by hand,
+ *     `<secure>/management/config/oauth-providers.json`, says which providers every project may use
+ *     and where each one's endpoints are. When the operator has not made that file, the shipped
+ *     `oauth-providers.json.example` beside it is the list. No command writes either: a project can
+ *     choose among the providers, never define one, so no project can change the endpoints another
+ *     project's sign-in talks to.
  *
- * File layout:
- *   - Admin presets:  secure/admin/config/oauth-presets.json (JSON)
- *   - Admin secrets:  secure/admin/config/oauth-secrets.php  (PHP — regenerated on write)
- *   - Project presets: secure/projects/<active>/data/oauth-presets.json (JSON)
- *   - Project secrets: secure/projects/<active>/data/oauth-secrets.json (JSON)
+ *   - THE KEYS belong to the project. Its owner or admin enters them on the OAuth providers page
+ *     (`setOAuthCredentials`), and they live in the project's `data/oauth-secrets.json`, two sets
+ *     per provider: `preview`, which the sign-in uses on this installation, and `build`, which a
+ *     build carries to the deployed site. There are no installation-wide keys: the operator offers
+ *     providers, each project brings its own registration with each provider.
  *
- * By design: DESIGN_DECISIONS.md "OAuth providers
- * admin page shape".
+ * A BUILT SITE carries copies of both, written by build.php: the entries of the providers its
+ * project uses at `<secure>/data/oauth-providers.json`, and only the `build` keys at
+ * `<secure>/data/oauth-secrets.json`. On the deployed server, `QS_OAUTH_<PROVIDER>_CLIENT_ID` /
+ * `_CLIENT_SECRET` come first, so a deployer can keep the secret out of the build folder. The
+ * installation never reads those variables: on a server that hosts many projects they would sign
+ * every project in with one registration.
+ *
+ * Installation or build is decided by the folders on disk, as IframeSandbox decides it: an
+ * installation carries `<secure>/management/config`, a build does not. Never a request-scoped
+ * signal — the build command reads a built site's parameters on the installation.
+ *
+ * This file travels into every build, so it requires only files a build carries.
  */
 
-if (!function_exists('oauthProviderPresetPath')) {
+require_once __DIR__ . '/environment.php'; // qs_is_development
+require_once __DIR__ . '/jsonIo.php';      // qs_json_write
 
-/**
- * Resolve the presets file path for a given scope. Returns null when
- * scope='project' but PROJECT_PATH is undefined.
- */
-function oauthProviderPresetPath(string $scope): ?string {
-    if ($scope === 'admin') {
-        return SECURE_FOLDER_PATH . '/admin/config/oauth-presets.json';
-    }
-    if ($scope === 'project') {
-        return defined('PROJECT_PATH')
-            ? PROJECT_PATH . '/data/oauth-presets.json'
-            : null;
-    }
-    return null;
+if (!function_exists('qs_oauth_on_installation')) {
+
+/** The two key sets a project keeps per provider. */
+define('QS_OAUTH_KEY_SETS', ['preview', 'build']);
+
+/** Authorize parameters the engine writes itself; a provider entry may not replace them. */
+define('QS_OAUTH_RESERVED_AUTHORIZE_PARAMS', [
+    'response_type', 'client_id', 'redirect_uri', 'scope', 'state', 'code_challenge', 'code_challenge_method',
+]);
+
+/** The longest client id and client secret a project may store, in bytes. */
+define('QS_OAUTH_CLIENT_ID_MAX', 512);
+define('QS_OAUTH_CLIENT_SECRET_MAX', 1024);
+
+/** True on the installation, false inside a built site. */
+function qs_oauth_on_installation(): bool
+{
+    return is_dir(SECURE_FOLDER_PATH . '/management/config');
 }
 
 /**
- * Resolve the secrets file path for a given scope. Admin = PHP file
- * (regenerated on write), project = JSON.
+ * The provider list this request reads: the operator's file, else the shipped `.example`, on the
+ * installation; the build's copy in a built site.
  */
-function oauthProviderSecretPath(string $scope): ?string {
-    if ($scope === 'admin') {
-        return SECURE_FOLDER_PATH . '/admin/config/oauth-secrets.php';
+function qs_oauth_providers_path(): string
+{
+    if (!qs_oauth_on_installation()) {
+        return SECURE_FOLDER_PATH . '/data/oauth-providers.json';
     }
-    if ($scope === 'project') {
-        return defined('PROJECT_PATH')
-            ? PROJECT_PATH . '/data/oauth-secrets.json'
-            : null;
+    $own = SECURE_FOLDER_PATH . '/management/config/oauth-providers.json';
+    return is_file($own) ? $own : $own . '.example';
+}
+
+/** The list's name as an operator reads it in a log line: the placeholder, never the real path. */
+function qs_oauth_providers_label(): string
+{
+    if (!qs_oauth_on_installation()) {
+        return '<secure>/data/oauth-providers.json';
     }
-    return null;
+    return '<secure>/management/config/' . basename(qs_oauth_providers_path());
 }
 
 /**
- * Read the full presets file at a scope. Returns [] when missing or
- * malformed. Ignore-marker keys (starting with `_`) are PRESERVED in
- * the returned array — callers that want only real providers must
- * filter themselves.
+ * Every usable provider, id => entry, in the file's order. Read and checked once per request.
+ *
+ * A key starting with `_` is documentation and is passed over. An entry that fails the check is
+ * left out and the reason written to the PHP error log. A file that is not a JSON object leaves
+ * the list EMPTY: it is never replaced by the shipped list, which could offer a provider the
+ * operator removed.
+ *
+ * @return array<string, array>
  */
-function oauthProviderReadPresetsFile(string $scope): array {
-    $path = oauthProviderPresetPath($scope);
-    if ($path === null || !file_exists($path)) {
-        return [];
+function qs_oauth_providers(): array
+{
+    static $cache = [];
+    $path = qs_oauth_providers_path();
+    if (isset($cache[$path])) {
+        return $cache[$path];
+    }
+    $out = [];
+    if (!is_file($path)) {
+        return $cache[$path] = $out;
     }
     $raw = @file_get_contents($path);
-    if ($raw === false) {
-        return [];
+    $data = $raw === false ? null : json_decode($raw);
+    if (!($data instanceof stdClass)) {
+        error_log('QuickSite: ' . qs_oauth_providers_label() . ' is not a JSON object'
+            . ($raw === false ? ' (unreadable)' : ' (' . json_last_error_msg() . ')') . ' — no OAuth provider is offered.');
+        return $cache[$path] = $out;
     }
-    $decoded = json_decode($raw, true);
-    return is_array($decoded) ? $decoded : [];
-}
-
-/**
- * Read the full secrets map at a scope. Admin returns the PHP array;
- * project returns the JSON object. Returns [] on missing / malformed.
- */
-function oauthProviderReadSecretsFile(string $scope): array {
-    $path = oauthProviderSecretPath($scope);
-    if ($path === null || !file_exists($path)) {
-        return [];
-    }
-    if ($scope === 'admin') {
-        $arr = require $path;
-        return is_array($arr) ? $arr : [];
-    }
-    $raw = @file_get_contents($path);
-    if ($raw === false) {
-        return [];
-    }
-    $decoded = json_decode($raw, true);
-    return is_array($decoded) ? $decoded : [];
-}
-
-/**
- * Write the presets map back to disk at a scope. JSON-encoded with
- * pretty print + unescaped slashes (matches what the user sees in
- * their editor). Creates the parent directory if needed.
- */
-function oauthProviderWritePresetsFile(string $scope, array $presets): bool {
-    $path = oauthProviderPresetPath($scope);
-    if ($path === null) {
-        return false;
-    }
-    $dir = dirname($path);
-    if (!is_dir($dir) && !@mkdir($dir, 0755, true)) {
-        return false;
-    }
-    $json = json_encode($presets, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-    return $json !== false && file_put_contents($path, $json . "\n", LOCK_EX) !== false;
-}
-
-/**
- * Write the secrets map back to disk at a scope. Project = JSON;
- * admin = PHP `<?php return [...]` file, hand-formatted because we
- * want a predictable shape (matches what `oauth-secrets.php.example`
- * documents). var_export is avoided because it uses `array(` syntax
- * and indentation that doesn't match the example.
- */
-function oauthProviderWriteSecretsFile(string $scope, array $secrets): bool {
-    $path = oauthProviderSecretPath($scope);
-    if ($path === null) {
-        return false;
-    }
-    $dir = dirname($path);
-    if (!is_dir($dir) && !@mkdir($dir, 0755, true)) {
-        return false;
-    }
-    if ($scope === 'project') {
-        $json = json_encode($secrets, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-        return $json !== false && file_put_contents($path, $json . "\n", LOCK_EX) !== false;
-    }
-    // admin: regenerate the PHP file with a small header.
-    $content  = "<?php\n";
-    $content .= "/**\n";
-    $content .= " * oauth-secrets.php — OAuth client credentials.\n";
-    $content .= " * Auto-managed by addOAuthProvider / editOAuthProvider /\n";
-    $content .= " * deleteOAuthProvider. Hand-edit if you prefer, but the\n";
-    $content .= " * next admin-UI write will replace the whole file.\n";
-    $content .= " *\n";
-    $content .= " * See oauth-secrets.php.example for the LOOKUP ORDER and\n";
-    $content .= " * security disclosure.\n";
-    $content .= " */\n";
-    $content .= "\n";
-    $content .= "return [\n";
-    foreach ($secrets as $id => $entry) {
-        if (!is_string($id) || $id === '' || !is_array($entry) || !isset($entry['client_id'])) {
+    foreach (json_decode($raw, true) as $id => $entry) {
+        $id = (string) $id;
+        if ($id !== '' && $id[0] === '_') {
             continue;
         }
-        $content .= "    " . var_export($id, true) . " => [\n";
-        $content .= "        'client_id' => " . var_export((string) $entry['client_id'], true) . ",\n";
-        if (isset($entry['client_secret']) && $entry['client_secret'] !== null && $entry['client_secret'] !== '') {
-            $content .= "        'client_secret' => " . var_export((string) $entry['client_secret'], true) . ",\n";
+        $problem = qs_oauth_provider_problem($id, $entry);
+        if ($problem !== null) {
+            error_log("QuickSite: OAuth provider '" . substr($id, 0, 64) . "' in " . qs_oauth_providers_label()
+                . " skipped: $problem.");
+            continue;
         }
-        $content .= "    ],\n";
+        $out[$id] = $entry;
     }
-    $content .= "];\n";
-    return file_put_contents($path, $content, LOCK_EX) !== false;
+    return $cache[$path] = $out;
+}
+
+/** One provider's entry, or null when the list does not offer it. */
+function qs_oauth_provider(string $id): ?array
+{
+    return qs_oauth_providers()[$id] ?? null;
+}
+
+/** True for a provider id's shape: lowercase letters, digits and hyphens, starting with a letter. */
+function qs_oauth_provider_id_ok(string $id): bool
+{
+    return strlen($id) <= 64 && preg_match('/^[a-z][a-z0-9-]*$/D', $id) === 1;
 }
 
 /**
- * Scan the active project for any usage of `$providerId`. Returns
- * a structured list of usage sites so the deleteOAuthProvider command
- * can refuse-and-explain when usage_count > 0. Two surfaces scanned:
+ * Why a provider entry cannot be used, or null when it can.
  *
- *   - route-resolvers.json: counts entries where an oauth-* kind
- *     declares `provider: "<id>"` literally. Param placeholders are
- *     ambiguous; we don't count them (the user manages those via the
- *     route-level UI directly).
- *   - page structure JSON: counts oauth-button nodes whose `provider`
- *     attribute matches. Walks recursively; bounded by project size.
- *
- * Returns array{routes: list, buttons: list, count: int}.
+ * Every address is absolute, with a host and no user name, password or fragment, and uses https.
+ * Plain http is accepted only in development, the same switch that lets the server reach a local
+ * address. Unknown fields are refused, so a misspelt optional field is reported rather than
+ * silently ignored.
  */
-function oauthProviderScanUsage(string $providerId): array {
-    $routes  = [];
-    $buttons = [];
-
-    if (defined('PROJECT_PATH')) {
-        // Resolvers
-        $sidecar = PROJECT_PATH . '/data/route-resolvers.json';
-        if (file_exists($sidecar)) {
-            $raw = @file_get_contents($sidecar);
-            $all = $raw !== false ? json_decode($raw, true) : null;
-            if (is_array($all)) {
-                foreach ($all as $routePath => $entry) {
-                    $configs = (isset($entry['kind']) && is_string($entry['kind'])) ? [$entry] : $entry;
-                    if (!is_array($configs)) continue;
-                    foreach ($configs as $config) {
-                        if (!is_array($config)) continue;
-                        $kind = $config['kind'] ?? null;
-                        if ($kind !== 'oauth-start' && $kind !== 'oauth-callback' && $kind !== 'oauth-logout') {
-                            continue;
-                        }
-                        $provider = $config['provider'] ?? null;
-                        if (is_string($provider) && $provider === $providerId) {
-                            $routes[] = ['route' => (string) $routePath, 'kind' => $kind];
-                        }
-                    }
-                }
-            }
+function qs_oauth_provider_problem(string $id, $entry): ?string
+{
+    if (!qs_oauth_provider_id_ok($id)) {
+        return 'the id must be lowercase letters, digits and hyphens, starting with a letter';
+    }
+    if (!is_array($entry) || ($entry !== [] && array_keys($entry) === range(0, count($entry) - 1))) {
+        return 'the entry is not an object';
+    }
+    $known = ['name', 'console_url', 'authorize_url', 'token_url', 'userinfo_url', 'revoke_url', 'scope',
+        'userinfo_sub_path', 'userinfo_email_path', 'userinfo_name_path', 'extra_authorize_params',
+        'refresh_token_supported'];
+    foreach (array_keys($entry) as $field) {
+        $field = (string) $field;
+        if ($field !== '' && $field[0] === '_') {
+            continue;
         }
-
-        // Page structure JSON — recursive scan
-        $pagesDir = PROJECT_PATH . '/templates/model/json/pages';
-        if (is_dir($pagesDir)) {
-            $rii = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($pagesDir));
-            foreach ($rii as $file) {
-                if (!$file->isFile() || strtolower($file->getExtension()) !== 'json') continue;
-                $raw = @file_get_contents($file->getPathname());
-                $tree = $raw !== false ? json_decode($raw, true) : null;
-                if (!is_array($tree)) continue;
-                $hits = [];
-                _oauthProvider_walkNodes($tree, $providerId, $hits);
-                if (!empty($hits)) {
-                    $relPath = str_replace($pagesDir . DIRECTORY_SEPARATOR, '', $file->getPathname());
-                    $buttons[] = [
-                        'page'  => str_replace(['\\', '.json'], ['/', ''], $relPath),
-                        'count' => count($hits),
-                    ];
-                }
+        if (!in_array($field, $known, true)) {
+            return "unknown field '" . substr($field, 0, 64) . "'";
+        }
+    }
+    foreach (['authorize_url', 'token_url', 'userinfo_url'] as $field) {
+        if (!isset($entry[$field])) {
+            return "'$field' is missing";
+        }
+    }
+    foreach (['authorize_url', 'token_url', 'userinfo_url', 'revoke_url', 'console_url'] as $field) {
+        if (array_key_exists($field, $entry) && ($why = qs_oauth_address_problem($entry[$field])) !== null) {
+            return "'$field' $why";
+        }
+    }
+    foreach (['scope', 'userinfo_sub_path', 'userinfo_email_path'] as $field) {
+        if (!isset($entry[$field]) || !is_string($entry[$field]) || trim($entry[$field]) === '') {
+            return "'$field' must be a non-empty string";
+        }
+    }
+    foreach (['name', 'userinfo_name_path'] as $field) {
+        if (array_key_exists($field, $entry) && (!is_string($entry[$field]) || trim($entry[$field]) === '')) {
+            return "'$field' must be a non-empty string";
+        }
+    }
+    if (array_key_exists('refresh_token_supported', $entry) && !is_bool($entry['refresh_token_supported'])) {
+        return "'refresh_token_supported' must be true or false";
+    }
+    if (array_key_exists('extra_authorize_params', $entry)) {
+        $extra = $entry['extra_authorize_params'];
+        if (!is_array($extra) || ($extra !== [] && array_keys($extra) === range(0, count($extra) - 1))) {
+            return "'extra_authorize_params' must be an object";
+        }
+        foreach ($extra as $k => $v) {
+            if (in_array((string) $k, QS_OAUTH_RESERVED_AUTHORIZE_PARAMS, true)) {
+                return "'extra_authorize_params' may not set '$k', which the engine writes";
+            }
+            if (!is_string($v) && !is_int($v) && !is_bool($v)) {
+                return "'extra_authorize_params.$k' must be a string, a number or true / false";
             }
         }
     }
+    return null;
+}
 
-    return [
-        'routes'  => $routes,
-        'buttons' => $buttons,
-        'count'   => count($routes) + array_sum(array_column($buttons, 'count')),
-    ];
+/** Why a provider address cannot be used, or null when it can. */
+function qs_oauth_address_problem($url): ?string
+{
+    if (!is_string($url) || $url === '' || preg_match('/[\x00-\x20\x7F]/', $url) === 1) {
+        return 'must be an address with no spaces or control characters';
+    }
+    $parts = parse_url($url);
+    if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host']) || filter_var($url, FILTER_VALIDATE_URL) === false) {
+        return 'must be an absolute address';
+    }
+    if (isset($parts['user']) || isset($parts['pass']) || isset($parts['fragment'])) {
+        return 'may not hold a user name, a password or a fragment';
+    }
+    $scheme = strtolower($parts['scheme']);
+    if ($scheme === 'https' || ($scheme === 'http' && qs_is_development())) {
+        return null;
+    }
+    return $scheme === 'http' ? 'must use https (http is accepted only in development)' : 'must use https';
+}
+
+/** The provider's display name: its `name`, else its id with the first letter capitalised. */
+function qs_oauth_provider_name(string $id, array $entry): string
+{
+    return isset($entry['name']) && is_string($entry['name']) ? $entry['name'] : ucfirst(str_replace('-', ' ', $id));
+}
+
+// ── a project's keys ───────────────────────────────────────────────────────────────────────
+
+/** The project's key file, or null when no project is bound. */
+function qs_oauth_keys_path(): ?string
+{
+    return defined('PROJECT_PATH') ? PROJECT_PATH . '/data/oauth-secrets.json' : null;
 }
 
 /**
- * Recursively walk a node tree counting oauth-button nodes that
- * reference $providerId. Helper for oauthProviderScanUsage. The
- * underscored name signals "internal — only used by the scanner".
+ * The project's key file, provider => set => {client_id, client_secret}, keeping only well-formed
+ * sets. [] when absent or unreadable.
+ *
+ * @return array<string, array<string, array{client_id: string, client_secret: ?string}>>
  */
-function _oauthProvider_walkNodes($nodes, string $providerId, array &$hits): void {
-    if (!is_array($nodes)) return;
+function qs_oauth_keys_read(): array
+{
+    $path = qs_oauth_keys_path();
+    if ($path === null || !is_file($path)) {
+        return [];
+    }
+    $raw = @file_get_contents($path);
+    $data = $raw === false ? null : json_decode($raw, true);
+    if (!is_array($data)) {
+        error_log("QuickSite: this project's data/oauth-secrets.json is not a JSON object — its OAuth keys are not read.");
+        return [];
+    }
+    $out = [];
+    foreach ($data as $provider => $sets) {
+        if (!is_string($provider) || !is_array($sets)) {
+            continue;
+        }
+        foreach (QS_OAUTH_KEY_SETS as $set) {
+            $s = $sets[$set] ?? null;
+            if (is_array($s) && isset($s['client_id']) && is_string($s['client_id']) && $s['client_id'] !== '') {
+                $out[$provider][$set] = [
+                    'client_id'     => $s['client_id'],
+                    'client_secret' => isset($s['client_secret']) && is_string($s['client_secret']) && $s['client_secret'] !== ''
+                        ? $s['client_secret'] : null,
+                ];
+            }
+        }
+    }
+    return $out;
+}
+
+/**
+ * True for a client id or secret a project may store: printable ASCII, no space, at most $max
+ * bytes. Every provider issues them in that alphabet; anything else is a paste gone wrong.
+ */
+function qs_oauth_key_value_ok(string $value, int $max): bool
+{
+    return $value !== '' && strlen($value) <= $max && preg_match('/^[\x21-\x7E]+$/D', $value) === 1;
+}
+
+/**
+ * Write the project's key file. Readable by the server's own user only, on systems that honour
+ * file modes.
+ */
+function qs_oauth_keys_write(array $keys): bool
+{
+    $path = qs_oauth_keys_path();
+    if ($path === null) {
+        return false;
+    }
+    if (!is_dir(dirname($path)) && !@mkdir(dirname($path), 0755, true)) {
+        return false;
+    }
+    if (!qs_json_write($path, (object) $keys, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE, LOCK_EX, "\n")) {
+        return false;
+    }
+    @chmod($path, 0600);
+    return true;
+}
+
+/**
+ * The keys this request's sign-in uses for a provider, or null when it has none.
+ *
+ *   installation  the project's `preview` set;
+ *   built site    the server's QS_OAUTH_<PROVIDER>_CLIENT_ID / _CLIENT_SECRET when set, else the
+ *                 `build` set the build carried.
+ *
+ * @return array{client_id: string, client_secret: ?string}|null
+ */
+function qs_oauth_sign_in_keys(string $provider): ?array
+{
+    if (!qs_oauth_on_installation()) {
+        $server = qs_oauth_server_keys($provider);
+        if ($server !== null) {
+            return $server;
+        }
+    }
+    return qs_oauth_keys_read()[$provider][qs_oauth_on_installation() ? 'preview' : 'build'] ?? null;
+}
+
+/**
+ * The deployed server's keys for a provider: QS_OAUTH_<PROVIDER>_CLIENT_ID and _CLIENT_SECRET,
+ * the provider id upper-cased with every run of other characters folded to `_` (`my-sso` reads
+ * QS_OAUTH_MY_SSO_CLIENT_ID). `REDIRECT_` is checked too: Apache prefixes environment variables
+ * with it once a request has been through an internal redirect, which a build's FallbackResource
+ * does to every page request.
+ *
+ * @return array{client_id: string, client_secret: ?string}|null
+ */
+function qs_oauth_server_keys(string $provider): ?array
+{
+    $name = 'QS_OAUTH_' . strtoupper((string) preg_replace('/[^A-Za-z0-9]+/', '_', $provider));
+    $read = static function (string $key): ?string {
+        $raw = $_SERVER[$key] ?? $_SERVER['REDIRECT_' . $key] ?? getenv($key);
+        return is_string($raw) && $raw !== '' ? $raw : null;
+    };
+    $id = $read($name . '_CLIENT_ID');
+    if ($id === null) {
+        return null;
+    }
+    return ['client_id' => $id, 'client_secret' => $read($name . '_CLIENT_SECRET')];
+}
+
+// ── what a project's routes use ────────────────────────────────────────────────────────────
+
+/**
+ * The project's sign-in routes: every route whose resolver is an OAuth kind, with the provider it
+ * names. A provider taken from the address (`{:param}`) is reported as null.
+ *
+ * @return list<array{route: string, kind: string, provider: ?string}>
+ */
+function qs_oauth_project_routes(): array
+{
+    $out = [];
+    if (!defined('PROJECT_PATH')) {
+        return $out;
+    }
+    $file = PROJECT_PATH . '/data/route-resolvers.json';
+    $raw = is_file($file) ? @file_get_contents($file) : false;
+    $all = $raw === false ? null : json_decode($raw, true);
+    if (!is_array($all)) {
+        return $out;
+    }
+    foreach ($all as $route => $entry) {
+        // One resolver is stored as an object, several as a list.
+        $configs = (is_array($entry) && isset($entry['kind'])) ? [$entry] : $entry;
+        if (!is_array($configs)) {
+            continue;
+        }
+        foreach ($configs as $config) {
+            $kind = is_array($config) ? ($config['kind'] ?? null) : null;
+            if ($kind !== 'oauth-start' && $kind !== 'oauth-callback' && $kind !== 'oauth-logout') {
+                continue;
+            }
+            $provider = $config['provider'] ?? null;
+            $literal = is_string($provider) && $provider !== '' && preg_match('/^\{:\w+\}$/D', $provider) !== 1;
+            if ($kind === 'oauth-logout' && !is_string($provider)) {
+                continue; // a sign-out names no provider: it reads the session's
+            }
+            $out[] = ['route' => (string) $route, 'kind' => $kind, 'provider' => $literal ? $provider : null];
+        }
+    }
+    return $out;
+}
+
+/** Every oauth-button on the project's pages that names $provider, page => count. */
+function qs_oauth_project_buttons(string $provider): array
+{
+    $out = [];
+    $dir = defined('PROJECT_PATH') ? PROJECT_PATH . '/templates/model/json/pages' : '';
+    if ($dir === '' || !is_dir($dir)) {
+        return $out;
+    }
+    $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir, FilesystemIterator::SKIP_DOTS));
+    foreach ($it as $file) {
+        if (!$file->isFile() || strtolower($file->getExtension()) !== 'json') {
+            continue;
+        }
+        $raw = @file_get_contents($file->getPathname());
+        $tree = $raw === false ? null : json_decode($raw, true);
+        $n = is_array($tree) ? qs_oauth_count_buttons($tree, $provider) : 0;
+        if ($n > 0) {
+            $rel = substr(str_replace('\\', '/', $file->getPathname()), strlen(str_replace('\\', '/', $dir)) + 1);
+            $out[substr($rel, 0, -5)] = $n;
+        }
+    }
+    ksort($out);
+    return $out;
+}
+
+/**
+ * The oauth-button nodes under $nodes for $provider. The button is written as plain markup, so it
+ * is recognised by the class the builder gives it.
+ */
+function qs_oauth_count_buttons(array $nodes, string $provider): int
+{
+    $n = 0;
     foreach ($nodes as $node) {
-        if (!is_array($node)) continue;
-        // oauth-button stamps an `<a>` tag with a specific class +
-        // href. We match against the rendered shape rather than a
-        // custom kind field — the splice writes plain DOM, no marker
-        // survives in the structure JSON. The class is the most
-        // stable signal; the href encodes the provider id too.
-        $cls = (isset($node['params']) && is_array($node['params'])) ? ($node['params']['class'] ?? '') : '';
-        if (is_string($cls) && strpos($cls, 'qs-oauth-button--' . $providerId) !== false) {
-            $hits[] = true;
+        if (!is_array($node)) {
+            continue;
+        }
+        $class = $node['params']['class'] ?? '';
+        if (is_string($class) && in_array('qs-oauth-button--' . $provider, preg_split('/\s+/', $class), true)) {
+            $n++;
         }
         if (isset($node['children']) && is_array($node['children'])) {
-            _oauthProvider_walkNodes($node['children'], $providerId, $hits);
+            $n += qs_oauth_count_buttons($node['children'], $provider);
         }
     }
+    return $n;
 }
 
-} // end if (!function_exists('oauthProviderPresetPath'))
+} // end if (!function_exists('qs_oauth_on_installation'))

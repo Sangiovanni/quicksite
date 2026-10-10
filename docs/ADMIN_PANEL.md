@@ -132,7 +132,7 @@ File lists are grouped by role. Where useful, the entry point or main exported f
 | `pages/builds.js` | Builds page: the project's single build — create, download, delete — plus the space picture and the near-the-limit warning (§9.16). |
 | `pages/embed-security.js` | Read-only view of the install-wide iframe embed policy. |
 | `pages/optimize.js` | Admin shell for the CSS Refiner library. |
-| `pages/oauth-providers.js` | OAuth provider preset CRUD (§9.5 Tier 4). |
+| `pages/oauth-providers.js` | The OAuth providers the installation offers, a how-to per provider, and the project's preview and build keys (§9.5 Tier 4). |
 | `pages/storage.js` | Browser-storage registry + cookie-consent management (§9.10). |
 | `pages/privacy.js` | Privacy helper — data-sharing registry + policy generation (§9.11). |
 | `pages/api-import/openapi-converter.js` | OpenAPI → native-shape converter for the API registry's import modal (§9.1). |
@@ -375,7 +375,7 @@ and the field is still empty.
 | Theme | `getRootVariables`, `setRootVariables`, `setThemeMode` |
 | Animations | `listKeyframes`, `getKeyframes`, `setKeyframes`, `deleteKeyframes`, `getAnimatedSelectors` |
 | Interactions / events | `listJsFunctions`, `listDataBindings`, `addInteraction`, `editInteraction`, `deleteInteraction`, `addPageEvent`, `editPageEvent`, `deletePageEvent` |
-| State + integrations | `getStateStores`, `setStateStores`, `listApiEndpoints`, `editApi`, `listOAuthProviders`, `listStorageItems`, `addStorageItem` |
+| State + integrations | `getStateStores`, `setStateStores`, `listApiEndpoints`, `editApi`, `listOAuthProviders`, `setOAuthCredentials`, `listStorageItems`, `addStorageItem` |
 | Assets / misc | `listAssets`, `help`, `backupProject` |
 
 For the full per-command reference see [COMMAND_API.md](COMMAND_API.md).
@@ -1768,8 +1768,8 @@ Any additional languages your project ships need the same shape.
 #### Tier 4 — OAuth
 
 OAuth 2.0 Authorization Code + PKCE flow with provider-side identity
-(Google / Meta / Amazon / GitHub presets shipped; authors add others).
-Server-side token custody — provider tokens never reach the browser.
+(Google / GitHub / Amazon / Meta shipped; the installation's operator adds
+others). Server-side token custody — provider tokens never reach the browser.
 
 **When to use OAuth vs Tier 3 magic-link**:
 
@@ -1800,24 +1800,59 @@ the record, consume its single-use sign-in state, or clear it. Cookie names are
 namespaced per project as well, but the namespacing is the lookup key rather than
 a check; the stamp is the check.
 
+**Who owns what.** The PROVIDERS belong to the installation: one file its
+operator edits, `<secure>/management/config/oauth-providers.json`, lists the
+providers every project may sign in with and where each one's endpoints are.
+While that file is absent, the shipped `oauth-providers.json.example` beside it
+is the list — Google, GitHub, Amazon and Meta. No command writes either file, so
+no project can define a provider or change the endpoints another project's
+sign-in talks to. The KEYS belong to the project: each project registers its own
+app with each provider and enters the client id and secret on the OAuth
+providers page. There are no installation-wide keys.
+
+**The provider list.** An entry names its `authorize_url`, `token_url` and
+`userinfo_url` (and optionally `revoke_url`), the `scope` it asks for, the
+dot-paths to the user's id and email in the user-information answer
+(`userinfo_sub_path`, `userinfo_email_path`, optionally `userinfo_name_path`),
+and optionally a display `name`, the `console_url` where an owner registers an
+app, `extra_authorize_params` and `refresh_token_supported`. The `.example`'s
+`_fields` entry documents each. Every address must be an absolute https address;
+plain http is accepted only when the installation runs in development. An entry
+that is malformed — a missing address, an unknown field, an extra parameter that
+would replace one the engine writes — is left out of the list, and the reason is
+written to the PHP error log. A file that is not JSON offers no provider at all;
+the shipped list never stands in for it. To change the list, copy the `.example`
+to `oauth-providers.json` and edit the copy: from then on the copy is the whole
+list, so a provider a later update adds to the `.example` is copied across by
+hand.
+
+**Two key sets per provider.** A project keeps, in its own
+`data/oauth-secrets.json`:
+
+- **preview keys** — what the sign-in uses on this installation, while the
+  site is tested in the preview. Their app must know the preview's callback
+  address, `<origin>/p/<projectId>/auth/oauth/<provider>/callback`.
+- **build keys** — what a build carries to the deployed site. Their app must
+  know the deployed site's callback, `https://<your-site>/auth/oauth/<provider>/callback`.
+  Often a second app: GitHub, for one, holds a single callback address per app.
+
+A build carries the build keys only; the preview keys never leave the
+installation. On the deployed server, `QS_OAUTH_<PROVIDER>_CLIENT_ID` and
+`QS_OAUTH_<PROVIDER>_CLIENT_SECRET` come first (the provider id upper-cased,
+every other character folded to `_`), so a deployer can keep the secret out of
+the build folder. The installation itself never reads those variables.
+
 **Setting up a provider — 3 steps**:
 
-1. **Preset** — engine catalogue at `secure/admin/config/oauth-presets.json`
-   ships Google / Meta / Amazon / GitHub + a test-oauth fixture. To
-   add a custom provider, append an entry there (see `_schema` for
-   the field list). Per-project overrides land at
-   `secure/projects/<active>/data/oauth-presets.json` — same shape,
-   wins over admin per-provider (full-entry replace, not field
-   merge). Useful when one project wants extra scopes or a custom
-   provider not in the engine catalogue.
-2. **Credentials** — copy `secure/admin/config/oauth-secrets.php.example`
-   to `oauth-secrets.php` (gitignored), fill in
-   `client_id` + `client_secret` for each provider you use. Most
-   projects use per-project credentials instead — drop a
-   `secure/projects/<active>/data/oauth-secrets.json` with the same
-   shape. Per-project wins over admin. Real-world: each project
-   registers its own OAuth app with each provider (different
-   `client_id` per project, blast-radius isolation).
+1. **The provider is offered** — the shipped four are; any other is added to
+   the list by the installation's operator.
+2. **The keys** — on the **OAuth providers** page (Authentication in the
+   sidebar), open the provider's *How to get the keys*: it links the
+   provider's console, gives the callback address to register for each set,
+   and notes the provider's own rules. Enter the client id and secret in
+   **Preview keys** (and, before building, in **Build keys**). Only the
+   project's owner and admin enter keys; an editor sees whether the preview
+   keys are set. The secret is never shown again — only whether one is stored.
 3. **Button + routes** — open the visual editor on a page, click
    "Add Element" → **Sign in with OAuth**, pick a provider in the
    wizard. The wizard creates the start + callback routes
@@ -1840,14 +1875,20 @@ a check; the stamp is the check.
    the provider's token endpoint (client_secret_basic auth +
    code_verifier), fetches userinfo with the access_token, generates
    a session id, stores `{provider, sub, email, name, tokens}`
-   server-side, returns a 302 to the homepage (or to the
-   `?return=/path` query param if provided) + sets the
-   `qs_oauth_user` cookie
+   server-side, returns a 302 to the site's home (or to the page the
+   `?return=/path` query param names) + sets the `qs_oauth_user`
+   cookie
 
 Authors customise the post-login landing by setting the wizard's
 "Redirect after login" field — appends `?return=/path` to the button's
-href. Server-side sanitisation rejects off-site URLs (open-redirect
-guard).
+href. **`?return=` stays on the site.** Every redirect the sign-in
+routes make from it — after the callback, on the callback's errors, after
+sign-out and on the sign-out's early exits — follows it only when it is a
+path on this site: one `/`, then neither a second `/` nor a backslash, and
+no control character, naming one of the site's routes. The path is
+composed against the site's base, so `/dashboard` lands on
+`/p/<projectId>/dashboard` in the preview and on `/dashboard` at a
+deployed site's root. Anything else lands on the site's home.
 
 **Template helpers** (always available — loaded by init.php):
 
@@ -1870,15 +1911,15 @@ session creation nor lookup cost — both helpers early-return.
 **Logout**: drop an `oauth-logout` resolver onto any route (e.g.
 `/auth/oauth/logout`, `/sign-out`). The dispatcher reads the
 `qs_oauth_user` cookie → finds the session → POSTs the access_token
-to the provider's `revoke_url` (when the preset declares one — Google,
-Amazon, the test-oauth fixture all do; GitHub + Meta use non-RFC-7009
-revoke flows so local-only logout there) → clears the server session
-→ expires the cookie → redirects to `?return=/path` or `/`. Idempotent
+to the provider's `revoke_url` (when its entry declares one — Google and
+Amazon do; GitHub + Meta use non-RFC-7009 revoke flows so local-only
+logout there) → clears the server session → expires the cookie →
+redirects to the page `?return=/path` names, or the site's home. Idempotent
 (no-session → just expire the cookie, no errors). Provider field on
 `oauth-logout` is optional — declared value acts as a sanity check
 against the cookie's session.
 
-**Failure-mode UX**: callback redirects to `returnTo` (or `/`) with
+**Failure-mode UX**: callback redirects to `returnTo` (or the site's home) with
 `?oauth_error=<code>` appended on:
 `invalid_state` / `missing_code` / `token_exchange_failed` /
 `userinfo_failed` / `userinfo_missing_sub`, plus the provider's own
@@ -1911,9 +1952,11 @@ guard.
 | State + session storage | `secure/src/functions/oauthStateStore.php` (PHP-session-backed; swappable abstraction) |
 | Resolver kind registration + validation | `secure/src/functions/resolverHelpers.php` (`oauth-start` / `oauth-callback` / `oauth-logout` in `RESOLVER_ALLOWED_KINDS`) |
 | Dispatcher | `public/p/index.php` OAuth branch (substitutes `{:routeParam}` placeholders, dispatches to handleStart / handleCallback / handleLogout) |
-| Provider presets | `secure/admin/config/oauth-presets.json` (admin catalogue) + per-project `data/oauth-presets.json` (override) |
-| Provider credentials | `secure/admin/config/oauth-secrets.php` (admin fallback) + per-project `data/oauth-secrets.json` (primary) |
-| Provider listing | `secure/management/command/listOAuthProviders.php` (union of admin + per-project, with per-provider setup status) |
+| The provider list | `<secure>/management/config/oauth-providers.json` (the operator's), else the shipped `oauth-providers.json.example`; read and checked by `secure/src/functions/oauthProviderHelpers.php` |
+| The project's keys | `data/oauth-secrets.json` (a preview set and a build set per provider), written by `secure/management/command/setOAuthCredentials.php` |
+| Provider listing | `secure/management/command/listOAuthProviders.php` (the offered providers, the project's key status, the callback addresses, per-provider setup status) |
+| The page | `secure/admin/templates/pages/oauth-providers.php` + `public/admin/assets/js/pages/oauth-providers.js` |
+| The `?return=` rule | `qs_site_path()` in `secure/src/functions/requestRuntime.php`; `OAuthHandler::returnTarget()` |
 | Visual element | `secure/src/classes/complexElements/OAuthButton.php` (builder) + `public/admin/.../contextual-complex/complex-oauth-button.js` (wizard) |
 | Template helpers | `secure/src/functions/oauthStateStore.php` (`isOAuthLoggedIn`, `getOAuthUser`) — loaded globally by `public/init.php` |
 | Locked design decisions | [docs/DESIGN_DECISIONS.md](DESIGN_DECISIONS.md) — OAuth section |
@@ -3095,6 +3138,7 @@ Where a project becomes a site you can put on a server: build it, download the a
 | A build | Its name, when it was made, its size, how many files and pages it carries, its languages, and the public / secure folder names and URL space it was built for. |
 | A build that did not finish | The same, marked **incomplete**, with a note saying it carries no manifest and can only be deleted. |
 | A build carrying OAuth client secrets | A warning that the archive is a credential, not just a website. |
+| A build whose sign-in is not ready | A warning naming the providers it carries without build keys (their sign-in fails on the deployed site until the server sets the keys or the project's build keys are entered and the project built again), any provider a sign-in route names that the installation no longer offers, and a route that takes its provider from the address when no provider has build keys — with a link to the OAuth providers page for a role that can open it. |
 
 #### Choosing the folder names and the URL space
 

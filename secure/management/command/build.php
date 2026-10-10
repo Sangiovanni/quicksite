@@ -661,13 +661,12 @@ if (MULTILINGUAL_SUPPORT) {
 
 // Copy the project data the SERVED page reads at request time.
 //
-// These four are the difference between a build that renders markup and a build
+// These three are the difference between a build that renders markup and a build
 // that runs a site. Each is read on the request path, not at authoring time:
 //
 //   aliases.json          alias resolution, before routing
 //   route-resolvers.json  which resolvers a route fires
 //   api-endpoints.json    what `@api/endpoint` resolves to
-//   oauth-presets.json    the OAuth provider presets
 //
 // ⚠ The iframe sandbox policy is NOT in this loop. It is install-wide, so it is
 // bundled separately below — from the INSTALL's config, never from the project,
@@ -677,12 +676,11 @@ if (MULTILINGUAL_SUPPORT) {
 //
 // Everything else under data/ stays behind on purpose: page-events and
 // state-stores are compiled INTO the pages, privacy/assets metadata feed the
-// authoring UI, and the OAuth secrets are handled separately (see below).
+// authoring UI, and OAuth's providers and keys are written separately (see below).
 $runtimeDataFiles = [
     'aliases.json',
     'route-resolvers.json',
     'api-endpoints.json',
-    'oauth-presets.json',
 ];
 $dataDir = $buildFullPath . '/' . $buildSecureName . '/data';
 foreach ($runtimeDataFiles as $dataFile) {
@@ -754,31 +752,81 @@ if (($copyError = qs_safe_copy($embedPolicySource, $dataDir . '/embed-policy.jso
     );
 }
 
-// OAuth client secrets — copied, but SEPARATELY from the rest, because copying
-// a credential into a distributable artifact is its own decision.
+// OAuth — the providers the deployed site signs in with, and their BUILD keys.
 //
-// A build folder is handed whole to anyone with build permission, so the secret
-// travels with the deliverable. It has to reach the deployer's server either
-// way, which is what makes shipping it defensible; a deployer who would rather
-// not carry it sets QS_OAUTH_<PROVIDER>_CLIENT_ID / _CLIENT_SECRET per-vhost
-// and deletes this file, and OAuthHandler prefers the server's value anyway.
-$oauthSecretsSource = PROJECT_PATH . '/data/oauth-secrets.json';
+// A build carries only what its project uses: the entries, from the installation's provider
+// list, of the providers its sign-in routes name. A route that takes its provider from the
+// address (`{:provider}`) names none, so for it the build carries every offered provider the
+// project has build keys for. The entries hold public addresses only.
+//
+// The keys are the project's BUILD set — never its preview set, so a key made for testing on this
+// installation never leaves it. Copying a credential into a distributable artifact is its own
+// decision: a build folder is handed whole to anyone with build permission, so the secret travels
+// with the deliverable. It has to reach the deployer's server either way, which is what makes
+// shipping it defensible; a deployer who would rather not carry it sets QS_OAUTH_<PROVIDER>_CLIENT_ID
+// / _CLIENT_SECRET on the server and deletes the file, and the sign-in prefers the server's value.
+//
+// What is missing is reported, never guessed: a provider carried without build keys, a provider a
+// route names that the installation does not offer, and an address route with no keys at all. The
+// builds page shows it, with the way to the OAuth providers page.
+require_once SECURE_FOLDER_PATH . '/src/functions/oauthProviderHelpers.php';
+$oauthOffered = qs_oauth_providers();
+$oauthKeys = qs_oauth_keys_read();
+$oauthCarried = [];
+$oauthNotOffered = [];
+$oauthFromAddress = false;
+foreach (qs_oauth_project_routes() as $oauthRoute) {
+    $oauthId = $oauthRoute['provider'];
+    if ($oauthId === null) {
+        $oauthFromAddress = true;
+    } elseif (isset($oauthOffered[$oauthId])) {
+        $oauthCarried[$oauthId] = $oauthOffered[$oauthId];
+    } else {
+        $oauthNotOffered[$oauthId] = true;
+    }
+}
+$oauthAddressWithoutKeys = false;
+if ($oauthFromAddress) {
+    $oauthKeyed = array_filter($oauthOffered, fn($id) => isset($oauthKeys[$id]['build']), ARRAY_FILTER_USE_KEY);
+    $oauthCarried += $oauthKeyed;
+    $oauthAddressWithoutKeys = $oauthKeyed === [];
+}
+$oauthBuildKeys = [];
+foreach (array_keys($oauthCarried) as $oauthId) {
+    if (isset($oauthKeys[$oauthId]['build'])) {
+        $oauthBuildKeys[$oauthId] = ['build' => $oauthKeys[$oauthId]['build']];
+    }
+}
+$oauthReport = [
+    'providers'                   => array_keys($oauthCarried),
+    'missing_build_keys'          => array_values(array_diff(array_keys($oauthCarried), array_keys($oauthBuildKeys))),
+    'not_offered'                 => array_keys($oauthNotOffered),
+    'address_routes_without_keys' => $oauthAddressWithoutKeys,
+];
 $buildCarriesOAuthSecrets = false;
-if (file_exists($oauthSecretsSource)) {
+if ($oauthCarried !== []) {
     if (!is_dir($dataDir) && !mkdir($dataDir, 0755, true)) {
         abort_build(
             ApiResponse::create(500, 'server.directory_create_failed')
                 ->withMessage("Failed to create the build's data directory")
         );
     }
-    if (($copyError = qs_safe_copy($oauthSecretsSource, $dataDir . '/oauth-secrets.json', 'build')) !== null) {
+    if (!qs_json_write($dataDir . '/oauth-providers.json', (object) $oauthCarried, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES, LOCK_EX, "\n")) {
         abort_build(
             ApiResponse::create(500, 'server.file_write_failed')
-                ->withMessage('Failed to copy oauth-secrets.json')
-                ->withData(['reason' => $copyError])
+                ->withMessage("Failed to write the build's OAuth provider list")
         );
     }
-    $buildCarriesOAuthSecrets = true;
+    if ($oauthBuildKeys !== []) {
+        if (!qs_json_write($dataDir . '/oauth-secrets.json', (object) $oauthBuildKeys, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES, LOCK_EX, "\n")) {
+            abort_build(
+                ApiResponse::create(500, 'server.file_write_failed')
+                    ->withMessage("Failed to write the build's OAuth keys")
+            );
+        }
+        @chmod($dataDir . '/oauth-secrets.json', 0600);
+        $buildCarriesOAuthSecrets = true;
+    }
 }
 
 // The consent runtime, PRECOMPUTED.
@@ -1223,6 +1271,9 @@ $manifest = [
     // server. A build made before this key existed simply has no flag and is
     // reported as an ordinary build, which is what it was.
     'oauth_secrets_included' => $buildCarriesOAuthSecrets,
+    // What the deployed site's sign-in has and lacks (see the OAuth step above), kept here for the
+    // same reason: the builds page warns from the manifest.
+    'oauth' => $oauthReport,
     'source' => [
         'public_folder' => PUBLIC_FOLDER_NAME,
         'secure_folder' => SECURE_FOLDER_NAME,
@@ -1357,6 +1408,7 @@ ApiResponse::create(201, 'operation.success')
         // Named because it changes what the deliverable IS: a build that
         // carries OAuth secrets is a credential, not just a website.
         'oauth_secrets_included' => $buildCarriesOAuthSecrets,
+        'oauth' => $oauthReport,
         'menu_compiled' => file_exists($buildFullPath . '/' . $buildSecureName . '/templates/menu.php'),
         'footer_compiled' => file_exists($buildFullPath . '/' . $buildSecureName . '/templates/footer.php'),
         'scripts_copied' => file_exists($scriptsDir . '/qs.js'),

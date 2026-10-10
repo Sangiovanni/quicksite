@@ -100,6 +100,16 @@ if (!function_exists('qs_request_origin')) {
     }
 }
 
+/**
+ * The author-site OAuth session cookie's bare name (an AUTH CREDENTIAL), namespaced per project by
+ * qs_project_cookie_name(). It lives here, beside that function, because the sign-in routes need it
+ * on `/p/` before anything else is loaded and in a production build, which carries this file and
+ * none of the authoring helpers.
+ */
+if (!defined('QS_OAUTH_COOKIE')) {
+    define('QS_OAUTH_COOKIE', 'qs_oauth_user');
+}
+
 if (!function_exists('qs_project_cookie_name')) {
     /**
      * The physical name of an engine-owned cookie, namespaced by project.
@@ -119,5 +129,35 @@ if (!function_exists('qs_project_cookie_name')) {
             $projectId = defined('PROJECT_NAME') ? (string) PROJECT_NAME : 'default';
         }
         return 'qsp_' . $projectId . '_' . $bareName;
+    }
+}
+
+if (!function_exists('qs_site_path')) {
+    /**
+     * A value a STRANGER wrote (a `?return=`), kept only when it is a path on this site.
+     *
+     * A path on this site is one `/`, then neither a second `/` nor a backslash, with no control
+     * character anywhere. Each refusal is a way a browser reads the value as another host or
+     * another scheme: `//host` is protocol-relative; a backslash after the first `/` is read as
+     * a slash; a tab, a line feed or a carriage return is dropped before the address is read, so
+     * `/<tab>/host` becomes `//host`; a value not starting with `/` (a scheme, a leading space)
+     * is not a path at all.
+     *
+     * The twin of qs.js's check for the same value, which the server never sees there. The caller
+     * composes the result against the site's base: the value names a page of the site, not of
+     * the host.
+     *
+     * @param mixed $value Anything a query string can hold: a string, an array, null.
+     * @return string|null The value unchanged when it is a path on this site, else null.
+     */
+    function qs_site_path($value): ?string
+    {
+        if (!is_string($value) || $value === '' || $value[0] !== '/') {
+            return null;
+        }
+        if (isset($value[1]) && ($value[1] === '/' || $value[1] === '\\')) {
+            return null;
+        }
+        return preg_match('/[\x00-\x1F\x7F]/', $value) === 1 ? null : $value;
     }
 }

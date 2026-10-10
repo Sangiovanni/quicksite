@@ -142,10 +142,11 @@ return [
         'commands' => ['addApi', 'editApi', 'deleteApi', 'testApiEndpoint'],
     ],
 
-    // OAuth provider writes — client secrets. admin+.
+    // The project's own OAuth keys (client secrets). admin+. The providers themselves belong to
+    // the installation: a file its operator edits, which no command writes.
     'oauth.manage' => [
         'scope' => 'project',
-        'commands' => ['addOAuthProvider', 'editOAuthProvider', 'deleteOAuthProvider'],
+        'commands' => ['setOAuthCredentials'],
     ],
 
     // Full-data dumps + zip-slip surface (backup/export/import/clone). admin+.

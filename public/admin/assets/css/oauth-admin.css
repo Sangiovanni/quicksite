@@ -4,8 +4,8 @@
  * Two consumers:
  *   - The oauth-button Complex Element wizard (cookie note panel,
  *     provider picker status panel — runs inside the visual editor)
- *   - The /admin/oauth-providers page (cards, modal form, in-use
- *     error panel)
+ *   - The /admin/oauth-providers page (provider cards, the how-to,
+ *     the preview and build key forms)
  *
  * All colors use the --admin-* CSS variables defined in admin.css so
  * the surfaces theme correctly (admin is dark-themed; light-themed
@@ -29,11 +29,21 @@
 .qs-oauth-status-panel__row--done { color: var(--admin-success); }
 .qs-oauth-status-panel__summary { margin-top: 6px; font-weight: 500; color: var(--admin-text); }
 .qs-oauth-status-panel__summary--warn { color: var(--admin-warning); }
+/* No preview keys yet: the sign-in cannot work until they are entered, so it reads as a warning. */
 .qs-oauth-status-panel__reminder {
-    margin-top: 6px;
-    font-size: 12px;
-    color: var(--admin-text-muted);
+    margin-top: 8px;
+    padding: 8px 10px;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    border-radius: 4px;
+    border-left: 3px solid var(--admin-error);
+    background: var(--admin-error-bg);
+    color: var(--admin-error);
+    font-size: 13px;
+    font-weight: 500;
 }
+.qs-oauth-status-panel__reminder svg { flex-shrink: 0; margin-top: 2px; }
 
 .qs-oauth-cookie-note {
     margin-top: 12px;
@@ -74,7 +84,7 @@
 
 
 /* ====================================================================
- * /admin/oauth-providers — list + cards + filters
+ * /admin/oauth-providers — provider cards, how-to, key forms
  * ==================================================================== */
 
 .oauth-providers-header__icon {
@@ -88,11 +98,7 @@
     flex-direction: column;
     gap: 10px;
 }
-.oauth-providers-list__loading {
-    padding: 24px;
-    color: var(--admin-text-muted);
-    text-align: center;
-}
+.oauth-providers-list__loading,
 .oauth-providers-list__empty {
     padding: 24px;
     color: var(--admin-text-muted);
@@ -118,33 +124,20 @@
     gap: 8px;
     flex-wrap: wrap;
 }
-.oauth-provider-card__id {
-    font-weight: 500;
+.oauth-provider-card__name {
+    font-weight: 600;
     font-size: 15px;
     color: var(--admin-text);
 }
-.oauth-provider-card__summary {
+.oauth-provider-card__id {
     font-size: 12px;
     color: var(--admin-text-muted);
-    margin-top: 6px;
     font-family: var(--font-mono, monospace);
 }
-.oauth-provider-card__actions {
-    display: flex;
-    gap: 6px;
-    flex-shrink: 0;
-}
-.oauth-provider-card__action {
-    padding: 4px 10px;
-    font-size: 12px;
-}
-.oauth-provider-card__action--disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-}
+.oauth-provider-card__readonly { margin: 10px 0 0 0; }
 
 
-/* Pills — source + status indicators */
+/* Pills — status indicators */
 
 .oauth-pill {
     font-size: 11px;
@@ -156,211 +149,103 @@
     background: var(--admin-bg-tertiary);
     color: var(--admin-text-muted);
 }
-.oauth-pill--admin    { background: var(--admin-bg-tertiary); color: var(--admin-text-muted); }
-.oauth-pill--project,
-.oauth-pill--override { background: var(--admin-info-bg); color: var(--admin-info); }
 .oauth-pill--success  { background: var(--admin-success-bg); color: var(--admin-success); }
 .oauth-pill--warning  { background: var(--admin-warning-bg); color: var(--admin-warning); }
 .oauth-pill--danger   { background: var(--admin-error-bg); color: var(--admin-error); }
 .oauth-pill--neutral  { background: var(--admin-bg-tertiary); color: var(--admin-text-muted); }
 
 
-/* Filter bar */
+/* How-to: the console, the callback addresses, the provider's own rules */
 
-.oauth-filter-bar {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
+.oauth-howto {
+    margin-top: 12px;
+    border-top: 0.5px solid var(--admin-border);
+    padding-top: 10px;
 }
-.oauth-filter-bar__btn {
-    padding: 4px 12px;
+.oauth-howto__summary {
+    cursor: pointer;
     font-size: 13px;
-}
-.oauth-filter-bar__btn--active {
-    background: var(--admin-surface);
-    border-color: transparent;
-}
-
-
-/* ====================================================================
- * Modal — add / edit / override / delete
- * ==================================================================== */
-
-.oauth-modal-backdrop {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.6);
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
-    z-index: 1000;
-    padding: 40px 16px;
-    overflow-y: auto;
-}
-.oauth-modal-dialog {
-    background: var(--admin-bg-secondary);
-    color: var(--admin-text);
-    border-radius: 8px;
-    border: 0.5px solid var(--admin-border);
-    padding: 20px 24px;
-    width: 100%;
-    max-width: 640px;
-    max-height: calc(100vh - 80px);
-    overflow-y: auto;
-}
-.oauth-modal-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 16px;
-}
-.oauth-modal-header__title {
-    margin: 0;
-    font-size: 18px;
+    font-weight: 500;
     color: var(--admin-text);
 }
-.oauth-modal-header__close {
-    padding: 4px 8px;
-}
-
-
-/* Form: scope toggle radio cards */
-
-.oauth-scope-toggle {
-    display: flex;
-    gap: 12px;
-}
-.oauth-scope-toggle__option {
+.oauth-howto__steps {
+    margin: 10px 0 0 0;
+    padding-left: 20px;
+    font-size: 13px;
+    color: var(--admin-text);
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    flex: 1;
-    padding: 10px;
-    border: 0.5px solid var(--admin-border);
-    border-radius: 8px;
-    cursor: pointer;
-    background: var(--admin-bg);
-}
-.oauth-scope-toggle__option--checked {
-    border-color: var(--admin-accent);
-    background: var(--admin-accent-muted);
-}
-.oauth-scope-toggle__head {
-    display: flex;
-    align-items: center;
     gap: 8px;
 }
-.oauth-scope-toggle__label {
-    font-weight: 500;
-    font-size: 13px;
-    color: var(--admin-text);
-}
-.oauth-scope-toggle__hint {
-    margin: 0;
-    font-size: 12px;
-    color: var(--admin-text-muted);
-}
-
-
-/* Credentials sub-section */
-
-.oauth-credentials {
-    margin-top: 12px;
-    padding: 12px 14px;
-    background: var(--admin-bg-tertiary);
-    border-radius: 8px;
-}
-.oauth-credentials__title {
-    margin: 0 0 8px;
-    font-size: 14px;
-    color: var(--admin-text);
-}
-.oauth-credentials__secret-row {
-    display: flex;
-    gap: 8px;
-    align-items: center;
-}
-.oauth-credentials__reveal-btn {
-    padding: 6px 10px;
-    font-size: 12px;
+.oauth-howto__console {
+    color: var(--admin-primary);
+    text-decoration: none;
     white-space: nowrap;
 }
-.oauth-credentials__revealed-value {
-    font-family: var(--font-mono, monospace);
+.oauth-howto__console:hover { text-decoration: underline; }
+.oauth-howto__note {
+    margin: 10px 0 0 0;
+    padding: 8px 10px;
+    border-radius: 6px;
     font-size: 12px;
-    color: var(--admin-text-muted);
+    background: var(--admin-info-bg);
+    color: var(--admin-info);
 }
 
-
-/* Extra-params editor */
-
-.oauth-extra-params {
+.oauth-address {
     display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-.oauth-extra-params__rows {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-.oauth-extra-params__row {
-    display: flex;
-    gap: 6px;
     align-items: center;
-}
-.oauth-extra-params__add {
-    padding: 4px 10px;
-    font-size: 12px;
-    align-self: flex-start;
-}
-
-
-/* Modal actions row */
-
-.oauth-modal-actions {
-    display: flex;
-    gap: 8px;
-    justify-content: flex-end;
-    margin-top: 16px;
-}
-.oauth-modal-actions__error {
-    color: var(--admin-error);
-    font-size: 13px;
-    margin-right: auto;
-    align-self: center;
-}
-.oauth-modal-actions__btn--danger {
-    background: var(--admin-error);
-    color: #fff;
-    border-color: transparent;
-}
-
-
-/* In-use error panel (delete blocked) */
-
-.oauth-in-use-panel {
-    padding: 12px 14px;
-    background: var(--admin-error-bg);
-    border: 0.5px solid var(--admin-error);
-    border-radius: 8px;
-    color: var(--admin-error);
-}
-.oauth-in-use-panel__msg {
-    margin: 0 0 8px;
-    font-weight: 500;
-}
-.oauth-in-use-panel__group-title {
-    font-size: 13px;
-    font-weight: 500;
+    gap: 6px;
     margin-top: 4px;
 }
-.oauth-in-use-panel__list {
-    margin: 4px 0;
-    padding-left: 20px;
+.oauth-address__value {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    padding: 4px 8px;
+    border-radius: 4px;
     font-size: 12px;
+    font-family: var(--font-mono, monospace);
+    background: var(--admin-bg-tertiary);
+    color: var(--admin-text);
 }
-.oauth-in-use-panel__hint {
-    margin: 8px 0 0;
+.oauth-address__copy { padding: 4px 8px; flex-shrink: 0; }
+
+
+/* The two key sets */
+
+.oauth-keysets {
+    margin-top: 12px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 12px;
+}
+.oauth-keyset {
+    border: 0.5px solid var(--admin-border);
+    border-radius: 6px;
+    padding: 10px 12px;
+}
+.oauth-keyset__title {
+    margin: 0 0 4px 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--admin-text);
+}
+.oauth-keyset .admin-input { margin-bottom: 8px; }
+.oauth-keyset__readonly {
+    margin: 6px 0 0 0;
+    font-size: 13px;
+    color: var(--admin-text-muted);
+    overflow-wrap: anywhere;
+}
+.oauth-keyset__actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.oauth-keyset__clear { color: var(--admin-error); }
+.oauth-keyset__status {
     font-size: 12px;
+    color: var(--admin-error);
 }

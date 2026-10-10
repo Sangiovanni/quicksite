@@ -44,13 +44,13 @@ quicksite/
 │   │   │   ├── languages.json    # The installation's language list, {"code": "name"} — the languages a project may start in or add, and their names (gitignored; optional, ABSENT MEANS the shipped languages.json.example is the list)
 │   │   │   ├── languages.NOTICE.txt # The Unicode License v3 notice the shipped list's language names are used under (tracked, beside languages.json.example)
 │   │   │   ├── default-language.php # The language a new project starts in when none is chosen (gitignored; optional, ABSENT MEANS en)
+│   │   │   ├── oauth-providers.json # The OAuth providers every project may sign in with — the operator edits it, no command writes it (gitignored; optional, ABSENT MEANS the shipped oauth-providers.json.example is the list)
 │   │   │   └── embed-policy.json # Install-wide iframe embed sandbox policy — which hosts a project's <iframe> may embed (gitignored; created from .example by setup, then by hand)
 │   │   └── routes.php            # Command whitelist
 │   ├── admin/                    # Admin panel backend
 │   │   ├── AdminRouter.php       # Admin routing and page rendering
 │   │   ├── config/               # Server-side secrets the browser never sees — data-resolver
-│   │   │                         #   API keys and OAuth client secrets (gitignored, with tracked
-│   │   │                         #   .example templates), plus the OAuth provider presets
+│   │   │                         #   API keys (gitignored, with a tracked .example template)
 │   │   ├── functions/            # Admin helper functions
 │   │   ├── templates/            # Admin panel page templates
 │   │   ├── translations/         # Admin UI translations
@@ -75,8 +75,9 @@ quicksite/
 │   │       ├── translate/        # Translation files (en.json, fr.json, etc.)
 │   │       ├── data/             # Project data (aliases, asset metadata, API endpoints,
 │   │       │                     #   state stores, route resolvers, page events, the storage
-│   │       │                     #   and consent registries). oauth-secrets.json is the one
-│   │       │                     #   secret here and is gitignored
+│   │       │                     #   and consent registries). oauth-secrets.json — the
+│   │       │                     #   project's OAuth keys, a preview set and a build set
+│   │       │                     #   per provider — is the one secret here and is gitignored
 │   │       ├── public/           # What /p/<projectId>/ serves — the project's own web files
 │   │       │   ├── assets/       #   images / font / audio / videos
 │   │       │   ├── style/        #   style.css (editable via API)
@@ -89,7 +90,8 @@ quicksite/
 │   │       │                     #   .htaccess, style, assets, scripts) beside <secure>/
 │   │       │                     #   (precompiled pages, the request-time runtime,
 │   │       │                     #   translations, and the project data a served
-│   │       │                     #   page reads — resolvers, API registry, consent)
+│   │       │                     #   page reads — resolvers, API registry, consent, the
+│   │       │                     #   OAuth providers it uses and their build keys)
 │   │       ├── snippets/         # Snippets belonging to this project alone
 │   │       ├── exports/          # This project's export ZIPs (generated)
 │   │       └── backups/          # Project backups (gitignored)

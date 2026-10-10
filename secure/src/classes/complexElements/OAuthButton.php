@@ -23,10 +23,10 @@
  * assumes those exist by the time it runs.
  *
  * Config:
- *   - provider    string, required — provider id (must match a key in
- *                                    oauth-presets.json, per-project or
- *                                    admin). Used for both the CSS
- *                                    modifier class and the href path.
+ *   - provider    string, required — the id of a provider the
+ *                                    installation offers. Used for both
+ *                                    the CSS modifier class and the href
+ *                                    path.
  *   - labelKey    string, required — textKey for the button label.
  *                                    Convention: form.signin.<provider>.
  *   - iconClass   string, optional — extra CSS class for the icon span.
@@ -34,11 +34,11 @@
  *   - returnTo    string, optional — path on this site users land on after
  *                                    a successful sign-in. Appended to the
  *                                    href as `?return=<urlencoded>`.
- *                                    Server-side sanitiseReturnTo guards
- *                                    against open-redirect — only same-
- *                                    site paths starting with '/' (not
- *                                    '//') are honoured. Omit to land on
- *                                    `/` (default in handleStart).
+ *                                    The sign-in follows it only when it
+ *                                    is a path on this site naming one of
+ *                                    its routes (OAuthHandler's
+ *                                    sanitiseReturnTo). Omit to land on
+ *                                    the site's home.
  */
 
 require_once __DIR__ . '/../ComplexElementBuilder.php';
@@ -58,7 +58,7 @@ class OAuthButtonBuilder extends ComplexElementBuilder {
         if (!preg_match('/^[a-z][a-z0-9-]*$/D', $provider)) {
             throw new ComplexElementBuilderException(
                 "OAuth provider id must be lowercase letters / digits / hyphens "
-                . "(matches the oauth-presets.json key shape). Got: '$provider'"
+                . "(the shape of a provider id). Got: '$provider'"
             );
         }
 

@@ -102,6 +102,32 @@
         return el('div', { class: 'admin-alert admin-alert--' + kind }, children);
     }
 
+    /**
+     * What the deployed site's sign-in lacks (the build's `oauth` report), with the way to the OAuth
+     * providers page where the build keys are entered. Null when nothing is missing — and for a
+     * build made before the report existed, which has none.
+     */
+    function _renderOAuthGaps(report) {
+        if (!report || typeof report !== 'object') return null;
+        var missing = Array.isArray(report.missing_build_keys) ? report.missing_build_keys : [];
+        var notOffered = Array.isArray(report.not_offered) ? report.not_offered : [];
+        var lines = [];
+        if (missing.length) lines.push(String(T.oauthMissingBody || '').split('{providers}').join(missing.join(', ')));
+        if (notOffered.length) lines.push(String(T.oauthNotOffered || '').split('{providers}').join(notOffered.join(', ')));
+        if (report.address_routes_without_keys === true) lines.push(T.oauthAddressNoKeys || '');
+        if (!lines.length) return null;
+        var children = [el('strong', { class: 'builds-alert__title', text: T.oauthMissingTitle || '' })];
+        lines.forEach(function (text) { children.push(el('p', { class: 'builds-alert__body', text: text })); });
+        // The link only for a role that can open the page (it is gated on listOAuthProviders).
+        var url = String(CFG.oauthPageUrl || '');
+        if (url !== '' && canRun('listOAuthProviders')) {
+            children.push(el('p', { class: 'builds-alert__body' }, [
+                el('a', { href: url, class: 'builds-alert__link', text: T.oauthKeysLink || '' }),
+            ]));
+        }
+        return el('div', { class: 'admin-alert admin-alert--warning' }, children);
+    }
+
     function _renderField(label, value) {
         return el('div', { class: 'builds-field' }, [
             el('span', { class: 'builds-field__label', text: label }),
@@ -307,6 +333,8 @@
         if (b.oauth_secrets_included) {
             nodes.push(_renderAlert('warning', null, T.oauthWarn || ''));
         }
+        var oauthGaps = _renderOAuthGaps(b.oauth);
+        if (oauthGaps) nodes.push(oauthGaps);
 
         nodes.push(_renderFacts(b));
 

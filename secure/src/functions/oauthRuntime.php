@@ -15,10 +15,17 @@
  * built site has all three. It needs nothing from the management API or the
  * admin panel, neither of which exists in a build.
  *
- * ⚠ THE CLIENT SECRET COMES FROM THE SERVER FIRST. OAuthHandler reads
- * QS_OAUTH_<PROVIDER>_CLIENT_ID / _CLIENT_SECRET before the shipped
- * `data/oauth-secrets.json`, so a deployer can keep the credential out of a
- * build folder that `downloadBuild` hands to anyone with build permission.
+ * ⚠ IN A BUILT SITE THE CLIENT SECRET COMES FROM THE SERVER FIRST. OAuthHandler
+ * reads QS_OAUTH_<PROVIDER>_CLIENT_ID / _CLIENT_SECRET before the build keys the
+ * build carried in `data/oauth-secrets.json`, so a deployer can keep the
+ * credential out of a build folder that `downloadBuild` hands to anyone with
+ * build permission. On the installation the project's preview keys are used.
+ *
+ * ⚠ EVERY REDIRECT A `?return=` CAN REACH GOES THROUGH OAuthHandler: the
+ * sign-in, the callback, the sign-out and the sign-out's two early exits below
+ * (no session; no handler), which run before any handler exists. The value is
+ * followed only when it is a path on this site naming one of its routes, and it
+ * is composed against the site's base.
  *
  * Lifted out of the /p/<projectId>/ renderer so both surfaces run one
  * implementation. The decisions below — logout deriving its provider from the
@@ -105,7 +112,7 @@ if (!function_exists('qs_run_oauth_route')) {
                         'httponly' => true,
                         'samesite' => 'Lax',
                     ]);
-                    header('Location: ' . ($_GET['return'] ?? '/'), true, 302);
+                    header('Location: ' . OAuthHandler::returnTarget($_GET['return'] ?? null), true, 302);
                     exit;
                 }
                 $__provider = (string) ($__logoutSession['provider'] ?? '');
@@ -116,12 +123,12 @@ if (!function_exists('qs_run_oauth_route')) {
             try {
                 $__oauthHandler = new OAuthHandler($__provider);
             } catch (RuntimeException $__oauthErr) {
-                // Surface OAuth misconfig loudly — missing presets file,
-                // unknown provider id, missing secrets entry. Mirrors the
-                // existing data-resolver config-bug treatment.
+                // Surface OAuth misconfig loudly — a provider the
+                // installation's list does not offer, or no keys for it.
+                // Mirrors the existing data-resolver config-bug treatment.
                 //
                 // Exception for logout: if the handler can't be built (e.g.,
-                // preset was removed after the user logged in), fall back to
+                // provider was removed after the user logged in), fall back to
                 // local-only logout — the user's intent of "log me out" must
                 // succeed even when the provider catalogue changed under
                 // them. The provider-side token will expire naturally.
@@ -142,7 +149,7 @@ if (!function_exists('qs_run_oauth_route')) {
                         'httponly' => true,
                         'samesite' => 'Lax',
                     ]);
-                    header('Location: ' . ($_GET['return'] ?? '/'), true, 302);
+                    header('Location: ' . OAuthHandler::returnTarget($_GET['return'] ?? null), true, 302);
                     exit;
                 }
                 // This is the PUBLIC site: never echo the raw exception message
@@ -159,7 +166,7 @@ if (!function_exists('qs_run_oauth_route')) {
                     echo '<p>Route: <code>' . htmlspecialchars($routePath) . "</code></p>\n";
                     echo '<p>Provider: <code>' . htmlspecialchars((string) $__provider) . "</code></p>\n";
                     echo '<p>Error: ' . htmlspecialchars($__oauthSafe) . "</p>\n";
-                    echo "<p><small>Fix the OAuth config (oauth-presets.json / oauth-secrets.php) and reload.</small></p>\n";
+                    echo "<p><small>Check the installation's OAuth provider list and this project's keys on the OAuth providers page, then reload.</small></p>\n";
                 }
                 exit;
             }

@@ -92,6 +92,7 @@ secure/management/config/console.php
 secure/management/config/embed-policy.json
 secure/management/config/languages.json
 secure/management/config/default-language.php
+secure/management/config/oauth-providers.json
 
 # Login/registration/upload-throttle runtime state - machine-written JSON
 # (auto-created; hashed-key backoff counters) plus flock sidecars and
@@ -147,20 +148,21 @@ secure/projects/quicksite/config/members.json.*
 !secure/management/config/*.example
 !secure/admin/config/*.example
 
-# Admin config - server-side secrets for data resolver +
-# OAuth provider credentials.
+# Admin config - server-side secrets for the data resolver.
 # Gitignored by design — anyone with filesystem access to secure/ can
 # read these. Ship the .example sibling as the template; deployments
 # copy + rename to the live filename and populate.
+# oauth-secrets.php is no longer read (OAuth keys belong to each project),
+# but an installation may still hold one: it stays ignored so that copy is
+# never committed.
 secure/admin/config/api-secrets.php
 secure/admin/config/oauth-secrets.php
 
-# Per-project OAuth credentials (primary lookup
-# before falling back to the admin-level file above). The
-# secure/projects/* tree is already gitignored EXCEPT the quicksite
-# starter template; this re-ignores the secrets file inside the template
-# explicitly so a copy-and-rename setup in the template can't accidentally
-# leak credentials at commit time.
+# Per-project OAuth keys (the preview and build sets a project's owner or
+# admin enters on the OAuth providers page). The secure/projects/* tree is
+# already gitignored EXCEPT the quicksite starter template; this re-ignores
+# the keys file inside the template explicitly so the template's keys can't
+# accidentally leak at commit time.
 secure/projects/quicksite/data/oauth-secrets.json
 
 # Per-project membership/access file. Install-local — references userIds

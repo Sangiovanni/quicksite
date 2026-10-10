@@ -1,0 +1,79 @@
+{
+    "_about": "The OAuth providers this installation offers to every project. While oauth-providers.json does not exist beside this file, this shipped list is the list; to change it, copy this file to oauth-providers.json and edit the copy (add an entry, change one, or remove one). No command writes either file. Each project enters its own keys for a provider on the panel's OAuth providers page. Every address must be an absolute https address (plain http is accepted only when the installation runs in development). An entry that is malformed is left out of the list and the reason is written to the PHP error log. A key starting with an underscore, like this one, is documentation.",
+
+    "_fields": {
+        "name": "Optional. The name the panel shows (else the id with a capital first letter).",
+        "console_url": "Optional. Where a project's owner registers an app with the provider; the panel links it.",
+        "authorize_url": "Required. The provider's authorization endpoint (the browser is sent there).",
+        "token_url": "Required. The provider's token endpoint (the server calls it).",
+        "userinfo_url": "Required. The provider's user-information endpoint (the server calls it).",
+        "revoke_url": "Optional. The provider's token-revocation endpoint (RFC 7009); signing out calls it when present.",
+        "scope": "Required. The scope string the sign-in asks for, space-separated.",
+        "userinfo_sub_path": "Required. Dot-path into the user-information answer to the user's unique id.",
+        "userinfo_email_path": "Required. Dot-path into the user-information answer to the user's email.",
+        "userinfo_name_path": "Optional. Dot-path into the user-information answer to the user's display name.",
+        "extra_authorize_params": "Optional. Extra query parameters for the authorization address, as an object of strings, numbers or true / false. It may not set response_type, client_id, redirect_uri, scope, state, code_challenge or code_challenge_method.",
+        "refresh_token_supported": "Optional. true when the provider issues refresh tokens with the standard flow."
+    },
+
+    "google": {
+        "name": "Google",
+        "console_url": "https://console.cloud.google.com/apis/credentials",
+        "authorize_url": "https://accounts.google.com/o/oauth2/v2/auth",
+        "token_url": "https://oauth2.googleapis.com/token",
+        "userinfo_url": "https://www.googleapis.com/oauth2/v2/userinfo",
+        "revoke_url": "https://oauth2.googleapis.com/revoke",
+        "scope": "openid email profile",
+        "userinfo_sub_path": "id",
+        "userinfo_email_path": "email",
+        "userinfo_name_path": "name",
+        "extra_authorize_params": {
+            "access_type": "offline",
+            "prompt": "consent"
+        },
+        "refresh_token_supported": true
+    },
+
+    "github": {
+        "name": "GitHub",
+        "console_url": "https://github.com/settings/developers",
+        "authorize_url": "https://github.com/login/oauth/authorize",
+        "token_url": "https://github.com/login/oauth/access_token",
+        "userinfo_url": "https://api.github.com/user",
+        "scope": "read:user user:email",
+        "userinfo_sub_path": "id",
+        "userinfo_email_path": "email",
+        "userinfo_name_path": "name",
+        "extra_authorize_params": {},
+        "refresh_token_supported": false
+    },
+
+    "amazon": {
+        "name": "Amazon",
+        "console_url": "https://developer.amazon.com/loginwithamazon/console/site/lwa/overview.html",
+        "authorize_url": "https://www.amazon.com/ap/oa",
+        "token_url": "https://api.amazon.com/auth/o2/token",
+        "userinfo_url": "https://api.amazon.com/user/profile",
+        "revoke_url": "https://api.amazon.com/auth/o2/revoke",
+        "scope": "profile",
+        "userinfo_sub_path": "user_id",
+        "userinfo_email_path": "email",
+        "userinfo_name_path": "name",
+        "extra_authorize_params": {},
+        "refresh_token_supported": true
+    },
+
+    "meta": {
+        "name": "Meta",
+        "console_url": "https://developers.facebook.com/apps/",
+        "authorize_url": "https://www.facebook.com/v26.0/dialog/oauth",
+        "token_url": "https://graph.facebook.com/v26.0/oauth/access_token",
+        "userinfo_url": "https://graph.facebook.com/v26.0/me?fields=id,name,email",
+        "scope": "email public_profile",
+        "userinfo_sub_path": "id",
+        "userinfo_email_path": "email",
+        "userinfo_name_path": "name",
+        "extra_authorize_params": {},
+        "refresh_token_supported": false
+    }
+}

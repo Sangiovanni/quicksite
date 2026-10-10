@@ -33,10 +33,12 @@
  *     project-local-with-encryption or multi-language support emerges.
  *   - **PKCE always-on** for all clients (belt-and-braces against partial
  *     code-leak attacks).
- *   - **Provider presets = JSON** (`secure/admin/config/oauth-presets.json`).
- *     Authors extend without PHP knowledge.
- *   - **Client secrets = dedicated PHP file** (`oauth-secrets.php`), not
- *     `api-secrets.php` — different lifecycle + blast radius.
+ *   - **Providers = one JSON list the operator edits**
+ *     (`<secure>/management/config/oauth-providers.json`, else the shipped
+ *     `.example`). No project defines a provider. See oauthProviderHelpers.php.
+ *   - **Keys = the project's own** (`data/oauth-secrets.json`): a `preview`
+ *     set for this installation and a `build` set a build carries. There are
+ *     no installation-wide keys.
  *
  *
  * Resolver return shape (consumed by the resolver-kind dispatcher):
@@ -56,13 +58,14 @@ require_once __DIR__ . '/OutboundUrlPolicy.php';
 // Only qs_project_cookie_name() and qs_request_host() are needed, and both
 // live in requestRuntime.php — storageHelpers and projectContext are
 // authoring files that cannot travel into a production build.
-require_once __DIR__ . '/../functions/requestRuntime.php'; // qs_project_cookie_name
+require_once __DIR__ . '/../functions/requestRuntime.php'; // qs_project_cookie_name, qs_site_path
+require_once __DIR__ . '/../functions/oauthProviderHelpers.php'; // qs_oauth_provider, qs_oauth_sign_in_keys
 
 class OAuthHandler
 {
     /**
-     * Default post-auth session lifetime (14 days). Matches the test.oauth
-     * fixture's refresh-token TTL and is a common SaaS-app default. A
+     * Default post-auth session lifetime (14 days), a common SaaS-app
+     * default. A
      * hardcoded constant, by design (DESIGN_DECISIONS.md "OAuth handleCallback
      * shape", which names the 14d TTL).
      */
@@ -120,15 +123,15 @@ class OAuthHandler
      *                                     callback_url, …); placeholder
      *                                     substitution already done by the
      *                                     dispatcher.
-     * @param string|null          $returnTo Optional post-login redirect
-     *                                       target. Only same-site paths
-     *                                       starting with '/' (and not '//')
-     *                                       are honoured; everything else
-     *                                       is dropped to prevent open-
-     *                                       redirect abuse.
+     * @param mixed                $returnTo Optional post-login redirect
+     *                                       target (`?return=`). Kept only
+     *                                       when it is a path on this site
+     *                                       naming one of its routes (see
+     *                                       sanitiseReturnTo); anything else
+     *                                       lands on the site's home.
      * @return array{redirect: string, cookie: null}
      */
-    public function handleStart(array $config, ?string $returnTo = null): array
+    public function handleStart(array $config, $returnTo = null): array
     {
         $state = bin2hex(random_bytes(16));
         $codeVerifier = self::base64url(random_bytes(32));
@@ -191,8 +194,8 @@ class OAuthHandler
      *   5. Generate an opaque 32-byte session id (64 hex chars), store
      *      the session record server-side via `storeOAuthSession` with
      *      a 14-day TTL.
-     *   6. Return `['redirect' => $returnTo ?? '/', 'cookie' => [name:
-     *      qs_oauth_user, value: sessionId, options: ...]]`.
+     *   6. Return `['redirect' => <the page returnTo names, on this site>,
+     *      'cookie' => [name: qs_oauth_user, value: sessionId, options: ...]]`.
      *
      * Token custody: provider tokens NEVER reach the browser. They live
      * in the server-side session record only (the BFF pattern, by
@@ -211,7 +214,7 @@ class OAuthHandler
      *                                      substitution already done by
      *                                      the dispatcher. Accepted for
      *                                      signature parity with
-     *                                      handleStart; current 2d uses
+     *                                      handleStart; the callback uses
      *                                      only the values stored in the
      *                                      state record (set at start).
      * @param array<string, string> $query  Query params from the callback
@@ -231,9 +234,9 @@ class OAuthHandler
             return self::buildErrorRedirect('/', 'invalid_state');
         }
 
-        $returnTo = isset($stateRecord['returnTo']) && is_string($stateRecord['returnTo']) && $stateRecord['returnTo'] !== ''
-            ? $stateRecord['returnTo']
-            : '/';
+        // Checked again on the way out: the record is the server's own, but the rule is cheap and
+        // a record written before an upgrade would otherwise be followed as stored.
+        $returnTo = self::sanitiseReturnTo($stateRecord['returnTo'] ?? null) ?? '/';
 
         if (isset($query['error']) && is_string($query['error']) && $query['error'] !== '') {
             return self::buildErrorRedirect($returnTo, (string) $query['error']);
@@ -283,7 +286,7 @@ class OAuthHandler
         storeOAuthSession($sessionId, $sessionRecord, self::SESSION_TTL_SECONDS);
 
         return [
-            'redirect' => $returnTo,
+            'redirect' => self::siteUrl($returnTo),
             'cookie'   => [
                 // Namespaced per project: one host serves every project at
                 // /p/<id>/ and they share one cookie jar. Set, read and CLEAR
@@ -335,12 +338,13 @@ class OAuthHandler
      *                                           cookie (the dispatcher
      *                                           confirmed it points at a
      *                                           live session before calling).
-     * @param string|null          $returnTo     Optional post-logout
-     *                                           redirect (same sanitisation
-     *                                           as handleStart's returnTo).
+     * @param mixed                $returnTo     Optional post-logout
+     *                                           redirect (`?return=`), kept
+     *                                           by the same rule as
+     *                                           handleStart's.
      * @return array{redirect: string, cookie: array{name:string,value:string,options:array}}
      */
-    public function handleLogout(array $config, string $sessionId, ?string $returnTo = null): array
+    public function handleLogout(array $config, string $sessionId, $returnTo = null): array
     {
         $record = getOAuthSession($sessionId);
 
@@ -366,10 +370,8 @@ class OAuthHandler
 
         clearOAuthSession($sessionId);
 
-        $safeReturnTo = self::sanitiseReturnTo($returnTo) ?? '/';
-
         return [
-            'redirect' => $safeReturnTo,
+            'redirect' => self::returnTarget($returnTo),
             'cookie'   => [
                 // Namespaced per project: one host serves every project at
                 // /p/<id>/ and they share one cookie jar. Set, read and CLEAR
@@ -446,11 +448,32 @@ class OAuthHandler
                 'Accept: application/json',
             ]
         );
-        if ($result === null || $result['status'] < 200 || $result['status'] >= 300) {
-            return null;
+        if ($result === null) {
+            return null; // the transport failure is already logged
         }
         $json = json_decode($result['body'], true);
-        return is_array($json) ? $json : null;
+        if ($result['status'] < 200 || $result['status'] >= 300 || !is_array($json) || empty($json['access_token'])) {
+            self::logProviderRefusal('token exchange', $this->providerId, $result['status'], is_array($json) ? $json : null);
+            return null;
+        }
+        return $json;
+    }
+
+    /**
+     * Log why a provider refused a back-channel request: the HTTP status and the provider's own
+     * `error` / `error_description` (RFC 6749 §5.2), which name the cause — a wrong secret
+     * (`invalid_client`, GitHub's `incorrect_client_credentials`), a callback address the app does
+     * not list (`redirect_uri_mismatch`), a code already used or expired (`invalid_grant`). Nothing
+     * else from the answer is written: it may hold a token.
+     */
+    private static function logProviderRefusal(string $what, string $providerId, int $status, ?array $json): void
+    {
+        $field = static function (?array $j, string $k): string {
+            $v = $j[$k] ?? null;
+            return is_string($v) ? substr((string) preg_replace('/[^\x20-\x7E]/', '?', $v), 0, 200) : '-';
+        };
+        error_log("OAuth $what at provider '$providerId' refused: HTTP $status, error=" . $field($json, 'error')
+            . ', description=' . $field($json, 'error_description'));
     }
 
     /**
@@ -470,208 +493,58 @@ class OAuthHandler
                 'User-Agent: QuickSite-OAuth/1.0',
             ]
         );
-        if ($result === null || $result['status'] < 200 || $result['status'] >= 300) {
-            return null;
+        if ($result === null) {
+            return null; // the transport failure is already logged
         }
         $json = json_decode($result['body'], true);
-        return is_array($json) ? $json : null;
+        if ($result['status'] < 200 || $result['status'] >= 300 || !is_array($json)) {
+            self::logProviderRefusal('userinfo request', $this->providerId, $result['status'], is_array($json) ? $json : null);
+            return null;
+        }
+        return $json;
     }
 
     // ====================================================================
-    // Loaders — preset + secret resolution.
+    // Loaders — the provider's entry and the keys this sign-in uses.
     //
-    // Lookup order ("per-project config", by design):
+    // The provider comes from the installation's list, never from the
+    // project: one file the operator edits (see oauthProviderHelpers.php).
+    // The keys come from the project: its `preview` set on this
+    // installation; in a built site the server's QS_OAUTH_<PROVIDER>_*
+    // variables, else the `build` set the build carried.
     //
-    //   1. Project file (secure/projects/<active>/data/oauth-{presets,secrets}.json)
-    //      — primary lookup. Each project owns its own credentials and
-    //        can override the engine catalogue with custom providers,
-    //        modified scopes, etc.
-    //   2. Admin file (secure/admin/config/oauth-{presets.json,secrets.php})
-    //      — fallback / engine-wide default. Holds the canonical provider
-    //        catalogue (URLs, default scope, userinfo paths) plus any
-    //        engine-wide credentials (typical case: the test-oauth
-    //        fixture credentials used across dev projects).
-    //
-    // Override is at PROVIDER level (full-entry replace, not field-level
-    // merge): if a project's file declares google, it owns google
-    // entirely; admin's google is ignored for that project. Authors who
-    // want to tweak one field copy the whole admin entry and edit it.
-    // Predictable beats clever — no surprise merge resolution.
-    //
-    // Each loader surfaces misconfig with an explicit error so authors
-    // get a clear "what's missing" message rather than a null-deref
-    // deeper in the flow.
+    // Each loader surfaces misconfiguration with an explicit error, which
+    // the dispatcher logs and answers with its "not configured" page.
     // ====================================================================
 
-    /**
-     * Load and return the preset for `$providerId`. Per-project
-     * `data/oauth-presets.json` takes precedence over the admin
-     * catalogue at `secure/admin/config/oauth-presets.json`.
-     */
+    /** The provider's entry from the installation's list. */
     private static function loadPreset(string $providerId): array
     {
-        $projectPath = self::projectConfigPath('oauth-presets.json');
-        if ($projectPath !== null && file_exists($projectPath)) {
-            $projectPresets = self::readJsonFile($projectPath, 'OAuth presets');
-            if (isset($projectPresets[$providerId]) && is_array($projectPresets[$providerId])) {
-                return $projectPresets[$providerId];
-            }
-        }
-
-        $adminPath = SECURE_FOLDER_PATH . '/admin/config/oauth-presets.json';
-        if (!file_exists($adminPath)) {
+        $entry = qs_oauth_provider($providerId);
+        if ($entry === null) {
             throw new RuntimeException(
-                "OAuth presets file not found: $adminPath. Ship or restore that file."
+                "OAuth provider '$providerId' is not offered: it is not in " . qs_oauth_providers_label()
+                . ', or its entry there is malformed (the reason is in the error log).'
             );
         }
-        $admin = self::readJsonFile($adminPath, 'OAuth presets');
-        if (!isset($admin[$providerId]) || !is_array($admin[$providerId])) {
-            throw new RuntimeException(
-                "OAuth provider preset '$providerId' not found. Add it to "
-                . ($projectPath ?? '<project>/data/oauth-presets.json')
-                . " (per-project) or $adminPath (engine catalogue)."
-            );
-        }
-        return $admin[$providerId];
+        return $entry;
     }
 
-    /**
-     * Load and return the secret entry for `$providerId`. Per-project
-     * `data/oauth-secrets.json` (JSON, gitignored per .gitignore rule)
-     * takes precedence over the admin fallback at
-     * `secure/admin/config/oauth-secrets.php` (PHP, gitignored).
-     *
-     * Admin-level secrets keep their PHP shape because they may carry
-     * env-var interpolation in deployed installs (mirrors
-     * api-secrets.php); per-project secrets are JSON because per-project
-     * data follows the locked "JSON for the author's website data"
-     * principle and lets authors edit without PHP knowledge.
-     */
+    /** The keys this request's sign-in uses for the provider. */
     private static function loadSecret(string $providerId): array
     {
-        // The SERVER's word first, the shipped file second.
-        //
-        // A production build is a distributable artifact: downloadBuild hands
-        // the whole folder to anyone with build permission, so a client secret
-        // sitting inside it is a credential travelling with a deliverable. The
-        // secret has to reach the deployer's machine either way, so shipping it
-        // is defensible — but a deployer who would rather not carry it can set
-        //
-        //   QS_OAUTH_<PROVIDER>_CLIENT_ID
-        //   QS_OAUTH_<PROVIDER>_CLIENT_SECRET
-        //
-        // per-vhost (Apache SetEnv, nginx fastcgi_param) and delete the file.
-        // The provider id is upper-cased with non-alphanumerics folded to '_',
-        // so `fixture-sso` reads QS_OAUTH_FIXTURE_SSO_CLIENT_SECRET.
-        $envKey = strtoupper(preg_replace('/[^A-Za-z0-9]+/', '_', $providerId));
-        $envId  = self::serverEnv('QS_OAUTH_' . $envKey . '_CLIENT_ID');
-        if ($envId !== null && $envId !== '') {
-            return self::normaliseSecretEntry([
-                'client_id'     => $envId,
-                'client_secret' => self::serverEnv('QS_OAUTH_' . $envKey . '_CLIENT_SECRET'),
-            ]);
-        }
-
-        $projectPath = self::projectConfigPath('oauth-secrets.json');
-        if ($projectPath !== null && file_exists($projectPath)) {
-            $projectSecrets = self::readJsonFile($projectPath, 'OAuth secrets');
-            if (isset($projectSecrets[$providerId]) && is_array($projectSecrets[$providerId])
-                && isset($projectSecrets[$providerId]['client_id'])
-            ) {
-                return self::normaliseSecretEntry($projectSecrets[$providerId]);
-            }
-        }
-
-        $adminPath = SECURE_FOLDER_PATH . '/admin/config/oauth-secrets.php';
-        if (file_exists($adminPath)) {
-            $admin = require $adminPath;
-            if (is_array($admin) && isset($admin[$providerId]) && is_array($admin[$providerId])
-                && isset($admin[$providerId]['client_id'])
-            ) {
-                return self::normaliseSecretEntry($admin[$providerId]);
-            }
-        }
-
-        $projectHint = $projectPath ?? '<project>/data/oauth-secrets.json';
-        throw new RuntimeException(
-            "OAuth secrets for provider '$providerId' not found. Add an "
-            . "entry with 'client_id' (+ 'client_secret' for confidential "
-            . "clients) to either $projectHint (per-project, JSON) or "
-            . "$adminPath (engine-wide fallback, PHP — copy "
-            . 'oauth-secrets.php.example if it does not exist yet).'
-        );
-    }
-
-    /**
-     * Resolve an absolute path to a per-project config file. Returns
-     * null when PROJECT_PATH is undefined (very early request boot;
-     * shouldn't happen in the OAuth flow but defensive). Always returns
-     * a non-existent path string when the active project simply has no
-     * such config file — callers must `file_exists()` check before
-     * reading.
-     */
-    /**
-     * One server-supplied value, from the places a web SAPI puts them.
-     *
-     * `REDIRECT_` is checked too: Apache prefixes environment variables with it
-     * once a request has been through an internal redirect, which is exactly
-     * what a build's FallbackResource does to every page request.
-     *
-     * @return string|null null when unset or empty.
-     */
-    private static function serverEnv(string $name): ?string
-    {
-        $raw = $_SERVER[$name] ?? $_SERVER['REDIRECT_' . $name] ?? getenv($name);
-        if (!is_string($raw) || $raw === '') {
-            return null;
-        }
-        return $raw;
-    }
-    private static function projectConfigPath(string $fileName): ?string
-    {
-        if (!defined('PROJECT_PATH')) {
-            return null;
-        }
-        return PROJECT_PATH . '/data/' . $fileName;
-    }
-
-    /**
-     * Read + decode a JSON config file. Throws with explicit context
-     * (which file, what kind) so authors get a useful error in the
-     * 500 page instead of "json_decode returned null".
-     */
-    private static function readJsonFile(string $path, string $kind): array
-    {
-        $raw = @file_get_contents($path);
-        if ($raw === false) {
-            throw new RuntimeException("$kind file unreadable: $path");
-        }
-        $decoded = json_decode($raw, true);
-        if (!is_array($decoded)) {
-            throw new RuntimeException(
-                "$kind file invalid JSON ($path): " . json_last_error_msg()
+        $keys = qs_oauth_sign_in_keys($providerId);
+        if ($keys === null) {
+            throw new RuntimeException(qs_oauth_on_installation()
+                ? "This project has no preview keys for OAuth provider '$providerId'. Its owner or admin enters them on the OAuth providers page."
+                : "This site has no keys for OAuth provider '$providerId': set QS_OAUTH_<PROVIDER>_CLIENT_ID and _CLIENT_SECRET on the server, or enter the project's build keys and build again."
             );
         }
-        return $decoded;
-    }
-
-    /**
-     * Coerce a secret entry to the canonical {client_id, client_secret}
-     * shape. `client_secret` is null for public clients (PKCE-only).
-     */
-    private static function normaliseSecretEntry(array $entry): array
-    {
-        return [
-            'client_id' => (string) $entry['client_id'],
-            'client_secret' => isset($entry['client_secret'])
-                ? (string) $entry['client_secret']
-                : null,
-        ];
+        return $keys;
     }
 
     // ====================================================================
-    // Helpers — URL + encoding + sanitisation utilities used by both
-    // start (2c) and (forthcoming) callback (2d) flows.
+    // Helpers — URL, encoding and sanitisation utilities.
     // ====================================================================
 
     /**
@@ -739,28 +612,51 @@ class OAuthHandler
     }
 
     /**
-     * Open-redirect guard for the `returnTo` value. Three layers of
-     * defense:
+     * Where a `?return=` sends the browser: the page it names, on this site, or the site's home.
      *
-     *   1. Must start with '/' (rejects full URLs like
-     *      http://evil.com/foo)
-     *   2. Must NOT start with '//' (rejects protocol-relative URLs
-     *      like //evil.com/foo)
-     *   3. Must match a registered route in ROUTES (rejects typo'd
-     *      and made-up paths; eliminates the "what if a phishing
-     *      route gets injected somehow" surface, by design)
+     * Every OAuth redirect a stranger's value can reach goes through here or through
+     * sanitiseReturnTo(): the sign-in (stored at start, followed after the callback), the
+     * callback's error redirects, the sign-out and the sign-out's two early exits in
+     * oauthRuntime.php, which run before any handler exists.
      *
-     * Anything that fails returns null so the callback handler falls
-     * back to '/' (homepage — always valid). Query string + fragment
-     * on `$returnTo` survive the check (stripped before matching,
-     * re-appended on return).
+     * @param mixed $returnTo The raw value: a string, an array, or null.
      */
-    private static function sanitiseReturnTo(?string $returnTo): ?string
+    public static function returnTarget($returnTo): string
     {
-        if ($returnTo === null || $returnTo === '') {
-            return null;
-        }
-        if ($returnTo[0] !== '/' || (isset($returnTo[1]) && $returnTo[1] === '/')) {
+        return self::siteUrl(self::sanitiseReturnTo($returnTo) ?? '/');
+    }
+
+    /**
+     * A path on this site, composed against the site's public base: `/` in a build at the
+     * domain's root, the URL space in a build below it, `/p/<projectId>/` in preview. The path
+     * names a page of the SITE, so `/` alone is the site's home, not the host's.
+     */
+    private static function siteUrl(string $sitePath): string
+    {
+        $base = defined('QS_PUBLIC_BASE') ? rtrim(QS_PUBLIC_BASE, '/') : '';
+        return $base . $sitePath;
+    }
+
+    /**
+     * Open-redirect guard for the `returnTo` value. Two layers:
+     *
+     *   1. A path on this site (`qs_site_path()`, the rule `qs.js` shares):
+     *      one `/`, then neither a second `/` nor a backslash, and no
+     *      control character. Everything else could be read by a browser
+     *      as another host or another scheme.
+     *   2. A registered route in ROUTES (rejects typo'd and made-up paths,
+     *      by design).
+     *
+     * Anything that fails returns null, and the caller lands on the site's
+     * home. A query string and a fragment survive the check (set aside
+     * for the route match, kept in the value returned).
+     *
+     * @param mixed $returnTo
+     */
+    private static function sanitiseReturnTo($returnTo): ?string
+    {
+        $returnTo = qs_site_path($returnTo);
+        if ($returnTo === null) {
             return null;
         }
 
@@ -869,8 +765,13 @@ class OAuthHandler
         }
         $respBody = curl_exec($ch);
         $status   = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
         curl_close($ch);
         if ($respBody === false) {
+            // The reason goes to the log: without it every transport failure reads as the same
+            // oauth_error on the page. A certificate the server cannot verify (no CA bundle
+            // configured for PHP's curl) is the common one on a local stack.
+            error_log('OAuth back-channel request to ' . (string) parse_url($url, PHP_URL_HOST) . " failed: $curlError");
             return null;
         }
         return ['status' => $status, 'body' => (string) $respBody];
@@ -897,15 +798,17 @@ class OAuthHandler
 
     /**
      * Build a redirect response carrying ?oauth_error=<code> so the
-     * destination page can surface a UX message. Preserves any existing
-     * query string on $returnTo (uses '&' instead of '?' when needed).
-     * Cookie is null — error paths never establish a session.
+     * destination page can surface a UX message. $sitePath is a path on
+     * this site that already passed sanitiseReturnTo() (or '/'); it is
+     * composed against the site's base. Preserves any existing query
+     * string (uses '&' instead of '?' when needed). Cookie is null — error
+     * paths never establish a session.
      */
-    private static function buildErrorRedirect(string $returnTo, string $code): array
+    private static function buildErrorRedirect(string $sitePath, string $code): array
     {
-        $sep = (strpos($returnTo, '?') === false) ? '?' : '&';
+        $sep = (strpos($sitePath, '?') === false) ? '?' : '&';
         return [
-            'redirect' => $returnTo . $sep . 'oauth_error=' . urlencode($code),
+            'redirect' => self::siteUrl($sitePath) . $sep . 'oauth_error=' . urlencode($code),
             'cookie'   => null,
         ];
     }

@@ -56,6 +56,8 @@ window.QS_BUILDS_CONFIG = {
     // stay visibly distinct — a caller who sees `true` here may still not be
     // allowed to deploy.
     deployEnabled: <?= $__deployEnabled ? 'true' : 'false' ?>,
+    // Where a build's OAuth warning sends the reader to enter the missing build keys.
+    oauthPageUrl: <?= json_encode($router->url('oauth-providers')) ?>,
 <?php if ($__deployShow): ?>
     // Emitted only to a caller who passes both gates.
     //
@@ -110,6 +112,11 @@ window.QS_BUILDS_I18N = <?= json_encode([
     'fieldSpace'       => __admin('builds.fieldSpace', 'URL space'),
     'spaceRoot'        => __admin('builds.spaceRoot', '(served from the root)'),
     'oauthWarn'        => __admin('builds.oauthWarn', 'This build carries OAuth client secrets. Treat the archive as a credential, not just a website.'),
+    'oauthMissingTitle'  => __admin('builds.oauthMissingTitle'),
+    'oauthMissingBody'   => __admin('builds.oauthMissingBody'),
+    'oauthNotOffered'    => __admin('builds.oauthNotOffered'),
+    'oauthAddressNoKeys' => __admin('builds.oauthAddressNoKeys'),
+    'oauthKeysLink'      => __admin('builds.oauthKeysLink'),
     'noControls'       => __admin('builds.noControls', 'Your role on this project can view builds but not create, download or delete them. Ask a project admin if you need one.'),
     'spaceTitle'       => __admin('builds.spaceTitle', 'Space'),
     'spaceProject'     => __admin('builds.spaceProject', 'This project uses'),

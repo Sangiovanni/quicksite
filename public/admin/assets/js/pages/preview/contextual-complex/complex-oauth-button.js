@@ -1,10 +1,11 @@
 /**
  * OAuth Button wizard — kind 'oauth-button'.
  *
- * Picks a provider from the listOAuthProviders catalogue (union of
- * admin + per-project oauth-presets.json), shows whether the per-
- * provider routes already exist, and orchestrates the multi-step setup
- * on submit:
+ * Picks one of the providers the installation offers (listOAuthProviders;
+ * the list is a file the installation's operator edits), shows whether
+ * the per-provider routes already exist and whether this project has
+ * entered its preview keys, and orchestrates the multi-step setup on
+ * submit:
  *
  *   1. addRoute   /auth/oauth/<provider>/start    (skip-if-exists)
  *   2. addRoute   /auth/oauth/<provider>/callback (skip-if-exists)
@@ -217,9 +218,8 @@
         providerSelect.appendChild(loadingOption);
         providerGroup.appendChild(providerSelect);
         providerGroup.appendChild(_renderHint(
-            'Pick a provider from oauth-presets.json. Add new providers '
-            + 'at secure/projects/<active>/data/oauth-presets.json or '
-            + 'secure/admin/config/oauth-presets.json.'
+            'The providers this installation offers. Its operator adds one by editing '
+            + 'management/config/oauth-providers.json in the secure folder.'
         ));
         wrap.appendChild(providerGroup);
 
@@ -332,13 +332,13 @@
 
         loadProvidersOnce().then(function (providers) {
             providersData = providers || [];
-            providerSelect.innerHTML = '';
+            QSDom.clear(providerSelect);
             if (providersData.length === 0) {
                 const opt = document.createElement('option');
                 opt.value = '';
                 opt.textContent = '(no providers configured)';
                 providerSelect.appendChild(opt);
-                statusPanel.textContent = 'No providers found in oauth-presets.json. Add one and reload.';
+                statusPanel.textContent = 'This installation offers no OAuth provider.';
                 return;
             }
             const placeholder = document.createElement('option');
@@ -404,12 +404,17 @@
                 : 'Wizard will create the missing route(s) + attach oauth-start / oauth-callback resolvers, then insert the button.';
             statusPanel.appendChild(summary);
 
-            const reminder = document.createElement('div');
-            reminder.className = 'qs-oauth-status-panel__reminder';
-            reminder.textContent = 'Remember: fill in client_id + client_secret for "'
-                + provider.id + '" in secure/admin/config/oauth-secrets.php '
-                + 'OR secure/projects/<active>/data/oauth-secrets.json before clicking the button.';
-            statusPanel.appendChild(reminder);
+            if (provider.credentials_status !== 'set') {
+                const reminder = document.createElement('div');
+                reminder.className = 'qs-oauth-status-panel__reminder';
+                reminder.setAttribute('role', 'alert');
+                reminder.appendChild(QSDom.svgIcon('M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z', 16));
+                const reminderText = document.createElement('span');
+                reminderText.textContent = 'This project has no preview keys for ' + provider.name
+                    + ' yet: enter them on the OAuth providers page before testing the button.';
+                reminder.appendChild(reminderText);
+                statusPanel.appendChild(reminder);
+            }
         }
 
         providerSelect.addEventListener('change', function () {

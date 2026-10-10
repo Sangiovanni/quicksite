@@ -1237,7 +1237,7 @@ on confidential clients. Off for confidential clients (rely on
 **Source**: `secure/src/classes/OAuthHandler.php`. Behaviour:
 [ADMIN_PANEL.md §9.5](ADMIN_PANEL.md) at ship time.
 
-### OAuth provider presets — JSON, single file (locked 2026-06-14)
+### OAuth provider presets — JSON, single file (locked 2026-06-14) (superseded 2026-10-09)
 
 **Decision**: Provider presets live in
 `secure/admin/config/oauth-presets.json` as one JSON document with all
@@ -1447,7 +1447,7 @@ already scaffolded — consumer landed here). Behaviour:
 [ADMIN_PANEL.md §9.5](ADMIN_PANEL.md) at ship time. PII surface
 tracked in `NOTES/planning/DATA_FLOWS_INVENTORY.md` (running log).
 
-### OAuth presets + secrets — per-project override over admin fallback (locked 2026-06-15)
+### OAuth presets + secrets — per-project override over admin fallback (locked 2026-06-15) (superseded 2026-10-09)
 
 **Decision**: OAuth presets and OAuth secrets each have a two-tier
 lookup: **per-project file first, admin file as fallback**. The two
@@ -1776,7 +1776,7 @@ setRouteResolver×2 + addComplexElement),
 `secure/admin/functions/AdminHelper.php` `getCommandCategories()` (UI
 list). Behaviour: [ADMIN_PANEL.md §9.5](ADMIN_PANEL.md) at ship time.
 
-### OAuth providers admin page — top-level Authentication nav + full CRUD + strict in-use delete block + first-chars credential reveal + pre-filled override-in-project (locked 2026-06-15)
+### OAuth providers admin page — top-level Authentication nav + full CRUD + strict in-use delete block + first-chars credential reveal + pre-filled override-in-project (locked 2026-06-15) (superseded 2026-10-09)
 
 **Decision**: `/admin/oauth-providers` ships as a top-level admin
 page (sibling of /admin/apis / /admin/sitemap / /admin/styles) under
@@ -13182,3 +13182,96 @@ the API's 400, setup's segments, the language switch, `editTitle`). The files:
 `secure/src/runtime/site/index.php`; `secure/src/classes/TrimParametersManagement.php`;
 `secure/src/functions/routeHelpers.php`. Behaviour: ARCHITECTURE.md §6.3, §7 and §9.5, and the
 `help` entries of the three page commands.
+
+### OAuth: the installation offers the providers, each project brings its keys in two sets, and every `?return=` stays on the site (locked 2026-10-09)
+
+**Supersedes**: *OAuth provider presets — JSON, single file* (locked 2026-06-14). The providers are
+still one JSON file, but it is the operator's, in `<secure>/management/config/`, and a project no
+longer extends it. *OAuth presets + secrets — per-project override over admin fallback* (locked
+2026-06-15). A project no longer defines a provider, and keys have no installation-wide tier.
+*OAuth providers admin page — top-level Authentication nav + full CRUD + strict in-use delete block
++ first-chars credential reveal + pre-filled override-in-project* (locked 2026-06-15). The
+top-level Authentication placement stands; the CRUD, the in-use delete block, the override flow and
+the first-characters reveal go.
+**Amends**: *OAuth client secrets — dedicated oauth-secrets.php* (locked 2026-06-11). Provider
+credentials still live apart from the API secrets, now in each project's `data/oauth-secrets.json`;
+the installation file is no longer read. *A built site's environment comes from the server, and its
+OAuth secret can too* (locked 2026-08-23). A build ships only the project's build keys, and only for
+the providers its routes use; only a built site reads the server variables. *An OAuth callback
+composes against the site's public base* (locked 2026-08-23). The `?return=` target and every
+fallback compose against it too. *OAuth-button Complex Element — sign-in only + listOAuthProviders +
+…* (locked 2026-06-15). The wizard's picker lists the providers the installation offers. *A page is
+named by its route path everywhere, …* (locked 2026-10-08). Its `?return=` rule in `qs.js` now has
+a server twin.
+
+**Decision**: six changes, made together.
+
+- **The providers are one file the operator edits**: `<secure>/management/config/oauth-providers.json`
+  when the installation has made it, else the shipped `oauth-providers.json.example` beside it
+  (Google, GitHub, Amazon, Meta). No command writes either. Each entry is checked when it is read:
+  absolute https addresses (plain http only in development, the switch that lets the server reach a
+  local address), known fields only, no extra authorize parameter that replaces one the engine
+  writes. A malformed entry is left out and the reason logged; a file that is not JSON offers no
+  provider, and the shipped list does not stand in for it.
+- **The keys are the project's**, in its `data/oauth-secrets.json`, two sets per provider: `preview`,
+  which the sign-in uses on the installation, and `build`, which a build carries. One command,
+  `setOAuthCredentials` (the project's owner and admin), sets or clears a set for a provider the list
+  offers, writes nothing else and never answers a secret. `listOAuthProviders` answers the build set
+  only to whoever may set it; the secret is never shown, only whether one is stored.
+- **`addOAuthProvider`, `editOAuthProvider` and `deleteOAuthProvider` are removed**: 151 commands
+  become 149. The panel's OAuth providers page lists what the file holds, says that the operator adds
+  a provider by editing it, and carries a how-to per provider (its console, the callback address
+  each set's app must know, the provider's own rules) beside the two key forms.
+- **A build carries what its project uses**: the entries of the providers its sign-in routes name
+  (for a route that takes its provider from the address, the providers with build keys) and their
+  build keys — never the preview keys. What is missing is recorded in the manifest (a provider
+  without build keys, a provider a route names that is no longer offered) and the builds page warns,
+  with the way to the OAuth providers page. On the deployed server
+  `QS_OAUTH_<PROVIDER>_CLIENT_ID` / `_CLIENT_SECRET` come first; the installation never reads them.
+- **`?return=` stays on the site**: one rule, a path on this site (one `/`, then neither a second `/`
+  nor a backslash, and no control character), then a registered route, for the sign-in, the
+  callback, the sign-out and the sign-out's two early exits. The path is composed against the
+  site's public base; anything else lands on the site's home.
+- **The sign-in cookie's name is defined beside the function that composes it**, in the request
+  helpers a build carries. It was defined only in an authoring file that neither the `/p/` sign-in
+  step nor a build loads, so every callback and every sign-out with a session ended in an error.
+
+**Reasoning**: a project's owner or admin could write the installation-wide catalogue and secrets
+every project falls back to, and roles have no installation-wide tier, so one project could point
+another's token address at a server of its choosing, or delete the provider it used. The cure is
+structural: installation-wide OAuth data is written only by whoever edits the server's files.
+
+Keys belong to the project because the operator offers providers and each project registers its own
+app: a provider's consent screen names the app, and a visitor signing in to one site should not be
+signed in under another site's registration. Two sets because an app knows its callback addresses
+in advance and the preview's and the deployed site's are different hosts (a GitHub OAuth app holds
+only one), and because a key made for testing has no business inside a distributable build. The
+build set is shown to the owner and admin only; the secret to no one, because "set / not set" is the
+sanity check an owner needs and the client id, which every sign-in sends to the browser anyway, says
+which app it is.
+
+The server composes `?return=` against the base because a bare path sends a visitor on `/p/<id>/`
+out of the project, and the rule is `qs.js`'s own for the same value, so the two surfaces cannot
+disagree. The live file stands over the `.example`, as `languages.json` does, so a fresh
+installation needs no setup step and a provider an update adds reaches every installation that has
+not made its own copy.
+
+**Alternatives considered**: keeping the commands behind an installation-wide role (rejected:
+QuickSite has none, by design, and inventing one for this would bring back the escalation its
+absence avoids); setup copying the `.example`, as for the embed policy (rejected: an update's new
+provider would then reach nobody); layering the operator's file over the shipped list (rejected:
+one file read is the whole list, and removing a shipped provider would need a rule of its own); one
+key set per project, the deployed site's keys only from the server or a hand-edited file (rejected
+in favour of the two sets in the panel); a first-characters reveal of the stored secret (rejected:
+it shows more and answers no question "set" does not); a build falling back to the preview keys
+(rejected: a testing key would leave the installation; the build warns instead); a build carrying
+every offered provider (rejected: a site carries what it uses).
+
+**Source**: design rounds 2026-10-09 during beta.12 (Sangio), after an audit found that a project's
+owner could write the installation-wide catalogue, and that the server's `?return=` lacked the rule
+`qs.js` had. Code: `secure/src/functions/oauthProviderHelpers.php`, `requestRuntime.php`,
+`oauthRuntime.php`, `resolverHelpers.php`, `storageHelpers.php`;
+`secure/src/classes/OAuthHandler.php`; the commands `setOAuthCredentials`, `listOAuthProviders`,
+`build`; `secure/management/config/oauth-providers.json.example`; the OAuth providers page and the
+builds page. Behaviour: ADMIN_PANEL.md §9.5 *Tier 4 — OAuth*, ARCHITECTURE.md §11, and the `help`
+entries of the two commands.
