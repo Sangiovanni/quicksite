@@ -20,6 +20,48 @@ require_once __DIR__ . '/utilsManagement.php'; // qs_json_write
  */
 
 /**
+ * The snippet categories, id => display name: the folder a snippet is saved in and the group a
+ * list shows it under. The one list every place that offers, checks or walks a category reads:
+ * createSnippet's check, the listing and the lookup below, listSnippets' names, and the panel's
+ * two dropdowns (the editor's "Save as snippet" and the Command page). A category is one of these;
+ * there is no way to create another.
+ */
+const SNIPPET_CATEGORIES = [
+    'nav'     => 'Navigation',
+    'forms'   => 'Forms',
+    'cards'   => 'Cards',
+    'layouts' => 'Layouts',
+    'content' => 'Content',
+    'lists'   => 'Lists',
+    'other'   => 'Other',
+];
+
+/** The category a snippet takes when none is given. */
+const SNIPPET_DEFAULT_CATEGORY = 'other';
+
+/** The category ids, in display order. */
+function qs_snippet_categories(): array {
+    return array_keys(SNIPPET_CATEGORIES);
+}
+
+/**
+ * Why $category cannot be a snippet's category, as the refusal to send, or null when it can:
+ * 400 validation.invalid_value, naming the categories there are.
+ *
+ * @param mixed $category the category as received
+ */
+function qs_snippet_category_refusal($category): ?ApiResponse {
+    if (is_string($category) && isset(SNIPPET_CATEGORIES[$category])) {
+        return null;
+    }
+    require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+    $allowed = qs_snippet_categories();
+    return ApiResponse::create(400, 'validation.invalid_value')
+        ->withMessage('Unknown snippet category. Use one of: ' . implode(', ', $allowed))
+        ->withErrors([['field' => 'category', 'value' => is_scalar($category) ? (string) $category : gettype($category), 'allowed' => $allowed]]);
+}
+
+/**
  * Get path to core snippets directory
  * 
  * @return string Path to core snippets directory
@@ -103,7 +145,7 @@ function listSnippetsFromPath(string $basePath, string $source = 'core'): array 
     }
     
     // Check for category subdirectories
-    $categories = ['nav', 'forms', 'cards', 'layouts', 'content', 'lists', 'other'];
+    $categories = qs_snippet_categories();
     $hasCategories = false;
     
     foreach ($categories as $category) {
@@ -237,7 +279,7 @@ function findSnippetInPath(string $snippetId, string $basePath, string $source =
     }
     
     // Search in category subdirectories
-    $categories = ['nav', 'forms', 'cards', 'layouts', 'content', 'lists'];
+    $categories = qs_snippet_categories();
     foreach ($categories as $category) {
         $categoryPath = $basePath . '/' . $category;
         if (is_dir($categoryPath)) {

@@ -937,7 +937,7 @@ $GLOBALS['__help_commands'] = [
                 'type' => 'string',
                 'description' => 'Name (required for page/component, optional for menu/footer). A page is named by its route path, nested and parameter routes included: guides/installation, products/:slug.',
                 'example' => 'home',
-                'validation' => 'A page: each segment letters, digits, hyphens and underscores, or ":" and a parameter name (products/:slug); an existing route or a special page (404, 500, 403, 401); at most 200 bytes; no "..", backslash or NUL byte (the rule every page command shares). A component: one segment of letters, digits, hyphens and underscores.'
+                'validation' => 'A page: each segment letters, digits, hyphens and underscores, or ":" and a parameter name (products/:slug); an existing route or a special page (404, 500, 403, 401); at most 200 bytes; no "..", backslash or NUL byte (the rule every page command shares). A component: a letter, then letters, digits, hyphens and underscores, up to 64 characters, never a path (the rule every component command shares, and the one a page places a component by).'
             ],
             '{option}' => [
                 'required' => false,
@@ -962,12 +962,12 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '400.validation.required' => 'Missing type or name in URL',
-            '400.validation.invalid_format' => 'Invalid type or option format; a page name with "..", a backslash or a NUL byte (reason path_traversal_attempt), or a segment that is neither letters, digits, hyphens and underscores nor ":" and a parameter name',
+            '400.validation.invalid_format' => 'Invalid type or option format; a page name with "..", a backslash or a NUL byte (reason path_traversal_attempt), or a segment that is neither letters, digits, hyphens and underscores nor ":" and a parameter name. A component name with "..", a slash, a backslash or a NUL byte (reason path_traversal_attempt), or outside the component-name rule (reason invalid_component_reference, errors[0].expected states it).',
             '404.route.not_found' => 'Page does not exist: neither a route of the project nor a special page',
             '404.file.not_found' => 'Structure file not found',
             '404.node.not_found' => 'Node not found at specified identifier',
             '500.server.file_write_failed' => 'Failed to read structure file',
-            '400.validation.invalid_length' => 'The type parameter is longer than the longest allowed type name, or the name parameter exceeds 200 characters.',
+            '400.validation.invalid_length' => 'The type parameter is longer than the longest allowed type name, or a page name exceeds 200 bytes.',
             '400.validation.invalid_type' => 'The type parameter is not a string, or the name parameter is neither a string nor a number. An integer or float name is accepted and used as its string form.',
             '400.validation.invalid_value' => 'The type parameter is not one of menu, footer, page, component.',
             '500.server.internal_error' => 'Invalid JSON in structure file.'
@@ -991,7 +991,7 @@ $GLOBALS['__help_commands'] = [
                 'type' => 'string',
                 'description' => 'Name (required for page/component). A page is named by its route path, nested and parameter routes included: guides/installation, products/:slug.',
                 'example' => 'home',
-                'validation' => 'A page: each segment letters, digits, hyphens and underscores, or ":" and a parameter name (products/:slug); an existing route or a special page (404, 500, 403, 401); at most 200 bytes; no "..", backslash or NUL byte (the rule every page command shares). A component: letters, digits, hyphens and underscores, no slash.'
+                'validation' => 'A page: each segment letters, digits, hyphens and underscores, or ":" and a parameter name (products/:slug); an existing route or a special page (404, 500, 403, 401); at most 200 bytes; no "..", backslash or NUL byte (the rule every page command shares). A component: a letter, then letters, digits, hyphens and underscores, up to 64 characters, never a path (the rule every component command shares, and the one a page places a component by).'
             ],
             'structure' => [
                 'required' => true,
@@ -1031,7 +1031,7 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '400.validation.required' => 'Missing type, name, or structure parameter',
-            '400.validation.invalid_format' => 'Invalid type, nodeId format, or structure format. Also returned when A component reference in the structure is not a bare component name. It must start with a letter, then letters, digits, hyphens and underscores, up to 64 characters - never a path. errors[0].expected states the rule.',
+            '400.validation.invalid_format' => 'Invalid type, nodeId format, or structure format. Also returned when A component reference in the structure is not a bare component name. It must start with a letter, then letters, digits, hyphens and underscores, up to 64 characters - never a path. errors[0].expected states the rule. A component name with "..", a slash, a backslash or a NUL byte (reason path_traversal_attempt), or outside the component-name rule (reason invalid_component_reference, errors[0].expected states it).',
 '400.validation.blocked_tag' => 'The structure holds something the renderer would refuse: a blocked or non-allowlisted tag, an attribute NAME outside [letters, digits, underscore, colon, hyphen], a raw on* handler (use {{call:...}} syntax), or a disallowed URL scheme (only http, https, mailto, tel). The message names the offender.',
             '400.operation.failed' => 'Node operation failed (e.g., node not found)',
             '404.route.not_found' => 'Page does not exist',
@@ -1039,7 +1039,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.file_write_failed' => 'Failed to write structure file',
             '500.server.internal_error' => 'Failed to encode structure to JSON',
             '400.operation.denied' => 'Cannot delete component: used by other components.',
-            '400.validation.invalid_length' => 'The type parameter is longer than the longest allowed type name, or the name parameter exceeds 200 characters.',
+            '400.validation.invalid_length' => 'The type parameter is longer than the longest allowed type name, or a page name exceeds 200 bytes.',
             '400.validation.invalid_type' => 'The structure parameter is not an object or array of objects, the type parameter is not a string, or the name parameter is neither a string nor a number. An integer or float name is accepted and used as its string form.',
             '400.validation.invalid_value' => 'The type parameter is not one of menu, footer, page, component; or, in targeted mode, action is not one of update, delete, insertBefore, insertAfter. The allowed set is echoed in errors[].allowed.',
             '400.validation.reserved_attribute' => 'A node carries an attribute starting with "data-qs-", which is reserved for QuickSite. Use a different prefix such as "data-custom-" or "data-app-". The offending attribute and its node are named in errors[].',
@@ -2723,14 +2723,16 @@ $GLOBALS['__help_commands'] = [
                 'type' => 'string',
                 'description' => 'Current component name. Can use "from" as an alias.',
                 'example' => 'menu-card',
-                'alias' => 'from'
+                'alias' => 'from',
+                'validation' => 'A component: a letter, then letters, digits, hyphens and underscores, up to 64 characters, never a path (the rule every component command shares, and the one a page places a component by).'
             ],
             'newName' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'New component name (letters, numbers, hyphens). Can use "to" as an alias.',
+                'description' => 'New component name. Can use "to" as an alias.',
                 'example' => 'nav-card',
-                'alias' => 'to'
+                'alias' => 'to',
+                'validation' => 'A component: a letter, then letters, digits, hyphens and underscores, up to 64 characters, never a path (the rule every component command shares, and the one a page places a component by).'
             ]
         ],
         'example_post' => 'POST /management/p/<projectId>/renameComponent with body: {"oldName": "menu-card", "newName": "nav-card"}',
@@ -2751,7 +2753,7 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '400.validation.missing_parameter' => 'oldName or newName not provided',
-            '400.validation.invalid_format' => 'Invalid component name format',
+            '400.validation.invalid_format' => 'A component name with "..", a slash, a backslash or a NUL byte (reason path_traversal_attempt), or outside the component-name rule (reason invalid_component_reference, errors[0].expected states it).',
             '404.file.not_found' => 'Source component does not exist',
             '409.file.already_exists' => 'Target component name already exists',
             '500.server.file_rename_failed' => 'Failed to rename component file.'
@@ -2768,14 +2770,16 @@ $GLOBALS['__help_commands'] = [
                 'type' => 'string',
                 'description' => 'Source component name to copy. Can use "from" as an alias.',
                 'example' => 'menu-card',
-                'alias' => 'from'
+                'alias' => 'from',
+                'validation' => 'A component: a letter, then letters, digits, hyphens and underscores, up to 64 characters, never a path (the rule every component command shares, and the one a page places a component by).'
             ],
             'name' => [
                 'required' => true,
                 'type' => 'string',
                 'description' => 'Name for the new component. Can use "to" as an alias.',
                 'example' => 'menu-card-v2',
-                'alias' => 'to'
+                'alias' => 'to',
+                'validation' => 'A component: a letter, then letters, digits, hyphens and underscores, up to 64 characters, never a path (the rule every component command shares, and the one a page places a component by).'
             ]
         ],
         'example_post' => 'POST /management/p/<projectId>/duplicateComponent with body: {"source": "menu-card", "name": "menu-card-v2"}',
@@ -2792,7 +2796,7 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '400.validation.missing_parameter' => 'source or name not provided',
-            '400.validation.invalid_format' => 'Invalid component name format',
+            '400.validation.invalid_format' => 'A component name with "..", a slash, a backslash or a NUL byte (reason path_traversal_attempt), or outside the component-name rule (reason invalid_component_reference, errors[0].expected states it).',
             '404.file.not_found' => 'Source component does not exist',
             '409.file.already_exists' => 'Target component name already exists',
             '500.server.directory_create_failed' => 'Failed to create components directory.',
@@ -2855,7 +2859,8 @@ $GLOBALS['__help_commands'] = [
                 'required' => 'conditional',
                 'type' => 'string',
                 'description' => 'Structure name (required for type=page/component)',
-                'example' => 'home'
+                'example' => 'home',
+                'validation' => 'A page is named by its route path: each segment letters, digits, hyphens and underscores, or ":" and a parameter name (products/:slug); an existing route or a special page (404, 500, 403, 401); at most 200 bytes; no "..", backslash or NUL byte (the rule every page command shares). A component: a letter, then letters, digits, hyphens and underscores, up to 64 characters, never a path (the rule every component command shares, and the one a page places a component by).'
             ],
             'sourceNodeId' => [
                 'required' => true,
@@ -2896,13 +2901,15 @@ $GLOBALS['__help_commands'] = [
             '400.operation.denied' => 'Cannot move to same position or inside self',
             '404.resource.not_found' => 'Source or target node not found',
             '400.operation.failed' => 'The move could not be applied: the source node could not be removed, the target could no longer be found once the source was removed, or the insert failed. The structure file is left unchanged.',
-            '400.validation.invalid_format' => 'Invalid sourceNodeId format. Use dot notation like \'0.2.1\'. Invalid targetNodeId format. Use dot notation like \'0.2.1\'. Structure too deeply nested (max 50 levels).',
+            '400.validation.invalid_format' => 'Invalid sourceNodeId format. Use dot notation like \'0.2.1\'. Invalid targetNodeId format. Use dot notation like \'0.2.1\'. Structure too deeply nested (max 50 levels). A page name with "..", a backslash or a NUL byte (reason path_traversal_attempt), or a segment outside the page-name rule; a component name with "..", a slash, a backslash or a NUL byte (reason path_traversal_attempt), or outside the component-name rule (reason invalid_component_reference, errors[0].expected states it).',
             '404.file.not_found' => 'Structure file not found.',
             '404.node.not_found' => 'The sourceNodeId or the targetNodeId does not resolve to a node in the structure.',
-            '404.route.not_found' => 'Page does not exist.',
+            '404.route.not_found' => 'The page is neither a route of the project nor a special page; data.available_routes and data.special_pages list both, or its route has no structure file.',
             '500.server.file_read_failed' => 'Failed to read structure file.',
             '500.server.file_write_failed' => 'Failed to write structure file.',
-            '500.server.internal_error' => 'Invalid JSON in structure file. Failed to encode structure to JSON.'
+            '500.server.internal_error' => 'Invalid JSON in structure file. Failed to encode structure to JSON.',
+            '400.validation.invalid_type' => 'A page name that is neither a string nor a number (a number is read as its string form).',
+            '400.validation.invalid_length' => 'A page name longer than 200 bytes.'
         ],
         'notes' => 'Atomic move operation with proper index adjustment. Use in Visual Editor drag & drop. Components are moved as single units. **Component node paths**: For type=component, children are "0", "1", etc. (root is "", not movable).'
     ],
@@ -2921,7 +2928,8 @@ $GLOBALS['__help_commands'] = [
                 'required' => 'conditional',
                 'type' => 'string',
                 'description' => 'Structure name (required for type=page/component)',
-                'example' => 'home'
+                'example' => 'home',
+                'validation' => 'A page is named by its route path: each segment letters, digits, hyphens and underscores, or ":" and a parameter name (products/:slug); an existing route or a special page (404, 500, 403, 401); at most 200 bytes; no "..", backslash or NUL byte (the rule every page command shares). A component: a letter, then letters, digits, hyphens and underscores, up to 64 characters, never a path (the rule every component command shares, and the one a page places a component by).'
             ],
             'nodeId' => [
                 'required' => true,
@@ -2957,13 +2965,15 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_value' => 'Invalid type value',
             '404.resource.not_found' => 'Node not found',
             '400.operation.failed' => 'Failed to delete node.',
-            '400.validation.invalid_format' => 'Invalid nodeId format. Use dot notation like \'0.2.1\'.',
+            '400.validation.invalid_format' => 'Invalid nodeId format. Use dot notation like \'0.2.1\'. A page name with "..", a backslash or a NUL byte (reason path_traversal_attempt), or a segment outside the page-name rule; a component name with "..", a slash, a backslash or a NUL byte (reason path_traversal_attempt), or outside the component-name rule (reason invalid_component_reference, errors[0].expected states it).',
             '404.file.not_found' => 'Structure file not found.',
             '404.node.not_found' => 'The nodeId does not resolve to a node in the structure.',
-            '404.route.not_found' => 'Page does not exist.',
+            '404.route.not_found' => 'The page is neither a route of the project nor a special page; data.available_routes and data.special_pages list both, or its route has no structure file.',
             '500.server.file_read_failed' => 'Failed to read structure file.',
             '500.server.file_write_failed' => 'Failed to write structure file.',
-            '500.server.internal_error' => 'Invalid JSON in structure file. Failed to encode structure to JSON.'
+            '500.server.internal_error' => 'Invalid JSON in structure file. Failed to encode structure to JSON.',
+            '400.validation.invalid_type' => 'A page name that is neither a string nor a number (a number is read as its string form).',
+            '400.validation.invalid_length' => 'A page name longer than 200 bytes.'
         ],
         'notes' => 'Recursively deletes all children AND removes associated translation keys from all language files. Collects textKey and translatable attributes (alt, placeholder, title, aria-*) from deleted node and children. Use in Visual Editor with Del key. **Component node paths**: For type=component, children are "0", "1", etc. (root itself is "", but cannot be deleted).'
     ],
@@ -2982,7 +2992,8 @@ $GLOBALS['__help_commands'] = [
                 'required' => 'conditional',
                 'type' => 'string',
                 'description' => 'Structure name (required for type=page/component)',
-                'example' => 'home'
+                'example' => 'home',
+                'validation' => 'A page is named by its route path: each segment letters, digits, hyphens and underscores, or ":" and a parameter name (products/:slug); an existing route or a special page (404, 500, 403, 401); at most 200 bytes; no "..", backslash or NUL byte (the rule every page command shares). A component: a letter, then letters, digits, hyphens and underscores, up to 64 characters, never a path (the rule every component command shares, and the one a page places a component by).'
             ],
             'targetNodeId' => [
                 'required' => true,
@@ -3059,15 +3070,17 @@ $GLOBALS['__help_commands'] = [
             '404.resource.not_found' => 'Target node not found',
             '400.operation.failed' => 'Failed to insert node.',
             '400.validation.blocked_tag' => 'Tag is blocked for security reasons.',
-            '400.validation.invalid_format' => 'Invalid targetNodeId format. Use dot notation like \'0.2.1\' or \'root\'. Structure too deeply nested (max 50 levels).',
+            '400.validation.invalid_format' => 'Invalid targetNodeId format. Use dot notation like \'0.2.1\' or \'root\'. Structure too deeply nested (max 50 levels). A page name with "..", a backslash or a NUL byte (reason path_traversal_attempt), or a segment outside the page-name rule; a component name with "..", a slash, a backslash or a NUL byte (reason path_traversal_attempt), or outside the component-name rule (reason invalid_component_reference, errors[0].expected states it).',
             '400.validation.reserved_attribute' => 'Cannot use reserved attribute. Attributes starting with \'data-qs-\' are reserved for QuickSite. Use a different prefix like \'data-custom-\' or \'data-app-\'.',
             '400.validation.reserved_key' => 'Reserved admin-namespace prefix (quicksite_ / quicksite- / qs_ / qs-). These are used by the admin panel and would collide with admin state. Pick a project-specific prefix.',
             '404.file.not_found' => 'Structure file not found.',
             '404.node.not_found' => 'The targetNodeId does not resolve to a node in the structure.',
-            '404.route.not_found' => 'Page does not exist.',
+            '404.route.not_found' => 'The page is neither a route of the project nor a special page; data.available_routes and data.special_pages list both, or its route has no structure file.',
             '500.server.file_read_failed' => 'Failed to read structure file.',
             '500.server.file_write_failed' => 'Failed to write structure file.',
-            '500.server.internal_error' => 'The structure file on disk is not valid JSON; the decoder message is returned.'
+            '500.server.internal_error' => 'The structure file on disk is not valid JSON; the decoder message is returned.',
+            '400.validation.invalid_type' => 'A page name that is neither a string nor a number (a number is read as its string form).',
+            '400.validation.invalid_length' => 'A page name longer than 200 bytes.'
         ],
         'notes' => 'TAG mode adds a tag element that comes in EMPTY by default; the legacy auto-generated placeholder textKey was removed (it was the cause of span-in-span nesting when authoring bound elements). Pass an explicit `textKey` to attach a translation-key text child at add-time, or leave empty and use the dedicated TEXT mode + the Text-mode inline editor (Text tool) afterwards. TEXT mode adds a bare `{textKey:...}` text node — set `textRaw=true` + `textValue` for a literal, or pass an explicit `textKey` (the visual editor\'s text-key picker handles key creation + translation write via setTranslationKeys before calling addNode). Position "inside" moves existing text children of the target into the new tag node; this move logic is skipped for TEXT inserts. For components, use addComponentToNode. **Component node paths**: For type=component, root is "" (empty) and children are "0", "1", etc. (differs from pages where root elements start at "0"). targetNodeId "root" inserts at the structure\'s root, by the one rule every command that inserts there shares: a structure whose root is a list of nodes (every page, menu and footer) takes the new node as its first entry; one whose root is a single node (a component) takes it as its first child; either way its id is "0". A root that cannot hold children (a component call, a text node) is refused.'
     ],
@@ -3098,7 +3111,8 @@ $GLOBALS['__help_commands'] = [
                 'required' => 'conditional',
                 'type' => 'string',
                 'description' => 'Structure name (required for structType=page/component)',
-                'example' => 'home'
+                'example' => 'home',
+                'validation' => 'A page is named by its route path: each segment letters, digits, hyphens and underscores, or ":" and a parameter name (products/:slug); an existing route or a special page (404, 500, 403, 401); at most 200 bytes; no "..", backslash or NUL byte (the rule every page command shares). A component: a letter, then letters, digits, hyphens and underscores, up to 64 characters, never a path (the rule every component command shares, and the one a page places a component by).'
             ],
             'targetNodeId' => [
                 'required' => true,
@@ -3131,11 +3145,11 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '400.validation.required' => 'Missing required parameter (kind, config, structType, targetNodeId)',
-            '400.validation.invalid_format' => 'Invalid kind format or invalid targetNodeId format, or the builder emitted a component reference that is not a bare component name (see editStructure).',
+            '400.validation.invalid_format' => 'Invalid kind format or invalid targetNodeId format, or the builder emitted a component reference that is not a bare component name (see editStructure). A page name with "..", a backslash or a NUL byte (reason path_traversal_attempt), or a segment outside the page-name rule; a component name with "..", a slash, a backslash or a NUL byte (reason path_traversal_attempt), or outside the component-name rule (reason invalid_component_reference, errors[0].expected states it).',
 '400.validation.invalid_value' => 'Invalid structType / position, or attempt to insert inside a component or text node',
             '400.complex_element.build_failed' => 'Builder rejected the config (e.g. list with no items, select with duplicate option values)',
             '404.complex_element.unknown_kind' => 'No builder registered for the requested kind (response includes availableKinds list)',
-            '404.route.not_found' => 'Target page does not exist',
+            '404.route.not_found' => 'The page is neither a route of the project nor a special page; data.available_routes and data.special_pages list both, or its route has no structure file.',
             '404.node.not_found' => 'Target node not found at the given dot path',
             '500.complex_element.build_failed' => 'Builder threw unexpectedly or returned a malformed node',
             '400.operation.failed' => 'Failed to insert subtree.',
@@ -3144,9 +3158,11 @@ $GLOBALS['__help_commands'] = [
             '404.file.not_found' => 'Structure file not found.',
             '500.server.file_read_failed' => 'Failed to read structure file.',
             '500.server.file_write_failed' => 'Failed to write structure file.',
-            '500.server.internal_error' => 'Builder failed unexpectedly. See server log. Invalid JSON.'
+            '500.server.internal_error' => 'Builder failed unexpectedly. See server log. Invalid JSON.',
+            '400.validation.invalid_type' => 'A page name that is neither a string nor a number (a number is read as its string form).',
+            '400.validation.invalid_length' => 'A page name longer than 200 bytes.'
         ],
-        'notes' => 'After save, the emitted subtree is INDISTINGUISHABLE from a hand-built one — same JSON shape, same renderer, editable with the regular visual-editor tools. Wizard is build-time only; nothing at render time knows the element came from here. Builders live in <secure>/src/classes/complexElements/*.php as ComplexElementBuilder subclasses and are auto-discovered by the dispatcher. Drop a new builder file + a matching <public>/admin/.../contextual-complex/complex-<kind>.js wizard to add a kind — zero registration. Reuses addNode\'s insertion helper for non-root targets (same atomicity). targetNodeId "root" inserts at the structure\'s root, by the one rule every command that inserts there shares: a structure whose root is a list of nodes (every page, menu and footer) takes the new node as its first entry; one whose root is a single node (a component) takes it as its first child; either way its id is "0". A root that cannot hold children (a component call, a text node) is refused with 400 operation.failed.'
+        'notes' => 'After save, the emitted subtree is INDISTINGUISHABLE from a hand-built one — same JSON shape, same renderer, editable with the regular visual-editor tools. Wizard is build-time only; nothing at render time knows the element came from here. Builders live in <secure>/src/classes/complexElements/*.php as ComplexElementBuilder subclasses and are auto-discovered by the dispatcher. Drop a new builder file + a matching <public>/admin/.../contextual-complex/complex-<kind>.js wizard to add a kind — zero registration. Before, after and inside a node follow the rule addNode follows, the one every positional insert shares. targetNodeId "root" inserts at the structure\'s root, by the one rule every command that inserts there shares: a structure whose root is a list of nodes (every page, menu and footer) takes the new node as its first entry; one whose root is a single node (a component) takes it as its first child; either way its id is "0". A root that cannot hold children (a component call, a text node) is refused with 400 operation.failed.'
     ],
 
     'duplicateNode' => [
@@ -3163,7 +3179,8 @@ $GLOBALS['__help_commands'] = [
                 'required' => 'conditional',
                 'type' => 'string',
                 'description' => 'Structure name (required for type=page/component)',
-                'example' => 'home'
+                'example' => 'home',
+                'validation' => 'A page is named by its route path: each segment letters, digits, hyphens and underscores, or ":" and a parameter name (products/:slug); an existing route or a special page (404, 500, 403, 401); at most 200 bytes; no "..", backslash or NUL byte (the rule every page command shares). A component: a letter, then letters, digits, hyphens and underscores, up to 64 characters, never a path (the rule every component command shares, and the one a page places a component by).'
             ],
             'nodeId' => [
                 'required' => true,
@@ -3201,15 +3218,17 @@ $GLOBALS['__help_commands'] = [
             '400.operation.denied' => 'Cannot duplicate component nodes (use at component definition level)',
             '404.resource.not_found' => 'Node not found',
             '400.operation.failed' => 'Component root has no children to duplicate. Failed to insert duplicated node.',
-            '400.validation.invalid_format' => 'Invalid nodeId format. Use dot notation like \'0.2.1\'. Structure too deeply nested (max 50 levels).',
+            '400.validation.invalid_format' => 'Invalid nodeId format. Use dot notation like \'0.2.1\'. Structure too deeply nested (max 50 levels). A page name with "..", a backslash or a NUL byte (reason path_traversal_attempt), or a segment outside the page-name rule; a component name with "..", a slash, a backslash or a NUL byte (reason path_traversal_attempt), or outside the component-name rule (reason invalid_component_reference, errors[0].expected states it).',
             '404.file.not_found' => 'Structure file not found.',
             '404.node.not_found' => 'The nodeId does not resolve to a node in the structure.',
-            '404.route.not_found' => 'Page does not exist.',
+            '404.route.not_found' => 'The page is neither a route of the project nor a special page; data.available_routes and data.special_pages list both, or its route has no structure file.',
             '500.server.file_read_failed' => 'Failed to read structure file.',
             '500.server.file_write_failed' => 'Failed to write structure file.',
-            '500.server.internal_error' => 'Invalid JSON in structure file. Failed to encode structure to JSON.'
+            '500.server.internal_error' => 'Invalid JSON in structure file. Failed to encode structure to JSON.',
+            '400.validation.invalid_type' => 'A page name that is neither a string nor a number (a number is read as its string form).',
+            '400.validation.invalid_length' => 'A page name longer than 200 bytes.'
         ],
-        'notes' => 'Creates a deep copy of the node and all children. Generates new unique translation keys for textKey and translatable attributes (alt, placeholder, title, aria-*). New keys follow pattern {prefix}.item{N+1}. Optionally copies translation values from source keys. Returns rendered HTML for live DOM update. Use in Visual Editor with D key shortcut. **Component node paths**: For type=component, children are "0", "1", etc. (root itself is "", but cannot be duplicated).'
+        'notes' => 'Creates a deep copy of the node and all children. Generates new unique translation keys for textKey and translatable attributes (alt, placeholder, title, aria-*). New keys follow pattern {prefix}.item{N+1}. Optionally copies translation values from source keys. Returns rendered HTML for live DOM update. Use in Visual Editor with D key shortcut. **Component node paths**: For type=component, children are "0", "1", etc. (root itself is "", but cannot be duplicated). A raw or literal value (__RAW__ / __LIT__) is copied as written: no key is made for it and nothing is translated.'
     ],
     
     'editNode' => [
@@ -3226,7 +3245,8 @@ $GLOBALS['__help_commands'] = [
                 'required' => 'conditional',
                 'type' => 'string',
                 'description' => 'Structure name (required for type=page/component)',
-                'example' => 'home'
+                'example' => 'home',
+                'validation' => 'A page is named by its route path: each segment letters, digits, hyphens and underscores, or ":" and a parameter name (products/:slug); an existing route or a special page (404, 500, 403, 401); at most 200 bytes; no "..", backslash or NUL byte (the rule every page command shares). A component: a letter, then letters, digits, hyphens and underscores, up to 64 characters, never a path (the rule every component command shares, and the one a page places a component by).'
             ],
             'nodeId' => [
                 'required' => true,
@@ -3288,13 +3308,15 @@ $GLOBALS['__help_commands'] = [
             '404.resource.not_found' => 'Node not found',
             '400.operation.failed' => 'Failed to edit node.',
             '400.validation.blocked_tag' => 'Tag is blocked for security reasons.',
-            '400.validation.invalid_format' => 'Invalid nodeId format. Use dot notation like \'0.2.1\'. Structure too deeply nested (max 50 levels).',
+            '400.validation.invalid_format' => 'Invalid nodeId format. Use dot notation like \'0.2.1\'. Structure too deeply nested (max 50 levels). A page name with "..", a backslash or a NUL byte (reason path_traversal_attempt), or a segment outside the page-name rule; a component name with "..", a slash, a backslash or a NUL byte (reason path_traversal_attempt), or outside the component-name rule (reason invalid_component_reference, errors[0].expected states it).',
             '404.file.not_found' => 'Structure file not found.',
             '404.node.not_found' => 'The nodeId does not resolve to a node in the structure.',
-            '404.route.not_found' => 'Page does not exist.',
+            '404.route.not_found' => 'The page is neither a route of the project nor a special page; data.available_routes and data.special_pages list both, or its route has no structure file.',
             '500.server.file_read_failed' => 'Failed to read structure file.',
             '500.server.file_write_failed' => 'Failed to write structure file.',
-            '500.server.internal_error' => 'The structure file on disk is not valid JSON; the decoder message is returned.'
+            '500.server.internal_error' => 'The structure file on disk is not valid JSON; the decoder message is returned.',
+            '400.validation.invalid_type' => 'A page name that is neither a string nor a number (a number is read as its string form).',
+            '400.validation.invalid_length' => 'A page name longer than 200 bytes.'
         ],
         'notes' => 'Does NOT edit translation values (use setTranslationKeys). Cannot edit component nodes or pure text nodes. After tag change, validates mandatory params are present. Returns rendered HTML for live DOM updates. **Component node paths**: For type=component, root is "" and children are "0", "1", etc. **addParams**: empty/null values are rejected — use removeParams to drop a key.'
     ],
@@ -3313,7 +3335,8 @@ $GLOBALS['__help_commands'] = [
                 'required' => 'conditional',
                 'type' => 'string',
                 'description' => 'Structure name (required for type=page/component)',
-                'example' => 'home'
+                'example' => 'home',
+                'validation' => 'A page is named by its route path: each segment letters, digits, hyphens and underscores, or ":" and a parameter name (products/:slug); an existing route or a special page (404, 500, 403, 401); at most 200 bytes; no "..", backslash or NUL byte (the rule every page command shares). A component: a letter, then letters, digits, hyphens and underscores, up to 64 characters, never a path (the rule every component command shares, and the one a page places a component by).'
             ],
             'targetNodeId' => [
                 'required' => true,
@@ -3324,7 +3347,7 @@ $GLOBALS['__help_commands'] = [
             'position' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Where to insert: before, after, or inside (forced to inside when targetNodeId is "root")',
+                'description' => 'Where to insert: before, after, or inside (the component becomes the target\'s first child); forced to inside when targetNodeId is "root". Inside a component call or a text node is refused.',
                 'example' => 'after'
             ],
             'component' => [
@@ -3365,18 +3388,21 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '400.validation.required' => 'Missing required parameter',
-            '400.validation.invalid_value' => 'Component not found',
+            '400.validation.invalid_value' => 'Component not found. Inside a component node (reason component_is_atomic) or a text node (reason text_node): neither renders children.',
             '400.operation.denied' => 'Cannot insert inside component node',
             '404.resource.not_found' => 'Target node not found',
             '400.operation.failed' => 'Failed to insert component node.',
-            '400.validation.invalid_format' => 'Invalid targetNodeId format. Use dot notation like \'0.2.1\' or \'root\'. Invalid component name format. Structure too deeply nested (max 50 levels).',
+            '400.validation.invalid_format' => 'Invalid targetNodeId format. Use dot notation like \'0.2.1\' or \'root\'. Invalid component name format. Structure too deeply nested (max 50 levels). A page name with "..", a backslash or a NUL byte (reason path_traversal_attempt), or a segment outside the page-name rule; a component name with "..", a slash, a backslash or a NUL byte (reason path_traversal_attempt), or outside the component-name rule (reason invalid_component_reference, errors[0].expected states it).',
             '400.validation.reserved_key' => 'Reserved admin-namespace prefix (quicksite_ / quicksite- / qs_ / qs-). These are used by the admin panel and would collide with admin state. Pick a project-specific prefix.',
             '404.error.notFound' => 'One of the four things the call needs does not exist: the component, the page, the structure file for the given type (and name), or the target node.',
             '500.error.fileRead' => 'Failed to read component file.',
             '500.error.fileWrite' => 'Failed to save structure file.',
-            '500.error.invalidJson' => 'Component has invalid JSON. Structure file has invalid JSON.'
+            '500.error.invalidJson' => 'Component has invalid JSON. Structure file has invalid JSON.',
+            '400.validation.invalid_type' => 'A page name that is neither a string nor a number (a number is read as its string form).',
+            '400.validation.invalid_length' => 'A page name longer than 200 bytes.',
+            '404.route.not_found' => 'The page is neither a route of the project nor a special page; data.available_routes and data.special_pages list both.'
         ],
-        'notes' => 'Auto-generates textKeys as {struct}.{component}{N}.{var}. Creates empty translations, only once the insert passes every check, so a refused insert writes nothing. Returns rendered HTML for live DOM insertion. System placeholders (__ prefix) are filtered out. targetNodeId "root" inserts at the structure\'s root, by the one rule every command that inserts there shares: a structure whose root is a list of nodes (every page, menu and footer) takes the new node as its first entry; one whose root is a single node (a component) takes it as its first child; either way its id is "0". A root that cannot hold children (a component call, a text node) is refused with 400 operation.failed.'
+        'notes' => 'Auto-generates textKeys as {struct}.{component}{N}.{var}. Creates empty translations, only once the insert passes every check, so a refused insert writes nothing. Returns rendered HTML for live DOM insertion. System placeholders (__ prefix) are filtered out. targetNodeId "root" inserts at the structure\'s root, by the one rule every command that inserts there shares: a structure whose root is a list of nodes (every page, menu and footer) takes the new node as its first entry; one whose root is a single node (a component) takes it as its first child; either way its id is "0". A root that cannot hold children (a component call, a text node) is refused with 400 operation.failed. Before, after and inside a node follow the one rule every positional insert shares: the new node becomes the target\'s sibling just before or just after it, or its first child.'
     ],
     
     'editComponentToNode' => [
@@ -3393,7 +3419,8 @@ $GLOBALS['__help_commands'] = [
                 'required' => 'conditional',
                 'type' => 'string',
                 'description' => 'Structure name (required for type=page/component)',
-                'example' => 'home'
+                'example' => 'home',
+                'validation' => 'A page is named by its route path: each segment letters, digits, hyphens and underscores, or ":" and a parameter name (products/:slug); an existing route or a special page (404, 500, 403, 401); at most 200 bytes; no "..", backslash or NUL byte (the rule every page command shares). A component: a letter, then letters, digits, hyphens and underscores, up to 64 characters, never a path (the rule every component command shares, and the one a page places a component by).'
             ],
             'nodeId' => [
                 'required' => true,
@@ -3428,12 +3455,15 @@ $GLOBALS['__help_commands'] = [
             '400.operation.denied' => 'Cannot edit textKey-type variables (use setTranslationKeys)',
             '404.resource.not_found' => 'Node not found or not a component',
             '400.validation.failed' => 'Some variables could not be updated.',
-            '400.validation.invalid_format' => 'Invalid nodeId format. Use dot notation like \'0.2.1\'. Structure too deeply nested (max 50 levels).',
+            '400.validation.invalid_format' => 'Invalid nodeId format. Use dot notation like \'0.2.1\'. Structure too deeply nested (max 50 levels). A page name with "..", a backslash or a NUL byte (reason path_traversal_attempt), or a segment outside the page-name rule; a component name with "..", a slash, a backslash or a NUL byte (reason path_traversal_attempt), or outside the component-name rule (reason invalid_component_reference, errors[0].expected states it).',
             '400.validation.invalid_value' => 'The type parameter is not one of menu, footer, page, component; or the node at nodeId is a tag node rather than a component node (use editNode for those).',
             '404.error.notFound' => 'One of the four things the call needs does not exist: the page, the structure file for the given type (and name), the node, or the component definition it points at.',
             '500.error.fileWrite' => 'Failed to save structure file.',
             '500.error.internal' => 'Failed to update node.',
-            '500.error.invalidJson' => 'Structure file has invalid JSON. Component has invalid JSON.'
+            '500.error.invalidJson' => 'Structure file has invalid JSON. Component has invalid JSON.',
+            '400.validation.invalid_type' => 'A page name that is neither a string nor a number (a number is read as its string form).',
+            '400.validation.invalid_length' => 'A page name longer than 200 bytes.',
+            '404.route.not_found' => 'The page is neither a route of the project nor a special page; data.available_routes and data.special_pages list both.'
         ],
         'notes' => 'Only param-type variables can be edited (href, src, etc.). TextKey variables are read-only - use setTranslationKeys to change translation values. Returns rendered HTML for live DOM update.'
     ],
@@ -3747,7 +3777,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.delete_failed' => 'The tree could not be fully removed. data.partial says whether anything was deleted; data.survived names what could not be (project-relative paths); data.retained names what was kept deliberately so a retry stays possible; data.files_deleted / data.directories_deleted count what did go.',
             '400.validation.invalid_format' => 'Invalid project name.'
         ],
-        'notes' => 'WARNING: This is permanent and cannot be undone. Use exportProject first to backup. Only the project OWNER may delete it. Membership cascade: every OTHER member and every ENGAGED pending party (invitees, self-requesters) gets a dismissable status "deleted" notice in their own cache (it appears in their membership inbox in the admin panel, where they clear it) so the deletion is never mistaken for a refusal or removal; the deleting owner\'s own entry is simply removed, and a sponsored not-yet-validated proposal target gets NOTHING (they were never told the project existed). The response reports the cascade under data.membership_cascade. PARTIAL DELETES: the removal continues past a file it cannot remove rather than stopping at the first, and reports what is left — data.survived (blocked) and data.retained (kept on purpose). config.php, routes.php and config/ go LAST and are skipped entirely when anything else failed: the first two are what the project context boots from and config/members.json is the permission gate, so removing them on the way past would leave a project that could be neither named nor authorized, and no retry could finish it. Release whatever blocked the delete and re-run; the command is safe to repeat.'
+        'notes' => 'WARNING: This is permanent and cannot be undone. Use exportProject first to backup. Only the project OWNER may delete it. Membership cascade: every OTHER member and every ENGAGED pending party (invitees, self-requesters) gets a dismissable status "deleted" notice in their own cache (it appears in their membership inbox in the admin panel, where they clear it) so the deletion is never mistaken for a refusal or removal; the deleting owner\'s own entry is simply removed, and a sponsored not-yet-validated proposal target gets NOTHING (they were never told the project existed). The response reports the cascade under data.membership_cascade. PARTIAL DELETES: the removal continues past a file it cannot remove rather than stopping at the first, and reports what is left — data.survived (blocked) and data.retained (kept on purpose). config.php, routes.php and config/ go LAST and are skipped entirely when anything else failed: the first two are what the project context boots from and config/members.json is the permission gate, so removing them on the way past would leave a project that could be neither named nor authorized, and no retry could finish it. Release whatever blocked the delete and re-run; the command is safe to repeat. The project\'s cached space measurement goes with it, so a project created or imported later under the same name measures itself.'
     ],
 
     'listMembers' => [
@@ -4786,8 +4816,9 @@ $GLOBALS['__help_commands'] = [
             'pageName' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => 'Page name (required when structType is "page")',
-                'example' => 'home'
+                'description' => 'Page name, or component name (required when structType is "page" or "component")',
+                'example' => 'home',
+                'validation' => 'A page is named by its route path: each segment letters, digits, hyphens and underscores, or ":" and a parameter name (products/:slug); an existing route or a special page (404, 500, 403, 401); at most 200 bytes; no "..", backslash or NUL byte (the rule every page command shares). A component: a letter, then letters, digits, hyphens and underscores, up to 64 characters, never a path (the rule every component command shares, and the one a page places a component by).'
             ],
             'nodeId' => [
                 'required' => true,
@@ -4829,9 +4860,12 @@ $GLOBALS['__help_commands'] = [
             '404.node.not_found' => 'Node not found in structure',
             '400.validation.invalid_value' => 'The structType parameter is not one of menu, footer, page, component.',
             '404.file.not_found' => 'The structure file for the requested page (or for the menu, footer or component) does not exist.',
-            '404.route.not_found' => 'Page does not exist.',
+            '404.route.not_found' => 'The page is neither a route of the project nor a special page; data.available_routes and data.special_pages list both.',
             '500.server.file_read_failed' => 'Failed to read structure file.',
-            '500.server.internal_error' => 'Invalid JSON in structure file.'
+            '500.server.internal_error' => 'Invalid JSON in structure file.',
+            '400.validation.invalid_type' => 'A page name that is neither a string nor a number (a number is read as its string form).',
+            '400.validation.invalid_length' => 'A page name longer than 200 bytes.',
+            '400.validation.invalid_format' => 'A page name with "..", a backslash or a NUL byte (reason path_traversal_attempt), or a segment outside the page-name rule; a component name with "..", a slash, a backslash or a NUL byte (reason path_traversal_attempt), or outside the component-name rule (reason invalid_component_reference, errors[0].expected states it).'
         ],
         'notes' => 'Available events are filtered by element tag type. Forms get onsubmit/onreset, inputs get oninput/onchange, media elements get onplay/onpause/onended. Interactions are parsed from {{call:...}} syntax in event params.'
     ],
@@ -4849,8 +4883,9 @@ $GLOBALS['__help_commands'] = [
             'pageName' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => 'Page name (required when structType is "page")',
-                'example' => 'home'
+                'description' => 'Page name, or component name (required when structType is "page" or "component")',
+                'example' => 'home',
+                'validation' => 'A page is named by its route path: each segment letters, digits, hyphens and underscores, or ":" and a parameter name (products/:slug); an existing route or a special page (404, 500, 403, 401); at most 200 bytes; no "..", backslash or NUL byte (the rule every page command shares). A component: a letter, then letters, digits, hyphens and underscores, up to 64 characters, never a path (the rule every component command shares, and the one a page places a component by).'
             ],
             'nodeId' => [
                 'required' => true,
@@ -4896,14 +4931,16 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_function' => 'Function not found in available functions',
             '404.node.not_found' => 'Node not found in structure',
             '201.operation.success' => 'Interaction added successfully.',
-            '400.validation.invalid_format' => 'Invalid function name format.',
+            '400.validation.invalid_format' => 'Invalid function name format. A page name with "..", a backslash or a NUL byte (reason path_traversal_attempt), or a segment outside the page-name rule; a component name with "..", a slash, a backslash or a NUL byte (reason path_traversal_attempt), or outside the component-name rule (reason invalid_component_reference, errors[0].expected states it).',
             '400.validation.invalid_value' => 'The structType parameter is not one of menu, footer, page, component; or event is not a valid HTML event attribute (UNIVERSAL_EVENTS plus the entry for the node tag in TAG_SPECIFIC_EVENTS).',
             '404.file.not_found' => 'The structure file for the requested page (or for the menu, footer or component) does not exist.',
-            '404.route.not_found' => 'Page does not exist.',
+            '404.route.not_found' => 'The page is neither a route of the project nor a special page; data.available_routes and data.special_pages list both.',
             '422.node.invalid_target' => 'Interactions must be attached to a tag node, not a text node. Select the parent element (e.g. the button or link) and try again.',
             '500.server.file_read_failed' => 'Failed to read structure file.',
             '500.server.file_write_failed' => 'Failed to save structure file.',
-            '500.server.internal_error' => 'Invalid JSON in structure file. Failed to update node.'
+            '500.server.internal_error' => 'Invalid JSON in structure file. Failed to update node.',
+            '400.validation.invalid_type' => 'A page name that is neither a string nor a number (a number is read as its string form).',
+            '400.validation.invalid_length' => 'A page name longer than 200 bytes.'
         ],
         'notes' => 'If the event already has interactions, the new one is appended (space-separated). Use listJsFunctions to get available function names. Params array order must match function argument order.'
     ],
@@ -4921,8 +4958,9 @@ $GLOBALS['__help_commands'] = [
             'pageName' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => 'Page name (required when structType is "page")',
-                'example' => 'home'
+                'description' => 'Page name, or component name (required when structType is "page" or "component")',
+                'example' => 'home',
+                'validation' => 'A page is named by its route path: each segment letters, digits, hyphens and underscores, or ":" and a parameter name (products/:slug); an existing route or a special page (404, 500, 403, 401); at most 200 bytes; no "..", backslash or NUL byte (the rule every page command shares). A component: a letter, then letters, digits, hyphens and underscores, up to 64 characters, never a path (the rule every component command shares, and the one a page places a component by).'
             ],
             'nodeId' => [
                 'required' => true,
@@ -4980,14 +5018,16 @@ $GLOBALS['__help_commands'] = [
             '404.node.not_found' => 'Node not found in structure',
             '404.interaction.not_found' => 'No interaction found at specified index',
             '200.operation.success' => 'Interaction updated successfully.',
-            '400.validation.invalid_format' => 'Invalid function name format.',
+            '400.validation.invalid_format' => 'Invalid function name format. A page name with "..", a backslash or a NUL byte (reason path_traversal_attempt), or a segment outside the page-name rule; a component name with "..", a slash, a backslash or a NUL byte (reason path_traversal_attempt), or outside the component-name rule (reason invalid_component_reference, errors[0].expected states it).',
             '400.validation.invalid_value' => 'The structType parameter is not one of menu, footer, page, component; index is not a non-negative integer; or event / newEvent is not a valid HTML event attribute.',
             '404.file.not_found' => 'The structure file for the requested page (or for the menu, footer or component) does not exist.',
-            '404.route.not_found' => 'Page does not exist.',
+            '404.route.not_found' => 'The page is neither a route of the project nor a special page; data.available_routes and data.special_pages list both.',
             '422.node.invalid_target' => 'Interactions must be attached to a tag node, not a text node. Select the parent element and try again.',
             '500.server.file_read_failed' => 'Failed to read structure file.',
             '500.server.file_write_failed' => 'Failed to save structure file.',
-            '500.server.internal_error' => 'Invalid JSON in structure file. Failed to update node.'
+            '500.server.internal_error' => 'Invalid JSON in structure file. Failed to update node.',
+            '400.validation.invalid_type' => 'A page name that is neither a string nor a number (a number is read as its string form).',
+            '400.validation.invalid_length' => 'A page name longer than 200 bytes.'
         ],
         'notes' => 'Index is 0-based within the specific event. Use listInteractions to find the correct index. Only replaces the interaction at that index, other interactions on the same event are preserved.'
     ],
@@ -5005,8 +5045,9 @@ $GLOBALS['__help_commands'] = [
             'pageName' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => 'Page name (required when structType is "page")',
-                'example' => 'home'
+                'description' => 'Page name, or component name (required when structType is "page" or "component")',
+                'example' => 'home',
+                'validation' => 'A page is named by its route path: each segment letters, digits, hyphens and underscores, or ":" and a parameter name (products/:slug); an existing route or a special page (404, 500, 403, 401); at most 200 bytes; no "..", backslash or NUL byte (the rule every page command shares). A component: a letter, then letters, digits, hyphens and underscores, up to 64 characters, never a path (the rule every component command shares, and the one a page places a component by).'
             ],
             'nodeId' => [
                 'required' => true,
@@ -5045,10 +5086,13 @@ $GLOBALS['__help_commands'] = [
             '404.interaction.not_found' => 'No interaction found on this event',
             '400.validation.invalid_value' => 'The structType parameter is not one of menu, footer, page, component; or event is not a valid HTML event attribute.',
             '404.file.not_found' => 'The structure file for the requested page (or for the menu, footer or component) does not exist.',
-            '404.route.not_found' => 'Page does not exist.',
+            '404.route.not_found' => 'The page is neither a route of the project nor a special page; data.available_routes and data.special_pages list both.',
             '500.server.file_read_failed' => 'Failed to read structure file.',
             '500.server.file_write_failed' => 'Failed to save structure file.',
-            '500.server.internal_error' => 'Invalid JSON in structure file. Failed to update node.'
+            '500.server.internal_error' => 'Invalid JSON in structure file. Failed to update node.',
+            '400.validation.invalid_type' => 'A page name that is neither a string nor a number (a number is read as its string form).',
+            '400.validation.invalid_length' => 'A page name longer than 200 bytes.',
+            '400.validation.invalid_format' => 'A page name with "..", a backslash or a NUL byte (reason path_traversal_attempt), or a segment outside the page-name rule; a component name with "..", a slash, a backslash or a NUL byte (reason path_traversal_attempt), or outside the component-name rule (reason invalid_component_reference, errors[0].expected states it).'
         ],
         'notes' => 'If index is omitted, ALL interactions on that event are removed (the event param is deleted entirely). If index is provided, only that specific interaction is removed and others are preserved.'
     ],
@@ -5063,7 +5107,7 @@ $GLOBALS['__help_commands'] = [
                 'type' => 'string',
                 'description' => 'Page/route name, as URL segments. A nested route is written with slashes, exactly as the route reads — the segments after the command name are joined back together.',
                 'example' => 'docs/commands',
-                'validation' => 'Must be an existing route, or one of the special pages 404, 500, 403, 401.'
+                'validation' => 'A page is named by its route path: each segment letters, digits, hyphens and underscores, or ":" and a parameter name (products/:slug); an existing route or a special page (404, 500, 403, 401); at most 200 bytes; no "..", backslash or NUL byte (the rule every page command shares).'
             ]
         ],
         'example_get' => 'GET /management/p/<projectId>/getPageEvents/home or GET /management/p/<projectId>/getPageEvents/docs/commands',
@@ -5091,7 +5135,9 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '400.validation.required' => 'No page name was given — the URL carried no segment after the command.',
-            '404.route.not_found' => 'The page is neither an existing route nor one of the special pages 404, 500, 403, 401.'
+            '404.route.not_found' => 'The page is neither a route of the project nor a special page; data.available_routes and data.special_pages list both.',
+            '400.validation.invalid_length' => 'A page name longer than 200 bytes.',
+            '400.validation.invalid_format' => 'A page name with "..", a backslash or a NUL byte (reason path_traversal_attempt), or a segment outside the page-name rule.'
         ],
         'notes' => 'data.events is the raw stored map of event name to call strings; data.interactions is the same content parsed into function + params, with the index each call sits at — that index is what addPageEvent returns and what editPageEvent and deletePageEvent take. A page with nothing attached answers 200 with an empty events map and count 0, so absence is not an error. data.availableEvents is the fixed set of page-level events; element-level events live on nodes and are reached through listInteractions.'
     ],
@@ -5106,7 +5152,7 @@ $GLOBALS['__help_commands'] = [
                 'type' => 'string',
                 'description' => 'Page/route the event belongs to. Nested routes are written with slashes.',
                 'example' => 'home',
-                'validation' => 'Must be an existing route, or one of the special pages 404, 500, 403, 401.'
+                'validation' => 'A page is named by its route path: each segment letters, digits, hyphens and underscores, or ":" and a parameter name (products/:slug); an existing route or a special page (404, 500, 403, 401); at most 200 bytes; no "..", backslash or NUL byte (the rule every page command shares).'
             ],
             'event' => [
                 'required' => true,
@@ -5143,11 +5189,13 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '400.validation.required' => 'pageName, event or function is missing or empty; or one of the verb\'s arguments failed validation, in which case errors[] carries a field, an index and a reason per argument.',
-            '404.route.not_found' => 'pageName is neither an existing route nor one of the special pages 404, 500, 403, 401.',
+            '404.route.not_found' => 'The page is neither a route of the project nor a special page; data.available_routes and data.special_pages list both.',
             '400.validation.invalid_value' => 'event is not one of onload, onresize, onscroll.',
-            '400.validation.invalid_format' => 'function is not a valid identifier.',
+            '400.validation.invalid_format' => 'function is not a valid identifier. A page name with "..", a backslash or a NUL byte (reason path_traversal_attempt), or a segment outside the page-name rule.',
             '422.validation.unknown_verb' => 'function is a well-formed name but is not in the QS verb catalogue.',
-            '500.server.file_write_failed' => 'The page-events file could not be written.'
+            '500.server.file_write_failed' => 'The page-events file could not be written.',
+            '400.validation.invalid_type' => 'A page name that is neither a string nor a number (a number is read as its string form).',
+            '400.validation.invalid_length' => 'A page name longer than 200 bytes.'
         ],
         'notes' => 'The call is appended to the event\'s list, and data.index is the position it landed at — pass that index to editPageEvent or deletePageEvent. The verb\'s arguments are validated against the catalogue, but the catalogue\'s own events list is NOT enforced here: a verb documented only for click events is accepted on onload. Prefer onScrollFetchState over a raw onscroll fetchState for infinite scroll — it carries the debounce and exhausted guards. Adding the first event for a page creates the project\'s page-events file and its data folder if they do not exist yet.'
     ],
@@ -5160,7 +5208,8 @@ $GLOBALS['__help_commands'] = [
                 'required' => true,
                 'type' => 'string',
                 'description' => 'Page/route name as stored in data/page-events.json',
-                'example' => 'test/scrolling'
+                'example' => 'test/scrolling',
+                'validation' => 'A page is named by its route path: each segment letters, digits, hyphens and underscores, or ":" and a parameter name (products/:slug); an existing route or a special page (404, 500, 403, 401); at most 200 bytes; no "..", backslash or NUL byte (the rule every page command shares).'
             ],
             'event' => [
                 'required' => true,
@@ -5213,13 +5262,15 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.validation.required' => 'pageName, event, index, and function are required',
             '400.validation.invalid_value' => 'event/newEvent not in [onload, onresize, onscroll], or index negative',
-            '400.validation.invalid_format' => 'function name does not match identifier pattern',
-            '404.route.not_found' => 'pageName does not exist in routes',
+            '400.validation.invalid_format' => 'function name does not match identifier pattern. A page name with "..", a backslash or a NUL byte (reason path_traversal_attempt), or a segment outside the page-name rule.',
+            '404.route.not_found' => 'The page is neither a route of the project nor a special page; data.available_routes and data.special_pages list both.',
             '404.data.not_found' => 'page-events.json file is missing',
             '404.interaction.not_found' => 'No interaction at the given (event, index) for this page',
             '500.server.file_read_failed' => 'Failed to read page events file.',
             '500.server.file_write_failed' => 'Failed to save page events file.',
-            '500.server.internal_error' => 'Invalid JSON in page events file. Failed to encode page events JSON.'
+            '500.server.internal_error' => 'Invalid JSON in page events file. Failed to encode page events JSON.',
+            '400.validation.invalid_type' => 'A page name that is neither a string nor a number (a number is read as its string form).',
+            '400.validation.invalid_length' => 'A page name longer than 200 bytes.'
         ],
         'notes' => 'When newEvent differs from event, the interaction is spliced out of the source event and pushed onto the new event (empty event/page entries are cleaned up). When newEvent is omitted or equal, the call is replaced in-place at the same index. Counterpart to editInteraction (which edits element-level events on a node).'
     ],
@@ -5278,7 +5329,8 @@ $GLOBALS['__help_commands'] = [
                 'required' => true,
                 'type' => 'string',
                 'description' => 'Page route containing the target structure',
-                'example' => 'test/complex-element'
+                'example' => 'test/complex-element',
+                'validation' => 'A page is named by its route path: each segment letters, digits, hyphens and underscores, or ":" and a parameter name (products/:slug); an existing route or a special page (404, 500, 403, 401); at most 200 bytes; no "..", backslash or NUL byte (the rule every page command shares).'
             ],
             'kind' => [
                 'required' => true,
@@ -5329,13 +5381,14 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.validation.required' => 'route, kind, structureId, language, and rows are required',
             '400.validation.invalid_value' => 'unsupported kind, language not in project config, or rows malformed',
-            '400.validation.invalid_format' => 'structureId does not match HTML id format',
-            '404.route.not_found' => 'page JSON file does not exist for the route',
+            '400.validation.invalid_format' => 'structureId does not match HTML id format. A page name with "..", a backslash or a NUL byte (reason path_traversal_attempt), or a segment outside the page-name rule.',
+            '404.route.not_found' => 'The page is neither a route of the project nor a special page; data.available_routes and data.special_pages list both, or the route has no page JSON file.',
             '404.structure.not_found' => 'no <table data-qs-complex-id=X> found on the page (table may predate the marker: re-create it with the Table wizard, then delete the old one)',
             '422.validation.dimension_mismatch' => 'pasted grid dimensions do not match the existing table — response data carries the expected vs got diff',
             '500.server.file_read_failed' => 'page JSON file unreadable',
             '500.server.file_write_failed' => 'translation file write failed',
-            '500.server.internal_error' => 'The page JSON is malformed, a complex table node\'s dimensions could not be measured, or the merged translations could not be encoded. The offending element is named in the message.'
+            '500.server.internal_error' => 'The page JSON is malformed, a complex table node\'s dimensions could not be measured, or the merged translations could not be encoded. The offending element is named in the message.',
+            '400.validation.invalid_length' => 'A page name longer than 200 bytes.'
         ],
         'notes' => 'Counterpart to the Table wizard\'s Translatable paste mode (which CREATES + writes the FIRST language\'s values). This command is for adding additional languages to an existing structure. Empty cells in the pasted grid become empty translation values (NOT skipped — the key must exist after this write or the renderer falls back to the raw key text).'
     ],
@@ -5386,9 +5439,10 @@ $GLOBALS['__help_commands'] = [
             'route' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Page/route name to write stores for. Must be an existing route (special pages 404/500/403/401 are also allowed). "pageName" is accepted as an alias.',
+                'description' => 'Page/route name to write stores for. "pageName" is accepted as an alias.',
                 'example' => 'home',
-                'alias' => 'pageName'
+                'alias' => 'pageName',
+                'validation' => 'A page is named by its route path: each segment letters, digits, hyphens and underscores, or ":" and a parameter name (products/:slug); an existing route or a special page (404, 500, 403, 401); at most 200 bytes; no "..", backslash or NUL byte (the rule every page command shares).'
             ],
             'stores' => [
                 'required' => true,
@@ -5418,7 +5472,10 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.validation.required' => 'Missing/invalid "route", or "stores" is not an object',
             '400.validation.invalid_value' => 'A store failed validation (bad store id; endpoint not "@apiId/endpointId"; no fields; bad field name; dir not request|response|both; or missing "from" for a response/both field)',
-            '404.route.not_found' => 'Route does not exist'
+            '404.route.not_found' => 'The page is neither a route of the project nor a special page; data.available_routes and data.special_pages list both.',
+            '400.validation.invalid_type' => 'A page name that is neither a string nor a number (a number is read as its string form).',
+            '400.validation.invalid_length' => 'A page name longer than 200 bytes.',
+            '400.validation.invalid_format' => 'A page name with "..", a backslash or a NUL byte (reason path_traversal_attempt), or a segment outside the page-name rule.'
         ],
         'notes' => 'Store definition shape — endpoint: "@apiId/endpointId" (required); fetchOnLoad: bool (optional); fields: {name => {dir, init?, default?, from?, append?}} (at least one field). Field directions: "request" (sent only), "response" (set from the response only — requires "from"), "both" (sent from its current value, then updated from the response — requires "from"). init (for sent fields): a literal, or "query:<param>" | "localStorage:<key>" | "sessionStorage:<key>". from (for received fields): a response dot-path (e.g. "data" or "meta.total"). append: true makes a list field grow (infinite scroll) instead of replacing. The definition is runtime-agnostic JSON; the server-side data-resolver reads the same shape. Permission: editStructure.'
     ],
@@ -6256,7 +6313,9 @@ $GLOBALS['__help_commands'] = [
                     'nav' => [['id' => 'navbar-basic', 'name' => 'Basic Navbar', 'source' => 'core']],
                     'forms' => [['id' => 'contact-form', 'name' => 'Contact Form', 'source' => 'core']]
                 ],
-                'categories' => ['nav', 'forms', 'cards', 'layouts']
+                'categoryNames' => ['nav' => 'Navigation', 'forms' => 'Forms', 'cards' => 'Cards', 'layouts' => 'Layouts', 'content' => 'Content', 'lists' => 'Lists', 'other' => 'Other'],
+                'counts' => ['total' => 2, 'core' => 2, 'personal' => 0, 'project' => 0],
+                'project' => 'quicksite'
             ]
         ],
         'error_responses' => [
@@ -6323,8 +6382,9 @@ $GLOBALS['__help_commands'] = [
             'category' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Category folder (nav, forms, cards, layouts, content, lists)',
-                'example' => 'nav'
+                'description' => 'Category folder: nav, forms, cards, layouts, content, lists or other (default other)',
+                'example' => 'nav',
+                'validation' => 'One of the snippet categories: nav, forms, cards, layouts, content, lists, other. There is no way to create another.'
             ],
             'description' => [
                 'required' => false,
@@ -6376,7 +6436,7 @@ $GLOBALS['__help_commands'] = [
             '400.snippets.name_required' => 'Snippet name is required.',
             '400.snippets.structure_required' => 'Snippet structure is required.',
             '400.validation.blocked_tag' => 'Tag is not allowed (security restriction).',
-            '400.validation.invalid_value' => 'scope is neither project nor personal. errors[0].allowed lists the two values.',
+            '400.validation.invalid_value' => 'scope is neither project nor personal. errors[0].allowed lists the two values. Or category is not one of the snippet categories; errors[0].allowed lists them.',
             '409.snippets.already_exists' => 'A snippet with this ID already exists.',
             '500.snippets.save_failed' => 'The snippet passed validation but could not be written to the project. The underlying reason is returned in the message.'
         ]
@@ -6481,7 +6541,8 @@ $GLOBALS['__help_commands'] = [
                 'required' => true,
                 'type' => 'string',
                 'description' => 'Target name (page name or component name). Required for type page and component; ignored for menu and footer.',
-                'example' => 'home'
+                'example' => 'home',
+                'validation' => 'A page is named by its route path: each segment letters, digits, hyphens and underscores, or ":" and a parameter name (products/:slug); an existing route or a special page (404, 500, 403, 401); at most 200 bytes; no "..", backslash or NUL byte (the rule every page command shares). A component: a letter, then letters, digits, hyphens and underscores, up to 64 characters, never a path (the rule every component command shares, and the one a page places a component by).'
             ],
             'targetNodeId' => [
                 'required' => true,
@@ -6492,7 +6553,7 @@ $GLOBALS['__help_commands'] = [
             'position' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => 'Insertion position: inside, before, after. Default: after. Forced to inside when targetNodeId is the literal "root".',
+                'description' => 'Insertion position: inside (the snippet becomes the target\'s first children), before, after. Default: after. Forced to inside when targetNodeId is the literal "root". Inside a component call or a text node is refused.',
                 'example' => 'inside'
             ]
         ],
@@ -6505,10 +6566,11 @@ $GLOBALS['__help_commands'] = [
                 'snippetId' => 'navbar-basic',
                 'snippetName' => 'Basic Navbar',
                 'newNodeId' => '0.1',
+                'newNodeIds' => ['0.1'],
                 'position' => 'after',
                 'targetNodeId' => '0.0',
                 'translationsAdded' => 3,
-                'keyMapping' => ['snippet.navbar.home' => 'text_abc12345'],
+                'keyMapping' => ['snippet.navbar.home' => 'home.item3'],
                 'html' => '<nav class="qs-snippet-navbar">...</nav>'
             ]
         ],
@@ -6519,19 +6581,22 @@ $GLOBALS['__help_commands'] = [
             '404.file.not_found' => 'Target structure file not found',
             '400.project.mismatch' => 'The project named in the body does not match the project in the URL marker. The marker decides; a disagreeing echo is refused rather than ignored.',
             '400.project.required' => 'No project marker on the request. This command is project-scoped: target a project with /management/p/<projectId>/.',
-            '400.snippets.no_structure' => 'Snippet has no structure defined.',
-            '400.validation.invalid_format' => 'targetNodeId is neither a dot-separated node ID nor "root". Structure too deeply nested (max 50 levels).',
+            '400.snippets.no_structure' => 'Snippet has no structure defined. A root of the snippet\'s structure is not a node.',
+            '400.validation.invalid_format' => 'targetNodeId is neither a dot-separated node ID nor "root". Structure too deeply nested (max 50 levels). A page name with "..", a backslash or a NUL byte (reason path_traversal_attempt), or a segment outside the page-name rule; a component name with "..", a slash, a backslash or a NUL byte (reason path_traversal_attempt), or outside the component-name rule (reason invalid_component_reference, errors[0].expected states it).',
             '400.validation.invalid_position' => 'Position must be: before, after, or inside.',
-            '400.validation.invalid_type' => 'Invalid structure type. Must be: page, menu, footer, or component.',
+            '400.validation.invalid_type' => 'Invalid structure type. Must be: page, menu, footer, or component. A page name that is neither a string nor a number (a number is read as its string form).',
             '400.validation.name_required' => 'Name is required for page/component structures.',
             '400.validation.snippet_required' => 'Snippet ID is required.',
             '400.validation.target_required' => 'Target node ID is required.',
             '404.snippets.not_found' => 'No snippet with that id exists in this project.',
             '404.structure.not_found' => 'Page structure not found. Structure file not found.',
             '500.server.file_write_failed' => 'Failed to write structure file.',
-            '500.structure.invalid' => 'Invalid structure JSON.'
+            '500.structure.invalid' => 'Invalid structure JSON.',
+            '400.validation.invalid_length' => 'A page name longer than 200 bytes.',
+            '404.route.not_found' => 'The page is neither a route of the project nor a special page; data.available_routes and data.special_pages list both.',
+            '400.validation.invalid_value' => 'Inside a component call or a text node: neither renders children, so the snippet would never show.'
         ],
-        'notes' => 'Each inserted node gets a unique textKey (e.g., text_abc12345) to prevent conflicts. Translations from the snippet are mapped to new keys and added to all project language files - only once the insert passes every check, so a refused insert writes nothing. targetNodeId "root" inserts at the structure\'s root, by the one rule every command that inserts there shares: a structure whose root is a list of nodes (every page, menu and footer) takes the new node as its first entry; one whose root is a single node (a component) takes it as its first child; either way its id is "0". A root that cannot hold children (a component call, a text node) is refused with 400 operation.failed.'
+        'notes' => 'Every root of the snippet is inserted, in order, at the position asked (a snippet whose structure is a list of nodes has several roots): newNodeId names the first, newNodeIds every one, and html holds every root\'s HTML in order. Each translatable value (a text node\'s key, an alt / placeholder / title / aria-label key, a component\'s text variable) gets a new key {prefix}.item{N}, numbered on from the highest the project holds and from one root to the next. A raw or literal value (__RAW__ / __LIT__) is kept as written: no key, no translation. The snippet\'s translations are written under the new keys in every project language file, one for each new key (a key the snippet uses twice is written for both copies; keyMapping names the last), only once the insert passes every check, so a refused insert writes nothing. Before, after and inside a node follow the one rule every positional insert shares. targetNodeId "root" inserts at the structure\'s root, by the one rule every command that inserts there shares: a structure whose root is a list of nodes (every page, menu and footer) takes the new node as its first entry; one whose root is a single node (a component) takes it as its first child; either way its id is "0". A root that cannot hold children (a component call, a text node) is refused with 400 operation.failed.'
     ],
 
     'injectSnippetCss' => [

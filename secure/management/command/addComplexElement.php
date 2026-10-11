@@ -19,7 +19,8 @@
  * Pure dispatcher — looks up the builder for `kind`, has it produce
  * a single root node spec (with arbitrary nested children), validates
  * the result, then splices the WHOLE subtree into the structure JSON
- * under one file lock by reusing addNode's insertion helper.
+ * through the one positional insert (NodeNavigator::insertAt) or the root
+ * insert (NodeNavigator::insertAtRoot), as addNode does.
  *
  * After save, the emitted subtree is indistinguishable from a
  * hand-built one. The wizard is build-time only; nothing at render
@@ -34,24 +35,10 @@ require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/reservedStorageKeys.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 
-// We're about to `require_once addNode.php` only to reuse its
-// `insertNodeIntoStructure_addNode()` helper. addNode.php has a bottom
-// dispatch guarded by `defined('COMMAND_INTERNAL_CALL')` — if we leave
-// the constant undefined, that bottom block fires with empty params,
-// returns 400 "Required parameter missing", and `->send()` exits the
-// script BEFORE our code runs. So: capture whether we're the direct
-// HTTP-dispatched command, then define the constant so addNode skips,
-// then dispatch ourselves at the bottom using the captured flag.
-$_qsAddComplexElement_isDirectHttpCall = !defined('COMMAND_INTERNAL_CALL');
-if ($_qsAddComplexElement_isDirectHttpCall) {
-    define('COMMAND_INTERNAL_CALL', true);
-}
-
 require_once SECURE_FOLDER_PATH . '/src/classes/TagRegistry.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/IframeSandbox.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/JsonToHtmlRenderer.php';
-require_once SECURE_FOLDER_PATH . '/management/command/addNode.php';
 
 /**
  * Lazy-load all builders under secure/src/classes/complexElements/ and
@@ -253,12 +240,22 @@ function __command_addComplexElement(array $params = [], array $urlParams = []):
 
     // ----- Load structure file -----
     if ($structType === 'page') {
+        // The one page-name rule every command shares (qs_page_name_refusal()).
+        $refusal = qs_page_name_refusal($pageName, 'pageName');
+        if ($refusal !== null) {
+            return $refusal;
+        }
         $json_file = resolvePageJsonPath($pageName);
         if ($json_file === null) {
             return ApiResponse::create(404, 'route.not_found')
                 ->withMessage("Page '{$pageName}' does not exist");
         }
     } elseif ($structType === 'component') {
+        // The one component-name rule every command shares (qs_component_name_refusal()).
+        $refusal = qs_component_name_refusal($pageName, 'pageName');
+        if ($refusal !== null) {
+            return $refusal;
+        }
         $json_file = PROJECT_PATH . '/templates/model/json/components/' . $pageName . '.json';
     } else {
         $json_file = PROJECT_PATH . '/templates/model/json/' . $structType . '.json';
@@ -304,13 +301,9 @@ function __command_addComplexElement(array $params = [], array $urlParams = []):
         // first child (NodeNavigator::insertAtRoot, the rule every root insert shares).
         $insertResult = NodeNavigator::insertAtRoot($structure, $newNode);
     } else {
-        $targetIndices = array_map('intval', explode('.', $targetNodeId));
-        // Reuse addNode's insertion helper — same atomicity guarantees,
-        // handles before/after/inside, and supports nested children
-        // verbatim (our root node may carry arbitrary subtree).
-        $insertResult = insertNodeIntoStructure_addNode(
-            $structure, $targetIndices, $newNode, $position, []
-        );
+        // The one positional insert addNode uses: before / after / inside, the
+        // subtree carried whole.
+        $insertResult = NodeNavigator::insertAt($structure, (string) $targetNodeId, $newNode, $position);
     }
     if (!$insertResult['success']) {
         return ApiResponse::create(400, 'operation.failed')
@@ -355,10 +348,8 @@ function __command_addComplexElement(array $params = [], array $urlParams = []):
         ]);
 }
 
-// Direct HTTP dispatch. We can't use `!defined('COMMAND_INTERNAL_CALL')`
-// here because we defined the constant at the top (to silence addNode's
-// own dispatch). Use the captured flag instead.
-if (!empty($_qsAddComplexElement_isDirectHttpCall)) {
+// Direct HTTP dispatch.
+if (!defined('COMMAND_INTERNAL_CALL')) {
     require_once SECURE_FOLDER_PATH . '/src/classes/TrimParametersManagement.php';
     $trimParams = new TrimParametersManagement();
     __command_addComplexElement($trimParams->params(), $trimParams->additionalParams())->send();

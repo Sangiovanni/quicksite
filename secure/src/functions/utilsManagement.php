@@ -808,6 +808,7 @@ function routeExists(string $routePath, array $routes): bool {
  * command that checks a page name asks this, so a page one command opens is a page the others
  * open too; the visual editor works on one page through several of them. The answers, in order:
  *
+ *   400 validation.invalid_type    not a string (a number is read as one: the page '404')
  *   400 validation.invalid_length  more than 200 bytes
  *   400 validation.invalid_format  a '..', a backslash or a NUL byte (reason path_traversal_attempt),
  *                                  or a segment that is neither letters, digits, hyphens and
@@ -817,13 +818,22 @@ function routeExists(string $routePath, array $routes): bool {
  *
  * Whether the page's structure file exists is the caller's next question (resolvePageJsonPath()).
  *
- * @param string $name  the page name as received (a numeric name already cast to a string)
+ * @param mixed  $name  the page name as received
  * @param string $field the parameter the refusal names
  */
-function qs_page_name_refusal(string $name, string $field = 'name'): ?ApiResponse
+function qs_page_name_refusal($name, string $field = 'name'): ?ApiResponse
 {
     require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
     require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
+
+    if (is_int($name) || is_float($name)) {
+        $name = (string) $name;
+    }
+    if (!is_string($name)) {
+        return ApiResponse::create(400, 'validation.invalid_type')
+            ->withMessage("The {$field} parameter must be a string.")
+            ->withErrors([['field' => $field, 'reason' => 'invalid_type', 'expected' => 'string']]);
+    }
 
     if (strlen($name) > 200) {
         return ApiResponse::create(400, 'validation.invalid_length')
@@ -853,6 +863,52 @@ function qs_page_name_refusal(string $name, string $field = 'name'): ?ApiRespons
             ->withData(['available_routes' => flattenRoutes(ROUTES), 'special_pages' => SPECIAL_PAGES]);
     }
     return null;
+}
+
+/**
+ * Why a command cannot take $name as the name of one of the project's components, as the refusal
+ * it sends, or null when it can.
+ *
+ * A component is named by the rule a page places one with (qs_is_valid_component_reference()): a
+ * letter, then letters, digits, hyphens and underscores, up to 64 characters. One name, never a
+ * path, so the file it names is always in the project's own components folder. Every command that
+ * builds a component's file from a name it was given asks this, so a component one command saves
+ * is a component every other command opens and a page can place. The answers, in order:
+ *
+ *   400 validation.invalid_format  a '..', a slash, a backslash or a NUL byte (reason
+ *                                  path_traversal_attempt), or a name outside the rule (reason
+ *                                  invalid_component_reference)
+ *
+ * Whether the component's file exists is the caller's next question.
+ *
+ * @param mixed  $name  the component name as received
+ * @param string $field the parameter the refusal names
+ */
+function qs_component_name_refusal($name, string $field = 'name'): ?ApiResponse
+{
+    require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+
+    if (is_string($name) && (strpos($name, '..') !== false || strpbrk($name, "/\\\0") !== false)) {
+        return ApiResponse::create(400, 'validation.invalid_format')
+            ->withMessage('Name contains invalid path characters')
+            ->withErrors([['field' => $field, 'reason' => 'path_traversal_attempt']]);
+    }
+    if (!qs_is_valid_component_reference($name)) {
+        return ApiResponse::create(400, 'validation.invalid_format')
+            ->withMessage('Invalid component name. ' . RegexPatterns::getDescription('component_name'))
+            ->withErrors([qs_component_reference_error($field, $name)]);
+    }
+    return null;
+}
+
+/**
+ * Whether a text value is written as is: a `__RAW__` or `__LIT__` value, which the renderer and the
+ * compiler show verbatim, never a translation key. A command that copies nodes keeps such a value as
+ * it is, with no key and no translation: a key made for it would show the key's name, not the text.
+ */
+function qs_is_literal_text($value): bool
+{
+    return is_string($value) && (strncmp($value, '__RAW__', 7) === 0 || strncmp($value, '__LIT__', 7) === 0);
 }
 /**
  * Validate that params array does not contain reserved data-qs-* attributes

@@ -186,6 +186,11 @@ function __command_importStructureTranslations(array $params = [], array $urlPar
     }
 
     // ---- locate the page + structure -------------------------------------
+    // The one page-name rule every command shares (qs_page_name_refusal()).
+    $refusal = qs_page_name_refusal($route, 'route');
+    if ($refusal !== null) {
+        return $refusal;
+    }
     $jsonFile = resolvePageJsonPath($route);
     if ($jsonFile === null) {
         return ApiResponse::create(404, 'route.not_found')

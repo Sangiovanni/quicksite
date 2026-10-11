@@ -148,12 +148,22 @@ function __command_editComponentToNode(array $params = [], array $urlParams = []
     
     // Build JSON file path
     if ($type === 'page') {
+        // The one page-name rule every command shares (qs_page_name_refusal()).
+        $refusal = qs_page_name_refusal($name);
+        if ($refusal !== null) {
+            return $refusal;
+        }
         $jsonPath = resolvePageJsonPath($name);
         if ($jsonPath === null) {
             return ApiResponse::create(404, 'error.notFound')
                 ->withMessage("Page '{$name}' does not exist");
         }
     } elseif ($type === 'component') {
+        // The one component-name rule every command shares (qs_component_name_refusal()).
+        $refusal = qs_component_name_refusal($name);
+        if ($refusal !== null) {
+            return $refusal;
+        }
         $jsonPath = PROJECT_PATH . '/templates/model/json/components/' . $name . '.json';
     } else {
         $jsonPath = PROJECT_PATH . '/templates/model/json/' . $type . '.json';

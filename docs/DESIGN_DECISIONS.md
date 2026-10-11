@@ -13275,3 +13275,111 @@ owner could write the installation-wide catalogue, and that the server's `?retur
 `build`; `secure/management/config/oauth-providers.json.example`; the OAuth providers page and the
 builds page. Behaviour: ADMIN_PANEL.md §9.5 *Tier 4 — OAuth*, ARCHITECTURE.md §11, and the `help`
 entries of the two commands.
+
+### Every insert next to or into a node follows one rule, every root of a snippet lands, and a raw text stays as written (locked 2026-10-10)
+
+**Extends**: *One rule inserts at a structure's root, a backup is whole or not kept, and every write
+that adds a copy is checked against the storage quota* (locked 2026-10-04), whose root insert now has
+its twin for before, after and inside a node.
+
+**Decision**: three changes, made together.
+
+- **One positional insert.** `NodeNavigator::insertAt()`, beside `insertAtRoot()`, is the before /
+  after / inside insert of `addNode`, `addComplexElement`, `addComponentToNode`, `insertSnippet`,
+  `duplicateNode` and `editStructure`'s `insertBefore` / `insertAfter`. Before or after makes the new
+  node the target's sibling, just before or just after it; inside makes it the target's first child.
+  A target that cannot hold children (a component call, a text node) is refused, as such a root is.
+  Each command keeps its own answers; after a refusal's prefix, the sentence is the insert's own.
+  `addComponentToNode` with `inside` now puts the component inside the node, and refuses a text node
+  as `addNode` does; `insertSnippet` refuses inside a component call or a text node.
+- **Every root of a snippet lands**, in order, at the position asked. The answer's `newNodeId` names
+  the first root, `newNodeIds` every one, and `html` holds every root's HTML in order. The visual
+  editor reloads its preview when more than one root landed: its live insert places one element.
+- **A raw or literal value stays as written.** A value starting with `__RAW__` or `__LIT__`, in a
+  text node, a translatable attribute or a component's text variable, is copied by `insertSnippet`
+  and `duplicateNode` as it is: no new key, no translation, no item number. Every new key gets its
+  own translation, so a key a snippet uses twice reaches both copies.
+
+**Reasoning**: three positional inserts had drifted apart. One had no inside at all, so a component
+added inside a node was saved before it while the editor showed it inside until a reload; one wrote
+`children` into a text node or a component call, answered 200, and no page ever showed the insert;
+they disagreed on how a component's root is found. The root insert had already become one rule; the
+positional insert completes it, and one rule makes several roots simple: each root inserted at the
+same place, last one first, leaves them in order.
+
+A snippet saved through the API can hold a list of nodes. The insert took the first and dropped the
+others without a word.
+
+The renderer and the compiler show a `__RAW__` / `__LIT__` value verbatim. A copy that turned it
+into a key showed the key's prettified name instead (a UX run inserted a saved paragraph and the
+page read "RAW Changed Text"), or a missing translation after a duplicate. The editor's own copy of a
+node for a new component already kept such a value as it is.
+
+**Alternatives considered**: keeping the three inserts and fixing each (rejected: the drift is how an
+inside became a before); keeping each command's exact inner error sentence (rejected: three wordings
+kept alive for paths only a missing target reaches); wrapping several roots in a container (rejected:
+it adds an element the author did not make); an empty `html` for several roots, so the editor needs
+no change (rejected: the answer would leave out what was inserted); a translation key per root
+(rejected: the running item number already keeps every key unique).
+
+**Source**: design rounds 2026-10-04 to 2026-10-10 during beta.12 (Sangio), after an audit counted
+the inserts and a UX run showed "RAW Changed Text". Code: `secure/src/classes/NodeNavigator.php`,
+`secure/src/functions/utilsManagement.php` (`qs_is_literal_text()`), the commands `addNode`,
+`addComplexElement`, `addComponentToNode`, `insertSnippet`, `duplicateNode`, `editStructure`, and
+the visual editor's snippet insert. Behaviour: the `help` entries of those commands.
+
+### Every command checks a page name and a component name by one rule each, and a request value that is not UTF-8 is refused wherever it arrives (locked 2026-10-10)
+
+**Extends**: *A page is named by its route path everywhere, …* (locked 2026-10-08), whose page-name
+rule now holds for every command that takes a page name and whose UTF-8 answer now covers the query
+string and a form body; *A component reference is a name, not a path* (locked 2026-09-01), whose
+rule now also names the component a command is given.
+
+**Decision**: three changes, made together.
+
+- **One page-name rule, every page command.** `qs_page_name_refusal()` is asked by every command
+  that takes a page name: the node, component and interaction commands, `insertSnippet`,
+  `importStructureTranslations`, `addPageEvent`, `editPageEvent`, `getPageEvents` and
+  `setStateStores`, beside `getStructure`, `editStructure` and `editTitle`. A name that is not a
+  string is answered `400 validation.invalid_type` (a number is read as its string form).
+  `deletePageEvent` and `getStateStores` read stored keys and are left as they are, so what a deleted
+  route left behind stays removable.
+- **One component-name rule.** `qs_component_name_refusal()` applies the reference rule (a letter,
+  then letters, digits, hyphens and underscores, up to 64 characters) wherever a command builds a
+  component's file from a name it was given: the node, component and interaction commands,
+  `insertSnippet`, `getStructure`, `editStructure`, `duplicateComponent` and `renameComponent`. A name
+  holding `..`, a slash, a backslash or a NUL byte is answered `400 validation.invalid_format` with the
+  reason `path_traversal_attempt`, any other name outside the rule with `invalid_component_reference`.
+- **A request value that is not UTF-8 is refused wherever it arrives**: a key or a value of the
+  query string or of a form-encoded body, at any depth, as a segment of the address already was.
+  One check answers `400 validation.invalid_format` before any command runs.
+
+**Reasoning**: thirteen commands built a component's file from the caller's name with no check at
+all, so a member allowed to edit one project's structures could name a file of another project and
+write into it (observed on throwaway projects: a command on one changed the other's page). The two
+copies of a check that did exist already disagreed with each other; a third rule named components
+when a page placed them, and a fourth refused underscores in a new name. A component could be saved
+under a name no page could use. One rule, the one the renderer and the compiler enforce, makes saving
+and placing agree. The rule cannot meet the `:slug` → `__slug` page folders: components live in a
+folder of their own, and no literal route segment holds an underscore.
+
+The page commands checked their page each in its own way, most only by looking for its file, so a
+malformed name was a 404 for one and a 400 for another, and a page file with no route was edited by
+one command and refused by the next.
+
+A command that repeats a value in its answer cannot encode bytes that are not UTF-8, and answered
+500. The address's segments were already checked; the query string and a form body arrive beside
+them, and one check for all three keeps the next input source from being forgotten.
+
+**Alternatives considered**: lifting `editStructure`'s own rule (any first character, up to 200)
+into the helper (rejected: it keeps a component the editor can save and a page cannot place);
+loosening the reference rule to match it (rejected: the reference rule is the read gate of the
+renderer and the compiler, locked on its own); moving `deletePageEvent` and `getStateStores` onto
+the page-name rule (rejected: a leftover of a deleted route could no longer be removed); a UTF-8 check
+in each command that reads the query (rejected: the next command would be the one that forgot it).
+
+**Source**: design rounds 2026-10-08 to 2026-10-10 during beta.12 (Sangio), from the audit of the
+page-name rule and of the API's UTF-8 answer, and a containment gap found while reading the commands.
+Code: `secure/src/functions/utilsManagement.php` (`qs_page_name_refusal()`,
+`qs_component_name_refusal()`), `secure/src/classes/TrimParametersManagement.php`, and the commands
+named above. Behaviour: COMMAND_API.md (*Endpoint*) and the `help` entries of those commands.

@@ -126,6 +126,11 @@ function __command_deleteProject(array $params = [], array $urlParams = []): Api
     // (qs_delete_tree continues past failures by design).
     $removal = qs_delete_tree($projectPath, ['config', 'config.php', 'routes.php']);
 
+    // The project's cached space measurement goes too, however much of the tree was
+    // removed: a project made or imported later under the same name measures itself.
+    require_once SECURE_FOLDER_PATH . '/src/functions/spaceUsage.php';
+    qs_invalidate_space_cache($projectName);
+
     if (!$removal['ok']) {
         // No `path` => the absolute project directory. The central scrub in
         // ApiResponse would render it "secure/projects/<id>", but the id is

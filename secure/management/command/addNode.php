@@ -237,12 +237,22 @@ function __command_addNode(array $params = [], array $urlParams = []): ApiRespon
 
     // Load structure file
     if ($type === 'page') {
+        // The one page-name rule every command shares (qs_page_name_refusal()).
+        $refusal = qs_page_name_refusal($name);
+        if ($refusal !== null) {
+            return $refusal;
+        }
         $json_file = resolvePageJsonPath($name);
         if ($json_file === null) {
             return ApiResponse::create(404, 'route.not_found')
                 ->withMessage("Page '{$name}' does not exist");
         }
     } elseif ($type === 'component') {
+        // The one component-name rule every command shares (qs_component_name_refusal()).
+        $refusal = qs_component_name_refusal($name);
+        if ($refusal !== null) {
+            return $refusal;
+        }
         $json_file = PROJECT_PATH . '/templates/model/json/components/' . $name . '.json';
     } else {
         $json_file = PROJECT_PATH . '/templates/model/json/' . $type . '.json';
@@ -339,8 +349,10 @@ function __command_addNode(array $params = [], array $urlParams = []): ApiRespon
         // child (NodeNavigator::insertAtRoot, the rule every root insert shares).
         $insertResult = NodeNavigator::insertAtRoot($structure, $newNode, $movedTextKeys);
     } else {
-        $targetIndices = array_map('intval', explode('.', $targetNodeId));
-        $insertResult = insertNodeIntoStructure_addNode($structure, $targetIndices, $newNode, $position, $movedTextKeys);
+        // Before / after / inside the target (NodeNavigator::insertAt, the rule every
+        // positional insert shares); inside, the target's text children move into the
+        // new node first.
+        $insertResult = NodeNavigator::insertAt($structure, $targetNodeId, $newNode, $position, $movedTextKeys);
     }
     
     if (!$insertResult['success']) {
@@ -418,124 +430,6 @@ function __command_addNode(array $params = [], array $urlParams = []): ApiRespon
     return ApiResponse::create(200, 'operation.success')
         ->withMessage('Node added successfully')
         ->withData($responseData);
-}
-
-// =============================================================================
-// STRUCTURE MANIPULATION
-// =============================================================================
-
-function insertNodeIntoStructure_addNode(array $structure, array $targetIndices, array $newNode, string $position, array $textKeyIndicesToMove = []): array {
-    if (empty($targetIndices)) {
-        return ['success' => false, 'error' => 'Empty target indices'];
-    }
-    
-    // Detect if root is a single object (component) or array of nodes (page)
-    $isRootObject = isset($structure['tag']);
-    
-    if ($position === 'inside') {
-        $ref = &$structure;
-        for ($i = 0; $i < count($targetIndices); $i++) {
-            $index = $targetIndices[$i];
-            
-            // For root object (component), first index accesses children directly
-            if ($isRootObject && $i === 0) {
-                if (!isset($ref['children'][$index])) {
-                    return ['success' => false, 'error' => "Node not found at index {$index}"];
-                }
-                $ref = &$ref['children'][$index];
-                if ($i < count($targetIndices) - 1) {
-                    if (!isset($ref['children'])) {
-                        return ['success' => false, 'error' => 'Parent node has no children array'];
-                    }
-                    $ref = &$ref['children'];
-                }
-            } else {
-                if (!isset($ref[$index])) {
-                    return ['success' => false, 'error' => "Node not found at index {$index}"];
-                }
-                $ref = &$ref[$index];
-                if ($i < count($targetIndices) - 1) {
-                    if (!isset($ref['children'])) {
-                        return ['success' => false, 'error' => 'Parent node has no children array'];
-                    }
-                    $ref = &$ref['children'];
-                }
-            }
-        }
-        
-        if (!isset($ref['children'])) $ref['children'] = [];
-        
-        // Move textKey children into new node (prepend to existing children)
-        if (!empty($textKeyIndicesToMove) && isset($newNode['children'])) {
-            rsort($textKeyIndicesToMove);
-            $movedChildren = [];
-            foreach ($textKeyIndicesToMove as $idx) {
-                if (isset($ref['children'][$idx])) {
-                    array_unshift($movedChildren, $ref['children'][$idx]);
-                    array_splice($ref['children'], $idx, 1);
-                }
-            }
-            // Prepend moved children to existing children (which may include auto-generated textKey)
-            $newNode['children'] = array_merge($movedChildren, $newNode['children']);
-        }
-        
-        array_unshift($ref['children'], $newNode);
-        $newNodeId = implode('.', $targetIndices) . '.0';
-        
-        return ['success' => true, 'structure' => $structure, 'newNodeId' => $newNodeId];
-    }
-    
-    // Before/after: insert as sibling
-    $parentPath = array_slice($targetIndices, 0, -1);
-    $targetIndex = end($targetIndices);
-    
-    $ref = &$structure;
-    
-    // For root object with empty parent path, we insert into children array
-    if ($isRootObject && empty($parentPath)) {
-        if (!isset($ref['children'][$targetIndex])) {
-            return ['success' => false, 'error' => "Target node not found at index {$targetIndex}"];
-        }
-        
-        $insertIndex = ($position === 'before') ? $targetIndex : $targetIndex + 1;
-        array_splice($ref['children'], $insertIndex, 0, [$newNode]);
-        
-        $newNodeId = (string)$insertIndex;
-        return ['success' => true, 'structure' => $structure, 'newNodeId' => $newNodeId];
-    }
-    
-    for ($i = 0; $i < count($parentPath); $i++) {
-        $index = $parentPath[$i];
-        
-        // For root object (component), first index accesses children directly
-        if ($isRootObject && $i === 0) {
-            if (!isset($ref['children'][$index])) {
-                return ['success' => false, 'error' => "Parent node not found at index {$index}"];
-            }
-            $ref = &$ref['children'][$index];
-        } else {
-            if (!isset($ref[$index])) {
-                return ['success' => false, 'error' => "Parent node not found at index {$index}"];
-            }
-            $ref = &$ref[$index];
-        }
-        
-        if (!isset($ref['children'])) {
-            return ['success' => false, 'error' => 'Parent node has no children array'];
-        }
-        $ref = &$ref['children'];
-    }
-    
-    if (!isset($ref[$targetIndex])) {
-        return ['success' => false, 'error' => "Target node not found at index {$targetIndex}"];
-    }
-    
-    $insertIndex = ($position === 'before') ? $targetIndex : $targetIndex + 1;
-    array_splice($ref, $insertIndex, 0, [$newNode]);
-    
-    $newNodeId = empty($parentPath) ? (string)$insertIndex : implode('.', $parentPath) . '.' . $insertIndex;
-    
-    return ['success' => true, 'structure' => $structure, 'newNodeId' => $newNodeId];
 }
 
 // =============================================================================

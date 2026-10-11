@@ -9,7 +9,8 @@
  * 
  * Creates a deep copy of a node and all its children, generating new
  * translation keys for all textKey and translatable attributes (alt, title, etc).
- * Optionally copies translation values from the source to the new keys.
+ * Optionally copies translation values from the source to the new keys. A raw or
+ * literal value (`__RAW__` / `__LIT__`) is copied as it is: it is no key.
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
@@ -161,8 +162,9 @@ function processNodeTranslationKeys(
     bool $copyValues,
     array &$keyMappings
 ): array {
-    // Process textKey
-    if (isset($node['textKey']) && is_string($node['textKey'])) {
+    // Process textKey. A raw or literal text is copied as written: no key is made for it
+    // and nothing is translated (qs_is_literal_text()).
+    if (isset($node['textKey']) && is_string($node['textKey']) && !qs_is_literal_text($node['textKey'])) {
         $oldKey = $node['textKey'];
         $newKey = generateNextTextKey($prefix, $existingKeys);
         $node['textKey'] = $newKey;
@@ -177,7 +179,8 @@ function processNodeTranslationKeys(
     // Process translatable attributes in params
     if (isset($node['params']) && is_array($node['params'])) {
         foreach (DUPLICATE_TRANSLATABLE_ATTRS as $attr) {
-            if (isset($node['params'][$attr]) && is_string($node['params'][$attr])) {
+            if (isset($node['params'][$attr]) && is_string($node['params'][$attr])
+                && !qs_is_literal_text($node['params'][$attr])) {
                 $oldKey = $node['params'][$attr];
                 // Only process if it looks like a translation key (has dots, not a URL)
                 if (strpos($oldKey, '.') !== false && !preg_match('/^https?:/', $oldKey)) {
@@ -266,14 +269,23 @@ function __command_duplicateNode(array $params = [], array $urlParams = []): Api
             ->withErrors([RegexPatterns::validationError('node_id', 'nodeId', $nodeId)]);
     }
     
-    // Build file path
+    // Build file path: a page by the one page-name rule, a component by the one
+    // component-name rule.
     if ($type === 'page') {
+        $refusal = qs_page_name_refusal($name);
+        if ($refusal !== null) {
+            return $refusal;
+        }
         $json_file = resolvePageJsonPath($name);
         if ($json_file === null) {
             return ApiResponse::create(404, 'route.not_found')
                 ->withMessage("Page '{$name}' does not exist");
         }
     } elseif ($type === 'component') {
+        $refusal = qs_component_name_refusal($name);
+        if ($refusal !== null) {
+            return $refusal;
+        }
         $json_file = PROJECT_PATH . '/templates/model/json/components/' . $name . '.json';
     } else {
         $json_file = PROJECT_PATH . '/templates/model/json/' . $type . '.json';
@@ -406,8 +418,9 @@ function __command_duplicateNode(array $params = [], array $urlParams = []): Api
         $keyMappings
     );
     
-    // Insert the processed node after the source
-    $insertResult = NodeNavigator::insertNode($structure, $nodeId, $processedNode, 'after');
+    // Insert the processed node after the source (NodeNavigator::insertAt, the rule
+    // every positional insert shares)
+    $insertResult = NodeNavigator::insertAt($structure, (string) $nodeId, $processedNode, 'after');
     
     if (!$insertResult['success']) {
         return ApiResponse::create(400, 'operation.failed')
@@ -439,11 +452,7 @@ function __command_duplicateNode(array $params = [], array $urlParams = []): Api
             ->withMessage("Failed to write structure file");
     }
     
-    // Calculate new node ID using the actual insertion index
-    $parts = explode('.', $nodeId);
-    array_pop($parts); // Remove the original index
-    $parts[] = (string)$insertResult['insertedAt']; // Use the actual inserted index
-    $newNodeId = implode('.', $parts);
+    $newNodeId = $insertResult['newNodeId'];
     
     // Render HTML for live DOM update
     $renderedHtml = '';

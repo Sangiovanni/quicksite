@@ -71,16 +71,8 @@ function __command_listSnippets(array $params = [], array $urlParams = []): ApiR
     // Sort categories
     ksort($byCategory);
     
-    // Category display names
-    $categoryNames = [
-        'nav' => 'Navigation',
-        'forms' => 'Forms',
-        'cards' => 'Cards',
-        'layouts' => 'Layouts',
-        'content' => 'Content',
-        'lists' => 'Lists',
-        'other' => 'Other'
-    ];
+    // Category display names (SNIPPET_CATEGORIES, the one list)
+    $categoryNames = SNIPPET_CATEGORIES;
     
     return ApiResponse::create(200, 'snippets.list_success')
         ->withMessage('Found ' . count($allSnippets) . ' snippet(s)')

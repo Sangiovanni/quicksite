@@ -153,13 +153,13 @@
         <div class="preview-contextual-form__field">
             <label for="save-snippet-category"><?= __admin('preview.snippetCategory') ?? 'Category' ?></label>
             <select id="save-snippet-category" class="admin-input admin-input--sm">
-                <option value="other"><?= __admin('preview.snippetCategoryOther') ?? 'Other' ?></option>
-                <option value="nav"><?= __admin('preview.snippetCategoryNav') ?? 'Navigation' ?></option>
-                <option value="forms"><?= __admin('preview.snippetCategoryForms') ?? 'Forms' ?></option>
-                <option value="cards"><?= __admin('preview.snippetCategoryCards') ?? 'Cards' ?></option>
-                <option value="layouts"><?= __admin('preview.snippetCategoryLayouts') ?? 'Layouts' ?></option>
-                <option value="content"><?= __admin('preview.snippetCategoryContent') ?? 'Content' ?></option>
-                <option value="lists"><?= __admin('preview.snippetCategoryLists') ?? 'Lists' ?></option>
+                <?php
+                // The snippet categories (qs_snippet_categories(), the one list), the default first.
+                require_once SECURE_FOLDER_PATH . '/src/functions/SnippetManagement.php';
+                foreach (array_unique(array_merge([SNIPPET_DEFAULT_CATEGORY], qs_snippet_categories())) as $qsSnippetCategory):
+                ?>
+                <option value="<?= htmlspecialchars($qsSnippetCategory, ENT_QUOTES) ?>"><?= htmlspecialchars(__admin('preview.snippetCategory' . ucfirst($qsSnippetCategory), SNIPPET_CATEGORIES[$qsSnippetCategory]), ENT_QUOTES) ?></option>
+                <?php endforeach; ?>
             </select>
         </div>
         

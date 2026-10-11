@@ -426,43 +426,11 @@ if ($type === 'page' || $type === 'component') {
             $refusal->send();
         }
     } else {
-        // Length validation - max 200 characters
-        if (strlen($name) > 200) {
-            ApiResponse::create(400, 'validation.invalid_length')
-                ->withMessage("The name parameter must not exceed 200 characters.")
-                ->withErrors([
-                    ['field' => 'name', 'value' => $name, 'max_length' => 200]
-                ])
-                ->send();
-        }
-
-        // Check for path traversal attempts in name
-        if (strpos($name, '..') !== false ||
-            strpos($name, '\\') !== false ||
-            strpos($name, "\0") !== false) {
-            ApiResponse::create(400, 'validation.invalid_format')
-                ->withMessage('Name contains invalid path characters')
-                ->withErrors([
-                    ['field' => 'name', 'reason' => 'path_traversal_attempt']
-                ])
-                ->send();
-        }
-
-        // A component name is one segment: no slashes at all
-        if (strpos($name, '/') !== false) {
-            ApiResponse::create(400, 'validation.invalid_format')
-                ->withMessage('Component name cannot contain slashes')
-                ->withErrors([
-                    ['field' => 'name', 'reason' => 'invalid_character']
-                ])
-                ->send();
-        }
-
-        if (!RegexPatterns::match('identifier_alphanum', $name)) {
-            ApiResponse::create(400, 'validation.invalid_format')
-                ->withMessage("Invalid segment '$name'. Use only alphanumeric, hyphens, and underscores")
-                ->withErrors([RegexPatterns::validationError('identifier_alphanum', 'name', $name)])
-                ->send();
+        // The one component-name rule every command shares: the name a page places a
+        // component by, so a component saved here is one a page can use.
+        $refusal = qs_component_name_refusal($name);
+        if ($refusal !== null) {
+            $refusal->send();
         }
     }
 
@@ -609,13 +577,16 @@ if ($nodeId !== null) {
             break;
             
         case 'insertBefore':
-            $result = NodeNavigator::insertNode($existingStructure, $nodeId, $structure, 'before');
-            $result['action'] = 'inserted';
-            break;
-            
         case 'insertAfter':
-            $result = NodeNavigator::insertNode($existingStructure, $nodeId, $structure, 'after');
+            // NodeNavigator::insertAt, the rule every positional insert shares.
+            $result = NodeNavigator::insertAt($existingStructure, (string) $nodeId, $structure,
+                $action === 'insertBefore' ? 'before' : 'after');
             $result['action'] = 'inserted';
+            if ($result['success']) {
+                // The new node's index among its siblings, which the answer reports.
+                $newIdParts = explode('.', $result['newNodeId']);
+                $result['insertedAt'] = (int) end($newIdParts);
+            }
             break;
     }
     

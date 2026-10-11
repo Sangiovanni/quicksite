@@ -359,7 +359,10 @@ const ENUM_VALUES = {
     // the boolean renderer uses for 'true'/'false'.
     pageEvent: [
         { value: 'onload' }, { value: 'onresize' }, { value: 'onscroll' }
-    ]
+    ],
+    // The snippet categories, NOT a copy: command-form.php writes the server's one
+    // list (qs_snippet_categories()) with its translated names.
+    snippetCategory: (window.QS_SNIPPET_CATEGORIES || []).map(c => ({ value: c.value, label: c.label }))
 };
 
 // The sentinel value a pick-or-type field's "type your own" entry carries.
@@ -496,6 +499,8 @@ const FIELD_PICKERS = {
     // ⚠ user snippets only: "Core snippets cannot be deleted", so offering one
     // would offer a choice the command refuses.
     deleteSnippet:    { kind: 'snippet', param: 'id', userOnly: true },
+    // The category is one of a fixed set the server keeps; "default other".
+    createSnippet:    { kind: 'enum', param: 'category', values: 'snippetCategory', defaultValue: 'other' },
 
     // --- Language: the languages the project ALREADY HAS -------------------
     setStorageDescLang: { kind: 'select', param: 'lang', source: 'languages' },
@@ -999,7 +1004,7 @@ function _initEnumSelect(form, cfg) {
         select,
         (ENUM_VALUES[cfg.values] || []).map(v => ({
             value: v.value,
-            label: v.labelKey ? t(v.labelKey) : v.value
+            label: v.label || (v.labelKey ? t(v.labelKey) : v.value)
         })),
         t('commandForm.field.selectPlaceholder'));
 

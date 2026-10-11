@@ -587,23 +587,17 @@ Content shown for single-language workflows.
 **Loop sources:**
 - `data.xxx` — any data from `dataRequirements`
 - Bare names — checked in `fetchedData`
-- `commands` — superseded by the partial form, see below
+- `commands` — each command the workflow's `relatedCommands` lists, keyed by its name, its `help` entry as the value
 
 **Loop variables:**
 - `{{@key}}` — current key (index for arrays, key for objects)
 - `{{this}}` — current value (formatted)
 - `{{this.field}}` — access object property
 
-**Superseded form:**
+A command's documentation is written with the partial form (*Pass 0.5*), not with a loop:
 
 ```markdown
-{{#each commands}}{{formatCommand @key this}}{{/each}}   <!-- deprecated -->
-```
-
-Use the partial form instead:
-
-```markdown
-{{> command.$relatedCommands}}                            <!-- canonical -->
+{{> command.$relatedCommands}}
 ```
 
 or for inline insertion of a single command's docs interleaved with prose:
@@ -618,7 +612,7 @@ Then wire styles:
 {{> command.editStyles}}
 ```
 
-The partial form routes to `formatCommandFull()` which produces cleaner markdown (description, method, parameters with types, one fenced example). The `{{formatCommand}}` helper still works, but emits an HTML comment marking it deprecated into the rendered prompt and writes a notice to the server's PHP error log.
+The partial form routes to `formatCommandFull()`, which writes the description, the method, the parameters with their types and one fenced example.
 
 ### Pass 3: JSON Export — `{{json}}`
 
@@ -672,7 +666,7 @@ Fallback: checks `$fetchedData[key]`. Unknown placeholders are left as-is.
 2. **Show the expected format** — `[{ "command": "...", "params": {...} }]`
 3. **Use conditionals** for branches (multilingual vs single-language)
 4. **Include current state** via `{{json dataId}}` so the AI knows what exists
-5. **Show command docs** via `{{> command.$relatedCommands}}` (the `{{#each commands}}{{formatCommand @key this}}{{/each}}` form is deprecated)
+5. **Show command docs** via `{{> command.$relatedCommands}}`
 6. **Be explicit about order** — AI needs to know command dependency order
 7. **Add examples** — concrete JSON examples help AI accuracy dramatically
 

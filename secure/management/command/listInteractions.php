@@ -101,17 +101,21 @@ function __command_listInteractions(array $params = [], array $urlParams = []): 
         $pageName = implode('/', array_slice($urlParams, 1, $tailIdx - 1));
         $nodeId = $urlParams[$tailIdx];
         
-        // Validate page exists
-        $specialPages = ['404', '500', '403', '401'];
-        if (!routeExists($pageName, ROUTES) && !in_array($pageName, $specialPages, true)) {
-            return ApiResponse::create(404, 'route.not_found')
-                ->withMessage("Page '{$pageName}' does not exist");
+        // The one page-name rule every command shares (qs_page_name_refusal()).
+        $refusal = qs_page_name_refusal($pageName, 'pageName');
+        if ($refusal !== null) {
+            return $refusal;
         }
         
     } elseif ($structType === 'component') {
         // First segment is component name
         $componentName = $urlParams[1];
         $pageName = $componentName; // Reuse variable for consistency
+        // The one component-name rule every command shares (qs_component_name_refusal()).
+        $refusal = qs_component_name_refusal($componentName, 'componentName');
+        if ($refusal !== null) {
+            return $refusal;
+        }
         
         // Remaining segments form the nodeId
         if (!isset($urlParams[2])) {

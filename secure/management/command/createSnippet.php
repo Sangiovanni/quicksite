@@ -8,7 +8,7 @@
  * @permission edit
  * @param string $id Required - Unique snippet ID
  * @param string $name Required - Display name
- * @param string $category Optional - Category (nav, forms, cards, layouts, content, lists, other)
+ * @param string $category Optional - Category: one of qs_snippet_categories() (default other)
  * @param string $description Optional - Description text
  * @param object $structure Required - Structure JSON (like components)
  * @param object $translations Optional - Translation keys by language
@@ -39,7 +39,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 function __command_createSnippet(array $params = [], array $urlParams = []): ApiResponse {
     $snippetId = $params['id'] ?? null;
     $name = $params['name'] ?? null;
-    $category = $params['category'] ?? 'other';
+    $category = $params['category'] ?? SNIPPET_DEFAULT_CATEGORY;
     $description = $params['description'] ?? '';
     $structure = $params['structure'] ?? null;
     $translations = $params['translations'] ?? [];
@@ -89,10 +89,11 @@ function __command_createSnippet(array $params = [], array $urlParams = []): Api
             ->withMessage('Snippet ID must start with a letter and contain only letters, numbers, dashes, and underscores');
     }
     
-    // Validate category
-    $validCategories = ['nav', 'forms', 'cards', 'layouts', 'content', 'lists', 'other'];
-    if (!in_array($category, $validCategories)) {
-        $category = 'other';
+    // One of the snippet categories (qs_snippet_categories()); an unknown one is refused, not
+    // saved under another name.
+    $categoryRefusal = qs_snippet_category_refusal($category);
+    if ($categoryRefusal !== null) {
+        return $categoryRefusal;
     }
 
     // SECURITY (the write side): the structure arrives verbatim

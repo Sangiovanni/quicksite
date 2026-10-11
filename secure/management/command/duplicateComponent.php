@@ -39,21 +39,11 @@ function __command_duplicateComponent(array $params = [], array $urlParams = [])
             ->withData(['missing' => 'name']);
     }
     
-    // Validate names don't contain path characters (/, \, or ..). On Windows a
-    // backslash is a separator, so a /-only check would let `source=..\..\x` traverse
-    // out of the components/ dir.
-    if (strpos($sourceName, '/') !== false || strpos($newName, '/') !== false ||
-        strpos($sourceName, '\\') !== false || strpos($newName, '\\') !== false ||
-        strpos($sourceName, '..') !== false || strpos($newName, '..') !== false) {
-        return ApiResponse::create(400, 'validation.invalid_format')
-            ->withMessage('Component names cannot contain path separators');
-    }
-    
-    // Validate new name format (alphanumeric with hyphens)
-    if (!preg_match('/^[a-zA-Z][a-zA-Z0-9-]*$/D', $newName)) {
-        return ApiResponse::create(400, 'validation.invalid_format')
-            ->withMessage('Component name must start with a letter and contain only letters, numbers, and hyphens')
-            ->withData(['invalid' => $newName]);
+    // The one component-name rule every command shares (qs_component_name_refusal()):
+    // each name is one name, never a path, and the new one is a name a page can place.
+    $refusal = qs_component_name_refusal($sourceName, 'source') ?? qs_component_name_refusal($newName, 'name');
+    if ($refusal !== null) {
+        return $refusal;
     }
     
     $componentsDir = PROJECT_PATH . '/templates/model/json/components';

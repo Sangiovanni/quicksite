@@ -7462,8 +7462,11 @@
                 if (addIdInput) addIdInput.focus();
             });
             if (!keptOpen) {
-                // Live DOM update if HTML returned (auto-selects the new node).
-                if (data.html && targetNode) {
+                // Live DOM update if HTML returned (auto-selects the new node). An add
+                // inside an element holding text moves that text into the new element
+                // (movedTextKeyChildren); the live insert places one element and would
+                // leave the moved text where it was, so the preview reloads instead.
+                if (data.html && targetNode && !(data.movedTextKeyChildren > 0)) {
                     sendToIframe('insertNode', {
                         struct: targetStruct,
                         targetNode: targetNode,
@@ -7694,11 +7697,14 @@
             showToast((PreviewConfig.i18n.snippetAdded || 'Snippet added') + translationsMsg, 'success');
             hideSidebarAddForm();
             
+            // The live insert places one element; a snippet with several roots reloads.
+            const severalRoots = Array.isArray(data.newNodeIds) && data.newNodeIds.length > 1;
+
             // If CSS was injected, force full reload so the iframe picks up the new stylesheet
             if (cssWasInjected) {
                 console.log('[Preview] CSS was injected, forcing full reload.');
                 reloadPreview();
-            } else if (data.html && targetNode) {
+            } else if (data.html && targetNode && !severalRoots) {
                 console.log('[Preview] Live DOM insert snippet:', { struct: targetStruct, targetNode, position, newNodeId: data.newNodeId });
                 sendToIframe('insertNode', {
                     struct: targetStruct,

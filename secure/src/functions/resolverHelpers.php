@@ -188,21 +188,6 @@ function getResolverForRoute(string $routePath): ?array {
     return empty($configs) ? null : $configs[0];
 }
 
-/**
- * Backward-compat single-resolver setter — REPLACES the entire entry
- * with the single config (or clears with null). Multi-resolver entries
- * are clobbered to a single resolver if called.
- *
- * @deprecated prefer setResolversForRoute. Kept for
- *             backward compatibility.
- */
-function setResolverForRoute(string $routePath, ?array $config): bool {
-    if ($config === null) {
-        return setResolversForRoute($routePath, null);
-    }
-    return setResolversForRoute($routePath, [$config]);
-}
-
 function deleteResolverForRoute(string $routePath): bool {
     return setResolversForRoute($routePath, null);
 }

@@ -32,11 +32,11 @@ function __command_getPageEvents(array $params = [], array $urlParams = []): Api
             ->withMessage('Missing required parameter: pageName');
     }
     
-    // Validate page exists
-    $specialPages = ['404', '500', '403', '401'];
-    if (!routeExists($pageName, ROUTES) && !in_array($pageName, $specialPages, true)) {
-        return ApiResponse::create(404, 'route.not_found')
-            ->withMessage("Page '{$pageName}' does not exist");
+    // The one page-name rule every command shares (qs_page_name_refusal()): a route of the
+    // project or a special page.
+    $refusal = qs_page_name_refusal($pageName, 'pageName');
+    if ($refusal !== null) {
+        return $refusal;
     }
     
     // Load page events file

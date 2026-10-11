@@ -1420,7 +1420,6 @@ class WorkflowManager {
      * Supports:
      * - {{#each data.xxx}} — iterate over fetchedData[xxx]
      * - {{#each commands}} — iterate over built commands context
-     * - {{formatCommand @key this}} — format command help as markdown
      * - {{@key}}, {{this}}, {{this.field}} — standard loop variables
      */
     private function processEachLoops(string $template, array $fetchedData, array $commandsContext = []): string {
@@ -1451,12 +1450,7 @@ class WorkflowManager {
             
             foreach ($items as $key => $item) {
                 $itemOutput = $loopContent;
-                
-                // Replace {{formatCommand @key this}} — special helper
-                $itemOutput = preg_replace_callback('/\{\{formatCommand\s+@key\s+this\}\}/', function() use ($key, $item) {
-                    return $this->formatCommand($key, is_array($item) ? $item : []);
-                }, $itemOutput);
-                
+
                 // Replace {{@key}}
                 $itemOutput = str_replace('{{@key}}', (string)$key, $itemOutput);
                 
@@ -1642,31 +1636,6 @@ class WorkflowManager {
      */
     public function isAiWorkflow(array $workflow): bool {
         return isset($workflow['promptTemplate']);
-    }
-    
-    /**
-     * Format helper for commands in prompt.
-     *
-     * @deprecated Since 1.0.0-beta.7. Use {{> command.X}} or {{> command.$relatedCommands}} in
-     *             workflow templates instead. The new partial syntax routes to formatCommandFull()
-     *             which produces cleaner markdown. This helper remains for back-compat with custom
-     *             workflows that have not yet migrated; the rendered prompt now carries an HTML
-     *             comment marking it deprecated so reviewers spot it.
-     * @see formatCommandFull()
-     */
-    public function formatCommand(string $command, array $params): string {
-        error_log("[WorkflowManager] DEPRECATED: formatCommand('$command') called — migrate template to {{> command.$command}}");
-        $parts = [
-            "<!-- DEPRECATED: replace {{formatCommand}} with {{> command.{$command}}} — see docs/WORKFLOW_SYSTEM.md -->",
-            "### **{$command}**",
-        ];
-        foreach ($params as $key => $value) {
-            $formattedValue = is_array($value) 
-                ? json_encode($value, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
-                : (string)$value;
-            $parts[] = "- **{$key}**: {$formattedValue}";
-        }
-        return implode("\n", $parts);
     }
     
     /**

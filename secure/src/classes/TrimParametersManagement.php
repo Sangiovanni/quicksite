@@ -25,18 +25,14 @@ class TrimParametersManagement{
     // any param route. (Note: $_GET is auto-decoded by PHP, so query-string
     // params don't need this — only the path segments do.)
     $parts = array_map('rawurldecode', $parts);
-    // A segment that is not valid UTF-8 is a malformed request, answered 400 here,
+    // A value that is not valid UTF-8 is a malformed request, answered 400 here,
     // before any command reads it: a command that names the value in its answer
-    // could not encode it and would answer 500 instead. (The site's router answers
-    // the same bytes in a page address 404: a page that does not exist.)
-    foreach ($parts as $part) {
-      if (preg_match('//u', $part) !== 1) {
-        require_once __DIR__ . '/ApiResponse.php';
-        ApiResponse::create(400, 'validation.invalid_format')
-          ->withMessage('A segment of the address is not valid UTF-8')
-          ->send();
-      }
-    }
+    // could not encode it and would answer 500 instead. One check reads every part
+    // a value arrives in: the address's segments, the query string and a form body
+    // (refuseNonUtf8()). (The site's router answers the same bytes in a page address
+    // 404: a page that does not exist. A JSON body cannot carry them: json_decode()
+    // refuses it.)
+    self::refuseNonUtf8($parts, 'A segment of the address is not valid UTF-8');
     //shift management folder
     array_shift($parts);
     // Peel the optional project marker: '/management/p/<projectId>/<command>'.
@@ -57,11 +53,13 @@ class TrimParametersManagement{
 
     // Start with GET parameters (query string)
     if (!empty($_GET)) {
+        self::refuseNonUtf8($_GET, 'A value of the query string is not valid UTF-8');
         $this->params = $_GET;
     }
 
     // Check for standard POST data (form-urlencoded) - overrides GET
     if (!empty($_POST)) {
+        self::refuseNonUtf8($_POST, 'A value of the request body is not valid UTF-8');
         $this->params = array_merge($this->params, $_POST);
     }
     else{
@@ -77,6 +75,36 @@ class TrimParametersManagement{
           $this->params = array_merge($this->params, $data);
       }
     }
+  }
+
+  /**
+   * Answer 400 when a string in $values, a key or a value at any depth, is not valid
+   * UTF-8. $message names the part of the request it came in.
+   */
+  private static function refuseNonUtf8(array $values, string $message): void {
+    if (self::isUtf8($values)) {
+      return;
+    }
+    require_once __DIR__ . '/ApiResponse.php';
+    ApiResponse::create(400, 'validation.invalid_format')
+      ->withMessage($message)
+      ->send();
+  }
+
+  /** Whether every string in $value, keys included, at any depth, is valid UTF-8. */
+  private static function isUtf8($value): bool {
+    if (is_string($value)) {
+      return preg_match('//u', $value) === 1;
+    }
+    if (!is_array($value)) {
+      return true;
+    }
+    foreach ($value as $key => $item) {
+      if ((is_string($key) && preg_match('//u', $key) !== 1) || !self::isUtf8($item)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   public function command() {

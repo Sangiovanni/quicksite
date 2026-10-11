@@ -251,12 +251,22 @@ function __command_addComponentToNode(array $params = [], array $urlParams = [])
     
     // Build JSON file path
     if ($type === 'page') {
+        // The one page-name rule every command shares (qs_page_name_refusal()).
+        $refusal = qs_page_name_refusal($name);
+        if ($refusal !== null) {
+            return $refusal;
+        }
         $jsonPath = resolvePageJsonPath($name);
         if ($jsonPath === null) {
             return ApiResponse::create(404, 'error.notFound')
                 ->withMessage("Page '{$name}' does not exist");
         }
     } elseif ($type === 'component') {
+        // The one component-name rule every command shares (qs_component_name_refusal()).
+        $refusal = qs_component_name_refusal($name);
+        if ($refusal !== null) {
+            return $refusal;
+        }
         $jsonPath = PROJECT_PATH . '/templates/model/json/components/' . $name . '.json';
     } else {
         $jsonPath = PROJECT_PATH . '/templates/model/json/' . $type . '.json';
@@ -293,6 +303,12 @@ function __command_addComponentToNode(array $params = [], array $urlParams = [])
         return ApiResponse::create(400, 'validation.invalid_value')
             ->withMessage("Cannot insert inside a component node. Components are atomic units.")
             ->withErrors([['field' => 'position', 'reason' => 'component_is_atomic', 'targetNode' => $targetNodeId]]);
+    }
+    // ...and for text nodes, as addNode refuses them: a text node renders no children.
+    if ($position === 'inside' && isset($targetNode['textKey']) && !isset($targetNode['tag'])) {
+        return ApiResponse::create(400, 'validation.invalid_value')
+            ->withMessage("Cannot insert inside a text node.")
+            ->withErrors([['field' => 'position', 'reason' => 'text_node', 'targetNode' => $targetNodeId]]);
     }
     
     // Get structure name for translation key prefix
@@ -372,25 +388,19 @@ function __command_addComponentToNode(array $params = [], array $urlParams = [])
     
     // Insert the node. A list root takes it as its first entry, a node root as its
     // first child (NodeNavigator::insertAtRoot, the rule every root insert shares).
+    // Before / after / inside a node, NodeNavigator::insertAt (the rule every
+    // positional insert shares).
     if ($isRootTarget) {
         $result = NodeNavigator::insertAtRoot($structure, $newNode);
-        $newNodeId = '0';
     } else {
-        $result = NodeNavigator::insertNode($structure, $targetNodeId, $newNode, $position);
+        $result = NodeNavigator::insertAt($structure, (string) $targetNodeId, $newNode, $position);
     }
 
     if (!$result['success']) {
         return ApiResponse::create(400, 'operation.failed')
             ->withMessage($result['error'] ?? 'Failed to insert component node');
     }
-
-    // Compute newNodeId from insertion result
-    if (!$isRootTarget) {
-        $targetIndices = explode('.', $targetNodeId);
-        $parentPath = array_slice($targetIndices, 0, -1);
-        $insertedAt = $result['insertedAt'];
-        $newNodeId = empty($parentPath) ? (string)$insertedAt : implode('.', $parentPath) . '.' . $insertedAt;
-    }
+    $newNodeId = $result['newNodeId'];
     
     $updatedStructure = $result['structure'];
 

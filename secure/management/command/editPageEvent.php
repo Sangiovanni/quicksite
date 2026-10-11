@@ -93,6 +93,17 @@ function __command_editPageEvent(array $params = [], array $urlParams = []): Api
     }
 
     // ==========================================================================
+    // VALIDATE PAGE EXISTS
+    // ==========================================================================
+
+    // The one page-name rule every command shares (qs_page_name_refusal()): a route of the
+    // project or a special page. Before the arguments: the validator reads the page name.
+    $refusal = qs_page_name_refusal($pageName, 'pageName');
+    if ($refusal !== null) {
+        return $refusal;
+    }
+
+    // ==========================================================================
     // PER-VERB ARG VALIDATION
     // ==========================================================================
     // Defense-in-depth — symmetric with addInteraction. See
@@ -107,16 +118,6 @@ function __command_editPageEvent(array $params = [], array $urlParams = []): Api
                 ? "Unknown verb: {$function}"
                 : 'One or more parameters failed validation.')
             ->withErrors($argErrors);
-    }
-
-    // ==========================================================================
-    // VALIDATE PAGE EXISTS
-    // ==========================================================================
-
-    $specialPages = ['404', '500', '403', '401'];
-    if (!routeExists($pageName, ROUTES) && !in_array($pageName, $specialPages, true)) {
-        return ApiResponse::create(404, 'route.not_found')
-            ->withMessage("Page '{$pageName}' does not exist");
     }
 
     // ==========================================================================

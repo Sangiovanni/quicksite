@@ -64,7 +64,7 @@ class AdminRouter {
         'embed-security', // Embed Security (iframe sandbox)
         'preview',     // Visual Editor (route kept as 'preview' for URL compatibility)
         'apis',        // External API Registry
-        'oauth-providers', // OAuth Provider catalogue + per-project overrides
+        'oauth-providers', // OAuth Providers: the providers the installation offers, and this project's keys for them
         'storage',     // Storage registry — GDPR / cookie-consent data layer
         'privacy',     // Privacy helper — data-sharing / API surface
         'memberships', // My Memberships — inbox / requests / proposals / notices (any authenticated user)

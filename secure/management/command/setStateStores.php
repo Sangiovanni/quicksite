@@ -33,11 +33,11 @@ function __command_setStateStores(array $params = [], array $urlParams = []): Ap
             ->withMessage('Missing or invalid "route" parameter');
     }
 
-    // Validate the page exists (same special-page allowance as page events).
-    $specialPages = ['404', '500', '403', '401'];
-    if (!routeExists($route, ROUTES) && !in_array($route, $specialPages, true)) {
-        return ApiResponse::create(404, 'route.not_found')
-            ->withMessage("Page '{$route}' does not exist");
+    // The one page-name rule every command shares (qs_page_name_refusal()): a route of the
+    // project or a special page.
+    $refusal = qs_page_name_refusal($route, isset($params['route']) ? 'route' : 'pageName');
+    if ($refusal !== null) {
+        return $refusal;
     }
 
     $stores = $params['stores'] ?? null;

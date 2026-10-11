@@ -60,6 +60,7 @@ require_once __DIR__ . '/OutboundUrlPolicy.php';
 // authoring files that cannot travel into a production build.
 require_once __DIR__ . '/../functions/requestRuntime.php'; // qs_project_cookie_name, qs_site_path
 require_once __DIR__ . '/../functions/oauthProviderHelpers.php'; // qs_oauth_provider, qs_oauth_sign_in_keys
+require_once __DIR__ . '/../functions/projectLanguage.php'; // qs_is_project_language (it travels into builds)
 
 class OAuthHandler
 {
@@ -645,7 +646,9 @@ class OAuthHandler
      *      control character. Everything else could be read by a browser
      *      as another host or another scheme.
      *   2. A registered route in ROUTES (rejects typo'd and made-up paths,
-     *      by design).
+     *      by design). On a multilingual site a leading language segment
+     *      (`/fr/dashboard`) is taken off for the match; the value itself is
+     *      kept, so the visitor lands on the page in that language.
      *
      * Anything that fails returns null, and the caller lands on the site's
      * home. A query string and a fragment survive the check (set aside
@@ -682,6 +685,10 @@ class OAuthHandler
             explode('/', trim($pathOnly, '/')),
             function ($s) { return $s !== ''; }
         ));
+        // A multilingual site's address starts with its language: the route follows it.
+        if ($segments !== [] && qs_is_project_language($segments[0])) {
+            array_shift($segments);
+        }
         if (empty($segments)) {
             return $returnTo;
         }

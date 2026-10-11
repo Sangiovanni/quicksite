@@ -6,7 +6,7 @@
  * - Adding node identifiers to structure trees
  * - Navigating to specific nodes by identifier
  * - Editing/deleting nodes by identifier
- * - Inserting nodes before/after specific positions
+ * - Inserting nodes before, after or inside a node, or at the root
  * 
  * Node identifiers use 0-indexed dot notation: "0.2.1" means
  * root's 1st child → 3rd child → 2nd child
@@ -134,25 +134,6 @@ class NodeNavigator {
     }
     
     /**
-     * Insert a node before or after a specific position
-     * 
-     * @param mixed $structure The structure to modify
-     * @param string $nodeId The reference node identifier
-     * @param array $newNode The node to insert
-     * @param string $position 'before' or 'after'
-     * @return array ['success' => bool, 'structure' => modified structure]
-     */
-    public static function insertNode($structure, string $nodeId, array $newNode, string $position = 'after'): array {
-        $path = self::parseNodeId($nodeId);
-        
-        if ($path === null || empty($path)) {
-            return ['success' => false, 'error' => 'Invalid node identifier for insertion'];
-        }
-        
-        return self::insertNodeAtPath($structure, $path, $newNode, $position);
-    }
-
-    /**
      * Insert a node at a structure's root: the one rule for every command that
      * takes targetNodeId "root".
      *
@@ -187,18 +168,7 @@ class NodeNavigator {
 
         $entries = $isList ? $structure : (is_array($structure['children'] ?? null) ? $structure['children'] : []);
 
-        if ($adopt !== [] && isset($newNode['children']) && is_array($newNode['children'])) {
-            rsort($adopt);
-            $moved = [];
-            foreach ($adopt as $index) {
-                if (isset($entries[$index])) {
-                    array_unshift($moved, $entries[$index]);
-                    array_splice($entries, $index, 1);
-                }
-            }
-            $newNode['children'] = array_merge($moved, $newNode['children']);
-        }
-
+        $newNode = self::adopt($entries, $newNode, $adopt);
         array_unshift($entries, $newNode);
         if ($isList) {
             $structure = $entries;
@@ -206,6 +176,113 @@ class NodeNavigator {
             $structure['children'] = $entries;
         }
         return ['success' => true, 'structure' => $structure, 'newNodeId' => '0'];
+    }
+
+    /**
+     * Insert a node before, after or inside the node $targetNodeId names: the one
+     * rule for every command that inserts next to a node or into one. The root has
+     * its own, insertAtRoot().
+     *
+     * The target is found as getNode() finds it: in a LIST root (every page, menu
+     * and footer) the first index picks an entry, in a NODE root (a component) a
+     * child of the root.
+     *
+     *   before / after  the new node becomes the target's sibling, just before or
+     *                   just after it.
+     *   inside          the new node becomes the target's first child. A target that
+     *                   cannot hold children (a component call, a text node) is
+     *                   refused, as such a root is: the renderer reads no children
+     *                   there, so the insert would be written and never shown.
+     *
+     * Several nodes land in order when each is inserted at the same target and
+     * position, last one first.
+     *
+     * @param mixed  $structure    The whole structure, as read from its file
+     * @param string $targetNodeId Dot-separated indices ("0.2.1")
+     * @param array  $newNode      The node to insert
+     * @param string $position     'before', 'after' or 'inside'
+     * @param int[]  $adopt        For 'inside': indices of the target's children to move
+     *                             into the new node first, keeping their order (addNode's
+     *                             rule for an insert inside a node that holds text). Used
+     *                             only when the new node has children.
+     * @return array ['success' => true, 'structure' => array, 'newNodeId' => string],
+     *               or ['success' => false, 'error' => string]
+     */
+    public static function insertAt($structure, string $targetNodeId, array $newNode, string $position, array $adopt = []): array {
+        if (!in_array($position, ['before', 'after', 'inside'], true)) {
+            return ['success' => false, 'error' => "Invalid position '{$position}'"];
+        }
+        if (preg_match('/^[0-9]+(\.[0-9]+)*$/D', $targetNodeId) !== 1) {
+            return ['success' => false, 'error' => "Invalid node identifier '{$targetNodeId}'"];
+        }
+        if (!is_array($structure)) {
+            return ['success' => false, 'error' => 'The structure is neither a list of nodes nor a node'];
+        }
+        $path = array_map('intval', explode('.', $targetNodeId));
+        $notFound = ['success' => false, 'error' => "Target node not found: {$targetNodeId}"];
+
+        // $siblings is the array that holds the target: the root list, or a node's children.
+        if (self::isAssociativeArray($structure)) {
+            if (!isset($structure['children']) || !is_array($structure['children'])) {
+                return $notFound;
+            }
+            $siblings = &$structure['children'];
+        } else {
+            $siblings = &$structure;
+        }
+        $index = array_pop($path);
+        foreach ($path as $step) {
+            if (!is_array($siblings[$step] ?? null) || !is_array($siblings[$step]['children'] ?? null)) {
+                return $notFound;
+            }
+            $siblings = &$siblings[$step]['children'];
+        }
+        if (!array_key_exists($index, $siblings)) {
+            return $notFound;
+        }
+
+        if ($position === 'inside') {
+            $target = &$siblings[$index];
+            if (!is_array($target) || !isset($target['tag']) || isset($target['component'])
+                || (isset($target['children']) && !is_array($target['children']))) {
+                return ['success' => false, 'error' => 'The target node cannot hold children'];
+            }
+            $children = $target['children'] ?? [];
+            $newNode = self::adopt($children, $newNode, $adopt);
+            array_unshift($children, $newNode);
+            $target['children'] = $children;
+            unset($target, $siblings);
+            $path[] = $index;
+            $path[] = 0;
+            return ['success' => true, 'structure' => $structure, 'newNodeId' => implode('.', $path)];
+        }
+
+        $at = $position === 'before' ? $index : $index + 1;
+        array_splice($siblings, $at, 0, [$newNode]);
+        unset($siblings);
+        $path[] = $at;
+        return ['success' => true, 'structure' => $structure, 'newNodeId' => implode('.', $path)];
+    }
+
+    /**
+     * Move the entries at $adopt (indices into $entries) into $newNode's children,
+     * before its own, keeping their order. Nothing moves when $adopt is empty or the
+     * new node has no children list.
+     */
+    private static function adopt(array &$entries, array $newNode, array $adopt): array {
+        if ($adopt === [] || !isset($newNode['children']) || !is_array($newNode['children'])) {
+            return $newNode;
+        }
+        rsort($adopt);
+        $moved = [];
+        foreach ($adopt as $index) {
+            if (isset($entries[$index])) {
+                array_unshift($moved, $entries[$index]);
+                array_splice($entries, $index, 1);
+            }
+        }
+        $newNode['children'] = array_merge($moved, $newNode['children']);
+        return $newNode;
     }
 
     /**
@@ -364,83 +441,6 @@ class NodeNavigator {
         }
         
         return ['success' => true, 'structure' => $structure];
-    }
-    
-    /**
-     * Insert a node at a specific path
-     */
-    private static function insertNodeAtPath($structure, array $path, array $newNode, string $position): array {
-        $structure = json_decode(json_encode($structure), true);
-        
-        $targetIndex = (int)array_pop($path);
-        $insertIndex = $position === 'after' ? $targetIndex + 1 : $targetIndex;
-        
-        // Determine if root is an array of nodes (pages) or single object (components)
-        $isRootArray = is_array($structure) && !self::isAssociativeArray($structure);
-        
-        if (empty($path)) {
-            // Insert at root level
-            if ($isRootArray) {
-                // Root is an array of nodes (page structure)
-                if ($targetIndex < 0 || $targetIndex >= count($structure)) {
-                    return ['success' => false, 'error' => 'Invalid target index'];
-                }
-                array_splice($structure, $insertIndex, 0, [$newNode]);
-                return ['success' => true, 'structure' => $structure, 'insertedAt' => $insertIndex];
-            } else {
-                // Root is a single object (component structure) - target is in children
-                if (!isset($structure['children']) || $targetIndex < 0 || $targetIndex >= count($structure['children'])) {
-                    return ['success' => false, 'error' => 'Invalid target index'];
-                }
-                array_splice($structure['children'], $insertIndex, 0, [$newNode]);
-                return ['success' => true, 'structure' => $structure, 'insertedAt' => $insertIndex];
-            }
-        }
-        
-        // Navigate to parent
-        $parent = &$structure;
-        
-        foreach ($path as $i => $segment) {
-            if ($segment === 'slots') {
-                $slotName = $path[$i + 1] ?? null;
-                if (!isset($parent['slots'][$slotName])) {
-                    return ['success' => false, 'error' => 'Slot not found'];
-                }
-                $parent = &$parent['slots'][$slotName];
-                continue;
-            }
-            
-            if ($i > 0 && ($path[$i - 1] ?? '') === 'slots') {
-                continue;
-            }
-            
-            $index = (int)$segment;
-            
-            if ($isRootArray && $i === 0) {
-                if (!isset($parent[$index])) {
-                    return ['success' => false, 'error' => 'Node not found'];
-                }
-                $parent = &$parent[$index];
-                $isRootArray = false;
-            } elseif (isset($parent['children'][$index])) {
-                $parent = &$parent['children'][$index];
-            } else {
-                return ['success' => false, 'error' => 'Node not found at path'];
-            }
-        }
-        
-        // Insert into parent's children
-        if (!isset($parent['children']) || !is_array($parent['children'])) {
-            return ['success' => false, 'error' => 'Parent has no children array'];
-        }
-        
-        if ($targetIndex < 0 || $targetIndex >= count($parent['children'])) {
-            return ['success' => false, 'error' => 'Invalid target index'];
-        }
-        
-        array_splice($parent['children'], $insertIndex, 0, [$newNode]);
-        
-        return ['success' => true, 'structure' => $structure, 'insertedAt' => $insertIndex];
     }
     
     /**

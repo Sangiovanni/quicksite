@@ -14,8 +14,10 @@
  * @param string $snippetId Required - Snippet ID to insert
  * 
  * Inserts the full snippet structure with:
- * - Recursive node insertion (full tree)
- * - Auto-generated unique textKeys for all translatable content
+ * - Recursive node insertion (full tree); every root of a snippet that has
+ *   several, in order, at the position asked
+ * - Auto-generated unique textKeys for all translatable content; a raw or
+ *   literal value (`__RAW__` / `__LIT__`) is kept as written, with no key
  * - Translations copied to project's translation files
  */
 
@@ -146,16 +148,29 @@ function getNestedValue(array $arr, string $key) {
  * Process snippet structure recursively:
  * - Replace textKeys with new unique keys
  * - Build mapping of old -> new keys for translations
+ *
+ * A raw or literal value (qs_is_literal_text()) is no key: in a text node, a
+ * translatable attribute or a component's text variable it is kept as written,
+ * with no new key and no translation, and takes no item number.
+ *
+ * @param array $keyMapping  old key => new key, as the answer reports it (a key the
+ *                           snippet uses twice names its last copy)
+ * @param array $keySources  new key => old key: every new key with the key its value
+ *                           is read from, so each copy gets its translation
  */
-function processSnippetStructure(array $node, string $prefix, int &$itemCounter, array &$keyMapping): array {
+function processSnippetStructure(array $node, string $prefix, int &$itemCounter, array &$keyMapping, array &$keySources): array {
     $processed = [];
-    
+
     // Handle textKey nodes
     if (isset($node['textKey']) && !isset($node['tag'])) {
         $oldKey = $node['textKey'];
+        if (qs_is_literal_text($oldKey)) {
+            return ['textKey' => $oldKey];
+        }
         $newKey = $prefix . '.item' . $itemCounter;
         $itemCounter++;
         $keyMapping[$oldKey] = $newKey;
+        $keySources[$newKey] = $oldKey;
         return ['textKey' => $newKey];
     }
     
@@ -168,12 +183,13 @@ function processSnippetStructure(array $node, string $prefix, int &$itemCounter,
             $processed['params'] = [];
             foreach ($node['params'] as $key => $value) {
                 // For translatable attributes like alt, placeholder, etc.
-                if (in_array($key, ['alt', 'placeholder', 'title', 'aria-label']) && 
-                    is_string($value) && strpos($value, '.') !== false) {
+                if (in_array($key, ['alt', 'placeholder', 'title', 'aria-label']) &&
+                    is_string($value) && strpos($value, '.') !== false && !qs_is_literal_text($value)) {
                     // This might be a translation key - map it
                     $newKey = $prefix . '.item' . $itemCounter;
                     $itemCounter++;
                     $keyMapping[$value] = $newKey;
+                    $keySources[$newKey] = $value;
                     $processed['params'][$key] = $newKey;
                 } else {
                     $processed['params'][$key] = $value;
@@ -185,7 +201,7 @@ function processSnippetStructure(array $node, string $prefix, int &$itemCounter,
         if (isset($node['children']) && is_array($node['children'])) {
             $processed['children'] = [];
             foreach ($node['children'] as $child) {
-                $processed['children'][] = processSnippetStructure($child, $prefix, $itemCounter, $keyMapping);
+                $processed['children'][] = processSnippetStructure($child, $prefix, $itemCounter, $keyMapping, $keySources);
             }
         }
     }
@@ -214,14 +230,16 @@ function processSnippetStructure(array $node, string $prefix, int &$itemCounter,
                 // Check if this variable is a textKey type (translatable)
                 $isTextKey = isset($componentVars[$varName]) && $componentVars[$varName]['type'] === 'textKey';
                 
-                if ($isTextKey && is_string($oldValue)) {
+                if ($isTextKey && is_string($oldValue) && !qs_is_literal_text($oldValue)) {
                     // Generate new unique key and map old -> new
                     $newKey = $prefix . '.item' . $itemCounter;
                     $itemCounter++;
                     $keyMapping[$oldValue] = $newKey;
+                    $keySources[$newKey] = $oldValue;
                     $processed['data'][$varName] = $newKey;
                 } else {
-                    // Non-textKey variables (params like href, class) - keep as-is
+                    // Non-textKey variables (params like href, class), and raw or
+                    // literal texts - keep as-is
                     $processed['data'][$varName] = $oldValue;
                 }
             }
@@ -233,8 +251,12 @@ function processSnippetStructure(array $node, string $prefix, int &$itemCounter,
 
 /**
  * Add translations to project translation files
+ *
+ * @param array $keySources new key => the snippet's key its value is read from
+ *                          (processSnippetStructure()): one value per new key, so
+ *                          two copies of one key both get it
  */
-function addSnippetTranslations(array $keyMapping, array $snippetTranslations): array {
+function addSnippetTranslations(array $keySources, array $snippetTranslations): array {
     $addedKeys = [];
     
     // Get all language files
@@ -260,7 +282,7 @@ function addSnippetTranslations(array $keyMapping, array $snippetTranslations): 
         }
         
         // Add each mapped translation
-        foreach ($keyMapping as $oldKey => $newKey) {
+        foreach ($keySources as $newKey => $oldKey) {
             // Find translation value from snippet
             $value = '';
             
@@ -310,107 +332,6 @@ function setNestedKey(array &$arr, string $key, $value): void {
             $current = &$current[$part];
         }
     }
-}
-
-/**
- * Insert node into structure at specified position
- * Uses same logic as addNode.php for consistency
- */
-function insertNodeAtPosition(array $structure, array $targetIndices, array $newNode, string $position): array {
-    if (empty($targetIndices)) {
-        return ['success' => false, 'error' => 'Empty target indices'];
-    }
-    
-    // Detect if root is a single object (component/page) or array of nodes
-    $isRootObject = isset($structure['tag']);
-    
-    if ($position === 'inside') {
-        $ref = &$structure;
-        for ($i = 0; $i < count($targetIndices); $i++) {
-            $index = $targetIndices[$i];
-            
-            if ($isRootObject && $i === 0) {
-                if (!isset($ref['children'][$index])) {
-                    return ['success' => false, 'error' => "Node not found at index {$index}"];
-                }
-                $ref = &$ref['children'][$index];
-                if ($i < count($targetIndices) - 1) {
-                    if (!isset($ref['children'])) {
-                        return ['success' => false, 'error' => 'Parent node has no children array'];
-                    }
-                    $ref = &$ref['children'];
-                }
-            } else {
-                if (!isset($ref[$index])) {
-                    return ['success' => false, 'error' => "Node not found at index {$index}"];
-                }
-                $ref = &$ref[$index];
-                if ($i < count($targetIndices) - 1) {
-                    if (!isset($ref['children'])) {
-                        return ['success' => false, 'error' => 'Parent node has no children array'];
-                    }
-                    $ref = &$ref['children'];
-                }
-            }
-        }
-        
-        if (!isset($ref['children'])) $ref['children'] = [];
-        array_unshift($ref['children'], $newNode);
-        $newNodeId = implode('.', $targetIndices) . '.0';
-        
-        return ['success' => true, 'structure' => $structure, 'newNodeId' => $newNodeId];
-    }
-    
-    // Before/after: insert as sibling
-    $parentPath = array_slice($targetIndices, 0, -1);
-    $targetIndex = end($targetIndices);
-    
-    $ref = &$structure;
-    
-    // For root object with empty parent path, we insert into children array
-    if ($isRootObject && empty($parentPath)) {
-        if (!isset($ref['children'][$targetIndex])) {
-            return ['success' => false, 'error' => "Target node not found at index {$targetIndex}"];
-        }
-        
-        $insertIndex = ($position === 'before') ? $targetIndex : $targetIndex + 1;
-        array_splice($ref['children'], $insertIndex, 0, [$newNode]);
-        
-        $newNodeId = (string)$insertIndex;
-        return ['success' => true, 'structure' => $structure, 'newNodeId' => $newNodeId];
-    }
-    
-    for ($i = 0; $i < count($parentPath); $i++) {
-        $index = $parentPath[$i];
-        
-        if ($isRootObject && $i === 0) {
-            if (!isset($ref['children'][$index])) {
-                return ['success' => false, 'error' => "Parent node not found at index {$index}"];
-            }
-            $ref = &$ref['children'][$index];
-        } else {
-            if (!isset($ref[$index])) {
-                return ['success' => false, 'error' => "Parent node not found at index {$index}"];
-            }
-            $ref = &$ref[$index];
-        }
-        
-        if (!isset($ref['children'])) {
-            return ['success' => false, 'error' => 'Parent node has no children array'];
-        }
-        $ref = &$ref['children'];
-    }
-    
-    if (!isset($ref[$targetIndex])) {
-        return ['success' => false, 'error' => "Target node not found at index {$targetIndex}"];
-    }
-    
-    $insertIndex = ($position === 'before') ? $targetIndex : $targetIndex + 1;
-    array_splice($ref, $insertIndex, 0, [$newNode]);
-    
-    $newNodeId = empty($parentPath) ? (string)$insertIndex : implode('.', $parentPath) . '.' . $insertIndex;
-    
-    return ['success' => true, 'structure' => $structure, 'newNodeId' => $newNodeId];
 }
 
 /**
@@ -483,9 +404,14 @@ function __command_insertSnippet(array $params = [], array $urlParams = []): Api
             ->withMessage('Snippet has no structure defined');
     }
     
-    // Load structure file
+    // Load structure file: a page by the one page-name rule, a component by the one
+    // component-name rule.
     switch ($type) {
         case 'page':
+            $refusal = qs_page_name_refusal($name);
+            if ($refusal !== null) {
+                return $refusal;
+            }
             $json_file = resolvePageJsonPath($name);
             if ($json_file === null) {
                 return ApiResponse::create(404, 'structure.not_found')
@@ -493,6 +419,10 @@ function __command_insertSnippet(array $params = [], array $urlParams = []): Api
             }
             break;
         case 'component':
+            $refusal = qs_component_name_refusal($name);
+            if ($refusal !== null) {
+                return $refusal;
+            }
             $json_file = PROJECT_PATH . '/templates/model/json/components/' . $name . '.json';
             break;
         default:
@@ -511,39 +441,67 @@ function __command_insertSnippet(array $params = [], array $urlParams = []): Api
         return ApiResponse::create(500, 'structure.invalid')
             ->withMessage('Invalid structure JSON');
     }
-    
+
+    // Inside a component call or a text node, as addNode refuses: neither renders
+    // children, so the snippet would be written and never shown. A target that does
+    // not exist is the insert's own answer below.
+    if (!$isRootTarget && $position === 'inside') {
+        $targetNode = NodeNavigator::getNode($structure, (string) $targetNodeId);
+        if ($targetNode !== null && isset($targetNode['component'])) {
+            return ApiResponse::create(400, 'validation.invalid_value')
+                ->withMessage('Cannot insert inside a component. Components are atomic.');
+        }
+        if ($targetNode !== null && isset($targetNode['textKey']) && !isset($targetNode['tag'])) {
+            return ApiResponse::create(400, 'validation.invalid_value')
+                ->withMessage('Cannot insert inside a text node.');
+        }
+    }
+
     // Generate text key prefix and starting item number
     $prefix = generateSnippetTextKeyPrefix($type, $name);
     $itemCounter = getNextItemNumber($prefix);
-    
-    // Process snippet structure - generate new unique textKeys
+
+    // Process snippet structure - generate new unique textKeys. A snippet is one node
+    // or a list of roots; every root is processed, the item numbers running on from
+    // one root to the next.
     $keyMapping = [];
+    $keySources = [];
     $snippetStructure = $snippet['structure'];
-    
-    // Handle array of nodes at root level
-    if (isset($snippetStructure[0])) {
-        // Multiple root nodes - wrap in a container or process first one
-        $processedStructure = processSnippetStructure($snippetStructure[0], $prefix, $itemCounter, $keyMapping);
-    } else {
-        $processedStructure = processSnippetStructure($snippetStructure, $prefix, $itemCounter, $keyMapping);
+    $roots = (is_array($snippetStructure) && $snippetStructure !== [] && array_is_list($snippetStructure))
+        ? $snippetStructure
+        : [$snippetStructure];
+    $processedRoots = [];
+    foreach ($roots as $root) {
+        if (!is_array($root)) {
+            return ApiResponse::create(400, 'snippets.no_structure')
+                ->withMessage('Snippet structure holds a root that is not a node');
+        }
+        $processedRoots[] = processSnippetStructure($root, $prefix, $itemCounter, $keyMapping, $keySources);
     }
-    
-    // Insert processed structure into target. A list root takes the snippet as its
-    // first entry, a node root as its first child (the rule every root insert shares).
-    if ($isRootTarget) {
-        $insertResult = NodeNavigator::insertAtRoot($structure, $processedStructure);
-    } else {
-        $targetPath = array_map('intval', explode('.', (string) $targetNodeId));
-        $insertResult = insertNodeAtPosition($structure, $targetPath, $processedStructure, $position);
+
+    // Insert every root at the target, last one first: each lands in front of the one
+    // inserted before it, so the roots end in order. A list root takes the snippet as
+    // its first entries, a node root as its first children (the rule every root insert
+    // shares); before, after or inside a node, NodeNavigator::insertAt.
+    for ($i = count($processedRoots) - 1; $i >= 0; $i--) {
+        $insertResult = $isRootTarget
+            ? NodeNavigator::insertAtRoot($structure, $processedRoots[$i])
+            : NodeNavigator::insertAt($structure, (string) $targetNodeId, $processedRoots[$i], $position);
+        if (!$insertResult['success']) {
+            return ApiResponse::create(400, 'operation.failed')
+                ->withMessage('Failed to insert snippet: ' . ($insertResult['error'] ?? 'Unknown error'));
+        }
+        $structure = $insertResult['structure'];
     }
-    
-    if (!$insertResult['success']) {
-        return ApiResponse::create(400, 'operation.failed')
-            ->withMessage('Failed to insert snippet: ' . ($insertResult['error'] ?? 'Unknown error'));
-    }
-    
-    $structure = $insertResult['structure'];
+
+    // The first root's id, then its siblings' in order.
     $newNodeId = $insertResult['newNodeId'];
+    $idParts = explode('.', $newNodeId);
+    $firstIndex = (int) array_pop($idParts);
+    $newNodeIds = [];
+    foreach (array_keys($processedRoots) as $i) {
+        $newNodeIds[] = implode('.', array_merge($idParts, [(string) ($firstIndex + $i)]));
+    }
     
     // SECURITY: depth-check the RESULT of the snippet insert.
     if (!qs_structure_depth_ok($structure)) {
@@ -562,8 +520,8 @@ function __command_insertSnippet(array $params = [], array $urlParams = []): Api
     // The snippet's translations, once nothing can refuse the insert: a refused
     // insert writes nothing at all.
     $addedTranslations = [];
-    if (!empty($keyMapping)) {
-        $addedTranslations = addSnippetTranslations($keyMapping, $snippet['translations'] ?? []);
+    if (!empty($keySources)) {
+        $addedTranslations = addSnippetTranslations($keySources, $snippet['translations'] ?? []);
     }
 
     // Save structure
@@ -587,7 +545,10 @@ function __command_insertSnippet(array $params = [], array $urlParams = []): Api
         $translator = new Translator($lang);
         $renderer = new JsonToHtmlRenderer($translator, ['editorMode' => true]);
         
-        $renderedHtml = $renderer->renderNodeAtPath($structure, $newNodeId, $structureName);
+        // Every root, in order.
+        foreach ($newNodeIds as $rootId) {
+            $renderedHtml .= $renderer->renderNodeAtPath($structure, $rootId, $structureName);
+        }
     } catch (Exception $e) {
         error_log("Failed to render snippet HTML: " . $e->getMessage());
     }
@@ -598,6 +559,7 @@ function __command_insertSnippet(array $params = [], array $urlParams = []): Api
             'snippetId' => $snippetId,
             'snippetName' => $snippet['name'] ?? $snippetId,
             'newNodeId' => $newNodeId,
+            'newNodeIds' => $newNodeIds,
             'position' => $position,
             'targetNodeId' => $targetNodeId,
             'translationsAdded' => count($addedTranslations),

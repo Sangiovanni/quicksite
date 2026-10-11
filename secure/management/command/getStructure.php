@@ -59,10 +59,8 @@ function __command_getStructure(array $params = [], array $urlParams = []): ApiR
             ]);
     }
 
-    // Special pages that exist but are not in ROUTES (error pages, etc.).
-    // Declared up here, not beside the existence check further down, because the
-    // route-or-nodeId decision below has to know about them too.
-    $specialPages = ['404', '500', '403', '401'];
+    // Special pages exist but are not in ROUTES (SPECIAL_PAGES): the route-or-nodeId
+    // decision below has to know about them.
 
     // Which trailing segment, if any, the page branch took as an option. It is
     // decided once, while the route path is being resolved, and reused when the
@@ -94,12 +92,12 @@ function __command_getStructure(array $params = [], array $urlParams = []): ApiR
                 // '404', '2024' both satisfy the node_id pattern. Resolve the
                 // WHOLE path as a route first and read the tail as a nodeId only
                 // if that misses. Popping first meant getStructure/page/404 asked
-                // for the page named '' — so the $specialPages allowance below
+                // for the page named '' — so the SPECIAL_PAGES allowance below
                 // could never fire for the very pages it names — and
                 // getStructure/page/blog/2024 quietly answered with page 'blog'.
                 $wholePath = implode('/', array_filter($routeSegments, fn($s) => $s !== ''));
                 $isRoutedPage = routeExists($wholePath, ROUTES)
-                    || in_array($wholePath, $specialPages, true);
+                    || in_array($wholePath, SPECIAL_PAGES, true);
                 // AND a structure file, not just a route. routeExists() filters
                 // its segments with a bare array_filter(), and '0' is falsy in
                 // PHP — so it drops a '0' segment and reports 'home/0' as an
@@ -140,30 +138,11 @@ function __command_getStructure(array $params = [], array $urlParams = []): ApiR
                 return $refusal;
             }
         } else {
-            // Length validation - max 200 characters
-            if (strlen($name) > 200) {
-                return ApiResponse::create(400, 'validation.invalid_length')
-                    ->withMessage("The name parameter must not exceed 200 characters.")
-                    ->withErrors([
-                        ['field' => 'name', 'value' => $name, 'max_length' => 200]
-                    ]);
-            }
-
-            // Check for path traversal attempts in name (BEFORE other validations)
-            if (strpos($name, '..') !== false ||
-                strpos($name, '\\') !== false ||
-                strpos($name, "\0") !== false) {
-                return ApiResponse::create(400, 'validation.invalid_format')
-                    ->withMessage('Name contains invalid path characters')
-                    ->withErrors([
-                        ['field' => 'name', 'reason' => 'path_traversal_attempt']
-                    ]);
-            }
-
-            if (!RegexPatterns::match('identifier_alphanum', $name)) {
-                return ApiResponse::create(400, 'validation.invalid_format')
-                    ->withMessage("Invalid segment '$name'. Use only alphanumeric, hyphens, and underscores")
-                    ->withErrors([RegexPatterns::validationError('identifier_alphanum', 'name', $name)]);
+            // The one component-name rule every command shares: the name a page places a
+            // component by.
+            $refusal = qs_component_name_refusal($name);
+            if ($refusal !== null) {
+                return $refusal;
             }
         }
         

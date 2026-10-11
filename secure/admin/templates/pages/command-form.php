@@ -118,10 +118,23 @@ require_once SECURE_FOLDER_PATH . '/src/functions/SessionManagement.php';
 $qsConsoleFlags = [
     'selfRegistration' => (bool)qs_registration_config()['allow_self_registration'],
 ];
+
+// The snippet categories createSnippet's dropdown offers: the server's one list
+// (qs_snippet_categories()) with the editor's translated names, so the page keeps
+// no copy of its own.
+require_once SECURE_FOLDER_PATH . '/src/functions/SnippetManagement.php';
+$qsSnippetCategories = [];
+foreach (qs_snippet_categories() as $qsCategory) {
+    $qsSnippetCategories[] = [
+        'value' => $qsCategory,
+        'label' => __admin('preview.snippetCategory' . ucfirst($qsCategory), SNIPPET_CATEGORIES[$qsCategory]),
+    ];
+}
 ?>
 <script>
     window.QS_COMMAND_FORM_I18N = <?= json_encode($qsCommandFormI18n, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
     window.QS_CONSOLE_FLAGS = <?= json_encode($qsConsoleFlags, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+    window.QS_SNIPPET_CATEGORIES = <?= json_encode($qsSnippetCategories, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?>;
 </script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/command-form.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/command-form.js') ?>"></script>
 
