@@ -354,6 +354,14 @@ const ENUM_VALUES = {
         { value: 'after', labelKey: 'commandForm.addComponent.positionAfter' },
         { value: 'inside', labelKey: 'commandForm.addComponent.positionInside' }
     ],
+    // moveNode's four: the three every insert takes, and "inside-end" (the target's
+    // last child), which only a move offers - the editor's drop inside an element.
+    movePosition: [
+        { value: 'before', labelKey: 'commandForm.addComponent.positionBefore' },
+        { value: 'after', labelKey: 'commandForm.addComponent.positionAfter' },
+        { value: 'inside', labelKey: 'commandForm.addComponent.positionInside' },
+        { value: 'inside-end', labelKey: 'commandForm.addComponent.positionInsideEnd' }
+    ],
     // "Page-level event the interaction sits on: onload, onresize or onscroll".
     // Literal DOM event names, not prose - labelled bare, the same reasoning
     // the boolean renderer uses for 'true'/'false'.
@@ -533,8 +541,12 @@ const FIELD_PICKERS = {
     // `allowRoot` prepends the literal "root", which is a documented value that
     // is NOT a node - true for every structure type, or an array naming the
     // types that accept it (duplicateNode refuses root unless type=component).
-    moveNode:          { kind: 'structure', typeParam: 'type', param: 'name',
-                         nodeParams: ['sourceNodeId', 'targetNodeId'] },
+    moveNode: [
+        { kind: 'structure', typeParam: 'type', param: 'name',
+          nodeParams: ['sourceNodeId', 'targetNodeId'] },
+        // "default: after" — optional, so the select shows what it will send.
+        { kind: 'enum', param: 'position', values: 'movePosition', defaultValue: 'after' }
+    ],
     deleteNode:        { kind: 'structure', typeParam: 'type', param: 'name',
                          nodeParams: ['nodeId'] },
     duplicateNode:     { kind: 'structure', typeParam: 'type', param: 'name',
@@ -1507,6 +1519,13 @@ async function _initStructurePicker(form, cfg) {
     });
 
     nameSelect.addEventListener('change', async () => {
+        await loadNodes();
+        await loadEvents();
+    });
+
+    // A command that succeeded may have moved, added or removed nodes, so the ids the
+    // node fields list are read again for the same structure; the answer stays on screen.
+    form.addEventListener('command-success', async () => {
         await loadNodes();
         await loadEvents();
     });

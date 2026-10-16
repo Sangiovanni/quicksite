@@ -69,10 +69,21 @@ class PageManagement {
         $base = defined('QS_PUBLIC_BASE') ? QS_PUBLIC_BASE
             : ((defined('BASE_URL') ? rtrim(BASE_URL, '/') : '') . '/');
 
+        // The route this request resolved, read once for the title and the render below.
+        require_once SECURE_FOLDER_PATH . '/src/classes/TrimParameters.php';
+        $trimParameters = new TrimParameters();
+
+        // The title takes {{param:NAME}} and {{resolved:NAME}} as a page text does, through the
+        // same definition: the resolver (or the editor's emulation) has run before the page's
+        // template, and a name with no value stays as written. A build does the same (Page.php),
+        // and both escape the result alike.
+        require_once SECURE_FOLDER_PATH . '/src/functions/runtimePlaceholders.php';
+        $title = qs_apply_runtime_placeholders((string) $this->title, $trimParameters->routeParams());
+
         $header = "<!DOCTYPE html>";
         $header .= '<html lang="' . htmlspecialchars($this->lang) . '"' . $themeAttr . '>';
         $header .="<head>";
-        $header .= "<title>" . htmlspecialchars($this->title) . "</title>";
+        $header .= '<title>' . htmlspecialchars($title, ENT_QUOTES | ENT_HTML5, 'UTF-8') . '</title>';
         // The icon (CONFIG['FAVICON_PATH'], else the conventional assets path),
         // linked only when its file is in the project's public folder: a link to
         // a file that is not there fails on every page view. Checked here on
@@ -104,8 +115,7 @@ class PageManagement {
         require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';
 
         $translator = new Translator($this->lang);
-        $trimParameters = new TrimParameters();
-        
+
         // Check for editor mode (visual editor preview)
         $editorMode = isset($_GET['_editor']) && $_GET['_editor'] === '1';
 

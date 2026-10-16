@@ -594,6 +594,9 @@ function qs_small_file_label(string $kind): string
  *      files growing in total → 507 `quota.storage_exceeded`. A write that keeps
  *      their size or shrinks them passes, so an owner can always clean up.
  *
+ * A command that only removes content is refused by neither, even when its
+ * re-save makes a file larger (qs_small_write_removal_only()).
+ *
  * Called once, with ALL the command's files, before the first of them is
  * written — so a refused command has written nothing. Files the engine derives
  * from these (generated scripts, page wrappers, the sitemap) follow their source
@@ -607,6 +610,11 @@ function qs_small_file_label(string $kind): string
  */
 function qs_small_write_refusal(array $writes): ?ApiResponse
 {
+    // A command that only removes content is never refused (qs_small_write_removal_only()).
+    if (qs_small_write_journal()['removal']) {
+        return null;
+    }
+
     // One entry per file: a path may reach here spelled two ways (a live and a
     // project copy that are the same file, a separator of each kind), and a file
     // counted twice would double its growth.
@@ -708,6 +716,9 @@ function qs_small_write_guard(string $path, ?int $bytes): bool
     if ($journal['refused'] !== null) {
         return false;   // the command was refused already: nothing more is written
     }
+    if ($journal['removal']) {
+        return true;    // a command that only removes content (qs_small_write_removal_only())
+    }
     $norm = str_replace('\\', '/', $path);
     if (!array_key_exists($norm, $journal['files'])) {
         $journal['files'][$norm] = is_file($norm) ? (string)@file_get_contents($norm) : null;
@@ -787,10 +798,32 @@ function qs_small_write_on_rollback(callable $undo): void
     $journal['undo'][] = $undo;
 }
 
+/**
+ * Mark the command being served as one that ONLY REMOVES content (a node, a rule, a key, a
+ * route, a language, an asset…): from then on neither small-write check refuses its writes,
+ * the size cap and the over-quota rule alike.
+ *
+ * A removal adds no content. It can still make a file larger: the engine saves JSON
+ * indented, and an import keeps an archive's bytes, so a file stored compact grows when it is
+ * re-saved without one of its nodes — several times larger, and past its cap when it was near
+ * it. Refusing that would leave an owner over the storage ceiling, or a file near its cap, with
+ * nothing that frees space or shrinks a page. The file then follows the rule for a file over a
+ * cap: it may shrink or keep its size until it is back under.
+ *
+ * The engine's rule, not a setting: no quota file changes it. Called first by every command
+ * that only removes content, in its own file; a command that can also add content never
+ * calls it.
+ */
+function qs_small_write_removal_only(): void
+{
+    $journal = &qs_small_write_journal();
+    $journal['removal'] = true;
+}
+
 /** The command's journal of guarded files (one per request). */
 function &qs_small_write_journal(): array
 {
-    static $journal = ['files' => [], 'dirs' => [], 'undo' => [], 'refused' => null];
+    static $journal = ['files' => [], 'dirs' => [], 'undo' => [], 'refused' => null, 'removal' => false];
     return $journal;
 }
 

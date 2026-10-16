@@ -55,7 +55,8 @@ function policyAddRoute(array $segments, array $routes): array {
 }
 
 /**
- * Write a default empty page (php bootstrap + empty json) for an ancestor route.
+ * Write a new page (php bootstrap + its structure, empty as every new page starts:
+ * generate_page_json()) for an ancestor route.
  * Each file passes the size check first (qs_small_write_guard); false when one is
  * refused — the command answers qs_small_write_refused().
  */
@@ -64,18 +65,17 @@ function _policyWriteAncestorPage(array $segments): bool {
     $name = end($segments);
     $phpPath = PROJECT_PATH . '/templates/pages/' . implode('/', $segments) . '/' . $name . '.php';
     $jsonPath = PROJECT_PATH . '/templates/model/json/pages/' . implode('/', $segments) . '/' . $name . '.json';
-    $page = [['tag' => 'main', 'params' => ['class' => 'container'], 'children' => []]];
-    $jsonFlags = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE;
+    $json = generate_page_json($name);
     $php = generate_page_template(implode('/', $segments));
     if ((!file_exists($phpPath) && !qs_small_write_guard($phpPath, strlen($php)))
-        || (!file_exists($jsonPath) && !qs_small_write_guard($jsonPath, qs_json_size($page, $jsonFlags)))) {
+        || (!file_exists($jsonPath) && !qs_small_write_guard($jsonPath, strlen($json)))) {
         return false;
     }
     foreach ([dirname($phpPath), dirname($jsonPath)] as $d) {
         if (!is_dir($d)) @mkdir($d, 0755, true);
     }
     if (!file_exists($phpPath)) file_put_contents($phpPath, $php, LOCK_EX);
-    if (!file_exists($jsonPath)) qs_json_write($jsonPath, $page, $jsonFlags, LOCK_EX);
+    if (!file_exists($jsonPath)) file_put_contents($jsonPath, $json, LOCK_EX);
     return true;
 }
 

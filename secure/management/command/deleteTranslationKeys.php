@@ -14,6 +14,10 @@ require_once SECURE_FOLDER_PATH . '/src/functions/languageRegistry.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/translationHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
+// This command only removes content: neither the size cap nor the over-quota rule refuses
+// its writes, even when a re-save makes a file larger (qs_small_write_removal_only()).
+qs_small_write_removal_only();
+
 $params = $trimParametersManagement->params();
 
 if (!isset($params['language']) || !isset($params['keys'])) {
@@ -185,8 +189,7 @@ if ($json_content === false) {
         ->send();
 }
 
-// The size check (qs_small_write_refusal). A deletion only shrinks the file, so
-// it is never refused.
+// The size check (qs_small_write_refusal): a removal, so it never refuses (marked above).
 $refusal = qs_small_write_refusal([$translations_file => strlen($json_content)]);
 if ($refusal !== null) {
     $refusal->send();

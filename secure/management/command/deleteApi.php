@@ -27,6 +27,10 @@ require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_
  * @return ApiResponse
  */
 function __command_deleteApi(array $params = [], array $urlParams = []): ApiResponse {
+    // This command only removes content: neither the size cap nor the over-quota rule
+    // refuses its writes, even when a re-save makes a file larger (qs_small_write_removal_only()).
+    qs_small_write_removal_only();
+
     $apiId = $urlParams[0] ?? $params['apiId'] ?? null;
     
     if (!$apiId || !is_string($apiId)) {

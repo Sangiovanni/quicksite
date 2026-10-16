@@ -296,8 +296,8 @@ The sidebar exposes eight modes, each backed by a `data-mode="..."` button. Sour
 | Button | Mode | What it does |
 |---|---|---|
 | **Preview** | `preview` | Reloads the iframe and re-enters preview-only behaviour (no selection / hover overlays). |
-| **Select** | `select` | Click an element → inspect node, add a sibling/child, **edit its params + class + mandatory attrs in place** (via the Edit Params button), delete, duplicate, or save as snippet / component. |
-| **Drag** | `drag` | Drag elements to reorder within parent (`preview-drag.js`). |
+| **Select** | `select` | Click an element → inspect node, add a sibling/child (a child only where the element can hold one: not a text, a component or a void element such as an image), **edit its params + class + mandatory attrs in place** (via the Edit Params button), delete, duplicate, or save as snippet / component. |
+| **Drag** | `drag` | Drag an element before, after or into another of the same structure (`preview-drag.js`, the drop zones in `preview-iframe-inject.js`). A drop into an element makes it that element's last child, and is saved as `moveNode`'s `inside-end`. No drop into an element is offered over a text, a component, or a void element such as an image: there, only before and after. |
 | **Text** | `text` | Inline-edit a text node's translation **for the currently selected language**. Intentionally primitive: no rich text, no line breaks. Edits the value, never the key. |
 | **CSS** | `style` | Click an element → CSS panel (Theme / Selectors / Motion tabs); edits apply to the element's selector with full pseudo-state support. The Theme tab includes an inline **+ Add variable** form per section (Colors / Fonts / Spacing) for scope-aware writes (current light/dark scope, optional "also other scope" when dark mode is enabled). The Motion tab carries two sections: **Selectors with motion** (transitions + animations + a "hover-state-only" diagnostic) and the **Keyframes library** below — see §8.11. Designer / developer / admin roles also see a top-row **Source** advanced view that opens the whole `style.css` in a code editor — see §8.10. |
 | **Interactions** | `js` | Event editor (`preview-js-interactions.js`). Three CRUD-capable panels: **per-element interactions** (the selected node's `onclick`/`oninput`/etc.), **Page Events** (page-level `onload`/`onresize`/`onscroll`), and **State Stores** (page-scoped state). Each interaction is a `{{call:fn:args}}` chain using a QS.* verb from the catalog. |
@@ -350,6 +350,17 @@ only opens with a selection, leaving no way back in. In editor mode the renderer
 emits a dashed placeholder standing for the structure root; selecting it and
 adding an element inserts the first node. The placeholder is editor-only: the
 published page renders nothing.
+
+**A new structure starts empty.** A new project's home page, menu and footer, a
+page `addRoute` creates and a parent page it creates on the way all start with no
+nodes, so each shows its own placeholder ("The menu is empty…", "This page is
+empty…") and an author can tell what nobody has built yet from what they emptied.
+An emptied structure stays empty: nothing is put back. The one exception is a new
+project's **404 page**, which a visitor can reach before anything else is built:
+it starts with a heading, a sentence and a link back to the home page, three
+ordinary nodes whose texts (`404.title`, `404.message`, `404.backHome`) are written
+in English into every language file the project starts with, for the author to
+rewrite.
 
 **Which tags the editor offers, and which params it asks for, come from the
 server.** `TagRegistry` is the single source of truth, and

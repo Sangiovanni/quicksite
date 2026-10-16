@@ -6,11 +6,14 @@
  * - Adding node identifiers to structure trees
  * - Navigating to specific nodes by identifier
  * - Editing/deleting nodes by identifier
- * - Inserting nodes before, after or inside a node, or at the root
+ * - Inserting nodes before, after or inside a node (first or last), or at the root
  * 
  * Node identifiers use 0-indexed dot notation: "0.2.1" means
  * root's 1st child → 3rd child → 2nd child
  */
+
+// Which tags are void elements (TagRegistry::isVoidElement): an insert never puts children in one.
+require_once __DIR__ . '/TagRegistry.php';
 
 class NodeNavigator {
     
@@ -145,8 +148,8 @@ class NodeNavigator {
      * Writing `children` into a list instead turns it into an object the renderer
      * cannot read: the page shows nothing and the insert is lost.
      *
-     * A node root that cannot hold children (a component call, a text node) is
-     * refused, as an insert inside one is.
+     * A node root that cannot hold children (a component call, a text node, a void
+     * element such as an img) is refused, as an insert inside one is.
      *
      * @param mixed $structure The whole structure, as read from its file
      * @param array $newNode   The node to insert
@@ -164,6 +167,9 @@ class NodeNavigator {
         $isList = !self::isAssociativeArray($structure);
         if (!$isList && (!isset($structure['tag']) || isset($structure['component']))) {
             return ['success' => false, 'error' => 'The structure root cannot hold children'];
+        }
+        if (!$isList && ($void = self::voidElementRefusal($structure, 'The structure root')) !== null) {
+            return ['success' => false, 'error' => $void];
         }
 
         $entries = $isList ? $structure : (is_array($structure['children'] ?? null) ? $structure['children'] : []);
@@ -189,10 +195,14 @@ class NodeNavigator {
      *
      *   before / after  the new node becomes the target's sibling, just before or
      *                   just after it.
-     *   inside          the new node becomes the target's first child. A target that
-     *                   cannot hold children (a component call, a text node) is
-     *                   refused, as such a root is: the renderer reads no children
-     *                   there, so the insert would be written and never shown.
+     *   inside          the new node becomes the target's first child.
+     *   inside-end      the new node becomes the target's last child (a move's drop
+     *                   inside an element, which the editor appends).
+     *
+     * Inside or at the end, a target that cannot hold children is refused, as such a
+     * root is: a component call, a text node, or a void element (img, input, br…).
+     * The renderer reads no children there, so the insert would be written and
+     * never shown.
      *
      * Several nodes land in order when each is inserted at the same target and
      * position, last one first.
@@ -200,8 +210,8 @@ class NodeNavigator {
      * @param mixed  $structure    The whole structure, as read from its file
      * @param string $targetNodeId Dot-separated indices ("0.2.1")
      * @param array  $newNode      The node to insert
-     * @param string $position     'before', 'after' or 'inside'
-     * @param int[]  $adopt        For 'inside': indices of the target's children to move
+     * @param string $position     'before', 'after', 'inside' or 'inside-end'
+     * @param int[]  $adopt        Inside or at the end: indices of the target's children to move
      *                             into the new node first, keeping their order (addNode's
      *                             rule for an insert inside a node that holds text). Used
      *                             only when the new node has children.
@@ -209,7 +219,7 @@ class NodeNavigator {
      *               or ['success' => false, 'error' => string]
      */
     public static function insertAt($structure, string $targetNodeId, array $newNode, string $position, array $adopt = []): array {
-        if (!in_array($position, ['before', 'after', 'inside'], true)) {
+        if (!in_array($position, ['before', 'after', 'inside', 'inside-end'], true)) {
             return ['success' => false, 'error' => "Invalid position '{$position}'"];
         }
         if (preg_match('/^[0-9]+(\.[0-9]+)*$/D', $targetNodeId) !== 1) {
@@ -241,19 +251,28 @@ class NodeNavigator {
             return $notFound;
         }
 
-        if ($position === 'inside') {
+        if ($position === 'inside' || $position === 'inside-end') {
             $target = &$siblings[$index];
             if (!is_array($target) || !isset($target['tag']) || isset($target['component'])
                 || (isset($target['children']) && !is_array($target['children']))) {
                 return ['success' => false, 'error' => 'The target node cannot hold children'];
             }
+            if (($void = self::voidElementRefusal($target, 'The target node')) !== null) {
+                return ['success' => false, 'error' => $void];
+            }
             $children = $target['children'] ?? [];
             $newNode = self::adopt($children, $newNode, $adopt);
-            array_unshift($children, $newNode);
+            if ($position === 'inside') {
+                array_unshift($children, $newNode);
+                $at = 0;
+            } else {
+                $children[] = $newNode;
+                $at = count($children) - 1;
+            }
             $target['children'] = $children;
             unset($target, $siblings);
             $path[] = $index;
-            $path[] = 0;
+            $path[] = $at;
             return ['success' => true, 'structure' => $structure, 'newNodeId' => implode('.', $path)];
         }
 
@@ -262,6 +281,21 @@ class NodeNavigator {
         unset($siblings);
         $path[] = $at;
         return ['success' => true, 'structure' => $structure, 'newNodeId' => implode('.', $path)];
+    }
+
+    /**
+     * The refusal for a node that is a void element (TagRegistry::isVoidElement: img,
+     * input, br…), which HTML gives no children, or null. $what names the node in the
+     * sentence ("The target node", "The structure root").
+     */
+    private static function voidElementRefusal(array $node, string $what): ?string {
+        $tag = $node['tag'] ?? null;
+        if (!is_string($tag) || !TagRegistry::isVoidElement($tag)) {
+            return null;
+        }
+        $tag = strtolower($tag);
+        $article = in_array($tag[0], ['a', 'e', 'i', 'o', 'u'], true) ? 'an' : 'a';
+        return "{$what} is {$article} {$tag} element, which cannot hold children";
     }
 
     /**

@@ -81,7 +81,7 @@
 
         const source    = data.sourceElement;
         const target    = data.targetElement;
-        const position  = data.position;        // 'before', 'after', or 'inside'
+        const position  = data.position;        // 'before', 'after' or 'inside-end' (the last child)
         const isUndoRedo      = !!data.isUndoRedo;
         const undoRedoAction  = data.undoRedoAction; // 'undo' or 'redo'
 

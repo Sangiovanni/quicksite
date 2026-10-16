@@ -793,7 +793,8 @@
         },
         "addComponent": {
             "selectPosition": "Select position...",
-            "positionInside": "Inside (as child)",
+            "positionInside": "Inside (as first child)",
+            "positionInsideEnd": "Inside (as last child)",
             "positionBefore": "Before",
             "positionAfter": "After",
             "dataSubtitle": "Select a component to see its variables",

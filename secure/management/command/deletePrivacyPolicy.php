@@ -21,6 +21,10 @@ require_once SECURE_FOLDER_PATH . '/src/functions/privacyHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/consentLayerHelpers.php'; // consentRouteExists
 require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
+// This command only removes content: neither the size cap nor the over-quota rule refuses
+// its writes, even when a re-save makes a file larger (qs_small_write_removal_only()).
+qs_small_write_removal_only();
+
 $reg = loadPrivacyRegistry();
 $route = $reg['privacyRoute'] ?? null;
 if (!is_string($route) || trim($route, '/') === '') {
@@ -40,8 +44,8 @@ if (consentRouteExists($routeTrim)) {
 
 $reg['privacyRoute'] = null;
 savePrivacyRegistry($reg);
-// Every write here shrinks a file, so the size check never refuses; answered
-// like every chain all the same (qs_small_write_guard).
+// A removal, so the size check never refuses (marked above); answered like every
+// chain all the same (qs_small_write_guard).
 qs_small_write_send_refusal();
 
 ApiResponse::create(200, 'success')

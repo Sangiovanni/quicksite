@@ -136,6 +136,17 @@ function __command_importStructureTranslations(array $params = [], array $urlPar
             ->withErrors(array_map(fn($f) => ['field' => $f, 'reason' => 'missing'], $missing));
     }
 
+    // Each of the four names one value. One that is neither a string nor a number (a list,
+    // a boolean) is refused before a cast reads it as "Array" or "1": the answer the page-name
+    // rule gives a page name of the wrong type, for all four alike.
+    foreach (['route', 'kind', 'structureId', 'language'] as $f) {
+        if (!is_string($params[$f]) && !is_int($params[$f]) && !is_float($params[$f])) {
+            return ApiResponse::create(400, 'validation.invalid_type')
+                ->withMessage("The {$f} parameter must be a string.")
+                ->withErrors([['field' => $f, 'reason' => 'invalid_type', 'expected' => 'string']]);
+        }
+    }
+
     $route = (string)$params['route'];
     $kind = (string)$params['kind'];
     $structureId = (string)$params['structureId'];

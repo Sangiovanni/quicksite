@@ -18,6 +18,11 @@ require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_
  * - Same-level moves (reordering siblings)
  * - Cross-level moves (moving into/out of nested children)
  * - Automatic index adjustment after removal
+ *
+ * The node is removed, then put back through NodeNavigator::insertAt(), the insert every
+ * command shares: before / after the target, inside it as its first child, or inside it as
+ * its last child (inside-end, what the editor's drag and drop sends for a drop inside). A
+ * target that cannot hold children (a text node, a component call, a void element) is refused.
  */
 
 /**
@@ -47,7 +52,7 @@ function __command_moveNode(array $params = [], array $urlParams = []): ApiRespo
     $name = $params['name'] ?? null;
     $sourceNodeId = $params['sourceNodeId'];
     $targetNodeId = $params['targetNodeId'];
-    $position = $params['position'] ?? 'after'; // 'before' or 'after'
+    $position = $params['position'] ?? 'after'; // 'before', 'after', 'inside' or 'inside-end'
     
     // Validate type
     $allowed_types = ['menu', 'footer', 'page', 'component'];
@@ -78,10 +83,11 @@ function __command_moveNode(array $params = [], array $urlParams = []): ApiRespo
     }
     
     // Validate position
-    if (!in_array($position, ['before', 'after', 'inside'], true)) {
+    $allowedPositions = ['before', 'after', 'inside', 'inside-end'];
+    if (!in_array($position, $allowedPositions, true)) {
         return ApiResponse::create(400, 'validation.invalid_value')
-            ->withMessage("Invalid position. Must be 'before', 'after', or 'inside'")
-            ->withErrors([['field' => 'position', 'value' => $position, 'allowed' => ['before', 'after', 'inside']]]);
+            ->withMessage("Invalid position. Must be 'before', 'after', 'inside' or 'inside-end'")
+            ->withErrors([['field' => 'position', 'value' => $position, 'allowed' => $allowedPositions]]);
     }
     
     // Can't move a node relative to itself
@@ -160,15 +166,6 @@ function __command_moveNode(array $params = [], array $urlParams = []): ApiRespo
     $sourceIndices = array_map('intval', explode('.', $sourceNodeId));
     $targetIndices = array_map('intval', explode('.', $targetNodeId));
     
-    // Determine source and target parents
-    $sourceParentPath = array_slice($sourceIndices, 0, -1);
-    $targetParentPath = array_slice($targetIndices, 0, -1);
-    $sourceIndex = end($sourceIndices);
-    $targetIndex = end($targetIndices);
-    
-    // Check if same parent (simpler case)
-    $sameParent = ($sourceParentPath === $targetParentPath);
-    
     // Step 1: Remove source node from its current position
     $removeResult = removeNodeFromStructure($structure, $sourceIndices);
     if (!$removeResult['success']) {
@@ -215,38 +212,18 @@ function __command_moveNode(array $params = [], array $urlParams = []): ApiRespo
     }
     
     // Use adjusted indices
-    $targetIndices = $adjustedTargetIndices;
-    $targetIndex = end($targetIndices);
-    $targetParentPath = array_slice($targetIndices, 0, -1);
-    
-    // Step 3: Calculate insert position
-    if ($position === 'inside') {
-        // 'inside' = append as last child of the target node
-        // Navigate to the target node in the (post-removal) structure to count its children
-        $adjustedTargetId = implode('.', $targetIndices);
-        $targetNodeAfterRemoval = NodeNavigator::getNode($structure, $adjustedTargetId);
-        if ($targetNodeAfterRemoval === null) {
-            return ApiResponse::create(400, 'operation.failed')
-                ->withMessage("Target node not found after source removal at: {$adjustedTargetId}");
-        }
-        $childCount = isset($targetNodeAfterRemoval['children']) ? count($targetNodeAfterRemoval['children']) : 0;
-        $insertIndices = $targetIndices;
-        $insertIndices[] = $childCount; // append at end of children
-    } else {
-        $insertIndex = ($position === 'after') ? $targetIndex + 1 : $targetIndex;
-        $insertIndices = $targetParentPath;
-        $insertIndices[] = $insertIndex;
-    }
-    
-    // Step 4: Insert node at new position
-    $insertResult = insertNodeIntoStructure($structure, $insertIndices, $removedNode);
+    $adjustedTargetId = implode('.', $adjustedTargetIndices);
+
+    // Step 3: put the node back next to or into the target (NodeNavigator::insertAt, the
+    // insert every command shares). Nothing is written when it refuses.
+    $insertResult = NodeNavigator::insertAt($structure, $adjustedTargetId, $removedNode, $position);
     if (!$insertResult['success']) {
         return ApiResponse::create(400, 'operation.failed')
             ->withMessage("Failed to insert node: " . $insertResult['error']);
     }
     $structure = $insertResult['structure'];
-    $newNodeId = implode('.', $insertIndices);
-    
+    $newNodeId = $insertResult['newNodeId'];
+
     // SECURITY: depth-check the RESULT. A move that goes SHALLOWER
     // still passes, so an over-deep page stays repairable.
     if (!qs_structure_depth_ok($structure)) {
@@ -367,75 +344,6 @@ function removeNodeFromStructure(array $structure, array $indices): array {
     }
     
     return ['success' => true, 'structure' => $structure, 'node' => $removedNode];
-}
-
-/**
- * Insert a node into the structure at the given indices path
- */
-function insertNodeIntoStructure(array $structure, array $indices, array $node): array {
-    if (empty($indices)) {
-        return ['success' => false, 'error' => 'Empty indices'];
-    }
-    
-    // Detect if root is a single object (component) or array of nodes (page)
-    $isRootObject = isset($structure['tag']);
-    
-    $ref = &$structure;
-    
-    for ($i = 0; $i < count($indices) - 1; $i++) {
-        $idx = $indices[$i];
-        
-        if ($i === 0) {
-            // First level
-            if ($isRootObject) {
-                // Component: first index accesses children directly
-                if (!isset($ref['children'][$idx])) {
-                    return ['success' => false, 'error' => "Parent node not found at index {$idx}"];
-                }
-                $ref = &$ref['children'][$idx];
-            } else {
-                // Page: direct array access
-                if (!isset($ref[$idx])) {
-                    return ['success' => false, 'error' => "Parent node not found at index {$idx}"];
-                }
-                $ref = &$ref[$idx];
-            }
-        } else {
-            // Deeper levels
-            if (!isset($ref['children'])) {
-                $ref['children'] = [];
-            }
-            if (!isset($ref['children'][$idx])) {
-                return ['success' => false, 'error' => "Parent node not found in children at index {$idx}"];
-            }
-            $ref = &$ref['children'][$idx];
-        }
-    }
-    
-    // Insert at final index
-    $finalIndex = end($indices);
-    
-    if (count($indices) === 1) {
-        // Root level insert
-        if ($isRootObject) {
-            // Component: insert into children array
-            if (!isset($structure['children'])) {
-                $structure['children'] = [];
-            }
-            array_splice($structure['children'], $finalIndex, 0, [$node]);
-        } else {
-            // Page: insert into root array
-            array_splice($structure, $finalIndex, 0, [$node]);
-        }
-    } else {
-        // Nested level insert
-        if (!isset($ref['children'])) {
-            $ref['children'] = [];
-        }
-        array_splice($ref['children'], $finalIndex, 0, [$node]);
-    }
-    
-    return ['success' => true, 'structure' => $structure];
 }
 
 // Execute via HTTP

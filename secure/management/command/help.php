@@ -17,7 +17,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 // Define commands in global scope for access from __command_help()
 $GLOBALS['__help_commands'] = [
     'addRoute' => [
-        'description' => 'Creates a new route with PHP page template and empty JSON structure. Supports nested routes (e.g., "guides/getting-started") and parameterised routes via ":name" segments (e.g., "products/:slug").',
+        'description' => 'Creates a new route with PHP page template and an empty JSON structure ([]: the visual editor shows its empty-page placeholder). Supports nested routes (e.g., "guides/getting-started") and parameterised routes via ":name" segments (e.g., "products/:slug").',
         'method' => 'POST',
         'parameters' => [
             'route' => [
@@ -63,7 +63,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.operation_failed' => 'An unexpected failure while creating the route files; any directories already created are removed first. The exception message is returned.',
             '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
-        'notes' => 'Creates PHP template + empty JSON structure. **Filesystem mapping**: ":slug" segments become "__slug" on disk (NTFS reserves ":") via routeHelpers.php. **Conflict warnings** (non-blocking): the response data.warnings[] array surfaces situations the user should confirm. Each warning carries a machine-readable `type` (i18n key) + EN `message` fallback + structured details. Two shapes today: `route.warning.param_shadows_exact_siblings` (param route alongside existing literals — runtime-safe via specificity but worth verifying intent) and `route.warning.duplicate_param_at_depth` (two ":name" siblings — declaration order resolves, but ambiguous).'
+        'notes' => 'Creates PHP template + empty JSON structure ([]), and the same for a parent page it creates on the way. **Filesystem mapping**: ":slug" segments become "__slug" on disk (NTFS reserves ":") via routeHelpers.php. **Conflict warnings** (non-blocking): the response data.warnings[] array surfaces situations the user should confirm. Each warning carries a machine-readable `type` (i18n key) + EN `message` fallback + structured details. Two shapes today: `route.warning.param_shadows_exact_siblings` (param route alongside existing literals — runtime-safe via specificity but worth verifying intent) and `route.warning.duplicate_param_at_depth` (two ":name" siblings — declaration order resolves, but ambiguous).'
     ],
     
     'deleteRoute' => [
@@ -1062,7 +1062,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.file_read_failed' => 'Failed to read structure file.',
             '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
-        'notes' => 'Two modes: (1) Full replacement - sends complete structure. (2) Targeted edit - use nodeId to modify single node. Use getStructure/page/name/showIds to see node identifiers first. Actions: update (replace), delete (remove), insertBefore/insertAfter (add sibling). Security: max 10,000 nodes, max 50 levels deep. **Component node paths**: For type=component, the root object is "" (empty) and children are "0", "1", etc. This differs from pages where root elements are "0", "1".'
+        'notes' => 'Two modes: (1) Full replacement - sends complete structure. (2) Targeted edit - use nodeId to modify single node. Use getStructure/page/name/showIds to see node identifiers first. Actions: update (replace), delete (remove), insertBefore/insertAfter (add sibling). A structure left empty, by a full replacement with [] or by deleting its last node, is saved empty: nothing is added in its place. Security: max 10,000 nodes, max 50 levels deep. **Component node paths**: For type=component, the root object is "" (empty) and children are "0", "1", etc. This differs from pages where root elements are "0", "1".'
     ],
     
     'getTranslation' => [
@@ -2885,7 +2885,7 @@ $GLOBALS['__help_commands'] = [
     // =========================================================================
     
     'moveNode' => [
-        'description' => 'Moves a node from one position to another within a structure. Handles same-level reordering and cross-level moves with automatic index adjustment.',
+        'description' => 'Moves a node from one position to another within a structure. Handles same-level reordering and cross-level moves with automatic index adjustment. The node is put back by the insert every command shares.',
         'method' => 'PATCH',
         'parameters' => [
             'type' => [
@@ -2916,7 +2916,7 @@ $GLOBALS['__help_commands'] = [
             'position' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => 'Insert before or after target (default: after)',
+                'description' => 'Where the node lands relative to targetNodeId: before or after it (its sibling), inside (its first child) or inside-end (its last child: what the visual editor\'s drag and drop sends for a drop inside an element). Default "after". Inside or inside-end, a target that cannot hold children (a text node, a component call, or a void element such as img, input or br) is refused.',
                 'example' => 'before'
             ]
         ],
@@ -2936,10 +2936,10 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '400.validation.required' => 'Missing required parameter',
-            '400.validation.invalid_value' => 'Invalid type or position value',
+            '400.validation.invalid_value' => 'Invalid type, or a position other than before, after, inside or inside-end.',
             '400.operation.denied' => 'Cannot move to same position or inside self',
             '404.resource.not_found' => 'Source or target node not found',
-            '400.operation.failed' => 'The move could not be applied: the source node could not be removed, the target could no longer be found once the source was removed, or the insert failed. The structure file is left unchanged.',
+            '400.operation.failed' => 'The move could not be applied: the source node could not be removed, the target could no longer be found once the source was removed, or the target cannot hold children, inside or inside-end (a text node, a component call, or a void element such as img, input or br: "The target node is an img element, which cannot hold children"). The structure file is left unchanged.',
             '400.validation.invalid_format' => 'Invalid sourceNodeId format. Use dot notation like \'0.2.1\'. Invalid targetNodeId format. Use dot notation like \'0.2.1\'. Structure too deeply nested (max 50 levels). A page name with "..", a backslash or a NUL byte (reason path_traversal_attempt), or a segment outside the page-name rule; a component name with "..", a slash, a backslash or a NUL byte (reason path_traversal_attempt), or outside the component-name rule (reason invalid_component_reference, errors[0].expected states it).',
             '404.file.not_found' => 'Structure file not found.',
             '404.node.not_found' => 'The sourceNodeId or the targetNodeId does not resolve to a node in the structure.',
@@ -2952,7 +2952,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_length' => 'A page name longer than 200 bytes.',
             '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
-        'notes' => 'Atomic move operation with proper index adjustment. Use in Visual Editor drag & drop. Components are moved as single units. **Component node paths**: For type=component, children are "0", "1", etc. (root is "", not movable).'
+        'notes' => 'Atomic move operation with proper index adjustment. Use in Visual Editor drag & drop. Components are moved as single units. "inside" puts the node first among the target\'s children, as every insert command does; "inside-end" puts it last, and only a move offers it. **Component node paths**: For type=component, children are "0", "1", etc. (root is "", not movable).'
     ],
     
     'deleteNode' => [
@@ -3045,7 +3045,7 @@ $GLOBALS['__help_commands'] = [
             'position' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => 'Where to insert: before, after, or inside (default after; forced inside when targetNodeId="root")',
+                'description' => 'Where to insert: before, after, or inside (default after; forced inside when targetNodeId="root"). Inside a target that cannot hold children (a component call, a text node, or a void element such as img, input or br) is refused.',
                 'example' => 'after',
                 'default' => 'after'
             ],
@@ -3109,7 +3109,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.unsafe_param' => 'A param the renderer would refuse: an attribute NAME outside [letters, digits, underscore, colon, hyphen]; a raw on* handler (use {{call:...}} syntax); or a disallowed URL scheme (only http, https, mailto, tel)',
             '400.operation.denied' => 'Cannot insert inside component node',
             '404.resource.not_found' => 'Target node not found',
-            '400.operation.failed' => 'Failed to insert node.',
+            '400.operation.failed' => 'Failed to insert node: inside (or at "root") a target that cannot hold children — a component call, a text node, or a void element such as img, input or br: "The target node is an img element, which cannot hold children" (at "root": "The structure root is …").',
             '400.validation.blocked_tag' => 'Tag is blocked for security reasons.',
             '400.validation.invalid_format' => 'Invalid targetNodeId format. Use dot notation like \'0.2.1\' or \'root\'. Structure too deeply nested (max 50 levels). A page name with "..", a backslash or a NUL byte (reason path_traversal_attempt), or a segment outside the page-name rule; a component name with "..", a slash, a backslash or a NUL byte (reason path_traversal_attempt), or outside the component-name rule (reason invalid_component_reference, errors[0].expected states it).',
             '400.validation.reserved_attribute' => 'Cannot use reserved attribute. Attributes starting with \'data-qs-\' are reserved for QuickSite. Use a different prefix like \'data-custom-\' or \'data-app-\'.',
@@ -3125,7 +3125,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_length' => 'A page name longer than 200 bytes.',
             '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
-        'notes' => 'TAG mode adds a tag element that comes in EMPTY by default; the legacy auto-generated placeholder textKey was removed (it was the cause of span-in-span nesting when authoring bound elements). Pass an explicit `textKey` to attach a translation-key text child at add-time, or leave empty and use the dedicated TEXT mode + the Text-mode inline editor (Text tool) afterwards. TEXT mode adds a bare `{textKey:...}` text node — set `textRaw=true` + `textValue` for a literal, or pass an explicit `textKey` (the visual editor\'s text-key picker handles key creation + translation write via setTranslationKeys before calling addNode). Position "inside" moves existing text children of the target into the new tag node; this move logic is skipped for TEXT inserts. For components, use addComponentToNode. **Component node paths**: For type=component, root is "" (empty) and children are "0", "1", etc. (differs from pages where root elements start at "0"). targetNodeId "root" inserts at the structure\'s root, by the one rule every command that inserts there shares: a structure whose root is a list of nodes (every page, menu and footer) takes the new node as its first entry; one whose root is a single node (a component) takes it as its first child; either way its id is "0". A root that cannot hold children (a component call, a text node) is refused.'
+        'notes' => 'TAG mode adds a tag element that comes in EMPTY by default; the legacy auto-generated placeholder textKey was removed (it was the cause of span-in-span nesting when authoring bound elements). Pass an explicit `textKey` to attach a translation-key text child at add-time, or leave empty and use the dedicated TEXT mode + the Text-mode inline editor (Text tool) afterwards. TEXT mode adds a bare `{textKey:...}` text node — set `textRaw=true` + `textValue` for a literal, or pass an explicit `textKey` (the visual editor\'s text-key picker handles key creation + translation write via setTranslationKeys before calling addNode). Position "inside" moves existing text children of the target into the new tag node; this move logic is skipped for TEXT inserts. For components, use addComponentToNode. **Component node paths**: For type=component, root is "" (empty) and children are "0", "1", etc. (differs from pages where root elements start at "0"). targetNodeId "root" inserts at the structure\'s root, by the one rule every command that inserts there shares: a structure whose root is a list of nodes (every page, menu and footer) takes the new node as its first entry; one whose root is a single node (a component) takes it as its first child; either way its id is "0". A root that cannot hold children (a component call, a text node, a void element such as img) is refused.'
     ],
 
     'addComplexElement' => [
@@ -3166,7 +3166,7 @@ $GLOBALS['__help_commands'] = [
             'position' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => 'Where to insert relative to targetNodeId: before, after, or inside. Default "after". Forced to "inside" when targetNodeId="root".',
+                'description' => 'Where to insert relative to targetNodeId: before, after, or inside. Default "after". Forced to "inside" when targetNodeId="root". Inside a target that cannot hold children (a component call, a text node, or a void element such as img, input or br) is refused.',
                 'default' => 'after',
                 'example' => 'inside'
             ]
@@ -3196,7 +3196,7 @@ $GLOBALS['__help_commands'] = [
             '404.node.not_found' => 'Target node not found at the given dot path',
             '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
             '500.complex_element.build_failed' => 'Builder threw unexpectedly or returned a malformed node',
-            '400.operation.failed' => 'Failed to insert subtree.',
+            '400.operation.failed' => 'Failed to insert subtree: inside (or at "root") a target that cannot hold children — a component call, a text node, or a void element such as img, input or br: "The target node is an img element, which cannot hold children" (at "root": "The structure root is …").',
             '400.validation.blocked_tag' => 'Builder emitted tag, which is not allowed (security restriction).',
             '400.validation.reserved_key' => 'Reserved admin-namespace prefix (quicksite_ / quicksite- / qs_ / qs-). These are used by the admin panel and would collide with admin state. Pick a project-specific prefix.',
             '404.file.not_found' => 'Structure file not found.',
@@ -3207,7 +3207,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_length' => 'A page name longer than 200 bytes.',
             '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
-        'notes' => 'After save, the emitted subtree is INDISTINGUISHABLE from a hand-built one — same JSON shape, same renderer, editable with the regular visual-editor tools. Wizard is build-time only; nothing at render time knows the element came from here. Builders live in <secure>/src/classes/complexElements/*.php as ComplexElementBuilder subclasses and are auto-discovered by the dispatcher. Drop a new builder file + a matching <public>/admin/.../contextual-complex/complex-<kind>.js wizard to add a kind — zero registration. Before, after and inside a node follow the rule addNode follows, the one every positional insert shares. targetNodeId "root" inserts at the structure\'s root, by the one rule every command that inserts there shares: a structure whose root is a list of nodes (every page, menu and footer) takes the new node as its first entry; one whose root is a single node (a component) takes it as its first child; either way its id is "0". A root that cannot hold children (a component call, a text node) is refused with 400 operation.failed.'
+        'notes' => 'After save, the emitted subtree is INDISTINGUISHABLE from a hand-built one — same JSON shape, same renderer, editable with the regular visual-editor tools. Wizard is build-time only; nothing at render time knows the element came from here. Builders live in <secure>/src/classes/complexElements/*.php as ComplexElementBuilder subclasses and are auto-discovered by the dispatcher. Drop a new builder file + a matching <public>/admin/.../contextual-complex/complex-<kind>.js wizard to add a kind — zero registration. Before, after and inside a node follow the rule addNode follows, the one every positional insert shares. targetNodeId "root" inserts at the structure\'s root, by the one rule every command that inserts there shares: a structure whose root is a list of nodes (every page, menu and footer) takes the new node as its first entry; one whose root is a single node (a component) takes it as its first child; either way its id is "0". A root that cannot hold children (a component call, a text node, a void element such as img) is refused with 400 operation.failed.'
     ],
 
     'duplicateNode' => [
@@ -3396,7 +3396,7 @@ $GLOBALS['__help_commands'] = [
             'position' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Where to insert: before, after, or inside (the component becomes the target\'s first child); forced to inside when targetNodeId is "root". Inside a component call or a text node is refused.',
+                'description' => 'Where to insert: before, after, or inside (the component becomes the target\'s first child); forced to inside when targetNodeId is "root". Inside a component call or a text node is refused, and inside a void element such as img, input or br.',
                 'example' => 'after'
             ],
             'component' => [
@@ -3440,7 +3440,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_value' => 'Component not found. Inside a component node (reason component_is_atomic) or a text node (reason text_node): neither renders children.',
             '400.operation.denied' => 'Cannot insert inside component node',
             '404.resource.not_found' => 'Target node not found',
-            '400.operation.failed' => 'Failed to insert component node.',
+            '400.operation.failed' => 'Inside (or at "root") a void element such as img, input or br, which cannot hold children: "The target node is an img element, which cannot hold children" (at "root": "The structure root is …").',
             '400.validation.invalid_format' => 'Invalid targetNodeId format. Use dot notation like \'0.2.1\' or \'root\'. Invalid component name format. Structure too deeply nested (max 50 levels). A page name with "..", a backslash or a NUL byte (reason path_traversal_attempt), or a segment outside the page-name rule; a component name with "..", a slash, a backslash or a NUL byte (reason path_traversal_attempt), or outside the component-name rule (reason invalid_component_reference, errors[0].expected states it).',
             '400.validation.reserved_key' => 'Reserved admin-namespace prefix (quicksite_ / quicksite- / qs_ / qs-). These are used by the admin panel and would collide with admin state. Pick a project-specific prefix.',
             '404.error.notFound' => 'One of the four things the call needs does not exist: the component, the page, the structure file for the given type (and name), or the target node.',
@@ -3453,7 +3453,7 @@ $GLOBALS['__help_commands'] = [
             '404.route.not_found' => 'The page is neither a route of the project nor a special page; data.available_routes and data.special_pages list both.',
             '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
-        'notes' => 'Auto-generates textKeys as {struct}.{component}{N}.{var}. Creates empty translations, only once the insert passes every check, so a refused insert writes nothing. Returns rendered HTML for live DOM insertion. System placeholders (__ prefix) are filtered out. targetNodeId "root" inserts at the structure\'s root, by the one rule every command that inserts there shares: a structure whose root is a list of nodes (every page, menu and footer) takes the new node as its first entry; one whose root is a single node (a component) takes it as its first child; either way its id is "0". A root that cannot hold children (a component call, a text node) is refused with 400 operation.failed. Before, after and inside a node follow the one rule every positional insert shares: the new node becomes the target\'s sibling just before or just after it, or its first child.'
+        'notes' => 'Auto-generates textKeys as {struct}.{component}{N}.{var}. Creates empty translations, only once the insert passes every check, so a refused insert writes nothing. Returns rendered HTML for live DOM insertion. System placeholders (__ prefix) are filtered out. targetNodeId "root" inserts at the structure\'s root, by the one rule every command that inserts there shares: a structure whose root is a list of nodes (every page, menu and footer) takes the new node as its first entry; one whose root is a single node (a component) takes it as its first child; either way its id is "0". A root that cannot hold children (a component call, a text node, a void element such as img) is refused with 400 operation.failed. Before, after and inside a node follow the one rule every positional insert shares: the new node becomes the target\'s sibling just before or just after it, or its first child.'
     ],
     
     'editComponentToNode' => [
@@ -3733,7 +3733,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.file_write_failed' => 'Failed to create config.php. Failed to create routes.php. Failed to initialise project membership.',
             '507.quota.storage_exceeded' => 'A storage quota is configured and the caller\'s projects are already over it, so no new project can be created. Nothing was written.'
         ],
-        'notes' => 'Creates complete project structure: config.php, routes.php, templates/, translate/, etc. with basic home page template and an empty stylesheet. A create that fails part-way removes what it wrote: no project folder is left behind.'
+        'notes' => 'Creates complete project structure: config.php, routes.php, templates/, translate/, etc., and an empty stylesheet. The home page, the menu and the footer start empty ([]: the visual editor shows each one\'s placeholder). The 404 page starts with its message: a heading (404.title), the sentence (404.message) and a link to the home page (404.backHome), texts written in English into the project\'s language file and default.json for the author to rewrite. A create that fails part-way removes what it wrote: no project folder is left behind.'
     ],
 
     'cloneProject' => [
@@ -5453,6 +5453,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.file_write_failed' => 'translation file write failed',
             '500.server.internal_error' => 'The page JSON is malformed, a complex table node\'s dimensions could not be measured, or the merged translations could not be encoded. The offending element is named in the message.',
             '400.validation.invalid_length' => 'A page name longer than 200 bytes.',
+            '400.validation.invalid_type' => 'route, kind, structureId or language is neither a string nor a number (a list, a boolean): refused before it is read. errors[0].field names it.',
             '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'Counterpart to the Table wizard\'s Translatable paste mode (which CREATES + writes the FIRST language\'s values). This command is for adding additional languages to an existing structure. Empty cells in the pasted grid become empty translation values (NOT skipped — the key must exist after this write or the renderer falls back to the raw key text).'
@@ -6652,7 +6653,7 @@ $GLOBALS['__help_commands'] = [
             'position' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => 'Insertion position: inside (the snippet becomes the target\'s first children), before, after. Default: after. Forced to inside when targetNodeId is the literal "root". Inside a component call or a text node is refused.',
+                'description' => 'Insertion position: inside (the snippet becomes the target\'s first children), before, after. Default: after. Forced to inside when targetNodeId is the literal "root". Inside a component call or a text node is refused, and inside a void element such as img, input or br.',
                 'example' => 'inside'
             ]
         ],
@@ -6675,7 +6676,7 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '400.validation.missing_field' => 'Missing required parameter',
-            '400.operation.failed' => 'Failed to insert snippet at the specified position',
+            '400.operation.failed' => 'Failed to insert snippet: inside (or at "root") a void element such as img, input or br, which cannot hold children: "The target node is an img element, which cannot hold children" (at "root": "The structure root is …").',
             '404.snippet.not_found' => 'Snippet not found',
             '404.file.not_found' => 'Target structure file not found',
             '400.project.mismatch' => 'The project named in the body does not match the project in the URL marker. The marker decides; a disagreeing echo is refused rather than ignored.',
@@ -6697,7 +6698,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_value' => 'Inside a component call or a text node: neither renders children, so the snippet would never show.',
             '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
-        'notes' => 'Every root of the snippet is inserted, in order, at the position asked (a snippet whose structure is a list of nodes has several roots): newNodeId names the first, newNodeIds every one, and html holds every root\'s HTML in order. Each translatable value (a text node\'s key, an alt / placeholder / title / aria-label key, a component\'s text variable) gets a new key {prefix}.item{N}, numbered on from the highest the project holds and from one root to the next. A raw or literal value (__RAW__ / __LIT__) is kept as written: no key, no translation. The snippet\'s translations are written under the new keys in every project language file, one for each new key (a key the snippet uses twice is written for both copies; keyMapping names the last), only once the insert passes every check, so a refused insert writes nothing. Before, after and inside a node follow the one rule every positional insert shares. targetNodeId "root" inserts at the structure\'s root, by the one rule every command that inserts there shares: a structure whose root is a list of nodes (every page, menu and footer) takes the new node as its first entry; one whose root is a single node (a component) takes it as its first child; either way its id is "0". A root that cannot hold children (a component call, a text node) is refused with 400 operation.failed.'
+        'notes' => 'Every root of the snippet is inserted, in order, at the position asked (a snippet whose structure is a list of nodes has several roots): newNodeId names the first, newNodeIds every one, and html holds every root\'s HTML in order. Each translatable value (a text node\'s key, an alt / placeholder / title / aria-label key, a component\'s text variable) gets a new key {prefix}.item{N}, numbered on from the highest the project holds and from one root to the next. A raw or literal value (__RAW__ / __LIT__) is kept as written: no key, no translation. The snippet\'s translations are written under the new keys in every project language file, one for each new key (a key the snippet uses twice is written for both copies; keyMapping names the last), only once the insert passes every check, so a refused insert writes nothing. Before, after and inside a node follow the one rule every positional insert shares. targetNodeId "root" inserts at the structure\'s root, by the one rule every command that inserts there shares: a structure whose root is a list of nodes (every page, menu and footer) takes the new node as its first entry; one whose root is a single node (a component) takes it as its first child; either way its id is "0". A root that cannot hold children (a component call, a text node, a void element such as img) is refused with 400 operation.failed.'
     ],
 
     'injectSnippetCss' => [
@@ -7007,6 +7008,7 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                     'setting' => 'max_file_bytes.<kind>, one cap per kind of small file: page, structure (menu, footer, components, consent layer), stylesheet, translation, routes, snippet, settings (every other project file a command writes: config.php, the registries, aliases, events, layouts...). 0 turns a cap off. The stylesheet\'s cap never exceeds what the CSS parser reads back.',
                     'refusal' => '413 validation.size_limit_exceeded: a file the command writes would pass its kind\'s cap and grow. Nothing is written; a file already over a lowered cap may still shrink. Files the engine derives from another (page wrappers, generated scripts, the sitemap) and uploaded assets have no cap.'
                 ],
+                'removals' => 'A command that only removes content is refused by neither the file caps nor the storage quota, even when its re-save makes a file larger (a file stored compact, as an import keeps it, is saved indented): deleteAlias, deleteApi, deleteAsset, deleteCollectedDatum, deleteCookiePolicy, deleteInteraction, deleteKeyframes, deleteLang, deleteNode, deletePageEvent, deletePrivacyPolicy, deleteRoute, deleteStorageItem, deleteStyleRule, deleteTranslationKeys. A file a removal takes over its cap may then shrink or keep its size until it is back under. No setting changes this.',
                 'storage' => [
                     'setting' => 'max_total_bytes: the storage quota per account (0 = off), measured over the projects it owns and its personal snippets.',
                     'small_writes' => '507 quota.storage_exceeded: while the owner is already over the quota, a change that makes files larger is refused; one that keeps their size or shrinks them is accepted, so an owner can always clean up. The figure is cached, so a change can take an owner a few bytes over.'

@@ -389,38 +389,56 @@ deflang_label() {
     fi
 }
 
-# Quota is the one config whose ABSENCE is a real setting: no quota.php means
-# nothing is limited, and a fresh install has none. So the label distinguishes
-# "no file" from "file present, both axes unlimited" — they behave the same
-# today but the second is a deliberate choice somebody made.
-quota_bytes_current() {
-    first_capture "$(CONFIG_DIR)/quota.php" \
-        "'max_total_bytes'[[:space:]]*=>[[:space:]]*\\([0-9]*\\)"
+# Quota is the one config whose ABSENCE is a real setting: no quota.php means the
+# defaults — no storage ceiling and no upload rate, while the size caps and the write
+# rate apply at the values the engine ships — and a fresh install has none. So the
+# label tells "no file" from "a file that sets no ceiling": they behave the same
+# today, but the second is a deliberate choice somebody made.
+#
+# A setting is read from its own line, which starts with the key: the .example
+# carries a commented example above each setting (// 'max_uploads' => 60, a
+# multiplication for the bytes), and a reader that matched anywhere on a line took
+# that example for the setting. A value that is not a plain number is "?".
+quota_setting() {
+    local file line
+    file="$(CONFIG_DIR)/quota.php"
+    [ -f "$file" ] || { echo ""; return 0; }
+    line=$(grep -E "^[[:space:]]*'$1'[[:space:]]*=>" "$file" 2>/dev/null | head -n 1)
+    [ -n "$line" ] || { echo ""; return 0; }
+    if [[ "$line" =~ =\>[[:space:]]*([0-9]+)[[:space:]]*,?[[:space:]]*$ ]]; then
+        echo "${BASH_REMATCH[1]}"
+    else
+        echo "?"
+    fi
 }
 
-quota_uploads_current() {
-    first_capture "$(CONFIG_DIR)/quota.php" \
-        "'max_uploads'[[:space:]]*=>[[:space:]]*\\([0-9]*\\)"
-}
+quota_bytes_current() { quota_setting max_total_bytes; }
+
+quota_uploads_current() { quota_setting max_uploads; }
 
 quota_label() {
     if [ ! -f "$(CONFIG_DIR)/quota.php" ]; then
-        echo -e "no limits  ${DIM}(default — quota.php not created yet)${NC}"
+        echo -e "size caps + write rate (defaults)  ${DIM}(quota.php not created yet; no storage ceiling, no upload rate)${NC}"
         return
     fi
     local b u parts=""
     b="$(quota_bytes_current)"; u="$(quota_uploads_current)"
-    if [ -n "$b" ] && [ "$b" != "0" ]; then
+    if [ "$b" = "?" ]; then
+        parts="a storage ceiling"
+    elif [ -n "$b" ] && [ "$b" != "0" ]; then
         parts="$(( b / 1024 / 1024 )) MB per user"
     fi
-    if [ -n "$u" ] && [ "$u" != "0" ]; then
+    if [ "$u" = "?" ]; then
+        [ -n "$parts" ] && parts="$parts, "
+        parts="${parts}an upload rate"
+    elif [ -n "$u" ] && [ "$u" != "0" ]; then
         [ -n "$parts" ] && parts="$parts, "
         parts="${parts}${u} uploads per period"
     fi
     if [ -z "$parts" ]; then
-        echo -e "no limits  ${DIM}(quota.php present, both axes unlimited)${NC}"
+        echo -e "no storage ceiling, no upload rate  ${DIM}(quota.php present; it also holds the size caps and the write rate)${NC}"
     else
-        echo -e "${YELLOW}${parts}${NC}"
+        echo -e "${YELLOW}${parts}${NC}  ${DIM}(quota.php also holds the size caps and the write rate)${NC}"
     fi
 }
 
@@ -1018,12 +1036,13 @@ item_token() {
 # ==========================================================
 # Item 7 — storage quotas
 # ==========================================================
-# ⚠ ABSENT MEANS NO LIMITS, AND THAT IS A REAL SETTING, NOT A MISSING ONE.
-# A fresh install has no quota.php and must not refuse uploads out of the box,
-# so declining every prompt here LEAVES THE FILE ABSENT rather than writing
-# zeros. The two are equivalent to the engine today, but writing a file for
-# "no limits" would turn an install that opted out into one that opted in to
-# nothing, and the next person to read the folder could not tell them apart.
+# ⚠ ABSENT MEANS THE DEFAULTS, AND THAT IS A REAL SETTING, NOT A MISSING ONE: no
+# storage ceiling and no upload rate, with the size caps and the write rate at the
+# values the engine ships. A fresh install has no quota.php and must not refuse
+# uploads out of the box, so declining every prompt here LEAVES THE FILE ABSENT
+# rather than writing zeros. The two are equivalent to the engine today, but writing
+# a file for "no ceiling" would turn an install that opted out into one that opted in
+# to nothing, and the next person to read the folder could not tell them apart.
 item_quota() {
     local cfg_dir; cfg_dir="$(CONFIG_DIR)"
     local live="$cfg_dir/quota.php"
@@ -1042,7 +1061,8 @@ item_quota() {
     echo ""
     echo -e "  Currently: $(quota_label)"
     echo ""
-    echo -e "  ${DIM}Leave both blank for no limits. Full documentation of every${NC}"
+    echo -e "  ${DIM}Leave both blank for no storage ceiling and no upload rate; the size${NC}"
+    echo -e "  ${DIM}caps and the write rate still apply. Full documentation of every${NC}"
     echo -e "  ${DIM}option lives in quota.php.example, which is never modified.${NC}"
     echo ""
 
@@ -1084,12 +1104,13 @@ item_quota() {
     if [ "$BYTES" = "0" ] && [ "$MAXUP" = "0" ]; then
         if [ ! -f "$live" ]; then
             echo ""
-            echo -e "  ${GREEN}✓${NC} No limits — quota.php left absent, which is what a fresh"
-            echo "    install has. Nothing is refused."
+            echo -e "  ${GREEN}✓${NC} No storage ceiling or upload rate — quota.php left absent, which"
+            echo "    is what a fresh install has. The size caps and the write rate apply at"
+            echo "    their defaults."
             return 0
         fi
         echo ""
-        echo -e "  ${DIM}quota.php already exists. To go back to no limits, delete it:${NC}"
+        echo -e "  ${DIM}quota.php already exists. To go back to the defaults, delete it:${NC}"
         echo -e "  ${DIM}$live${NC}"
         echo -e "  ${DIM}Setup does not delete a config file you wrote.${NC}"
         return 0
@@ -1121,7 +1142,7 @@ item_quota() {
 # Item 8 — self-deploy
 # ==========================================================
 # ⚠ ABSENT MEANS DENIED, which is the OPPOSITE of item 7 above. quota.php absent
-# means "no limits"; deploy.php absent means "nobody deploys". The two configs
+# means "the defaults, no ceiling"; deploy.php absent means "nobody deploys". The two configs
 # look alike and behave in opposite directions, so the reasoning is written down
 # rather than left to be inferred: deploy is the one command that writes outside
 # the project's own storage, and an install nobody configured must not do it.

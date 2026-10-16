@@ -138,7 +138,7 @@ re-run, so changing one setting later never means answering the others again:
 | **4** | Switch environment | `production` (default) or `development` — see below |
 | **5** | Self-registration on / off | may visitors create their own accounts at `/admin/register`? Default off |
 | **6** | Show my setup token | reads the first-run credential off disk once it exists |
-| **7** | Storage quotas | per-account ceilings on total size and upload rate. Leave both blank for no limits, which is the default |
+| **7** | Storage quotas | per-account ceilings on total size and upload rate. Leave both blank for none, which is the default. The size cap on each kind of file and the write rate (1,000 commands an hour per account) apply either way, at the defaults `quota.php.example` documents |
 | **8** | Self-deploy on / off | may this installation copy a built site onto a filesystem path? **Default off** — building and downloading still work either way |
 | **9** | Command console on / off | should the panel offer the raw command runner at `/admin/command`? **Default on.** Turning it off removes reach and discoverability, not access — every command stays reachable at `/management/` to any caller whose role allows it, and the command history stays either way |
 

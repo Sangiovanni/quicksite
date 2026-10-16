@@ -332,37 +332,48 @@ function createBasicPageTemplates(string $projectPath): void {
     // 404.php - use centralized generate_page_template()
     file_put_contents($projectPath . '/templates/pages/404/404.php', generate_page_template('404'), LOCK_EX);
     
-    // home.json — use generate_page_json for consistent minimal root
+    // home.json — empty, as every new page starts (generate_page_json)
     file_put_contents($projectPath . '/templates/model/json/pages/home/home.json', generate_page_json('home'), LOCK_EX);
-    
-    // 404.json — use generate_page_json for consistent minimal root
-    file_put_contents($projectPath . '/templates/model/json/pages/404/404.json', generate_page_json('404'), LOCK_EX);
+
+    // 404.json — the one page that starts with content: its message
+    qs_json_write($projectPath . '/templates/model/json/pages/404/404.json', createNotFoundPageStructure(),
+        JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES, LOCK_EX);
 }
 
 /**
- * Create menu.json and footer.json
+ * The 404 page a new project starts with: a heading, the sentence and a link back to the home
+ * page, from the three texts createDefaultTranslations() writes (404.title, 404.message,
+ * 404.backHome). A visitor can land on it before the author has built anything, so it says
+ * what happened. No wrapper and no class: it is an ordinary page the author edits, restyles or
+ * empties. The link's "/" is the home page; the renderer and the compiler add the site's base
+ * and, on a multilingual site, the language.
+ */
+function createNotFoundPageStructure(): array {
+    return [
+        ['tag' => 'h1', 'children' => [['textKey' => '404.title']]],
+        ['tag' => 'p', 'children' => [['textKey' => '404.message']]],
+        ['tag' => 'p', 'children' => [
+            ['tag' => 'a', 'params' => ['href' => '/'], 'children' => [['textKey' => '404.backHome']]],
+        ]],
+    ];
+}
+
+/**
+ * Create menu.json and footer.json: both empty, so the editor shows each one's empty-structure
+ * placeholder and the author adds what the site needs.
  */
 function createMenuAndFooter(string $projectPath, string $siteName): void {
-    // menu.json — minimal root, content added by user/workflows
-    $menuJson = [
-        ['tag' => 'nav', 'params' => ['class' => 'main-nav'], 'children' => []]
-    ];
-    qs_json_write($projectPath . '/templates/model/json/menu.json', $menuJson, JSON_PRETTY_PRINT, LOCK_EX);
-    
-    // footer.json — minimal root, content added by user/workflows
-    $footerJson = [
-        ['tag' => 'footer', 'params' => ['class' => 'main-footer'], 'children' => []]
-    ];
-    qs_json_write($projectPath . '/templates/model/json/footer.json', $footerJson, JSON_PRETTY_PRINT, LOCK_EX);
-    
+    qs_json_write($projectPath . '/templates/model/json/menu.json', [], JSON_PRETTY_PRINT, LOCK_EX);
+    qs_json_write($projectPath . '/templates/model/json/footer.json', [], JSON_PRETTY_PRINT, LOCK_EX);
+
     // Note: No menu.php or footer.php needed - PageManagement renders JSON directly
 }
 
 /**
- * The project's stylesheet, empty: a new site shows only what its author adds. The starter
- * structures keep their class names (main-nav, main-footer, container) as hooks, unstyled. The
- * commands that edit the stylesheet only need the file to exist: setRootVariables creates the
- * :root block when there is none.
+ * The project's stylesheet, empty: a new site shows only what its author adds, and its
+ * structures start empty too (the 404 page's message has no class). The commands that edit the
+ * stylesheet only need the file to exist: setRootVariables creates the :root block when there
+ * is none.
  */
 function createEmptyStylesheet(string $projectPath): void {
     file_put_contents($projectPath . '/public/style/style.css', '', LOCK_EX);

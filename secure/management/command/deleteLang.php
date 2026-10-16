@@ -5,6 +5,10 @@ require_once SECURE_FOLDER_PATH . '/src/functions/languageRegistry.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectSettings.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
+// This command only removes content: neither the size cap nor the over-quota rule refuses
+// its writes, even when a re-save makes a file larger (qs_small_write_removal_only()).
+qs_small_write_removal_only();
+
 // Works in either mode, so fresh-start workflows can delete orphaned languages
 // before multilingual mode is on.
 
@@ -97,8 +101,7 @@ if (file_exists($translation_file)) {
 // Build new config file content using var_export for safety
 $new_config_content = "<?php\n\nreturn " . var_export($current_config, true) . ";\n";
 
-// The size check (qs_small_write_refusal). Removing a language only shrinks
-// config.php, so it is never refused.
+// The size check (qs_small_write_refusal): a removal, so it never refuses (marked above).
 $refusal = qs_small_write_refusal([$config_path => strlen($new_config_content)]);
 if ($refusal !== null) {
     $refusal->send();

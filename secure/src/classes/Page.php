@@ -37,6 +37,16 @@ class Page {
         $stateStores = $this->stateStores;
         $spacePrefix = PUBLIC_FOLDER_SPACE !== '' ? PUBLIC_FOLDER_SPACE . '/' : '';
 
+        // The route this request resolved, read once: its parameters fill the title, and the
+        // handoff at the end of the body hands the route to qs.js.
+        $__tp = class_exists('TrimParameters') ? new TrimParameters() : null;
+
+        // The title takes {{param:NAME}} and {{resolved:NAME}} as a page text does, through the
+        // same definition: the resolver has run before any page renders, and a name with no
+        // value stays as written. The live render does the same (PageManagement::render()).
+        require_once SECURE_FOLDER_PATH . '/src/functions/runtimePlaceholders.php';
+        $title = qs_apply_runtime_placeholders((string) $title, $__tp !== null ? $__tp->routeParams() : []);
+
         // The inline-script encoder (the theme script below), the runtime
         // handoff (the end of the body) and the head's icon and `?v=` helpers
         // all live here.
@@ -89,19 +99,17 @@ class Page {
     <?= $themeScript ?>
 </head>
 <body>
-    <?php if ($showMenu): ?>
-    <header>
-        <?php require_once PROJECT_PATH . '/templates/menu.php'; ?>
-    </header>
-    <?php endif; ?>
-    <main>
-        <?= $content ?>
-    </main>
-    <?php if ($showFooter): ?>
-    <footer>
-        <?php require_once PROJECT_PATH . '/templates/footer.php'; ?>
-    </footer>
-    <?php endif; ?>
+    <?php
+    // The menu, the page and the footer, with nothing around them: the body the live render
+    // serves (PageManagement::render()). The landmarks are the author's to place.
+    if ($showMenu) {
+        require_once PROJECT_PATH . '/templates/menu.php';
+    }
+    echo $content;
+    if ($showFooter) {
+        require_once PROJECT_PATH . '/templates/footer.php';
+    }
+    ?>
     <?php
     // The consent banner + popup, compiled at build time and site-wide (not
     // per-route like the menu and footer). Hidden by default; qs.js reveals
@@ -140,13 +148,12 @@ class Page {
         }
     }
 
-    // The route this request resolved, read once: for this route's resolvers,
-    // and handed to qs.js so the browser reads the router's answer instead of
-    // matching its own address (which starts with the site's URL space).
+    // The route this request resolved (read at the top): for this route's
+    // resolvers, and handed to qs.js so the browser reads the router's answer
+    // instead of matching its own address (which starts with the site's URL space).
     $__routePath = '';
     $__route = null;
-    if (class_exists('TrimParameters')) {
-        $__tp = new TrimParameters();
+    if ($__tp !== null) {
         $__routePath = $__tp->routePath();
         $__route = ['path' => $__routePath, 'params' => $__tp->routeParams(), 'found' => $__tp->routeFound()];
     }

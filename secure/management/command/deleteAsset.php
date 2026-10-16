@@ -4,6 +4,11 @@ require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/AssetMetadataManager.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_favicon_repoint
 require_once SECURE_FOLDER_PATH . '/src/functions/projectPublicArtifacts.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_removal_only
+
+// This command only removes content: neither the size cap nor the over-quota rule refuses
+// its writes, even when a re-save makes a file larger (qs_small_write_removal_only()).
+qs_small_write_removal_only();
 
 /**
  * Delete Asset Command

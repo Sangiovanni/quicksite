@@ -2845,6 +2845,7 @@
     let selectedComponent = null;
     let selectedElementClasses = null;  // For style mode preselection
     let selectedElementTag = null;      // For style mode preselection
+    let selectedHoldsChildren = true;   // Whether the Add panel may offer "Inside" (the iframe's answer)
 
     function showNodePanel(data) {
         // Check if user clicked a menu/footer element while editing a different target
@@ -2888,6 +2889,11 @@
         selectedComponent = data.component || null;
         selectedElementClasses = data.classes || null;  // Store classes for style mode
         selectedElementTag = data.tag || null;          // Store tag for style mode
+        selectedHoldsChildren = data.holdsChildren !== false;
+        // An Add form left open follows the new selection's positions.
+        if (contextualAddMode === 'add' && contextualAddForm && contextualAddForm.style.display !== 'none') {
+            _syncAddPositionOptions();
+        }
         
         // If Variables panel is open, refresh it for the new node instead of hiding
         const variablesPanelOpen = variablesPanel && variablesPanel.style.display !== 'none';
@@ -3356,6 +3362,7 @@
         selectedComponent = null;
         selectedElementClasses = null;
         selectedElementTag = null;
+        selectedHoldsChildren = true;
         
         // Clear navigation states
         if (window.PreviewState) {
@@ -4555,6 +4562,32 @@
     }
     
     // Show sidebar add form with selection context
+    /**
+     * The positions the Add form offers for the current selection. At the root only "inside"
+     * (before / after hidden). Elsewhere "inside" only where the node can hold children — not a
+     * text, a component or a void element such as an image (the iframe's answer, the rule the
+     * drag follows): the server refuses an insert there. Run when the form opens, and again when
+     * the selection changes while it is open.
+     */
+    function _syncAddPositionOptions() {
+        const isAtRoot = selectedNode === '' && currentEditType !== 'component';
+        const insideOffered = isAtRoot || selectedHoldsChildren;
+        if (isAtRoot) {
+            setAddPosition('inside');
+        } else if (!insideOffered && getAddPosition() === 'inside') {
+            setAddPosition('after');
+        }
+        if (!addPositionPicker) return;
+        addPositionPicker.querySelectorAll('input[name="add-position"]').forEach(radio => {
+            const wrapper = radio.closest('label') || radio.parentElement;
+            if (radio.value === 'before' || radio.value === 'after') {
+                wrapper.style.display = isAtRoot ? 'none' : '';
+            } else if (radio.value === 'inside') {
+                wrapper.style.display = insideOffered ? '' : 'none';
+            }
+        });
+    }
+
     function showSidebarAddForm() {
         if (!contextualAddForm || !contextualAddDefault) return;
         
@@ -4597,19 +4630,7 @@
         if (addComponentSelector) addComponentSelector.reset();
         else if (addComponentSelect) addComponentSelect.value = '';
 
-        // When at root, force "inside" and hide before/after options
-        const isAtRoot = selectedNode === '' && currentEditType !== 'component';
-        if (isAtRoot) {
-            setAddPosition('inside');
-        }
-        if (addPositionPicker) {
-            addPositionPicker.querySelectorAll('input[name="add-position"]').forEach(radio => {
-                const wrapper = radio.closest('label') || radio.parentElement;
-                if (radio.value === 'before' || radio.value === 'after') {
-                    wrapper.style.display = isAtRoot ? 'none' : '';
-                }
-            });
-        }
+        _syncAddPositionOptions();
 
         
         // Update tabs UI

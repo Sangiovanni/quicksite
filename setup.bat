@@ -239,11 +239,12 @@ REM ==========================================================
 REM ==========================================================
 REM Item 7 - storage quotas
 REM ==========================================================
-REM Absent means NO LIMITS, and that is a real setting rather than a missing
-REM one: a fresh install has no quota.php and must not refuse uploads out of
-REM the box. Leaving both prompts blank therefore leaves the file ABSENT — it
-REM does not write zeros. Setup also never deletes a quota.php somebody wrote;
-REM it says where the file is instead.
+REM Absent means THE DEFAULTS, and that is a real setting rather than a missing
+REM one: no storage ceiling and no upload rate, with the size caps and the write
+REM rate at the values the engine ships. A fresh install has no quota.php and must
+REM not refuse uploads out of the box. Leaving both prompts blank therefore
+REM leaves the file ABSENT — it does not write zeros. Setup also never deletes
+REM a quota.php somebody wrote; it says where the file is instead.
 :item_quota
 call :read_state
 echo.
@@ -259,7 +260,8 @@ echo                   churn (upload, delete, repeat) rather than volume.
 echo.
 echo   Currently: !QUOTA_LABEL!
 echo.
-echo   Leave both blank for no limits. Full documentation of every option
+echo   Leave both blank for no storage ceiling and no upload rate; the size
+echo   caps and the write rate still apply. Full documentation of every option
 echo   lives in quota.php.example, which is never modified.
 echo.
 
@@ -307,12 +309,13 @@ if not "!Q_HOURS!"=="" set /a Q_PERIOD=!Q_HOURS! * 3600
 if "!Q_BYTES!"=="0" if "!Q_MAXUP!"=="0" (
     if not exist "!QUOTA_FILE!" (
         echo.
-        echo   + No limits - quota.php left absent, which is what a fresh
-        echo     install has. Nothing is refused.
+        echo   + No storage ceiling or upload rate - quota.php left absent, which
+        echo     is what a fresh install has. The size caps and the write rate apply at
+        echo     their defaults.
         goto :eof
     )
     echo.
-    echo   quota.php already exists. To go back to no limits, delete it:
+    echo   quota.php already exists. To go back to the defaults, delete it:
     echo   !QUOTA_FILE!
     echo   Setup does not remove a config file you wrote.
     goto :eof
@@ -373,10 +376,10 @@ if exist "!ENV_FILE!" (
 )
 
 set "QUOTA_FILE=!CONFIG_DIR!\quota.php"
-set "QUOTA_LABEL=no limits  (default - quota.php not created yet)"
+set "QUOTA_LABEL=size caps + write rate (defaults)  (quota.php not created yet; no storage ceiling, no upload rate)"
 if exist "!QUOTA_FILE!" (
-    set "QUOTA_LABEL=limits set  (see quota.php)"
-    findstr /c:"'max_total_bytes' => 0," "!QUOTA_FILE!" >nul 2>&1 && findstr /c:"'max_uploads'    => 0," "!QUOTA_FILE!" >nul 2>&1 && set "QUOTA_LABEL=no limits  (quota.php present, both axes unlimited)"
+    set "QUOTA_LABEL=storage or upload limits set  (see quota.php, which also holds the size caps and the write rate)"
+    findstr /c:"'max_total_bytes' => 0," "!QUOTA_FILE!" >nul 2>&1 && findstr /c:"'max_uploads'    => 0," "!QUOTA_FILE!" >nul 2>&1 && set "QUOTA_LABEL=no storage ceiling, no upload rate  (quota.php present; it also holds the size caps and the write rate)"
 )
 
 set "SELFREG_LABEL=off  (default - auth.php not created yet)"
@@ -1021,7 +1024,7 @@ REM ==========================================================
 REM Item 8 - self-deploy
 REM ==========================================================
 REM ABSENT MEANS DENIED, which is the OPPOSITE of item 7. quota.php absent means
-REM "no limits"; deploy.php absent means "nobody deploys". The two configs look
+REM "the defaults, no ceiling"; deploy.php absent means "nobody deploys". The two configs look
 REM alike and behave in opposite directions, so the reasoning is written down
 REM rather than left to be inferred: deploy is the one command that writes
 REM outside the project's own storage, and an install nobody configured must not

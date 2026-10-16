@@ -23,6 +23,10 @@ require_once SECURE_FOLDER_PATH . '/src/functions/consentHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/consentLayerHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
+// This command only removes content: neither the size cap nor the over-quota rule refuses
+// its writes, even when a re-save makes a file larger (qs_small_write_removal_only()).
+qs_small_write_removal_only();
+
 $cfg = loadConsentConfig();
 $route = $cfg['policyRoute'] ?? null;
 if (!is_string($route) || trim($route, '/') === '') {
@@ -43,7 +47,7 @@ if (consentRouteExists($routeTrim)) {
     $phpDir  = PROJECT_PATH . '/templates/pages/' . implode('/', $segments);
     $routesContent = '<?php return ' . varExportNested($newRoutes) . '; ?>';
     // Every write of this command passes the size check as it happens
-    // (qs_small_write_guard). Each here shrinks a file, so none is refused.
+    // (qs_small_write_guard). A removal, so none is refused (marked above).
     if ((defined('ROUTES_PATH') && !qs_small_write_guard(ROUTES_PATH, strlen($routesContent)))
         || !qs_small_write_guard($jsonDir . '/' . $name . '.json', null)
         || !qs_small_write_guard($phpDir . '/' . $name . '.php', null)) {

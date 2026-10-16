@@ -228,21 +228,17 @@ PHP;
 }
 
 /**
- * Generate default JSON page structure
- * 
+ * A new page's structure: empty. The editor shows its empty-structure placeholder, so an
+ * author can tell a page nobody has built yet from one they emptied, and a page holds only
+ * what its author put there. Every creator of a page's structure — addRoute (the page and a
+ * parent it creates), createProject (the home page) and the policy pages' parents — takes it
+ * from here.
+ *
  * @param string $route_name The route name
  * @return string JSON content for the page
  */
 function generate_page_json(string $route_name): string {
-    $json_structure = [
-        [
-            'tag' => 'main',
-            'params' => ['class' => 'container'],
-            'children' => []
-        ]
-    ];
-    
-    return json_encode($json_structure, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+    return json_encode([], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
 }
 
 

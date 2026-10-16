@@ -28,6 +28,10 @@ require_once SECURE_FOLDER_PATH . '/src/functions/String.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/routeHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
+// This command only removes content: neither the size cap nor the over-quota rule refuses
+// its writes, even when a re-save makes a file larger (qs_small_write_removal_only()).
+qs_small_write_removal_only();
+
 // ============================================================================
 // VALIDATION
 // ============================================================================
@@ -166,8 +170,8 @@ foreach ($routesToDelete as $routeSegments) {
     }
 }
 
-// The size check (qs_small_write_refusal), before anything is deleted. Removing
-// a route only shrinks routes.php and the files after it, so it is never refused.
+// The size check (qs_small_write_refusal), before anything is deleted: a removal,
+// so it never refuses (marked above).
 $newRoutes = removeRouteFromStructure($segments, $currentRoutes);
 $routesContent = "<?php return " . varExportNested($newRoutes) . "; ?>";
 $refusal = qs_small_write_refusal([ROUTES_PATH => strlen($routesContent)]);

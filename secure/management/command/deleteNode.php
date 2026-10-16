@@ -160,6 +160,10 @@ function cleanupEmptyParents(array &$arr): void {
  * Command function for internal execution via CommandRunner
  */
 function __command_deleteNode(array $params = [], array $urlParams = []): ApiResponse {
+    // This command only removes content: neither the size cap nor the over-quota rule
+    // refuses its writes, even when a re-save makes a file larger (qs_small_write_removal_only()).
+    qs_small_write_removal_only();
+
     // Required parameters
     if (!isset($params['type'])) {
         return ApiResponse::create(400, 'validation.required')
@@ -286,8 +290,8 @@ function __command_deleteNode(array $params = [], array $urlParams = []): ApiRes
             ->withMessage("Failed to encode structure to JSON");
     }
     
-    // The size check (qs_small_write_refusal). A deletion only shrinks the
-    // structure and the translation files after it, so it is never refused.
+    // The size check (qs_small_write_refusal): a removal, so it never refuses (marked
+    // above), even when the structure was stored compact and grows as it is re-saved.
     $refusal = qs_small_write_refusal([$json_file => strlen($json_content)]);
     if ($refusal !== null) {
         return $refusal;

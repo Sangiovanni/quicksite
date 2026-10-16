@@ -601,15 +601,8 @@ if ($nodeId !== null) {
     // Use the modified structure
     $structure = $result['structure'];
     
-    // Empty structure guard: ensure page/menu/footer always has a minimal root
-    if (is_array($structure) && empty($structure) && $type !== 'component') {
-        $structure = match($type) {
-            'menu'   => [['tag' => 'nav', 'params' => ['class' => 'main-nav'], 'children' => []]],
-            'footer' => [['tag' => 'footer', 'params' => ['class' => 'main-footer'], 'children' => []]],
-            default  => [['tag' => 'main', 'params' => ['class' => 'container'], 'children' => []]],
-        };
-    }
-    
+    // A structure the operation emptied is saved empty: the editor shows its placeholder,
+    // and nothing the author removed is put back.
     // Normalize "text" -> "textKey" in structure (AI models sometimes output wrong key)
     if (is_array($structure)) {
         if (isset($structure[0]) || empty($structure)) {
@@ -664,14 +657,8 @@ if ($nodeId !== null) {
 
 // ===== Full structure replacement mode =====
 
-// Empty structure guard: ensure page/menu/footer always has a minimal root
-if (is_array($structure) && empty($structure) && $type !== 'component') {
-    $structure = match($type) {
-        'menu'   => [['tag' => 'nav', 'params' => ['class' => 'main-nav'], 'children' => []]],
-        'footer' => [['tag' => 'footer', 'params' => ['class' => 'main-footer'], 'children' => []]],
-        default  => [['tag' => 'main', 'params' => ['class' => 'container'], 'children' => []]],
-    };
-}
+// An empty structure is saved as sent: the editor shows its placeholder, and nothing is
+// added that the author did not send.
 
 // Normalize "text" -> "textKey" in structure (AI models sometimes output wrong key)
 if (is_array($structure)) {

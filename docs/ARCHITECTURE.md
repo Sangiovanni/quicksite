@@ -609,7 +609,10 @@ Page template
   ├── new Translator($lang)
   ├── new JsonToHtmlRenderer (or in build mode, the compiled PHP runs directly)
   ├── renders structure → HTML body
-  └── Page::render() emits <!doctype>, <head>, menu, body, footer
+  └── PageManagement::render() (in a build, Page::render()) emits <!doctype>,
+        <head> with the page's <title>, then the menu, the page and the footer
+        with no element around them: one body on both, the author places the
+        landmarks
 ```
 
 Emitted URLs are **root-relative**: a page links to `/p/mysite/about` on the install's own
@@ -721,7 +724,7 @@ Captured values are URL-decoded before exposure, matching PHP's `$_GET` conventi
 
 #### How captured params flow
 
-- **Server (PHP)** — `Page::render()` injects each captured value as a template variable named after the param. Inside a page's PHP template, `$slug`, `$id`, etc. sit alongside `$translator` and other request-scoped variables. Inside JSON pages a `{{param:NAME}}` placeholder is substituted in raw text, translated text and attributes, on both the served site and a build (§4.2). The literal `param:` prefix is required so it doesn't collide with component-variable patterns.
+- **Server (PHP)** — The router captures each value (`TrimParameters::routeParams()`). Inside JSON pages a `{{param:NAME}}` placeholder is substituted in raw text, translated text and attributes, on both the served site and a build (§4.2). A page's title (`page.titles.<route>`) takes `{{param:NAME}}` and `{{resolved:NAME}}` too, through the same definition: both page shells — `PageManagement::render()` on `/p/`, `Page::render()` in a build — replace them just before the title is escaped into `<title>`, so every page has it, whenever its template was written. A name with no value stays as written, as in a page text. The literal `param:` prefix is required so it doesn't collide with component-variable patterns.
 - **Client (qs.js)** — The page hands `qs.js` the route the server resolved for it: the runtime handoff (§9.5) writes `window.QS_ROUTE` — the matched pattern, the captured values and whether a route was found — from the same router call the page was rendered with. qs.js's synchronous IIFE exposes it on load as three globals: `QS.routeParams` (a dict of captured values), `QS.routePath` (the matched pattern), `QS.routeFound` (a boolean; when it is false the other two are `null` and empty). The browser does no matching of its own, so it agrees with the server under any base the page is served at — the `/p/<projectId>/` preview, an installation's URL space, a build's space — and on everything the rules above decide, a multilingual site's language segment and internal aliases included. `window.QS_ROUTE` also carries the base the page is served under (`/p/<projectId>/`, a URL space, `/`), exposed as `QS.basePath`. State stores can initialise a field from `init: 'param:slug'` — a fifth source kind alongside the existing `query:` / `localStorage:` / `sessionStorage:` / literal. The project's own `public/scripts/qs-route-schema.js` (`window.QS_ROUTES`) lists every route's pattern + param shape; for a deeper URL → live data loop (server-rendered authed pages, SEO) the server data resolver builds on the same schema.
 
 #### Conflict detection

@@ -20,6 +20,10 @@ require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_
  * @return ApiResponse
  */
 function __command_deletePageEvent(array $params = [], array $urlParams = []): ApiResponse {
+    // This command only removes content: neither the size cap nor the over-quota rule
+    // refuses its writes, even when a re-save makes a file larger (qs_small_write_removal_only()).
+    qs_small_write_removal_only();
+
     // Validate required fields
     $required = ['pageName', 'event', 'index'];
     $missing = [];
@@ -72,8 +76,7 @@ function __command_deletePageEvent(array $params = [], array $urlParams = []): A
         unset($allEvents[$pageName]);
     }
     
-    // The size check (qs_small_write_refusal). A removal only shrinks the file,
-    // so it is never refused.
+    // The size check (qs_small_write_refusal): a removal, so it never refuses (marked above).
     $refusal = qs_small_write_refusal([$eventsFile => qs_json_size($allEvents, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)]);
     if ($refusal !== null) {
         return $refusal;

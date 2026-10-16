@@ -1164,7 +1164,10 @@
             hasParent: hasParent,
             hasPrevSibling: hasPrevSibling,
             hasNextSibling: hasNextSibling,
-            hasChildren: hasChildren
+            hasChildren: hasChildren,
+            // Whether an insert INSIDE this node is one the server accepts: the rule the drag
+            // follows, read by the Add panel to offer "Inside" only where it can land.
+            holdsChildren: !cannotHoldChildren(el)
         };
     }
     
@@ -1403,16 +1406,15 @@
         if (dragUndoStack.length === 0) return;
         const entry = dragUndoStack.pop();
         
-        // Store current position for redo
+        // The redo entry: the element goes back where it came from (old), and a redo takes it
+        // to where it stands now (new).
         const redoEntry = {
             element: entry.element,
-            oldParent: entry.element.parentNode,
-            oldNextSibling: entry.element.nextElementSibling,
-            newParent: entry.oldParent,
-            newNextSibling: entry.oldNextSibling,
-            struct: entry.struct,
-            sourceInfo: entry.targetInfo,
-            targetInfo: entry.sourceInfo
+            oldParent: entry.oldParent,
+            oldNextSibling: entry.oldNextSibling,
+            newParent: entry.element.parentNode,
+            newNextSibling: entry.element.nextElementSibling,
+            struct: entry.struct
         };
         
         // Move element back to original position
@@ -1438,16 +1440,15 @@
         if (dragRedoStack.length === 0) return;
         const entry = dragRedoStack.pop();
         
-        // Store current position for undo
+        // The undo entry: an undo takes the element back to where it stands now (old); the redo
+        // takes it to where the move had put it (new).
         const undoEntry = {
             element: entry.element,
             oldParent: entry.element.parentNode,
             oldNextSibling: entry.element.nextElementSibling,
             newParent: entry.newParent,
             newNextSibling: entry.newNextSibling,
-            struct: entry.struct,
-            sourceInfo: entry.targetInfo,
-            targetInfo: entry.sourceInfo
+            struct: entry.struct
         };
         
         // Move element to redo position
@@ -1491,11 +1492,11 @@
             targetEl = nextSibling;
             position = 'before';
         } else {
-            // Only child — moved inside parent
+            // Only child — moved inside parent, as its last child (the DOM move appended it)
             const parentNode = element.parentElement ? element.parentElement.closest('[data-qs-node]') : null;
             if (parentNode) {
                 targetEl = parentNode;
-                position = 'inside';
+                position = 'inside-end';
             }
         }
         
@@ -1851,6 +1852,18 @@
         });
     }
     
+    /**
+     * Whether a drop INSIDE this element is one the server refuses: a text node, a
+     * component call, or a void element (img, input, br...), which HTML gives no
+     * children. The browser's own serializer says which tags are void (it writes no
+     * closing tag for one), so the editor keeps no copy of the list.
+     */
+    function cannotHoldChildren(el) {
+        if (el.hasAttribute('data-qs-textonly') || el.hasAttribute('data-qs-component')) return true;
+        const tag = el.tagName.toLowerCase();
+        return !document.createElement(tag).outerHTML.endsWith('</' + tag + '>');
+    }
+
     function canDropAt(source, target, position) {
         if (!source || !target) return false;
         if (source === target) return false;
@@ -1864,9 +1877,9 @@
         const targetStruct = target.getAttribute('data-qs-struct');
         if (sourceStruct !== targetStruct) return false;
         
-        // For 'inside': also verify target can accept children
-        // (it already has a data-qs-node, so it represents a structure node)
-        // Cross-level moves are allowed. The server API fully supports this.
+        // 'inside' only into an element that can hold children (the zones below never
+        // offer it over one that cannot). Cross-level moves are allowed: the server supports them.
+        if (position === 'inside' && cannotHoldChildren(target)) return false;
         return true;
     }
     
@@ -2043,12 +2056,13 @@
         
         if (foundTarget) {
             // 3-zone detection: 30% top = before, 40% middle = inside, 30% bottom = after
-            // For very small elements (< 30px), skip 'inside' — only before/after.
+            // For very small elements (< 30px), and for one that cannot hold children (a text
+            // node, a component call, a void element), skip 'inside' — only before/after.
             const rect = foundTarget.getBoundingClientRect();
             const relY = e.clientY - rect.top;
             const height = rect.height;
             let position;
-            if (height < 30) {
+            if (height < 30 || cannotHoldChildren(foundTarget)) {
                 position = relY < height / 2 ? 'before' : 'after';
             } else {
                 const edgeZone = height * 0.30;
@@ -2185,7 +2199,9 @@
                     action: 'elementMoved',
                     sourceElement: dragInfo,
                     targetElement: finalTargetInfo,
-                    position: dropPosition
+                    // A drop inside appended the element (the target's last child), so the server
+                    // is asked for the same place, 'inside-end': its 'inside' is the first child.
+                    position: dropPosition === 'inside' ? 'inside-end' : dropPosition
                 }, ALLOWED_ORIGIN);
             } else {
                 console.log('[QuickSite] No meaningful move (same position)');

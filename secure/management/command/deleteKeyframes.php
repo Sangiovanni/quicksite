@@ -9,6 +9,11 @@ require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_pa
 
 require_once SECURE_FOLDER_PATH . '/src/classes/CssParser.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsStyleManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_removal_only
+
+// This command only removes content: neither the size cap nor the over-quota rule refuses
+// its writes, even when a re-save makes a file larger (qs_small_write_removal_only()).
+qs_small_write_removal_only();
 
 // Get parameters
 $params = $trimParametersManagement->params();

@@ -12127,7 +12127,7 @@ and `languages.NOTICE.txt` (the Unicode License v3 notice the names are used und
 commands under `secure/management/command/`; `secure/management/config/categories.php`
 (`getLanguageList`). Behaviour: [COMMAND_API.md](COMMAND_API.md) and `help`.
 
-### A new project starts with an empty stylesheet (locked 2026-09-27)
+### A new project starts with an empty stylesheet (locked 2026-09-27) (superseded 2026-10-16)
 
 **Decision**: `createProject` writes the project's `public/style/style.css` empty. The starter
 pages keep their three class names — `main-nav` on the menu, `main-footer` on the footer,
@@ -13474,3 +13474,131 @@ from the audit of the storage ceiling; the window's start ruled 2026-10-16 (Sang
 `public/admin/assets/js/pages/preview/preview-ai-tools.js`. Behaviour: COMMAND_API.md (*Per-user
 resource limits*), ADMIN_PANEL.md (§7, §8.12), `secure/management/config/quota.php.example`, and the
 `help` entries of those commands.
+
+### One page shell on both surfaces, new structures start empty, and the 404 page starts with its message (locked 2026-10-09)
+
+**Supersedes** (in part): *A new project starts with an empty stylesheet* (locked 2026-09-27), whose starter
+pages kept three class names as hooks. The stylesheet still starts empty.
+
+**Decision**: three changes, made together.
+
+- **One page shell, the preview's.** A built page serves the body the `/p/` render serves: the menu, the
+  page and the footer one after another, with no `<header>`, `<main>` or `<footer>` around them
+  (`Page::render()`, as `PageManagement::render()`). The landmarks are the author's to place, in the editor.
+- **New structures start empty.** A new project's home page, menu and footer, a page `addRoute` creates, a
+  parent page it creates on the way and a parent page a policy page's route creates all start as `[]`
+  (`generate_page_json()`), so the editor shows each one's empty-structure placeholder. `editStructure`
+  saves an emptied page, menu or footer empty, as `deleteNode` already did, instead of putting a starter
+  node back. Existing projects keep their structures.
+- **The 404 page starts with its message**: a heading, the sentence and a link to the home page, from the
+  three texts `createProject` already wrote (`404.title`, `404.message`, `404.backHome`) and nothing showed.
+  The link is `/`, which the renderer and the compiler compose with the site's base and, on a multilingual
+  site, the language. No wrapper, no class: an ordinary page the author edits.
+
+**Reasoning**: the built page wrapped what the preview did not, so preview and build served different HTML
+for one page, and the starter nodes (`main.container`, `footer.main-footer`) gave every built page a
+`<main>` inside a `<main>` and a `<footer>` inside a `<footer>`, which is invalid HTML. A stylesheet rule on
+`footer` applied twice in a build and once in the preview. A starter node showed no placeholder, so an
+author could not tell a fresh menu from one they had built, and the class names it carried were hooks
+nothing styled. The 404 page is the one page a visitor can land on before anything is built, so it says
+what happened.
+
+**Alternatives considered**: both surfaces wrapping (rejected: the shell would own the landmarks, and a
+page holding its own `main` would nest one); keeping the starter nodes as styling hooks (rejected: a fresh
+structure looks built); an empty 404 page (rejected: a visitor can reach it first); replacing the starter
+nodes of existing projects (rejected: by now they may be the author's).
+
+**Source**: Sangio, 2026-10-04 to 2026-10-16 during beta.12, after a review could not tell a fresh menu
+from a built one and a reading of the two shells found the nesting. Code:
+`secure/src/classes/Page.php`, `secure/src/classes/PageManagement.php`,
+`secure/src/functions/utilsManagement.php` (`generate_page_json()`),
+`secure/management/command/createProject.php`, `secure/management/command/editStructure.php`,
+`secure/src/functions/policyPageHelpers.php`. Behaviour: ARCHITECTURE.md (the page emit), ADMIN_PANEL.md
+§8, and the `help` entries of `createProject`, `addRoute` and `editStructure`.
+
+### A page title takes the request's placeholders, in both page shells (locked 2026-10-09)
+
+**Decision**: a page's title (`page.titles.<route>`) takes `{{param:NAME}}` and `{{resolved:NAME}}` as a
+page text does, through the same definition (`qs_apply_runtime_placeholders()`). Both page shells replace
+them just before the title is escaped into `<title>`: `PageManagement::render()` on `/p/`,
+`Page::render()` in a build. A name with no value stays as written. Both shells escape the title alike.
+
+**Reasoning**: a page per parameter value needs a title per value (a product's name in the browser tab),
+and the mechanism already served page texts on both surfaces. On `/p/` the title is computed in each
+route's generated page file, and a file written earlier keeps its own copy of that code. Every page file
+hands its title to the shell, so the shell is the one place that reaches every page, old and new; the
+resolver, or the editor's emulation, has run by then on both surfaces.
+
+**Alternatives considered**: substituting in the generated page file and the compiled page (rejected: a
+page file written before the change would never get it); an empty string for a name with no value
+(rejected: a page text keeps it visible, so a typo shows).
+
+**Source**: Sangio, 2026-10-09 and 2026-10-16 during beta.12. Code: `secure/src/classes/Page.php`,
+`secure/src/classes/PageManagement.php`, `secure/src/functions/runtimePlaceholders.php`. Behaviour:
+ARCHITECTURE.md §6.3 (*How captured params flow*).
+
+### `moveNode` moves through the one insert, which gains `inside-end`, and no insert goes inside a void element (locked 2026-10-11)
+
+**Extends**: *Every insert next to or into a node follows one rule, every root of a snippet lands, and a
+raw text stays as written* (locked 2026-10-10).
+
+**Decision**: two changes.
+
+- `moveNode` removes the node and puts it back through `NodeNavigator::insertAt()`; its own insert is gone.
+  `insertAt()` gains `inside-end`, the target's last child, and `moveNode` alone accepts it. `moveNode`'s
+  `inside` is now the first child, as in every insert command. The visual editor's drag and drop appends an
+  element dropped inside another, so it sends `inside-end` and an author sees no change; the Command page
+  offers the four positions.
+- A void element (`img`, `input`, `br`…, `TagRegistry::isVoidElement()`) takes no children. An insert
+  inside one (`inside` or `inside-end`), at a void root, or a move into one is refused as a target that
+  cannot hold children is: 400 `operation.failed`, "The target node is an img element, which cannot hold
+  children". The editor's drag offers no drop inside a void element, a text node or a component call, since
+  the server refuses each; it tells a void element by the browser's own serializer, which writes no closing
+  tag for one, rather than by a copy of the list.
+
+**Reasoning**: `moveNode` kept an insert of its own. Its inside appended last, and a text node or a
+component call took children no page shows, while every other insert put the node first and refused both.
+A void element's children were saved and never rendered: HTML gives it none. One insert makes the rules
+one.
+
+**Alternatives considered**: keeping `moveNode`'s inside as the last child (rejected: one word would mean
+two places across the API); `inside-end` for every insert command (not taken: only a move needs it); a
+void-element list in the editor (rejected: `TagRegistry` is the one list, and the browser already knows).
+
+**Source**: an audit of the inserts during beta.12, ruled by Sangio 2026-10-11 and 2026-10-16. Code:
+`secure/src/classes/NodeNavigator.php`, `secure/management/command/moveNode.php`,
+`public/admin/assets/js/pages/preview/preview-iframe-inject.js`, `preview-drag.js`, `command-form.js`.
+Behaviour: the `help` entries of `moveNode`, `addNode`, `addComplexElement`, `addComponentToNode` and
+`insertSnippet`, ADMIN_PANEL.md (the Drag row).
+
+### A command that only removes content is never refused by the size cap or the storage quota (locked 2026-10-16)
+
+**Extends**: *Every small file has a size cap, a growing write waits while its owner is over the quota, and
+every command but a read counts against a rate per account* (locked 2026-10-11).
+
+**Decision**: the fifteen commands that only remove content (`deleteAlias`, `deleteApi`, `deleteAsset`,
+`deleteCollectedDatum`, `deleteCookiePolicy`, `deleteInteraction`, `deleteKeyframes`, `deleteLang`,
+`deleteNode`, `deletePageEvent`, `deletePrivacyPolicy`, `deleteRoute`, `deleteStorageItem`,
+`deleteStyleRule`, `deleteTranslationKeys`) each mark themselves first with
+`qs_small_write_removal_only()`, and from then on neither small-write check refuses a write of theirs. A
+file a removal takes over its cap may then shrink or keep its size until it is back under. It is the
+engine's rule: no quota setting changes it. A command that can also add content (`editStructure`'s delete
+action among them) is checked as before.
+
+**Reasoning**: a removal adds no content, yet it can make a file larger. The engine saves JSON indented,
+and an import keeps an archive's bytes, so a file stored compact grows when it is saved again without one
+of its nodes: 3.6 times on the median of the real structure files measured, 6 times at most. While its
+owner was over the ceiling such a deletion answered 507, and near the file's cap 413, so the owner or the
+author could not remove content to get back under. When a storage quota exists, the commands that remove
+content must stay available.
+
+**Alternatives considered**: a list of the removal commands apart from them (rejected: in the deployer's
+quota file it would make engine behaviour a setting, and in the engine it needs the dispatcher to name
+the running command, where each command can say it of itself); a parameter on the size check (rejected: it would not reach the
+writes made by shared helpers, such as an asset's metadata); saving a removal compact whenever the
+indented copy would be larger (rejected: it covers JSON only, a stylesheet or `routes.php` would still need
+the rule, and an author reading the raw file would meet two formats).
+
+**Source**: Sangio, 2026-10-16 during beta.12, after the size limits were audited. Code:
+`secure/src/functions/quota.php` (`qs_small_write_removal_only()`) and the fifteen commands. Behaviour:
+COMMAND_API.md (*Small files*), `help`'s `limits.removals`.
