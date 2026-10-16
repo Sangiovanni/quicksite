@@ -3,6 +3,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/opcacheHygiene.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/languageRegistry.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectSettings.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 // Works in either mode, so fresh-start workflows can delete orphaned languages
 // before multilingual mode is on.
@@ -95,6 +96,13 @@ if (file_exists($translation_file)) {
 // --- UPDATE CONFIG FILE ---
 // Build new config file content using var_export for safety
 $new_config_content = "<?php\n\nreturn " . var_export($current_config, true) . ";\n";
+
+// The size check (qs_small_write_refusal). Removing a language only shrinks
+// config.php, so it is never refused.
+$refusal = qs_small_write_refusal([$config_path => strlen($new_config_content)]);
+if ($refusal !== null) {
+    $refusal->send();
+}
 
 // Write updated config with exclusive lock
 if (file_put_contents($config_path, $new_config_content, LOCK_EX) === false) {

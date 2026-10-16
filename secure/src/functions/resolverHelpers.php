@@ -63,6 +63,13 @@ function loadResolversSidecar(?string $projectPath = null): array {
 
 function saveResolversSidecar(array $resolvers): bool {
     $path = getResolverSidecarPath();
+    // The size check (qs_small_write_guard): false when refused, and the command
+    // answers qs_small_write_refused().
+    $flags = JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES;
+    require_once __DIR__ . '/quota.php';
+    if (!qs_small_write_guard($path, empty($resolvers) ? 3 : qs_json_size($resolvers, $flags))) {
+        return false;
+    }
     $dir = dirname($path);
     if (!is_dir($dir)) {
         if (!mkdir($dir, 0755, true)) {
@@ -80,7 +87,7 @@ function saveResolversSidecar(array $resolvers): bool {
         // Literal — no encode involved, so qs_json_write has nothing to guard.
         return file_put_contents($path, "{}\n", LOCK_EX) !== false;
     }
-    return qs_json_write($path, $resolvers, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES, LOCK_EX);
+    return qs_json_write($path, $resolvers, $flags, LOCK_EX);
 }
 
 /**

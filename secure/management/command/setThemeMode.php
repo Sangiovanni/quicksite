@@ -1,6 +1,7 @@
 <?php
 require_once SECURE_FOLDER_PATH . '/src/functions/opcacheHygiene.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectSettings.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 /**
  * setThemeMode - Enable/disable dark mode support and configure theme defaults
  *
@@ -119,6 +120,16 @@ if ($hasUserToggle) {
 }
 
 $configContent = "<?php\n\nreturn " . var_export($config, true) . ";\n";
+
+// The size check (qs_small_write_refusal): the settings cap, and growth while
+// the owner is over quota.
+$refusal = qs_small_write_refusal([$configPath => strlen($configContent)]);
+if ($refusal !== null) {
+    flock($lockHandle, LOCK_UN);
+    fclose($lockHandle);
+    @unlink($lockFile);
+    $refusal->send();
+}
 
 $result = @file_put_contents($configPath, $configContent, LOCK_EX);
 

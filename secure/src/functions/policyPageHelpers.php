@@ -54,24 +54,39 @@ function policyAddRoute(array $segments, array $routes): array {
     return $result;
 }
 
-/** Write a default empty page (php bootstrap + empty json) for an ancestor route. */
-function _policyWriteAncestorPage(array $segments): void {
+/**
+ * Write a default empty page (php bootstrap + empty json) for an ancestor route.
+ * Each file passes the size check first (qs_small_write_guard); false when one is
+ * refused — the command answers qs_small_write_refused().
+ */
+function _policyWriteAncestorPage(array $segments): bool {
+    require_once __DIR__ . '/quota.php';
     $name = end($segments);
     $phpPath = PROJECT_PATH . '/templates/pages/' . implode('/', $segments) . '/' . $name . '.php';
     $jsonPath = PROJECT_PATH . '/templates/model/json/pages/' . implode('/', $segments) . '/' . $name . '.json';
+    $page = [['tag' => 'main', 'params' => ['class' => 'container'], 'children' => []]];
+    $jsonFlags = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE;
+    $php = generate_page_template(implode('/', $segments));
+    if ((!file_exists($phpPath) && !qs_small_write_guard($phpPath, strlen($php)))
+        || (!file_exists($jsonPath) && !qs_small_write_guard($jsonPath, qs_json_size($page, $jsonFlags)))) {
+        return false;
+    }
     foreach ([dirname($phpPath), dirname($jsonPath)] as $d) {
         if (!is_dir($d)) @mkdir($d, 0755, true);
     }
-    if (!file_exists($phpPath)) file_put_contents($phpPath, generate_page_template(implode('/', $segments)), LOCK_EX);
-    if (!file_exists($jsonPath)) qs_json_write($jsonPath, [['tag' => 'main', 'params' => ['class' => 'container'], 'children' => []]], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE, LOCK_EX);
+    if (!file_exists($phpPath)) file_put_contents($phpPath, $php, LOCK_EX);
+    if (!file_exists($jsonPath)) qs_json_write($jsonPath, $page, $jsonFlags, LOCK_EX);
+    return true;
 }
 
 /**
  * Cascade-create any missing route in the chain (writing default ancestor pages),
  * then persist routes.php + regen the client route schema. No-op for an existing
- * leaf. Safe to call after a route-exists check.
+ * leaf. Safe to call after a route-exists check. False when the size check
+ * refused a file (qs_small_write_guard): what it wrote is taken back.
  */
-function policyCreateRoute(array $segments): void {
+function policyCreateRoute(array $segments): bool {
+    require_once __DIR__ . '/quota.php';
     $routes = defined('ROUTES') && is_array(ROUTES) ? ROUTES : [];
     $newRoutes = $routes;
     $changed = false;
@@ -80,19 +95,27 @@ function policyCreateRoute(array $segments): void {
         if (!policyRouteExists($chain, $newRoutes)) {
             $newRoutes = policyAddRoute($chain, $newRoutes);
             $changed = true;
-            if ($i < count($segments)) {
-                _policyWriteAncestorPage($chain);
+            if ($i < count($segments) && !_policyWriteAncestorPage($chain)) {
+                return false;
             }
         }
     }
     if ($changed && defined('ROUTES_PATH')) {
-        file_put_contents(ROUTES_PATH, '<?php return ' . varExportNested($newRoutes) . '; ?>', LOCK_EX);
+        $content = '<?php return ' . varExportNested($newRoutes) . '; ?>';
+        if (!qs_small_write_guard(ROUTES_PATH, strlen($content))) {
+            return false;
+        }
+        file_put_contents(ROUTES_PATH, $content, LOCK_EX);
         qs_opcache_invalidate(ROUTES_PATH);
         require_once SECURE_FOLDER_PATH . '/src/functions/projectPublicArtifacts.php';
+        // A later refusal puts routes.php back; the schema derived from it with it.
+        foreach (qs_public_artifact_targets('scripts/qs-route-schema.js') as $schema) {
+            qs_small_write_keep($schema);
+        }
         qs_emit_route_schema($newRoutes);
     }
+    return true;
 }
-
 /** Remove a route chain from a ROUTES-shaped array (returns the new array). */
 function policyRemoveRoute(array $segments, array $routes): array {
     if (count($segments) === 1) {
@@ -109,22 +132,37 @@ function policyRemoveRoute(array $segments, array $routes): array {
 /**
  * Delete a leaf route: remove it from ROUTES, persist routes.php + regen schema,
  * delete the leaf page files, and prune now-empty folders. Parent routes stay.
+ * False when the size check refused (it never does: a deletion only shrinks).
  */
-function policyDeleteRoute(array $segments): void {
-    $newRoutes = policyRemoveRoute($segments, defined('ROUTES') && is_array(ROUTES) ? ROUTES : []);
-    if (defined('ROUTES_PATH')) {
-        file_put_contents(ROUTES_PATH, '<?php return ' . varExportNested($newRoutes) . '; ?>', LOCK_EX);
-        qs_opcache_invalidate(ROUTES_PATH);
-    }
-    require_once SECURE_FOLDER_PATH . '/src/functions/projectPublicArtifacts.php';
-    qs_emit_route_schema($newRoutes);
+function policyDeleteRoute(array $segments): bool {
+    require_once __DIR__ . '/quota.php';
+    $routes = defined('ROUTES') && is_array(ROUTES) ? ROUTES : [];
+    $newRoutes = policyRemoveRoute($segments, $routes);
     $name = end($segments);
     $jsonDir = PROJECT_PATH . '/templates/model/json/pages/' . implode('/', $segments);
     $phpDir  = PROJECT_PATH . '/templates/pages/' . implode('/', $segments);
+    $content = '<?php return ' . varExportNested($newRoutes) . '; ?>';
+    // Guarded like every write of a chain, so a refusal later in the command can
+    // put the route and its page files back (qs_small_write_guard).
+    if ((defined('ROUTES_PATH') && !qs_small_write_guard(ROUTES_PATH, strlen($content)))
+        || !qs_small_write_guard($jsonDir . '/' . $name . '.json', null)
+        || !qs_small_write_guard($phpDir . '/' . $name . '.php', null)) {
+        return false;
+    }
+    if (defined('ROUTES_PATH')) {
+        file_put_contents(ROUTES_PATH, $content, LOCK_EX);
+        qs_opcache_invalidate(ROUTES_PATH);
+    }
+    require_once SECURE_FOLDER_PATH . '/src/functions/projectPublicArtifacts.php';
+    foreach (qs_public_artifact_targets('scripts/qs-route-schema.js') as $schema) {
+        qs_small_write_keep($schema);
+    }
+    qs_emit_route_schema($newRoutes);
     @unlink($jsonDir . '/' . $name . '.json');
     @unlink($phpDir . '/' . $name . '.php');
     @rmdir($jsonDir);
     @rmdir($phpDir);
+    return true;
 }
 
 /**
@@ -133,14 +171,23 @@ function policyDeleteRoute(array $segments): void {
  * @return bool whether the json structure was written.
  */
 function policyWriteLeaf(array $segments, array $structure): bool {
+    require_once __DIR__ . '/quota.php';
     $name = end($segments);
     $phpPath = PROJECT_PATH . '/templates/pages/' . implode('/', $segments) . '/' . $name . '.php';
     $jsonPath = PROJECT_PATH . '/templates/model/json/pages/' . implode('/', $segments) . '/' . $name . '.json';
+    $flags = JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE;
+    $php = generate_page_template(implode('/', $segments));
+    // The size check (qs_small_write_guard): false when refused, and the command
+    // answers qs_small_write_refused().
+    if ((!file_exists($phpPath) && !qs_small_write_guard($phpPath, strlen($php)))
+        || !qs_small_write_guard($jsonPath, qs_json_size($structure, $flags, "\n"))) {
+        return false;
+    }
     foreach ([dirname($phpPath), dirname($jsonPath)] as $d) {
         if (!is_dir($d)) @mkdir($d, 0755, true);
     }
     if (!file_exists($phpPath)) {
-        file_put_contents($phpPath, generate_page_template(implode('/', $segments)), LOCK_EX);
+        file_put_contents($phpPath, $php, LOCK_EX);
     }
-    return qs_json_write($jsonPath, $structure, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE, LOCK_EX, "\n");
+    return qs_json_write($jsonPath, $structure, $flags, LOCK_EX, "\n");
 }

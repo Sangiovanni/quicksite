@@ -26,6 +26,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/consentHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/consentLayerHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/translationHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 // The policy route is owned by generateCookiePolicy / deleteCookiePolicy (set
 // only when a page actually exists). Here we just read it for the banner link
@@ -52,12 +53,20 @@ foreach (['consent-banner.json' => $banner, 'consent-popup.json' => $popup] as $
     }
 }
 
+// Every write of this command passes the size check as it happens
+// (qs_small_write_guard); a refusal takes back what it wrote and is answered.
+$jsonFlags = JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE;
+if (!qs_small_write_guard(consentBannerPath(), qs_json_size($banner, $jsonFlags, "\n"))) {
+    qs_small_write_send_refusal();
+}
 $dir = dirname(consentBannerPath());
 if (!is_dir($dir)) {
     @mkdir($dir, 0755, true);
 }
-$jsonFlags = JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE;
 $wroteBanner = qs_json_write(consentBannerPath(), $banner, $jsonFlags, LOCK_EX, "\n");
+if (!qs_small_write_guard(consentPopupPath(), qs_json_size($popup, $jsonFlags, "\n"))) {
+    qs_small_write_send_refusal();
+}
 $wrotePopup  = qs_json_write(consentPopupPath(),  $popup,  $jsonFlags, LOCK_EX, "\n");
 if (!$wroteBanner || !$wrotePopup) {
     ApiResponse::create(500, 'server.operation_failed')
@@ -75,6 +84,7 @@ $flat = ($defaultLang === 'fr') ? $seed['fr'] : $seed['en'];
 $newOnly = consentFilterNewKeys($defaultLang, $flat);
 if (!empty($newOnly)) {
     $res = writeTranslationsToFile($defaultLang, convertDotNotationToNested($newOnly), false);
+    qs_small_write_send_refusal();
     if (!empty($res['ok'])) {
         $languagesSeeded[$defaultLang] = $res['keysAdded'] ?? count($newOnly);
     }
@@ -82,6 +92,7 @@ if (!empty($newOnly)) {
 
 // 3. Enable the layer (policyRoute is left untouched — owned elsewhere).
 saveConsentConfig(array_merge($config, ['enabled' => true]));
+qs_small_write_send_refusal();
 
 ApiResponse::create(200, 'success')
     ->withMessage('Consent layer generated and enabled')

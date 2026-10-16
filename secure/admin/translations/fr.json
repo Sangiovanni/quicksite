@@ -44,6 +44,22 @@
             "error": "Erreur"
         }
     },
+    "writeRate": {
+        "refused": "Ce serveur autorise {max} modifications par {period}. Elles sont \u00e9puis\u00e9es jusqu\u2019\u00e0 {time} (dans {wait}).",
+        "figure": "{remaining} modifications restantes",
+        "titleHead": "Modifications encore possibles sur ce serveur\u00a0:",
+        "titleWindow": "{remaining} sur {max} par {period} \u00b7 de nouveau complet \u00e0 {time}",
+        "titleWindowFull": "{remaining} sur {max} par {period}",
+        "period_day": "jour",
+        "period_days": "{n} jours",
+        "period_hour": "heure",
+        "period_hours": "{n} heures",
+        "period_minute": "minute",
+        "period_minutes": "{n} minutes",
+        "period_seconds": "{n} secondes",
+        "waitSeconds": "{n} s",
+        "waitMinutes": "{n} min"
+    },
     "login": {
         "title": "Connexion Admin",
         "subtitle": "Connectez-vous avec votre nom d'utilisateur et votre mot de passe",
@@ -393,7 +409,8 @@
             "ownerOneProject": "1 projet",
             "content": "Contenu",
             "refresh": "Actualiser",
-            "cachedHint": "En cache \u2014 actualiser pour recalculer"
+            "cachedHint": "En cache \u2014 actualiser pour recalculer",
+            "personalSnippets": "Snippets personnels"
         },
         "structure": {
             "title": "Aperçu de la Structure",
@@ -1728,6 +1745,19 @@
         "aiToolsExecutionRunning": "Exécution {current}/{total}",
         "aiToolsExecutionDone": "Terminé ({ok} réussi(es))",
         "aiToolsExecutionDoneWithErrors": "Terminé ({ok}/{total} réussi(es), {fail} échoué(es))",
+        "aiToolsRateRefusedToStart": "Cette ex\u00e9cution demande {needs} modifications et il en reste {left} sur ce serveur. Assez seront de nouveau disponibles \u00e0 {time} (dans {wait}).",
+        "aiToolsRateNeverOneGo": "Cette ex\u00e9cution demande {needs} modifications\u00a0; ce serveur en autorise {max} par {period}, elle ne peut donc pas s\u2019ex\u00e9cuter d\u2019un seul coup.",
+        "aiToolsRateRunInParts": "Ex\u00e9cuter maintenant les {fits} premi\u00e8res \u00e9tapes et garder les {rest} autres pour plus tard\u00a0?",
+        "aiToolsRateRunPart": "Ex\u00e9cuter la premi\u00e8re partie",
+        "aiToolsRateWaiting": "En attente de modifications disponibles\u2026 {wait}",
+        "aiToolsRateStopped": "Arr\u00eat\u00e9\u00a0: les modifications disponibles sont \u00e9puis\u00e9es jusqu\u2019\u00e0 {time}. Les {n} \u00e9tapes non ex\u00e9cut\u00e9es sont gard\u00e9es\u00a0; ex\u00e9cutez-les d\u2019ici quand elles seront de nouveau disponibles.",
+        "aiToolsRateKeptRest": "Les {n} autres \u00e9tapes sont gard\u00e9es\u00a0; ex\u00e9cutez-les d\u2019ici quand les modifications seront de nouveau disponibles.",
+        "aiToolsKeptTitle": "{n} \u00e9tapes gard\u00e9es d\u2019une ex\u00e9cution arr\u00eat\u00e9e ({label}, pr\u00e9vue \u00e0 {time})",
+        "aiToolsKeptWarning": "La page a pu changer depuis qu\u2019elles ont \u00e9t\u00e9 pr\u00e9vues\u00a0: la position des n\u0153uds peut avoir boug\u00e9.",
+        "aiToolsKeptRun": "Les ex\u00e9cuter",
+        "aiToolsKeptDiscard": "Abandonner",
+        "aiToolsKeptNotYet": "Assez seront de nouveau disponibles \u00e0 {time}.",
+        "aiToolsKeptBlocking": "Ex\u00e9cutez ou abandonnez d\u2019abord les \u00e9tapes gard\u00e9es.",
         "aiToolsStepPending": "En attente",
         "aiToolsStepRunning": "En cours…",
         "aiToolsStepError": "Échec : {error}",

@@ -29,6 +29,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/consentHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/consentLayerHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/translationHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 $params = $trimParametersManagement->params();
 
@@ -54,6 +55,9 @@ $registry = loadStorageRegistry();
 if (storageMigrateInlineDescriptions($registry)) {
     saveStorageRegistry($registry);
 }
+// Every write of this command passes the size check as it happens
+// (qs_small_write_guard); a refusal takes back what it wrote and is answered.
+qs_small_write_send_refusal();
 $items = $registry['items'];
 $structure = buildCookiePolicyStructure($items, consentOAuthLinks());
 
@@ -78,10 +82,11 @@ if ($overwritten && !$overwrite) {
 }
 
 // ---- Create the route (cascade parents) + write the leaf page -------------
-if (!$overwritten) {
-    policyCreateRoute($segments);
+if (!$overwritten && !policyCreateRoute($segments)) {
+    qs_small_write_send_refusal();
 }
 if (!policyWriteLeaf($segments, $structure)) {
+    qs_small_write_send_refusal();
     ApiResponse::create(500, 'server.operation_failed')
         ->withMessage('Failed to write the cookie-policy page structure')
         ->send();
@@ -89,6 +94,7 @@ if (!policyWriteLeaf($segments, $structure)) {
 
 // ---- Record the route + seed copy ----------------------------------------
 saveConsentConfig(array_merge(loadConsentConfig(), ['policyRoute' => '/' . $route]));
+qs_small_write_send_refusal();
 
 // Seed structural copy (NEW keys only) for the project DEFAULT language only.
 // Other languages are translated via the Translation Manager (the textKeys
@@ -109,6 +115,7 @@ foreach ($catKeys as $ck) {
 $newOnly = consentFilterNewKeys($defaultLang, $structural);
 if (!empty($newOnly)) {
     $res = writeTranslationsToFile($defaultLang, convertDotNotationToNested($newOnly), false);
+    qs_small_write_send_refusal();
     if (!empty($res['ok'])) $languagesSeeded[$defaultLang] = $res['keysAdded'] ?? count($newOnly);
 }
 

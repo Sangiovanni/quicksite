@@ -247,16 +247,18 @@ A client that receives a non-JSON error — from nginx, a proxy, or a gateway �
 
 ## Per-user resource limits
 
-Creating projects and uploading into them are open to any authenticated account. On a shared install, nothing stops an ordinary signed-in user from filling the disk, so QuickSite enforces two optional per-user ceilings. The storage ceiling is checked by every write that adds a copy's worth of bytes — `uploadAsset`, `importProject`, `backupProject`, `restoreBackup`, `cloneProject`, `build`, and `exportProject` with `save` — and by `createProject`, which an account already over the ceiling cannot use; the rate ceiling by `uploadAsset` and `importProject`.
+Creating projects and uploading into them are open to any authenticated account. On a shared install, nothing stops an ordinary signed-in user from filling the disk or keeping the server busy, so QuickSite enforces four per-user limits. The storage ceiling is checked by every write that adds a copy's worth of bytes — `uploadAsset`, `importProject`, `backupProject`, `restoreBackup`, `cloneProject`, `build`, and `exportProject` with `save` — and by `createProject`, which an account already over the ceiling cannot use; while an account is over it, a small edit that makes its files larger is refused too. The upload rate is checked by `uploadAsset` and `importProject`. Every command that writes a small file — a structure, the stylesheet, a translation, the routes, a snippet, a settings file — checks that file's size cap. And every command but a read counts against the write rate.
 
-**Nothing is limited by default.** With no `<secure>/management/config/quota.php` both axes are unlimited, and updating QuickSite never changes that — an existing install cannot start refusing uploads because it was upgraded. A malformed file is ignored, with a line in the server error log, and again nothing is limited: a typo in a quota file must not lock every author out of their own site.
+**The storage ceiling and the upload rate are off by default; the file caps and the write rate are on.** With no `<secure>/management/config/quota.php`, nothing bounds an account's disk or its uploads, and updating QuickSite never changes that — an existing install cannot start refusing uploads because it was upgraded, and only its operator knows the size of its disk. The file caps and the write rate apply at their defaults, set several times above the largest real files and the busiest real editing sessions, so that no real session meets them. A malformed file is ignored, with a line in the server error log, and the same defaults apply: a typo in a quota file must not lock every author out of their own site.
 
-| Axis | Setting | Refusal |
-|---|---|---|
-| Total bytes | `max_total_bytes` | `507 quota.storage_exceeded` |
-| Upload rate | `upload_rate.max_uploads` per `upload_rate.period_seconds` | `429 quota.rate_limited`, with `retry_after` in seconds |
+| Axis | Setting | Default | Refusal |
+|---|---|---|---|
+| Total bytes | `max_total_bytes` | off | `507 quota.storage_exceeded` |
+| Upload rate | `upload_rate.max_uploads` per `upload_rate.period_seconds` | off | `429 quota.rate_limited`, with `retry_after` in seconds |
+| File size, per kind | `max_file_bytes.<kind>` | on | `413 validation.size_limit_exceeded` |
+| Write rate | `write_rate`: a list of windows | on, one window of an hour | `429 quota.rate_limited`, with `Retry-After` |
 
-Storage is charged to the account that **owns the project receiving the bytes**, which is not always the caller: a member uploading into somebody else's project spends that owner's allowance, because that is whose disk grows. It is measured across every project that owner owns — the same figure `GET /admin/self/space-usage` reports to them and their dashboard shows — counting each project's content, backups, exports and builds. A caller who is not that owner is told only that the owner is out of space and what the per-account ceiling is; the owner's totals are not disclosed, since they aggregate projects the caller may not be a member of. The upload **rate** limit is the opposite case and follows the caller, because it bounds what one actor does rather than where the bytes land. An upload is refused when current usage **plus the incoming file** would cross the ceiling, so the configured number is a ceiling the total never crosses rather than a threshold it overshoots by one file. For an import, the incoming size is the archive's uncompressed total, read from its central directory, and the refusal happens before the project directory is created. An import and a clone make a new project, so they are charged to the caller, who owns it; a clone counts everything it copies. A backup, a restore and a saved export also remove something — the older backups `max_backups` deletes, what a restore replaces (and, with `delete_backup`, the backup itself), the oldest archive past the last five — so only their net growth is charged; each makes its copy before it removes what the copy replaces, so while it runs the total can exceed the ceiling by what it then removes. A build is checked once its size is known, and removed when it does not fit. A streamed export lives in the system's temporary folder for the download only and is not charged. Each refusal names the write and the way out: a backup's says to delete an older backup first, a restore's to free space or restore with `delete_backup`.
+Storage is charged to the account that **owns the project receiving the bytes**, which is not always the caller: a member uploading into somebody else's project spends that owner's allowance, because that is whose disk grows. It is measured across every project that owner owns, and their personal snippets (which live outside every project) — the same figure `GET /admin/self/space-usage` reports to them and their dashboard shows — counting each project's content, backups, exports and builds. A caller who is not that owner is told only that the owner is out of space and what the per-account ceiling is; the owner's totals are not disclosed, since they aggregate projects the caller may not be a member of. The upload **rate** limit is the opposite case and follows the caller, because it bounds what one actor does rather than where the bytes land. An upload is refused when current usage **plus the incoming file** would cross the ceiling, so the configured number is a ceiling the total never crosses rather than a threshold it overshoots by one file. For an import, the incoming size is the archive's uncompressed total, read from its central directory, and the refusal happens before the project directory is created. An import and a clone make a new project, so they are charged to the caller, who owns it; a clone counts everything it copies. A backup, a restore and a saved export also remove something — the older backups `max_backups` deletes, what a restore replaces (and, with `delete_backup`, the backup itself), the oldest archive past the last five — so only their net growth is charged; each makes its copy before it removes what the copy replaces, so while it runs the total can exceed the ceiling by what it then removes. A build is checked once its size is known, and removed when it does not fit. A streamed export lives in the system's temporary folder for the download only and is not charged. Each refusal names the write and the way out: a backup's says to delete an older backup first, a restore's to free space or restore with `delete_backup`.
 
 ```json
 {
@@ -273,13 +275,68 @@ Storage is charged to the account that **owns the project receiving the bytes**,
 }
 ```
 
-Two consequences of measuring by ownership are worth knowing before setting a number. A project with two owners counts in **full** against both — ownership is a set, not a share. And bytes are attributed to the project they land in, so an invited member's upload counts against that project's **owner**; an account that owns nothing has no storage total to exceed, and it is the rate axis that bounds it.
+Two consequences of measuring by ownership are worth knowing before setting a number. A project with two owners counts in **full** against both — ownership is a set, not a share. And bytes are attributed to the project they land in, so an invited member's upload counts against that project's **owner**; an account that owns nothing has no storage total to exceed beyond its personal snippets, and it is the rate axes that bound it.
 
-The rate axis counts uploads that actually wrote something — a refused upload does not spend an allowance — in fixed windows, so the allowance refills on a period boundary rather than sliding. It exists to bound churn (upload, delete, upload again, which never grows a total), while `max_total_bytes` bounds volume.
+The rate axes count in windows that open at the account's first counted upload or command and last their period: "1,000 per hour" is an hour from the account's first change, not the clock's hour. When a window is over the allowance is whole again, and the next counted one opens the next window. Windows do not slide, so a caller can spend a whole allowance at the end of one window and another at the start of the next. The upload rate counts uploads that actually wrote something — a refused upload does not spend an allowance. It exists to bound churn (upload, delete, upload again, which never grows a total), while `max_total_bytes` bounds volume.
 
-Sizes come from a short-lived measurement cache, read so that growth is measured exactly: the project a write lands in is measured afresh by the check itself, and every write the ceiling is checked for drops its project's cached measurement after it writes (so does deleting a backup), so the owner's other projects read exactly too. A small edit — a structure, a stylesheet, a translation — is not checked, and can leave a measurement slightly low for up to five minutes. A **deletion** of an export, a build or a project can leave a total reading high for up to five minutes, which makes the quota briefly stricter than reality and never looser. Re-measuring on the spot is what the dashboard's refresh control does (`GET /admin/self/space-usage?refresh=1`), and the upload refusal says so.
+Sizes come from a short-lived measurement cache, read so that growth is measured exactly: the project a write lands in is measured afresh by the check itself, and every write the ceiling is checked for drops its project's cached measurement after it writes (so does deleting a backup), so the owner's other projects read exactly too. A small edit reads the cached figure without dropping it, so it can leave a measurement slightly low for up to five minutes. A **deletion** of an export, a build or a project can leave a total reading high for up to five minutes, which makes the quota briefly stricter than reality and never looser. Re-measuring on the spot is what the dashboard's refresh control does (`GET /admin/self/space-usage?refresh=1`), and the upload refusal says so.
 
-Copy `<secure>/management/config/quota.php.example` to `quota.php` to set the numbers; every value is an integer and 0 means unlimited for that axis.
+### Small files
+
+Each kind of small file has a size cap, checked on the bytes a command is about to write: `page` (a page's structure), `structure` (the menu, the footer, a component, the consent layer), `stylesheet`, `translation` (one language's file), `routes`, `snippet` (a project's or a personal one) and `settings` (every other project file a command writes — `config.php`, aliases, page events, layouts, the registries). A write that would take a file over its cap and make it larger is refused and **nothing is written**; a file already over a cap that was lowered after it was written may still shrink or keep its size, so its author can always bring it back under. The stylesheet's cap never exceeds what the CSS parser reads back. Files the engine derives from another — a page's PHP wrapper, a generated script, the sitemap — and uploaded assets have no cap: their source is capped, or the storage ceiling bounds them. Nothing caps how many pages, components or snippets an account makes: the file caps and the storage ceiling already bound them.
+
+```json
+{
+  "status": 413,
+  "code": "validation.size_limit_exceeded",
+  "message": "This change would make the stylesheet 520 KB, over the 512 KB this server allows for it. Nothing was saved.",
+  "data": {
+    "kind": "stylesheet",
+    "file": "public/style/style.css",
+    "bytes": 532480,
+    "max_bytes": 524288,
+    "setting": "max_file_bytes.stylesheet"
+  }
+}
+```
+
+While the owner is **already over** the storage ceiling, a write whose files grow in total is refused with `507 quota.storage_exceeded`; a write that keeps their size or shrinks them is accepted. The check reads the cached figure, so a small edit can take an owner a few bytes over the ceiling — the operator keeps a margin. A command that writes several files is checked on all of them before the first is written; one whose files are written by shared helpers in turn (a generated policy page, a storage item with its descriptions) checks each as it writes and, when one is refused, puts every file it wrote back as it was.
+
+### The write rate
+
+Every command but a read counts against the caller's windows — per account, never per project, so one account never spends another's. The reads are every command of the `content.read` and `config.read` categories, and `listBackups`, `downloadExport`, `downloadBuild`, `getCommandHistory`, `listMembers`, `getProjectRoster`, `listProjects`, `getLanguageList` and `logoutSession`; a new command counts until it is declared a read. A command is counted when the dispatcher admits it — after authentication and the permission check, before the command runs — whatever it then answers; a refused request is not counted. The three public commands (`help`, `login`, `register`) are answered before authentication, so they never count; `login` and `register` have flood controls of their own.
+
+`write_rate` is a list of windows, as many as the operator wants, each `{max_commands, period_seconds}`; they all apply, each opening at the account's first counted command, and with none the rate is off. A counted command's answer says what is left of each window, in the two headers of the IETF RateLimit draft — a window is named by its period:
+
+```
+RateLimit-Policy: "3600";q=1000;w=3600
+RateLimit: "3600";r=937;t=1380
+```
+
+When a window is used up the command is refused before it runs:
+
+```
+HTTP/1.1 429 Too Many Requests
+Retry-After: 1380
+```
+
+```json
+{
+  "status": 429,
+  "code": "quota.rate_limited",
+  "message": "You have reached this server's limit of 1,000 changes per hour. It frees at 15:00:00 UTC, in 23 minutes.",
+  "data": {
+    "retry_after": 1380,
+    "resets_at": "2026-10-11T15:00:00+00:00",
+    "window": { "max_commands": 1000, "period_seconds": 3600 },
+    "windows": [ { "max_commands": 1000, "period_seconds": 3600, "remaining": 0, "reset": 1380, "resets_at": "2026-10-11T15:00:00+00:00" } ]
+  }
+}
+```
+
+With several windows, the one named is the one that frees last. `write_rate.wait_seconds` is not a limit: it is how long the admin panel's batch runner waits for a window to free before it stops a run.
+
+Copy `<secure>/management/config/quota.php.example` to `quota.php` to set the numbers. Every value is an integer; the example documents each default and how to turn each limit off.
 
 ## Self-deploy
 

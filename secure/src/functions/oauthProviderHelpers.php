@@ -291,10 +291,17 @@ function qs_oauth_keys_write(array $keys): bool
     if ($path === null) {
         return false;
     }
+    // The size check (qs_small_write_guard): false when refused, and the command
+    // answers qs_small_write_refused().
+    $flags = JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE;
+    require_once __DIR__ . '/quota.php';
+    if (!qs_small_write_guard($path, qs_json_size((object) $keys, $flags, "\n"))) {
+        return false;
+    }
     if (!is_dir(dirname($path)) && !@mkdir(dirname($path), 0755, true)) {
         return false;
     }
-    if (!qs_json_write($path, (object) $keys, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE, LOCK_EX, "\n")) {
+    if (!qs_json_write($path, (object) $keys, $flags, LOCK_EX, "\n")) {
         return false;
     }
     @chmod($path, 0600);

@@ -223,7 +223,7 @@ Everything true of the **installation** rather than of one project lives in one 
 | `roles.php` | the six roles and the categories each grants | by hand |
 | `categories.php` | every command's category, and each category's scope | ships fixed |
 | `environment.php` | `production` or `development` | setup |
-| `quota.php` | per-account disk and upload-rate ceilings | setup |
+| `quota.php` | per-account disk ceiling, upload and write rates, small-file caps | setup |
 | `deploy.php` · `deploy-roots.php` | whether this install may write a built site, and where | setup, then by hand |
 | `console.php` | whether the raw command runner is offered at `/admin/command` | setup |
 | `import-policy.php` | archive-import limits and the publish allowlist | by hand |

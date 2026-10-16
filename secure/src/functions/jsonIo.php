@@ -47,8 +47,8 @@
 if (!function_exists('qs_json_write')) {
 function qs_json_write(string $path, $data, int $jsonFlags = 0, int $fileFlags = 0, string $trailer = ''): bool
 {
-    $json = json_encode($data, $jsonFlags);
-    if ($json === false) {
+    $json = qs_json_file_bytes($data, $jsonFlags, $trailer);
+    if ($json === null) {
         error_log('qs_json_write: refusing to write ' . $path
             . ' — json_encode failed (' . json_last_error_msg() . '); file left unchanged');
         return false;
@@ -56,11 +56,37 @@ function qs_json_write(string $path, $data, int $jsonFlags = 0, int $fileFlags =
     // Warnings are suppressed and reported through error_log instead: a raw
     // file_put_contents warning carries an absolute path and, with display_errors
     // on, prints it into the response body (path disclosure).
-    $bytes = @file_put_contents($path, $json . $trailer, $fileFlags);
+    $bytes = @file_put_contents($path, $json, $fileFlags);
     if ($bytes === false) {
         error_log('qs_json_write: write failed for ' . $path);
         return false;
     }
     return true;
+}
+}
+
+/**
+ * The exact bytes qs_json_write() writes for these arguments, or null when the
+ * value cannot be encoded. The one encoding both share, so what a command
+ * measures is what it then writes.
+ */
+if (!function_exists('qs_json_file_bytes')) {
+function qs_json_file_bytes($data, int $jsonFlags = 0, string $trailer = ''): ?string
+{
+    $json = json_encode($data, $jsonFlags);
+    return $json === false ? null : $json . $trailer;
+}
+}
+
+/**
+ * How many bytes qs_json_write() would write for these arguments — what a command
+ * hands the size check (qs_small_write_refusal) before it writes. 0 when the value
+ * cannot be encoded: the write that follows refuses it and leaves the file as it is.
+ */
+if (!function_exists('qs_json_size')) {
+function qs_json_size($data, int $jsonFlags = 0, string $trailer = ''): int
+{
+    $json = qs_json_file_bytes($data, $jsonFlags, $trailer);
+    return $json === null ? 0 : strlen($json);
 }
 }

@@ -53,13 +53,15 @@ $GLOBALS['__help_commands'] = [
             '400.validation.required' => 'Missing route parameter',
             '400.route.invalid_segment' => 'Invalid segment. Literal: lowercase / numbers / hyphens. Param: ":name" with identifier.',
             '400.route.already_exists' => 'Route already exists',
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
             '500.server.file_write_failed' => 'Failed to create files',
             '500.server.directory_create_failed' => 'Failed to create directory',
             '200.route.special_page' => 'The first segment names a special-page template (404, 500, 403 or 401), which already exists — nothing was created and no route entry is needed. A 200, not an error.',
             '400.route.too_deep' => 'Route path exceeds maximum depth of 5 levels.',
             '400.validation.invalid_length' => 'Route path must be between 1 and 200 characters. Segment exceeds maximum length of 50.',
             '400.validation.invalid_type' => 'The route parameter is neither a string nor a number - an array, object, boolean or null. An integer or float is accepted and used as its string form.',
-            '500.server.operation_failed' => 'An unexpected failure while creating the route files; any directories already created are removed first. The exception message is returned.'
+            '500.server.operation_failed' => 'An unexpected failure while creating the route files; any directories already created are removed first. The exception message is returned.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'Creates PHP template + empty JSON structure. **Filesystem mapping**: ":slug" segments become "__slug" on disk (NTFS reserves ":") via routeHelpers.php. **Conflict warnings** (non-blocking): the response data.warnings[] array surfaces situations the user should confirm. Each warning carries a machine-readable `type` (i18n key) + EN `message` fallback + structured details. Two shapes today: `route.warning.param_shadows_exact_siblings` (param route alongside existing literals — runtime-safe via specificity but worth verifying intent) and `route.warning.duplicate_param_at_depth` (two ":name" siblings — declaration order resolves, but ambiguous).'
     ],
@@ -165,7 +167,9 @@ $GLOBALS['__help_commands'] = [
             '400.validation.required' => 'Missing route or both menu/footer parameters',
             '400.validation.invalid_type' => 'Invalid parameter type',
             '404.route.not_found' => 'Route does not exist',
-            '400.validation.invalid_length' => 'Route path must be between 1 and 200 characters.'
+            '400.validation.invalid_length' => 'Route path must be between 1 and 200 characters.',
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'Layout settings use inheritance: child routes inherit from nearest ancestor with explicit settings. Default is menu=true, footer=true. Use propagate=true to apply settings to all descendants at once.'
     ],
@@ -230,7 +234,9 @@ $GLOBALS['__help_commands'] = [
             '200.resolver.cleared' => 'Every resolver was removed from the route. A 200, not an error.',
             '200.resolver.unchanged' => 'A clear was requested but the route had no resolver attached — the idempotent no-op. A 200, not an error.',
             '200.resolver.removed' => 'The resolver at index was removed and the array shrank. data.removedIndex echoes the slot. A 200, not an error.',
-            '500.server.operation_failed' => 'The resolver sidecar could not be written.'
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
+            '500.server.operation_failed' => 'The resolver sidecar could not be written.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'The six body shapes are: {route, resolver} replace with one; {route, resolver: [...]} replace with several; {route, resolver, index} patch that slot; {route, resolver, index: <length>} append; {route, index} remove that slot; {route} clear all. The on-disk shape follows the length — a single resolver is stored as a scalar, several as an array — but data.resolvers in the response is ALWAYS the resulting array, empty when cleared. Every resolver on one route must be the same kind: side-effect kinds short-circuit the render with a redirect while data resolvers feed it, so a mixed array is refused. Across data resolvers, expose names share one flat template namespace and a duplicate is refused at save time; the always-available $r0 / $r1 namespaced form is the alternative. Use cleanResolverCache to drop cached resolver responses after changing an endpoint.'
     ],
@@ -704,7 +710,9 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_format' => 'Invalid filename, or a format that cannot be a favicon',
             '400.validation.invalid_length' => 'Filename exceeds 100 characters',
             '404.file.not_found' => 'Named image does not exist in assets/images/',
-            '500.server.file_write_failed' => 'Could not read or write the project config'
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
+            '500.server.file_write_failed' => 'Could not read or write the project config',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'Stores a POINTER, not a copy: the chosen asset stays where it is and no favicon.png or favicon_backup_* file is written. The value is written with var_export and the filename is validated before the write, so it lands in config.php as data. Selecting a different asset REPLACES the pointer (exactly one favicon per site). Renaming the chosen asset follows the pointer; deleting it clears the pointer. Because a build copies config.php verbatim, the choice travels into a built site. File validity is uploadAsset\'s job and is not re-checked here.'
     ],
@@ -754,12 +762,14 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_length' => 'route too long (>200 bytes), lang too long (>10) or title too long (>200 chars)',
             '404.route.not_found' => 'The route is neither a route of the project nor a special page',
             '404.file.not_found' => 'Translation file not found for language',
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
             '500.server.file_read_failed' => 'Failed to read translation file',
             '500.server.file_write_failed' => 'Failed to write updated translation file',
             '500.server.internal_error' => 'Invalid JSON in translation file',
             '400.validation.unsupported_language' => 'The language is not one of the project\'s; errors[0].allowed lists what it takes',
             '500.server.invalid_json' => 'Translation file contains invalid JSON.',
-            '500.server.json_encode_failed' => 'Failed to encode translation data.'
+            '500.server.json_encode_failed' => 'Failed to encode translation data.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'Updates ONE language at a time for single route. Updates page.titles.{route} key in the specified language translation file, and keeps translate/default.json in step, as setTranslationKeys does: a single-language site reads default.json. Creates nested page.titles object if it doesn\'t exist. A page reads the key page.titles.<route path>, so a nested page and a parameter route\'s page have a title of their own (one title for all of a parameter route\'s values). The route must exist, and the language must be one of the project\'s.'
     ],
@@ -884,8 +894,10 @@ $GLOBALS['__help_commands'] = [
             '400.validation.missing_field' => 'neither excludedRoutes nor customUrls was provided',
             '400.validation.invalid_type' => 'excludedRoutes or customUrls is not an array',
             '403.auth.forbidden' => 'the caller\'s role does not grant route.write (viewer cannot write sitemap data)',
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
             '500.server.file_write_failed' => 'could not persist sitemap-config.json',
-            '500.operation.write_failed' => 'configuration saved, but sitemap.txt could not be generated or written'
+            '500.operation.write_failed' => 'configuration saved, but sitemap.txt could not be generated or written',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'Sending only one of excludedRoutes / customUrls merges onto the stored value rather than clearing the other. Requires route.write (editor and above) — getSiteMap remains readable by viewers but can no longer write anything.'
     ],
@@ -1036,6 +1048,7 @@ $GLOBALS['__help_commands'] = [
             '400.operation.failed' => 'Node operation failed (e.g., node not found)',
             '404.route.not_found' => 'Page does not exist',
             '404.file.not_found' => 'Structure file not found',
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
             '500.server.file_write_failed' => 'Failed to write structure file',
             '500.server.internal_error' => 'Failed to encode structure to JSON',
             '400.operation.denied' => 'Cannot delete component: used by other components.',
@@ -1046,7 +1059,8 @@ $GLOBALS['__help_commands'] = [
             '400.validation.reserved_key' => 'Reserved admin-namespace prefix (quicksite_ / quicksite- / qs_ / qs-). These are used by the admin panel and would collide with admin state. Pick a project-specific prefix.',
             '500.server.directory_create_failed' => 'Failed to create components directory.',
             '500.server.file_delete_failed' => 'Failed to delete component file.',
-            '500.server.file_read_failed' => 'Failed to read structure file.'
+            '500.server.file_read_failed' => 'Failed to read structure file.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'Two modes: (1) Full replacement - sends complete structure. (2) Targeted edit - use nodeId to modify single node. Use getStructure/page/name/showIds to see node identifiers first. Actions: update (replace), delete (remove), insertBefore/insertAfter (add sibling). Security: max 10,000 nodes, max 50 levels deep. **Component node paths**: For type=component, the root object is "" (empty) and children are "0", "1", etc. This differs from pages where root elements are "0", "1".'
     ],
@@ -1158,10 +1172,12 @@ $GLOBALS['__help_commands'] = [
             '400.validation.required' => 'Missing language or translations parameter',
             '400.validation.invalid_format' => 'Invalid translation format',
             '400.validation.unsupported_language' => 'The language is not one of the project\'s; errors[0].allowed lists what it takes',
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
             '500.server.file_write_failed' => 'Failed to write translation file',
             '400.validation.invalid_length' => 'Language code must not exceed 10 characters. Translation data too large (max 5MB).',
             '400.validation.invalid_type' => 'The language parameter must be a string. The translations parameter must be an object/array.',
-            '500.server.internal_error' => 'The translation file could not be written for a reason other than a failed write or invalid JSON; the underlying reason is returned in the message.'
+            '500.server.internal_error' => 'The translation file could not be written for a reason other than a failed write or invalid JSON; the underlying reason is returned in the message.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'SAFE by default: Merges with existing translations. Use language="default" in mono-language mode to edit default.json. New keys are added, existing keys are updated, other keys are preserved. Set replace=true to completely replace the file (used by fresh-start workflow).'
     ],
@@ -1294,8 +1310,10 @@ $GLOBALS['__help_commands'] = [
             '400.validation.required' => 'Missing enabled parameter',
             '400.validation.invalid_type' => 'enabled must be boolean',
             '400.validation.invalid_format' => 'Multilingual mode requires at least 2 languages (use addLang first)',
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
             '500.server.file_write_failed' => 'Failed to update config.php or translation files',
-            '500.server.internal_error' => 'Failed to create config lock file. Failed to acquire config lock. Failed to read configuration file.'
+            '500.server.internal_error' => 'Failed to create config lock file. Failed to acquire config lock. Failed to read configuration file.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'To enable multilingual: 1) Use addLang to add languages first, 2) Then use setMultilingual(enabled=true). When switching modes, translations are synced: mono→multi copies default.json keys to default language file, multi→mono copies default language to default.json.'
     ],
@@ -1364,9 +1382,11 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_format' => 'The code is not a string',
             '400.validation.unsupported_language' => 'The code is not in the installation\'s language list (getLanguageList returns it)',
             '409.conflict.duplicate' => 'Language already exists',
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
             '500.server.file_write_failed' => 'Failed to update config or create translation file',
             '500.file.not_found' => 'Configuration file not found.',
-            '500.server.internal_error' => 'Failed to create config lock file. Failed to acquire config lock. Failed to parse configuration file.'
+            '500.server.internal_error' => 'Failed to create config lock file. Failed to acquire config lock. Failed to parse configuration file.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'Can be used before enabling multilingual mode (to add languages first). Use setMultilingual to enable multilingual mode after adding 2+ languages. Updates config.php and creates translation file by copying from default language. The language\'s name is not stored: it comes from the installation\'s language list wherever it is shown, and data.name carries it. translation_file is relative to the project.'
     ],
@@ -1468,9 +1488,11 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_format' => 'lang is not a string',
             '403.mode.requires_multilingual' => 'This command requires multilingual mode',
             '404.not_found.language' => 'The language is not one of the project\'s',
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
             '500.server.file_write_failed' => 'Failed to update config file',
             '500.file.not_found' => 'Configuration file not found.',
-            '500.server.internal_error' => 'Failed to parse configuration file.'
+            '500.server.internal_error' => 'Failed to parse configuration file.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'Only available when MULTILINGUAL_SUPPORT = true. The language must first be added using addLang. This affects the LANGUAGE_DEFAULT config value.'
     ],
@@ -1722,6 +1744,7 @@ $GLOBALS['__help_commands'] = [
             '400.asset.file_too_large' => 'File exceeds size limit',
             '400.asset.invalid_file_type' => 'MIME type not allowed',
             '400.asset.invalid_extension' => 'Unrecognized file extension',
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
             '500.asset.move_failed' => 'Failed to save file',
             '400.asset.invalid_upload' => 'File was not uploaded via HTTP POST.',
             '400.validation.forbidden_extension' => 'Executable file types are not allowed.',
@@ -1733,7 +1756,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_type' => 'The description parameter must be a string. The alt parameter must be a string. The url parameter must be a string.',
             '400.validation.missing_field' => 'No file source provided. Upload a file or provide a url parameter.',
             '413.request.body_too_large' => 'The request body exceeded what this server accepts, so PHP discarded it before the command could read it.',
-            '429.quota.rate_limited' => 'Too many uploads in the current period. The response carries retry_after (seconds) and the message states the limit in force.',
+            '429.quota.rate_limited' => 'Too many uploads in the current period (upload_rate), or a window of the write rate is used up (see limits.write_rate in the overview). Both carry retry_after (seconds) and a message stating the limit in force; the write rate also names its window and sends Retry-After.',
             '500.server.directory_not_found' => 'The asset directory for the resolved category does not exist under the project. The category is named in the message.',
             '500.server.file_corrupted' => 'File upload failed: size mismatch (possible corruption).',
             '500.server.file_move_failed' => 'Failed to move file to destination.',
@@ -1908,7 +1931,9 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_length' => 'Filename, description, or alt text too long',
             '404.asset.not_found' => 'Asset file not found',
             '409.asset.already_exists' => 'Target filename already exists',
-            '500.asset.rename_failed' => 'File system rename failed'
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
+            '500.asset.rename_failed' => 'File system rename failed',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'Category is auto-detected from file extension. At least one of newFilename, description, alt, or starred must be provided. If newFilename omits the extension, the original extension is auto-appended. If an extension is provided, it must match the original. Metadata is preserved when renaming. Send empty string for description/alt to remove that field. Starred assets are included in AI workflow prompts when the user enables the option.'
     ],
@@ -1966,9 +1991,11 @@ $GLOBALS['__help_commands'] = [
             '400.validation.required' => 'Missing content parameter',
             '400.validation.invalid_format' => 'The content fails the stylesheet scan (see notes); errors[0].pattern names what was found',
             '404.file.not_found' => 'Style file not found',
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
             '500.server.file_write_failed' => 'Failed to read or write style file',
             '400.validation.invalid_length' => 'The content parameter is empty, or larger than 512 KB.',
-            '400.validation.invalid_type' => 'The content parameter must be a string.'
+            '400.validation.invalid_type' => 'The content parameter must be a string.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'Completely replaces style.css content. Response includes backup_content for manual rollback if needed. Max size: 512 KB. File locking prevents concurrent writes. THE STYLESHEET SCAN — run by every command that writes CSS into a stylesheet (editStyles, setStyleRule, setKeyframes, setRootVariables, injectSnippetCss) and by importProject on every .css entry: with comments removed and CSS escapes decoded, the text may not hold a javascript: or vbscript: URL, expression(, behavior: (scroll-behavior is fine), -moz-binding:, a data:text/html URI, an @import of another host or of a scheme (a relative @import is fine), or an HTML script or style tag; and its raw bytes may not open a PHP block (<?php, <?=, or <? followed by whitespace or the end of the text), which an import refuses.'
     ],
@@ -2050,10 +2077,12 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_format' => 'variables is not a non-empty object, a variable name or value is not a string, or themeTarget is not "light" or "dark"',
             '400.validation.invalid_type' => 'themeTarget is not a string.',
             '404.file.not_found' => 'Style file not found',
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
             '500.server.file_write_failed' => 'Failed to write style file',
             '400.validation.invalid_css' => 'Invalid CSS value detected: a value holds < > { }, javascript: or expression(; a name or value holds { or }; a declaration as written is not a CSS declaration (errors[0].variable names it, errors[0].reason is unclosed_quote, unclosed_comment, unclosed_bracket or not_a_declaration); or a declaration fails the stylesheet scan, answered "Potentially dangerous CSS pattern detected" with errors[0].pattern naming what was found.',
             '500.server.lock_failed' => 'Could not acquire file lock.',
-            '500.server.operation_failed' => 'An unexpected failure while writing the variables; the stylesheet lock is released first. The exception message is returned.'
+            '500.server.operation_failed' => 'An unexpected failure while writing the variables; the stylesheet lock is released first. The exception message is returned.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'Adds new variables or updates existing ones. Each declaration, as it will be written (--name: value), must be a CSS declaration — its name a custom property\'s, every quote, comment and bracket it opens closed — and passes the stylesheet scan every CSS writer runs (see editStyles). File locking prevents concurrent writes. Creates :root block if not exists.'
     ],
@@ -2107,8 +2136,10 @@ $GLOBALS['__help_commands'] = [
             '400.validation.required' => 'None of enabled, default or userToggle was supplied — at least one is needed.',
             '400.validation.invalid_type' => 'enabled or userToggle was neither a boolean nor the string "true"/"false".',
             '400.validation.invalid_format' => 'default was not "light", "dark" or "system".',
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
             '500.server.internal_error' => 'The project config lock could not be created or acquired, or the configuration file could not be read back.',
-            '500.server.file_write_failed' => 'The updated configuration could not be written.'
+            '500.server.file_write_failed' => 'The updated configuration could not be written.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'data.changes lists only the settings this call wrote; data.current reports all three afterwards, so a partial update still shows the resulting state. The write takes an exclusive lock on the project configuration and re-reads it inside the lock, so concurrent calls that each set a different setting do not overwrite one another.'
     ],
@@ -2229,9 +2260,11 @@ $GLOBALS['__help_commands'] = [
             '400.validation.security' => 'The selector, the styles, the media query or the rule as it will be written fails the stylesheet scan (see editStyles) — errors[0].field and errors[0].pattern say where and what — or one of the three holds { or }',
             '400.validation.invalid_media_query' => 'Invalid media query format',
             '404.file.not_found' => 'Style file not found',
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
             '500.server.file_write_failed' => 'Failed to write style file',
             '500.server.lock_failed' => 'Could not acquire file lock.',
-            '500.server.operation_failed' => 'An unexpected failure while writing the rule; the stylesheet lock is released first. The exception message is returned.'
+            '500.server.operation_failed' => 'An unexpected failure while writing the rule; the stylesheet lock is released first. The exception message is returned.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'The styles are merged into the rule: a property sent replaces that property, and the rule\'s other properties stay (getStyleRule returns what the rule holds). A property sent replaces every declaration of it, in the place of the first, written as sent; a property not sent keeps all of its declarations, a fallback written twice included. Property names compare without case, as CSS reads them (COLOR: red replaces color: blue); a custom property (--name) keeps its case, as CSS compares those as written. No comment in the rule is dropped: one written before a declaration stays where it is when that declaration is replaced or removed. Use removeProperties to delete properties; if that leaves the rule empty, it is deleted (action: deleted). The styles must be CSS declarations: each declaration is property: value, and every quote, comment and bracket it opens is closed, because one left open reads on into the rules after it. Anything else — a quoted string, "color red", a quote left open — answers 400 invalid_format and nothing is written. The selector, the styles, the media query and the rule as it will be written each pass the stylesheet scan every CSS writer runs (see editStyles).'
     ],
@@ -2407,10 +2440,12 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_frame' => 'Invalid frame key: not a percentage, from or to, nor a comma-separated list of them',
             '400.validation.security' => 'A frame, or the @keyframes block as it will be written, fails the stylesheet scan (see editStyles; errors[0].pattern names what was found), or a frame holds { or }',
             '404.file.not_found' => 'Style file not found',
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
             '500.server.file_write_failed' => 'Failed to write style file',
             '409.keyframe.already_exists' => 'Keyframe already exists. Set allowOverwrite: true to replace it.',
             '500.server.lock_failed' => 'Could not acquire file lock.',
-            '500.server.operation_failed' => 'An unexpected failure while writing the keyframes; the stylesheet lock is released first. The exception message is returned.'
+            '500.server.operation_failed' => 'An unexpected failure while writing the keyframes; the stylesheet lock is released first. The exception message is returned.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'Frame keys: percentages, decimals included (0%, 12.5%, 100%), keywords (from, to), or a comma-separated list mixing them (0%, 100% or from, to). getKeyframes returns every key exactly as the stylesheet writes it, so its frames can be sent back unchanged. An existing animation is replaced only with allowOverwrite:true. A frame\'s value must be CSS declarations: each declaration is property: value, and every quote, comment and bracket it opens is closed. Each frame, and the block as it will be written, pass the stylesheet scan every CSS writer runs (see editStyles).'
     ],
@@ -2756,7 +2791,9 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_format' => 'A component name with "..", a slash, a backslash or a NUL byte (reason path_traversal_attempt), or outside the component-name rule (reason invalid_component_reference, errors[0].expected states it).',
             '404.file.not_found' => 'Source component does not exist',
             '409.file.already_exists' => 'Target component name already exists',
-            '500.server.file_rename_failed' => 'Failed to rename component file.'
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
+            '500.server.file_rename_failed' => 'Failed to rename component file.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'Renames file and updates all references atomically. Name must start with letter and contain only letters, numbers, hyphens. Use findComponentUsages first to preview impact.'
     ],
@@ -2799,10 +2836,12 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_format' => 'A component name with "..", a slash, a backslash or a NUL byte (reason path_traversal_attempt), or outside the component-name rule (reason invalid_component_reference, errors[0].expected states it).',
             '404.file.not_found' => 'Source component does not exist',
             '409.file.already_exists' => 'Target component name already exists',
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
             '500.server.directory_create_failed' => 'Failed to create components directory.',
             '500.server.file_read_failed' => 'Failed to read source component.',
             '500.server.file_write_failed' => 'Failed to create new component file.',
-            '500.validation.invalid_json' => 'Source component contains invalid JSON.'
+            '500.validation.invalid_json' => 'Source component contains invalid JSON.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'Creates independent copy. Existing pages using original component are NOT modified. Use to create variations of components.'
     ],
@@ -2905,11 +2944,13 @@ $GLOBALS['__help_commands'] = [
             '404.file.not_found' => 'Structure file not found.',
             '404.node.not_found' => 'The sourceNodeId or the targetNodeId does not resolve to a node in the structure.',
             '404.route.not_found' => 'The page is neither a route of the project nor a special page; data.available_routes and data.special_pages list both, or its route has no structure file.',
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
             '500.server.file_read_failed' => 'Failed to read structure file.',
             '500.server.file_write_failed' => 'Failed to write structure file.',
             '500.server.internal_error' => 'Invalid JSON in structure file. Failed to encode structure to JSON.',
             '400.validation.invalid_type' => 'A page name that is neither a string nor a number (a number is read as its string form).',
-            '400.validation.invalid_length' => 'A page name longer than 200 bytes.'
+            '400.validation.invalid_length' => 'A page name longer than 200 bytes.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'Atomic move operation with proper index adjustment. Use in Visual Editor drag & drop. Components are moved as single units. **Component node paths**: For type=component, children are "0", "1", etc. (root is "", not movable).'
     ],
@@ -3076,11 +3117,13 @@ $GLOBALS['__help_commands'] = [
             '404.file.not_found' => 'Structure file not found.',
             '404.node.not_found' => 'The targetNodeId does not resolve to a node in the structure.',
             '404.route.not_found' => 'The page is neither a route of the project nor a special page; data.available_routes and data.special_pages list both, or its route has no structure file.',
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
             '500.server.file_read_failed' => 'Failed to read structure file.',
             '500.server.file_write_failed' => 'Failed to write structure file.',
             '500.server.internal_error' => 'The structure file on disk is not valid JSON; the decoder message is returned.',
             '400.validation.invalid_type' => 'A page name that is neither a string nor a number (a number is read as its string form).',
-            '400.validation.invalid_length' => 'A page name longer than 200 bytes.'
+            '400.validation.invalid_length' => 'A page name longer than 200 bytes.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'TAG mode adds a tag element that comes in EMPTY by default; the legacy auto-generated placeholder textKey was removed (it was the cause of span-in-span nesting when authoring bound elements). Pass an explicit `textKey` to attach a translation-key text child at add-time, or leave empty and use the dedicated TEXT mode + the Text-mode inline editor (Text tool) afterwards. TEXT mode adds a bare `{textKey:...}` text node — set `textRaw=true` + `textValue` for a literal, or pass an explicit `textKey` (the visual editor\'s text-key picker handles key creation + translation write via setTranslationKeys before calling addNode). Position "inside" moves existing text children of the target into the new tag node; this move logic is skipped for TEXT inserts. For components, use addComponentToNode. **Component node paths**: For type=component, root is "" (empty) and children are "0", "1", etc. (differs from pages where root elements start at "0"). targetNodeId "root" inserts at the structure\'s root, by the one rule every command that inserts there shares: a structure whose root is a list of nodes (every page, menu and footer) takes the new node as its first entry; one whose root is a single node (a component) takes it as its first child; either way its id is "0". A root that cannot hold children (a component call, a text node) is refused.'
     ],
@@ -3151,6 +3194,7 @@ $GLOBALS['__help_commands'] = [
             '404.complex_element.unknown_kind' => 'No builder registered for the requested kind (response includes availableKinds list)',
             '404.route.not_found' => 'The page is neither a route of the project nor a special page; data.available_routes and data.special_pages list both, or its route has no structure file.',
             '404.node.not_found' => 'Target node not found at the given dot path',
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
             '500.complex_element.build_failed' => 'Builder threw unexpectedly or returned a malformed node',
             '400.operation.failed' => 'Failed to insert subtree.',
             '400.validation.blocked_tag' => 'Builder emitted tag, which is not allowed (security restriction).',
@@ -3160,7 +3204,8 @@ $GLOBALS['__help_commands'] = [
             '500.server.file_write_failed' => 'Failed to write structure file.',
             '500.server.internal_error' => 'Builder failed unexpectedly. See server log. Invalid JSON.',
             '400.validation.invalid_type' => 'A page name that is neither a string nor a number (a number is read as its string form).',
-            '400.validation.invalid_length' => 'A page name longer than 200 bytes.'
+            '400.validation.invalid_length' => 'A page name longer than 200 bytes.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'After save, the emitted subtree is INDISTINGUISHABLE from a hand-built one — same JSON shape, same renderer, editable with the regular visual-editor tools. Wizard is build-time only; nothing at render time knows the element came from here. Builders live in <secure>/src/classes/complexElements/*.php as ComplexElementBuilder subclasses and are auto-discovered by the dispatcher. Drop a new builder file + a matching <public>/admin/.../contextual-complex/complex-<kind>.js wizard to add a kind — zero registration. Before, after and inside a node follow the rule addNode follows, the one every positional insert shares. targetNodeId "root" inserts at the structure\'s root, by the one rule every command that inserts there shares: a structure whose root is a list of nodes (every page, menu and footer) takes the new node as its first entry; one whose root is a single node (a component) takes it as its first child; either way its id is "0". A root that cannot hold children (a component call, a text node) is refused with 400 operation.failed.'
     ],
@@ -3222,11 +3267,13 @@ $GLOBALS['__help_commands'] = [
             '404.file.not_found' => 'Structure file not found.',
             '404.node.not_found' => 'The nodeId does not resolve to a node in the structure.',
             '404.route.not_found' => 'The page is neither a route of the project nor a special page; data.available_routes and data.special_pages list both, or its route has no structure file.',
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
             '500.server.file_read_failed' => 'Failed to read structure file.',
             '500.server.file_write_failed' => 'Failed to write structure file.',
             '500.server.internal_error' => 'Invalid JSON in structure file. Failed to encode structure to JSON.',
             '400.validation.invalid_type' => 'A page name that is neither a string nor a number (a number is read as its string form).',
-            '400.validation.invalid_length' => 'A page name longer than 200 bytes.'
+            '400.validation.invalid_length' => 'A page name longer than 200 bytes.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'Creates a deep copy of the node and all children. Generates new unique translation keys for textKey and translatable attributes (alt, placeholder, title, aria-*). New keys follow pattern {prefix}.item{N+1}. Optionally copies translation values from source keys. Returns rendered HTML for live DOM update. Use in Visual Editor with D key shortcut. **Component node paths**: For type=component, children are "0", "1", etc. (root itself is "", but cannot be duplicated). A raw or literal value (__RAW__ / __LIT__) is copied as written: no key is made for it and nothing is translated.'
     ],
@@ -3312,11 +3359,13 @@ $GLOBALS['__help_commands'] = [
             '404.file.not_found' => 'Structure file not found.',
             '404.node.not_found' => 'The nodeId does not resolve to a node in the structure.',
             '404.route.not_found' => 'The page is neither a route of the project nor a special page; data.available_routes and data.special_pages list both, or its route has no structure file.',
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
             '500.server.file_read_failed' => 'Failed to read structure file.',
             '500.server.file_write_failed' => 'Failed to write structure file.',
             '500.server.internal_error' => 'The structure file on disk is not valid JSON; the decoder message is returned.',
             '400.validation.invalid_type' => 'A page name that is neither a string nor a number (a number is read as its string form).',
-            '400.validation.invalid_length' => 'A page name longer than 200 bytes.'
+            '400.validation.invalid_length' => 'A page name longer than 200 bytes.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'Does NOT edit translation values (use setTranslationKeys). Cannot edit component nodes or pure text nodes. After tag change, validates mandatory params are present. Returns rendered HTML for live DOM updates. **Component node paths**: For type=component, root is "" and children are "0", "1", etc. **addParams**: empty/null values are rejected — use removeParams to drop a key.'
     ],
@@ -3395,12 +3444,14 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_format' => 'Invalid targetNodeId format. Use dot notation like \'0.2.1\' or \'root\'. Invalid component name format. Structure too deeply nested (max 50 levels). A page name with "..", a backslash or a NUL byte (reason path_traversal_attempt), or a segment outside the page-name rule; a component name with "..", a slash, a backslash or a NUL byte (reason path_traversal_attempt), or outside the component-name rule (reason invalid_component_reference, errors[0].expected states it).',
             '400.validation.reserved_key' => 'Reserved admin-namespace prefix (quicksite_ / quicksite- / qs_ / qs-). These are used by the admin panel and would collide with admin state. Pick a project-specific prefix.',
             '404.error.notFound' => 'One of the four things the call needs does not exist: the component, the page, the structure file for the given type (and name), or the target node.',
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
             '500.error.fileRead' => 'Failed to read component file.',
             '500.error.fileWrite' => 'Failed to save structure file.',
             '500.error.invalidJson' => 'Component has invalid JSON. Structure file has invalid JSON.',
             '400.validation.invalid_type' => 'A page name that is neither a string nor a number (a number is read as its string form).',
             '400.validation.invalid_length' => 'A page name longer than 200 bytes.',
-            '404.route.not_found' => 'The page is neither a route of the project nor a special page; data.available_routes and data.special_pages list both.'
+            '404.route.not_found' => 'The page is neither a route of the project nor a special page; data.available_routes and data.special_pages list both.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'Auto-generates textKeys as {struct}.{component}{N}.{var}. Creates empty translations, only once the insert passes every check, so a refused insert writes nothing. Returns rendered HTML for live DOM insertion. System placeholders (__ prefix) are filtered out. targetNodeId "root" inserts at the structure\'s root, by the one rule every command that inserts there shares: a structure whose root is a list of nodes (every page, menu and footer) takes the new node as its first entry; one whose root is a single node (a component) takes it as its first child; either way its id is "0". A root that cannot hold children (a component call, a text node) is refused with 400 operation.failed. Before, after and inside a node follow the one rule every positional insert shares: the new node becomes the target\'s sibling just before or just after it, or its first child.'
     ],
@@ -3458,12 +3509,14 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_format' => 'Invalid nodeId format. Use dot notation like \'0.2.1\'. Structure too deeply nested (max 50 levels). A page name with "..", a backslash or a NUL byte (reason path_traversal_attempt), or a segment outside the page-name rule; a component name with "..", a slash, a backslash or a NUL byte (reason path_traversal_attempt), or outside the component-name rule (reason invalid_component_reference, errors[0].expected states it).',
             '400.validation.invalid_value' => 'The type parameter is not one of menu, footer, page, component; or the node at nodeId is a tag node rather than a component node (use editNode for those).',
             '404.error.notFound' => 'One of the four things the call needs does not exist: the page, the structure file for the given type (and name), the node, or the component definition it points at.',
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
             '500.error.fileWrite' => 'Failed to save structure file.',
             '500.error.internal' => 'Failed to update node.',
             '500.error.invalidJson' => 'Structure file has invalid JSON. Component has invalid JSON.',
             '400.validation.invalid_type' => 'A page name that is neither a string nor a number (a number is read as its string form).',
             '400.validation.invalid_length' => 'A page name longer than 200 bytes.',
-            '404.route.not_found' => 'The page is neither a route of the project nor a special page; data.available_routes and data.special_pages list both.'
+            '404.route.not_found' => 'The page is neither a route of the project nor a special page; data.available_routes and data.special_pages list both.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'Only param-type variables can be edited (href, src, etc.). TextKey variables are read-only - use setTranslationKeys to change translation values. Returns rendered HTML for live DOM update.'
     ],
@@ -3512,7 +3565,9 @@ $GLOBALS['__help_commands'] = [
             '400.api.error.invalid_request' => 'The request body is not valid JSON.',
             '400.api.error.missing_parameter' => 'Missing or invalid "alias" parameter. Missing or invalid "target" parameter.',
             '409.api.error.conflict' => 'Alias conflicts with existing route. Alias uses a reserved path. Alias already exists. Use deleteAlias first to modify it.',
-            '500.api.error.write_failed' => 'Failed to save aliases.'
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
+            '500.api.error.write_failed' => 'Failed to save aliases.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'Aliases cannot conflict with existing routes or reserved paths (management, assets, build). Delete an alias first to modify its target. Stored per project in <secure>/projects/<projectId>/data/aliases.json.'
     ],
@@ -4398,7 +4453,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_type' => 'File must be a ZIP archive.',
             '400.validation.missing_field' => 'No archive was uploaded. Send the ZIP as multipart/form-data.',
             '400.validation.reserved_name' => 'Project name is reserved.',
-            '429.quota.rate_limited' => 'Too many uploads in the current period. The response carries retry_after (seconds) and the message states the limit in force.',
+            '429.quota.rate_limited' => 'Too many uploads in the current period (upload_rate), or a window of the write rate is used up (see limits.write_rate in the overview). Both carry retry_after (seconds) and a message stating the limit in force; the write rate also names its window and sends Retry-After.',
             '500.server.directory_create_failed' => 'Failed to create project directory.',
             '500.server.extract_failed' => 'Failed to extract project files.',
             '500.server.file_write_failed' => 'Failed to initialise imported project membership.',
@@ -4935,12 +4990,14 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_value' => 'The structType parameter is not one of menu, footer, page, component; or event is not a valid HTML event attribute (UNIVERSAL_EVENTS plus the entry for the node tag in TAG_SPECIFIC_EVENTS).',
             '404.file.not_found' => 'The structure file for the requested page (or for the menu, footer or component) does not exist.',
             '404.route.not_found' => 'The page is neither a route of the project nor a special page; data.available_routes and data.special_pages list both.',
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
             '422.node.invalid_target' => 'Interactions must be attached to a tag node, not a text node. Select the parent element (e.g. the button or link) and try again.',
             '500.server.file_read_failed' => 'Failed to read structure file.',
             '500.server.file_write_failed' => 'Failed to save structure file.',
             '500.server.internal_error' => 'Invalid JSON in structure file. Failed to update node.',
             '400.validation.invalid_type' => 'A page name that is neither a string nor a number (a number is read as its string form).',
-            '400.validation.invalid_length' => 'A page name longer than 200 bytes.'
+            '400.validation.invalid_length' => 'A page name longer than 200 bytes.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'If the event already has interactions, the new one is appended (space-separated). Use listJsFunctions to get available function names. Params array order must match function argument order.'
     ],
@@ -5022,12 +5079,14 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_value' => 'The structType parameter is not one of menu, footer, page, component; index is not a non-negative integer; or event / newEvent is not a valid HTML event attribute.',
             '404.file.not_found' => 'The structure file for the requested page (or for the menu, footer or component) does not exist.',
             '404.route.not_found' => 'The page is neither a route of the project nor a special page; data.available_routes and data.special_pages list both.',
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
             '422.node.invalid_target' => 'Interactions must be attached to a tag node, not a text node. Select the parent element and try again.',
             '500.server.file_read_failed' => 'Failed to read structure file.',
             '500.server.file_write_failed' => 'Failed to save structure file.',
             '500.server.internal_error' => 'Invalid JSON in structure file. Failed to update node.',
             '400.validation.invalid_type' => 'A page name that is neither a string nor a number (a number is read as its string form).',
-            '400.validation.invalid_length' => 'A page name longer than 200 bytes.'
+            '400.validation.invalid_length' => 'A page name longer than 200 bytes.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'Index is 0-based within the specific event. Use listInteractions to find the correct index. Only replaces the interaction at that index, other interactions on the same event are preserved.'
     ],
@@ -5192,10 +5251,12 @@ $GLOBALS['__help_commands'] = [
             '404.route.not_found' => 'The page is neither a route of the project nor a special page; data.available_routes and data.special_pages list both.',
             '400.validation.invalid_value' => 'event is not one of onload, onresize, onscroll.',
             '400.validation.invalid_format' => 'function is not a valid identifier. A page name with "..", a backslash or a NUL byte (reason path_traversal_attempt), or a segment outside the page-name rule.',
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
             '422.validation.unknown_verb' => 'function is a well-formed name but is not in the QS verb catalogue.',
             '500.server.file_write_failed' => 'The page-events file could not be written.',
             '400.validation.invalid_type' => 'A page name that is neither a string nor a number (a number is read as its string form).',
-            '400.validation.invalid_length' => 'A page name longer than 200 bytes.'
+            '400.validation.invalid_length' => 'A page name longer than 200 bytes.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'The call is appended to the event\'s list, and data.index is the position it landed at — pass that index to editPageEvent or deletePageEvent. The verb\'s arguments are validated against the catalogue, but the catalogue\'s own events list is NOT enforced here: a verb documented only for click events is accepted on onload. Prefer onScrollFetchState over a raw onscroll fetchState for infinite scroll — it carries the debounce and exhausted guards. Adding the first event for a page creates the project\'s page-events file and its data folder if they do not exist yet.'
     ],
@@ -5266,11 +5327,13 @@ $GLOBALS['__help_commands'] = [
             '404.route.not_found' => 'The page is neither a route of the project nor a special page; data.available_routes and data.special_pages list both.',
             '404.data.not_found' => 'page-events.json file is missing',
             '404.interaction.not_found' => 'No interaction at the given (event, index) for this page',
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
             '500.server.file_read_failed' => 'Failed to read page events file.',
             '500.server.file_write_failed' => 'Failed to save page events file.',
             '500.server.internal_error' => 'Invalid JSON in page events file. Failed to encode page events JSON.',
             '400.validation.invalid_type' => 'A page name that is neither a string nor a number (a number is read as its string form).',
-            '400.validation.invalid_length' => 'A page name longer than 200 bytes.'
+            '400.validation.invalid_length' => 'A page name longer than 200 bytes.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'When newEvent differs from event, the interaction is spliced out of the source event and pushed onto the new event (empty event/page entries are cleaned up). When newEvent is omitted or equal, the call is replaced in-place at the same index. Counterpart to editInteraction (which edits element-level events on a node).'
     ],
@@ -5384,11 +5447,13 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_format' => 'structureId does not match HTML id format. A page name with "..", a backslash or a NUL byte (reason path_traversal_attempt), or a segment outside the page-name rule.',
             '404.route.not_found' => 'The page is neither a route of the project nor a special page; data.available_routes and data.special_pages list both, or the route has no page JSON file.',
             '404.structure.not_found' => 'no <table data-qs-complex-id=X> found on the page (table may predate the marker: re-create it with the Table wizard, then delete the old one)',
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
             '422.validation.dimension_mismatch' => 'pasted grid dimensions do not match the existing table — response data carries the expected vs got diff',
             '500.server.file_read_failed' => 'page JSON file unreadable',
             '500.server.file_write_failed' => 'translation file write failed',
             '500.server.internal_error' => 'The page JSON is malformed, a complex table node\'s dimensions could not be measured, or the merged translations could not be encoded. The offending element is named in the message.',
-            '400.validation.invalid_length' => 'A page name longer than 200 bytes.'
+            '400.validation.invalid_length' => 'A page name longer than 200 bytes.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'Counterpart to the Table wizard\'s Translatable paste mode (which CREATES + writes the FIRST language\'s values). This command is for adding additional languages to an existing structure. Empty cells in the pasted grid become empty translation values (NOT skipped — the key must exist after this write or the renderer falls back to the raw key text).'
     ],
@@ -5475,7 +5540,9 @@ $GLOBALS['__help_commands'] = [
             '404.route.not_found' => 'The page is neither a route of the project nor a special page; data.available_routes and data.special_pages list both.',
             '400.validation.invalid_type' => 'A page name that is neither a string nor a number (a number is read as its string form).',
             '400.validation.invalid_length' => 'A page name longer than 200 bytes.',
-            '400.validation.invalid_format' => 'A page name with "..", a backslash or a NUL byte (reason path_traversal_attempt), or a segment outside the page-name rule.'
+            '400.validation.invalid_format' => 'A page name with "..", a backslash or a NUL byte (reason path_traversal_attempt), or a segment outside the page-name rule.',
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'Store definition shape — endpoint: "@apiId/endpointId" (required); fetchOnLoad: bool (optional); fields: {name => {dir, init?, default?, from?, append?}} (at least one field). Field directions: "request" (sent only), "response" (set from the response only — requires "from"), "both" (sent from its current value, then updated from the response — requires "from"). init (for sent fields): a literal, or "query:<param>" | "localStorage:<key>" | "sessionStorage:<key>". from (for received fields): a response dot-path (e.g. "data" or "meta.total"). append: true makes a list field grow (infinite scroll) instead of replacing. The definition is runtime-agnostic JSON; the server-side data-resolver reads the same shape. Permission: editStructure.'
     ],
@@ -5595,8 +5662,10 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.validation.failed' => 'provider or set missing or invalid; client_id missing or malformed; client_secret malformed, or missing while no secret is stored for this set; or client_secret sent in the address — see errors[]',
             '404.oauth.provider.not_offered' => 'The installation does not offer this provider',
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
             '500.server.invalid_json' => 'The project\'s data/oauth-secrets.json is not a JSON object, so it is not written over',
-            '500.server.file_write_failed' => 'The project\'s data/oauth-secrets.json could not be written'
+            '500.server.file_write_failed' => 'The project\'s data/oauth-secrets.json could not be written',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'Answers oauth.credentials.cleared when clear is true. On this installation the sign-in reads the preview set only. A build carries the build set only, never the preview set; on the deployed server QS_OAUTH_<PROVIDER>_CLIENT_ID and QS_OAUTH_<PROVIDER>_CLIENT_SECRET come first (the provider id upper-cased, every other character folded to "_"). The installation itself never reads those variables. Each provider\'s console must know the callback address listOAuthProviders answers for the set.'
     ],
@@ -5638,7 +5707,9 @@ $GLOBALS['__help_commands'] = [
             '400.validation.required' => 'id missing',
             '400.validation.invalid' => 'Invalid scope/category/etc. — see errors[]',
             '409.storage.duplicate' => 'An item with this id already exists; use editStorageItem',
-            '500.server.operation_failed' => 'Failed to write the storage registry.'
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
+            '500.server.operation_failed' => 'Failed to write the storage registry.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'Writes data/storage.json. consentRequired is derived from category.'
     ],
@@ -5664,7 +5735,9 @@ $GLOBALS['__help_commands'] = [
             '409.storage.duplicate' => 'newId already taken',
             '400.validation.invalid' => 'Invalid fields — see errors[]',
             '400.validation.required' => 'Storage item id is required.',
-            '500.server.operation_failed' => 'Failed to write the storage registry.'
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
+            '500.server.operation_failed' => 'Failed to write the storage registry.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'Cookie-only fields (domain/path/secure/sameSite) accepted when scope is cookie.'
     ],
@@ -5704,7 +5777,9 @@ $GLOBALS['__help_commands'] = [
             '409.storage.desclang_confirm' => 'Confirmation required — data: {from, to, moved, overwrites, needsConfirm}',
             '400.validation.invalid' => 'Language not in LANGUAGES_SUPPORTED',
             '400.validation.required' => 'A target language is required.',
-            '500.server.operation_failed' => 'Failed to write the storage registry.'
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
+            '500.server.operation_failed' => 'Failed to write the storage registry.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'No-op (200) when lang already active. Drives the /admin/storage description-language selector.'
     ],
@@ -5733,7 +5808,9 @@ $GLOBALS['__help_commands'] = [
             'data' => ['categories' => '[declared non-essential categories]', 'languagesSeeded' => '{lang: keysAdded}', 'policyRoute' => 'string|null', 'enabled' => true]
         ],
         'error_responses' => [
-            '500.server.operation_failed' => 'Failed to write the consent layer structure files.'
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
+            '500.server.operation_failed' => 'Failed to write the consent layer structure files.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'Idempotent. Runtime write-gating only activates once this enables the layer. Drives the /admin/storage "Generate consent layer" button.'
     ],
@@ -5765,7 +5842,9 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.validation.required' => 'A route is required for the cookie-policy page.',
             '409.route.exists' => 'The requested route already exists, and generating the cookie-policy page there would overwrite its content.',
-            '500.server.operation_failed' => 'Failed to write the cookie-policy page structure.'
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
+            '500.server.operation_failed' => 'Failed to write the cookie-policy page structure.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'Creates the route (cascading parents) when missing; overwrites the structure when it exists (warned). Pairs with generateConsentLayer (which links the banner to this route).'
     ],
@@ -5844,7 +5923,9 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.validation.invalid' => 'Invalid id slug',
             '400.validation.required' => 'Missing id or label',
-            '500.server.operation_failed' => 'Failed to write the privacy registry.'
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
+            '500.server.operation_failed' => 'Failed to write the privacy registry.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => '201 when new, 200 on update. Drives the /admin/privacy collected-data editor.'
     ],
@@ -5884,7 +5965,9 @@ $GLOBALS['__help_commands'] = [
             '409.privacy.desclang_confirm' => 'Confirmation required — data: {from, to, moved, overwrites, needsConfirm}',
             '400.validation.invalid' => 'Language not in LANGUAGES_SUPPORTED',
             '400.validation.required' => 'A target language is required.',
-            '500.server.operation_failed' => 'Failed to write the privacy registry.'
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
+            '500.server.operation_failed' => 'Failed to write the privacy registry.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'No-op (200) when lang already active. Drives the /admin/privacy description-language selector.'
     ],
@@ -5905,7 +5988,9 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.privacy.unknown_datum' => 'datum is not a declared collected-data id',
             '400.validation.required' => 'Missing endpoint or field',
-            '500.server.operation_failed' => 'Failed to write the privacy registry.'
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
+            '500.server.operation_failed' => 'Failed to write the privacy registry.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'Drives the /admin/privacy atom-mapping UI. Mapping an atom reduces the unmapped-coverage count.'
     ],
@@ -5927,7 +6012,9 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.validation.invalid' => 'kind must be self or third-party',
             '400.validation.required' => 'Missing baseUrl',
-            '500.server.operation_failed' => 'Failed to write the privacy registry.'
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
+            '500.server.operation_failed' => 'Failed to write the privacy registry.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'Drives the /admin/privacy host-classification UI. name/privacyUrl are ignored for kind=self.'
     ],
@@ -5949,7 +6036,9 @@ $GLOBALS['__help_commands'] = [
             '400.route.invalid' => 'Route must have 1-5 segments',
             '400.route.invalid_segment' => 'Invalid route segment',
             '400.validation.required' => 'A route is required for the privacy-policy page.',
-            '500.server.operation_failed' => 'Failed to write the privacy-policy page structure.'
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
+            '500.server.operation_failed' => 'Failed to write the privacy-policy page structure.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'Descriptions resolve live (textKeys); regenerate only for data changes (new mappings, host re-classification). Drives the /admin/privacy Generate/Update flow.'
     ],
@@ -5972,7 +6061,9 @@ $GLOBALS['__help_commands'] = [
         'example_post' => 'POST /management/p/<projectId>/setPrivacyCookieSection with {"cookieSection":"omit"}',
         'success_response' => ['status' => 200, 'code' => 'success', 'data' => ['cookieSection' => 'omit']],
         'error_responses' => ['400.validation.invalid' => 'cookieSection must be auto or omit',
-            '500.server.operation_failed' => 'Failed to write the privacy registry.'],
+            '413.validation.size_limit_exceeded' => 'The privacy registry would pass the size cap for project settings files (max_file_bytes.settings in <secure>/management/config/quota.php). Nothing was written.',
+            '500.server.operation_failed' => 'Failed to write the privacy registry.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes the registry larger. Nothing was written.'],
         'notes' => 'Applies on the next generate/update. Drives the /admin/privacy cookie-section toggle.'
     ],
 
@@ -6079,7 +6170,9 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '400.api.error.missing_parameter' => 'Missing required parameter (apiId, name, or baseUrl)',
-            '400.api.error.invalid_parameter' => 'API with this ID already exists, or an invalid apiId, baseUrl or auth (a tokenSource header name that is not an RFC 7230 token included); the message says which'
+            '400.api.error.invalid_parameter' => 'API with this ID already exists, or an invalid apiId, baseUrl or auth (a tokenSource header name that is not an RFC 7230 token included); the message says which',
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'After creating an API, add endpoints using editApi with addEndpoint parameter. The API config is stored in data/api-endpoints.json and compiled to qs-api-config.js for client-side use.'
     ],
@@ -6167,7 +6260,9 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.api.error.missing_parameter' => 'Missing apiId or no updates provided',
             '400.api.error.invalid_parameter' => 'Endpoint already exists (when adding), invalid update operation, invalid callableFrom value (must be client/server/both or omitted for auto-derive), an endpoint path outside its character set, or a tokenSource header name that is not an RFC 7230 token',
-            '404.api.error.not_found' => 'API or endpoint not found'
+            '404.api.error.not_found' => 'API or endpoint not found',
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'Use ONE endpoint operation per request: endpoints (full replace), addEndpoint, editEndpoint, or deleteEndpoint. Regenerates qs-api-config.js automatically (server-only endpoints are filtered out). **callableFrom**: per-endpoint marker — "client"/"server"/"both", or absent for auto-derive (apiKey → server, others → both). **countKeyWarnings**: advisory list of count-sentence bindings whose translation key does not resolve in every project language (empty array when all resolve). The edit is saved regardless. **auth.csrf**: optional on auth type "cookie" only — {"from": "cookie:XSRF-TOKEN", "to": "header:X-XSRF-TOKEN"} makes QS.fetch echo the named cookie into the named request header (the double-submit pattern used by the AUTHOR\'s own API, unrelated to QuickSite\'s session).'
     ],
@@ -6438,7 +6533,9 @@ $GLOBALS['__help_commands'] = [
             '400.validation.blocked_tag' => 'Tag is not allowed (security restriction).',
             '400.validation.invalid_value' => 'scope is neither project nor personal. errors[0].allowed lists the two values. Or category is not one of the snippet categories; errors[0].allowed lists them.',
             '409.snippets.already_exists' => 'A snippet with this ID already exists.',
-            '500.snippets.save_failed' => 'The snippet passed validation but could not be written to the project. The underlying reason is returned in the message.'
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
+            '500.snippets.save_failed' => 'The snippet passed validation but could not be written to the project. The underlying reason is returned in the message.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ]
     ],
     
@@ -6516,7 +6613,9 @@ $GLOBALS['__help_commands'] = [
             '400.snippets.invalid_id' => 'New ID must start with a letter and contain only letters, numbers, dashes, and underscores.',
             '404.snippets.source_not_found' => 'Source snippet not found.',
             '409.snippets.already_exists' => 'A snippet with the requested new id already exists in this project.',
-            '500.snippets.save_failed' => 'The copy could not be written to the project. The underlying reason is returned in the message.'
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
+            '500.snippets.save_failed' => 'The copy could not be written to the project. The underlying reason is returned in the message.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'The duplicate is created without the css field (user snippets use project classes). Edit the structure JSON directly or use Visual Editor.'
     ],
@@ -6590,11 +6689,13 @@ $GLOBALS['__help_commands'] = [
             '400.validation.target_required' => 'Target node ID is required.',
             '404.snippets.not_found' => 'No snippet with that id exists in this project.',
             '404.structure.not_found' => 'Page structure not found. Structure file not found.',
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
             '500.server.file_write_failed' => 'Failed to write structure file.',
             '500.structure.invalid' => 'Invalid structure JSON.',
             '400.validation.invalid_length' => 'A page name longer than 200 bytes.',
             '404.route.not_found' => 'The page is neither a route of the project nor a special page; data.available_routes and data.special_pages list both.',
-            '400.validation.invalid_value' => 'Inside a component call or a text node: neither renders children, so the snippet would never show.'
+            '400.validation.invalid_value' => 'Inside a component call or a text node: neither renders children, so the snippet would never show.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'Every root of the snippet is inserted, in order, at the position asked (a snippet whose structure is a list of nodes has several roots): newNodeId names the first, newNodeIds every one, and html holds every root\'s HTML in order. Each translatable value (a text node\'s key, an alt / placeholder / title / aria-label key, a component\'s text variable) gets a new key {prefix}.item{N}, numbered on from the highest the project holds and from one root to the next. A raw or literal value (__RAW__ / __LIT__) is kept as written: no key, no translation. The snippet\'s translations are written under the new keys in every project language file, one for each new key (a key the snippet uses twice is written for both copies; keyMapping names the last), only once the insert passes every check, so a refused insert writes nothing. Before, after and inside a node follow the one rule every positional insert shares. targetNodeId "root" inserts at the structure\'s root, by the one rule every command that inserts there shares: a structure whose root is a list of nodes (every page, menu and footer) takes the new node as its first entry; one whose root is a single node (a component) takes it as its first child; either way its id is "0". A root that cannot hold children (a component call, a text node) is refused with 400 operation.failed.'
     ],
@@ -6645,7 +6746,8 @@ $GLOBALS['__help_commands'] = [
             '400.project.mismatch' => 'The project named in the body does not match the project in the URL marker. The marker decides; a disagreeing echo is refused rather than ignored.',
             '413.validation.size_limit_exceeded' => 'Injecting this snippet would take the project stylesheet past 512 KB, the ceiling every CSS writer enforces.',
             '400.validation.security' => 'The snippet\'s CSS, or the block as it will be appended (its comment names the snippet id), fails the stylesheet scan (see editStyles); errors[0].field and errors[0].pattern say where and what. Nothing is written.',
-            '500.server.file_write_failed' => 'Failed to write stylesheet.'
+            '500.server.file_write_failed' => 'Failed to write stylesheet.',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
         'notes' => 'Writes to both the live public stylesheet and the project backup in <secure>/projects/. Includes :root variables referenced by injected rules. In "replace" mode, only global-scope rules are removed (media query rules are left untouched). The snippet\'s CSS and the block appended pass the stylesheet scan every CSS writer runs (see editStyles) — a project snippet can arrive in an imported archive.'
     ],
@@ -6892,6 +6994,23 @@ function __command_help(array $params = [], array $urlParams = []): ApiResponse 
                 'development_mode' => 'Allows localhost:* origins automatically',
                 'config_file' => '<secure>/management/config/auth.php',
                 'allowed_methods' => ['GET', 'POST', 'OPTIONS']
+            ],
+            'limits' => [
+                'note' => 'Every limit is the operator\'s, set in <secure>/management/config/quota.php; its shipped .example documents each default. This response names the settings, never their values, which vary per installation.',
+                'write_rate' => [
+                    'setting' => 'write_rate: a list of windows, each {max_commands, period_seconds}; each opens at the account\'s first counted command and lasts period_seconds, then the allowance is whole again; with no window the rate is off. write_rate.wait_seconds is how long the admin panel\'s batch runner waits for a window to free before it stops and keeps the steps not run.',
+                    'counts' => 'Every command but a read, per account (never per project), counted when the dispatcher admits it - after authentication and the permission check, before the command runs - whatever the command then answers. A request answered 429 is not counted. The reads are every command of the content.read and config.read categories, and listBackups, downloadExport, downloadBuild, getCommandHistory, listMembers, getProjectRoster, listProjects, getLanguageList and logoutSession. The public commands (help, login, register) are answered before authentication and never count.',
+                    'headers' => 'A counted command\'s answer carries RateLimit-Policy ("<period>";q=<max_commands>;w=<period_seconds>, one item per window) and RateLimit ("<period>";r=<remaining>;t=<seconds until that window frees>): the two fields of the IETF RateLimit header draft. A window is named by its period.',
+                    'refusal' => '429 quota.rate_limited, from any command but a read: a window is used up. Retry-After gives the seconds until the window it names frees; data carries retry_after, resets_at (UTC, ISO 8601), window {max_commands, period_seconds} and every window as it stands.'
+                ],
+                'file_caps' => [
+                    'setting' => 'max_file_bytes.<kind>, one cap per kind of small file: page, structure (menu, footer, components, consent layer), stylesheet, translation, routes, snippet, settings (every other project file a command writes: config.php, the registries, aliases, events, layouts...). 0 turns a cap off. The stylesheet\'s cap never exceeds what the CSS parser reads back.',
+                    'refusal' => '413 validation.size_limit_exceeded: a file the command writes would pass its kind\'s cap and grow. Nothing is written; a file already over a lowered cap may still shrink. Files the engine derives from another (page wrappers, generated scripts, the sitemap) and uploaded assets have no cap.'
+                ],
+                'storage' => [
+                    'setting' => 'max_total_bytes: the storage quota per account (0 = off), measured over the projects it owns and its personal snippets.',
+                    'small_writes' => '507 quota.storage_exceeded: while the owner is already over the quota, a change that makes files larger is refused; one that keeps their size or shrinks them is accepted, so an owner can always clean up. The figure is cached, so a change can take an owner a few bytes over.'
+                ]
             ],
             'usage' => 'All requests require Authorization header. GET commands: help, getRoutes, getSiteMap, analyzeReachability, getStructure, getTranslation, getTranslations, getLangList, getTranslationKeys, validateTranslations, getUnusedTranslationKeys, analyzeTranslations, listAssets, getStyles, getRootVariables, listStyleRules, getStyleRule, getKeyframes, listComponents, getComponent, listPages, listAliases, listMembers. POST commands: all others.',
             'note' => 'For GET commands with URL parameters, use URL segments (e.g., /getStructure/menu, /validateTranslations/en, /getStyleRule/.btn-primary, /getSiteMap/text). For POST commands, send parameters as JSON in request body. For file uploads, use multipart/form-data encoding.',

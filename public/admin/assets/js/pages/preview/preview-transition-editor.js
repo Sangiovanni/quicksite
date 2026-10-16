@@ -33,10 +33,6 @@ window.PreviewTransitionEditor = (function() {
     let ensureKeyframesData = async () => {};   // ask the list's owner to load it if it has not
     let getThemeVariables = () => ({});
 
-    // API configuration
-    let managementUrl = '';
-    let authToken = '';
-
     // Transition Editor state
     let transitionEditorSelector = null;
     let transitionEditorBaseProperties = {};
@@ -220,24 +216,17 @@ window.PreviewTransitionEditor = (function() {
      * Load base and pseudo-state styles for the selector
      */
     async function loadTransitionSelectorStates(selector) {
-        managementUrl = PreviewConfig?.managementUrl || '';
-        authToken = PreviewConfig?.authToken || '';
-        
         const pseudoClass = transitionEditorCurrentPseudo;
         const hoverSelector = selector + pseudoClass;
 
         try {
             const [baseResponse, hoverResponse] = await Promise.all([
-                fetch(managementUrl + 'getStyleRule/' + encodeURIComponent(selector), {
-                    headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
-                }),
-                fetch(managementUrl + 'getStyleRule/' + encodeURIComponent(hoverSelector), {
-                    headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
-                })
+                QuickSiteAdmin.apiRequest('getStyleRule', 'GET', null, [encodeURIComponent(selector)]),
+                QuickSiteAdmin.apiRequest('getStyleRule', 'GET', null, [encodeURIComponent(hoverSelector)])
             ]);
 
-            const baseData = await baseResponse.json();
-            const hoverData = await hoverResponse.json();
+            const baseData = baseResponse.data || {};
+            const hoverData = hoverResponse.data || {};
 
             // Extract properties
             transitionEditorBaseProperties = {};
@@ -490,28 +479,18 @@ window.PreviewTransitionEditor = (function() {
      * Delete a property from base or trigger state
      */
     async function deleteTransitionProperty(target, property) {
-        managementUrl = PreviewConfig?.managementUrl || '';
-        authToken = PreviewConfig?.authToken || '';
-        
         const selector = target === 'base'
             ? transitionEditorSelector
             : transitionEditorSelector + transitionEditorCurrentPseudo;
 
         try {
-            const response = await fetch(managementUrl + 'setStyleRule', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
-                },
-                body: JSON.stringify({
-                    selector: selector,
-                    styles: '',
-                    removeProperties: [property]
-                })
+            const response = await QuickSiteAdmin.apiRequest('setStyleRule', 'POST', {
+                selector: selector,
+                styles: '',
+                removeProperties: [property]
             });
 
-            const result = await response.json();
+            const result = response.data || {};
 
             if (result.status === 200) {
                 showToast(PreviewConfig.i18n.propertyDeleted || 'Property deleted', 'success');
@@ -531,27 +510,18 @@ window.PreviewTransitionEditor = (function() {
     async function addTransitionProperty(target, property, value) {
         if (!property || !value) return;
 
-        managementUrl = PreviewConfig?.managementUrl || '';
-        authToken = PreviewConfig?.authToken || '';
 
         const selector = target === 'base'
             ? transitionEditorSelector
             : transitionEditorSelector + transitionEditorCurrentPseudo;
 
         try {
-            const response = await fetch(managementUrl + 'setStyleRule', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
-                },
-                body: JSON.stringify({
-                    selector: selector,
-                    styles: `${property}: ${value};`
-                })
+            const response = await QuickSiteAdmin.apiRequest('setStyleRule', 'POST', {
+                selector: selector,
+                styles: `${property}: ${value};`
             });
 
-            const result = await response.json();
+            const result = response.data || {};
 
             if (result.status === 200) {
                 showToast(PreviewConfig.i18n.propertyAdded || 'Property added', 'success');
@@ -760,16 +730,11 @@ window.PreviewTransitionEditor = (function() {
      * Open animation picker dropdown
      */
     function openAnimationPicker(target) {
-        managementUrl = PreviewConfig?.managementUrl || '';
-        authToken = PreviewConfig?.authToken || '';
-        
         const keyframesData = getKeyframesData();
 
         if (!keyframesData || keyframesData.length === 0) {
-            fetch(managementUrl + 'getKeyframes', {
-                headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
-            })
-            .then(res => res.json())
+            QuickSiteAdmin.apiRequest('getKeyframes')
+            .then(res => res.data || {})
             .then(data => {
                 if (data.status === 200 && data.data) {
                     // API returns { keyframes: { name: frames, ... }, count }
@@ -875,28 +840,18 @@ window.PreviewTransitionEditor = (function() {
      * Add animation to selector
      */
     async function addAnimationToSelector(target, keyframeName) {
-        managementUrl = PreviewConfig?.managementUrl || '';
-        authToken = PreviewConfig?.authToken || '';
-        
         const selector = target === 'base' ? transitionEditorSelector :
             `${transitionEditorSelector}${transitionEditorCurrentPseudo || ':hover'}`;
 
         const animationValue = `${keyframeName} 1000ms ease forwards`;
 
         try {
-            const response = await fetch(managementUrl + 'setStyleRule', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
-                },
-                body: JSON.stringify({
-                    selector: selector,
-                    styles: `animation: ${animationValue};`
-                })
+            const response = await QuickSiteAdmin.apiRequest('setStyleRule', 'POST', {
+                selector: selector,
+                styles: `animation: ${animationValue};`
             });
 
-            const result = await response.json();
+            const result = response.data || {};
             if (result.status === 200) {
                 showToast(PreviewConfig.i18n.animationAdded || 'Animation added', 'success');
 
@@ -923,27 +878,17 @@ window.PreviewTransitionEditor = (function() {
      * Remove animation from selector
      */
     async function removeAnimation(target) {
-        managementUrl = PreviewConfig?.managementUrl || '';
-        authToken = PreviewConfig?.authToken || '';
-        
         const selector = target === 'base' ? transitionEditorSelector :
             `${transitionEditorSelector}${transitionEditorCurrentPseudo || ':hover'}`;
 
         try {
-            const response = await fetch(managementUrl + 'setStyleRule', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
-                },
-                body: JSON.stringify({
-                    selector: selector,
-                    styles: '',
-                    removeProperties: ['animation']
-                })
+            const response = await QuickSiteAdmin.apiRequest('setStyleRule', 'POST', {
+                selector: selector,
+                styles: '',
+                removeProperties: ['animation']
             });
 
-            const result = await response.json();
+            const result = response.data || {};
             if (result.status === 200) {
                 showToast(PreviewConfig.i18n.animationRemoved || 'Animation removed', 'success');
 
@@ -1005,8 +950,6 @@ window.PreviewTransitionEditor = (function() {
         const animation = target === 'base' ? transitionEditorBaseAnimation : transitionEditorTriggerAnimation;
         if (!animation || !animation.name) return;
 
-        managementUrl = PreviewConfig?.managementUrl || '';
-        authToken = PreviewConfig?.authToken || '';
 
         const selector = target === 'base' ? transitionEditorSelector :
             `${transitionEditorSelector}${transitionEditorCurrentPseudo || ':hover'}`;
@@ -1022,19 +965,12 @@ window.PreviewTransitionEditor = (function() {
         const animationValue = `${animation.name} ${duration}ms ease ${iterations === 'infinite' ? 'infinite' : ''} forwards`.replace(/\s+/g, ' ').trim();
 
         try {
-            const response = await fetch(managementUrl + 'setStyleRule', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
-                },
-                body: JSON.stringify({
-                    selector: selector,
-                    styles: `animation: ${animationValue};`
-                })
+            const response = await QuickSiteAdmin.apiRequest('setStyleRule', 'POST', {
+                selector: selector,
+                styles: `animation: ${animationValue};`
             });
 
-            const result = await response.json();
+            const result = response.data || {};
             if (result.status === 200) {
                 if (target === 'base') {
                     transitionEditorBaseAnimation = { ...animation, duration: parseInt(duration), iterations: infinite ? 'infinite' : parseInt(iterationsEl?.value || 1), infinite };
@@ -1160,25 +1096,16 @@ window.PreviewTransitionEditor = (function() {
     async function saveTransition() {
         if (!transitionEditorSelector) return;
 
-        managementUrl = PreviewConfig?.managementUrl || '';
-        authToken = PreviewConfig?.authToken || '';
 
         const transitionValue = buildTransitionValue();
 
         try {
-            const response = await fetch(managementUrl + 'setStyleRule', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
-                },
-                body: JSON.stringify({
-                    selector: transitionEditorSelector,
-                    styles: `transition: ${transitionValue};`
-                })
+            const response = await QuickSiteAdmin.apiRequest('setStyleRule', 'POST', {
+                selector: transitionEditorSelector,
+                styles: `transition: ${transitionValue};`
             });
 
-            const result = await response.json();
+            const result = response.data || {};
 
             if (result.status === 200) {
                 showToast(PreviewConfig.i18n.transitionSaved || 'Transition saved', 'success');

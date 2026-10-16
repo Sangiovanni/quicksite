@@ -37,8 +37,6 @@
     
     // ==================== Configuration ====================
     
-    const managementUrl = PreviewConfig?.managementUrl || '';
-    const authToken = PreviewConfig?.authToken || '';
     
     // Common CSS properties that should use color picker
     const colorProperties = [
@@ -209,11 +207,9 @@
                 originalStyles = {};
                 currentStyles = {};
             } else {
-                const response = await fetch(managementUrl + 'getStyleRule/' + encodeURIComponent(selector), {
-                    headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
-                });
-                
-                const result = await response.json();
+                const response = await QuickSiteAdmin.apiRequest('getStyleRule', 'GET', null, [encodeURIComponent(selector)]);
+
+                const result = response.data || {};
                 
                 if (response.ok && result.data) {
                     const stylesString = result.data.styles || '';
@@ -1042,16 +1038,9 @@
         }
         
         try {
-            const response = await fetch(managementUrl + 'setStyleRule', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
-                },
-                body: JSON.stringify(requestBody)
-            });
-            
-            const result = await response.json();
+            const response = await QuickSiteAdmin.apiRequest('setStyleRule', 'POST', requestBody);
+
+            const result = response.data || {};
             
             if (response.ok) {
                 originalStyles = { ...allStyles };

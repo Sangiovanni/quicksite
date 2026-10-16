@@ -94,6 +94,7 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/resolverHelpers.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 // ============================================================================
 // PARAMETER PARSING
@@ -162,6 +163,7 @@ if (!routeExists($routePath, ROUTES)) {
 if ($resolverInput === null && $index === null) {
     $existed = !empty(getResolversForRoute($routePath));
     if (!setResolversForRoute($routePath, null)) {
+        qs_small_write_send_refusal();
         ApiResponse::create(500, 'server.operation_failed')
             ->withMessage('Failed to write resolver sidecar after clear')
             ->send();
@@ -196,6 +198,7 @@ if ($resolverInput === null && $index !== null) {
     }
     array_splice($existing, $index, 1);
     if (!setResolversForRoute($routePath, $existing)) {
+        qs_small_write_send_refusal();
         ApiResponse::create(500, 'server.operation_failed')
             ->withMessage('Failed to write resolver sidecar after index remove')
             ->send();
@@ -302,6 +305,8 @@ if (!empty($errors)) {
 // (back-compat), array when length > 1.
 
 if (!setResolversForRoute($routePath, $targetConfigs)) {
+    // The sidecar's size check refused the save (qs_small_write_guard).
+    qs_small_write_send_refusal();
     ApiResponse::create(500, 'server.operation_failed')
         ->withMessage('Failed to write resolver sidecar')
         ->send();

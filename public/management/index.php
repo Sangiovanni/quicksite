@@ -298,6 +298,20 @@ if ($commandScope === 'project') {
 }
 
 // ============================================================================
+// Write rate — every command but a read counts against the caller's windows
+// ============================================================================
+// After the permission check, so a refused caller spends nothing; before the
+// command, so a full window stops it before it touches anything. A counted
+// command is counted whatever it then answers, and its answer carries what is
+// left of each window in its headers. Per account, never per project: another
+// account's allowance never moves with this one's (quota.php).
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php';
+$__qsRateRefusal = qs_write_rate_admit((string)($currentUser['id'] ?? ''), $command);
+if ($__qsRateRefusal !== null) {
+    $__qsRateRefusal->send();
+}
+
+// ============================================================================
 // Execute Command
 // ============================================================================
 

@@ -18,6 +18,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 
 // Include shared interaction helpers (constants, parseCallSyntax, generateCallSyntax, etc.)
 require_once SECURE_FOLDER_PATH . '/src/functions/interactionHelpers.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 /**
  * Command function for internal execution via CommandRunner
@@ -215,7 +216,14 @@ function __command_addInteraction(array $params = [], array $urlParams = []): Ap
         return qs_unsafe_structure_param_response($unsafeStructureParam);
     }
 
-    if (!qs_json_write($jsonFile, $updatedStructure, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES, LOCK_EX)) {
+    // The size check (qs_small_write_refusal): the structure's cap, and growth
+    // while the owner is over quota.
+    $jsonFlags = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
+    $refusal = qs_small_write_refusal([$jsonFile => qs_json_size($updatedStructure, $jsonFlags)]);
+    if ($refusal !== null) {
+        return $refusal;
+    }
+    if (!qs_json_write($jsonFile, $updatedStructure, $jsonFlags, LOCK_EX)) {
         return ApiResponse::create(500, 'server.file_write_failed')
             ->withMessage('Failed to save structure file');
     }

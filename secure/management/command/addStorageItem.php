@@ -27,6 +27,7 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/storageHelpers.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 $params = $trimParametersManagement->params();
 
@@ -45,6 +46,7 @@ $registry = loadStorageRegistry();
 
 // Converge any not-yet-keyed descriptions into translate/ before writing.
 storageMigrateInlineDescriptions($registry);
+qs_small_write_send_refusal();
 
 if (isset($registry['items'][$id])) {
     ApiResponse::create(409, 'storage.duplicate')
@@ -63,14 +65,17 @@ if (!empty($result['errors'])) {
 
 $registry['items'][$id] = $result['item'];
 if (!saveStorageRegistry($registry)) {
+    qs_small_write_send_refusal();
     ApiResponse::create(500, 'server.operation_failed')
         ->withMessage('Failed to write the storage registry')
         ->send();
 }
 
-// Persist the description (if any) into translate/, keyed — not inline.
+// Persist the description (if any) into translate/, keyed — not inline. A
+// refused write takes back the registry above too (qs_small_write_guard).
 if (!empty($result['description'])) {
     storageWriteDescription($id, $result['description']);
+    qs_small_write_send_refusal();
 }
 
 $stored = $result['item'];

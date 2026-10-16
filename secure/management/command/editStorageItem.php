@@ -17,6 +17,7 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/storageHelpers.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 $params = $trimParametersManagement->params();
 
@@ -35,6 +36,7 @@ $registry = loadStorageRegistry();
 
 // Converge any not-yet-keyed descriptions into translate/ before writing.
 storageMigrateInlineDescriptions($registry);
+qs_small_write_send_refusal();
 
 if (!isset($registry['items'][$id])) {
     ApiResponse::create(404, 'storage.not_found')
@@ -70,6 +72,7 @@ if ($targetId !== $id) {
 $registry['items'][$targetId] = $result['item'];
 
 if (!saveStorageRegistry($registry)) {
+    qs_small_write_send_refusal();
     ApiResponse::create(500, 'server.operation_failed')
         ->withMessage('Failed to write the storage registry')
         ->send();
@@ -77,7 +80,8 @@ if (!saveStorageRegistry($registry)) {
 
 // Persist the description into translate/ (keyed). Replace-all semantic: a
 // missing/empty description clears the key. On rename the old key is left to
-// the orphan-translation cleanup (the new key carries the submitted copy).
+// the orphan-translation cleanup (the new key carries the submitted copy). A
+// refused write takes back the registry above too (qs_small_write_guard).
 if ($targetId !== $id) {
     storageClearDescription($id);
 }
@@ -86,6 +90,7 @@ if (!empty($result['description'])) {
 } else {
     storageClearDescription($targetId);
 }
+qs_small_write_send_refusal();
 
 $stored = $result['item'];
 $stored['id'] = $targetId;

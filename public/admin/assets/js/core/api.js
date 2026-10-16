@@ -419,7 +419,11 @@ window.QuickSiteAPI = (function() {
             if (response.status === 204) {
                 result = { status: 204, code: 'operation.success', message: 'Operation completed successfully' };
             }
-            
+
+            // What is left of the write rate, and its refusal in the panel's language
+            noteWriteRate(response);
+            localizeRateRefusal(result, response.status);
+
             // Dispatch event for successful write operations (non-GET)
             // This allows miniplayer to auto-reload preview
             if (response.ok && method !== 'GET') {
@@ -532,10 +536,13 @@ window.QuickSiteAPI = (function() {
             return clientError('client.network_error', error.message || 'Network error', 0);
         }
 
+        noteWriteRate(response);
+
         // A refusal is a normal envelope — read it as one and let the caller
         // show the message rather than saving an error page as a .zip.
         if (!response.ok) {
             const result = await readResponseBody(response);
+            localizeRateRefusal(result, response.status);
             if (response.status === 401 && !redirectingToLogin) {
                 redirectingToLogin = true;
                 clearToken();
@@ -615,6 +622,8 @@ window.QuickSiteAPI = (function() {
             // reported the parse error — a sentence about tokens where the user
             // needed to be told the file was too big.
             const result = await readResponseBody(response);
+            noteWriteRate(response);
+            localizeRateRefusal(result, response.status);
 
             // Same 401 handling as request(), kept symmetric.
             if (response.status === 401) {
@@ -839,6 +848,154 @@ window.QuickSiteAPI = (function() {
     }
 
     // ============================================
+    // Write rate — what is left of each window
+    // ============================================
+    // The server counts every command but a read against the caller's windows
+    // and says what is left on each counted answer, in the two headers of the
+    // IETF RateLimit draft: `RateLimit-Policy: "3600";q=1000;w=3600` (each
+    // window's size and length) and `RateLimit: "3600";r=937;t=1380` (what is
+    // left, and in how many seconds it frees). The page hands the starting
+    // point (QUICKSITE_CONFIG.writeRate), with the commands that never count.
+    // This module keeps the one current picture: the header's figure and the
+    // batch runner read it, and every request through here updates it.
+
+    const writeRate = {
+        windows: [],        // [{period, max, remaining, resetAt (ms)}]
+        waitSeconds: 0,
+        reads: new Set(),
+        account: ''
+    };
+    (function seedWriteRate() {
+        const seed = window.QUICKSITE_CONFIG && window.QUICKSITE_CONFIG.writeRate;
+        if (!seed) return;
+        const now = Date.now();
+        writeRate.windows = (seed.windows || []).map(w => ({
+            period: Number(w.period_seconds),
+            max: Number(w.max_commands),
+            remaining: Number(w.remaining),
+            resetAt: now + Number(w.reset) * 1000
+        }));
+        writeRate.waitSeconds = Number(seed.wait_seconds) || 0;
+        writeRate.reads = new Set(seed.reads || []);
+        writeRate.account = String(seed.account || '');
+    })();
+
+    /** One structured-field list ("name";k=v;k=v, …) as [{name, params}]. */
+    function parseRateField(value) {
+        if (!value) return [];
+        return String(value).split(',').map(item => {
+            const parts = item.trim().split(';');
+            const name = parts.shift().trim().replace(/^"|"$/g, '');
+            const params = {};
+            parts.forEach(p => {
+                const eq = p.indexOf('=');
+                if (eq > 0) params[p.slice(0, eq).trim()] = Number(p.slice(eq + 1).trim());
+            });
+            return { name, params };
+        }).filter(i => i.name !== '');
+    }
+
+    /** Adopt the allowance a counted answer carries, and tell the page. */
+    function noteWriteRate(response) {
+        if (!response || !response.headers || typeof response.headers.get !== 'function') return;
+        const left = parseRateField(response.headers.get('RateLimit'));
+        if (left.length === 0) return;
+        const policy = {};
+        parseRateField(response.headers.get('RateLimit-Policy')).forEach(p => { policy[p.name] = p.params; });
+        const now = Date.now();
+        writeRate.windows = left.map(l => ({
+            period: Number((policy[l.name] || {}).w || l.name),
+            max: Number((policy[l.name] || {}).q || 0),
+            remaining: Number(l.params.r),
+            resetAt: now + Number(l.params.t) * 1000
+        }));
+        window.dispatchEvent(new CustomEvent('quicksite:write-rate', { detail: getWriteRate() }));
+    }
+
+    /**
+     * Every window as it stands now. A window whose reset has passed is over:
+     * its allowance is whole again, and the next window opens with the account's
+     * next counted command, so until an answer says otherwise it would free a
+     * whole period from now.
+     */
+    function getWriteRate() {
+        const now = Date.now();
+        writeRate.windows.forEach(w => {
+            if (w.period > 0 && now >= w.resetAt) {
+                w.resetAt = now + w.period * 1000;
+                w.remaining = w.max;
+            }
+        });
+        return {
+            windows: writeRate.windows.map(w => Object.assign({}, w)),
+            waitSeconds: writeRate.waitSeconds,
+            account: writeRate.account
+        };
+    }
+
+    /** Does this command count against the write rate? (the server's own list) */
+    function countsAsWrite(command) {
+        return !writeRate.reads.has(command);
+    }
+
+    /** A translation of the write-rate strings layout.php hands, with {name} filled. */
+    function rateText(key, fallback, vars) {
+        const set = (window.QUICKSITE_CONFIG && window.QUICKSITE_CONFIG.translations
+            && window.QUICKSITE_CONFIG.translations.writeRate) || {};
+        let s = set[key] || fallback;
+        Object.keys(vars || {}).forEach(k => { s = s.split('{' + k + '}').join(String(vars[k])); });
+        return s;
+    }
+
+    /** "hour", "2 hours", "minute"… for a period in seconds, in the panel's language. */
+    function periodText(seconds) {
+        const units = [[86400, 'day', 'days'], [3600, 'hour', 'hours'], [60, 'minute', 'minutes']];
+        for (const [size, one, many] of units) {
+            if (seconds % size === 0) {
+                const n = seconds / size;
+                return n === 1 ? rateText('period_' + one, one) : rateText('period_' + many, '{n} ' + many, { n });
+            }
+        }
+        return rateText('period_seconds', '{n} seconds', { n: seconds });
+    }
+
+    /** A wait in seconds, as the panel says it: "45 s", "12 min". */
+    function waitText(seconds) {
+        return seconds < 120
+            ? rateText('waitSeconds', '{n} s', { n: Math.max(0, Math.round(seconds)) })
+            : rateText('waitMinutes', '{n} min', { n: Math.ceil(seconds / 60) });
+    }
+
+    /** A clock time, local to the viewer, for a moment in milliseconds. */
+    function clockText(ms) {
+        try {
+            return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        } catch {
+            return new Date(ms).toTimeString().slice(0, 5);
+        }
+    }
+
+    /**
+     * The write rate's refusal, said in the panel's language: which window is
+     * used up and when it frees (the server's sentence is English). Applied to
+     * every 429 that names a window, so a caller that shows `data.message`
+     * shows this.
+     */
+    function localizeRateRefusal(result, status) {
+        if (status !== 429 || !result || result.code !== 'quota.rate_limited' || !result.data || !result.data.window) {
+            return;
+        }
+        const wait = Number(result.data.retry_after) || 0;
+        result.message = rateText('refused',
+            'This server allows {max} changes per {period}. They are used up until {time} (in {wait}).', {
+                max: result.data.window.max_commands,
+                period: periodText(Number(result.data.window.period_seconds)),
+                time: clockText(Date.now() + wait * 1000),
+                wait: waitText(wait)
+            });
+    }
+
+    // ============================================
     // Public API
     // ============================================
 
@@ -881,7 +1038,16 @@ window.QuickSiteAPI = (function() {
         // which reads a ZIP stream rather than an envelope). Exported so it does
         // not hand-roll the body reading too — that is where the assumption
         // "an HTTP answer is JSON" keeps coming back.
-        readResponseBody
+        readResponseBody,
+
+        // The write rate: what is left of each window, and the server's rule
+        // for what counts (see the section above).
+        getWriteRate,
+        countsAsWrite,
+        rateText,
+        periodText,
+        waitText,
+        clockText
     };
 
 })();

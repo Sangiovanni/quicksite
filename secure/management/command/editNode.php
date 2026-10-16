@@ -8,6 +8,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/reservedStorageKeys.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 /**
  * editNode - Edits an existing node in a structure
@@ -73,9 +74,10 @@ function flattenTranslationKeys_editNode(array $arr, string $prefix = ''): array
     return $keys;
 }
 
-function createEmptyTranslation_editNode(string $textKey): bool {
+/** default.json with an empty entry for $textKey (not written: the command writes it). */
+function emptyTranslation_editNode(string $textKey): array {
     $translationFile = PROJECT_PATH . '/translate/default.json';
-    
+
     $translations = [];
     if (file_exists($translationFile)) {
         $content = @file_get_contents($translationFile);
@@ -94,8 +96,9 @@ function createEmptyTranslation_editNode(string $textKey): bool {
             $ref = &$ref[$key];
         }
     }
-    
-    return qs_json_write($translationFile, $translations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES, LOCK_EX);
+    unset($ref);
+
+    return $translations;
 }
 
 // =============================================================================
@@ -400,8 +403,26 @@ function __command_editNode(array $params = [], array $urlParams = []): ApiRespo
         return qs_unsafe_structure_param_response($unsafeStructureParam);
     }
 
+    // The size check on every file this edit writes, before any is written
+    // (qs_small_write_refusal): the structure, and default.json when the edit
+    // generated a text key.
+    $jsonFlags = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
+    $writes = [$json_file => qs_json_size($structure, $jsonFlags)];
+    $generatedTranslations = null;
+    if (!empty($editResult['textKeyGenerated'])) {
+        $generatedTranslations = emptyTranslation_editNode((string) $editResult['textKey']);
+        $writes[PROJECT_PATH . '/translate/default.json'] = qs_json_size($generatedTranslations, $jsonFlags);
+    }
+    $refusal = qs_small_write_refusal($writes);
+    if ($refusal !== null) {
+        return $refusal;
+    }
+    if ($generatedTranslations !== null) {
+        qs_json_write(PROJECT_PATH . '/translate/default.json', $generatedTranslations, $jsonFlags, LOCK_EX);
+    }
+
     // Write back
-    if (!qs_json_write($json_file, $structure, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES, LOCK_EX)) {
+    if (!qs_json_write($json_file, $structure, $jsonFlags, LOCK_EX)) {
         return ApiResponse::create(500, 'server.file_write_failed')
             ->withMessage("Failed to write structure file");
     }
@@ -567,9 +588,8 @@ function editNodeInStructure(array $structure, array $nodeIndices, string $tag, 
         $generatedTextKey = generateUniqueTextKey($structure, $prefix);
         $ref['children'] = [['textKey' => $generatedTextKey]];
         
-        // Create empty translation entry in default.json
-        createEmptyTranslation_editNode($generatedTextKey);
-        
+        // Its empty translation entry in default.json is written by the command,
+        // after the size check has seen both files.
         return ['success' => true, 'structure' => $structure, 'textKeyGenerated' => true, 'textKey' => $generatedTextKey];
     }
     

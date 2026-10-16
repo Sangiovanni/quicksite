@@ -16,6 +16,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 
 // Include shared interaction helpers
 require_once SECURE_FOLDER_PATH . '/src/functions/interactionHelpers.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 /**
  * @param array $params Body parameters: pageName, event, function, params[]
@@ -107,7 +108,14 @@ function __command_addPageEvent(array $params = [], array $urlParams = []): ApiR
     
     // Add the interaction
     $allEvents[$pageName][$event][] = $callSyntax;
-    
+
+    // The size check (qs_small_write_refusal): the settings cap, and growth
+    // while the owner is over quota.
+    $refusal = qs_small_write_refusal([$eventsFile => qs_json_size($allEvents, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)]);
+    if ($refusal !== null) {
+        return $refusal;
+    }
+
     // Save
     $dataDir = PROJECT_PATH . '/data';
     if (!is_dir($dataDir)) {

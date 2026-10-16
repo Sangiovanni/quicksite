@@ -153,12 +153,14 @@ class ApiEndpointManager {
             $data['apis'] = new \stdClass();
         }
         
-        return qs_json_write(
-            $this->configPath,
-            $data,
-            JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES,
-            LOCK_EX
-        );
+        // The size check (qs_small_write_guard): false when refused, and the
+        // command answers qs_small_write_refused().
+        $flags = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
+        require_once SECURE_FOLDER_PATH . '/src/functions/quota.php';
+        if (!qs_small_write_guard($this->configPath, qs_json_size($data, $flags))) {
+            return false;
+        }
+        return qs_json_write($this->configPath, $data, $flags, LOCK_EX);
     }
     
     /**

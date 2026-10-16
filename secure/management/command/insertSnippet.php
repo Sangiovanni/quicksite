@@ -31,6 +31,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/SnippetManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/componentPolicy.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 /**
  * Generate a unique text key prefix based on structure type and name
@@ -308,8 +309,14 @@ function addSnippetTranslations(array $keySources, array $snippetTranslations): 
             $addedKeys[$newKey] = true;
         }
         
-        // Write back
-        qs_json_write($langFile, $translations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES, LOCK_EX);
+        // Write back, after the size check (qs_small_write_guard): a refusal
+        // stops here, takes back the files written before, and the command
+        // answers qs_small_write_refused().
+        $flags = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
+        if (!qs_small_write_guard($langFile, qs_json_size($translations, $flags))) {
+            break;
+        }
+        qs_json_write($langFile, $translations, $flags, LOCK_EX);
     }
     
     return array_keys($addedKeys);
@@ -524,8 +531,13 @@ function __command_insertSnippet(array $params = [], array $urlParams = []): Api
         $addedTranslations = addSnippetTranslations($keySources, $snippet['translations'] ?? []);
     }
 
-    // Save structure
-    if (!qs_json_write($json_file, $structure, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES, LOCK_EX)) {
+    // Save structure, after the size check the translations had
+    // (qs_small_write_guard): a refusal takes them back too.
+    $jsonFlags = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
+    if (qs_small_write_refused() !== null || !qs_small_write_guard($json_file, qs_json_size($structure, $jsonFlags))) {
+        return qs_small_write_refused();
+    }
+    if (!qs_json_write($json_file, $structure, $jsonFlags, LOCK_EX)) {
         return ApiResponse::create(500, 'server.file_write_failed')
             ->withMessage('Failed to write structure file');
     }

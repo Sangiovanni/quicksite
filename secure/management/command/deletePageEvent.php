@@ -12,6 +12,7 @@
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 /**
  * @param array $params Body parameters: pageName, event, index
@@ -71,6 +72,13 @@ function __command_deletePageEvent(array $params = [], array $urlParams = []): A
         unset($allEvents[$pageName]);
     }
     
+    // The size check (qs_small_write_refusal). A removal only shrinks the file,
+    // so it is never refused.
+    $refusal = qs_small_write_refusal([$eventsFile => qs_json_size($allEvents, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)]);
+    if ($refusal !== null) {
+        return $refusal;
+    }
+
     // Save
     if (!qs_json_write($eventsFile, $allEvents, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)) {
         return ApiResponse::create(500, 'server.file_write_failed')

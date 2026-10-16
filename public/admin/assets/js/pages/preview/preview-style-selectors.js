@@ -62,9 +62,7 @@
     let selectorMediaList = null;
     let selectorMediaCount = null;
     
-    // Shared references
-    let managementUrl = '';
-    let authToken = '';
+    // Shared references (management calls go through QuickSiteAdmin.apiRequest)
     let iframe = null;
     
     // Callback references
@@ -117,9 +115,6 @@
         selectorMediaList = document.getElementById('selectors-media-list');
         selectorMediaCount = document.getElementById('selectors-media-count');
         
-        // Get shared references from PreviewConfig
-        managementUrl = PreviewConfig.managementUrl;
-        authToken = PreviewConfig.authToken;
         iframe = document.getElementById('preview-iframe');
         
         // Initialize event handlers
@@ -136,10 +131,8 @@
         if (selectorsLoaded) return true;
         
         try {
-            const response = await fetch(managementUrl + 'listStyleRules', {
-                headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
-            });
-            const data = await response.json();
+            const response = await QuickSiteAdmin.apiRequest('listStyleRules');
+            const data = response.data || {};
             
             if (data.status === 200 && data.data?.selectors) {
                 allSelectors = data.data.selectors;
@@ -837,16 +830,9 @@
      */
     async function createNewSelector(selector) {
         try {
-            const response = await fetch(managementUrl + 'setStyleRule', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(authToken ? { 'Authorization': 'Bearer ' + authToken } : {})
-                },
-                body: JSON.stringify({ selector: selector, styles: '/* empty */' })
-            });
-            
-            const result = await response.json();
+            const response = await QuickSiteAdmin.apiRequest('setStyleRule', 'POST', { selector: selector, styles: '/* empty */' });
+
+            const result = response.data || {};
             
             if (!response.ok || result.status >= 400) {
                 if (typeof showToast === 'function') {
@@ -1095,14 +1081,10 @@
         
         try {
             // Fetch source selector's styles
-            let url = managementUrl + 'getStyleRule/' + encodeURIComponent(sourceSelector);
-            if (mediaQuery) url += '?mediaQuery=' + encodeURIComponent(mediaQuery);
-            
-            const response = await fetch(url, {
-                headers: authToken ? { 'Authorization': 'Bearer ' + authToken } : {}
-            });
-            
-            const result = await response.json();
+            const response = await QuickSiteAdmin.apiRequest('getStyleRule', 'GET', null,
+                [encodeURIComponent(sourceSelector)], mediaQuery ? { mediaQuery: mediaQuery } : {});
+
+            const result = response.data || {};
             
             if (!response.ok || !result.data?.styles) {
                 if (typeof showToast === 'function') {

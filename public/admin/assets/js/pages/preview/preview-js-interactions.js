@@ -608,26 +608,16 @@
         }
         
         try {
-            // managementUrl carries BOTH the URL space and the /p/<projectId>/ marker
-            // (preview-config.php bakes them in), which a root-absolute path has neither of:
-            // listInteractions is project-scoped, so without the marker the dispatcher
-            // refuses it outright, and under a URL space the path does not exist at all.
-            const url = pageName 
-                ? PreviewConfig.managementUrl + `listInteractions/${structType}/${pageName}/${nodeId}`
-                : PreviewConfig.managementUrl + `listInteractions/${structType}/${nodeId}`;
-            
-            const response = await fetch(url, {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${PreviewConfig.authToken}`
-                }
-            });
-            
+            // Through the panel's API client: it carries the URL space and the
+            // /p/<projectId>/ marker listInteractions (project-scoped) needs.
+            const segments = pageName ? [structType, pageName, nodeId] : [structType, nodeId];
+            const response = await QuickSiteAdmin.apiRequest('listInteractions', 'GET', null, segments);
+
             if (!response.ok) {
                 throw new Error('Failed to fetch interactions');
             }
-            
-            const result = await response.json();
+
+            const result = response.data || {};
             console.log('[PreviewJsInteractions] Interactions loaded:', result);
             
             // Store available events for the add form (flat list kept for legacy callers)
@@ -644,9 +634,18 @@
             console.error('[PreviewJsInteractions] Failed to load interactions:', error);
             const listEl = document.getElementById('js-interactions-list');
             if (listEl) {
-                listEl.innerHTML = '<p class="preview-contextual-js-empty" style="color: var(--danger);">Failed to load interactions</p>';
+                listEl.replaceChildren(_renderEmptyNote('Failed to load interactions', true));
             }
         }
+    }
+
+    /** The short note a list shows when it is empty or failed to load. */
+    function _renderEmptyNote(text, isError) {
+        const p = document.createElement('p');
+        p.className = 'preview-contextual-js-empty';
+        if (isError) p.style.color = 'var(--danger)';
+        p.textContent = text;
+        return p;
     }
     
     /**
@@ -748,16 +747,9 @@
         }
         
         try {
-            const response = await fetch(PreviewConfig.managementUrl + 'deleteInteraction', {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${PreviewConfig.authToken}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(body)
-            });
-            
-            const result = await response.json();
+            const response = await QuickSiteAdmin.apiRequest('deleteInteraction', 'DELETE', body);
+
+            const result = response.data || {};
             
             if (!response.ok) {
                 throw new Error(result.message || 'Failed to delete interaction');
@@ -1756,14 +1748,7 @@
             var delBody = { structType: structType, nodeId: nodeId, event: eventName, index: j };
             if (pageName) delBody.pageName = pageName;
             try {
-                await fetch(PreviewConfig.managementUrl + 'deleteInteraction', {
-                    method: 'DELETE',
-                    headers: {
-                        'Authorization': 'Bearer ' + PreviewConfig.authToken,
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(delBody),
-                });
+                await QuickSiteAdmin.apiRequest('deleteInteraction', 'DELETE', delBody);
             } catch (e) {
                 console.warn('[PreviewJsInteractions] failed to delete sibling action at index ' + j, e);
             }
@@ -1790,14 +1775,7 @@
             if (pageName) addBody.pageName = pageName;
 
             try {
-                await fetch(PreviewConfig.managementUrl + 'addInteraction', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': 'Bearer ' + PreviewConfig.authToken,
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(addBody),
-                });
+                await QuickSiteAdmin.apiRequest('addInteraction', 'POST', addBody);
             } catch (e) {
                 console.warn('[PreviewJsInteractions] failed to add post-fetch action #' + k, e);
             }
@@ -2786,18 +2764,13 @@
      */
     async function fetchJsFunctions() {
         try {
-            const response = await fetch(PreviewConfig.managementUrl + 'listJsFunctions', {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${PreviewConfig.authToken}`
-                }
-            });
+            const response = await QuickSiteAdmin.apiRequest('listJsFunctions');
             
             if (!response.ok) {
                 throw new Error('Failed to fetch functions');
             }
             
-            const result = await response.json();
+            const result = response.data || {};
             availableFunctions = result.data?.functions || [];
             console.log('[PreviewJsInteractions] Functions loaded:', availableFunctions.length);
             
@@ -2812,18 +2785,13 @@
      */
     async function fetchApiEndpoints() {
         try {
-            const response = await fetch(PreviewConfig.managementUrl + 'listApiEndpoints', {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${PreviewConfig.authToken}`
-                }
-            });
+            const response = await QuickSiteAdmin.apiRequest('listApiEndpoints');
             
             if (!response.ok) {
                 throw new Error('Failed to fetch API endpoints');
             }
             
-            const result = await response.json();
+            const result = response.data || {};
             
             const apis = result.data?.apis || [];
             availableApiEndpoints = [];
@@ -2860,16 +2828,11 @@
      */
     async function fetchRoutes() {
         try {
-            const response = await fetch(PreviewConfig.managementUrl + 'getRoutes', {
-                method: 'GET',
-                headers: {
-                    'Authorization': `Bearer ${PreviewConfig.authToken}`
-                }
-            });
+            const response = await QuickSiteAdmin.apiRequest('getRoutes');
             if (!response.ok) {
                 throw new Error('Failed to fetch routes');
             }
-            const result = await response.json();
+            const result = response.data || {};
             // ApiResponse envelope wraps payload in `.data.data`; defensive
             // unwrap in case the envelope shape changes.
             const payload = (result && result.data && (result.data.data || result.data)) || {};
@@ -2890,16 +2853,9 @@
      */
     async function fetchStorageItems() {
         try {
-            const response = await fetch(PreviewConfig.managementUrl + 'listStorageItems', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${PreviewConfig.authToken}`,
-                    'Content-Type': 'application/json'
-                },
-                body: '{}'
-            });
+            const response = await QuickSiteAdmin.apiRequest('listStorageItems', 'POST', {});
             if (!response.ok) throw new Error('Failed to fetch storage items');
-            const result = await response.json();
+            const result = response.data || {};
             const payload = (result && result.data && (result.data.data || result.data)) || {};
             availableStorageItems = Array.isArray(payload.items) ? payload.items : [];
         } catch (error) {
@@ -3074,15 +3030,8 @@
                 skBody.description[skLang] = skDesc;
             }
             try {
-                var response = await fetch(PreviewConfig.managementUrl + 'addStorageItem', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${PreviewConfig.authToken}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(skBody)
-                });
-                var result = await response.json().catch(function () { return null; });
+                var response = await QuickSiteAdmin.apiRequest('addStorageItem', 'POST', skBody);
+                var result = response.data || {};
                 if (!response.ok) {
                     errSpan.textContent = (result && result.message) || (result && result.data && result.data.message) || 'Create failed';
                     createBtn.disabled = false;
@@ -4270,19 +4219,12 @@
                 jsFormSave.textContent = PreviewConfig.i18n?.saving || 'Saving...';
             }
             
-            const endpoint = isEdit ? PreviewConfig.managementUrl + 'editInteraction' : PreviewConfig.managementUrl + 'addInteraction';
+            const command = isEdit ? 'editInteraction' : 'addInteraction';
             const method = isEdit ? 'PUT' : 'POST';
+
+            const response = await QuickSiteAdmin.apiRequest(command, method, body);
             
-            const response = await fetch(endpoint, {
-                method: method,
-                headers: {
-                    'Authorization': `Bearer ${PreviewConfig.authToken}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(body)
-            });
-            
-            const result = await response.json();
+            const result = response.data || {};
             
             if (!response.ok) {
                 throw new Error(result.message || (isEdit ? 'Failed to edit' : 'Failed to add'));
@@ -4374,20 +4316,17 @@
             // Split nested routes (e.g. "documentation/commands") so each segment
             // is encoded individually — encoding the whole string would turn "/" into
             // "%2F", collapsing the path into a single segment the router can't match.
-            var url = PreviewConfig.managementUrl + 'getPageEvents/' + currentPageName.split('/').map(encodeURIComponent).join('/');
-            var response = await fetch(url, {
-                method: 'GET',
-                headers: { 'Authorization': 'Bearer ' + PreviewConfig.authToken }
-            });
-            
+            var response = await QuickSiteAdmin.apiRequest('getPageEvents', 'GET', null,
+                currentPageName.split('/').map(encodeURIComponent));
+
             if (!response.ok) throw new Error('Failed to fetch page events');
-            var result = await response.json();
+            var result = response.data || {};
             currentPageEventsData = result.data;
             displayPageEvents(result.data);
 
         } catch (error) {
             console.error('[PreviewJsInteractions] Failed to load page events:', error);
-            if (peList) peList.innerHTML = '<p class="preview-contextual-js-empty">Failed to load page events</p>';
+            if (peList) peList.replaceChildren(_renderEmptyNote('Failed to load page events', false));
             if (peCount) peCount.textContent = '0';
         }
     }
@@ -4457,16 +4396,9 @@
         if (!confirm(PreviewConfig.i18n?.confirmDeleteInteraction || 'Delete this interaction?')) return;
         
         try {
-            var response = await fetch(PreviewConfig.managementUrl + 'deletePageEvent', {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': 'Bearer ' + PreviewConfig.authToken,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ pageName: currentPageName, event: eventName, index: index })
-            });
+            var response = await QuickSiteAdmin.apiRequest('deletePageEvent', 'DELETE', { pageName: currentPageName, event: eventName, index: index });
             
-            var result = await response.json();
+            var result = response.data || {};
             if (!response.ok) throw new Error(result.message || 'Failed to delete');
             
             if (showToastFn) showToastFn(PreviewConfig.i18n?.interactionDeleted || 'Deleted', 'success');
@@ -4859,7 +4791,7 @@
                 peFormSave.textContent = PreviewConfig.i18n?.saving || 'Saving...';
             }
 
-            var endpoint = isEdit ? PreviewConfig.managementUrl + 'editPageEvent' : PreviewConfig.managementUrl + 'addPageEvent';
+            var command = isEdit ? 'editPageEvent' : 'addPageEvent';
             var method = isEdit ? 'PUT' : 'POST';
             var body = {
                 pageName: currentPageName,
@@ -4877,16 +4809,9 @@
                 }
             }
 
-            var response = await fetch(endpoint, {
-                method: method,
-                headers: {
-                    'Authorization': 'Bearer ' + PreviewConfig.authToken,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(body)
-            });
+            var response = await QuickSiteAdmin.apiRequest(command, method, body);
 
-            var result = await response.json();
+            var result = response.data || {};
             if (!response.ok) throw new Error(result.message || (isEdit ? 'Failed to edit' : 'Failed to add'));
 
             if (showToastFn) {
@@ -4999,16 +4924,9 @@
     async function loadStateStores() {
         if (!currentPageName) return;
         try {
-            var response = await fetch(PreviewConfig.managementUrl + 'getStateStores', {
-                method: 'POST',
-                headers: {
-                    'Authorization': 'Bearer ' + PreviewConfig.authToken,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ route: currentPageName })
-            });
+            var response = await QuickSiteAdmin.apiRequest('getStateStores', 'POST', { route: currentPageName });
             if (!response.ok) throw new Error('Failed to fetch state stores');
-            var result = await response.json();
+            var result = response.data || {};
             // getForRoute returns [] (array) when empty, or an object map otherwise.
             var stores = (result.data && result.data.stores) || {};
             ssCurrentStores = (stores && typeof stores === 'object' && !Array.isArray(stores)) ? stores : {};
@@ -5085,15 +5003,8 @@
         var stores = Object.assign({}, ssCurrentStores);
         delete stores[id];
         try {
-            var response = await fetch(PreviewConfig.managementUrl + 'setStateStores', {
-                method: 'POST',
-                headers: {
-                    'Authorization': 'Bearer ' + PreviewConfig.authToken,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ route: currentPageName, stores: stores })
-            });
-            var result = await response.json();
+            var response = await QuickSiteAdmin.apiRequest('setStateStores', 'POST', { route: currentPageName, stores: stores });
+            var result = response.data || {};
             if (!response.ok) throw new Error(result.message || 'Failed to delete');
             if (showToastFn) showToastFn(PreviewConfig.i18n?.stateStoreDeleted || 'State store deleted', 'success');
             await loadStateStores();
@@ -5531,24 +5442,17 @@
         // Hide the wizard if it was open (mutually exclusive UI).
         if (ssForm) ssForm.style.display = 'none';
         // Reset picker state.
-        if (ssImportSelect) ssImportSelect.innerHTML = '';
+        if (ssImportSelect) ssImportSelect.replaceChildren();
         if (ssImportRenameRow) ssImportRenameRow.style.display = 'none';
         if (ssImportRenameInput) ssImportRenameInput.value = '';
         if (ssImportConfirm) ssImportConfirm.disabled = true;
 
         var allStores = {};
         try {
-            var response = await fetch(PreviewConfig.managementUrl + 'getStateStores', {
-                method: 'POST',
-                headers: {
-                    'Authorization': 'Bearer ' + PreviewConfig.authToken,
-                    'Content-Type': 'application/json'
-                },
-                // No `route` → backend returns the full map: {<route>: {<storeId>: def}, ...}.
-                body: JSON.stringify({})
-            });
+            // No `route` → backend returns the full map: {<route>: {<storeId>: def}, ...}.
+            var response = await QuickSiteAdmin.apiRequest('getStateStores', 'POST', {});
             if (!response.ok) throw new Error('Failed to fetch state stores');
-            var result = await response.json();
+            var result = response.data || {};
             allStores = (result.data && result.data.stores) || {};
         } catch (error) {
             console.error('[PreviewJsInteractions] Import: fetch failed:', error);
@@ -5688,15 +5592,8 @@
 
         try {
             if (ssImportConfirm) ssImportConfirm.disabled = true;
-            var response = await fetch(PreviewConfig.managementUrl + 'setStateStores', {
-                method: 'POST',
-                headers: {
-                    'Authorization': 'Bearer ' + PreviewConfig.authToken,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ route: currentPageName, stores: stores })
-            });
-            var result = await response.json();
+            var response = await QuickSiteAdmin.apiRequest('setStateStores', 'POST', { route: currentPageName, stores: stores });
+            var result = response.data || {};
             if (!response.ok) throw new Error(result.message || 'Failed to save');
             if (showToastFn) showToastFn(PreviewConfig.i18n?.stateStoreImported || 'Store imported', 'success');
             hideStateStoreImportPicker();
@@ -5764,15 +5661,8 @@
 
         try {
             if (ssFormSave) { ssFormSave.disabled = true; ssFormSave.textContent = PreviewConfig.i18n?.saving || 'Saving...'; }
-            var response = await fetch(PreviewConfig.managementUrl + 'setStateStores', {
-                method: 'POST',
-                headers: {
-                    'Authorization': 'Bearer ' + PreviewConfig.authToken,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ route: currentPageName, stores: stores })
-            });
-            var result = await response.json();
+            var response = await QuickSiteAdmin.apiRequest('setStateStores', 'POST', { route: currentPageName, stores: stores });
+            var result = response.data || {};
             if (!response.ok) throw new Error(result.message || 'Failed to save');
             if (showToastFn) showToastFn(PreviewConfig.i18n?.stateStoreSaved || 'State store saved', 'success');
             hideStateStoreForm();
@@ -5895,10 +5785,8 @@
 
     function _loadComponentListOnce() {
         if (_componentListCache) return _componentListCache;
-        _componentListCache = fetch(PreviewConfig.managementUrl + 'listComponents', {
-            headers: { 'Authorization': 'Bearer ' + PreviewConfig.authToken }
-        })
-        .then(function(r) { return r.json(); })
+        _componentListCache = QuickSiteAdmin.apiRequest('listComponents')
+        .then(function(r) { return r.data; })
         .then(function(j) {
             return (j && j.data && Array.isArray(j.data.components)) ? j.data.components : [];
         })
@@ -7014,13 +6902,7 @@
      */
     async function saveResponseBindings(apiName, endpointId, bindings) {
         try {
-            var response = await fetch(PreviewConfig.managementUrl + 'editApi', {
-                method: 'POST',
-                headers: {
-                    'Authorization': 'Bearer ' + PreviewConfig.authToken,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
+            var response = await QuickSiteAdmin.apiRequest('editApi', 'POST', {
                     apiId: apiName,
                     editEndpoint: {
                         id: endpointId,
@@ -7028,9 +6910,8 @@
                             responseBindings: bindings
                         }
                     }
-                })
-            });
-            var result = await response.json();
+                });
+            var result = response.data || {};
             if (!response.ok) throw new Error(result.message || 'Failed to save bindings');
 
             // Sangio's rule — nothing happens silently. A count-sentence

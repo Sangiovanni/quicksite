@@ -2,29 +2,34 @@
 /**
  * Per-user resource limits — OPTIONAL override
  *
- * Copy this file to `quota.php` to cap how much disk one account may consume
- * and how often it may upload.
+ * Copy this file to `quota.php` to cap how much disk one account may consume,
+ * how large each small file may grow, and how often an account may upload or
+ * change its sites.
  *
- * You do NOT need this file. WITHOUT IT NOTHING IS LIMITED — that is the
- * shipped behaviour and updating QuickSite never changes it, so an existing
- * install cannot start refusing uploads because it was upgraded. A malformed
- * file is ignored (with a line in the error log) and, again, nothing is
- * limited: a typo here must not lock every author out of their own site.
+ * You do NOT need this file. Without it, the storage ceiling and the upload
+ * rate are OFF — updating QuickSite never turns them on, so an existing install
+ * cannot start refusing uploads because it was upgraded — and the file caps and
+ * the write rate apply at the defaults shown below, which no real editing
+ * session meets. A malformed file is ignored (with a line in the error log) and
+ * the same defaults apply: a typo here must not lock every author out of their
+ * own site.
  *
  * ⚠ On a SHARED install this file is the difference between "an ordinary signed-
  * in account can fill the disk" and "it cannot". Creating a project and
  * uploading into it are open to every authenticated user by design; nothing
  * else bounds the total.
  *
- * Every limit is an integer, and 0 (or a missing key) means UNLIMITED for that
- * axis — the same convention PHP uses for post_max_size. The two axes are
- * independent: set either, both, or neither.
+ * Every limit is an integer. For max_total_bytes and upload_rate, 0 (or a missing
+ * key) means UNLIMITED — the same convention PHP uses for post_max_size. For the
+ * file caps and the write rate, a missing key keeps the default, and 0 (or a
+ * write_rate with no window) turns that limit off. The axes are independent.
  *
  * ── WHAT "PER USER" MEANS ────────────────────────────────────────────────────
  *
- * Storage is measured across the projects an account OWNS — the same figure the
- * dashboard shows under "space usage" and the account space report
- * returns, including each project's content, backups, exports and builds.
+ * Storage is measured across the projects an account OWNS and its personal
+ * snippets — the same figure the dashboard shows under "space usage" and the
+ * account space report returns, including each project's content, backups,
+ * exports and builds.
  *
  * Two things follow, and neither is a bug:
  *
@@ -32,9 +37,9 @@
  *     set, not a share, and this is the direction that cannot be gamed.
  *   - Bytes are attributed to the project they land in, so an invited member's
  *     upload counts against the project's OWNER, not the member. An account
- *     that owns nothing has no storage total to exceed; it can still only write
- *     into projects it was invited to, and the rate limit below applies to it
- *     normally.
+ *     that owns nothing has no storage total to exceed beyond its personal
+ *     snippets; it can still only write into projects it was invited to, and
+ *     the rates below apply to it normally.
  *
  * ── DELETING SPACE AND RETRYING ──────────────────────────────────────────────
  *
@@ -59,6 +64,13 @@ return [
     // they remove), so while one runs the total can pass the ceiling by what it
     // is about to remove.
     //
+    // Small edits (a structure, the stylesheet, a translation, a setting) are
+    // too small to measure the disk for: while the account is ALREADY over the
+    // ceiling, an edit that makes its files larger is refused, and one that
+    // keeps their size or shrinks them still passes, so the owner can clean up.
+    // The figure is cached, so an edit can take an account a few bytes over —
+    // keep a margin between this number and your disk.
+    //
     // Refusal: HTTP 507, code `quota.storage_exceeded`, with the used / quota /
     // remaining figures in the response data.
     //
@@ -77,9 +89,12 @@ return [
     // upload, delete, upload again, which never grows the total but does keep
     // the server busy indefinitely.
     //
-    // Windows are fixed, not sliding: the allowance refills on a period
-    // boundary. A caller can therefore burst across one boundary, which is the
-    // accepted cost of a state file that keeps no per-request history.
+    // A window opens at the account's first counted upload and lasts the
+    // period; once it is over the allowance is whole again, and the next upload
+    // opens the next window. Windows do not slide: a caller can use a whole
+    // allowance at the end of one window and another at the start of the next,
+    // which is the accepted cost of a state file that keeps no per-request
+    // history.
     //
     // Refusal: HTTP 429, code `quota.rate_limited`, with `retry_after` in
     // seconds.
@@ -91,5 +106,77 @@ return [
         // The window, in seconds. Only consulted when max_uploads is set.
         // 3600 = one hour (the default), 86400 = one day.
         'period_seconds' => 3600,
+    ],
+
+    // ── Axis 3: file caps ────────────────────────────────────────────────────
+    // The most bytes one small file of each kind may hold, checked on the bytes
+    // a command is about to write. Over its cap the write is refused and nothing
+    // is written. A file already over a cap you lowered may still shrink or keep
+    // its size, so its author can always bring it back under.
+    //
+    //   page         a page's structure
+    //   structure    the menu, the footer, a component, the consent layer
+    //   stylesheet   the project's style.css — never above 512 KB, the most the
+    //                CSS parser reads back (a larger value is read as 512 KB)
+    //   translation  one language's translation file
+    //   routes       the routes file
+    //   snippet      one snippet, a project's or an account's personal one
+    //   settings     every other project file a command writes: config.php,
+    //                aliases, page events, layouts, the registries...
+    //
+    // Files the engine derives from another (page wrappers, generated scripts,
+    // the sitemap) and uploaded assets have no cap.
+    //
+    // The defaults (shown) are several times the largest real file of each
+    // kind. A kind left out keeps its default; 0 turns that cap off.
+    //
+    // Refusal: HTTP 413, code `validation.size_limit_exceeded`, naming the kind,
+    // the file, its size, the cap and the setting.
+    'max_file_bytes' => [
+        'page'        => 2 * 1024 * 1024,
+        'structure'   => 256 * 1024,
+        'stylesheet'  => 512 * 1024,
+        'translation' => 2 * 1024 * 1024,
+        'routes'      => 128 * 1024,
+        'snippet'     => 512 * 1024,
+        'settings'    => 1024 * 1024,
+    ],
+
+    // ── Axis 4: write rate ───────────────────────────────────────────────────
+    // How many commands one account may run in a window. Every command counts
+    // but a read (the content.read and config.read categories, and the reads
+    // that share a category with writes: listBackups, downloadExport,
+    // downloadBuild, getCommandHistory, listMembers, getProjectRoster,
+    // listProjects, getLanguageList, logoutSession). A command counts as soon as
+    // it is admitted, whatever it then answers; a refused one does not. help,
+    // login and register are answered before sign-in and never count. The
+    // count is per account, never per project: one account never spends
+    // another's.
+    //
+    // The numbered entries are the windows, as many as you like, each with its
+    // own size; they all apply. Each opens at the account's first counted
+    // command and lasts its period, like the upload rate's: "1000 per hour" is
+    // an hour from the first change, not the clock's hour. Several windows, for
+    // the shape:
+    //
+    //   ['max_commands' => 60,    'period_seconds' => 60],
+    //   ['max_commands' => 1000,  'period_seconds' => 3600],
+    //   ['max_commands' => 10000, 'period_seconds' => 86400],
+    //
+    // With no window (`'write_rate' => []`) the rate is off. The default is one
+    // window of an hour, about twelve times what the largest AI site build sends
+    // (a site build with its project reset and languages: 83 commands).
+    //
+    // `wait_seconds` is not a limit: it is how long the admin panel's batch
+    // runner (workflows and AI command lists) waits for a window to free before
+    // it stops and keeps the steps not run, to be run once the allowance is back.
+    //
+    // Refusal: HTTP 429, code `quota.rate_limited`, with Retry-After and the
+    // window that is used up. Every counted command's answer carries what is
+    // left of each window in the RateLimit / RateLimit-Policy headers, and the
+    // panel shows it in its header.
+    'write_rate' => [
+        ['max_commands' => 1000, 'period_seconds' => 3600],
+        'wait_seconds' => 60,
     ],
 ];

@@ -37,22 +37,6 @@ if ($contentSize === 0) {
         ->send();
 }
 
-// Validate file size. The ceiling is CSS_MAX_BYTES (what the CssParser can read
-// back within the memory_limit), shared with every other CSS writer via
-// cssWriteAllTargets: a larger sheet would break every CssParser-using command.
-$maxSize = CSS_MAX_BYTES;
-
-if ($contentSize > $maxSize) {
-    ApiResponse::create(400, 'validation.invalid_length')
-        ->withMessage('Content too large (max ' . (int) round($maxSize / 1024) . ' KB)')
-        ->withData([
-            'size' => $contentSize,
-            'max_size' => $maxSize,
-            'size_kb' => round($contentSize / 1024, 1)
-        ])
-        ->send();
-}
-
 // SECURITY: the scan every stylesheet writer runs (qs_css_first_danger) — one
 // denylist on the normalised text, and a PHP opening tag on the raw bytes.
 $danger = qs_css_first_danger($newContent);
@@ -90,6 +74,13 @@ if ($oldContent === false) {
     ApiResponse::create(500, 'server.file_write_failed')
         ->withMessage("Failed to read current style file")
         ->send();
+}
+
+// The size check every stylesheet writer runs: the cap (never above CSS_MAX_BYTES,
+// what the CssParser can read back) and growth while the owner is over quota.
+$refusal = cssWriteRefusal($newContent, $styleFile, $projectStyleFile);
+if ($refusal !== null) {
+    $refusal->send();
 }
 
 // Write new content to live stylesheet and project stylesheet copy

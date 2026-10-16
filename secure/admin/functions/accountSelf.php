@@ -416,7 +416,11 @@ function qs_account_space_usage(array $params): ApiResponse {
     // Largest first — the point of the panel is "what is eating my space".
     usort($projects, fn($a, $b) => $b['total'] <=> $a['total']);
 
-    $grand = $totContent + $totBackups + $totExports + $totBuilds;
+    // Personal snippets live outside every project; they are this account's bytes
+    // and count in its total — the same figure the quota reads (qs_quota_usage).
+    $totSnippets = qs_personal_snippets_space($userId);
+
+    $grand = $totContent + $totBackups + $totExports + $totBuilds + $totSnippets;
 
     // Same ceiling qs_quota_check_storage enforces, read from the same config, so
     // the figure on the dashboard and the number in a refusal cannot disagree.
@@ -437,6 +441,7 @@ function qs_account_space_usage(array $params): ApiResponse {
                 'backups' => ['size' => $totBackups, 'size_formatted' => qs_format_size($totBackups)],
                 'builds'  => ['size' => $totBuilds,  'size_formatted' => qs_format_size($totBuilds)],
                 'exports' => ['size' => $totExports, 'size_formatted' => qs_format_size($totExports)],
+                'snippets' => ['size' => $totSnippets, 'size_formatted' => qs_format_size($totSnippets)],
             ],
             // The ceiling this account is measured against, and what is left of
             // it. `configured` is false on an install with no quota.php — the

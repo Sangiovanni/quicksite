@@ -8,6 +8,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/reservedStorageKeys.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/componentPolicy.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 /**
  * addComponentToNode - Add a component instance to a structure
@@ -448,13 +449,31 @@ function __command_addComponentToNode(array $params = [], array $urlParams = [])
                 }
             }
             
-            // Save translations
-            qs_json_write($defaultFile, $translations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+            // Saved below, once the size check has seen both files
+            unset($ref);
+            $translationsWrite = [$defaultFile, $translations];
         }
     }
 
-    // Save structure
+    // The size check on both files before either is written
+    // (qs_small_write_refusal): a refused add writes nothing.
     $jsonOptions = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
+    $translationFlags = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE;
+    $writes = [$jsonPath => qs_json_size($updatedStructure, $jsonOptions)];
+    if (isset($translationsWrite)) {
+        $writes[$translationsWrite[0]] = qs_json_size($translationsWrite[1], $translationFlags);
+    }
+    $refusal = qs_small_write_refusal($writes);
+    if ($refusal !== null) {
+        return $refusal;
+    }
+
+    // Save translations
+    if (isset($translationsWrite)) {
+        qs_json_write($translationsWrite[0], $translationsWrite[1], $translationFlags);
+    }
+
+    // Save structure
     if (!qs_json_write($jsonPath, $updatedStructure, $jsonOptions)) {
         return ApiResponse::create(500, 'error.fileWrite')
             ->withMessage("Failed to save structure file");

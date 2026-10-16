@@ -14,6 +14,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_js
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 /**
  * Command function for duplicateComponent
@@ -94,8 +95,15 @@ function __command_duplicateComponent(array $params = [], array $urlParams = [])
         return qs_unsafe_structure_param_response($unsafeStructureParam);
     }
 
-    // Write to new file (re-encode to ensure consistent formatting)
-    if (!qs_json_write($newFile, $structure, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) {
+    // Write to new file (re-encode to ensure consistent formatting), unless it
+    // would pass the structure cap or grow while the owner is over quota
+    // (qs_small_write_refusal)
+    $jsonFlags = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
+    $refusal = qs_small_write_refusal([$newFile => qs_json_size($structure, $jsonFlags)]);
+    if ($refusal !== null) {
+        return $refusal;
+    }
+    if (!qs_json_write($newFile, $structure, $jsonFlags)) {
         return ApiResponse::create(500, 'server.file_write_failed')
             ->withMessage("Failed to create new component file")
             ->withData(['file' => $newFile]);

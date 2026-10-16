@@ -366,6 +366,17 @@ function cssReleaseLock($lock): void {
 }
 
 /**
+ * The size check for a stylesheet write (qs_small_write_refusal): the refusal to
+ * answer, or null to go on. Every stylesheet writer calls it with the content it
+ * is about to write, before cssWriteAllTargets() or its own write — so a refused
+ * write leaves the stylesheet as it was.
+ */
+function cssWriteRefusal(string $content, string $livePath, string $projectPath): ?ApiResponse {
+    require_once __DIR__ . '/quota.php';
+    return qs_small_write_refusal([$livePath => strlen($content), $projectPath => strlen($content)]);
+}
+
+/**
  * Writes CSS content to the live stylesheet and the project backup copy.
  * 
  * If both paths resolve to the same file, the content is written only once.

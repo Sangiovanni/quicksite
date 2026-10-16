@@ -20,6 +20,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/JsonToHtmlRenderer.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 /**
  * Translatable attributes that need new keys when duplicating
@@ -141,8 +142,15 @@ function setTranslationKey(string $key, string $value): bool {
             $ref = &$ref[$part];
         }
     }
-    
-    return qs_json_write($translationFile, $translations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES, LOCK_EX);
+    unset($ref);
+
+    // The size check, write by write (qs_small_write_guard): the command answers
+    // qs_small_write_refused(), and a refusal takes back the keys written before.
+    $flags = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
+    if (!qs_small_write_guard($translationFile, qs_json_size($translations, $flags))) {
+        return false;
+    }
+    return qs_json_write($translationFile, $translations, $flags, LOCK_EX);
 }
 
 /**
@@ -364,6 +372,11 @@ function __command_duplicateNode(array $params = [], array $urlParams = []): Api
             return ApiResponse::create(500, 'server.internal_error')
                 ->withMessage('Failed to encode structure to JSON');
         }
+        // The size check, as the copied keys' translations had it (qs_small_write_guard):
+        // a refusal here takes them back too.
+        if (qs_small_write_refused() !== null || !qs_small_write_guard($json_file, strlen($json_content))) {
+            return qs_small_write_refused();
+        }
         if (file_put_contents($json_file, $json_content, LOCK_EX) === false) {
             return ApiResponse::create(500, 'server.file_write_failed')
                 ->withMessage('Failed to write structure file');
@@ -446,7 +459,13 @@ function __command_duplicateNode(array $params = [], array $urlParams = []): Api
         return ApiResponse::create(500, 'server.internal_error')
             ->withMessage("Failed to encode structure to JSON");
     }
-    
+
+    // The size check, as the copied keys' translations had it (qs_small_write_guard):
+    // a refusal here takes them back too.
+    if (qs_small_write_refused() !== null || !qs_small_write_guard($json_file, strlen($json_content))) {
+        return qs_small_write_refused();
+    }
+
     if (file_put_contents($json_file, $json_content, LOCK_EX) === false) {
         return ApiResponse::create(500, 'server.file_write_failed')
             ->withMessage("Failed to write structure file");

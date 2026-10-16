@@ -16,6 +16,7 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/privacyHelpers.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 $params = $trimParametersManagement->params();
 
@@ -30,6 +31,7 @@ if (!in_array($value, PRIVACY_COOKIE_SECTION, true)) {
 $reg = loadPrivacyRegistry();
 $reg['cookieSection'] = $value;
 if (!savePrivacyRegistry($reg)) {
+    qs_small_write_send_refusal();
     ApiResponse::create(500, 'server.operation_failed')
         ->withMessage('Failed to write the privacy registry')
         ->send();

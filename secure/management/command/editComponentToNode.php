@@ -8,6 +8,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/componentPolicy.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 /**
  * editComponentToNode - Edit a component instance's data bindings
@@ -332,8 +333,13 @@ function __command_editComponentToNode(array $params = [], array $urlParams = []
         return qs_unsafe_structure_param_response($unsafeStructureParam);
     }
 
-    // Save structure
+    // Save structure, unless it would pass its size cap or grow while the owner
+    // is over quota (qs_small_write_refusal)
     $jsonOptions = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
+    $refusal = qs_small_write_refusal([$jsonPath => qs_json_size($updatedStructure, $jsonOptions)]);
+    if ($refusal !== null) {
+        return $refusal;
+    }
     if (!qs_json_write($jsonPath, $updatedStructure, $jsonOptions)) {
         return ApiResponse::create(500, 'error.fileWrite')
             ->withMessage("Failed to save structure file");

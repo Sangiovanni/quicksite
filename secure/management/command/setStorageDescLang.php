@@ -26,6 +26,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectLanguage.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/storageHelpers.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 $params = $trimParametersManagement->params();
 
@@ -76,8 +77,10 @@ if (!$confirm) {
 
 // Execute the move + persist the new language.
 $result = storageMoveDescriptions($current, $lang, true);
+qs_small_write_send_refusal();
 $registry['descLang'] = $lang;
 if (!saveStorageRegistry($registry)) {
+    qs_small_write_send_refusal();
     ApiResponse::create(500, 'server.operation_failed')
         ->withMessage('Failed to write the storage registry')
         ->send();

@@ -199,12 +199,12 @@ function __command_injectSnippetCss(array $params = [], array $urlParams = []): 
     }
     $newCss = rtrim($existingCss) . "\n\n" . $block . "\n";
 
-    // Cap the result at the size the CssParser can read back, matching every
-    // other CSS writer (this command writes directly, so it checks here).
-    if (strlen($newCss) > CSS_MAX_BYTES) {
-        return ApiResponse::create(413, 'validation.size_limit_exceeded')
-            ->withMessage('Injecting this snippet would exceed the maximum stylesheet size ('
-                . (int) round(CSS_MAX_BYTES / 1024) . ' KB)');
+    // The size check every stylesheet writer runs: the cap (never above
+    // CSS_MAX_BYTES, what the CssParser can read back) and growth while the owner
+    // is over quota. This command writes directly, so it checks here.
+    $refusal = cssWriteRefusal($newCss, $liveStylePath, $projectStylePath);
+    if ($refusal !== null) {
+        return $refusal;
     }
 
     // Write to BOTH locations: live public + project backup

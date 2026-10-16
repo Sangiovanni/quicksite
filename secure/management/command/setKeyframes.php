@@ -166,8 +166,15 @@ try {
     // Update keyframes
     $result = $parser->setKeyframes($name, $frames);
     
-    // Write updated content to live stylesheet and project backup copy
-    cssWriteAllTargets($parser->getContent(), $styleFile, cssProjectPath());
+    // Write updated content to live stylesheet and project backup copy, unless
+    // the stylesheet would pass its size cap or grow while the owner is over quota
+    $newContent = $parser->getContent();
+    $refusal = cssWriteRefusal($newContent, $styleFile, cssProjectPath());
+    if ($refusal !== null) {
+        cssReleaseLock($lock);
+        $refusal->send();
+    }
+    cssWriteAllTargets($newContent, $styleFile, cssProjectPath());
 
     cssReleaseLock($lock);
 

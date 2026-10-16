@@ -119,6 +119,9 @@ $newTranslations = sanitizePlaceholderKeys($newTranslations);
 $writeResult = writeTranslationsToFile($language, $newTranslations, $replaceMode);
 
 if (!$writeResult['ok']) {
+    if ($writeResult['reason'] === 'refused') {
+        $writeResult['response']->send();
+    }
     if ($writeResult['reason'] === 'collisions') {
         ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage($writeResult['collisions'][0]['suggestion'])

@@ -83,11 +83,18 @@ class StateStoreManager {
             $all[$route] = $stores;
         }
 
+        // The size check (qs_small_write_guard): the command answers
+        // qs_small_write_refused().
+        $flags = JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES;
+        require_once SECURE_FOLDER_PATH . '/src/functions/quota.php';
+        if (!qs_small_write_guard($this->configPath, qs_json_size($all, $flags))) {
+            return ['success' => false, 'error' => 'refused', 'refused' => true];
+        }
         $dir = dirname($this->configPath);
         if (!is_dir($dir)) {
             mkdir($dir, 0755, true);
         }
-        if (!qs_json_write($this->configPath, $all, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES, LOCK_EX)) {
+        if (!qs_json_write($this->configPath, $all, $flags, LOCK_EX)) {
             return ['success' => false, 'error' => 'Failed to save state stores'];
         }
         return ['success' => true, 'route' => $route, 'stores' => $stores];

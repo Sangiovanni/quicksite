@@ -691,9 +691,13 @@ if (isset($fileInfo['width'])) {
     $assetMeta['dimensions'] = $fileInfo['dimensions'];
 }
 
-// Store metadata
+// Store metadata. Its size check refusing (qs_small_write_guard) takes the
+// stored file back too: an asset with no metadata entry is not kept.
 $metaManager->set($category, $finalFilename, $assetMeta);
-$metaManager->save();
+if (!$metaManager->save() && qs_small_write_refused() !== null) {
+    @unlink($targetFile);
+    qs_small_write_send_refusal();
+}
 
 // ============================================================
 // Per-user resource limits — record what this upload consumed

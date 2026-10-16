@@ -1151,3 +1151,33 @@
     color: var(--admin-accent);
     font-style: italic;
 }
+
+/* Steps a run did not reach when the write rate stopped it: how many, from when,
+   the warning that the page may have changed, and Run / Discard. */
+.preview-contextual-ai-tools__kept {
+    margin: 0 0 var(--space-md, 12px);
+    padding: var(--space-sm, 8px) var(--space-md, 12px);
+    border: 1px solid var(--admin-warning, #d4a84b);
+    border-radius: var(--radius-md, 6px);
+    background: var(--admin-warning-bg, rgba(212, 168, 75, 0.15));
+}
+.preview-contextual-ai-tools__kept-title {
+    margin: 0 0 4px;
+    font-weight: 600;
+}
+.preview-contextual-ai-tools__kept-warning,
+.preview-contextual-ai-tools__kept-wait {
+    margin: 0 0 6px;
+    font-size: 12px;
+    line-height: 1.4;
+}
+.preview-contextual-ai-tools__kept-actions {
+    display: flex;
+    gap: var(--space-sm, 8px);
+}
+/* Run before the allowance is back: it looks unavailable, and a click says when. */
+.preview-contextual-ai-tools__kept-actions .admin-btn[aria-disabled="true"],
+.preview-contextual-ai-tools__kept-actions .admin-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

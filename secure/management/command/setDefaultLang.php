@@ -13,6 +13,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/opcacheHygiene.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/languageRegistry.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectSettings.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 // Check if multilingual mode is enabled
 if (!MULTILINGUAL_SUPPORT) {
@@ -107,6 +108,13 @@ if ($refusal !== null) {
 
 // Build new config file content using var_export for safety
 $new_config_content = "<?php\n\nreturn " . var_export($current_config, true) . ";\n";
+
+// The size check (qs_small_write_refusal): the settings cap, and growth while
+// the owner is over quota.
+$refusal = qs_small_write_refusal([$config_path => strlen($new_config_content)]);
+if ($refusal !== null) {
+    $refusal->send();
+}
 
 // Write updated config
 if (file_put_contents($config_path, $new_config_content, LOCK_EX) === false) {

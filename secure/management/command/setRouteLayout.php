@@ -27,6 +27,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RouteLayoutManager.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/String.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 // ============================================================================
 // CONSTANTS
@@ -191,11 +192,13 @@ $beforeLayout = $layoutManager->getEffectiveLayout($route);
 
 // Set the layout (only provided values will be updated)
 $layoutManager->setLayout($route, $menu, $footer);
+qs_small_write_send_refusal();
 
 // If propagate is true, apply to all descendants
 $propagatedRoutes = [];
 if ($propagate) {
     $propagateResult = $layoutManager->propagateLayout($route, $menu, $footer, $allRoutes);
+    qs_small_write_send_refusal();
     $propagatedRoutes = $propagateResult['affected'] ?? [];
 }
 

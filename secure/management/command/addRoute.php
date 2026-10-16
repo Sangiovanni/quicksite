@@ -22,6 +22,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/opcacheHygiene.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/String.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 // ============================================================================
 // CONSTANTS
@@ -175,21 +176,31 @@ if (count($segments) > 1) {
             $parentPath = implode('/', $parentSegments);
             $parentName = end($parentSegments);
 
-            // Create parent PHP file
+            // Create parent PHP file. Every file of this command passes the size
+            // check as it is written (qs_small_write_guard); a refusal takes back
+            // the files and folders written before it.
             $parentPhpPath = resolveNewRoutePhpPath($parentSegments, $currentRoutes, $pagesDir);
+            $parentPhp = generate_page_template($parentPath);
+            if (!qs_small_write_guard($parentPhpPath, strlen($parentPhp))) {
+                qs_small_write_send_refusal();
+            }
             $parentPhpDir = dirname($parentPhpPath);
             if (!is_dir($parentPhpDir)) {
                 mkdir($parentPhpDir, 0755, true);
             }
-            file_put_contents($parentPhpPath, generate_page_template($parentPath), LOCK_EX);
+            file_put_contents($parentPhpPath, $parentPhp, LOCK_EX);
 
             // Create parent JSON file
             $parentJsonPath = resolveNewRouteJsonPath($parentSegments, $jsonDir);
+            $parentJson = generate_page_json($parentName);
+            if (!qs_small_write_guard($parentJsonPath, strlen($parentJson))) {
+                qs_small_write_send_refusal();
+            }
             $parentJsonDir = dirname($parentJsonPath);
             if (!is_dir($parentJsonDir)) {
                 mkdir($parentJsonDir, 0755, true);
             }
-            file_put_contents($parentJsonPath, generate_page_json($parentName), LOCK_EX);
+            file_put_contents($parentJsonPath, $parentJson, LOCK_EX);
 
             // Add parent to routes structure
             $currentRoutes = addRouteToStructure($parentSegments, $currentRoutes);
@@ -212,6 +223,17 @@ $jsonFilePath = resolveNewRouteJsonPath($segments, $jsonDir);
 
 $createdDirs = [];
 $createdFiles = [];
+
+// The size check on the new page and the route file (qs_small_write_guard), each
+// before it is written; a refusal takes back everything this command wrote.
+$phpContent = generate_page_template($routePath);
+$jsonContent = generate_page_json($routeName);
+$newRoutes = addRouteToStructure($segments, $currentRoutes);
+$routesContent = "<?php return " . varExportNested($newRoutes) . "; ?>";
+if (!qs_small_write_guard($phpFilePath, strlen($phpContent))
+    || !qs_small_write_guard($jsonFilePath, strlen($jsonContent))) {
+    qs_small_write_send_refusal();
+}
 
 try {
     // Create PHP directory if needed
@@ -236,27 +258,25 @@ try {
     // CREATE NEW ROUTE FILES
     // ========================================================================
     
-    // Generate PHP template (use full route path, not just the name)
-    $phpContent = generate_page_template($routePath);
+    // The PHP template (built from the full route path, not just the name)
     if (file_put_contents($phpFilePath, $phpContent, LOCK_EX) === false) {
         throw new Exception("Failed to write PHP file: $phpFilePath");
     }
     $createdFiles[] = $phpFilePath;
-    
-    // Generate JSON structure
-    $jsonContent = generate_page_json($routeName);
+
+    // The JSON structure
     if (file_put_contents($jsonFilePath, $jsonContent, LOCK_EX) === false) {
         throw new Exception("Failed to write JSON file: $jsonFilePath");
     }
     $createdFiles[] = $jsonFilePath;
-    
+
     // ========================================================================
     // UPDATE ROUTES.PHP
     // ========================================================================
-    
-    $newRoutes = addRouteToStructure($segments, $currentRoutes);
-    $routesContent = "<?php return " . varExportNested($newRoutes) . "; ?>";
-    
+
+    if (!qs_small_write_guard(ROUTES_PATH, strlen($routesContent))) {
+        qs_small_write_send_refusal();
+    }
     if (file_put_contents(ROUTES_PATH, $routesContent, LOCK_EX) === false) {
         throw new Exception("Failed to update routes file");
     }

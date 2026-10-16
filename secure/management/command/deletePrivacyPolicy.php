@@ -19,6 +19,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/policyPageHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/privacyHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/consentLayerHelpers.php'; // consentRouteExists
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 $reg = loadPrivacyRegistry();
 $route = $reg['privacyRoute'] ?? null;
@@ -39,6 +40,9 @@ if (consentRouteExists($routeTrim)) {
 
 $reg['privacyRoute'] = null;
 savePrivacyRegistry($reg);
+// Every write here shrinks a file, so the size check never refuses; answered
+// like every chain all the same (qs_small_write_guard).
+qs_small_write_send_refusal();
 
 ApiResponse::create(200, 'success')
     ->withMessage($routeDeleted ? "Privacy-policy page deleted ($route)" : "Cleared stale privacy-policy route ($route)")

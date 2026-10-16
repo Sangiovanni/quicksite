@@ -62,6 +62,7 @@ if (isset($_GET['denied'])): ?>
             <div class="storage-overview__segment storage-overview__segment--backups" id="owner-space-seg-backups" style="width: 0%"></div>
             <div class="storage-overview__segment storage-overview__segment--builds" id="owner-space-seg-builds" style="width: 0%"></div>
             <div class="storage-overview__segment storage-overview__segment--exports" id="owner-space-seg-exports" style="width: 0%"></div>
+            <div class="storage-overview__segment storage-overview__segment--snippets" id="owner-space-seg-snippets" style="width: 0%"></div>
         </div>
 
         <div class="storage-overview__legend">
@@ -84,6 +85,12 @@ if (isset($_GET['denied'])): ?>
                 <span class="storage-overview__legend-color storage-overview__legend-color--exports"></span>
                 <span class="storage-overview__legend-label"><?= __admin('dashboard.storage.exports') ?></span>
                 <span class="storage-overview__legend-value" id="owner-space-val-exports">--</span>
+            </div>
+            <!-- Personal snippets live outside every project; they count in this total. -->
+            <div class="storage-overview__legend-item">
+                <span class="storage-overview__legend-color storage-overview__legend-color--snippets"></span>
+                <span class="storage-overview__legend-label"><?= __admin('dashboard.storage.personalSnippets') ?></span>
+                <span class="storage-overview__legend-value" id="owner-space-val-snippets">--</span>
             </div>
             <!-- What is LEFT of this account's quota. Hidden on an install with no
                  quota.php (the default), where there is no ceiling to have room in. -->

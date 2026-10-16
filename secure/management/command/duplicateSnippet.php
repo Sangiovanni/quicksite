@@ -22,6 +22,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/SnippetManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -125,8 +126,11 @@ function __command_duplicateSnippet(array $params = [], array $urlParams = []): 
 
     // Save new snippet
     $result = saveProjectSnippet($newSnippet, $projectName);
-    
+
     if (!$result['success']) {
+        if (!empty($result['refused'])) {
+            return qs_small_write_refused();
+        }
         return ApiResponse::create(500, 'snippets.save_failed')
             ->withMessage($result['error']);
     }

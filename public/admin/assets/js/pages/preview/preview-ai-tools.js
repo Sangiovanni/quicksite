@@ -127,6 +127,10 @@ window.PreviewAiTools = (function () {
 
         _bindEvents();
         _subscribeToSelectionChanges();
+        // The kept steps' banner follows the allowance: Run enables once it is back.
+        window.addEventListener('quicksite:write-rate', function () {
+            if (_keptEl && !_keptEl.hidden) _renderKept();
+        });
     }
 
     function _subscribeToSelectionChanges() {
@@ -166,21 +170,17 @@ window.PreviewAiTools = (function () {
         var origLabel = _backupBtnEl.textContent;
         _backupBtnEl.disabled = true;
         _backupBtnEl.textContent = _t('backupCreating', 'Creating backup…');
-        var cfg = window.PreviewConfig || {};
-        var url = (cfg.managementUrl || '') + 'backupProject';
-        var headers = { 'Accept': 'application/json' };
-        if (cfg.authToken) headers['Authorization'] = 'Bearer ' + cfg.authToken;
         var toaster = (window.QuickSiteAdmin && typeof window.QuickSiteAdmin.showToast === 'function')
             ? window.QuickSiteAdmin.showToast.bind(window.QuickSiteAdmin)
             : null;
-        fetch(url, { method: 'GET', headers: headers }).then(function (res) {
-            return res.json().then(function (json) { return { ok: res.ok, json: json }; });
-        }).then(function (result) {
-            if (!result.ok || !result.json || (!result.json.success && result.json.status >= 300)) {
-                var errMsg = (result.json && (result.json.error || result.json.message)) || 'HTTP error';
-                throw new Error(errMsg);
+        // Through the panel's API client, like every management call: it carries the
+        // project marker and keeps the write allowance current.
+        window.QuickSiteAdmin.apiRequest('backupProject', 'GET').then(function (res) {
+            var json = res.data || {};
+            if (!res.ok) {
+                throw new Error(json.error || json.message || ('HTTP ' + res.status));
             }
-            var path = (result.json.data && (result.json.data.path || result.json.data.backupPath)) || '';
+            var path = (json.data && (json.data.path || json.data.backupPath)) || '';
             if (toaster) {
                 toaster(_t('backupSuccess', 'Backup created ({path})').replace('{path}', path || '✓'), 'success');
             }
@@ -198,6 +198,7 @@ window.PreviewAiTools = (function () {
         opts = opts || {};
         if (!_section) return;
         _showListView();
+        _renderKept();
         if (_entered && !opts.refresh) return;
         _entered = true;
         _initData();
@@ -1687,10 +1688,149 @@ window.PreviewAiTools = (function () {
     }
 
     // ──────────────────────────── Execute batch ─────────────────────────
+    //
+    // Every command but a read counts against the account's write rate (the
+    // server's own list: QuickSiteAPI.countsAsWrite). Before a run starts its
+    // counted steps are set against what is left of each window
+    // (_planRun): a run that would have to wait longer than the runner's wait
+    // limit does not start, and one that can never fit in one go is offered in
+    // parts. During a run, a refusal whose wait fits the limit is waited out and
+    // the same step sent again; a longer one stops the run and keeps the steps
+    // not run (per account and project), offered again once the allowance is
+    // back — never run on their own.
 
-    async function _executeCommands(commands) {
+    /** Commands of a list that count against the write rate. */
+    function _countedSteps(commands) {
+        var api = window.QuickSiteAPI;
+        var n = 0;
+        for (var i = 0; i < commands.length; i++) {
+            var name = commands[i].command || commands[i].name;
+            if (!api || typeof api.countsAsWrite !== 'function' || api.countsAsWrite(name)) n++;
+        }
+        return n;
+    }
+
+    /**
+     * Whether a run of `counted` write steps can start against the windows as
+     * they stand. A window shorter than the wait limit never stops a run: each
+     * of its waits is short. A longer one lets the run start when it has room,
+     * or when the one wait the run needs from it (until its reset) fits the
+     * limit; otherwise the run waits for its reset ('wait') — unless even a full
+     * window cannot hold the run ('never'), which is offered in parts: `fitsNow`
+     * write steps can run at once.
+     *
+     * @returns {{start: boolean, reason?: string, needs: number, left: number, backAt?: number,
+     *            fitsNow?: number, window?: object}}
+     */
+    function _planRun(counted, rate) {
+        var limitMs = Math.max(0, Number(rate.waitSeconds) || 0) * 1000;
+        var now = Date.now();
+        var plan = { start: true, needs: counted, left: Infinity, fitsNow: Infinity };
+        var waitUntil = 0;
+        var never = null;
+        for (var i = 0; i < rate.windows.length; i++) {
+            var w = rate.windows[i];
+            plan.left = Math.min(plan.left, w.remaining);
+            var periodMs = w.period * 1000;
+            var firstWait = Math.max(0, w.resetAt - now);
+            var shortWindow = periodMs <= limitMs;
+            var capacity = shortWindow ? Infinity : (firstWait <= limitMs ? w.remaining + w.max : w.remaining);
+            plan.fitsNow = Math.min(plan.fitsNow, capacity);
+            if (counted <= w.remaining || shortWindow) continue;
+            if (firstWait <= limitMs && counted <= w.remaining + w.max) continue;
+            if (counted <= w.max) {
+                waitUntil = Math.max(waitUntil, w.resetAt);
+            } else if (!never) {
+                never = w;
+            }
+        }
+        if (plan.left === Infinity) plan.left = counted;
+        if (never) {
+            plan.start = false;
+            plan.reason = 'never';
+            plan.window = never;
+            plan.backAt = waitUntil || never.resetAt;
+        } else if (waitUntil > 0) {
+            plan.start = false;
+            plan.reason = 'wait';
+            plan.backAt = waitUntil;
+        }
+        return plan;
+    }
+
+    /** The first steps of a list holding at most `writes` counted ones. */
+    function _firstPart(commands, writes) {
+        var api = window.QuickSiteAPI;
+        var taken = 0;
+        var i = 0;
+        for (; i < commands.length; i++) {
+            var name = commands[i].command || commands[i].name;
+            var counts = !api || typeof api.countsAsWrite !== 'function' || api.countsAsWrite(name);
+            if (counts && taken >= writes) break;
+            if (counts) taken++;
+        }
+        return i;
+    }
+
+    async function _executeCommands(commands, opts) {
+        opts = opts || {};
         if (!Array.isArray(commands) || commands.length === 0) return;
         if (!_stepsBody) return;
+
+        var toaster = (window.QuickSiteAdmin && typeof window.QuickSiteAdmin.showToast === 'function')
+            ? window.QuickSiteAdmin.showToast.bind(window.QuickSiteAdmin)
+            : function () {};
+        var api = window.QuickSiteAPI;
+
+        // Kept steps come first: a new run would plan over a page they were planned for.
+        if (!opts.fromKept && _readKept()) {
+            toaster(_t('keptBlocking', 'Run or discard the kept steps first.'), 'warning');
+            _renderKept();
+            return;
+        }
+
+        // ── Before starting: the counted steps against what is left ──
+        var rate = (api && typeof api.getWriteRate === 'function') ? api.getWriteRate() : { windows: [], waitSeconds: 0 };
+        var counted = _countedSteps(commands);
+        var keepAfter = null;
+        if (rate.windows.length > 0 && counted > 0) {
+            var plan = _planRun(counted, rate);
+            if (!plan.start && (plan.reason === 'wait' || plan.fitsNow <= 0)) {
+                var waitMsg = _t('rateRefusedToStart', 'This run needs {needs} changes and {left} are left on this server. Enough is back at {time} (in {wait}).')
+                    .replace('{needs}', String(counted))
+                    .replace('{left}', String(plan.left))
+                    .replace('{time}', api.clockText(plan.backAt))
+                    .replace('{wait}', api.waitText((plan.backAt - Date.now()) / 1000));
+                if (_stepsHeaderState) _stepsHeaderState.textContent = waitMsg;
+                toaster(waitMsg, 'warning');
+                return;
+            }
+            if (!plan.start) {
+                // More than a whole window: never in one go. Offered in parts.
+                var fits = _firstPart(commands, plan.fitsNow);
+                var neverMsg = _t('rateNeverOneGo', 'This run needs {needs} changes; this server allows {max} per {period}, so it cannot run in one go.')
+                    .replace('{needs}', String(counted))
+                    .replace('{max}', String(plan.window.max))
+                    .replace('{period}', api.periodText(plan.window.period));
+                var partsMsg = _t('rateRunInParts', 'Run the first {fits} steps now and keep the other {rest} for later?')
+                    .replace('{fits}', String(fits))
+                    .replace('{rest}', String(commands.length - fits));
+                var go = window.QuickSiteUtils && typeof window.QuickSiteUtils.confirm === 'function'
+                    ? await window.QuickSiteUtils.confirm(neverMsg + ' ' + partsMsg, { confirmText: _t('rateRunPart', 'Run the first part') })
+                    : false;
+                if (!go) {
+                    if (_stepsHeaderState) _stepsHeaderState.textContent = neverMsg;
+                    return;
+                }
+                keepAfter = fits;
+            }
+        }
+
+        // The run starts: kept steps it runs leave storage (they come back if it stops again).
+        if (opts.fromKept) {
+            _clearKept();
+            _renderKept();
+        }
 
         if (_stepsSetOpen) _stepsSetOpen(true);
         _stepsBody.replaceChildren();
@@ -1703,9 +1843,11 @@ window.PreviewAiTools = (function () {
 
         var ok = 0;
         var fail = 0;
+        var stoppedAt = -1;
         var runTpl = _t('executionRunning', 'Running {current}/{total}');
+        var last = keepAfter !== null ? keepAfter : commands.length;
 
-        for (var j = 0; j < commands.length; j++) {
+        for (var j = 0; j < last; j++) {
             if (_stepsHeaderState) {
                 _stepsHeaderState.textContent = runTpl
                     .replace('{current}', String(j + 1))
@@ -1714,6 +1856,18 @@ window.PreviewAiTools = (function () {
             _updateStepRow(rows[j], 'running');
             try {
                 var result = await _executeOneCommand(commands[j]);
+                // The write rate refused this step: wait it out when the wait fits
+                // the limit (then the same step again), else stop here.
+                while (result.rateLimited && result.retryAfter <= rate.waitSeconds) {
+                    await _waitWithCountdown(result.retryAfter);
+                    _updateStepRow(rows[j], 'running');
+                    result = await _executeOneCommand(commands[j]);
+                }
+                if (result.rateLimited) {
+                    stoppedAt = j;
+                    _updateStepRow(rows[j], 'error', result.error || '');
+                    break;
+                }
                 if (result.ok) {
                     ok++;
                     _updateStepRow(rows[j], 'ok', result.message || '');
@@ -1727,7 +1881,22 @@ window.PreviewAiTools = (function () {
             }
         }
 
-        if (_stepsHeaderState) {
+        // Steps not run: kept for later — after a stop, or the rest of a run in parts.
+        var keepFrom = stoppedAt >= 0 ? stoppedAt : (keepAfter !== null ? keepAfter : -1);
+        if (keepFrom >= 0 && keepFrom < commands.length) {
+            _writeKept(commands.slice(keepFrom), opts.label || _currentRunLabel());
+            var backAt = (api.getWriteRate().windows || []).reduce(function (m, w) {
+                return w.remaining <= 0 ? Math.max(m, w.resetAt) : m;
+            }, 0);
+            var keptMsg = (stoppedAt >= 0
+                ? _t('rateStopped', 'Stopped: the change allowance is used up until {time}. The {n} steps not run are kept; run them from here once it is back.')
+                : _t('rateKeptRest', 'The other {n} steps are kept; run them from here once the allowance is back.'))
+                .replace('{time}', backAt ? api.clockText(backAt) : '')
+                .replace('{n}', String(commands.length - keepFrom));
+            if (_stepsHeaderState) _stepsHeaderState.textContent = keptMsg;
+            toaster(keptMsg, stoppedAt >= 0 ? 'warning' : 'info');
+            _renderKept();
+        } else if (_stepsHeaderState) {
             if (fail === 0) {
                 _stepsHeaderState.textContent = _t('executionDone', 'Done ({ok} succeeded)')
                     .replace('{ok}', String(ok));
@@ -1752,38 +1921,193 @@ window.PreviewAiTools = (function () {
         }
     }
 
+    /** Wait `seconds`, counting down in the batch's header. */
+    function _waitWithCountdown(seconds) {
+        var api = window.QuickSiteAPI;
+        var end = Date.now() + Math.max(0, seconds) * 1000;
+        return new Promise(function (resolve) {
+            var tick = function () {
+                var left = Math.max(0, Math.ceil((end - Date.now()) / 1000));
+                if (_stepsHeaderState) {
+                    _stepsHeaderState.textContent = _t('rateWaiting', 'Waiting for the change allowance… {wait}')
+                        .replace('{wait}', api ? api.waitText(left) : left + ' s');
+                }
+                if (left <= 0) {
+                    resolve();
+                    return;
+                }
+                setTimeout(tick, 1000);
+            };
+            tick();
+        });
+    }
+
+    /**
+     * One step, through the panel's API client (the project marker, the write
+     * allowance kept current). A refusal by the write rate is reported as such,
+     * with the server's wait, so the run can wait it out or stop.
+     */
     async function _executeOneCommand(cmd) {
-        var cfg = window.PreviewConfig || {};
         var commandName = cmd.command || cmd.name;
         if (!commandName) return { ok: false, error: 'Missing command name' };
         var method = String(cmd.method || 'POST').toUpperCase();
-        var url = (cfg.managementUrl || '') + commandName;
-        var options = {
-            method: method,
-            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' }
-        };
-        if (cfg.authToken) options.headers['Authorization'] = 'Bearer ' + cfg.authToken;
-        if (method !== 'GET' && cmd.params) {
-            options.body = JSON.stringify(cmd.params);
+        var res = await window.QuickSiteAdmin.apiRequest(commandName, method, method !== 'GET' ? (cmd.params || null) : null);
+        var data = res.data || {};
+        if (res.status === 429 && data.code === 'quota.rate_limited') {
+            return {
+                ok: false,
+                rateLimited: true,
+                retryAfter: Number(data.data && data.data.retry_after) || 0,
+                error: data.message || ('HTTP ' + res.status)
+            };
         }
-        var response;
-        try {
-            response = await fetch(url, options);
-        } catch (e) {
-            return { ok: false, error: (e && e.message) || 'Network error' };
-        }
-        var text = await response.text();
-        var data;
-        try {
-            data = text ? JSON.parse(text) : { status: response.status };
-        } catch (e) {
-            return { ok: false, error: 'Invalid JSON response (HTTP ' + response.status + ')' };
-        }
-        var isSuccess = (data.status >= 200 && data.status < 300) || data.success === true;
+        var isSuccess = res.ok && ((data.status >= 200 && data.status < 300) || data.success === true);
         if (!isSuccess) {
-            return { ok: false, error: data.error || data.message || ('HTTP ' + response.status) };
+            return { ok: false, error: data.error || data.message || ('HTTP ' + res.status) };
         }
         return { ok: true, message: data.message || '', data: data };
+    }
+
+    // ──────────────────────────── Kept steps ────────────────────────────
+
+    /** Where this account's kept steps for this project live in the browser. */
+    function _keptKey() {
+        var base = (window.QuickSiteStorageKeys || {}).aiKeptSteps;
+        var api = window.QuickSiteAPI;
+        var account = (api && typeof api.getWriteRate === 'function') ? api.getWriteRate().account : '';
+        var project = (window.PreviewConfig && window.PreviewConfig.currentProject) || '';
+        return base && account && project ? base + ':' + account + ':' + project : null;
+    }
+
+    /** The kept steps ({steps, label, savedAt}), or null. */
+    function _readKept() {
+        var key = _keptKey();
+        if (!key) return null;
+        try {
+            var kept = JSON.parse(localStorage.getItem(key) || 'null');
+            return kept && Array.isArray(kept.steps) && kept.steps.length > 0 ? kept : null;
+        } catch (_e) {
+            return null;
+        }
+    }
+
+    function _writeKept(steps, label) {
+        var key = _keptKey();
+        if (!key) return;
+        try {
+            localStorage.setItem(key, JSON.stringify({ steps: steps, label: label || '', savedAt: Date.now() }));
+        } catch (_e) { /* storage unavailable: the steps are not kept */ }
+    }
+
+    function _clearKept() {
+        var key = _keptKey();
+        if (!key) return;
+        try { localStorage.removeItem(key); } catch (_e) { /* ignore */ }
+    }
+
+    /** The name of the run being started, for the kept steps' banner. */
+    function _currentRunLabel() {
+        return (_activeWorkflowSummary && (_activeWorkflowSummary.title || _activeWorkflowSummary.id)) || '';
+    }
+
+    var _keptEl = null;
+    var _keptTimer = null;
+
+    /**
+     * The kept steps' banner, at the top of the panel: how many, from when, the
+     * warning that the page may have changed, and Run (only once the allowance
+     * covers them) / Discard. Redrawn when the allowance moves.
+     */
+    function _renderKept() {
+        if (!_section) return;
+        if (!_keptEl) {
+            _keptEl = document.createElement('div');
+            _keptEl.className = 'preview-contextual-ai-tools__kept';
+            _section.insertBefore(_keptEl, _section.firstChild);
+        }
+        clearTimeout(_keptTimer);
+        var kept = _readKept();
+        _keptEl.replaceChildren();
+        _keptEl.hidden = !kept;
+        if (!kept) return;
+
+        var api = window.QuickSiteAPI;
+        var rate = api.getWriteRate();
+        var plan = _planRun(_countedSteps(kept.steps), rate);
+
+        var title = document.createElement('p');
+        title.className = 'preview-contextual-ai-tools__kept-title';
+        title.textContent = _t('keptTitle', '{n} steps kept from a stopped run ({label}, planned at {time})')
+            .replace('{n}', String(kept.steps.length))
+            .replace('{label}', kept.label || '—')
+            .replace('{time}', api.clockText(kept.savedAt));
+        var warn = document.createElement('p');
+        warn.className = 'preview-contextual-ai-tools__kept-warning';
+        warn.textContent = _t('keptWarning', 'The page may have changed since they were planned: node positions can shift.');
+
+        var actions = document.createElement('div');
+        actions.className = 'preview-contextual-ai-tools__kept-actions';
+        var run = document.createElement('button');
+        run.type = 'button';
+        run.className = 'admin-btn admin-btn--primary admin-btn--small';
+        run.textContent = _t('keptRun', 'Run them');
+        var canRun = plan.start || (plan.reason === 'never' && plan.fitsNow > 0);
+        var notYetText = canRun ? '' : _t('keptNotYet', 'Enough is back at {time}.').replace('{time}', api.clockText(plan.backAt));
+        // Not yet: the button looks unavailable but still answers a click with
+        // when it will be (a disabled button would swallow the click silently).
+        run.disabled = _executing;
+        if (!canRun) {
+            run.setAttribute('aria-disabled', 'true');
+            run.title = notYetText;
+        }
+        run.addEventListener('click', function () {
+            if (!canRun) {
+                if (window.QuickSiteAdmin && typeof window.QuickSiteAdmin.showToast === 'function') {
+                    window.QuickSiteAdmin.showToast(notYetText, 'info');
+                }
+                return;
+            }
+            _runKept();
+        });
+        var discard = document.createElement('button');
+        discard.type = 'button';
+        discard.className = 'admin-btn admin-btn--secondary admin-btn--small';
+        discard.textContent = _t('keptDiscard', 'Discard');
+        discard.addEventListener('click', function () {
+            _clearKept();
+            _renderKept();
+        });
+        actions.appendChild(run);
+        actions.appendChild(discard);
+
+        _keptEl.appendChild(title);
+        _keptEl.appendChild(warn);
+        if (!canRun) {
+            var notYet = document.createElement('p');
+            notYet.className = 'preview-contextual-ai-tools__kept-wait';
+            notYet.textContent = notYetText;
+            _keptEl.appendChild(notYet);
+            _keptTimer = setTimeout(_renderKept, Math.max(1000, plan.backAt - Date.now() + 500));
+        }
+        _keptEl.appendChild(actions);
+    }
+
+    /** Run the kept steps (the user asked). They stay kept until the run starts. */
+    async function _runKept() {
+        if (_executing) return;
+        var kept = _readKept();
+        if (!kept) return;
+        _executing = true;
+        _updateActionStates();
+        try {
+            await _executeCommands(kept.steps, { fromKept: true, label: kept.label });
+        } catch (err) {
+            console.error('[PreviewAiTools] kept steps failed:', err);
+        } finally {
+            _executing = false;
+            _updateActionStates();
+            _renderKept();
+        }
     }
 
     async function _resolveDeterministicCommands() {

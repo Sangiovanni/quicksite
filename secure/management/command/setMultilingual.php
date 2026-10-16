@@ -4,6 +4,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/projectLanguage.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/opcacheHygiene.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectSettings.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 /**
  * setMultilingual - Enable or disable multilingual support
@@ -157,7 +158,13 @@ if ($enabled) {
         $afterCount = countKeys($langTranslations);
         $syncedKeys = $afterCount - $beforeCount;
         
-        // Save updated language file
+        // Save updated language file, after the size check (qs_small_write_guard)
+        if (!qs_small_write_guard($defaultLangFile, qs_json_size($langTranslations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE))) {
+            flock($lockHandle, LOCK_UN);
+            fclose($lockHandle);
+            @unlink($lockFile);
+            qs_small_write_send_refusal();
+        }
         if (!qs_json_write($defaultLangFile, $langTranslations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)) {
             ApiResponse::create(500, 'server.file_write_failed')
                 ->withMessage("Failed to update {$defaultLang}.json")
@@ -175,7 +182,13 @@ if ($enabled) {
         $afterCount = countKeys($defaultTranslations);
         $syncedKeys = $afterCount - $beforeCount;
         
-        // Save updated default file
+        // Save updated default file, after the size check (qs_small_write_guard)
+        if (!qs_small_write_guard($defaultFile, qs_json_size($defaultTranslations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE))) {
+            flock($lockHandle, LOCK_UN);
+            fclose($lockHandle);
+            @unlink($lockFile);
+            qs_small_write_send_refusal();
+        }
         if (!qs_json_write($defaultFile, $defaultTranslations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)) {
             ApiResponse::create(500, 'server.file_write_failed')
                 ->withMessage('Failed to update default.json')
@@ -205,6 +218,15 @@ $config = $freshConfig;
 $config['MULTILINGUAL_SUPPORT'] = $enabled;
 
 $configContent = "<?php\n\nreturn " . var_export($config, true) . ";\n";
+
+// The size check, as the translation file had it (qs_small_write_guard): a
+// refusal takes that file back too.
+if (!qs_small_write_guard($configPath, strlen($configContent))) {
+    flock($lockHandle, LOCK_UN);
+    fclose($lockHandle);
+    @unlink($lockFile);
+    qs_small_write_send_refusal();
+}
 
 // Write config (we already hold the lock from earlier)
 $result = @file_put_contents($configPath, $configContent, LOCK_EX);

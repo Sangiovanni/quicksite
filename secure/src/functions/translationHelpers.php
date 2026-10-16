@@ -208,6 +208,10 @@ function countNestedTranslationKeys(array $arr): int {
  *   io / encode failure: ['ok' => false,
  *                         'reason' => 'json_encode_failed' | 'file_write_failed',
  *                         'message' => string]
+ *   size check refused: ['ok' => false, 'reason' => 'refused',
+ *                        'response' => ApiResponse (the 413 / 507 to answer),
+ *                        'message' => string] — every file the command
+ *                        wrote is put back (qs_small_write_guard)
  */
 function writeTranslationsToFile(string $language, array $newNested, bool $replaceMode = false): array {
     $translationsFile = PROJECT_PATH . '/translate/' . $language . '.json';
@@ -260,25 +264,11 @@ function writeTranslationsToFile(string $language, array $newNested, bool $repla
         ];
     }
 
-    // Ensure directory exists (importStructureTranslations relied on this)
-    $translateDir = dirname($translationsFile);
-    if (!is_dir($translateDir)) {
-        @mkdir($translateDir, 0755, true);
-    }
-
-    if (file_put_contents($translationsFile, $jsonContent, LOCK_EX) === false) {
-        return [
-            'ok' => false,
-            'reason' => 'file_write_failed',
-            'message' => 'Failed to write translation file',
-        ];
-    }
-
     // Sync to default.json — default always has at least the union of
     // keys from any language update. Non-default languages only.
-    $defaultUpdated = false;
+    $defaultFile = PROJECT_PATH . '/translate/default.json';
+    $defaultJsonContent = false;
     if (!$isDefault) {
-        $defaultFile = PROJECT_PATH . '/translate/default.json';
         $existingDefault = [];
         if (file_exists($defaultFile)) {
             $defaultJson = @file_get_contents($defaultFile);
@@ -295,12 +285,46 @@ function writeTranslationsToFile(string $language, array $newNested, bool $repla
                 $mergedDefault,
                 JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
             );
-            if ($defaultJsonContent !== false
-                && file_put_contents($defaultFile, $defaultJsonContent, LOCK_EX) !== false
-            ) {
-                $defaultUpdated = true;
-            }
         }
+    }
+
+    // The size check, write by write (qs_small_write_guard): this writer also
+    // runs inside chains of helpers, and a refusal takes back every file the
+    // command wrote before it — this language file included.
+    require_once __DIR__ . '/quota.php';
+    $refused = static function (): array {
+        $refusal = qs_small_write_refused();
+        return [
+            'ok' => false,
+            'reason' => 'refused',
+            'response' => $refusal,
+            'message' => $refusal !== null ? (string)($refusal->toArray()['message'] ?? '') : '',
+        ];
+    };
+
+    if (!qs_small_write_guard($translationsFile, strlen($jsonContent))) {
+        return $refused();
+    }
+    // Ensure directory exists (importStructureTranslations relied on this)
+    $translateDir = dirname($translationsFile);
+    if (!is_dir($translateDir)) {
+        @mkdir($translateDir, 0755, true);
+    }
+
+    if (file_put_contents($translationsFile, $jsonContent, LOCK_EX) === false) {
+        return [
+            'ok' => false,
+            'reason' => 'file_write_failed',
+            'message' => 'Failed to write translation file',
+        ];
+    }
+
+    $defaultUpdated = false;
+    if ($defaultJsonContent !== false) {
+        if (!qs_small_write_guard($defaultFile, strlen($defaultJsonContent))) {
+            return $refused();
+        }
+        $defaultUpdated = file_put_contents($defaultFile, $defaultJsonContent, LOCK_EX) !== false;
     }
 
     return [
@@ -350,7 +374,14 @@ function translationSetKey(string $lang, string $dotKey, string $value): void {
     }
     $cur[$leaf] = $value;
     unset($cur);
-    qs_json_write($file, $decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES, LOCK_EX);
+    // The size check, write by write: these run inside chains of helpers. A refusal
+    // leaves the file as it is and is answered by the command (qs_small_write_refused).
+    require_once __DIR__ . '/quota.php';
+    $flags = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
+    if (!qs_small_write_guard($file, qs_json_size($decoded, $flags))) {
+        return;
+    }
+    qs_json_write($file, $decoded, $flags, LOCK_EX);
 }
 
 /** Unset a single dot-notation key from translate/<lang>.json (best-effort). */
@@ -369,7 +400,12 @@ function translationUnsetKey(string $lang, string $dotKey): void {
     if (!array_key_exists($leaf, $cur)) return;
     unset($cur[$leaf]);
     unset($cur);
-    qs_json_write($file, $decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES, LOCK_EX);
+    require_once __DIR__ . '/quota.php';
+    $flags = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
+    if (!qs_small_write_guard($file, qs_json_size($decoded, $flags))) {
+        return;
+    }
+    qs_json_write($file, $decoded, $flags, LOCK_EX);
 }
 
 } // end if (!function_exists('convertDotNotationToNested'))

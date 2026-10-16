@@ -3,6 +3,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/AssetMetadataManager.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_favicon_repoint
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 /**
  * Edit Asset Command
@@ -228,6 +229,10 @@ if ($newFilename !== null) {
             ->send();
     }
 
+    // A metadata save the size check refuses below takes the rename back too.
+    $renamedTo = $categoryDir . '/' . $newFilename;
+    qs_small_write_on_rollback(static function () use ($renamedTo, $sourcePath) { @rename($renamedTo, $sourcePath); });
+
     $metaManager->rename($category, $filename, $newFilename);
     $currentFilename = $newFilename;
     $updated[] = 'filename';
@@ -301,8 +306,11 @@ if (!empty($metaUpdates)) {
     $metaManager->set($category, $currentFilename, $metaUpdates);
 }
 
-// Save metadata
-$metaManager->save();
+// Save metadata. Its size check refusing (qs_small_write_guard) takes back
+// the rename above too.
+if (!$metaManager->save()) {
+    qs_small_write_send_refusal();
+}
 
 // Build response
 $finalPath = '/assets/' . $category . '/' . $currentFilename;

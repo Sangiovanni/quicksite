@@ -7,6 +7,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/IframeSandbox.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/reservedStorageKeys.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 // SECURITY: Blocked tags are defined in TagRegistry::BLOCKED_TAGS
 
@@ -634,12 +635,19 @@ if ($nodeId !== null) {
             ->send();
     }
     
+    // The size check (qs_small_write_refusal): the structure's cap, and growth
+    // while the owner is over quota.
+    $refusal = qs_small_write_refusal([$json_file => strlen($json_content)]);
+    if ($refusal !== null) {
+        $refusal->send();
+    }
+
     if (file_put_contents($json_file, $json_content, LOCK_EX) === false) {
         ApiResponse::create(500, 'server.file_write_failed')
             ->withMessage("Failed to write structure file")
             ->send();
     }
-    
+
     // Success for nodeId operation
     ApiResponse::create(200, 'operation.success')
         ->withMessage("Node {$result['action']} successfully")
@@ -687,6 +695,13 @@ if ($json_content === false) {
     ApiResponse::create(500, 'server.internal_error')
         ->withMessage("Failed to encode structure to JSON")
         ->send();
+}
+
+// The size check (qs_small_write_refusal): the structure's cap, and growth
+// while the owner is over quota.
+$refusal = qs_small_write_refusal([$json_file => strlen($json_content)]);
+if ($refusal !== null) {
+    $refusal->send();
 }
 
 // Write to file

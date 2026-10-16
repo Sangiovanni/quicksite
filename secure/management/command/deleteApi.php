@@ -17,6 +17,7 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiEndpointManager.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/cascadeCleanupHelpers.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 /**
  * Command function for internal execution
@@ -35,6 +36,10 @@ function __command_deleteApi(array $params = [], array $urlParams = []): ApiResp
     
     $manager = new ApiEndpointManager();
     $result = $manager->deleteApi($apiId);
+    // The registry's size check refused the save (qs_small_write_guard).
+    if (empty($result['success']) && qs_small_write_refused() !== null) {
+        return qs_small_write_refused();
+    }
     
     if (!$result['success']) {
         $code = strpos($result['error'], 'not found') !== false ? 404 : 400;

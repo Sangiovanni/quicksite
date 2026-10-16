@@ -87,6 +87,18 @@ function qs_count_glob(string $pattern): int {
 }
 
 /**
+ * Bytes of one account's personal snippets. They live outside every project, so
+ * no project's measurement holds them; the account's storage figure (the space
+ * report, the quota) adds them. Measured on every call: a few small files, not
+ * worth a cache entry that could go stale.
+ */
+function qs_personal_snippets_space(string $userId): int {
+    require_once __DIR__ . '/SnippetManagement.php';   // getPersonalSnippetsPath: the one rule for the folder
+    $dir = $userId === '' ? null : getPersonalSnippetsPath($userId);
+    return $dir === null ? 0 : qs_dir_size($dir);
+}
+
+/**
  * Measure ONE project. Never returns names of anything inside it — sizes and
  * counts only. (Backup names are not disclosed by the project-scoped report
  * either; an aggregate is not the place to introduce them.)

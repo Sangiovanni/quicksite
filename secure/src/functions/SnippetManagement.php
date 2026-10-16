@@ -447,19 +447,28 @@ function saveProjectSnippet(array $snippetData, string $projectName, string $sco
         $basePath = getProjectSnippetsPath($projectName);
     }
     
-    // Create category directory if needed
-    $categoryPath = $basePath . '/' . $category;
-    if (!is_dir($categoryPath)) {
-        mkdir($categoryPath, 0755, true);
-    }
-    
     // Remove internal flags
     unset($snippetData['source']);
     unset($snippetData['_filePath']);
-    
+
+    $categoryPath = $basePath . '/' . $category;
     $filePath = $categoryPath . '/' . $snippetId . '.json';
 
-    if (!qs_json_write($filePath, $snippetData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)) {
+    // The size check (qs_small_write_guard): the snippet cap, and growth while
+    // the owner — the caller, for a personal snippet — is over quota. A refusal
+    // is answered by the command (qs_small_write_refused).
+    $flags = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE;
+    require_once __DIR__ . '/quota.php';
+    if (!qs_small_write_guard($filePath, qs_json_size($snippetData, $flags))) {
+        return ['success' => false, 'path' => '', 'error' => 'refused', 'refused' => true];
+    }
+
+    // Create category directory if needed
+    if (!is_dir($categoryPath)) {
+        mkdir($categoryPath, 0755, true);
+    }
+
+    if (!qs_json_write($filePath, $snippetData, $flags)) {
         return ['success' => false, 'path' => '', 'error' => 'Failed to write snippet file'];
     }
     

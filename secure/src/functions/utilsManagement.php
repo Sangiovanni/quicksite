@@ -1019,7 +1019,8 @@ function qs_format_size(int $bytes): string {
  * @param string   $configPath Absolute path to the project's config.php
  * @param callable $patch      fn(array &$config): bool
  * @return array{ok:bool, reason:string, config:array} `reason` is one of
- *         'lock_failed', 'read_failed', 'write_failed', 'abandoned', or ''.
+ *         'lock_failed', 'read_failed', 'write_failed', 'abandoned', 'refused'
+ *         (the size check: answer qs_small_write_refused()), or ''.
  */
 function qs_config_mutate(string $configPath, callable $patch): array
 {
@@ -1057,11 +1058,16 @@ function qs_config_mutate(string $configPath, callable $patch): array
         return ['ok' => false, 'reason' => 'abandoned', 'config' => $config];
     }
 
-    $written = @file_put_contents(
-        $configPath,
-        "<?php\n\nreturn " . var_export($config, true) . ";\n",
-        LOCK_EX
-    );
+    // The size check (qs_small_write_guard): a refusal leaves the file as it is,
+    // and the caller answers qs_small_write_refused().
+    $content = "<?php\n\nreturn " . var_export($config, true) . ";\n";
+    require_once __DIR__ . '/quota.php';
+    if (!qs_small_write_guard($configPath, strlen($content))) {
+        $release($lockHandle, $lockFile);
+        return $fail('refused');
+    }
+
+    $written = @file_put_contents($configPath, $content, LOCK_EX);
     $release($lockHandle, $lockFile);
 
     if ($written === false) {

@@ -49,15 +49,18 @@ class AssetMetadataManager
      */
     public function save(): bool
     {
+        // The size check (qs_small_write_guard): false when refused, and the
+        // command answers qs_small_write_refused().
+        $flags = JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES;
+        require_once SECURE_FOLDER_PATH . '/src/functions/quota.php';
+        if (!qs_small_write_guard($this->metadataPath, qs_json_size($this->metadata, $flags))) {
+            return false;
+        }
         $dir = dirname($this->metadataPath);
         if (!is_dir($dir)) {
             mkdir($dir, 0750, true);
         }
-        return qs_json_write(
-            $this->metadataPath,
-            $this->metadata,
-            JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES
-        );
+        return qs_json_write($this->metadataPath, $this->metadata, $flags);
     }
 
     /**

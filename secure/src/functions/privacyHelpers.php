@@ -62,10 +62,6 @@ function loadPrivacyRegistry(): array {
 /** Write the registry. Creates data/ if missing. Empty maps encode as {} not []. */
 function savePrivacyRegistry(array $reg): bool {
     $path = getPrivacyRegistryPath();
-    $dir = dirname($path);
-    if (!is_dir($dir)) {
-        @mkdir($dir, 0755, true);
-    }
     $cd = (isset($reg['collectedData']) && is_array($reg['collectedData']))
         ? array_values(array_unique(array_filter($reg['collectedData'], 'is_string'))) : [];
     sort($cd);
@@ -80,7 +76,18 @@ function savePrivacyRegistry(array $reg): bool {
     $out['cookieSection'] = (isset($reg['cookieSection']) && in_array($reg['cookieSection'], PRIVACY_COOKIE_SECTION, true)) ? $reg['cookieSection'] : 'auto';
     $out['privacyRoute']  = (isset($reg['privacyRoute']) && is_string($reg['privacyRoute']) && $reg['privacyRoute'] !== '') ? $reg['privacyRoute'] : null;
 
-    return qs_json_write($path, $out, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE, LOCK_EX);
+    $flags = JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE;
+    // The size check, write by write (the registry is saved inside chains of
+    // helpers); a refusal is answered by the command (qs_small_write_refused).
+    require_once __DIR__ . '/quota.php';
+    if (!qs_small_write_guard($path, qs_json_size($out, $flags))) {
+        return false;
+    }
+    $dir = dirname($path);
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0755, true);
+    }
+    return qs_json_write($path, $out, $flags, LOCK_EX);
 }
 
 /** Language the collected-data prose is authored in (defaults to website default). */

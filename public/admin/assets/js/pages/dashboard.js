@@ -712,7 +712,7 @@
                 ? Math.max(quota.limit, total)
                 : total;
 
-            ['content', 'backups', 'builds', 'exports'].forEach(cat => {
+            ['content', 'backups', 'builds', 'exports', 'snippets'].forEach(cat => {
                 const bytes = cats[cat]?.size || 0;
                 const seg = document.getElementById('owner-space-seg-' + cat);
                 const val = document.getElementById('owner-space-val-' + cat);
@@ -1332,45 +1332,18 @@
             const originalText = QSDom.setButtonBusy(this, proj.exporting || 'Exporting...');
 
             try {
-                // exportProject streams a binary ZIP (can't go through request()), but
-                // it is project-scoped: it MUST carry the '/p/<id>/' marker or the
-                // dispatcher answers 400 project.required. The command binds the marker
-                // as the target (containment), so no ?name is needed.
+                // exportProject streams a binary ZIP: the client's download path
+                // carries the '/p/<id>/' marker for the target (the command binds it
+                // as the target, so no ?name is needed), reads a refusal as an
+                // envelope, and keeps the write allowance current like every call.
                 const target = getTargetProject();
-                const response = await fetch(window.QUICKSITE_CONFIG.apiBase + '/p/' + encodeURIComponent(target) + '/exportProject', {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': 'Bearer ' + QuickSiteAdmin.getToken()
-                    }
-                });
+                const res = await QuickSiteAdmin.downloadFile('exportProject', [], {},
+                    { project: target, filename: target + '_export.zip' });
 
-                if (response.ok) {
-                    const contentDisposition = response.headers.get('Content-Disposition');
-                    let filename = target + '_export.zip';
-                    if (contentDisposition) {
-                        const match = contentDisposition.match(/filename="?([^";\n]+)"?/);
-                        if (match) filename = match[1];
-                    }
-                    
-                    const blob = await response.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = filename;
-                    document.body.appendChild(a);
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                    a.remove();
-                    
+                if (res.ok) {
                     QuickSiteAdmin.showToast(proj.exported || 'Project exported', 'success');
                 } else {
-                    // The `.catch(() => ({}))` this replaces did not throw, so
-                    // this path was never broken — but it turned every non-JSON
-                    // failure into the same generic toast with the status code
-                    // thrown away. readResponseBody keeps the status in the
-                    // sentence and cannot throw either.
-                    const errorData = (await window.QuickSiteAPI.readResponseBody(response)) || {};
-                    QuickSiteAdmin.showToast(errorData.message || 'Failed to export project', 'error');
+                    QuickSiteAdmin.showToast((res.data && res.data.message) || 'Failed to export project', 'error');
                 }
             } catch (error) {
                 console.error('Export error:', error);

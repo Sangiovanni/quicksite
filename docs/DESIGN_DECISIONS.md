@@ -13383,3 +13383,94 @@ page-name rule and of the API's UTF-8 answer, and a containment gap found while 
 Code: `secure/src/functions/utilsManagement.php` (`qs_page_name_refusal()`,
 `qs_component_name_refusal()`), `secure/src/classes/TrimParametersManagement.php`, and the commands
 named above. Behaviour: COMMAND_API.md (*Endpoint*) and the `help` entries of those commands.
+
+### Every small file has a size cap, a growing write waits while its owner is over the quota, and every command but a read counts against a rate per account (locked 2026-10-11)
+
+**Amends**: *Per-user quotas exist, and default to unlimited* (locked 2026-08-16), on one point: with
+no `quota.php`, the storage ceiling and the upload rate are still off, but the file caps and the write
+rate below apply at their defaults. **Extends**: *A storage quota is charged to the project's owner,
+not the uploader* (locked 2026-08-20) and *One rule inserts at a structure's root, a backup is whole or
+not kept, and every write that adds a copy is checked against the storage quota* (locked 2026-10-04),
+whose storage ceiling now also reaches the small edits.
+
+**Decision**: three limits on the writes that are too small for the storage ceiling to see, each a
+setting of `quota.php` the operator can change or turn off.
+
+- **A size cap per kind of small file** (`max_file_bytes`): a page's structure, the other structures
+  (menu, footer, component, consent layer), the stylesheet, one translation file, the routes, a
+  snippet, and every other project file a command writes (`settings`). Checked on the bytes the command
+  is about to write; a write that would take a file over its cap and make it larger is refused (`413
+  validation.size_limit_exceeded`) and nothing is written. A file already over a cap that was lowered
+  may still shrink. The stylesheet's cap never exceeds what the CSS parser reads back. Files derived
+  from another (page wrappers, generated scripts) and uploaded assets have none.
+- **Over the storage ceiling, a growing write is refused** (`507 quota.storage_exceeded`): while the
+  owner is already over (the cached figure), a write whose files grow in total is refused; one that
+  keeps their size or shrinks them passes. A command checks every file it writes before the first,
+  through one helper (`qs_small_write_refusal()`); one whose files are written by shared helpers in
+  turn checks each as it writes, and a refusal puts back every file it wrote
+  (`qs_small_write_guard()`).
+- **A write rate per account** (`write_rate`): a list of windows, each a number of commands per a
+  period, as many as the operator wants; none is off. Every command but a read counts — the reads are
+  declared, so a new command counts until it is declared one — when the dispatcher admits it, after
+  the permission check and before the command runs. A full window answers `429 quota.rate_limited`
+  with `Retry-After` and the window that frees last; every counted answer carries what is left in the
+  IETF RateLimit headers. The default is one window of an hour. A window opens at the account's first
+  counted command and lasts its period; then the allowance is whole again. The upload rate keeps its
+  own window and shares the window rule and the per-account store.
+- **The panel lives with it**: its header shows what is left of the tightest window; every
+  Management call goes through its API client, which reads the headers; and the batch runner counts a
+  run's write steps before it starts, waits out a short refusal (`write_rate.wait_seconds`), stops on
+  a long one and keeps the steps not run, per account and project, until the user runs them.
+- **Personal snippets count** in the account's storage figure, which the dashboard shows.
+
+**Reasoning**: the storage ceiling is checked by the writes that add a copy's worth of bytes, because
+they are the ones worth measuring the disk for. The thousands of small edits an author makes are not,
+and nothing else bounded them: an account could grow one translation file or one page without limit,
+or keep the server rewriting files all day. A cap on each file bounds what one write can grow; the
+check against the quota while over it keeps an owner who reached the ceiling from growing past it by
+small steps, without walking the disk for every keystroke — the figure is cached, so the deployer
+keeps a margin, and a write that keeps or shrinks a file always passes, so cleaning up is never
+refused. The rate bounds churn: writes that never grow a total but keep the server busy.
+
+The defaults are measured, not guessed: each cap is several times the largest real file of its kind
+across every real project (a page's structure at half a megabyte the largest), and the rate's window
+is twelve times the busiest real session — the largest AI site build, with the project reset that
+precedes it. They are on by default because a default nobody meets costs nothing and bounds a shared
+install from its first day; the storage ceiling stays off because only the operator knows the disk.
+
+The rate is a list rather than fixed minute and hour windows because the right shape is the
+operator's and may change: one window, or a short and a long one, without a new release. It is per
+account, never per project, so one member cannot spend a shared project's allowance and an account
+with many projects does not multiply its own. Reads never count because the editor reads constantly
+and a read writes nothing.
+
+A window opens at the account's first counted command, not on the clock, because "1,000 per hour"
+reads as an hour from when the author starts: a window aligned to the clock can be nearly over by the
+first change and refills at a moment nobody chose. The upload rate shares the one window rule, so its
+window opens at the first upload too.
+
+The panel's batch runner sends a whole AI list back to back; a limit met halfway would leave a site
+half built. Counting the run first, waiting out what fits the patience limit and keeping the rest
+turns the limit into a pause the user can see. The steps are never resumed on their own, because the
+page they were planned for may have moved.
+
+**Alternatives considered**: one cap for every file (rejected: the menu and footer are drawn on every
+page, a page once); a cap in the shared JSON writer, told the kind (rejected: a command writing two
+files could be refused at the second after writing the first); refusing any write that would cross
+the ceiling (rejected: it needs a fresh measurement per keystroke, and the cached figure makes the
+answer wrong either way); a cap on how many pages, components or snippets (rejected: the file caps and
+the ceiling already bound them); counting by HTTP method (rejected: no command checks its method, so a
+write sent as GET would not count); counting only the commands that succeed (rejected: a stream of
+refused writes is load too); resuming kept steps automatically when the allowance returns (rejected:
+the page may have changed); windows aligned to the clock, the upload rate's earlier rule (rejected
+after the first UX pass: an author expects the hour to start at their first change); a sliding window
+(rejected: it needs the time of every request in the store).
+
+**Source**: design round 2026-10-10 and rulings 2026-10-11 during beta.12 (Sangio, with the manager),
+from the audit of the storage ceiling; the window's start ruled 2026-10-16 (Sangio, after the UX). Code: `secure/src/functions/quota.php`,
+`secure/src/functions/jsonIo.php` (`qs_json_size()`), `secure/src/functions/spaceUsage.php`,
+`public/management/index.php`, the commands and shared writers that write a project file,
+`public/admin/assets/js/core/api.js`, `public/admin/assets/admin.js`,
+`public/admin/assets/js/pages/preview/preview-ai-tools.js`. Behaviour: COMMAND_API.md (*Per-user
+resource limits*), ADMIN_PANEL.md (§7, §8.12), `secure/management/config/quota.php.example`, and the
+`help` entries of those commands.

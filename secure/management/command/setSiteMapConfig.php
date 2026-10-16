@@ -28,6 +28,7 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/sitemapHelpers.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 /**
  * Command function for internal execution or direct PHP call
@@ -80,6 +81,9 @@ function __command_setSiteMapConfig(array $params = [], array $urlParams = []): 
     }
 
     if (!qs_sitemap_config_save(PROJECT_PATH, $normalised)) {
+        if (qs_small_write_refused() !== null) {
+            return qs_small_write_refused();
+        }
         return ApiResponse::create(500, 'server.file_write_failed')
             ->withMessage('Failed to persist the sitemap configuration');
     }

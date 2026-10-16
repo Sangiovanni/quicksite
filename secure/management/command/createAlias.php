@@ -17,6 +17,7 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 // Get request body
 $rawBody = defined('REQUEST_BODY_RAW') ? REQUEST_BODY_RAW : file_get_contents('php://input');
@@ -148,7 +149,12 @@ $aliases[$alias] = [
     'created' => date('Y-m-d H:i:s')
 ];
 
-// Save aliases
+// Save aliases, unless the file would pass the settings cap or grow while the
+// owner is over quota (qs_small_write_refusal)
+$refusal = qs_small_write_refusal([$aliasesFile => qs_json_size($aliases, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)]);
+if ($refusal !== null) {
+    $refusal->send();
+}
 if (!qs_json_write($aliasesFile, $aliases, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)) {
     ApiResponse::create(500, 'api.error.write_failed')
         ->withMessage('Failed to save aliases')

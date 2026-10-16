@@ -281,6 +281,21 @@ code,
     gap: var(--space-sm);
 }
 
+/* The write allowance in the header: what is left of the write rate's tightest
+   window (every window on hover). Not a button: it shows, it does nothing. It
+   wears .admin-btn--ghost for its shape, so these rules carry two classes to
+   win over that one (and over .admin-btn's pointer cursor), wherever they sit. */
+.admin-btn.admin-write-rate {
+    cursor: default;
+    font-variant-numeric: tabular-nums;
+    color: var(--admin-text-muted);
+}
+.admin-btn.admin-write-rate--low,
+.admin-btn.admin-write-rate--low:hover {
+    color: var(--admin-warning);
+    background: var(--admin-warning-bg);
+}
+
 /* The two logout actions are POST forms, not links (they carry the session
    token). The wrapper is laid out as the button used to be, so the header row
    is unchanged. */
@@ -2870,6 +2885,13 @@ kbd {
 .storage-overview__segment--builds,
 .storage-overview__legend-color--builds {
     background: #ef4444;
+}
+
+/* An account's personal snippets: they live outside every project, and count
+   in its total like the projects it owns. */
+.storage-overview__segment--snippets,
+.storage-overview__legend-color--snippets {
+    background: var(--admin-warning, #f59e0b);
 }
 
 /* Free space is the one legend entry with no segment of its own: it names the

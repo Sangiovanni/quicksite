@@ -51,14 +51,6 @@
         return getConfig().i18n || {};
     }
     
-    function getManagementUrl() {
-        return getConfig().managementUrl || '';
-    }
-    
-    function getAuthToken() {
-        return getConfig().authToken || null;
-    }
-    
     function getIframe() {
         return window.PreviewState?.getIframe?.() || document.getElementById('preview-iframe');
     }
@@ -140,35 +132,19 @@
      * @returns {Promise<Object>} variable map
      */
     async function fetchScopeVariables(scope, signal) {
-        // Use the shared API layer to keep auth/query handling consistent.
-        if (window.QuickSiteAPI?.request) {
-            const result = await QuickSiteAPI.request(
-                'getRootVariables',
-                'GET',
-                null,
-                [],
-                scope === 'dark' ? { themeTarget: 'dark' } : {}
-            );
-            if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
-            if (result.ok && result.data?.data?.variables) {
-                return result.data.data.variables;
-            }
-            throw new Error(result.data?.message || result.data?.error || 'Failed to load theme variables');
+        // Through the panel's API client, like every management call.
+        const result = await QuickSiteAdmin.apiRequest(
+            'getRootVariables',
+            'GET',
+            null,
+            [],
+            scope === 'dark' ? { themeTarget: 'dark' } : {}
+        );
+        if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+        if (result.ok && result.data?.data?.variables) {
+            return result.data.data.variables;
         }
-
-        // Fallback for contexts where QuickSiteAPI is unavailable.
-        const managementUrl = getManagementUrl();
-        const authToken = getAuthToken();
-        const url = managementUrl + 'getRootVariables' + (scope === 'dark' ? '?themeTarget=dark' : '');
-        const response = await fetch(url, {
-            headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {},
-            signal: signal ?? undefined
-        });
-        const data = await response.json();
-        if (data.status === 200 && data.data?.variables) {
-            return data.data.variables;
-        }
-        throw new Error(data.message || 'Failed to load theme variables');
+        throw new Error(result.data?.message || result.data?.error || 'Failed to load theme variables');
     }
 
     /**
@@ -479,20 +455,13 @@
         }
         
         const i18n = getI18n();
-        const managementUrl = getManagementUrl();
-        const authToken = getAuthToken();
-        
-        // Disable button and show loading
+
+        // Disable button and show loading. The button's own nodes are kept and
+        // put back afterwards.
         themeSaveBtn.disabled = true;
-        const originalText = themeSaveBtn.innerHTML;
-        themeSaveBtn.innerHTML = `
-            <svg class="preview-theme-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                <circle cx="12" cy="12" r="10" opacity="0.25"/>
-                <path d="M12 2a10 10 0 0 1 10 10" stroke-linecap="round"/>
-            </svg>
-            ${i18n.saving || 'Saving...'}
-        `;
-        
+        const originalContent = Array.from(themeSaveBtn.childNodes);
+        themeSaveBtn.replaceChildren(renderSavingSpinner(), document.createTextNode(' ' + (i18n.saving || 'Saving...')));
+
         try {
             const changedVariables = Object.fromEntries(
                 Object.entries(currentThemeVariables).filter(([name, value]) => value !== originalThemeVariables[name])
@@ -506,25 +475,12 @@
             const body = { variables: changedVariables };
             if (currentScope === 'dark') body.themeTarget = 'dark';
 
-            let data;
-            if (window.QuickSiteAPI?.request) {
-                const result = await QuickSiteAPI.request('setRootVariables', 'POST', body);
-                if (!result.ok) {
-                    throw new Error(result.data?.message || result.data?.error || 'Failed to save theme variables');
-                }
-                data = result.data;
-            } else {
-                const headers = { 'Content-Type': 'application/json' };
-                if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
-
-                const response = await fetch(managementUrl + 'setRootVariables', {
-                    method: 'POST',
-                    headers: headers,
-                    body: JSON.stringify(body)
-                });
-                data = await response.json();
+            const result = await QuickSiteAdmin.apiRequest('setRootVariables', 'POST', body);
+            if (!result.ok) {
+                throw new Error(result.data?.message || result.data?.error || 'Failed to save theme variables');
             }
-            
+            const data = result.data;
+
             if (data.status === 200 || data.status === 201) {
                 // Update baseline only for the values we persisted.
                 for (const [name, value] of Object.entries(changedVariables)) {
@@ -546,8 +502,28 @@
         } finally {
             // Restore button
             themeSaveBtn.disabled = false;
-            themeSaveBtn.innerHTML = originalText;
+            themeSaveBtn.replaceChildren(...originalContent);
         }
+    }
+
+    /** The spinner the Save button shows while a save runs. */
+    function renderSavingSpinner() {
+        const ns = 'http://www.w3.org/2000/svg';
+        const svg = document.createElementNS(ns, 'svg');
+        const attrs = { class: 'preview-theme-spinner', viewBox: '0 0 24 24', fill: 'none',
+            stroke: 'currentColor', 'stroke-width': '2', width: '14', height: '14' };
+        Object.keys(attrs).forEach(k => svg.setAttribute(k, attrs[k]));
+        const circle = document.createElementNS(ns, 'circle');
+        circle.setAttribute('cx', '12');
+        circle.setAttribute('cy', '12');
+        circle.setAttribute('r', '10');
+        circle.setAttribute('opacity', '0.25');
+        const arc = document.createElementNS(ns, 'path');
+        arc.setAttribute('d', 'M12 2a10 10 0 0 1 10 10');
+        arc.setAttribute('stroke-linecap', 'round');
+        svg.appendChild(circle);
+        svg.appendChild(arc);
+        return svg;
     }
     
     /**
@@ -707,8 +683,6 @@
 
     if (themeConfigSaveBtn) {
         themeConfigSaveBtn.addEventListener('click', async function() {
-            const managementUrl = getManagementUrl();
-            const authToken = getAuthToken();
             const i18n = getI18n();
 
             const body = {};
@@ -718,12 +692,8 @@
 
             themeConfigSaveBtn.disabled = true;
             try {
-                const headers = { 'Content-Type': 'application/json' };
-                if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
-                const res = await fetch(managementUrl + 'setThemeMode', {
-                    method: 'POST', headers, body: JSON.stringify(body)
-                });
-                const data = await res.json();
+                const res = await QuickSiteAdmin.apiRequest('setThemeMode', 'POST', body);
+                const data = res.data || {};
                 if (data.status === 200) {
                     // Reflect new config immediately in this panel and toolbar visibility.
                     syncThemeConfigDependents();
@@ -911,26 +881,11 @@
         const body = { variables: { [name]: value } };
         if (scope === 'dark') body.themeTarget = 'dark';
 
-        if (window.QuickSiteAPI && QuickSiteAPI.request) {
-            const result = await QuickSiteAPI.request('setRootVariables', 'POST', body);
-            if (!result.ok) {
-                throw new Error((result.data && (result.data.message || result.data.error)) || 'Save failed');
-            }
-            return result.data;
+        const result = await QuickSiteAdmin.apiRequest('setRootVariables', 'POST', body);
+        if (!result.ok) {
+            throw new Error((result.data && (result.data.message || result.data.error)) || 'Save failed');
         }
-        const headers = { 'Content-Type': 'application/json' };
-        const authToken = getAuthToken();
-        if (authToken) headers['Authorization'] = 'Bearer ' + authToken;
-        const response = await fetch(getManagementUrl() + 'setRootVariables', {
-            method: 'POST',
-            headers: headers,
-            body: JSON.stringify(body)
-        });
-        const data = await response.json();
-        if (data.status !== 200 && data.status !== 201) {
-            throw new Error(data.message || 'Save failed');
-        }
-        return data;
+        return result.data;
     }
 
     // ==================== Event Listeners ====================

@@ -21,6 +21,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 
 // Include shared interaction helpers (generateCallSyntax)
 require_once SECURE_FOLDER_PATH . '/src/functions/interactionHelpers.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 /**
  * @param array $params Body parameters: pageName, event, index, function, params[], newEvent?
@@ -206,6 +207,13 @@ function __command_editPageEvent(array $params = [], array $urlParams = []): Api
     if ($jsonOutput === false) {
         return ApiResponse::create(500, 'server.internal_error')
             ->withMessage('Failed to encode page events JSON');
+    }
+
+    // The size check (qs_small_write_refusal): the settings cap, and growth
+    // while the owner is over quota.
+    $refusal = qs_small_write_refusal([$eventsFile => strlen($jsonOutput)]);
+    if ($refusal !== null) {
+        return $refusal;
     }
 
     if (file_put_contents($eventsFile, $jsonOutput, LOCK_EX) === false) {

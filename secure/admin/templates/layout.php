@@ -78,6 +78,16 @@ if (!$isLoginPage) {
     }
 }
 
+// The write rate as it stands for this account (quota.php): every window with what
+// is left of it, the batch runner's patience, and the commands that never count.
+// The header shows it whenever a window is set; each counted command's answer
+// updates it from then on. No window = the rate is off and nothing is shown.
+$writeRatePanel = null;
+if (!$isLoginPage && !empty($__pkUserId)) {
+    require_once SECURE_FOLDER_PATH . '/src/functions/quota.php';
+    $writeRatePanel = qs_write_rate_panel($__pkUserId);
+}
+
 // Get page title from translations or fallback to capitalized page name
 $pageTitle = $lang->has('nav.' . $currentPage) 
     ? __admin('nav.' . $currentPage) 
@@ -434,6 +444,14 @@ $langNames = [
             // Single-project users see a plain badge; multi-project users get the dropdown.
             $editingProject = $currentProject;
             ?>
+            <?php if (!empty($writeRatePanel['windows'])): ?>
+            <span id="admin-write-rate" class="admin-btn admin-btn--ghost admin-write-rate" tabindex="0" aria-live="polite">
+                <svg class="admin-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path d="M12 14l4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/>
+                </svg>
+                <span class="admin-write-rate__figure"></span>
+            </span>
+            <?php endif; ?>
             <?php if (!empty($myProjectIds) && count($myProjectIds) > 1): ?>
             <label class="admin-btn admin-btn--ghost admin-project-badge admin-project-picker" title="<?= __admin('common.activeProject', 'Active project') ?>">
                 <svg class="admin-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -587,6 +605,8 @@ $langNames = [
             // globalCommands. Both are UX/plumbing — the server re-authorizes each call.
             currentProject: <?= json_encode($currentProject) ?>,
             globalCommands: <?= json_encode($globalCommands) ?>,
+            // The write rate on load (null on the auth pages); api.js keeps it current.
+            writeRate: <?= qs_inline_script_json($writeRatePanel) ?>,
             // Operator notices — a DISPLAY flag, never an authorization input.
             // No version is emitted here: the notice gets both versions from the
             // update-check arm's own response, and putting the engine version into
@@ -613,6 +633,24 @@ $langNames = [
                     confirm: '<?= __adminJs('common.confirm') ?>',
                     confirmAction: '<?= __adminJs('common.confirmAction') ?>',
                     copyFailed: '<?= __adminJs('common.copyFailed') ?>'
+                },
+                // The write rate's strings: the header's figure and its hover, and
+                // the refusal api.js says in the panel's language.
+                writeRate: {
+                    refused: '<?= __adminJs('writeRate.refused') ?>',
+                    figure: '<?= __adminJs('writeRate.figure') ?>',
+                    titleHead: '<?= __adminJs('writeRate.titleHead') ?>',
+                    titleWindow: '<?= __adminJs('writeRate.titleWindow') ?>',
+                    titleWindowFull: '<?= __adminJs('writeRate.titleWindowFull') ?>',
+                    period_day: '<?= __adminJs('writeRate.period_day') ?>',
+                    period_days: '<?= __adminJs('writeRate.period_days') ?>',
+                    period_hour: '<?= __adminJs('writeRate.period_hour') ?>',
+                    period_hours: '<?= __adminJs('writeRate.period_hours') ?>',
+                    period_minute: '<?= __adminJs('writeRate.period_minute') ?>',
+                    period_minutes: '<?= __adminJs('writeRate.period_minutes') ?>',
+                    period_seconds: '<?= __adminJs('writeRate.period_seconds') ?>',
+                    waitSeconds: '<?= __adminJs('writeRate.waitSeconds') ?>',
+                    waitMinutes: '<?= __adminJs('writeRate.waitMinutes') ?>'
                 },
                 dashboard: {
                     projects: {

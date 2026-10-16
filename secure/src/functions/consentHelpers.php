@@ -47,13 +47,21 @@ function loadConsentConfig(): array {
 /** Persist the consent config. Creates data/ if missing. */
 function saveConsentConfig(array $config): bool {
     $path = getConsentConfigPath();
+    $merged = array_merge(CONSENT_CONFIG_DEFAULTS, $config);
+    $flags = JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE;
+    // The size check, write by write (it runs inside chains of helpers); a
+    // refusal is answered by the command (qs_small_write_refused).
+    require_once __DIR__ . '/quota.php';
+    if (!qs_small_write_guard($path, qs_json_size($merged, $flags, "\n"))) {
+        return false;
+    }
     $dir = dirname($path);
     if (!is_dir($dir)) {
         @mkdir($dir, 0755, true);
     }
-    $merged = array_merge(CONSENT_CONFIG_DEFAULTS, $config);
-    $json = json_encode($merged, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-    return file_put_contents($path, $json . "\n", LOCK_EX) !== false;
+    // qs_json_write, not json_encode() . "\n": a failed encode must leave the
+    // file as it is, not write a lone newline over it.
+    return qs_json_write($path, $merged, $flags, LOCK_EX, "\n");
 }
 
 /** key => category map from the registry — drives client-side write gating. */

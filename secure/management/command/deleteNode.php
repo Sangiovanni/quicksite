@@ -4,6 +4,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/NodeNavigator.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 /**
  * Translatable attributes that may contain translation keys
@@ -285,11 +286,18 @@ function __command_deleteNode(array $params = [], array $urlParams = []): ApiRes
             ->withMessage("Failed to encode structure to JSON");
     }
     
+    // The size check (qs_small_write_refusal). A deletion only shrinks the
+    // structure and the translation files after it, so it is never refused.
+    $refusal = qs_small_write_refusal([$json_file => strlen($json_content)]);
+    if ($refusal !== null) {
+        return $refusal;
+    }
+
     if (file_put_contents($json_file, $json_content, LOCK_EX) === false) {
         return ApiResponse::create(500, 'server.file_write_failed')
             ->withMessage("Failed to write structure file");
     }
-    
+
     // Clean up translation keys from the deleted node (unless keepTranslationKeys is set)
     $translationCleanup = ['removed' => 0, 'errors' => []];
     if (!empty($translationKeys) && !$keepTranslationKeys) {

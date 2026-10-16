@@ -32,6 +32,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectLanguage.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/translationHelpers.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 /**
  * Walk a JSON structure tree and find the first node matching a kind
@@ -314,6 +315,13 @@ function __command_importStructureTranslations(array $params = [], array $urlPar
     if ($output === false) {
         return ApiResponse::create(500, 'server.internal_error')
             ->withMessage('Failed to encode merged translations JSON.');
+    }
+
+    // The size check (qs_small_write_refusal): the translation file's cap, and
+    // growth while the owner is over quota.
+    $refusal = qs_small_write_refusal([$translationsFile => strlen($output)]);
+    if ($refusal !== null) {
+        return $refusal;
     }
 
     // Ensure translate directory exists.

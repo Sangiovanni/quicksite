@@ -4,6 +4,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/NodeNavigator.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 /**
  * moveNode - Moves a node from one position to another within a structure
@@ -267,6 +268,13 @@ function __command_moveNode(array $params = [], array $urlParams = []): ApiRespo
             ->withMessage("Failed to encode structure to JSON");
     }
     
+    // The size check (qs_small_write_refusal): the structure's cap, and growth
+    // while the owner is over quota.
+    $refusal = qs_small_write_refusal([$json_file => strlen($json_content)]);
+    if ($refusal !== null) {
+        return $refusal;
+    }
+
     if (file_put_contents($json_file, $json_content, LOCK_EX) === false) {
         return ApiResponse::create(500, 'server.file_write_failed')
             ->withMessage("Failed to write structure file");

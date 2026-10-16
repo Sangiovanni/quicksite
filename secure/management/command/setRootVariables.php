@@ -145,6 +145,11 @@ try {
     
     $updatedContent = $parser->getContent();
 
+    $refusal = cssWriteRefusal($updatedContent, $styleFile, $projectStyleFile);
+    if ($refusal !== null) {
+        cssReleaseLock($lock);
+        $refusal->send();
+    }
     cssWriteAllTargets($updatedContent, $styleFile, $projectStyleFile);
     cssReleaseLock($lock);
     

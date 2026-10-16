@@ -55,16 +55,19 @@ function qs_sitemap_config_normalise(array $config): array {
 
 /** Write the sidecar (creating config/ if needed). Returns false on failure. */
 function qs_sitemap_config_save(string $projectPath, array $config): bool {
+    $payload = qs_sitemap_config_normalise($config);
+    $flags = JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES;
+    // The size check (qs_small_write_guard): false when refused, and the command
+    // answers qs_small_write_refused().
+    require_once __DIR__ . '/quota.php';
+    if (!qs_small_write_guard(qs_sitemap_config_path($projectPath), qs_json_size($payload, $flags))) {
+        return false;
+    }
     $configDir = $projectPath . '/config';
     if (!is_dir($configDir) && !mkdir($configDir, 0755, true) && !is_dir($configDir)) {
         return false;
     }
-    $payload = qs_sitemap_config_normalise($config);
-    return qs_json_write(
-        qs_sitemap_config_path($projectPath),
-        $payload,
-        JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES
-    );
+    return qs_json_write(qs_sitemap_config_path($projectPath), $payload, $flags);
 }
 
 /**

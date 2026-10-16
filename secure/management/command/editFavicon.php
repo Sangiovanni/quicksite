@@ -4,6 +4,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/filePolicy.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectSettings.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 /**
  * editFavicon — point the site's favicon at an existing image asset.
@@ -153,6 +154,7 @@ $result = qs_config_mutate(
 );
 
 if (!$result['ok']) {
+    qs_small_write_send_refusal();
     ApiResponse::create(500, 'server.file_write_failed')
         ->withMessage($result['reason'] === 'read_failed'
             ? 'Failed to read configuration file'

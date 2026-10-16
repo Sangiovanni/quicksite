@@ -4,6 +4,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/opcacheHygiene.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/languageRegistry.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectSettings.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 // NOTE: addLang works regardless of MULTILINGUAL_SUPPORT setting
 // This allows adding languages BEFORE enabling multilingual mode
@@ -125,6 +126,23 @@ if ($refusal !== null) {
 // Build new config file content using var_export for safety
 $new_config_content = "<?php\n\nreturn " . var_export($current_config, true) . ";\n";
 
+// The size check on both files this command writes, before either is
+// (qs_small_write_refusal): config.php, and the new language's translation file
+// — a copy of the default language's.
+$default_lang = qs_project_default_language();
+$source_file = PROJECT_PATH . '/translate/' . $default_lang . '.json';
+$target_file = PROJECT_PATH . '/translate/' . $langCode . '.json';
+$refusal = qs_small_write_refusal([
+    $config_path => strlen($new_config_content),
+    $target_file => file_exists($source_file) ? (int) filesize($source_file) : qs_json_size([], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
+]);
+if ($refusal !== null) {
+    flock($lockHandle, LOCK_UN);
+    fclose($lockHandle);
+    @unlink($lockFile);
+    $refusal->send();
+}
+
 // Write updated config
 if (file_put_contents($config_path, $new_config_content, LOCK_EX) === false) {
     flock($lockHandle, LOCK_UN);
@@ -139,11 +157,7 @@ if (file_put_contents($config_path, $new_config_content, LOCK_EX) === false) {
 qs_opcache_invalidate($config_path);
 
 // --- CREATE TRANSLATION FILE ---
-// Copy from default language
-$default_lang = qs_project_default_language();
-$source_file = PROJECT_PATH . '/translate/' . $default_lang . '.json';
-$target_file = PROJECT_PATH . '/translate/' . $langCode . '.json';
-
+// Copy from default language ($source_file / $target_file, set for the size check)
 if (!file_exists($source_file)) {
     // Fallback: create empty translation file
     qs_json_write($target_file, [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE, LOCK_EX);

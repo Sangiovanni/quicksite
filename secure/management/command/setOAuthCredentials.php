@@ -28,6 +28,7 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';      // qs_param_string
 require_once SECURE_FOLDER_PATH . '/src/functions/oauthProviderHelpers.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 function __command_setOAuthCredentials(array $params = [], array $urlParams = []): ApiResponse {
     if (isset($_GET['client_secret'])) {
@@ -72,6 +73,9 @@ function __command_setOAuthCredentials(array $params = [], array $urlParams = []
             unset($keys[$provider]);
         }
         if (!qs_oauth_keys_write($keys)) {
+            if (qs_small_write_refused() !== null) {
+                return qs_small_write_refused();
+            }
             return ApiResponse::create(500, 'server.file_write_failed')
                 ->withMessage("Could not write the project's OAuth keys.");
         }
@@ -110,6 +114,9 @@ function __command_setOAuthCredentials(array $params = [], array $urlParams = []
         'client_secret' => $secretGiven ? $secret : $stored['client_secret'],
     ];
     if (!qs_oauth_keys_write($keys)) {
+        if (qs_small_write_refused() !== null) {
+            return qs_small_write_refused();
+        }
         return ApiResponse::create(500, 'server.file_write_failed')
             ->withMessage("Could not write the project's OAuth keys.");
     }

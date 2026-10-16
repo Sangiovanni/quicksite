@@ -196,9 +196,58 @@ const QuickSiteAdmin = {
         this.initCopyButtons();
         this.initKeyboardShortcuts();
         this.checkPendingMessage();
-        
+        this.initWriteRate();
+
         // Permissions are already loading (started at parse time via QuickSiteAdmin.permissionsReady).
         // filterByPermissions() and updateUserBadge() will be called when that fetch resolves.
+    },
+
+    /**
+     * The write allowance in the header: the window closest to its limit as the
+     * figure, every window on hover. The page renders the element only when a
+     * window is set; the figure comes from QuickSiteAPI.getWriteRate(), which the
+     * page seeds and every counted answer updates. A window refills whole at its
+     * reset, so the figure is redrawn then without a request.
+     */
+    initWriteRate() {
+        const el = document.getElementById('admin-write-rate');
+        const api = window.QuickSiteAPI;
+        if (!el || !api || typeof api.getWriteRate !== 'function') return;
+        const figure = el.querySelector('.admin-write-rate__figure');
+        let timer = null;
+
+        const render = () => {
+            const state = api.getWriteRate();
+            if (state.windows.length === 0) {
+                el.hidden = true;
+                return;
+            }
+            // Closest to its limit: the smallest share left; on a tie, the one freeing last.
+            const tightest = state.windows.slice().sort((a, b) =>
+                (a.remaining / a.max) - (b.remaining / b.max) || b.resetAt - a.resetAt)[0];
+            el.hidden = false;
+            el.classList.toggle('admin-write-rate--low', tightest.remaining <= Math.max(1, Math.floor(tightest.max * 0.1)));
+            figure.textContent = api.rateText('figure', '{remaining} / {max}', {
+                remaining: tightest.remaining, max: tightest.max, period: api.periodText(tightest.period)
+            });
+            el.title = [api.rateText('titleHead', 'Changes you can still make on this server:')]
+                .concat(state.windows.map(w => w.remaining >= w.max
+                    // A whole window has not opened yet: nothing to wait for.
+                    ? api.rateText('titleWindowFull', '{remaining} of {max} per {period}', {
+                        remaining: w.remaining, max: w.max, period: api.periodText(w.period)
+                    })
+                    : api.rateText('titleWindow', '{remaining} of {max} per {period} · full again at {time}', {
+                        remaining: w.remaining, max: w.max, period: api.periodText(w.period), time: api.clockText(w.resetAt)
+                    }))).join('\n');
+            el.setAttribute('aria-label', el.title);
+            // Redraw when the next window refills.
+            clearTimeout(timer);
+            const next = Math.min.apply(null, state.windows.map(w => w.resetAt)) - Date.now();
+            timer = setTimeout(render, Math.max(1000, next + 250));
+        };
+
+        window.addEventListener('quicksite:write-rate', render);
+        render();
     },
 
     /**

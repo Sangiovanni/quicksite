@@ -183,6 +183,9 @@ if (json_last_error() !== JSON_ERROR_NONE) {
 require_once SECURE_FOLDER_PATH . '/src/functions/translationHelpers.php';
 $writeResult = writeTranslationsToFile($lang, ['page' => ['titles' => [$route => $title]]]);
 if (!$writeResult['ok']) {
+    if ($writeResult['reason'] === 'refused') {
+        $writeResult['response']->send();
+    }
     if ($writeResult['reason'] === 'collisions') {
         ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage($writeResult['collisions'][0]['suggestion'])

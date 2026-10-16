@@ -185,6 +185,11 @@ secure/cache/resolver/
 # the account space report's refresh=true rewrites them.
 secure/cache/space/
 
+# Rate counters: one small file per account (named by a hash of its id) holding
+# where its upload and write windows stand. Per-deployment runtime state — never
+# committed; deleting it only refills every allowance.
+secure/cache/rate/
+
 # Exports folder — legacy shared location. Exports live under each project
 # (secure/projects/<id>/exports/); both are runtime artifacts.
 secure/exports/

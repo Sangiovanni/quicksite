@@ -19,6 +19,7 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/privacyHelpers.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 $params = $trimParametersManagement->params();
 
@@ -53,6 +54,7 @@ $isNew = !in_array($id, $reg['collectedData'], true);
 
 privacyAddDatum($reg, $id);
 if (!savePrivacyRegistry($reg)) {
+    qs_small_write_send_refusal();
     ApiResponse::create(500, 'server.operation_failed')
         ->withMessage('Failed to write the privacy registry')
         ->send();
@@ -63,6 +65,8 @@ privacyWriteDatumText($id, $descLang, $label, $purpose !== '' ? $purpose : null)
 if ($purpose === '') {
     translationUnsetKey($descLang, privacyPurposeKey($id));
 }
+// A refused write takes back the registry above too (qs_small_write_guard).
+qs_small_write_send_refusal();
 
 ApiResponse::create($isNew ? 201 : 200, $isNew ? 'created' : 'success')
     ->withMessage($isNew ? "Collected datum '{$id}' created" : "Collected datum '{$id}' updated")

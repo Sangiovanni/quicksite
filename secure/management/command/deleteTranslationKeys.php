@@ -12,6 +12,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/languageRegistry.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/translationHelpers.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 $params = $trimParametersManagement->params();
 
@@ -182,6 +183,13 @@ if ($json_content === false) {
     ApiResponse::create(500, 'server.internal_error')
         ->withMessage("Failed to encode translations to JSON")
         ->send();
+}
+
+// The size check (qs_small_write_refusal). A deletion only shrinks the file, so
+// it is never refused.
+$refusal = qs_small_write_refusal([$translations_file => strlen($json_content)]);
+if ($refusal !== null) {
+    $refusal->send();
 }
 
 if (file_put_contents($translations_file, $json_content, LOCK_EX) === false) {

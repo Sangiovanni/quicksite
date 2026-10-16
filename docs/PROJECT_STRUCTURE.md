@@ -38,7 +38,7 @@ quicksite/
 │   │   │   ├── security-trail-key.txt # Key of the security trail's username digest (gitignored; written on the first refused sign-in, never regenerated)
 │   │   │   ├── deploy.php        # allow_deploy — may this install deploy at all (gitignored; ABSENT MEANS NO)
 │   │   │   ├── deploy-roots.php  # deployBuild allowed target roots (gitignored; default SERVER_ROOT only)
-│   │   │   ├── quota.php         # Per-account storage ceiling and upload rate (gitignored; optional, ABSENT MEANS NO LIMIT)
+│   │   │   ├── quota.php         # Per-account limits: storage ceiling, upload and write rates, file caps (gitignored; optional — absent: no storage ceiling or upload rate, the shipped file caps and write rate)
 │   │   │   ├── console.php       # Is the /admin/command console offered here (optional; ABSENT MEANS OFFERED)
 │   │   │   ├── import-policy.php # Archive import + publish allowlists and archive size limits (gitignored; optional, built-in defaults apply without it)
 │   │   │   ├── languages.json    # The installation's language list, {"code": "name"} — the languages a project may start in or add, and their names (gitignored; optional, ABSENT MEANS the shipped languages.json.example is the list)

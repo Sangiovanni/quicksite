@@ -17,6 +17,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_js
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 /**
  * Recursively update component references in a structure
@@ -83,7 +84,13 @@ function updateFileReferences(string $filePath, string $oldName, string $newName
     }
     
     if ($count > 0) {
-        if (!qs_json_write($filePath, $structure, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) {
+        // The size check, file by file (qs_small_write_guard): a refusal takes
+        // back every reference updated before it, and the rename itself.
+        $flags = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
+        if (!qs_small_write_guard($filePath, qs_json_size($structure, $flags))) {
+            return ['updated' => false, 'count' => 0, 'error' => null];
+        }
+        if (!qs_json_write($filePath, $structure, $flags)) {
             return ['updated' => false, 'count' => $count, 'error' => 'Could not write file'];
         }
     }
@@ -243,6 +250,8 @@ function __command_renameComponent(array $params = [], array $urlParams = []): A
             ->withMessage("Failed to rename component file")
             ->withData(['from' => $oldFile, 'to' => $newFile]);
     }
+    // A reference update refused below takes the rename back too.
+    qs_small_write_on_rollback(static function () use ($oldFile, $newFile) { @rename($newFile, $oldFile); });
     
     $jsonDir = PROJECT_PATH . '/templates/model/json';
     $updatedFiles = [];
@@ -304,7 +313,12 @@ function __command_renameComponent(array $params = [], array $urlParams = []): A
             }
         }
     }
-    
+
+    // A reference update the size check refused: everything above was taken back.
+    if (qs_small_write_refused() !== null) {
+        return qs_small_write_refused();
+    }
+
     return ApiResponse::create(200, 'operation.success')
         ->withMessage("Component renamed from '{$oldName}' to '{$newName}'" . 
             ($totalReferences > 0 ? " ({$totalReferences} references updated)" : ''))

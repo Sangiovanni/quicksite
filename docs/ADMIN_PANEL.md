@@ -4,7 +4,7 @@
 
 The admin panel is a server-rendered PHP shell plus a set of vanilla JS modules loaded per route. There is **no module bundler**. Load order is controlled by `secure/admin/templates/layout.php` and is the single most important contract in the front end — reorder a `<script>` tag and the panel breaks silently.
 
-State lives on a small set of `window.*` globals owned by core files. There is one custom event for cross-module signalling: `quicksite:command-executed`.
+State lives on a small set of `window.*` globals owned by core files. Cross-module signalling uses a handful of custom events (§4).
 
 ---
 
@@ -75,11 +75,12 @@ There is **no** `pages/ai.js`, `pages/batch.js`, or `pages/docs.js` in the curre
 
 ## 4. Event bus
 
-Four custom events, each with one emitter and one listener:
+Five custom events, each with one emitter:
 
 | Event | Emitted by | Listened for by |
 |---|---|---|
 | `quicksite:command-executed` | `js/core/api.js`, after a successful non-GET command | `js/components/miniplayer.js` — reloads the floating preview iframe |
+| `quicksite:write-rate` | `js/core/api.js`, when a counted command's answer carries the write allowance | `admin.js` — the header's figure; `js/pages/preview/preview-ai-tools.js` — the kept steps' Run button |
 | `quicksite:workflow-complete` | `js/pages/preview/preview-ai-tools.js`, after a workflow batch runs | `js/components/miniplayer.js` |
 | `quicksite:memberships-changed` | the membership pages, after a roster or inbox action | `js/core/members-badge.js` — recomputes the counts |
 | `quicksite:membership-counts-updated` | `js/core/members-badge.js`, once counts are recomputed | `js/pages/dashboard-memberships.js` — fills the dashboard card |
@@ -97,7 +98,7 @@ File lists are grouped by role. Where useful, the entry point or main exported f
 
 | File | Purpose |
 |---|---|
-| `js/core/api.js` | `QuickSiteAPI.request` + `upload`; in-memory session token sent with the session cookie (`setTokenSource` seam for embedders); emits `quicksite:command-executed`. |
+| `js/core/api.js` | `QuickSiteAPI.request` + `upload`; in-memory session token sent with the session cookie (`setTokenSource` seam for embedders); emits `quicksite:command-executed`; keeps the write allowance current from each answer's headers (`getWriteRate`, `countsAsWrite`) and emits `quicksite:write-rate`. |
 | `js/core/utils.js` | `QuickSiteUtils`: toasts, confirms, escaping, prefs storage, pending messages. |
 | `js/core/storage-keys.js` | Constants for every localStorage / sessionStorage key (`window.QuickSiteStorageKeys`). |
 | `js/core/dom.js` | `window.QSDom`: shared `el()` element factory + `svgIcon()` + `clear()` + `setSelectPlaceholder()` (resets a `<select>` to a single placeholder option) — the createElement/textContent idiom for dynamic DOM. Loaded in `<head>` so page scripts can use it at parse time. |
@@ -241,6 +242,7 @@ Two other cookies exist, both HttpOnly and neither readable by page scripts. `QS
 | `aiPersist` | localStorage | `connections-store.js`, `ai-connections.js`, `settings.js` |
 | `aiAutoPreview` | localStorage | declared; no current reader |
 | `aiAutoExecute` | localStorage | `preview-ai-tools.js`, `ai-connections.js`, `settings.js` |
+| `aiKeptSteps` | localStorage | `preview-ai-tools.js` — the steps a batch run did not reach when the write rate stopped it, per account and project (the key gets `:<account>:<project>` appended); offered again once the allowance is back, never run on their own (§8.12) |
 | `styleSourceDraft` | localStorage | `preview-style-source.js` (visual-editor CSS mode → Source view; debounced draft of unsaved edits, restored on next entry, cleared on save / discard) |
 | `updateCheckAt` | localStorage | `update-notice.js` — epoch ms of the last update check, so a panel navigation does not spend a GitHub API call each time |
 | `updateNoticeHidden` | localStorage | `update-notice.js` — the version string the operator dismissed; stored as the version, not a flag, so the next release shows the notice again |
@@ -252,7 +254,7 @@ Two other cookies exist, both HttpOnly and neither readable by page scripts. `QS
 
 | PHP file | Injects into | Notable fields |
 |---|---|---|
-| `templates/layout.php` | `window.QUICKSITE_CONFIG` | `apiBase`, `adminBase`, `baseUrl`, `publicSpace`, `currentProject`, `globalCommands`, `defaultLang`, `multilingual`, `translations`, `token` (the per-session token), `apiUrl`, `isOperator` (§9.14) |
+| `templates/layout.php` | `window.QUICKSITE_CONFIG` | `apiBase`, `adminBase`, `baseUrl`, `publicSpace`, `currentProject`, `globalCommands`, `writeRate`, `defaultLang`, `multilingual`, `translations`, `token` (the per-session token), `apiUrl`, `isOperator` (§9.14) |
 | `templates/pages/settings.php` | extends `QUICKSITE_CONFIG` + `window.QS_SETTINGS_I18N` | `baseUrl`, `commandUrl`, `aiSettingsUrl`, `quicksiteVersion`; the `settings` and `common` sub-trees, verbatim |
 | `templates/pages/apis.php` | `window.QS_APIS_I18N` | the `apis` and `common` sub-trees, verbatim |
 | `templates/pages/embed-security.php` | extends `QUICKSITE_CONFIG` + `window.QS_EMBED_SECURITY_I18N` | `baseUrl`; the `embedSecurity` sub-tree, verbatim |
@@ -268,6 +270,8 @@ Two other cookies exist, both HttpOnly and neither readable by page scripts. `QS
 A sub-tree emitted **verbatim** is the output of `AdminTranslation::getRaw()`, unchanged, so the page's JS resolves a string by the same dot path PHP would; each such page reads it through its own `t(path, params)`, which substitutes `:name` markers the way PHP's `t()` does and returns **the path itself** when nothing resolves, so an untranslated string shows on screen instead of hiding behind English. `QUICKSITE_CONFIG.translations` in `layout.php` is a hand-listed subset instead; its `common` branch carries the labels `js/core/utils.js` gives its panel-wide confirm dialog and toasts.
 
 `currentProject` is the user's **edited** project (their `selected_project`, §8.0) — the client prepends a `p/<currentProject>/` marker to project-scoped Management calls so the server acts on it; `globalCommands` is the set of commands called without that marker. There is no schema or runtime validation on injected objects, and page-level extensions of `QUICKSITE_CONFIG` can silently overwrite global fields. Treat the injected globals as read-only by convention.
+
+`writeRate` is the account's write rate as the page loads (COMMAND_API.md *Per-user resource limits*): every window with what is left of it and when it frees, the batch runner's wait limit, the commands that never count, and a short tag naming the account in browser storage (never its id). It is `null` on the sign-in pages. From then on `js/core/api.js` keeps it current from the `RateLimit` / `RateLimit-Policy` headers of every counted answer (`QuickSiteAPI.getWriteRate()`, `countsAsWrite()`), and says a write-rate refusal in the panel's language. Whenever a window is set, the **header shows what is left** of the window closest to its limit — every window on hover — and redraws when an answer moves it or a window refills; with no window it shows nothing. Every Management call in the panel goes through the API client, so no write escapes the figure.
 
 ---
 
@@ -828,6 +832,15 @@ A persistent amber-bordered banner sits at the top of the panel: `⚠ AI tools m
 
 After at least one command succeeds, the iframe reloads via `window.PreviewManager.reload()` so visual changes appear immediately. The `quicksite:workflow-complete` window event also fires for any listening sibling module (the miniplayer, etc.).
 
+#### The write rate
+
+A batch sends its commands back to back, and every command but a read counts against the account's write rate (COMMAND_API.md *Per-user resource limits*). The runner works with it rather than running into it halfway:
+
+- **Before it starts**, the runner counts the batch's write steps — by the server's own list of reads, handed with the page, never a copy of its own — against what is left of each window. A run that would have to wait longer than the runner's wait limit (`write_rate.wait_seconds` in `quota.php`) does not start: the batch header and a toast say how many changes it needs, how many are left, and when enough is back.
+- **A run larger than a whole window** that is longer than the wait limit can never run in one go. The runner says so and offers to run it in parts: the first steps that fit now, the rest kept for later.
+- **During the run**, a refusal whose wait fits the limit is waited out — the batch header counts it down — and the same step is sent again. A longer one stops the run.
+- **Kept steps.** The steps a stopped run did not reach, and the rest of a run in parts, are kept in the browser's local storage, per account and project (`aiKeptSteps`). A banner at the top of the panel says how many, from which run and when they were planned, warns that the page may have changed since (node positions can shift), and offers **Run them** — usable only once the allowance covers them; before that it looks unavailable and a click says when enough is back — and **Discard**. Kept steps are never run on their own, and a new run waits until they are run or discarded.
+
 #### Footer
 
 Single line: `Touches: cmd1, cmd2, cmd3` — the workflow's `relatedCommands` listed inline in mono font. Model is in the INPUTS zone, not the footer.
@@ -849,7 +862,7 @@ The AI call is browser-direct via `QSAiCall.call(...)` (see `public/admin/assets
 | Styles | `public/admin/assets/css/preview-ai-tools.css` |
 | Workflow detail endpoint | `public/admin/api/index.php` (`ai-spec-raw`, `ai-spec`) |
 | Deterministic resolver endpoint | `public/admin/api/index.php` (`workflow-generate-steps`) |
-| Per-command execution | direct `POST /management/p/<projectId>/{command}` — the marker comes from `PreviewConfig.managementUrl` |
+| Per-command execution | `QuickSiteAdmin.apiRequest()` — the panel's API client carries the project marker and keeps the write allowance current |
 | AI dispatch | `public/admin/assets/js/pages/ai/lib/ai-call.js` (+ `provider-catalog.js`, `connections-store.js`, `stream-parsers.js`) |
 | Workflow framework | `secure/src/classes/WorkflowManager.php` |
 

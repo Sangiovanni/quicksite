@@ -78,9 +78,7 @@
     let animationPreviewInfinite = null;
     let animationPreviewCss = null;
     
-    // Shared references
-    let managementUrl = '';
-    let authToken = '';
+    // Shared references (management calls go through QuickSiteAdmin.apiRequest)
     let iframe = null;
 
     // ==================== Utility Functions ====================
@@ -153,9 +151,6 @@
         animationPreviewInfinite = document.getElementById('animation-preview-infinite');
         animationPreviewCss = document.getElementById('animation-preview-css');
         
-        // Get shared references from PreviewConfig
-        managementUrl = PreviewConfig.managementUrl;
-        authToken = PreviewConfig.authToken;
         iframe = document.getElementById('preview-iframe');
         
         // Initialize components
@@ -194,16 +189,12 @@
         try {
             // Fetch both keyframes and animated selectors in parallel
             const [keyframesResponse, selectorsResponse] = await Promise.all([
-                fetch(managementUrl + 'listKeyframes', {
-                    headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
-                }),
-                fetch(managementUrl + 'getAnimatedSelectors', {
-                    headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
-                })
+                QuickSiteAdmin.apiRequest('listKeyframes'),
+                QuickSiteAdmin.apiRequest('getAnimatedSelectors')
             ]);
-            
-            const keyframesData_response = await keyframesResponse.json();
-            const selectorsData = await selectorsResponse.json();
+
+            const keyframesData_response = keyframesResponse.data || {};
+            const selectorsData = selectorsResponse.data || {};
 
             // Process animated selectors FIRST — populateKeyframesList()
             // (below) reads animatedSelectorsData to compute the
@@ -238,10 +229,10 @@
             
         } catch (error) {
             console.error('Failed to load animations:', error);
-            animationsLoading.innerHTML = `
-                ${QuickSiteUtils.iconAlertCircle(24)}
-                <span>${PreviewConfig.i18n.loadAnimationsFailed}</span>
-            `;
+            const message = document.createElement('span');
+            message.textContent = PreviewConfig.i18n.loadAnimationsFailed;
+            const icon = QSDom.iconEl(QuickSiteUtils.ICON_PATHS.alertCircle, 24);
+            animationsLoading.replaceChildren(...(icon ? [icon, message] : [message]));
         }
     }
 
@@ -657,12 +648,10 @@
         if (!keyframeData) return;
         
         try {
-            const response = await fetch(managementUrl + 'getKeyframes/' + encodeURIComponent(keyframeName), {
-                headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
-            });
-            
+            const response = await QuickSiteAdmin.apiRequest('getKeyframes', 'GET', null, [encodeURIComponent(keyframeName)]);
+
             if (response.ok) {
-                const data = await response.json();
+                const data = response.data || {};
                 if (data.status === 200 && data.data?.frames) {
                     let css = `@keyframes ${keyframeName} {\n`;
                     for (const [key, value] of Object.entries(data.data.frames)) {
@@ -806,12 +795,9 @@
     
     async function editKeyframe(keyframeName) {
         try {
-            const response = await fetch(managementUrl + 'getKeyframes/' + encodeURIComponent(keyframeName), {
-                method: 'GET',
-                headers: authToken ? { 'Authorization': `Bearer ${authToken}` } : {}
-            });
-            
-            const data = await response.json();
+            const response = await QuickSiteAdmin.apiRequest('getKeyframes', 'GET', null, [encodeURIComponent(keyframeName)]);
+
+            const data = response.data || {};
             
             if (data.status === 200 && data.data && data.data.frames) {
                 const keyframeData = data.data.frames;
@@ -1506,20 +1492,13 @@
         try {
             stopKeyframePreviewInIframe();
             
-            const response = await fetch(managementUrl + 'setKeyframes', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
-                },
-                body: JSON.stringify({
-                    name: name,
-                    frames: framesObj,
-                    allowOverwrite: allowOverwrite
-                })
+            const response = await QuickSiteAdmin.apiRequest('setKeyframes', 'POST', {
+                name: name,
+                frames: framesObj,
+                allowOverwrite: allowOverwrite
             });
-            
-            const data = await response.json();
+
+            const data = response.data || {};
             
             if (data.status === 409) {
                 const confirmOverwrite = confirm(
@@ -1527,19 +1506,12 @@
                     `\n\n@keyframes ${name}`
                 );
                 if (confirmOverwrite) {
-                    const retryResponse = await fetch(managementUrl + 'setKeyframes', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
-                        },
-                        body: JSON.stringify({
-                            name: name,
-                            frames: framesObj,
-                            allowOverwrite: true
-                        })
+                    const retryResponse = await QuickSiteAdmin.apiRequest('setKeyframes', 'POST', {
+                        name: name,
+                        frames: framesObj,
+                        allowOverwrite: true
                     });
-                    const retryData = await retryResponse.json();
+                    const retryData = retryResponse.data || {};
                     if (retryData.status !== 200) {
                         throw new Error(retryData.message || 'Failed to save keyframe');
                     }
@@ -1583,16 +1555,9 @@
         }
         
         try {
-            const response = await fetch(managementUrl + 'deleteKeyframes', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(authToken ? { 'Authorization': `Bearer ${authToken}` } : {})
-                },
-                body: JSON.stringify({ name: keyframeName })
-            });
-            
-            const data = await response.json();
+            const response = await QuickSiteAdmin.apiRequest('deleteKeyframes', 'POST', { name: keyframeName });
+
+            const data = response.data || {};
             
             if (data.status === 200) {
                 showToast(PreviewConfig.i18n.keyframeDeleted, 'success');
@@ -1792,23 +1757,9 @@
             };
             let ok = false;
             let errMsg = '';
-            if (window.QuickSiteAPI && QuickSiteAPI.request) {
-                const result = await QuickSiteAPI.request('setStyleRule', 'POST', body);
-                ok = !!result.ok;
-                errMsg = (result.data && (result.data.message || result.data.error)) || '';
-            } else {
-                const response = await fetch(managementUrl + 'setStyleRule', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...(authToken ? { 'Authorization': 'Bearer ' + authToken } : {})
-                    },
-                    body: JSON.stringify(body)
-                });
-                const data = await response.json();
-                ok = (data.status === 200 || data.status === 201);
-                errMsg = data.message || '';
-            }
+            const result = await QuickSiteAdmin.apiRequest('setStyleRule', 'POST', body);
+            ok = !!result.ok;
+            errMsg = (result.data && (result.data.message || result.data.error)) || '';
             if (!ok) throw new Error(errMsg || 'setStyleRule failed');
 
             const tpl = i18n.applyKeyframeAdded || '{name} applied to {selector}';
@@ -1877,23 +1828,9 @@
             };
             let ok = false;
             let errMsg = '';
-            if (window.QuickSiteAPI && QuickSiteAPI.request) {
-                const result = await QuickSiteAPI.request('setStyleRule', 'POST', body);
-                ok = !!result.ok;
-                errMsg = (result.data && (result.data.message || result.data.error)) || '';
-            } else {
-                const response = await fetch(managementUrl + 'setStyleRule', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...(authToken ? { 'Authorization': 'Bearer ' + authToken } : {})
-                    },
-                    body: JSON.stringify(body)
-                });
-                const data = await response.json();
-                ok = (data.status === 200 || data.status === 201);
-                errMsg = data.message || '';
-            }
+            const result = await QuickSiteAdmin.apiRequest('setStyleRule', 'POST', body);
+            ok = !!result.ok;
+            errMsg = (result.data && (result.data.message || result.data.error)) || '';
             if (!ok) throw new Error(errMsg || 'setStyleRule failed');
 
             const tpl = i18n.keyframeRemoved || 'Animation removed from {selector}';
@@ -2234,23 +2171,9 @@
             };
             let ok = false;
             let errMsg = '';
-            if (window.QuickSiteAPI && QuickSiteAPI.request) {
-                const result = await QuickSiteAPI.request('setStyleRule', 'POST', body);
-                ok = !!result.ok;
-                errMsg = (result.data && (result.data.message || result.data.error)) || '';
-            } else {
-                const response = await fetch(managementUrl + 'setStyleRule', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...(authToken ? { 'Authorization': 'Bearer ' + authToken } : {})
-                    },
-                    body: JSON.stringify(body)
-                });
-                const data = await response.json();
-                ok = (data.status === 200 || data.status === 201);
-                errMsg = data.message || '';
-            }
+            const result = await QuickSiteAdmin.apiRequest('setStyleRule', 'POST', body);
+            ok = !!result.ok;
+            errMsg = (result.data && (result.data.message || result.data.error)) || '';
             if (!ok) throw new Error(errMsg || 'setStyleRule failed');
 
             const tpl = i18n.addTransitionAdded || 'Transition added to {selector}';

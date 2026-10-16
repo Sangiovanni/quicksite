@@ -26,6 +26,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/String.php';
 // routeHelpers is already loaded by utilsManagement,
 // kept explicit here for clarity (paramRouteSegmentToFs use below).
 require_once SECURE_FOLDER_PATH . '/src/functions/routeHelpers.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 // ============================================================================
 // VALIDATION
@@ -165,6 +166,15 @@ foreach ($routesToDelete as $routeSegments) {
     }
 }
 
+// The size check (qs_small_write_refusal), before anything is deleted. Removing
+// a route only shrinks routes.php and the files after it, so it is never refused.
+$newRoutes = removeRouteFromStructure($segments, $currentRoutes);
+$routesContent = "<?php return " . varExportNested($newRoutes) . "; ?>";
+$refusal = qs_small_write_refusal([ROUTES_PATH => strlen($routesContent)]);
+if ($refusal !== null) {
+    $refusal->send();
+}
+
 // ============================================================================
 // DELETE FILES
 // ============================================================================
@@ -201,11 +211,8 @@ foreach ($dirsToDelete as $dir) {
 }
 
 // ============================================================================
-// UPDATE ROUTES.PHP
+// UPDATE ROUTES.PHP ($routesContent, computed for the size check above)
 // ============================================================================
-
-$newRoutes = removeRouteFromStructure($segments, $currentRoutes);
-$routesContent = "<?php return " . varExportNested($newRoutes) . "; ?>";
 
 if (file_put_contents(ROUTES_PATH, $routesContent, LOCK_EX) === false) {
     ApiResponse::create(500, 'server.file_write_failed')

@@ -8,6 +8,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/TagRegistry.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/reservedStorageKeys.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 /**
  * addNode - Adds a new HTML tag node to a structure
@@ -378,8 +379,14 @@ function __command_addNode(array $params = [], array $urlParams = []): ApiRespon
         return qs_unsafe_structure_param_response($unsafeStructureParam);
     }
 
-    // Write back
-    if (!qs_json_write($json_file, $structure, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES, LOCK_EX)) {
+    // Write back, unless the structure would pass its size cap or grow while the
+    // owner is over quota (qs_small_write_refusal)
+    $jsonFlags = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
+    $refusal = qs_small_write_refusal([$json_file => qs_json_size($structure, $jsonFlags)]);
+    if ($refusal !== null) {
+        return $refusal;
+    }
+    if (!qs_json_write($json_file, $structure, $jsonFlags, LOCK_EX)) {
         return ApiResponse::create(500, 'server.file_write_failed')
             ->withMessage("Failed to write structure file");
     }

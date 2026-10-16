@@ -110,6 +110,13 @@ class RouteLayoutManager {
         if (empty($data['routes'])) {
             $data['routes'] = new \stdClass();
         }
+
+        // The size check (qs_small_write_guard): false when refused, and the
+        // command answers qs_small_write_refused().
+        require_once SECURE_FOLDER_PATH . '/src/functions/quota.php';
+        if (!qs_small_write_guard($this->configPath, qs_json_size($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE))) {
+            return false;
+        }
         
         return qs_json_write($this->configPath, $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
     }

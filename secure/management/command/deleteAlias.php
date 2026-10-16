@@ -13,6 +13,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_js
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 // Get request body
 $rawBody = defined('REQUEST_BODY_RAW') ? REQUEST_BODY_RAW : file_get_contents('php://input');
@@ -65,6 +66,13 @@ $deletedAlias = $aliases[$alias];
 
 // Remove alias
 unset($aliases[$alias]);
+
+// The size check (qs_small_write_refusal). Removing an alias only shrinks the
+// file, so it is never refused.
+$refusal = qs_small_write_refusal([$aliasesFile => qs_json_size($aliases, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)]);
+if ($refusal !== null) {
+    $refusal->send();
+}
 
 // Save aliases
 if (!qs_json_write($aliasesFile, $aliases, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)) {

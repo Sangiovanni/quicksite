@@ -28,6 +28,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/privacyScanHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/privacyPageHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/translationHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
 $params = $trimParametersManagement->params();
 
@@ -95,10 +96,13 @@ if ($overwritten && empty($params['overwrite'])) {
         ->withData(['route' => '/' . $route, 'exists' => true, 'needsConfirm' => true])
         ->send();
 }
-if (!$overwritten) {
-    policyCreateRoute($segments);
+// Every write of this command passes the size check as it happens
+// (qs_small_write_guard); a refusal takes back what it wrote and is answered.
+if (!$overwritten && !policyCreateRoute($segments)) {
+    qs_small_write_send_refusal();
 }
 if (!policyWriteLeaf($segments, $structure)) {
+    qs_small_write_send_refusal();
     ApiResponse::create(500, 'server.operation_failed')
         ->withMessage('Failed to write the privacy-policy page structure')
         ->send();
@@ -107,6 +111,7 @@ if (!policyWriteLeaf($segments, $structure)) {
 // ---- Record the route + seed structural copy (default language only) ------
 $reg['privacyRoute'] = '/' . $route;
 savePrivacyRegistry($reg);
+qs_small_write_send_refusal();
 
 $seed = privacyPolicyTranslationSeed();
 $defaultLang = qs_project_default_language();
@@ -115,6 +120,7 @@ $flat = ($defaultLang === 'fr') ? $seed['fr'] : $seed['en'];
 $newOnly = consentFilterNewKeys($defaultLang, $flat);
 if (!empty($newOnly)) {
     $res = writeTranslationsToFile($defaultLang, convertDotNotationToNested($newOnly), false);
+    qs_small_write_send_refusal();
     if (!empty($res['ok'])) $languagesSeeded[$defaultLang] = $res['keysAdded'] ?? count($newOnly);
 }
 

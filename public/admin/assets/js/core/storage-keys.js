@@ -29,6 +29,10 @@ window.QuickSiteStorageKeys = Object.freeze({
     aiPersist:           'quicksite_ai_persist',
     aiAutoPreview:       'quicksite_ai_auto_preview',
     aiAutoExecute:       'quicksite_ai_auto_execute',
+    // The steps a batch run did not reach when the write rate stopped it, kept
+    // per account and project (the key gets ':<account>:<project>' appended) and
+    // offered again once the allowance is back — never run on their own.
+    aiKeptSteps:         'qs_ai_kept_steps',
 
     // Visual editor — Source tab draft. Persists unsaved
     // edits so the user can recover if they navigate away or refresh
