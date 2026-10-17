@@ -13,7 +13,7 @@ QuickSite separates concerns into three top-level layers. Each one has a clear b
 | Layer | Folder | Audience | Purpose |
 |---|---|---|---|
 | **Project** | `public/p/` + `secure/projects/<projectId>/` | Site owner | The actual website data: routes, page structures (JSON), translations, components, interactions, styles, assets. The public half is a single entry point, `index.php`, through which every project is served. |
-| **Management** | `public/management/` + `secure/management/` | API client (admin panel, scripts) | The 149 commands that read or mutate project data. The public half is again a single entry point: every command enters through it. Session + role enforced. AI calls bypass this layer entirely (browser-direct). |
+| **Management** | `public/management/` + `secure/management/` | API client (admin panel, scripts) | The 150 commands that read or mutate project data. The public half is again a single entry point: every command enters through it. Session + role enforced. AI calls bypass this layer entirely (browser-direct). |
 | **Admin** | `public/admin/` + `secure/admin/` | Human operator | The browser UI that calls Management commands. Includes the visual editor, sitemap, theme editor, AI workspace, workflow runner. It also owns the things that are **not** about developing a project — the installation's update check, the panel's own per-user state, and everything to do with the signed-in account and its access to projects — which are served from its own JSON endpoints (`/admin/api`, `/admin/state`, `/admin/self`) rather than being commands. |
 
 ```
@@ -65,7 +65,8 @@ A project is a self-contained website on disk. One QuickSite installation can ho
 ```
 secure/projects/<projectId>/
 ├── config.php           # languages, default lang, multilingual flag, etc.
-├── config/              # members.json — owner, visibility, join policy, roster
+├── config/              # members.json — owner, visibility, join policy, roster;
+│                        # project.json — the project's name
 ├── routes.php           # ['home' => …, 'about' => …, 'docs/install' => …]
 ├── templates/
 │   ├── model/json/      # Source of truth: the JSON
@@ -88,6 +89,8 @@ secure/projects/<projectId>/
 ```
 
 Interaction behaviour is not a folder: it is declared inline in the page JSON (§9).
+
+**A project has an id and a name.** The **id** is drawn by the engine when the project is made (`createProject`, `cloneProject`, `importProject`, and first run's copy of the starter): nine characters, a lowercase letter first, then lowercase letters and digits, leaving out the ones easily misread when typed (`0`, `o`, `1`, `l`, `i`), drawn again while it is taken. It is the project's folder, its `/p/<projectId>/` address, every project-scoped command's marker, its log bucket and its browser-storage prefix, and it never changes. Random and of fixed length, it cannot be found by trying names, and it holds no `_`, so two projects never build the same storage key (§9). A project made before ids were drawn keeps the one it has: every id is read against one shape rule, a letter first, then letters, digits, `-` and `_`. The **name** is free text — 1 to 60 characters, no control character — that the owner gives and can change (`renameProject`). It lives in `config/project.json` and is read wherever the project is shown, as "Name #id"; nothing else keeps a copy, and two projects may share a name. It is the panel's label only: what a visitor reads as the site's name is the site's own `site.name` text, which a rename never touches.
 
 ### JSON structure format
 
@@ -197,7 +200,7 @@ ApiResponse::create(201, 'route.created')
 
 **One command extends without new commands.** `addComplexElement` dispatches to a registry of **builders** auto-discovered from `secure/src/classes/complexElements/*.php` — each a `ComplexElementBuilder` subclass that turns a wizard config into a node spec (pure: config in, node out, no I/O), which the command splices into the structure under one lock using `addNode`'s insertion helper. A new wizard kind is therefore one PHP file drop: no `routes.php` / `roles.php` / `help.php` edit, no new command, because the dispatcher globs the directory at request time and registers each subclass by its declared `kind()`. What it emits is indistinguishable from a hand-built subtree, so nothing at render time knows the element came from a wizard. See [ADMIN_PANEL.md §8.7](ADMIN_PANEL.md#87-complex-element-wizard) for the per-kind catalogue and the client-side half.
 
-The full list of 149 commands is registered in `secure/management/routes.php`. See [COMMAND_API.md](COMMAND_API.md) for the catalogue and a per-command reference (also obtainable at runtime via `GET /management/help`).
+The full list of 150 commands is registered in `secure/management/routes.php`. See [COMMAND_API.md](COMMAND_API.md) for the catalogue and a per-command reference (also obtainable at runtime via `GET /management/help`).
 
 ### Response shape
 
@@ -283,7 +286,7 @@ A session holds five values and nothing more: the user id, the generation stampe
 
 **The first account** is created on the first-run page: while the registry is empty every admin URL renders `/admin/setup`, which asks for the token the engine wrote to `setup-token.txt`. Being able to read that file is the authorisation — filesystem access to the install, strictly stronger than any account it can mint — so no default credential ships and no command line is required. The rule sits at the single account-creation path every route shares, so a direct call to `register` on an empty registry is refused identically; the token is consumed on use and the gate independently requires an empty registry, so the path dies permanently once an account exists.
 
-That first account is also the moment two files can first be written, since neither has a subject before it exists (`secure/src/functions/firstRun.php`). Every project directory with no `config/members.json` gets one naming the account as owner — a project that shipped with the download never passed through project creation, and without a roster it reads as private with no members. And `operator.php` is created naming the same account. Neither write can fail the account creation: the account must stay usable, because the panel is where an operator would fix a directory that refused a write.
+That first account is also the moment two files can first be written, since neither has a subject before it exists (`secure/src/functions/firstRun.php`). Every project directory with no `config/members.json` is copied to an id drawn for it, and the copy gets one naming the account as owner — a project that shipped with the download never passed through project creation, and without a roster it reads as private with no members. The shipped folder stays as it came, roster-less and so served to nobody: the starter's id is the same on every installation, and its folder is tracked, so leaving it untouched keeps an operator's `git pull` clean. And `operator.php` is created naming the same account. Neither write can fail the account creation: the account must stay usable, because the panel is where an operator would fix a directory that refused a write.
 
 ### Roles and permissions — `roles.php` and `categories.php`
 
@@ -313,7 +316,7 @@ The global set is deliberately small: `help`, `createProject`, `importProject`, 
 | `designer` | 3 | styles, CSS variables, animations, theme |
 | `developer` | 4 | builds + server-side route resolvers |
 | `admin` | 5 | deploy, API config, the project's OAuth keys, backup / export, command history; manage members (invite, adjudicate join requests, join policy) |
-| `owner` | 6 | set the project's visibility; delete the project + transfer ownership; the single top of the project, cannot be removed by others |
+| `owner` | 6 | set the project's visibility; rename the project; delete the project + transfer ownership; the single top of the project, cannot be removed by others |
 
 `rank` also governs role management: a granter may only assign a role strictly below their own, which is the self-escalation guard.
 
@@ -682,7 +685,7 @@ addRoute.php
   └── ApiResponse::create(201, 'route.created')->send()
 ```
 
-The same pattern — parse → validate → mutate files → `ApiResponse` — is used by all 149 commands.
+The same pattern — parse → validate → mutate files → `ApiResponse` — is used by all 150 commands.
 
 ### 6.3 Routing — exact and parameterised routes
 
@@ -751,16 +754,16 @@ One QuickSite installation hosts any number of projects, each with its own confi
 
 ```
 secure/projects/
-├── portfolio/
-├── client-website/
-└── documentation/
+├── k7m2p9xq4/       # named "Portfolio" in its config/project.json
+├── h4w8tn3ra/       # "Client website"
+└── r3d6bwx2m/       # "Documentation"
 ```
 
 **A project always has exactly one owner, and may have any number of members.** Whoever runs `createProject` owns the result from its first moment; there is no ownerless project, and no way to walk away from one without handing it on first. Everybody else who works on it is a **member**, holding one of the six roles of §3 on that project and nowhere else — the same account can be an owner here, an editor there and a stranger to a third. The roster lives in the project's own `config/members.json`, and that file is the only thing any permission check reads.
 
 Membership itself changes on a **consent model**: an admin or owner *invites* an existing account to a role (rank-checked at send), the invitee sees the offer in their own invitation inbox, and the grant materializes only when the invitee accepts — where the inviter's authority is **re-validated** (a demoted or removed inviter's offer is void). Answering an invitation is an account operation rather than a command: the offer is the project's decision, the answer is the person's. Pending invitations live in a separate `invitations` block of `members.json`, so a pending entry is structurally unable to grant access — every permission check reads `members` only. Users are targeted by their opaque `user_id` (discovered by exact public-name lookup, an account operation served at `/admin/self/find-user`); membership output references people as `{user_id, name}` and never exposes the private login username. Ownership rotates atomically via `transferOwnership` (owner-only, member-only target, confirmation required); removals and project deletions leave a dismissable notice in the affected user's own project list, while self-initiated exits (leave, decline, withdraw) leave none.
 
-Membership can also start from the **other side**. With the project's `join_policy` set to `open` (`setJoinPolicy`, default `closed`), an authenticated outsider may knock from the panel — a mandatory-note ask, fixed at the `viewer` role, and itself an account operation rather than a command — that an admin/owner answers with `approveJoinRequest` (joins immediately: both consents now exist) or `denyJoinRequest` (mandatory reason, dismissable `refused` notice; re-asking is blocked until the notice is dismissed). Separately, ANY member may `proposeMember` — vouch an outsider with a mandatory note, at a role no higher than the sponsor's own rank (a viewer proposes viewers, an editor up to editors); the proposal grants nothing, the person is told nothing, and on validation it *converts into a normal invitation* carried by the approver's rank (`sponsored_by` preserved), which the person accepts or declines like any invite — membership always materializes on exactly two consents: the person's and a ranking authority's. Enumeration posture: a private project with a closed policy answers a knock identically to a nonexistent one; opening the policy on a *private* project deliberately makes it knockable-by-id (flagged by the command); on public projects existence is already public via `/p/<projectId>/`, so a closed lane answers honestly. A requester's own inbox shows a private project's *id*, never its site name, until they are a member. Two read surfaces complete the picture: `getProjectRoster` gives every member rank the active-members roster (no pending queue — adjudication data stays admin/owner via `listMembers`), and a sponsor reads their own outgoing proposals at `/admin/self/proposals` (pending validation, or approved and awaiting the person's answer).
+Membership can also start from the **other side**. With the project's `join_policy` set to `open` (`setJoinPolicy`, default `closed`), an authenticated outsider may knock from the panel — a mandatory-note ask, fixed at the `viewer` role, and itself an account operation rather than a command — that an admin/owner answers with `approveJoinRequest` (joins immediately: both consents now exist) or `denyJoinRequest` (mandatory reason, dismissable `refused` notice; re-asking is blocked until the notice is dismissed). Separately, ANY member may `proposeMember` — vouch an outsider with a mandatory note, at a role no higher than the sponsor's own rank (a viewer proposes viewers, an editor up to editors); the proposal grants nothing, the person is told nothing, and on validation it *converts into a normal invitation* carried by the approver's rank (`sponsored_by` preserved), which the person accepts or declines like any invite — membership always materializes on exactly two consents: the person's and a ranking authority's. Enumeration posture: a private project with a closed policy answers a knock identically to a nonexistent one; opening the policy on a *private* project deliberately makes it knockable-by-id (flagged by the command); on public projects existence is already public via `/p/<projectId>/`, so a closed lane answers honestly. A requester's own inbox shows a private project's *id*, never its name, until they are a member. Two read surfaces complete the picture: `getProjectRoster` gives every member rank the active-members roster (no pending queue — adjudication data stays admin/owner via `listMembers`), and a sponsor reads their own outgoing proposals at `/admin/self/proposals` (pending validation, or approved and awaiting the person's answer).
 
 **Project visibility.** Each project's `config/members.json` carries a `visibility` flag:
 

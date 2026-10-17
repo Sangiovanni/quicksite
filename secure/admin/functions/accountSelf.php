@@ -232,7 +232,7 @@ function qs_account_delete(array $params): ApiResponse {
         if (($m['owner'] ?? null) === $userId) {
             $owned[] = [
                 'project'      => $projectId,
-                'name'         => qs_project_site_name($projectId),
+                'name'         => qs_project_display_name($projectId),
                 'member_count' => count($m['members'] ?? []),
             ];
             continue; // an owned project is a blocker, not a cascade target
@@ -391,7 +391,8 @@ function qs_account_space_usage(array $params): ApiResponse {
         }
 
         $projects[] = [
-            'name'           => $project,
+            'project'        => $project,
+            'name'           => qs_project_display_name($project),
             'total'          => (int)$space['total'],
             'total_formatted'=> qs_format_size((int)$space['total']),
             'content'        => (int)$space['content'],

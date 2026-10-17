@@ -58,6 +58,7 @@ $currentProject = $isLoginPage ? null : $router->getCurrentProject();   // the p
 // browser already sends because the panel and surface B share an origin and the
 // cookie's path is '/'. Nothing extra is emitted here.
 $myProjectIds = [];
+require_once SECURE_FOLDER_PATH . '/src/functions/projectIdentity.php'; // qs_project_label (the picker)
 // Does THIS account see operator notices? (secure/management/config/operator.php,
 // written at first run.) A DISPLAY PREFERENCE AND NOTHING ELSE: it gates
 // whether the update banner renders, and no other decision anywhere reads it.
@@ -73,6 +74,11 @@ if (!$isLoginPage) {
     $__pkAuth = qs_session_auth();
     if (!empty($__pkAuth['valid'])) {
         $myProjectIds = getUserProjectIds($__pkAuth['user']);
+        // The picker shows each project as "Name #id", sorted by name, then id:
+        // two projects may share a name, the id tells them apart.
+        usort($myProjectIds, static function (string $a, string $b): int {
+            return [mb_strtolower(qs_project_display_name($a), 'UTF-8'), $a] <=> [mb_strtolower(qs_project_display_name($b), 'UTF-8'), $b];
+        });
         $__pkUserId = (string)($__pkAuth['user']['id'] ?? ($__pkAuth['userId'] ?? ''));
         $isOperator = $__pkUserId !== '' && in_array($__pkUserId, qs_operator_ids(), true);
     }
@@ -457,9 +463,9 @@ $langNames = [
                 <svg class="admin-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                 </svg>
-                <select id="admin-project-picker" aria-label="<?= __admin('common.activeProject', 'Active project') ?>" style="background:transparent;border:none;color:inherit;font:inherit;cursor:pointer;outline:none;padding:0 2px;max-width:12rem;">
+                <select id="admin-project-picker" aria-label="<?= __admin('common.activeProject', 'Active project') ?>" style="background:transparent;border:none;color:inherit;font:inherit;cursor:pointer;outline:none;padding:0 2px;max-width:16rem;">
                     <?php foreach ($myProjectIds as $pid): ?>
-                    <option value="<?= adminEscape($pid) ?>"<?= $pid === $editingProject ? ' selected' : '' ?>><?= adminEscape($pid) ?></option>
+                    <option value="<?= adminEscape($pid) ?>"<?= $pid === $editingProject ? ' selected' : '' ?>><?= adminEscape(qs_project_label($pid)) ?></option>
                     <?php endforeach; ?>
                 </select>
             </label>
@@ -468,7 +474,7 @@ $langNames = [
                 <svg class="admin-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                 </svg>
-                <span><?= adminEscape($editingProject) ?></span>
+                <span><?= adminEscape(qs_project_label((string)$editingProject)) ?></span>
             </a>
             <?php endif; ?>
             <?php

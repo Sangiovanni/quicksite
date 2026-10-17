@@ -94,7 +94,7 @@ function __command_deleteProject(array $params = [], array $urlParams = []): Api
             error_log("deleteProject: members.json for '{$projectName}' is unreadable — no membership cascade possible");
         }
     }
-    $cascadeSiteName = qs_project_site_name($projectName);
+    $cascadeName = qs_project_display_name($projectName);
     $callerId = getCurrentUser()['id'] ?? null;
 
     // Delete the project directory recursively.
@@ -190,15 +190,22 @@ function __command_deleteProject(array $params = [], array $urlParams = []): Api
     // self-requester (direction 'request', by == themselves). A SPONSORED,
     // not-yet-validated proposal target was never engaged — never told
     // anything — so the cascade must not conjure a notice for a project they
-    // never knew existed. Cache failure is silent by design (error_log only):
-    // access is already correct — the authority died with the folder.
+    // never knew existed. A notice keeps the project's name (nothing is left to
+    // read it from); a self-requester on a PRIVATE project gets its id, the
+    // name never having been theirs to see. Cache failure is silent by design
+    // (error_log only): access is already correct — the authority died with the
+    // folder.
     $cascade = ['members_notified' => 0, 'invitees_notified' => 0, 'self_removed' => false];
     if ($cascadeMembers !== null) {
         $engaged = [];
+        $requesters = [];
         foreach (($cascadeMembers['invitations'] ?? []) as $iuid => $inv) {
             $direction = is_array($inv) ? ($inv['direction'] ?? 'invite') : 'invite';
-            if ($direction === 'invite' || (is_array($inv) && ($inv['by'] ?? null) === (string)$iuid)) {
+            if ($direction === 'invite') {
                 $engaged[] = (string)$iuid;
+            } elseif (is_array($inv) && ($inv['by'] ?? null) === (string)$iuid) {
+                $engaged[] = (string)$iuid;
+                $requesters[(string)$iuid] = true;
             }
         }
         $affected = array_merge(
@@ -206,8 +213,9 @@ function __command_deleteProject(array $params = [], array $urlParams = []): Api
             $engaged
         );
         $memberIds = $cascadeMembers['members'] ?? [];
+        $private = ($cascadeMembers['visibility'] ?? 'private') !== 'public';
         $today = date('Y-m-d');
-        $written = qs_users_mutate(function (array &$cfg) use ($affected, $memberIds, $projectName, $cascadeSiteName, $callerId, $today, &$cascade) {
+        $written = qs_users_mutate(function (array &$cfg) use ($affected, $memberIds, $requesters, $private, $projectName, $cascadeName, $callerId, $today, &$cascade) {
             foreach (array_unique($affected) as $uid) {
                 $uid = (string)$uid;
                 if (!isset($cfg['users'][$uid])) {
@@ -218,9 +226,8 @@ function __command_deleteProject(array $params = [], array $urlParams = []): Api
                     $cascade['self_removed'] = true;
                     continue;
                 }
-                $existingName = $cfg['users'][$uid]['projects'][$projectName]['name'] ?? null;
                 $cfg['users'][$uid]['projects'][$projectName] = [
-                    'name'   => is_string($existingName) && $existingName !== '' ? $existingName : $cascadeSiteName,
+                    'name'   => ($private && isset($requesters[$uid]) && !isset($memberIds[$uid])) ? $projectName : $cascadeName,
                     'status' => 'deleted',
                     'at'     => $today,
                 ];

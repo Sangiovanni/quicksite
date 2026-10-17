@@ -12,7 +12,6 @@
  * ONE KEY LIST. QS_PROJECT_SETTING_KEYS is what an export carries and what an import takes back;
  * a key missing from it is lost on a round trip.
  *
- *   SITE_NAME                    createProject, cloneProject   text, at most 200 characters, no control characters
  *   LANGUAGES_SUPPORTED          createProject, addLang,       a non-empty list of distinct language codes
  *                                deleteLang
  *   LANGUAGE_DEFAULT             createProject, setDefaultLang a code listed in LANGUAGES_SUPPORTED
@@ -27,6 +26,9 @@
  * A language code's SHAPE is checked here. Whether a NEW code may be used is the installation's
  * language list (languageRegistry.php), which the writers that add a language and the import ask
  * separately: a project keeps a language the list later drops.
+ *
+ * A project's NAME is not a setting: it lives in its own file (projectIdentity.php). A config.php
+ * that still holds a SITE_NAME keeps it, unread, and an export does not carry it.
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
@@ -34,7 +36,6 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/filePolicy.php'; // qs_favicon_extensions
 
 const QS_PROJECT_SETTING_KEYS = [
-    'SITE_NAME',
     'LANGUAGES_SUPPORTED',
     'LANGUAGE_DEFAULT',
     'MULTILINGUAL_SUPPORT',
@@ -55,11 +56,6 @@ function qs_project_setting_error(string $key, $value, array $settings = []): ?s
 {
     $codeRule = RegexPatterns::getDescription('language_code');
     switch ($key) {
-        case 'SITE_NAME':
-            return (is_string($value) && mb_strlen($value, 'UTF-8') <= 200 && !preg_match('/[\x00-\x1F\x7F]/', $value))
-                ? null
-                : 'SITE_NAME must be text of at most 200 characters, with no control characters.';
-
         case 'LANGUAGES_SUPPORTED':
             $isCode = static fn($v): bool => is_string($v) && RegexPatterns::match('language_code', $v);
             return (is_array($value) && $value !== [] && array_values($value) === $value

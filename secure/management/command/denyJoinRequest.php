@@ -13,8 +13,9 @@
  * Tombstones follow the other-initiated-termination principle:
  *   - SELF-REQUEST: the requester asked and gets answered — a dismissable
  *     `refused` notice (with the reason) lands in THEIR cache. Its display
- *     name inherits the privacy-correct name from their pending entry
- *     (project id for a private project — never SITE_NAME).
+ *     name is the privacy-correct one: the project's name when it is public,
+ *     its id when it is private (a requester never learns a private project's
+ *     name).
  *   - SPONSORED PROPOSAL: the target was NEVER ENGAGED (no mirror, no inbox
  *     row) — denying it must not notify them of anything, a fortiori "must
  *     never read as refusal": they never read anything at all. The entry is
@@ -111,13 +112,9 @@ function __command_denyJoinRequest(array $params = [], array $urlParams = []): A
 
     if ($wasSelf) {
         // Refused tombstone in the requester's cache (dismissable; blocks
-        // re-requesting until acknowledged). Name privacy: inherit the
-        // pending_request entry's name; fall back to id-or-SITE_NAME by
-        // visibility (never SITE_NAME for a private project).
-        $existing = loadUsersConfig()['users'][$targetId]['projects'][$project] ?? null;
-        $name = (is_array($existing) && is_string($existing['name'] ?? null) && $existing['name'] !== '')
-            ? $existing['name']
-            : (($visibility === 'public') ? qs_project_site_name($project) : $project);
+        // re-requesting until acknowledged). Name privacy: the project's name
+        // only when it is public, else its id.
+        $name = ($visibility === 'public') ? qs_project_display_name($project) : $project;
         $tombstone = ['name' => $name, 'status' => 'refused', 'at' => $today, 'note' => $note];
         if (!qs_membership_cache_set($targetId, $project, $tombstone)) {
             error_log("denyJoinRequest: refused-tombstone write failed for '{$targetId}' on '{$project}'");

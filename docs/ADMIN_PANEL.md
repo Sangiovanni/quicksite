@@ -281,7 +281,7 @@ The visual editor is the panel's flagship feature. It runs as a sidebar UI in th
 
 ### 8.0 Which project the editor edits
 
-The panel edits one project at a time — the user's **selected project** (a per-user preference; ARCHITECTURE §7). The header carries a **project picker** listing the projects the user is a member of; changing it posts to `/admin/state/selected-project` and does a cache-busted reload, so the header badge, the editor's command target, and the preview iframe all follow together. The dashboard's project switch and the *Edit this project* button on My Memberships go through the same endpoint.
+The panel edits one project at a time — the user's **selected project** (a per-user preference; ARCHITECTURE §7). The header carries a **project picker** listing the projects the user is a member of, each as **"Name #id"** and sorted by name (a project without a name of its own is shown by its id; two projects may share a name, the id tells them apart); changing it posts to `/admin/state/selected-project` and does a cache-busted reload, so the header badge, the editor's command target, and the preview iframe all follow together. The dashboard's project switch and the *Edit this project* button on My Memberships go through the same endpoint.
 
 This pointer is **not** a command. Which project a person has open is a fact about the panel, not about any project, so it is panel state — the command API names its project in the URL marker instead and has no notion of a current one. The endpoint is POST-only, takes `{"project": "<id>"}`, and refuses a project the caller is not a member of (`403 authz.not_a_member`), so the panel can never open a project it cannot edit. The value is a UX default and never an authorization input: every request is re-authorized against the target project's `members.json`.
 
@@ -883,7 +883,7 @@ The AI call is browser-direct via `QSAiCall.call(...)` (see `public/admin/assets
 
 | Page | What it does |
 |---|---|
-| **Dashboard** (`dashboard.js`) | Stats cards (route count, language count, recent build), command activity feed, recent history. Calls `help`, `getRoutes`, `getCommandHistory`. The **New Project** dialog asks for the project's name and its first language: a searchable list of the installation's languages with the installation's default language preselected, both read from `getLanguageList`. It creates the project with `createProject`. **New Project**, **Clone** and **Import** each offer to switch to the new project, ticked by default. Deleting a project asks a second confirmation that names it. When an action reloads the page, its success message is shown after the reload. |
+| **Dashboard** (`dashboard.js`) | Stats cards (route count, language count, recent build), command activity feed, recent history. Calls `help`, `getRoutes`, `getCommandHistory`. The **Project Manager** names every project as "Name #id" — the edited project's chip, the project selector (with your role on each), the delete selector, the backups label, the storage rows — reading names from `listProjects` and `/admin/self/space-usage`. The **New Project** dialog asks for the project's name (free text, up to 60 characters) and its first language: a searchable list of the installation's languages with the installation's default language preselected, both read from `getLanguageList`. It creates the project with `createProject`; its id is drawn by the server. **Clone** opens prefilled with the source's name; **Import** reads the chosen archive's own name in the browser (its `config/project.json`, from the ZIP's directory, inflated with the browser's `DecompressionStream` — no library) and opens prefilled with it, or with the file name when the archive carries none. Each copy always gets a new id. **Rename** (`renameProject`) opens prefilled with the current name; it is enabled only when your role on the project chosen in the selector is owner, read from `listProjects` — the panel-wide permission set answers for the edited project only. **New Project**, **Clone** and **Import** each offer to switch to the new project, ticked by default. Deleting a project asks a second confirmation that names it. When an action reloads the page, its success message is shown after the reload. |
 | **Command** (`command.js`) | Permission-filtered command index. An installation can decline to offer the console at all — see §9.17. |
 | **Command form** (`command-form.js`) | Renders a dynamic form for any command from `help` metadata, then executes it. The escape hatch into raw API. Withheld with the rest of the console when the installation turns it off (§9.17). |
 | **History** (`history.js`) | Its own page at `/admin/history` — see §9.18. Browses `getCommandHistory` for the **currently edited project**, exports what is on screen as CSV, and clears the stored trail. The command history is per-project, so switching projects switches the trail. Actions that belong to no project (creating a project, signing out) are recorded server-side but are not shown here; see *Command history storage* in `COMMAND_API.md`. Admin and owner only. |
@@ -2957,7 +2957,9 @@ six-stat **Memberships** card with links to both pages.
 **My Memberships** (`/admin/memberships`) is the caller's own surface and works for
 every authenticated account — a freshly-registered, 0-membership user lands here to
 accept their first invitation, and the page fires only global self-service
-commands (zero 403 noise). Sections: **My projects** (`listProjects` — role chip,
+commands (zero 403 noise). Every project is named "Name #id"; a private project you
+have only asked to join shows its id alone, its name not being yours to see.
+Sections: **My projects** (`listProjects` — role chip,
 OWNED badge, *editing* chip on the current edit target, per-row *Edit this
 project* = the selected-project write + reload, *Leave* with confirm — hidden on
 owned rows), **Invitation inbox** (accept / decline, inviter + note + `sponsored_by`
@@ -2965,11 +2967,12 @@ shown; a voided invitation surfaces the server's 409 message), **My join
 requests** (withdraw), **My proposals** (`GET /admin/self/proposals` — pending validation
 vs. awaiting the person's answer; withdraw while pending), **Notices**
 (refused / removed / deleted with the recorded reason → dismiss, which also
-unblocks re-requesting), and a **Request to join** form (project id + mandatory
-note; every error code mapped to a human message).
+unblocks re-requesting), and a **Request to join** form (project id, with or
+without the `#` it is shown with, + mandatory note; every error code mapped to a
+human message).
 
 **Project members** (`/admin/members`) manages the **edited** project — a banner
-re-states the project id + the caller's role, and the page follows the header
+re-states the project ("Name #id") + the caller's role, and the page follows the header
 picker. Access requires membership of the edited project (`PAGE_PERMISSIONS`);
 sections render by role server-side: every rank sees the **Roster**
 (`getProjectRoster` — rank-ordered, "you" marker, `user_id` shown; change-role /

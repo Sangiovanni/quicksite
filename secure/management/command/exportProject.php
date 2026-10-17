@@ -8,7 +8,8 @@
  * Export format v2.0:
  * - config.json (sanitized from config.php)
  * - routes.json (from routes.php)
- * - config/*.json (project settings: route-layout, etc.)
+ * - config/*.json (project settings: route-layout, etc., and the project's
+ *   name, config/project.json — an import writes its own over it)
  * - templates/model/json/ (JSON structures only)
  * - snippets/ (the project's own snippets)
  * - translate/*.json
@@ -36,6 +37,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/projectSettings.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectLanguage.php'; // qs_project_language_codes
 require_once SECURE_FOLDER_PATH . '/src/functions/quota.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/spaceUsage.php'; // qs_invalidate_space_cache
+require_once SECURE_FOLDER_PATH . '/src/functions/projectIdentity.php'; // qs_project_name_in
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -492,8 +494,8 @@ function createExportMetadata(string $projectName, string $projectPath, array $s
             'note' => 'PHP files excluded for security. They will be rebuilt on import from JSON structures.'
         ],
         'project' => [
-            'name' => $projectName,
-            'site_name' => $config['SITE_NAME'] ?? $projectName,
+            'id' => $projectName,
+            'name' => qs_project_name_in($projectPath) ?? $projectName,
             'routes_count' => $routesCount,
             'languages' => $languages,
             'multilingual' => $config['MULTILINGUAL_SUPPORT'] ?? false

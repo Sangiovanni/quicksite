@@ -109,11 +109,11 @@ function __command_removeMember(array $params = [], array $urlParams = []): ApiR
     }
 
     // Mirror: other-initiated termination → dismissable 'removed' notice in
-    // the target's own cache (keeps the cached display name when present).
-    $usersCfg = loadUsersConfig();
-    $cachedName = $usersCfg['users'][$targetId]['projects'][$project]['name'] ?? null;
+    // the target's own cache. It keeps the project's name as it is now: the
+    // target was a member, so the name was theirs to see, and once removed they
+    // can no longer read it from the project.
     $notice = [
-        'name'   => is_string($cachedName) && $cachedName !== '' ? $cachedName : qs_project_site_name($project),
+        'name'   => qs_project_display_name($project),
         'status' => 'removed',
         'at'     => date('Y-m-d'),
     ];

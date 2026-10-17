@@ -54,10 +54,10 @@
             var adminProjects = [];
             projects.forEach(function (p) {
                 if (p.my_role === 'owner') counts.owned++;
-                if (p.my_role === 'owner' || p.my_role === 'admin') adminProjects.push(p.name);
+                if (p.my_role === 'owner' || p.my_role === 'admin') adminProjects.push(p.project);
             });
-            return Promise.all(adminProjects.map(function (name) {
-                return API.request('listMembers', 'GET', null, [], {}, false, { project: name }).then(function (r) {
+            return Promise.all(adminProjects.map(function (id) {
+                return API.request('listMembers', 'GET', null, [], {}, false, { project: id }).then(function (r) {
                     var invs = (r && r.ok && r.data && r.data.data && r.data.data.invitations) || [];
                     invs.forEach(function (inv) {
                         if (inv.direction === 'request') counts.adjudication++;

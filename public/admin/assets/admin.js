@@ -453,6 +453,23 @@ const QuickSiteAdmin = {
     },
 
     /**
+     * How a project is shown wherever it is listed or named: "Name #id". A
+     * project's id is drawn and its name is free, so two projects may share a
+     * name and the id tells them apart. A project without a name of its own (the
+     * server answers its id as the name) is shown by its id alone. The server's
+     * twin is qs_project_label() (projectIdentity.php).
+     *
+     * @param {string} id
+     * @param {?string} [name]
+     * @returns {string}
+     */
+    projectLabel(id, name) {
+        const pid = String(id || '');
+        const label = (typeof name === 'string') ? name : '';
+        return (label === '' || label === pid) ? pid : label + ' #' + pid;
+    },
+
+    /**
      * Does executing this command warrant an "are you sure"?
      *
      * TWO sources, in this order:

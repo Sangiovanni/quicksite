@@ -36,6 +36,7 @@ $baseUrl = rtrim(BASE_URL, '/');
 // controls, so a shell that somehow survived cannot acquire a deploy button.
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/deployPolicy.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/runtimeHandoff.php'; // qs_inline_script_json
 
 $__deployEnabled = qs_deploy_allowed();
 $__deployRole    = $router->getTokenRole();
@@ -47,6 +48,9 @@ $__deployShow    = $__deployEnabled && $__deployMayRun;
 <script>
 window.QS_BUILDS_CONFIG = {
     project: <?= json_encode($router->getCurrentProject()) ?>,
+    // How the page names the project: "Name #id" (projectIdentity.php). A name is
+    // free text, so it goes through the inline-script encoder.
+    projectLabel: <?= qs_inline_script_json(qs_project_label((string)$router->getCurrentProject())) ?>,
     // The project's build is roughly the size of its content, so this is where
     // "will my next build still fit" gets answered. Kept with the page rather
     // than hardcoded in JS so the shape is visible to whoever tunes it: warn

@@ -138,7 +138,7 @@ function getCommandCategories(): array {
         'project_management' => [
             'label' => 'Project Management',
             'icon' => 'folder-tree',
-            'commands' => ['listProjects', 'createProject', 'cloneProject', 'deleteProject', 'exportProject', 'importProject', 'downloadExport', 'clearExports', 'backupProject', 'listBackups', 'restoreBackup', 'deleteBackup']
+            'commands' => ['listProjects', 'createProject', 'cloneProject', 'renameProject', 'deleteProject', 'exportProject', 'importProject', 'downloadExport', 'clearExports', 'backupProject', 'listBackups', 'restoreBackup', 'deleteBackup']
         ],
         // Membership consent model. Marker-scoped roster
         // management, request adjudication + the join-policy knob + the

@@ -58,7 +58,7 @@ return [
     'admin' => [
         'rank' => 5,
         'builtin' => true,
-        'description' => 'Everything on the project EXCEPT delete / transfer ownership. Manages editor/designer/developer/viewer.',
+        'description' => 'Everything on the project EXCEPT delete / rename / transfer ownership. Manages editor/designer/developer/viewer.',
         'categories' => [
             'content.read', 'config.read', 'content.write', 'translation.write',
             'route.write', 'asset.write', 'interaction.write', 'privacy.manage',
@@ -70,7 +70,7 @@ return [
     'owner' => [
         'rank' => 6,
         'builtin' => true,
-        'description' => 'Top of the project: everything + delete + manage admins + transfer ownership. Cannot be removed by others.',
+        'description' => 'Top of the project: everything + delete + rename + manage admins + transfer ownership. Cannot be removed by others.',
         'categories' => [
             'content.read', 'config.read', 'content.write', 'translation.write',
             'route.write', 'asset.write', 'interaction.write', 'privacy.manage',

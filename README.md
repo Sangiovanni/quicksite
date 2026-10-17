@@ -220,9 +220,10 @@ Being able to read a file inside `secure/` is what proves the installation is yo
 
 The token is destroyed as soon as it is used, and the page is gone for good once an account exists.
 
-**What that first account gets.** It becomes the **owner of the starter
-project** QuickSite ships with, so the panel has a real site to edit the moment
-you sign in, and it is named in `secure/management/config/operator.php` — the
+**What that first account gets.** It becomes the **owner of its own copy of the
+starter project** QuickSite ships with — under an id drawn for it, so its address
+is not the same on every installation — so the panel has a real site to edit the
+moment you sign in, and it is named in `secure/management/config/operator.php` — the
 list of accounts that see operator notices such as "an update is available".
 That file grants nothing; it only decides whether a notice renders. Edit it by
 hand to add or remove people.
@@ -455,7 +456,7 @@ Three files are **not** created then, because none of them has a subject yet:
 
 - `users.php` — the user registry, written when you create your first account, so no credential ever ships in the repository.
 - `operator.php` — written at the same moment, naming that account. See *Create your first account*.
-- The starter project's `config/members.json` — also written then, making that account its owner.
+- The starter project's copy, under a drawn id, with its `config/members.json` — also written then, making that account its owner. `secure/projects/quicksite/` itself stays as it shipped.
 
 `environment.php` is never created automatically: with no file, QuickSite runs
 as `production`, which is the safe answer. Setup item 4 writes it when you

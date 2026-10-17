@@ -17,7 +17,9 @@
  *       scope: global, access: 'any'; there is no role gate in front of this)
  * 
  * @param file $file Uploaded ZIP file (required via multipart/form-data)
- * @param string $name New project name (optional, uses ZIP folder name if not provided)
+ * @param string $name The new project's name (optional: the archive's name —
+ *                     its config/project.json, else its folder's name). The
+ *                     project's id is always drawn (qs_project_id_claim()).
  * @param bool $switch_to Switch to imported project (optional, default: false)
  * 
  * @return ApiResponse Import result
@@ -35,6 +37,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectSettings.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/languageRegistry.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php'; // qs_delete_tree_rollback
+require_once SECURE_FOLDER_PATH . '/src/functions/projectIdentity.php';
 
 // The extension gate is an ALLOWLIST in filePolicy.php, not a blocklist here.
 // A blocklist had to enumerate every dangerous spelling, and missed three: it
@@ -120,7 +123,16 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
             ])
             ->withErrors(['file' => 'Required. Upload a ZIP file as multipart/form-data.']);
     }
-    $newName = trim($params['name'] ?? '');
+    // The name sent, checked before the archive is opened; '' or absent takes the
+    // archive's name below.
+    $sentName = null;
+    $rawName = $params['name'] ?? null;
+    if ($rawName !== null && !(is_string($rawName) && trim($rawName) === '')) {
+        $problem = qs_project_name_problem($rawName, $sentName);
+        if ($problem !== null) {
+            return qs_project_name_refusal($problem);
+        }
+    }
     $switchTo = filter_var($params['switch_to'] ?? false, FILTER_VALIDATE_BOOLEAN);
     
     // Open and validate ZIP
@@ -168,46 +180,6 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
             ->withErrors(['structure' => 'ZIP must contain a project folder with config.json, routes.json, or templates/model/json/']);
     }
     
-    // Determine project name
-    $projectName = !empty($newName) ? $newName : $projectFolder['name'];
-    
-    // Validate project name
-    if (!preg_match('/^[a-zA-Z][a-zA-Z0-9_-]{0,49}$/D', $projectName)) {
-        $zip->close();
-        return ApiResponse::create(400, 'validation.invalid_format')
-            ->withMessage('Invalid project name format')
-            ->withErrors(['name' => 'Must start with letter, contain only alphanumeric/dash/underscore, max 50 chars']);
-    }
-    
-    // Reserved names
-    $reserved = ['admin', 'management', 'src', 'logs', 'config', 'projects'];
-    if (in_array(strtolower($projectName), $reserved)) {
-        $zip->close();
-        return ApiResponse::create(400, 'validation.reserved_name')
-            ->withMessage("Project name '$projectName' is reserved");
-    }
-    
-    // Check if project already exists
-    $projectPath = SECURE_FOLDER_PATH . '/projects/' . $projectName;
-    
-    // A colliding id is refused, always — there is no option that turns this
-    // off. See the note beside the removed `overwrite` option above: an id is a
-    // project's identity AND its browser-storage namespace, and no upload gets
-    // to reassign either.
-    //
-    // ⚠ Deliberately says nothing about who owns the existing project, or
-    // whether the caller can see it. The dispatcher's rule is that existence,
-    // membership and role never leak; this answer is identical for a project
-    // the caller owns and one they have never heard of.
-    if (is_dir($projectPath)) {
-        $zip->close();
-        return ApiResponse::create(409, 'resource.already_exists')
-            ->withMessage("A project with the id '$projectName' already exists on this installation.")
-            ->withData([
-                'hint' => 'Import under a different name, or delete the existing project first.',
-            ]);
-    }
-    
     // Every entry's name, and every file the site is read from — pages,
     // components, menu, footer, snippets, settings, routes, translations, data —
     // is checked before the project directory exists, and the first one that
@@ -224,12 +196,26 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
         return qs_unsafe_structure_param_response($archiveFailure);
     }
 
-    // Create project directory structure
-    if (!mkdir($projectPath, 0755, true)) {
+    // The new project's name: the one sent, else the archive's own.
+    $projectDisplayName = $sentName ?? importArchiveName($zip, $projectFolder);
+    if ($projectDisplayName === null) {
+        $zip->close();
+        return ApiResponse::create(400, 'validation.missing_field')
+            ->withMessage('The archive names no project name this installation can use; send one as name.')
+            ->withErrors([['field' => 'name', 'reason' => 'required', 'max_length' => QS_PROJECT_NAME_MAX]]);
+    }
+
+    // The id is never the archive's: it is drawn as the project folder is made,
+    // so an import can neither take nor reassign an id — a project's identity and
+    // its browser-storage namespace.
+    // Create the project directory under a drawn id (exclusively), then its structure
+    $projectName = qs_project_id_claim();
+    if ($projectName === null) {
         $zip->close();
         return ApiResponse::create(500, 'server.directory_create_failed')
             ->withMessage('Failed to create project directory');
     }
+    $projectPath = SECURE_FOLDER_PATH . '/projects/' . $projectName;
     
     // Create required subdirectories
     $requiredDirs = [
@@ -282,12 +268,20 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
     
     // Validate imported project has required files
     $validation = validateImportedProject($projectPath);
-    
+
     if (!$validation['valid']) {
         qs_delete_tree_rollback($projectPath, 'importProject');
         return ApiResponse::create(400, 'validation.incomplete_project')
             ->withMessage('Imported project is incomplete')
             ->withErrors($validation['errors']);
+    }
+
+    // The project's name, in its own file: written over whatever name file the
+    // archive carried.
+    if (!qs_project_name_write($projectPath, $projectDisplayName)) {
+        qs_delete_tree_rollback($projectPath, 'importProject');
+        return ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage('Failed to write the project name');
     }
     
     // BIRTH-WRITE: an imported archive's config/members.json is UNTRUSTED
@@ -319,13 +313,13 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
 
     $result = [
         'project' => $projectName,
+        'name' => $projectDisplayName,
         'path' => SECURE_FOLDER_NAME . '/projects/' . $projectName,
         'imported' => true,
         'source_file' => $uploadedFile,
         'files_count' => $stats['files'],
         'directories_count' => $stats['directories'],
         'total_size' => formatImportBytes($stats['total_size']),
-        'site_name' => $projectInfo['site_name'],
         'routes_count' => $projectInfo['routes_count'],
         'languages' => $projectInfo['languages'],
         'switched_to' => false,
@@ -350,20 +344,17 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
         'rebuild_stats' => $rebuildResult['stats'] ?? []
     ];
     
-    // Register the import in the importer's project index + move ONLY their
+    // Register the import in the importer's project index (no name: read from
+    // the project when shown) + move ONLY their
     // per-user editing target with switch_to (the fixed-main model — a command
     // NEVER repoints what a deployment serves, as in createProject). Edited at
     // /p/<id>/.
     if ($importerId !== null) {
-        $siteName = $projectInfo['site_name'] ?? $projectName;
-        $written = qs_users_mutate(function (array &$cfg) use ($importerId, $projectName, $siteName, $switchTo) {
+        $written = qs_users_mutate(function (array &$cfg) use ($importerId, $projectName, $switchTo) {
             if (!isset($cfg['users'][$importerId])) {
                 return false;
             }
-            $cfg['users'][$importerId]['projects'][$projectName] = [
-                'name'    => $siteName,
-                'created' => date('Y-m-d'),
-            ];
+            $cfg['users'][$importerId]['projects'][$projectName] = qs_membership_mirror_entry('member', date('Y-m-d'));
             if ($switchTo) {
                 $cfg['users'][$importerId]['selected_project'] = $projectName;
             }
@@ -379,7 +370,7 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
     qs_quota_record_upload($quotaUserId);
 
     return ApiResponse::create(201, 'resource.imported')
-        ->withMessage("Project '$projectName' imported successfully (secure rebuild)")
+        ->withMessage("Project '$projectDisplayName #$projectName' imported successfully (secure rebuild)")
         ->withData($result);
 }
 
@@ -697,7 +688,7 @@ function importEntryNameRefusal(string $relativePath, bool $isDirectory): ?strin
         }
     }
     $probe = $isDirectory ? $relativePath . '/' : $relativePath;
-    foreach (['config.json', 'routes.json', 'config/', 'translate/', 'data/', 'snippets/', 'public/',
+    foreach (['config.json', 'routes.json', 'config/', QS_PROJECT_NAME_FILE, 'translate/', 'data/', 'snippets/', 'public/',
               'templates/', 'templates/model/', 'templates/model/json/'] as $fixed) {
         $spelled = substr($fixed, -1) === '/' ? substr($probe, 0, strlen($fixed)) : $probe;
         if ($spelled !== $fixed && strcasecmp($spelled, $fixed) === 0) {
@@ -1077,9 +1068,6 @@ function rebuildPhpFromJson(string $projectPath): array {
     // Defaults for the settings an archive may leave out. Its list has passed its
     // setting's rule in the archive gate — a non-empty list — so its first
     // language is always there to be the default.
-    if (!isset($validConfig['SITE_NAME'])) {
-        $validConfig['SITE_NAME'] = basename($projectPath);
-    }
     if (!isset($validConfig['LANGUAGE_DEFAULT'])) {
         $validConfig['LANGUAGE_DEFAULT'] = $validConfig['LANGUAGES_SUPPORTED'][0];
     }
@@ -1265,21 +1253,35 @@ function validateImportedProject(string $projectPath): array {
 }
 
 /**
+ * The name an archive gives its project when the import is sent none: the name in
+ * its name file (config/project.json), else its folder's name (an export's folder
+ * is the exported project's id), each only when the name rule takes it. Null when
+ * neither is usable. Read from the archive's central directory and one entry; the
+ * archive's limits were checked before this is asked.
+ *
+ * @param array{name: string, prefix: string} $projectFolder findProjectFolderInZip()
+ */
+function importArchiveName(ZipArchive $zip, array $projectFolder): ?string {
+    $raw = $zip->getFromName($projectFolder['prefix'] . QS_PROJECT_NAME_FILE);
+    $data = is_string($raw) ? json_decode($raw, true) : null;
+    if (is_array($data) && qs_project_name_problem($data['name'] ?? null, $name) === null) {
+        return $name;
+    }
+    if (qs_project_name_problem($projectFolder['name'], $name) === null) {
+        return $name;
+    }
+    return null;
+}
+
+/**
  * Get info from imported project
  */
 function getImportedProjectInfo(string $projectPath): array {
     $info = [
-        'site_name' => 'Unknown',
         'routes_count' => 0,
         'languages' => []
     ];
-    
-    // Load config
-    if (file_exists($projectPath . '/config.php')) {
-        $config = require $projectPath . '/config.php';
-        $info['site_name'] = $config['SITE_NAME'] ?? 'Unknown';
-    }
-    
+
     // Count routes (recursive for nested)
     if (file_exists($projectPath . '/routes.php')) {
         $routes = require $projectPath . '/routes.php';

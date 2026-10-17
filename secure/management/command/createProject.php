@@ -2,15 +2,17 @@
 /**
  * createProject Command
  * 
- * Creates a new empty project with basic structure.
+ * Creates a new empty project with basic structure. Its id is drawn
+ * (qs_project_id_claim()); the caller gives its name.
  * Can be called via API or internally from admin panel.
- * 
+ *
  * @method POST
  * @route /management/createProject
  * @auth required (admin permission)
- * 
- * @param string $name Project name (required)
- * @param string $site_name Display name for the site (optional)
+ *
+ * @param string $name The project's name (required): free text, the rule of
+ *                     qs_project_name_problem(). It also seeds the site's own
+ *                     texts (site.name and the texts built from it).
  * @param string $language The project's first language: a code from the
  *                         installation's language list (optional, default: the
  *                         installation's default language, qs_language_default())
@@ -29,6 +31,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/projectSettings.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php'; // qs_delete_tree
 require_once SECURE_FOLDER_PATH . '/src/functions/quota.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/spaceUsage.php'; // qs_invalidate_space_cache
+require_once SECURE_FOLDER_PATH . '/src/functions/projectIdentity.php';
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -38,45 +41,20 @@ require_once SECURE_FOLDER_PATH . '/src/functions/spaceUsage.php'; // qs_invalid
  * @return ApiResponse
  */
 function __command_createProject(array $params = [], array $urlParams = []): ApiResponse {
-    // Validate project name
-    // qs_param_string: `?name[]=x` would reach trim() as a TypeError.
-    $projectName = trim(qs_param_string($params, 'name', ''));
-    
-    if (empty($projectName)) {
-        return ApiResponse::create(400, 'validation.missing_field')
-            ->withMessage('Project name is required')
-            ->withErrors(['name' => 'Required field']);
+    // The project's name: free text, the one rule (projectIdentity.php). Its id is
+    // drawn below, never taken from the request.
+    $problem = qs_project_name_problem($params['name'] ?? '', $name);
+    if ($problem !== null) {
+        return qs_project_name_refusal($problem);
     }
-    
-    // Validate project name format
-    if (!preg_match('/^[a-zA-Z][a-zA-Z0-9_-]{0,49}$/D', $projectName)) {
-        return ApiResponse::create(400, 'validation.invalid_format')
-            ->withMessage('Invalid project name format')
-            ->withErrors(['name' => 'Must start with letter, contain only alphanumeric/dash/underscore, max 50 chars']);
-    }
-    
-    // Reserved names
-    $reserved = ['admin', 'management', 'src', 'logs', 'config', 'projects'];
-    if (in_array(strtolower($projectName), $reserved)) {
-        return ApiResponse::create(400, 'validation.reserved_name')
-            ->withMessage("Project name '$projectName' is reserved")
-            ->withErrors(['name' => 'This name is reserved for system use']);
-    }
-    
-    // Optional parameters: absent (or null) takes the default; any other value
+
+    // An optional language: absent (or null) takes the default; any other value
     // must be a string (an array reached trim() as a TypeError).
-    foreach (['site_name', 'language'] as $field) {
-        if (isset($params[$field]) && !is_string($params[$field])) {
-            return ApiResponse::create(400, 'validation.invalid_type')
-                ->withMessage("The {$field} parameter must be a string.")
-                ->withErrors([['field' => $field, 'reason' => 'invalid_type', 'expected' => 'string']]);
-        }
+    if (isset($params['language']) && !is_string($params['language'])) {
+        return ApiResponse::create(400, 'validation.invalid_type')
+            ->withMessage('The language parameter must be a string.')
+            ->withErrors([['field' => 'language', 'reason' => 'invalid_type', 'expected' => 'string']]);
     }
-    $siteName = mb_substr(trim(qs_param_string($params, 'site_name', ucfirst($projectName))), 0, 200);
-    // Cap length + strip control bytes (\x00-\x1F, \x7F). Byte-wise strip is
-    // UTF-8-safe: control bytes never occur inside a multibyte sequence. Display
-    // titles keep spaces / punctuation / accents — no strict format enforced.
-    $siteName = preg_replace('/[\x00-\x1F\x7F]/', '', $siteName);
     $defaultLang = trim(qs_param_string($params, 'language') ?? qs_language_default());
     $switchTo = filter_var($params['switch_to'] ?? false, FILTER_VALIDATE_BOOLEAN);
 
@@ -87,7 +65,6 @@ function __command_createProject(array $params = [], array $urlParams = []): Api
     }
 
     $config = [
-        'SITE_NAME' => $siteName,
         'LANGUAGE_DEFAULT' => $defaultLang,
         'LANGUAGES_SUPPORTED' => [$defaultLang],
         'MULTILINGUAL_SUPPORT' => false,
@@ -95,15 +72,6 @@ function __command_createProject(array $params = [], array $urlParams = []): Api
     $refusal = qs_project_settings_guard($config, array_keys($config));
     if ($refusal !== null) {
         return $refusal;
-    }
-
-    // Check project doesn't already exist
-    $projectPath = SECURE_FOLDER_PATH . '/projects/' . $projectName;
-
-    if (is_dir($projectPath)) {
-        return ApiResponse::create(409, 'resource.already_exists')
-            ->withMessage("Project '$projectName' already exists")
-            ->withData(['existing_path' => SECURE_FOLDER_NAME . '/projects/' . $projectName]);
     }
 
     // The storage quota: a new project is the caller's, and an owner already over
@@ -117,23 +85,21 @@ function __command_createProject(array $params = [], array $urlParams = []): Api
         }
     }
 
-    // The project root is created exclusively, so two creates of one name cannot
-    // share a folder, and every failure below removes a folder this request made:
-    // a create that answers an error leaves nothing behind.
-    if (!@mkdir($projectPath, 0755)) {
-        return is_dir($projectPath)
-            ? ApiResponse::create(409, 'resource.already_exists')
-                ->withMessage("Project '$projectName' already exists")
-                ->withData(['existing_path' => SECURE_FOLDER_NAME . '/projects/' . $projectName])
-            : ApiResponse::create(500, 'server.directory_create_failed')
-                ->withMessage('Failed to create project structure')
-                ->withData(['failed_path' => '']);
+    // The id is drawn and its folder created exclusively, so two creates cannot
+    // share a folder, and every failure below removes the folder this request
+    // made: a create that answers an error leaves nothing behind.
+    $projectName = qs_project_id_claim();
+    if ($projectName === null) {
+        return ApiResponse::create(500, 'server.directory_create_failed')
+            ->withMessage('Failed to create project structure')
+            ->withData(['failed_path' => '']);
     }
+    $projectPath = SECURE_FOLDER_PATH . '/projects/' . $projectName;
     $fail = static function (ApiResponse $response) use ($projectPath): ApiResponse {
         qs_delete_tree($projectPath);
         return $response;
     };
-    // A measurement left by an earlier project of the same name is not this one's.
+    // A measurement left under the same id is not this project's.
     qs_invalidate_space_cache($projectName);
 
     // Create project structure
@@ -179,6 +145,12 @@ function __command_createProject(array $params = [], array $urlParams = []): Api
             ->withMessage('Failed to create config.php'));
     }
 
+    // The project's name, in its own file (config/project.json)
+    if (!qs_project_name_write($projectPath, $name)) {
+        return $fail(ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage('Failed to write the project name'));
+    }
+
     // Create routes.php with home route (associative array format)
     $routesContent = "<?php\n/**\n * Route definitions (auto-generated)\n * Created: " . date('Y-m-d H:i:s') . "\n */\n\nreturn " . varExportNested(['home' => []]) . ";\n";
     if (file_put_contents($projectPath . '/routes.php', $routesContent, LOCK_EX) === false) {
@@ -192,8 +164,8 @@ function __command_createProject(array $params = [], array $urlParams = []): Api
     // Create empty assets_metadata.json
     file_put_contents($projectPath . '/data/assets_metadata.json', '{}', LOCK_EX);
 
-    // Create default translation file
-    $defaultTranslations = createDefaultTranslations($siteName);
+    // Create default translation file: the site's own texts, seeded from the name
+    $defaultTranslations = createDefaultTranslations($name);
     qs_json_write($projectPath . '/translate/default.json', $defaultTranslations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE, LOCK_EX);
     qs_json_write($projectPath . '/translate/' . $defaultLang . '.json', $defaultTranslations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE, LOCK_EX);
     
@@ -201,7 +173,7 @@ function __command_createProject(array $params = [], array $urlParams = []): Api
     createBasicPageTemplates($projectPath);
     
     // Create menu.json and footer.json
-    createMenuAndFooter($projectPath, $siteName);
+    createMenuAndFooter($projectPath);
     
     // Create .htaccess with space-aware FallbackResource + security headers
     $fallbackPath = PUBLIC_FOLDER_SPACE !== '' ? '/' . trim(PUBLIC_FOLDER_SPACE, '/') . '/index.php' : '/index.php';
@@ -238,21 +210,19 @@ HTACCESS;
     }
 
     // Update the creator's derived project index (users.php) — cache only, NO
-    // role key (role is authoritative in members.json). With switch_to,
+    // role key (role is authoritative in members.json) and no name (read from
+    // the project when it is shown). With switch_to,
     // ONLY the creator's selected_project (their per-user EDITING target) moves
     // to the new project — a command never repoints what a deployment serves;
     // the site root keeps serving the fixed main and the new project is edited
     // at /p/<id>/ (the fixed-main model).
     $selectedProjectSet = false;
     if ($creatorId !== null) {
-        $written = qs_users_mutate(function (array &$cfg) use ($creatorId, $projectName, $siteName, $switchTo) {
+        $written = qs_users_mutate(function (array &$cfg) use ($creatorId, $projectName, $switchTo) {
             if (!isset($cfg['users'][$creatorId])) {
                 return false;
             }
-            $cfg['users'][$creatorId]['projects'][$projectName] = [
-                'name'    => $siteName,
-                'created' => date('Y-m-d'),
-            ];
+            $cfg['users'][$creatorId]['projects'][$projectName] = qs_membership_mirror_entry('member', date('Y-m-d'));
             if ($switchTo) {
                 $cfg['users'][$creatorId]['selected_project'] = $projectName;
             }
@@ -263,8 +233,8 @@ HTACCESS;
 
     $result = [
         'project' => $projectName,
+        'name' => $name,
         'path' => SECURE_FOLDER_NAME . '/projects/' . $projectName,
-        'site_name' => $siteName,
         'default_language' => $defaultLang,
         'owner_user_id' => $creatorId,
         'created' => true,
@@ -272,7 +242,7 @@ HTACCESS;
     ];
 
     return ApiResponse::create(201, 'resource.created')
-        ->withMessage("Project '$projectName' created successfully")
+        ->withMessage("Project '$name #$projectName' created successfully")
         ->withData($result);
 }
 
@@ -362,7 +332,7 @@ function createNotFoundPageStructure(): array {
  * Create menu.json and footer.json: both empty, so the editor shows each one's empty-structure
  * placeholder and the author adds what the site needs.
  */
-function createMenuAndFooter(string $projectPath, string $siteName): void {
+function createMenuAndFooter(string $projectPath): void {
     qs_json_write($projectPath . '/templates/model/json/menu.json', [], JSON_PRETTY_PRINT, LOCK_EX);
     qs_json_write($projectPath . '/templates/model/json/footer.json', [], JSON_PRETTY_PRINT, LOCK_EX);
 

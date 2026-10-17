@@ -6791,7 +6791,7 @@ credential means a leaked credential can re-open it).
 **Source**: `setup.sh`, `setup.bat`, `secure/src/functions/NginxConfig.php`,
 `public/init.php`. Behaviour: [README.md](../README.md).
 
-### First run makes the bootstrap account the owner of the projects that shipped (locked 2026-08-11)
+### First run makes the bootstrap account the owner of the projects that shipped (locked 2026-08-11) (superseded 2026-10-16)
 
 **Decision**: When the first account on an installation is created, the engine
 writes a `config/members.json` for every project directory that has none, naming
@@ -13602,3 +13602,64 @@ the rule, and an author reading the raw file would meet two formats).
 **Source**: Sangio, 2026-10-16 during beta.12, after the size limits were audited. Code:
 `secure/src/functions/quota.php` (`qs_small_write_removal_only()`) and the fifteen commands. Behaviour:
 COMMAND_API.md (*Small files*), `help`'s `limits.removals`.
+
+### A project's id is drawn and its name is free, and first run gives the first account a copy of each project that shipped (locked 2026-10-16)
+
+**Supersedes**: *First run makes the bootstrap account the owner of the projects that shipped* (locked
+2026-08-11). Its adoption rule stands — by the absence of a roster, a failure reported and never fatal — but
+a shipped folder is now copied, not adopted where it lies.
+
+**Decision**: a new project's id is drawn by the engine — by `createProject`, `cloneProject`,
+`importProject` and first run's copy of a shipped project — and never taken from a request: nine
+characters, a lowercase letter first, then lowercase letters and digits, without `0`, `o`, `1`, `l` and
+`i`, drawn again while it is taken (a project folder or a log folder of that name, or a reserved name).
+The id is the project's folder, its `/p/<id>/` address, its command marker, its log bucket and its
+browser-storage prefix, and it never changes. A project's name is free text — 1 to 60 characters once
+trimmed, no control character — kept in the project's own `config/project.json` and read wherever the
+project is shown, as "Name #id"; two projects may share one. The three commands take the name as `name`
+(a clone and an import default to their source's) and answer the id as `project`; `listProjects` answers
+both. Only the owner renames (`renameProject`), and a rename changes the name alone. The name is the
+panel's label: `SITE_NAME` is neither written nor read, and the site's own `site.name` text is seeded
+from the name once and never rewritten by a rename or a clone. `users.php` keeps no name for a live
+membership; a notice (refused, removed, deleted) keeps the one it was written with. A backup does not hold
+the name and a restore does not change it; an export carries it and an import writes its own. First run
+copies every roster-less project to a drawn id and adopts the copy, leaving the shipped folder as it
+came. Existing ids stay valid and nothing is migrated: one shape rule reads every id.
+
+**Reasoning**: the id was the name the creator typed, so it did two jobs that pull apart. As an address
+it should be hard to guess — a project made public for a client for a while should not be found by
+trying names — and fixed, because renaming a folder changes the address, the marker, the storage
+namespace and the log bucket at once. As a label it should be free: accents, spaces, a name two projects
+share. A drawn id does the first job and a name file the second. A fixed length without `_` also closes a
+collision the chosen ids allowed: `qsp_<id>_<key>` built from ids that could hold `_` could name the same
+storage key for two projects. A letter first keeps every drawn id inside the rule that reads ids, and away
+from all-digit strings, which PHP turns into integer array keys; leaving out the characters people misread
+makes an id typed on the Memberships page right the first time. The name is read where it is shown rather
+than copied per member, so a rename reaches every list at once — except a notice, which records what a
+person saw, and a deleted project leaves nothing to read. The name belongs to the panel, not to the site:
+a visitor reads `site.name`, per language, and the author's text should not change because the panel's
+label did. A backup restores the site, not the label, so the name sits outside it with the roster. First
+run copies instead of adopting in place because the starter's id is the same on every installation —
+anyone could find it, and ask to join it, by typing `quicksite` — and because its folder is tracked:
+renaming it would leave its files deleted in the working tree and fail the operator's next `git pull`
+that touches the starter. The copy leaves the shipped folder as it came, roster-less, served to nobody.
+
+**Alternatives considered**: all 36 characters (rejected: about 7×10^13 ids instead of 2×10^13 buys
+nothing anyone needs, and costs every misread id); a digit allowed first (rejected: the rule that reads
+ids would widen everywhere, and an all-digit id becomes an integer key); the name kept in `config.php` as
+`SITE_NAME` (rejected: per-project data is JSON, and no visitor ever read `SITE_NAME`); two names, the
+panel's and the site's, both changed by a rename (rejected: a rename would rewrite the author's text in
+every language); the name copied into every member's `users.php` entry (rejected: a rename would rewrite
+every member's record, and a copy drifts); a backup that holds the name (rejected: a restore would rename
+the project behind its owner's back); renaming the starter's folder at first run (rejected: the
+`git pull` above); drawn ids given to the existing projects (rejected: they are test projects, and one
+rule reads every id, old or new).
+
+**Source**: Sangio's design change of 2026-10-03, its design round ruled the same day ("all as
+proposed"), and the proposals ruled one by one on 2026-10-16 during beta.12; first run's copy, Sangio
+2026-10-16 ("at deployment we generate a random id for this project"). Code:
+`secure/src/functions/projectIdentity.php`, `createProject`, `cloneProject`, `importProject`,
+`listProjects`, `renameProject`, `secure/src/functions/firstRun.php`, `AuthManagement.php`
+(`qs_membership_mirror_entry()`), `projectBackup.php`; the panel's `dashboard.js`, `memberships.js`,
+`layout.php`. Behaviour: COMMAND_API.md (*Projects*, *Export / Import*), ARCHITECTURE.md §2 and §7,
+ADMIN_PANEL.md, the `help` entries of those commands.

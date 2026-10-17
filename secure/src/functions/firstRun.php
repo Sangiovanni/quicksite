@@ -11,20 +11,22 @@
  *
  * WHAT IT WRITES.
  *
- *   1. A members.json for every SHIPPED project that has none. QuickSite ships a
- *      starter project, and `qs_project_birth_write_members()` only runs at
- *      project CREATION — a project that came with the download never passes
- *      through it. Without a roster `loadProjectMembers()` reads it as
- *      private-with-no-members, so it is invisible and uneditable to everyone,
- *      including the person who just installed it. This is what makes the
- *      starter project actually usable.
+ *   1. A project of the account's own for every SHIPPED project that has no
+ *      members.json: a copy under an id drawn for it, with a roster naming the
+ *      account as owner. QuickSite ships a starter project, and
+ *      `qs_project_birth_write_members()` only runs at project CREATION — a
+ *      project that came with the download never passes through it. Without a
+ *      roster `loadProjectMembers()` reads it as private-with-no-members, so it is
+ *      invisible and uneditable to everyone, including the person who just
+ *      installed it. This is what makes the starter project actually usable. The
+ *      shipped folder itself is left as it came (qs_first_run_adopt_projects()).
  *
  *   2. `secure/management/config/operator.php`, naming that same account.
  *      DISPLAY PREFERENCE, NOT AUTHORIZATION — see the file's own header and
  *      qs_operator_ids() below.
  *
  * ADOPTION IS BY ABSENCE, NOT BY NAME. Any project directory without a roster is
- * adopted, rather than a hardcoded 'quicksite'. The starter's id is not a
+ * copied and adopted, rather than a hardcoded 'quicksite'. The starter's id is not a
  * contract, someone may drop a second project in before first run, and — the
  * load-bearing part — a project with no roster is reachable by NOBODY, so
  * adopting it can never take anything away from anyone. The registry was empty
@@ -38,6 +40,8 @@
 
 require_once __DIR__ . '/AuthManagement.php';
 require_once __DIR__ . '/opcacheHygiene.php';
+require_once __DIR__ . '/projectIdentity.php'; // qs_project_id_claim, qs_project_name_write
+require_once __DIR__ . '/FileSystem.php';      // qs_copy_tree, qs_delete_tree_rollback
 
 /**
  * Path of the operator list. Gitignored, with a tracked `.example` sibling —
@@ -209,57 +213,88 @@ function qs_first_run_unowned_projects(): array {
 }
 
 /**
- * Make $userId the owner of every roster-less project, and mirror that into
- * their users.php project cache exactly as createProject does.
+ * Copy one roster-less project to a newly drawn id and make $userId its owner:
+ * everything but its backups, exports and builds (they belong to the source), a
+ * name file naming it after the source, and a fresh roster. Returns the copy's id,
+ * or null with nothing left behind.
+ */
+function qs_first_run_copy_project(string $source, string $userId): ?string {
+    $from = SECURE_FOLDER_PATH . '/projects/' . $source;
+    $id = qs_project_id_claim();
+    if ($id === null) {
+        return null;
+    }
+    $to = SECURE_FOLDER_PATH . '/projects/' . $id;
+    $ok = qs_copy_tree($from, $to, ['backups', 'exports', 'qs_build'])['ok']
+        && qs_project_name_write($to, qs_project_display_name($source));
+    // A roster or its lock carried over would make the copy someone else's: the
+    // source has none (that is why it is copied), but a stale lock is not ours.
+    @unlink($to . '/config/members.json.lock');
+    if (!$ok || !qs_project_birth_write_members($to, $userId)) {
+        qs_delete_tree_rollback($to, 'firstRun');
+        return null;
+    }
+    return $id;
+}
+
+/**
+ * Give $userId their own copy of every roster-less project: each is COPIED to an
+ * id drawn for it (qs_project_id_claim()), named after its source (its name, else
+ * its id), and the copy is adopted — its roster written with $userId as sole
+ * owner — and mirrored into their users.php project cache exactly as
+ * createProject does.
+ *
+ * A COPY, NOT THE SHIPPED FOLDER. The starter's id is the same on every
+ * installation, so a project served under it is one anybody can find, and ask to
+ * join, by typing `quicksite`; a drawn id is not. And the starter is tracked by
+ * git: an operator updates with `git pull`, so renaming its folder would leave its
+ * files deleted in the working tree and make the next pull that touches the
+ * starter fail. The source stays as it came, roster-less — reachable by nobody,
+ * `/p/<its id>/` answering as for a project that does not exist.
  *
  * The roster is written FIRST and the cache second, in that order deliberately:
  * members.json is authoritative and the cache is derived, so a crash
  * between them leaves a project that works and a picker entry that is missing —
  * recoverable — rather than a picker entry pointing at a project nobody owns.
  *
- * @return array{adopted: string[], failed: string[], selected: ?string, cached: bool}
+ * @return array{adopted: string[], sources: array<string, string>, failed: string[],
+ *               selected: ?string, cached: bool} adopted: the copies' ids; sources:
+ *               copy id => the source's id; failed: the sources that got no copy
  */
 function qs_first_run_adopt_projects(string $userId): array {
     $adopted = [];
+    $sources = [];
     $failed  = [];
-    foreach (qs_first_run_unowned_projects() as $id) {
-        $path = SECURE_FOLDER_PATH . '/projects/' . $id;
-        if (qs_project_birth_write_members($path, $userId)) {
+    foreach (qs_first_run_unowned_projects() as $source) {
+        $id = qs_first_run_copy_project($source, $userId);
+        if ($id !== null) {
             $adopted[] = $id;
+            $sources[$id] = $source;
         } else {
-            $failed[] = $id;
-            error_log('qs_first_run_adopt_projects: could not write a roster for project '
-                . $id . ' — it will not be visible to the account that installed QuickSite');
+            $failed[] = $source;
+            error_log('qs_first_run_adopt_projects: could not copy project ' . $source
+                . ' to a project of its own — it will not be visible to the account that installed QuickSite');
         }
     }
 
     // The starter project leads when it is there, so a default install opens on
     // the site it shipped with rather than on whatever sorts first.
-    $selected = null;
-    if (in_array('quicksite', $adopted, true)) {
-        $selected = 'quicksite';
-    } elseif ($adopted !== []) {
-        $selected = $adopted[0];
+    $selected = array_search('quicksite', $sources, true);
+    if ($selected === false) {
+        $selected = $adopted[0] ?? null;
     }
 
     $cached = false;
     if ($adopted !== []) {
         $today = date('Y-m-d');
-        $names = [];
-        foreach ($adopted as $id) {
-            $names[$id] = qs_project_site_name($id);
-        }
-        $cached = qs_users_mutate(function (array &$cfg) use ($userId, $adopted, $names, $selected, $today) {
+        $cached = qs_users_mutate(function (array &$cfg) use ($userId, $adopted, $selected, $today) {
             if (!isset($cfg['users'][$userId])) {
                 return false;
             }
             foreach ($adopted as $id) {
-                // Cache only — no role key. The role is authoritative in
-                // members.json, exactly as createProject leaves it.
-                $cfg['users'][$userId]['projects'][$id] = [
-                    'name'    => $names[$id],
-                    'created' => $today,
-                ];
+                // Cache only — no role key and no name. The role is
+                // authoritative in members.json, exactly as createProject leaves it.
+                $cfg['users'][$userId]['projects'][$id] = qs_membership_mirror_entry('member', $today);
             }
             if ($selected !== null) {
                 $cfg['users'][$userId]['selected_project'] = $selected;
@@ -270,6 +305,7 @@ function qs_first_run_adopt_projects(string $userId): array {
 
     return [
         'adopted'  => $adopted,
+        'sources'  => $sources,
         'failed'   => $failed,
         'selected' => $selected,
         'cached'   => $cached,

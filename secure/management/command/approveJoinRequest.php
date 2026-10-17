@@ -173,13 +173,10 @@ function __command_approveJoinRequest(array $params = [], array $urlParams = [])
         return ApiResponse::create($status, $code)->withMessage($message);
     }
 
-    // Status mirror (secondary write, silent-failure by ruling). A member —
-    // or an authority-engaged invitee — is entitled to the site's name.
-    if ($converted) {
-        $mirror = ['name' => qs_project_site_name($project), 'status' => 'pending_invite', 'at' => $today];
-    } else {
-        $mirror = ['name' => qs_project_site_name($project), 'created' => $today, 'status' => 'member'];
-    }
+    // Status mirror (secondary write, silent-failure by ruling). No name: a
+    // member — or an authority-engaged invitee — reads the project's name when
+    // it is shown.
+    $mirror = qs_membership_mirror_entry($converted ? 'pending_invite' : 'member', $today);
     if (!qs_membership_cache_set($targetId, $project, $mirror)) {
         error_log("approveJoinRequest: cache mirror write failed for '{$targetId}' on '{$project}'");
     }

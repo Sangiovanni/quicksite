@@ -154,7 +154,7 @@ function __command_inviteMember(array $params = [], array $urlParams = []): ApiR
     // pending entry their membership inbox reads. Failure is silent by
     // ruling — access is already correct (members.json committed), the mirror
     // heals via 8.4 reconcile.
-    $mirror = ['name' => qs_project_site_name($project), 'status' => 'pending_invite', 'at' => $today];
+    $mirror = qs_membership_mirror_entry('pending_invite', $today);
     if (!qs_membership_cache_set($targetId, $project, $mirror)) {
         error_log("inviteMember: cache mirror write failed for '{$targetId}' on '{$project}'");
     }

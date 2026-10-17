@@ -1,18 +1,19 @@
 <?php
-require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_json_write
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 /**
  * cloneProject Command
  * 
- * Duplicates an existing project to a new name.
- * Copies all project files (excluding backups), updates config,
+ * Duplicates an existing project as a new one: a new id, always drawn
+ * (qs_project_id_claim()), and the name the caller gives.
+ * Copies all project files (excluding backups) as they are,
  * and optionally switches to the new project.
  * 
  * @method POST
- * @route /management/cloneProject
+ * @route /management/p/<projectId>/cloneProject
  * @auth required (admin permission)
  * 
- * @param string $source Source project name (optional, default: active project)
- * @param string $name New project name (required)
+ * @param string $source Source project id (optional echo of the URL marker)
+ * @param string $name The clone's name (optional, default: the source's name)
  * @param bool $switch_to Switch to the cloned project after creation (optional, default: false)
  * 
  * @return ApiResponse Clone result
@@ -22,10 +23,10 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
-require_once SECURE_FOLDER_PATH . '/src/functions/projectSettings.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php'; // qs_copy_tree, qs_delete_tree_rollback, countDirectoryFiles
 require_once SECURE_FOLDER_PATH . '/src/functions/quota.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/spaceUsage.php'; // qs_invalidate_space_cache
+require_once SECURE_FOLDER_PATH . '/src/functions/projectIdentity.php';
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -53,31 +54,13 @@ function __command_cloneProject(array $params = [], array $urlParams = []): ApiR
             ->withErrors(['source' => 'Only letters, numbers, dash, underscore; must start with a letter']);
     }
 
-    // Validate new project name
-    // qs_param_string: `?name[]=x` would reach trim() as a TypeError.
-    $newName = trim(qs_param_string($params, 'name', ''));
-    
-    if (empty($newName)) {
-        return ApiResponse::create(400, 'validation.missing_field')
-            ->withMessage('New project name is required')
-            ->withErrors(['name' => 'Required field']);
+    // The clone's name: the one sent, else the source's (its name, else its id).
+    // The clone's id is drawn below, never taken from the request.
+    $problem = qs_project_name_problem($params['name'] ?? qs_project_display_name($sourceProject), $cloneName);
+    if ($problem !== null) {
+        return qs_project_name_refusal($problem);
     }
-    
-    // Validate project name format
-    if (!preg_match('/^[a-zA-Z][a-zA-Z0-9_-]{0,49}$/D', $newName)) {
-        return ApiResponse::create(400, 'validation.invalid_format')
-            ->withMessage('Invalid project name format')
-            ->withErrors(['name' => 'Must start with letter, contain only alphanumeric/dash/underscore, max 50 chars']);
-    }
-    
-    // Reserved names
-    $reserved = ['admin', 'management', 'src', 'logs', 'config', 'projects'];
-    if (in_array(strtolower($newName), $reserved)) {
-        return ApiResponse::create(400, 'validation.reserved_name')
-            ->withMessage("Project name '$newName' is reserved")
-            ->withErrors(['name' => 'This name is reserved for system use']);
-    }
-    
+
     $switchTo = filter_var($params['switch_to'] ?? false, FILTER_VALIDATE_BOOLEAN);
     
     // Check source project exists
@@ -87,15 +70,6 @@ function __command_cloneProject(array $params = [], array $urlParams = []): ApiR
         return ApiResponse::create(404, 'resource.not_found')
             ->withMessage("Source project '$sourceProject' not found")
             ->withData(['searched_path' => SECURE_FOLDER_NAME . '/projects/' . $sourceProject]);
-    }
-    
-    // Check target doesn't already exist
-    $targetPath = SECURE_FOLDER_PATH . '/projects/' . $newName;
-    
-    if (is_dir($targetPath)) {
-        return ApiResponse::create(409, 'resource.already_exists')
-            ->withMessage("Project '$newName' already exists")
-            ->withData(['existing_path' => SECURE_FOLDER_NAME . '/projects/' . $newName]);
     }
     
     // Every structure the clone would carry — pages, components, menu, footer,
@@ -118,42 +92,29 @@ function __command_cloneProject(array $params = [], array $urlParams = []): ApiR
         }
     }
 
-    // Recursive copy, excluding backups/
+    // A new id, drawn, its folder created exclusively; then the recursive copy
+    // into it, excluding backups/
+    $newName = qs_project_id_claim();
+    if ($newName === null) {
+        return ApiResponse::create(500, 'server.operation_failed')
+            ->withMessage('Failed to clone project files');
+    }
+    $targetPath = SECURE_FOLDER_PATH . '/projects/' . $newName;
     if (!qs_copy_tree($sourcePath, $targetPath, ['backups'])['ok']) {
         qs_delete_tree_rollback($targetPath, 'cloneProject');
         return ApiResponse::create(500, 'server.operation_failed')
             ->withMessage('Failed to clone project files');
     }
     
-    // Update config.php — change SITE_NAME to new project name
-    $configPath = $targetPath . '/config.php';
-    if (file_exists($configPath)) {
-        $config = include $configPath;
-        if (is_array($config)) {
-            $config['SITE_NAME'] = ucfirst(str_replace(['-', '_'], ' ', $newName));
-            $refusal = qs_project_settings_guard($config, ['SITE_NAME']);
-            if ($refusal !== null) {
-                qs_delete_tree_rollback($targetPath, 'cloneProject');
-                return $refusal;
-            }
-            $configContent = "<?php\n/**\n * Site Configuration\n * Cloned on " . date('Y-m-d H:i:s') . "\n */\n\nreturn " . var_export($config, true) . ";\n";
-            file_put_contents($configPath, $configContent, LOCK_EX);
-        }
+    // The clone's name, in its own file. The site itself is copied as it is: its
+    // config.php and its translations (site.name, the text visitors read) are
+    // the source's, for the clone's owner to change.
+    if (!qs_project_name_write($targetPath, $cloneName)) {
+        qs_delete_tree_rollback($targetPath, 'cloneProject');
+        return ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage('Failed to write the clone\'s name');
     }
-    
-    // Update site.name in translation files
-    $translateDir = $targetPath . '/translate';
-    $newSiteName = ucfirst(str_replace(['-', '_'], ' ', $newName));
-    if (is_dir($translateDir)) {
-        foreach (glob($translateDir . '/*.json') as $langFile) {
-            $translations = json_decode(file_get_contents($langFile), true);
-            if (is_array($translations) && isset($translations['site']['name'])) {
-                $translations['site']['name'] = $newSiteName;
-                qs_json_write($langFile, $translations, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE, LOCK_EX);
-            }
-        }
-    }
-    
+
     // BIRTH-WRITE: never inherit the source's members.json (a clone hijack —
     // the copy would carry the source's old owner, every member at
     // their role, and every pending invitation). Overwrite it with a fresh trust
@@ -172,7 +133,7 @@ function __command_cloneProject(array $params = [], array $urlParams = []): ApiR
     @unlink($targetPath . '/config/members.json.lock'); // stale sidecar if it was copied
     error_log("cloneProject: '{$newName}' birth-written to owner '{$clonerId}'; source '{$sourceProject}' roster NOT carried over (containment)");
 
-    // A measurement left by an earlier project of the same name is not this one's.
+    // A measurement left under the same id is not this project's.
     qs_invalidate_space_cache($newName);
 
     // Count cloned files for the response
@@ -180,29 +141,26 @@ function __command_cloneProject(array $params = [], array $urlParams = []): ApiR
 
     $result = [
         'project' => $newName,
+        'name' => $cloneName,
         'source' => $sourceProject,
         'path' => SECURE_FOLDER_NAME . '/projects/' . $newName,
-        'site_name' => $newSiteName,
         'files_copied' => $fileCount,
         'cloned' => true,
         'owner_user_id' => $clonerId,
         'switched_to' => false
     ];
     
-    // Register the clone in the cloner's own project index (users.php cache) —
-    // like createProject. With switch_to, ONLY the cloner's per-user editing
+    // Register the clone in the cloner's own project index (users.php cache, no
+    // name: read from the project when shown) — like createProject. With switch_to, ONLY the cloner's per-user editing
     // target (selected_project) moves to the new project; a command NEVER repoints
     // any installation-wide pointer, nor syncs the live public dir — as in
     // createProject. The new project is edited at /p/<id>/.
     if ($clonerId !== null) {
-        $written = qs_users_mutate(function (array &$cfg) use ($clonerId, $newName, $newSiteName, $switchTo) {
+        $written = qs_users_mutate(function (array &$cfg) use ($clonerId, $newName, $switchTo) {
             if (!isset($cfg['users'][$clonerId])) {
                 return false;
             }
-            $cfg['users'][$clonerId]['projects'][$newName] = [
-                'name'    => $newSiteName,
-                'created' => date('Y-m-d'),
-            ];
+            $cfg['users'][$clonerId]['projects'][$newName] = qs_membership_mirror_entry('member', date('Y-m-d'));
             if ($switchTo) {
                 $cfg['users'][$clonerId]['selected_project'] = $newName;
             }
@@ -212,7 +170,7 @@ function __command_cloneProject(array $params = [], array $urlParams = []): ApiR
     }
 
     return ApiResponse::create(201, 'resource.created')
-        ->withMessage("Project '$sourceProject' cloned to '$newName' successfully")
+        ->withMessage("Project '" . qs_project_label($sourceProject) . "' cloned to '$cloneName #$newName' successfully")
         ->withData($result);
 }
 

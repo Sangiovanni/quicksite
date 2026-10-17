@@ -189,13 +189,21 @@
     // My projects
     // ============================================================
 
+    /**
+     * "Name #id" (QuickSiteAdmin.projectLabel). The server sends a row's name
+     * only when it is the caller's to see: a private project they only asked to
+     * join comes with its id as its name, and shows as its id alone.
+     */
+    function projectLabel(id, name) {
+        return window.QuickSiteAdmin.projectLabel(id, name);
+    }
+
     function _renderProjectRow(p) {
         var isOwned = p.my_role === 'owner';
-        var isEditing = p.name === CFG.editedProject;
+        var isEditing = p.project === CFG.editedProject;
 
         var title = el('span', { class: 'members-row__title' }, [
-            el('strong', { text: p.name }),
-            (p.site_name && p.site_name !== p.name) ? el('span', { class: 'members-row__subtle', text: ' — ' + p.site_name }) : null,
+            el('strong', { text: projectLabel(p.project, p.name) }),
         ]);
         var chips = el('span', { class: 'members-row__chips' }, [
             _renderRoleChip(p.my_role),
@@ -206,7 +214,7 @@
         var actions = [];
         if (!isEditing) {
             actions.push(_renderActionBtn(T.editBtn || 'Edit this project', ICON_EDIT, 'ghost', function () {
-                onEditProject(p.name, this);
+                onEditProject(p.project, this);
             }));
         }
         // Per-project route to the builds page. Gated on THIS project's role
@@ -215,12 +223,12 @@
         // would gate every row by the wrong project's role.
         if ((CFG.buildRoles || []).indexOf(p.my_role) !== -1) {
             actions.push(_renderActionBtn(T.buildsBtn || 'Builds', ICON_BUILD, 'ghost', function () {
-                onOpenBuilds(p.name, isEditing, this);
+                onOpenBuilds(p.project, isEditing, this);
             }));
         }
         if (!isOwned) {
             actions.push(_renderActionBtn(T.leaveBtn || 'Leave', ICON_OUT, 'danger', function () {
-                onLeaveProject(p.name);
+                onLeaveProject(p.project, p.name);
             }));
         }
         return _renderRow([title, chips], actions);
@@ -276,10 +284,10 @@
         });
     }
 
-    function onLeaveProject(project) {
+    function onLeaveProject(project, name) {
         _renderConfirmModal(
             T.leaveTitle || 'Leave project',
-            [el('p', { text: (T.leaveConfirm || 'Leave {project}?').replace('{project}', project) })],
+            [el('p', { text: (T.leaveConfirm || 'Leave {project}?').replace('{project}', projectLabel(project, name)) })],
             T.leaveBtn || 'Leave', true,
             function (close, btn) {
                 account('leave-project', 'POST', { project: project }).then(function (res) {
@@ -307,8 +315,7 @@
     function _renderInviteRow(inv) {
         var main = [
             el('span', { class: 'members-row__title' }, [
-                el('strong', { text: inv.project_name || inv.project }),
-                (inv.project_name && inv.project_name !== inv.project) ? el('span', { class: 'members-row__subtle', text: ' (' + inv.project + ')' }) : null,
+                el('strong', { text: projectLabel(inv.project, inv.project_name) }),
             ]),
             el('span', { class: 'members-row__chips' }, [
                 el('span', { class: 'members-row__subtle', text: (T.offeredRole || 'offered role') + ': ' }),
@@ -354,7 +361,7 @@
     function onDecline(inv) {
         _renderConfirmModal(
             T.decline || 'Decline',
-            [el('p', { text: (inv.project_name || inv.project) + ' — ' + String(inv.role || '') })],
+            [el('p', { text: projectLabel(inv.project, inv.project_name) + ' — ' + String(inv.role || '') })],
             T.decline || 'Decline', false,
             function (close) {
                 account('decline-invitation', 'POST', { project: inv.project }).then(function (res) {
@@ -377,7 +384,7 @@
 
     function _renderRequestRow(req) {
         var main = [
-            el('span', { class: 'members-row__title' }, [el('strong', { text: req.project_name || req.project })]),
+            el('span', { class: 'members-row__title' }, [el('strong', { text: projectLabel(req.project, req.project_name) })]),
             _renderMeta([req.at || null]),
         ];
         if (req.note) main.push(_renderNote(req.note));
@@ -422,7 +429,7 @@
         var main = [
             el('span', { class: 'members-row__title' }, [
                 el('strong', { text: (pr.user && (pr.user.name || pr.user.user_id)) || '?' }),
-                el('span', { class: 'members-row__subtle', text: ' ' + (T.proposalFor || 'for') + ' ' + (pr.project_name || pr.project) }),
+                el('span', { class: 'members-row__subtle', text: ' ' + (T.proposalFor || 'for') + ' ' + projectLabel(pr.project, pr.project_name) }),
             ]),
             el('span', { class: 'members-row__chips' }, [
                 _renderRoleChip(pr.role),
@@ -462,7 +469,7 @@
         var main = [
             el('span', { class: 'members-row__title' }, [
                 el('span', { class: 'members-chip members-chip--' + n.status, text: statusLabel }),
-                el('strong', { class: 'members-row__notice-name', text: n.project_name || n.project }),
+                el('strong', { class: 'members-row__notice-name', text: projectLabel(n.project, n.project_name) }),
             ]),
             _renderMeta([n.at || null]),
         ];
@@ -515,7 +522,9 @@
         var projectInput = document.getElementById('request-project-id');
         var noteInput = document.getElementById('request-note');
         var btn = document.getElementById('btn-send-join-request');
-        var project = projectInput.value.trim();
+        // The id as shown after the name ("Name #id"): with or without its #.
+        // The server strips it too.
+        var project = projectInput.value.trim().replace(/^#\s*/, '');
         var note = noteInput.value.trim();
         if (!project) { projectInput.focus(); return; }
         if (!note) { toast(T.noteRequired || 'The note is required.', 'warning'); noteInput.focus(); return; }

@@ -213,10 +213,11 @@ return [
         'commands' => ['proposeMember'],
     ],
 
-    // Ownership rotation — owner only.
+    // The owner's prerogatives — owner only: handing the project on, and
+    // choosing what it is called.
     'project.ownership' => [
         'scope' => 'project',
-        'commands' => ['transferOwnership'],
+        'commands' => ['transferOwnership', 'renameProject'],
     ],
 
     // ====================================================================

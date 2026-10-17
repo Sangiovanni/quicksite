@@ -102,8 +102,7 @@
             ? (project.member_count + ' ' + (T.members || 'members'))
             : null;
         return el('li', { class: 'account-blocker' }, [
-            el('strong', { text: project.name || project.project || '?' }),
-            el('code', { class: 'account-blocker__id', text: String(project.project || '') }),
+            el('strong', { text: window.QuickSiteAdmin.projectLabel(project.project || '?', project.name) }),
             count ? el('span', { class: 'admin-hint', text: count }) : null,
         ]);
     }

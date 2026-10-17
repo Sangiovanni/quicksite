@@ -63,12 +63,16 @@ quicksite/
 │   │   └── runtime/              # What ships to a SITE rather than running the engine
 │   │       ├── qs.js             #   the browser runtime, copied into every build
 │   │       └── site/index.php    #   a built site's front controller, copied verbatim
-│   ├── projects/                 # Project data (one folder per project)
-│   │   └── quicksite/            # Default project
+│   ├── projects/                 # Project data: one folder per project, named by its id
+│   │   └── quicksite/            # The starter project as shipped. First run copies it to an
+│   │       │                     #   id drawn for the first account and leaves this folder as
+│   │       │                     #   it came: no roster, so it is served to nobody
 │   │       ├── config.php        # Project config (languages, settings)
 │   │       ├── config/           # Per-project settings that are not page content:
 │   │       │                     #   members.json (owner, visibility, join_policy, members
 │   │       │                     #   {userId → role} + pending invitations/requests — gitignored),
+│   │       │                     #   project.json (the project's name: {"name": "…"}; a project
+│   │       │                     #   without one is shown by its id),
 │   │       │                     #   route-layout.json, sitemap-config.json, custom-js-functions.json
 │   │       ├── routes.php        # Public route definitions
 │   │       ├── templates/        # Page and component JSON structures
@@ -147,6 +151,7 @@ operator's own site.
 - **`secure/src/runtime/` is what ships to a site**, as opposed to `src/classes/` and `src/functions/`, which run the engine. `qs.js` is its browser half; `site/index.php` is its server half — the front controller a build copies verbatim into the site it produces. Neither is used by the install itself: the install's own web root is deliberately free of an entry point, so QuickSite never squats the domain.
 - **`secure/management/config/`** holds the installation's own sensitive files — auth policy, the user registry, the first-run token, the deploy and import policies — and every one of those is gitignored. Session *files* are not here; they live under `secure/tmp/sessions/`. `auth.php` and `roles.php` are auto-created from `.example` templates on first load; `users.php` is written when the first account is created. `categories.php` and `assetCategories.php` sit alongside them but are tracked engine registries rather than operator config.
 - **Projects** are fully isolated in `secure/projects/`. Each has its own pages, translations, routes, and assets, and each is served from its own folder under its own `/p/<projectId>/` view — no project is privileged. Change which one you are *editing* with the admin header picker.
+- **A project has an id and a name.** The id is drawn when the project is made — nine characters, a letter first, then lowercase letters and digits — and is its folder, its `/p/<projectId>/` address and every command's marker; it never changes. The name is free text its owner chooses and can change, kept in the project's `config/project.json`; the panel shows a project as "Name #id".
 - **Snippets live in three tiers.** `secure/snippets/core/` ships with the engine and is read-only. `secure/snippets/custom/<userId>/` is one author's own library — private to them, and available to them in every project they work on. `secure/projects/<projectId>/snippets/` belongs to that project alone. See [COMMAND_API.md](COMMAND_API.md) for how a snippet is saved to each and how reads resolve between them.
 
 ## Folder customization

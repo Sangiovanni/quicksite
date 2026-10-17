@@ -159,22 +159,9 @@ function qs_cache_entry_is_member($entry): bool {
     return !is_array($entry) || (($entry['status'] ?? 'member') === 'member');
 }
 
-/**
- * A project's public display name (config.php SITE_NAME), read directly so it
- * works in every context (dispatcher, internal, harness) — falls back to the
- * project id. Shape-guarded like loadProjectMembers (cache mirror labels).
- */
-function qs_project_site_name(string $project): string {
-    if ($project === '' || strpbrk($project, "/\\") !== false || strpos($project, '..') !== false) {
-        return $project;
-    }
-    $path = SECURE_FOLDER_PATH . '/projects/' . $project . '/config.php';
-    if (!is_file($path)) {
-        return $project;
-    }
-    $cfg = @include $path;
-    return (is_array($cfg) && !empty($cfg['SITE_NAME'])) ? (string)$cfg['SITE_NAME'] : $project;
-}
+// A project's name and how it is shown (qs_project_display_name, qs_project_label):
+// read from the project's own name file whenever it is shown, never cached here.
+require_once __DIR__ . '/projectIdentity.php';
 
 /**
  * THE canonical members.json birth-write — mint a fresh trust file for a
@@ -491,6 +478,19 @@ function qs_members_failure_http(?string $failure): array {
         return [400, 'validation.unencodable', 'A submitted value could not be stored; check the text encoding'];
     }
     return [500, 'server.file_write_failed', 'Failed to persist the membership change'];
+}
+
+/**
+ * One entry of a user's `projects` cache for a live membership state: 'member', 'pending_invite'
+ * or 'pending_request'. It carries no project name — a name is read from the project when it is
+ * shown, so a rename reaches every list at once. A terminal notice ('refused', 'removed',
+ * 'deleted') is built by its writer and keeps the name the person saw when it happened: a record
+ * of the event, and for a deleted project the only copy left.
+ */
+function qs_membership_mirror_entry(string $status, string $date): array {
+    return $status === 'member'
+        ? ['created' => $date, 'status' => 'member']
+        : ['status' => $status, 'at' => $date];
 }
 
 /**
@@ -1177,7 +1177,7 @@ function qs_user_create(string $name, string $username, ?string $password, int $
     if (!qs_valid_username($username)) {
         return ['ok' => false, 'error' => 'invalid_username'];
     }
-    // Display name: cap + control-strip (same rule as createProject site_name).
+    // Display name: cap at 200 characters + control-strip.
     $name = preg_replace('/[\x00-\x1F\x7F]/', '', mb_substr(trim($name), 0, 200));
     // Privacy: the username is the PRIVATE login identifier; the public display
     // name is shown to other users. Forbid them being equal (case-insensitive)

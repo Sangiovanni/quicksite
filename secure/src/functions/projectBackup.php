@@ -8,8 +8,10 @@
  * A backup holds what an export carries: the project's settings and routes, its
  * config folder, its structures, translations, data, snippets and public files.
  * It never holds `config/members.json` or its lock: a backup does not carry who
- * may use the project, and a restore never changes it. Builds, exports and
- * earlier backups are never part of one.
+ * may use the project, and a restore never changes it. Nor its name
+ * (`config/project.json`, projectIdentity.php): a restore brings back the site,
+ * and the project keeps the name it has. Builds, exports and earlier backups are
+ * never part of one.
  *
  * A link is never followed (FileSystem.php): an item that is itself a link is
  * left out, as one inside an item is.
@@ -20,8 +22,8 @@ require_once __DIR__ . '/FileSystem.php'; // qs_copy_tree, qs_delete_entry, qs_t
 /** The top-level entries of a project a backup holds, in the order they are copied and restored. */
 const QS_BACKUP_ITEMS = ['config.php', 'routes.php', 'config', 'templates', 'translate', 'data', 'snippets', 'public'];
 
-/** The entries of `config/` a backup never holds and a restore never touches. */
-const QS_BACKUP_CONFIG_KEPT = ['members.json', 'members.json.lock'];
+/** The entries of `config/` a backup never holds and a restore never touches: who may use the project, and its name. */
+const QS_BACKUP_CONFIG_KEPT = ['members.json', 'members.json.lock', 'project.json'];
 
 /** Whether an item is in `$root` and is not a link: what a backup copies, or a restore brings back. */
 function qs_backup_item_present(string $root, string $item): bool {

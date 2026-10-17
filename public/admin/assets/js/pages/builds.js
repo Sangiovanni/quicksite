@@ -554,7 +554,7 @@
 
         var row = null;
         (data.projects || []).forEach(function (p) {
-            if (p.name === CFG.project) row = p;
+            if (p.project === CFG.project) row = p;
         });
 
         if (!row) {
@@ -1008,7 +1008,7 @@
 
     document.addEventListener('DOMContentLoaded', async function () {
         var chip = document.getElementById('builds-project-chip');
-        if (chip && CFG.project) chip.textContent = CFG.project;
+        if (chip && CFG.project) chip.textContent = CFG.projectLabel || CFG.project;
 
         // admin.js loads permissions asynchronously; every control here is gated
         // on them, so render nothing until they have landed.

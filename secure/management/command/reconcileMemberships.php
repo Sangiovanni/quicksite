@@ -69,18 +69,18 @@ function __command_reconcileMemberships(array $params = [], array $urlParams = [
             ->withMessage('Project membership authority is missing or unreadable — reconcile aborted');
     }
 
-    $siteName   = qs_project_site_name($project);
-    $isPublic   = (($members['visibility'] ?? 'private') === 'public');
     $memberIds  = array_keys($members['members']);
+    $today      = date('Y-m-d');
 
-    // Build the DESIRED cache entry per user from authority: member, then the
+    // Build the DESIRED cache status per user from authority: member, then the
     // engaged pending states. A SPONSORED proposal target (direction 'request',
     // by != target) is NOT engaged — it gets NO mirror, so it is absent
     // from $desired and treated like any other non-listed user (tombstone-preserve
-    // or stale-prune).
-    $desired = []; // uid => cache entry array
+    // or stale-prune). An entry carries no project name (qs_membership_mirror_entry):
+    // the inbox reads it when it lists, with the private-project rule.
+    $desired = []; // uid => status
     foreach ($members['members'] as $uid => $entry) {
-        $desired[(string)$uid] = ['name' => $siteName, 'status' => 'member'];
+        $desired[(string)$uid] = 'member';
     }
     foreach (($members['invitations'] ?? []) as $uid => $inv) {
         $uid = (string)$uid;
@@ -89,12 +89,9 @@ function __command_reconcileMemberships(array $params = [], array $urlParams = [
         }
         $direction = is_array($inv) ? ($inv['direction'] ?? 'invite') : 'invite';
         if ($direction === 'invite') {
-            // Authority-consented engagement → SITE_NAME is fine.
-            $desired[$uid] = ['name' => $siteName, 'status' => 'pending_invite'];
+            $desired[$uid] = 'pending_invite';
         } elseif ($direction === 'request' && (is_array($inv) && ($inv['by'] ?? null) === $uid)) {
-            // Self-request: name privacy — a private project shows only the id the
-            // requester already typed (never leak SITE_NAME before membership).
-            $desired[$uid] = ['name' => $isPublic ? $siteName : $project, 'status' => 'pending_request'];
+            $desired[$uid] = 'pending_request';
         }
         // sponsored proposal (by != uid) → intentionally no desired entry
     }
@@ -109,7 +106,7 @@ function __command_reconcileMemberships(array $params = [], array $urlParams = [
         'preserved_tombstones'  => 0,
     ];
 
-    $written = qs_users_mutate(function (array &$cfg) use ($project, $desired, &$counts) {
+    $written = qs_users_mutate(function (array &$cfg) use ($project, $desired, $today, &$counts) {
         foreach ($cfg['users'] as $uid => &$u) {
             $uid = (string)$uid;
             $has = isset($u['projects'][$project]);
@@ -117,11 +114,14 @@ function __command_reconcileMemberships(array $params = [], array $urlParams = [
 
             if (isset($desired[$uid])) {
                 // Authority lists this user in an engaged state — the cache must
-                // match it (heal status/name; add if missing).
-                $want = $desired[$uid];
-                // Preserve a benign informational `created` on member entries.
-                if ($want['status'] === 'member' && is_array($current) && isset($current['created'])) {
-                    $want['created'] = $current['created'];
+                // match it (heal the status, drop a name an older entry carried;
+                // add if missing).
+                $want = qs_membership_mirror_entry($desired[$uid], $today);
+                // Preserve the entry's benign informational date (`created` on a
+                // member entry, `at` on a pending one).
+                $dateKey = $desired[$uid] === 'member' ? 'created' : 'at';
+                if (is_array($current) && isset($current[$dateKey]) && is_string($current[$dateKey])) {
+                    $want[$dateKey] = $current[$dateKey];
                 }
                 if ($current !== $want) {
                     if (!$has) {

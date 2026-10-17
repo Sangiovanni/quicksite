@@ -3645,7 +3645,7 @@ $GLOBALS['__help_commands'] = [
     // ==========================================
     
     'listProjects' => [
-        'description' => 'Lists the CALLER\'s projects with metadata (name, site name, routes, languages, size). The list is filtered to the projects the authenticated user is a member of (from each project\'s members.json) - there is no all-projects view.',
+        'description' => 'Lists the CALLER\'s projects with metadata (id, name, routes, languages, size). The list is filtered to the projects the authenticated user is a member of (from each project\'s members.json) - there is no all-projects view.',
         'method' => 'GET',
         'parameters' => [],
         'example_get' => 'GET /management/listProjects',
@@ -3656,13 +3656,13 @@ $GLOBALS['__help_commands'] = [
             'data' => [
                 'projects' => [
                     [
-                        'name' => 'quicksite',
-                        'path' => '<secure>/projects/quicksite',
-                        'site_name' => 'QuickSite Demo',
+                        'project' => 'k7m2p9xq4',
+                        'name' => 'My Website',
+                        'path' => '<secure>/projects/k7m2p9xq4',
                         'routes_count' => 5,
                         'pages_count' => 5,
                         'languages' => ['en', 'fr'],
-                        'size' => '2.5 MB',
+                        'size_human' => '2.5 MB',
                         'size_bytes' => 2621440,
                         'my_role' => 'owner'
                     ]
@@ -3672,27 +3672,20 @@ $GLOBALS['__help_commands'] = [
             ]
         ],
         'error_responses' => [],
-        'notes' => 'Projects you are not a member of are simply absent from the list. my_role is your role on that project (members.json). A user with no memberships gets an empty list. No project is privileged, so the list is plain alphabetical.'
+        'notes' => 'project is the project\'s id - its folder, its /p/<projectId>/ address and the marker every project-scoped command takes; name is the name its owner gave it (renameProject), or the id when the project has none. Two projects may share a name: the id tells them apart. Projects you are not a member of are simply absent from the list. my_role is your role on that project (members.json). A user with no memberships gets an empty list. No project is privileged, so the list is sorted by name (case ignored), then by id. pages_count counts every page, nested ones included.'
     ],
     
 
     'createProject' => [
-        'description' => 'Creates a new empty project with basic structure and templates',
+        'description' => 'Creates a new empty project with basic structure and templates. Its id is drawn by the installation; the caller gives its name.',
         'method' => 'POST',
         'parameters' => [
             'name' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Project name (alphanumeric, starts with letter)',
-                'example' => 'my_new_site',
-                'validation' => 'Max 50 chars, alphanumeric/dash/underscore only, must start with letter'
-            ],
-            'site_name' => [
-                'required' => false,
-                'type' => 'string',
-                'description' => 'Display name for the site',
-                'default' => 'Capitalized project name',
-                'validation' => 'Max 200 chars; control characters stripped'
+                'description' => 'The project\'s name: how it is listed and shown ("Name #id"). It also seeds the site\'s own texts (site.name and the texts built from it in the first language file), which the author edits from then on. Two projects may share a name.',
+                'example' => 'My Website',
+                'validation' => '1 to 60 characters once trimmed: free text, accents and spaces welcome, no control character'
             ],
             'language' => [
                 'required' => false,
@@ -3708,51 +3701,53 @@ $GLOBALS['__help_commands'] = [
                 'default' => false
             ]
         ],
-        'example_post' => 'POST /management/createProject with body: {"name": "mysite", "site_name": "My Website", "language": "en", "switch_to": true}',
+        'example_post' => 'POST /management/createProject with body: {"name": "My Website", "language": "en", "switch_to": true}',
         'success_response' => [
             'status' => 201,
             'code' => 'resource.created',
-            'message' => "Project 'mysite' created successfully",
+            'message' => "Project 'My Website #k7m2p9xq4' created successfully",
             'data' => [
-                'project' => 'mysite',
-                'path' => '<secure>/projects/mysite',
-                'site_name' => 'My Website',
+                'project' => 'k7m2p9xq4',
+                'name' => 'My Website',
+                'path' => '<secure>/projects/k7m2p9xq4',
                 'default_language' => 'en',
+                'owner_user_id' => 'usr_0123456789abcdef0123456789abcdef',
                 'created' => true,
                 'switched_to' => true
             ]
         ],
         'error_responses' => [
-            '400.validation.missing_field' => 'Missing name parameter',
-            '400.validation.invalid_format' => 'Invalid project name format',
-            '400.validation.reserved_name' => 'Project name is reserved for system use',
-            '400.validation.invalid_type' => 'site_name or language is not a string',
+            '400.validation.missing_field' => 'No name, or a name that is empty once trimmed',
+            '400.validation.invalid_length' => 'The name has more than 60 characters once trimmed',
+            '400.validation.invalid_format' => 'The name holds a control character',
+            '400.validation.unencodable' => 'The name is not valid UTF-8 text',
+            '400.validation.invalid_type' => 'name or language is not a string',
             '400.validation.unsupported_language' => 'The code is not in the installation\'s language list (getLanguageList returns it)',
-            '409.resource.already_exists' => 'Project already exists',
-            '500.server.directory_create_failed' => 'Failed to create project structure.',
-            '500.server.file_write_failed' => 'Failed to create config.php. Failed to create routes.php. Failed to initialise project membership.',
+            '500.server.directory_create_failed' => 'Failed to create project structure (no project folder could be made under a drawn id).',
+            '500.server.file_write_failed' => 'Failed to create config.php. Failed to write the project name. Failed to create routes.php. Failed to initialise project membership.',
             '507.quota.storage_exceeded' => 'A storage quota is configured and the caller\'s projects are already over it, so no new project can be created. Nothing was written.'
         ],
-        'notes' => 'Creates complete project structure: config.php, routes.php, templates/, translate/, etc., and an empty stylesheet. The home page, the menu and the footer start empty ([]: the visual editor shows each one\'s placeholder). The 404 page starts with its message: a heading (404.title), the sentence (404.message) and a link to the home page (404.backHome), texts written in English into the project\'s language file and default.json for the author to rewrite. A create that fails part-way removes what it wrote: no project folder is left behind.'
+        'notes' => 'The project\'s id is drawn, never chosen: nine characters, a lowercase letter first, then lowercase letters and digits, leaving out the ones easily misread when typed (0, o, 1, l, i); drawn again while it is taken. It is the project\'s folder, its /p/<projectId>/ address and the marker every project-scoped command takes, and it never changes. The name is stored with the project, in config/project.json, and is read wherever the project is shown; renameProject changes it. data.project is the id. Creates complete project structure: config.php, routes.php, templates/, translate/, etc., and an empty stylesheet. The home page, the menu and the footer start empty ([]: the visual editor shows each one\'s placeholder). The 404 page starts with its message: a heading (404.title), the sentence (404.message) and a link to the home page (404.backHome), texts written in English into the project\'s language file and default.json for the author to rewrite. A create that fails part-way removes what it wrote: no project folder is left behind.'
     ],
 
     'cloneProject' => [
-        'description' => 'Duplicates a project under a new name. Every file is copied except the backups folder; the clone gets its own site name and a fresh membership file with the caller as its sole owner.',
+        'description' => 'Duplicates a project as a new one: a new id, always drawn by the installation, and the name the caller gives. Every file is copied as it is except the backups folder; the clone gets a fresh membership file with the caller as its sole owner.',
         'method' => 'POST',
         'url_structure' => '/management/p/<projectId>/cloneProject',
         'parameters' => [
             'name' => [
-                'required' => true,
+                'required' => false,
                 'type' => 'string',
-                'description' => 'Name of the new project. Becomes the clone\'s project id and, title-cased with dashes and underscores turned into spaces, its site name.',
-                'example' => 'my-site-copy',
-                'validation' => 'Must start with a letter and contain only letters, digits, dashes and underscores; maximum 50 characters. The names admin, management, src, logs, config and projects are reserved.'
+                'description' => 'The clone\'s name. Two projects may share a name.',
+                'example' => 'My Website (copy)',
+                'default' => 'The source\'s name (its id when it has none)',
+                'validation' => '1 to 60 characters once trimmed: free text, accents and spaces welcome, no control character'
             ],
             'source' => [
                 'required' => false,
                 'type' => 'string',
                 'description' => 'Echo-check only. The project cloned is ALWAYS the one in the URL marker (/management/p/<projectId>/cloneProject); this parameter cannot select a different one. Supply it and it must match the marker, or the call is refused with 400 project.mismatch.',
-                'example' => 'my-site'
+                'example' => 'k7m2p9xq4'
             ],
             'switch_to' => [
                 'required' => false,
@@ -3763,16 +3758,16 @@ $GLOBALS['__help_commands'] = [
                 'validation' => 'Read with a boolean filter, so true/false, 1/0 and the strings "true"/"false"/"on"/"yes" are all accepted; anything else reads as false.'
             ]
         ],
-        'example_post' => 'POST /management/p/<projectId>/cloneProject with body: {"name": "my-site-copy"} or {"name": "my-site-copy", "switch_to": true}',
+        'example_post' => 'POST /management/p/<projectId>/cloneProject with body: {"name": "My Website (copy)"} or {"name": "My Website (copy)", "switch_to": true}',
         'success_response' => [
             'status' => 201,
             'code' => 'resource.created',
-            'message' => "Project 'my-site' cloned to 'my-site-copy' successfully",
+            'message' => "Project 'My Website #k7m2p9xq4' cloned to 'My Website (copy) #h4w8tn3ra' successfully",
             'data' => [
-                'project' => 'my-site-copy',
-                'source' => 'my-site',
-                'path' => '<secure>/projects/my-site-copy',
-                'site_name' => 'My site copy',
+                'project' => 'h4w8tn3ra',
+                'name' => 'My Website (copy)',
+                'source' => 'k7m2p9xq4',
+                'path' => '<secure>/projects/h4w8tn3ra',
                 'files_copied' => 25,
                 'cloned' => true,
                 'owner_user_id' => 'usr_0123456789abcdef0123456789abcdef',
@@ -3782,18 +3777,60 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.project.required' => 'No project targeted — use /management/p/<projectId>/cloneProject.',
             '400.project.mismatch' => 'A source in the request disagreed with the project in the URL.',
-            '400.validation.missing_field' => 'name is missing or empty.',
-            '400.validation.invalid_format' => 'name does not match the allowed pattern, or the marker names a project id that is not a valid project name.',
-            '400.validation.reserved_name' => 'name is one of the reserved names: admin, management, src, logs, config, projects.',
+            '400.validation.missing_field' => 'name is empty once trimmed.',
+            '400.validation.invalid_length' => 'name has more than 60 characters once trimmed.',
+            '400.validation.invalid_format' => 'name holds a control character, or the marker names a project id that is not a valid project id.',
+            '400.validation.unencodable' => 'name is not valid UTF-8 text.',
+            '400.validation.invalid_type' => 'name is not a string.',
             '404.resource.not_found' => 'The source project folder does not exist.',
-            '409.resource.already_exists' => 'A project with that name already exists. data.existing_path reports where.',
-            '500.server.operation_failed' => 'The recursive copy failed; anything already copied is removed first.',
-            '500.server.file_write_failed' => 'The clone\'s membership file could not be created. The whole clone is deleted rather than left ownerless.',
+            '500.server.operation_failed' => 'No project folder could be made under a drawn id, or the recursive copy failed; anything already copied is removed first.',
+            '500.server.file_write_failed' => 'The clone\'s name file or membership file could not be created. The whole clone is deleted rather than left half-made.',
             '507.quota.storage_exceeded' => 'A storage quota is configured and the clone would put the caller over it. A clone is a new project owned by the caller, so it is charged to the caller - as an import is - for everything it copies (the source without its backups). Checked before the clone exists; nothing was written.'
         ],
-        'notes' => 'The clone does NOT inherit the source\'s roster: its membership file is written fresh with the caller as sole owner, no members, no pending invitations, visibility private and joining closed. A clone is an independent project — re-invite collaborators explicitly. The backups folder is skipped, so a clone starts with no backup history; everything else, including config, templates, translations, data and public assets, is copied. A link inside the project is not followed: what it points to is not copied. The clone\'s site name is derived from the new project name, and any site.name entry in its translation files is rewritten to match. data.files_copied counts the files present in the clone after the copy.'
+        'notes' => 'The clone does NOT inherit the source\'s roster: its membership file is written fresh with the caller as sole owner, no members, no pending invitations, visibility private and joining closed. A clone is an independent project — re-invite collaborators explicitly. The backups folder is skipped, so a clone starts with no backup history; everything else, including config, templates, translations, data and public assets, is copied. A link inside the project is not followed: what it points to is not copied. The clone always gets a new id, drawn like createProject\'s (data.project); its name is stored in its config/project.json. The site itself is copied as it is: its translations, site.name included, are the source\'s. data.files_copied counts the files present in the clone after the copy.'
     ],
     
+    'renameProject' => [
+        'description' => 'Gives the targeted project a new name. OWNER-ONLY. The name is how the project is listed and shown ("Name #id"); its id, folder and /p/<projectId>/ address never change.',
+        'method' => 'POST',
+        'url_structure' => '/management/p/<projectId>/renameProject',
+        'parameters' => [
+            'name' => [
+                'required' => true,
+                'type' => 'string',
+                'description' => 'The new name. Two projects may share a name: the id tells them apart.',
+                'example' => 'My Website',
+                'validation' => '1 to 60 characters once trimmed: free text, accents and spaces welcome, no control character'
+            ]
+        ],
+        'example_post' => 'POST /management/p/<projectId>/renameProject with body: {"name": "My Website"}',
+        'success_response' => [
+            'status' => 200,
+            'code' => 'operation.success',
+            'message' => "Project #k7m2p9xq4 renamed to 'My Website'",
+            'data' => [
+                'project' => 'k7m2p9xq4',
+                'name' => 'My Website',
+                'previous_name' => 'My Site',
+                'changed' => true
+            ]
+        ],
+        'error_responses' => [
+            '400.project.required' => 'No project targeted - use /management/p/<projectId>/renameProject',
+            '400.validation.missing_field' => 'No name, or a name that is empty once trimmed',
+            '400.validation.invalid_length' => 'The name has more than 60 characters once trimmed',
+            '400.validation.invalid_format' => 'The name holds a control character',
+            '400.validation.unencodable' => 'The name is not valid UTF-8 text',
+            '400.validation.invalid_type' => 'name is not a string',
+            '403.auth.forbidden' => 'Not the owner of this project (owner-only)',
+            '404.resource.not_found' => 'Project not found',
+            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
+            '500.server.file_write_failed' => 'The name file could not be written',
+            '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
+        ],
+        'notes' => 'The name is stored with the project, in config/project.json, and read wherever the project is shown, so a rename reaches every list at once; no copy is kept anywhere else. It is the panel\'s label only: the site\'s own texts - the site.name translation visitors read - are not touched. data.previous_name is the name the project had (null when it had none, and was shown by its id). Sending the name the project already has writes nothing and answers changed=false. An export carries the name; a backup does not hold it and a restore does not change it.'
+    ],
+
     'deleteProject' => [
         'description' => 'Permanently deletes a project and all its files. Project-scoped and OWNER-ONLY: authorized against the URL marker project (/management/p/<projectId>/deleteProject) via that project\'s members.json. The deleted project is always the marker project; a body "name" that disagrees is refused.',
         'method' => 'DELETE',
@@ -3832,7 +3869,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.delete_failed' => 'The tree could not be fully removed. data.partial says whether anything was deleted; data.survived names what could not be (project-relative paths); data.retained names what was kept deliberately so a retry stays possible; data.files_deleted / data.directories_deleted count what did go.',
             '400.validation.invalid_format' => 'Invalid project name.'
         ],
-        'notes' => 'WARNING: This is permanent and cannot be undone. Use exportProject first to backup. Only the project OWNER may delete it. Membership cascade: every OTHER member and every ENGAGED pending party (invitees, self-requesters) gets a dismissable status "deleted" notice in their own cache (it appears in their membership inbox in the admin panel, where they clear it) so the deletion is never mistaken for a refusal or removal; the deleting owner\'s own entry is simply removed, and a sponsored not-yet-validated proposal target gets NOTHING (they were never told the project existed). The response reports the cascade under data.membership_cascade. PARTIAL DELETES: the removal continues past a file it cannot remove rather than stopping at the first, and reports what is left — data.survived (blocked) and data.retained (kept on purpose). config.php, routes.php and config/ go LAST and are skipped entirely when anything else failed: the first two are what the project context boots from and config/members.json is the permission gate, so removing them on the way past would leave a project that could be neither named nor authorized, and no retry could finish it. Release whatever blocked the delete and re-run; the command is safe to repeat. The project\'s cached space measurement goes with it, so a project created or imported later under the same name measures itself.'
+        'notes' => 'WARNING: This is permanent and cannot be undone. Use exportProject first to backup. Only the project OWNER may delete it. Membership cascade: every OTHER member and every ENGAGED pending party (invitees, self-requesters) gets a dismissable status "deleted" notice in their own cache (it appears in their membership inbox in the admin panel, where they clear it) so the deletion is never mistaken for a refusal or removal; the notice keeps the project\'s name (its id for a self-requester on a private project, who never saw the name); the deleting owner\'s own entry is simply removed, and a sponsored not-yet-validated proposal target gets NOTHING (they were never told the project existed). The response reports the cascade under data.membership_cascade. PARTIAL DELETES: the removal continues past a file it cannot remove rather than stopping at the first, and reports what is left — data.survived (blocked) and data.retained (kept on purpose). config.php, routes.php and config/ go LAST and are skipped entirely when anything else failed: the first two are what the project context boots from and config/members.json is the permission gate, so removing them on the way past would leave a project that could be neither named nor authorized, and no retry could finish it. Release whatever blocked the delete and re-run; the command is safe to repeat. The project\'s cached space measurement goes with it, so no later project inherits it.'
     ],
 
     'listMembers' => [
@@ -4296,7 +4333,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.file_write_failed' => 'Could not persist the reconciled cache',
             '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.'
         ],
-        'notes' => 'MERGE-PRESERVE rule (the point of the command): member/pending_invite/pending_request are DERIVABLE from members.json and rebuilt from it; but refused/removed/deleted are TOMBSTONES that live ONLY in the user cache (members.json keeps no record of a refusal, kick, or dead project). Reconcile PRESERVES any tombstone for a user the authority no longer lists, and prunes only STALE POSITIVES (a cache claiming member/pending the authority contradicts). Aborts on an unreadable authority rather than wipe real memberships.'
+        'notes' => 'MERGE-PRESERVE rule (the point of the command): member/pending_invite/pending_request are DERIVABLE from members.json and rebuilt from it; but refused/removed/deleted are TOMBSTONES that live ONLY in the user cache (members.json keeps no record of a refusal, kick, or dead project). Reconcile PRESERVES any tombstone for a user the authority no longer lists, and prunes only STALE POSITIVES (a cache claiming member/pending the authority contradicts). A rebuilt entry carries no project name (a name is read from the project when it is shown), so a name an older entry kept is dropped; a tombstone keeps the name it was written with. Aborts on an unreadable authority rather than wipe real memberships.'
     ],
 
     'getProjectRoster' => [
@@ -4379,7 +4416,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.move_failed' => 'save=true, but the archive could not be written into the exports folder',
             '507.quota.storage_exceeded' => 'save=true and a storage quota is configured: keeping the archive would put the project owner over it, counting the archive less the oldest one the five-export limit drops for it. The archive was not kept. A streamed export (save=false) is never charged: it lives in the system\'s temporary folder for the download only.'
         ],
-        'notes' => 'Project-scoped: the exported project is the one in the URL marker; a name/project in the request is optional and must match. Export format v2.0-secure - PHP files are NOT included, they are rebuilt from JSON on import. The archive carries the project\'s settings (site name, languages, multilingual mode, theme mode, favicon and build size limit) and the routes as config.json and routes.json, config/*.json except members.json, its page, component, menu and footer structures, its own snippets, its translations and data, and - unless include_public=false - public/assets and public/style. It never carries builds, backups or earlier exports. Its config.json always names the project\'s languages: its list, or, when its configuration lists none, its default language (en when it has none either), because an import refuses an archive that names no language. Saved exports live in that project\'s own folder (<secure>/projects/<id>/exports/), are auto-cleaned (keeps the last 5), and are reachable only through their own project\'s marker via downloadExport.'
+        'notes' => 'Project-scoped: the exported project is the one in the URL marker; a name/project in the request is optional and must match. Export format v2.0-secure - PHP files are NOT included, they are rebuilt from JSON on import. The archive carries the project\'s settings (languages, multilingual mode, theme mode, favicon and build size limit) and the routes as config.json and routes.json, config/*.json except members.json (its name file, config/project.json, among them), its page, component, menu and footer structures, its own snippets, its translations and data, and - unless include_public=false - public/assets and public/style. It never carries builds, backups or earlier exports. Its config.json always names the project\'s languages: its list, or, when its configuration lists none, its default language (en when it has none either), because an import refuses an archive that names no language. Saved exports live in that project\'s own folder (<secure>/projects/<id>/exports/), are auto-cleaned (keeps the last 5), and are reachable only through their own project\'s marker via downloadExport.'
     ],
     
     'importProject' => [
@@ -4396,8 +4433,9 @@ $GLOBALS['__help_commands'] = [
             'name' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => 'Override project name',
-                'default' => 'Uses folder name from ZIP'
+                'description' => 'The new project\'s name. Two projects may share a name.',
+                'default' => 'The archive\'s name: the name in its config/project.json, else its project folder\'s name - each only when it follows the rule',
+                'validation' => '1 to 60 characters once trimmed: free text, accents and spaces welcome, no control character'
             ],
             'switch_to' => [
                 'required' => false,
@@ -4410,12 +4448,12 @@ $GLOBALS['__help_commands'] = [
         'success_response' => [
             'status' => 201,
             'code' => 'resource.imported',
-            'message' => "Project 'mysite' imported successfully",
+            'message' => "Project 'My Website #h4w8tn3ra' imported successfully (secure rebuild)",
             'data' => [
-                'project' => 'mysite',
+                'project' => 'h4w8tn3ra',
+                'name' => 'My Website',
                 'imported' => true,
                 'files_count' => 45,
-                'site_name' => 'My Website',
                 'routes_count' => 5,
                 'switched_to' => true,
                 'security' => [
@@ -4429,7 +4467,7 @@ $GLOBALS['__help_commands'] = [
         'notes' => [
             'An archive is untrusted input. Entries are accepted against an extension ALLOWLIST and each one is checked so its content matches what its name claims (magic bytes for binary formats, valid JSON for .json, no PHP opening tag in a text file a web server could serve, sanitisation for SVG, and for a .css file the stylesheet scan every CSS writer runs — see editStyles).',
             'A refused entry is skipped and listed in security.skipped_disallowed with the reason, and the rest of the archive still imports — except an entry whose name is not a clean path, a file the site reads and a stylesheet, which refuse the whole archive (next notes). security.skipped_unsafe lists entries whose folder the filesystem would not create.',
-            'Every entry in the project folder must have a clean relative path as its name: not absolute, no empty segment (two slashes in a row), no . or .. segment, no segment ending in a dot or a space, and config.json, routes.json and the folders config/, translate/, data/, snippets/, public/ and templates/model/json/ spelled exactly so, in lowercase (CONFIG.JSON or Templates/ is refused). One that does not refuses the WHOLE archive with 400 and nothing is created, because another spelling of a path can land on a real file without being recognised as it, and a name the engine reads would import differently on a system that tells case apart. Entries outside the project folder are ignored.',
+            'Every entry in the project folder must have a clean relative path as its name: not absolute, no empty segment (two slashes in a row), no . or .. segment, no segment ending in a dot or a space, and config.json, routes.json, config/project.json and the folders config/, translate/, data/, snippets/, public/ and templates/model/json/ spelled exactly so, in lowercase (CONFIG.JSON or Templates/ is refused). One that does not refuses the WHOLE archive with 400 and nothing is created, because another spelling of a path can land on a real file without being recognised as it, and a name the engine reads would import differently on a system that tells case apart. Entries outside the project folder are ignored.',
             'The files the site reads are checked before the project is created: config.json and routes.json at the project root, any .json file under config/, translate/ or data/, and every structure file — any .json file under templates/model/json/ or snippets/. Each must be readable, parse as a JSON array or object and pass the content check, and a structure file must also carry no unsafe attribute, blocked tag or invalid component reference. Every setting in config.json must be a value the command that writes it would accept: every language is in this installation\'s language list (getLanguageList), the default language is one of the listed ones, the flags are true or false, the theme default is light, dark or system, the favicon is an image under /assets/images/ with a favicon extension, and the build size limit, which no command writes, is a positive whole number. Language names are not imported: a project stores codes only, and names come from the installation\'s list. The first one that fails refuses the WHOLE archive with 400 and nothing is created, because importing the rest would leave a route whose page is missing, a language showing raw keys, or settings and routes replaced by the defaults. A file at a hidden path is not one of them: the import never writes a hidden path.',
             'An archive names its languages: config.json at the project root, with LANGUAGES_SUPPORTED. An archive with no config.json is refused WHOLE with 400 (reason missing_file, errors[0].file config.json), and so is one whose config.json has no LANGUAGES_SUPPORTED, an empty {} included (reason invalid_setting, errors[0].value LANGUAGES_SUPPORTED); nothing is created. An import never chooses a project\'s languages. A LANGUAGE_DEFAULT the archive leaves out is the first language of its list.',
             'Every stylesheet — any .css entry not at a hidden path — is checked before the project is created too. One that cannot be read, opens a PHP block, or fails the stylesheet scan every CSS writer runs (see editStyles) refuses the WHOLE archive with 400 (reason disallowed_content) and nothing is created: a project imported without its stylesheet would be a site with its styling missing, and a stylesheet the editor refuses cannot arrive by archive either.',
@@ -4437,7 +4475,7 @@ $GLOBALS['__help_commands'] = [
             'Archive resource limits are enforced from the ZIP headers before anything is extracted: entry count, total and per-entry uncompressed size, and per-entry compression ratio. Exceeding any of them returns 413 and writes nothing.',
             'The permitted extensions and the limits can be changed by copying <secure>/management/config/import-policy.php.example to import-policy.php.',
             'PHP is never imported. config.php and routes.php are rebuilt from the archive JSON, and any members.json in the archive is discarded — the importer becomes the sole owner.',
-            'A project id is unique across the installation and an import never reassigns one. If the id is taken the import refuses with 409 and writes nothing; there is no option to replace the existing project. Import under a different name, or delete the existing project first.',
+            'The imported project always gets a new id, drawn like createProject\'s (data.project): an archive never brings its id, so an import can neither take an id in use nor replace an existing project. Its name is the one sent, else the archive\'s own (the name in its config/project.json, else its project folder\'s name, each only when it follows the name rule); a name file the archive carries is replaced by the project\'s own. An archive that offers no usable name, imported without one, is refused with 400 validation.missing_field and nothing is created.',
             'Compatible with exports from exportProject.'
         ],
         'error_responses' => [
@@ -4447,16 +4485,16 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_zip' => 'Invalid or corrupted ZIP',
             '400.validation.invalid_structure' => 'ZIP missing required project files',
             '400.validation.unsafe_param' => 'An entry in the archive failed a check that refuses the whole archive, so nothing is created. errors[0].file names the entry and errors[0].reason the check: unsafe_path (the name is not a clean relative path), missing_file (the project folder has no config.json), invalid_json (cannot be read, does not parse, or is not a JSON array or object), disallowed_content (the import policy or the content check refused it), invalid_setting (no LANGUAGES_SUPPORTED in config.json, a setting the command that writes it would refuse, or a language this installation\'s list does not hold — errors[0].value names the setting), unsafe_value (an unsafe attribute — errors[0].node and errors[0].attribute name it), blocked_tag or invalid_component_reference (errors[0].value names the tag or reference).',
-            '409.resource.already_exists' => 'A project with that id already exists',
             '400.validation.incomplete_project' => 'Imported project is incomplete.',
-            '400.validation.invalid_format' => 'Invalid project name format.',
-            '400.validation.invalid_type' => 'File must be a ZIP archive.',
-            '400.validation.missing_field' => 'No archive was uploaded. Send the ZIP as multipart/form-data.',
-            '400.validation.reserved_name' => 'Project name is reserved.',
+            '400.validation.invalid_format' => 'The name holds a control character.',
+            '400.validation.invalid_length' => 'The name has more than 60 characters once trimmed.',
+            '400.validation.unencodable' => 'The name is not valid UTF-8 text.',
+            '400.validation.invalid_type' => 'File must be a ZIP archive, or the name is not a string.',
+            '400.validation.missing_field' => 'No archive was uploaded (send the ZIP as multipart/form-data), or no name was sent and the archive offers none that follows the rule.',
             '429.quota.rate_limited' => 'Too many uploads in the current period (upload_rate), or a window of the write rate is used up (see limits.write_rate in the overview). Both carry retry_after (seconds) and a message stating the limit in force; the write rate also names its window and sends Retry-After.',
             '500.server.directory_create_failed' => 'Failed to create project directory.',
             '500.server.extract_failed' => 'Failed to extract project files.',
-            '500.server.file_write_failed' => 'Failed to initialise imported project membership.',
+            '500.server.file_write_failed' => 'Failed to write the project name, or to initialise imported project membership.',
             '500.server.missing_extension' => 'ZIP extension not available.',
             '500.server.rebuild_failed' => 'Failed to rebuild PHP files from JSON.',
             '507.quota.storage_exceeded' => 'Importing this archive would take the owner over their configured storage quota. Charged to the project owner, so the refusal is generic when the caller is not that owner.'
@@ -4548,7 +4586,7 @@ $GLOBALS['__help_commands'] = [
             '500.backup.incomplete' => 'An item could not be copied completely: data.failed_items names it, data.errors the paths, relative to the project. Nothing was kept - the incomplete copy is removed (data.backup_kept is false; data.leftover names it in the rare case it could not be) - and no older backup was deleted. The project is untouched (data.project_intact); fix the cause and back it up again.',
             '507.quota.storage_exceeded' => 'A storage quota is configured and this backup would put the project owner over it: what the backup copies, less the older backups max_backups deletes for it. Nothing was written. Delete an older backup first.'
         ],
-        'notes' => 'A backup holds what an export carries: config.php, routes.php, config/ (never config/members.json or its lock), templates/, translate/, data/, snippets/ and public/ - never builds, exports or other backups. Backups are stored in the project\'s backups/ folder. Once a backup is made whole, the oldest backups past max_backups are deleted; one that cannot be fully deleted does not fail the backup (the message and data.prune_failed name it). A backup that cannot be made completely is not kept and deletes nothing older (500 backup.incomplete): restoring a partial copy would replace whole items of the project with it. With a storage quota configured, the backup is checked before anything is written, against the project OWNER\'s quota, and refused (507) when what it copies less what it deletes would not fit; while it is written, before the older backups go, the total can exceed the ceiling by the backups it then deletes. A link inside the project is not followed: what it points to is not copied into the backup. For sharing projects externally, use exportProject instead (JSON-only, secure).'
+        'notes' => 'A backup holds what an export carries: config.php, routes.php, config/ (never config/members.json or its lock, nor the project\'s name, config/project.json), templates/, translate/, data/, snippets/ and public/ - never builds, exports or other backups. Backups are stored in the project\'s backups/ folder. Once a backup is made whole, the oldest backups past max_backups are deleted; one that cannot be fully deleted does not fail the backup (the message and data.prune_failed name it). A backup that cannot be made completely is not kept and deletes nothing older (500 backup.incomplete): restoring a partial copy would replace whole items of the project with it. With a storage quota configured, the backup is checked before anything is written, against the project OWNER\'s quota, and refused (507) when what it copies less what it deletes would not fit; while it is written, before the older backups go, the total can exceed the ceiling by the backups it then deletes. A link inside the project is not followed: what it points to is not copied into the backup. For sharing projects externally, use exportProject instead (JSON-only, secure).'
     ],
     
     'listBackups' => [
@@ -4653,7 +4691,7 @@ $GLOBALS['__help_commands'] = [
             '500.restore.no_files_restored' => 'No file could be restored; data.errors lists why, data.failed_items the items, data.pre_restore_backup names the snapshot if one was taken. The backup is untouched (data.backup_intact) and can be restored again',
             '500.restore.incomplete' => 'Part of the backup was restored and part could not be: data.failed_items names the items not restored completely, data.restored_items the ones that were, data.errors the paths that failed. The project now mixes the two states. The backup is untouched (data.backup_intact) and can be restored again once the cause is fixed'
         ],
-        'notes' => 'DESTRUCTIVE: every item the chosen backup holds (config.php, routes.php, config/, templates/, translate/, data/, snippets/, public/) is overwritten from it; an item it does not hold is left as it is, and config/members.json and its lock are never touched, so a restore never changes who may use the project. There is NO automatic safety net- pass create_backup=true to snapshot the current state first (data.pre_restore_backup then names it, and restoring that snapshot undoes this restore). Omit it and data.pre_restore_backup is null and the state being overwritten is not recoverable from within QuickSite. The admin panel asks before it restores and sends create_backup according to the answer; a direct API caller gets no such prompt. A restore keeps going past a failure, so that as much as possible comes back, and answers 500 restore.incomplete when anything could not be restored completely: it never answers success for a partial restore. The backup is only read, never changed, so it can be restored again. Each item is removed before it is restored as deleteProject removes a tree: a link is removed and never followed, a read-only file is removed. A link inside the backup is not followed either: what it points to is not restored. With delete_backup=true the backup is deleted once the restore is complete (data.backup_deleted); an incomplete restore keeps it. With a storage quota configured, the restore is checked before anything is touched, against the project OWNER\'s quota (507 when it would not fit).'
+        'notes' => 'DESTRUCTIVE: every item the chosen backup holds (config.php, routes.php, config/, templates/, translate/, data/, snippets/, public/) is overwritten from it; an item it does not hold is left as it is, and config/members.json and its lock are never touched, so a restore never changes who may use the project; nor is config/project.json, so the project keeps the name it has. There is NO automatic safety net- pass create_backup=true to snapshot the current state first (data.pre_restore_backup then names it, and restoring that snapshot undoes this restore). Omit it and data.pre_restore_backup is null and the state being overwritten is not recoverable from within QuickSite. The admin panel asks before it restores and sends create_backup according to the answer; a direct API caller gets no such prompt. A restore keeps going past a failure, so that as much as possible comes back, and answers 500 restore.incomplete when anything could not be restored completely: it never answers success for a partial restore. The backup is only read, never changed, so it can be restored again. Each item is removed before it is restored as deleteProject removes a tree: a link is removed and never followed, a read-only file is removed. A link inside the backup is not followed either: what it points to is not restored. With delete_backup=true the backup is deleted once the restore is complete (data.backup_deleted); an incomplete restore keeps it. With a storage quota configured, the restore is checked before anything is touched, against the project OWNER\'s quota (507 when it would not fit).'
     ],
 
     'deleteBackup' => [

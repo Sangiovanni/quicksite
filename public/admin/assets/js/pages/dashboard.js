@@ -502,6 +502,30 @@
         return (sel && sel.value) ? sel.value : currentProject;
     }
 
+    /** A project of listProjects' answer, by id, or null. */
+    function projectById(id) {
+        return allProjects.find(p => p.project === id) || null;
+    }
+
+    /** "Name #id" for a project id (the id alone when it is not in the list). */
+    function labelOf(id) {
+        const p = projectById(id);
+        return QuickSiteAdmin.projectLabel(id, p ? p.name : null);
+    }
+
+    /**
+     * Rename is the OWNER's (renameProject is owner-only), and the Project Manager
+     * acts on the project chosen in its selector — so the button follows that
+     * project's role from listProjects, not the panel-wide permission set, which
+     * answers for the edited project only.
+     */
+    function _syncRenameButton() {
+        const btn = document.getElementById('btn-rename-project');
+        if (!btn) return;
+        const p = projectById(getTargetProject());
+        btn.disabled = !(p && p.my_role === 'owner');
+    }
+
     // Folder icon as an ELEMENT. QuickSiteUtils.icon* return HTML STRINGS; the
     // element-shaped route through the same catalogue is QSDom.iconEl.
     //
@@ -560,26 +584,28 @@
             selector.disabled = true;
             switchBtn.disabled = true;
             _setProjectActionsEnabled(false);
+            _syncRenameButton();
             return;
         }
 
         // Default the edited project when the client emitted none / a stale one.
-        if (!currentProject || !allProjects.some(p => p.name === currentProject)) {
-            currentProject = allProjects[0].name;
+        if (!currentProject || !projectById(currentProject)) {
+            currentProject = allProjects[0].project;
         }
-        const edited = allProjects.find(p => p.name === currentProject) || allProjects[0];
+        const edited = projectById(currentProject) || allProjects[0];
         infoContainer.appendChild(_renderProjectChip(edited, proj));
 
         QSDom.clear(selector);
         allProjects.forEach(p => {
-            const label = p.name + (p.my_role ? ' — ' + p.my_role : '');
-            const opt = QSDom.el('option', { value: p.name, text: label });
-            if (p.name === currentProject) opt.selected = true;
+            const label = QuickSiteAdmin.projectLabel(p.project, p.name) + (p.my_role ? ' — ' + p.my_role : '');
+            const opt = QSDom.el('option', { value: p.project, text: label });
+            if (p.project === currentProject) opt.selected = true;
             selector.appendChild(opt);
         });
         selector.disabled = false;
         switchBtn.disabled = false;
         _setProjectActionsEnabled(true);
+        _syncRenameButton();
 
         updateDeleteSelector();
     }
@@ -588,11 +614,10 @@
         return QSDom.el('div', { class: 'project-manager__info' }, [
             QSDom.el('div', { class: 'project-manager__name' }, [
                 _folderIcon(20),
-                QSDom.el('span', { text: edited.name }),
+                QSDom.el('span', { text: QuickSiteAdmin.projectLabel(edited.project, edited.name) }),
                 QSDom.el('span', { class: 'badge badge--primary', text: proj.editing || 'Editing' }),
                 edited.my_role ? QSDom.el('span', { class: 'badge', text: edited.my_role }) : null,
             ]),
-            edited.site_name ? QSDom.el('div', { class: 'project-manager__meta', text: edited.site_name }) : null,
         ]);
     }
 
@@ -630,7 +655,7 @@
 
         const name = document.createElement('span');
         name.className = 'owner-space__project-name';
-        name.textContent = project.name;
+        name.textContent = QuickSiteAdmin.projectLabel(project.project, project.name);
         row.appendChild(name);
 
         const bar = document.createElement('span');
@@ -1017,7 +1042,7 @@
         if (!list) return;
 
         if (projectLabel && currentProject) {
-            projectLabel.textContent = '(' + currentProject + ')';
+            projectLabel.textContent = '(' + labelOf(currentProject) + ')';
         }
         if (tip) {
             tip.textContent = t('dashboard.storage.backupsTip', 'Switch project to manage other projects\u2019 backups.');
@@ -1098,7 +1123,7 @@
         // Every project you own is deletable: no project is privileged any more, so there
         // is no "can't delete the active one" case to filter out.
         allProjects.forEach(p => {
-            deleteSelector.appendChild(QSDom.el('option', { value: p.name, text: p.name }));
+            deleteSelector.appendChild(QSDom.el('option', { value: p.project, text: QuickSiteAdmin.projectLabel(p.project, p.name) }));
         });
     }
 
@@ -1107,28 +1132,83 @@
     // ========================================================================
 
     /**
-     * A typed project name, made into an id: lowercase letters, digits, `-` and
-     * `_`, anything else becoming `-`. The one rule New Project, Clone and Import
-     * share; the server still validates what it receives.
+     * A typed project name as it is sent: trimmed. A name is free text (the
+     * server's rule: 1 to 60 characters, no control character); the project's
+     * id is drawn by the server, never made from the name.
      */
-    function normalizeProjectName(value) {
-        return String(value || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+    function cleanProjectName(value) {
+        return String(value || '').trim();
     }
 
     /**
-     * The name Import suggests for an archive: its file name without `.zip`, a
-     * browser's duplicate-download marker (` (1)`), and the `_export_<date>_<time>`
-     * suffix exportProject names every archive with. So
-     * `test2_export_20260918_101500.zip` suggests `test2` — the project it was
-     * exported from, which is also the name the server itself would use. A file
-     * named any other way is suggested whole.
+     * The name Import suggests when the archive carries none: its file name
+     * without `.zip`, a browser's duplicate-download marker (` (1)`), and the
+     * `_export_<date>_<time>` suffix exportProject names every archive with.
      */
     function importNameFromFile(fileName) {
         const base = String(fileName || '')
             .replace(/\.zip$/i, '')
             .replace(/\s*\(\d+\)$/, '')
-            .replace(/_export_\d{8}_\d{6}$/, '');
-        return normalizeProjectName(base);
+            .replace(/_export_\d{8}_\d{6}$/, '')
+            .trim();
+        return Array.from(base).slice(0, 60).join('');
+    }
+
+    /**
+     * The project name an archive carries: the `name` in its `config/project.json`
+     * (at the archive's root or in its one project folder, as exportProject writes
+     * it), read in the browser before anything is uploaded, so the Import dialog
+     * opens with the source project's name. Reads the ZIP's central directory and
+     * that one entry — stored, or deflated and inflated with the browser's own
+     * DecompressionStream. Resolves to null when the archive cannot be read this
+     * way or names nothing; the dialog then suggests the file name, and the server
+     * decides in any case.
+     *
+     * @param {File} file
+     * @returns {Promise<?string>}
+     */
+    async function readArchiveProjectName(file) {
+        try {
+            const tailSize = Math.min(file.size, 65557);   // the end record + its longest comment
+            const tail = new DataView(await file.slice(file.size - tailSize).arrayBuffer());
+            let eocd = -1;
+            for (let i = tailSize - 22; i >= 0; i--) {
+                if (tail.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+            }
+            if (eocd < 0) return null;
+            const cdSize = tail.getUint32(eocd + 12, true);
+            const cdOffset = tail.getUint32(eocd + 16, true);
+            if (cdOffset + cdSize > file.size) return null;
+            const cd = new DataView(await file.slice(cdOffset, cdOffset + cdSize).arrayBuffer());
+            const decoder = new TextDecoder();
+            for (let p = 0; p + 46 <= cd.byteLength && cd.getUint32(p, true) === 0x02014b50;) {
+                const method = cd.getUint16(p + 10, true);
+                const compSize = cd.getUint32(p + 20, true);
+                const nameLen = cd.getUint16(p + 28, true);
+                const extraLen = cd.getUint16(p + 30, true);
+                const commentLen = cd.getUint16(p + 32, true);
+                const localOffset = cd.getUint32(p + 42, true);
+                const name = decoder.decode(new Uint8Array(cd.buffer, cd.byteOffset + p + 46, nameLen));
+                p += 46 + nameLen + extraLen + commentLen;
+                if (!/^([^/]+\/)?config\/project\.json$/.test(name) || compSize > 65536) continue;
+                const local = new DataView(await file.slice(localOffset, localOffset + 30).arrayBuffer());
+                if (local.getUint32(0, true) !== 0x04034b50) return null;
+                const start = localOffset + 30 + local.getUint16(26, true) + local.getUint16(28, true);
+                let bytes = file.slice(start, start + compSize);
+                if (method === 8) {
+                    if (typeof DecompressionStream !== 'function') return null;
+                    bytes = await new Response(bytes.stream().pipeThrough(new DecompressionStream('deflate-raw'))).blob();
+                } else if (method !== 0) {
+                    return null;
+                }
+                const data = JSON.parse(await bytes.text());
+                const value = data && typeof data.name === 'string' ? data.name.trim() : '';
+                return value !== '' && Array.from(value).length <= 60 ? value : null;
+            }
+        } catch (error) {
+            // Not an archive this can read: the file name stands in.
+        }
+        return null;
     }
 
     /**
@@ -1160,7 +1240,7 @@
                 // the SAME as the header picker. Panel state, not a command.
                 const result = await QuickSiteAdmin.setSelectedProject(newProject);
                 if (result.ok) {
-                    reloadWithMessage((proj.switched || 'Switched to project') + ': ' + newProject);
+                    reloadWithMessage((proj.switched || 'Switched to project') + ': ' + labelOf(newProject));
                 } else {
                     QuickSiteAdmin.showToast(result.data?.message || 'Failed to switch project', 'error');
                     this.disabled = false;
@@ -1229,21 +1309,66 @@
             openCreateProjectModal();
         }
         
-        // Clone project modal
+        // The selector's choice moves what Rename may act on.
+        document.getElementById('project-selector').addEventListener('change', _syncRenameButton);
+
+        // Clone project modal: prefilled with the source's name (the copy gets
+        // an id of its own, drawn by the server).
         document.getElementById('btn-clone-project').addEventListener('click', function() {
             const target = getTargetProject();
-            document.getElementById('clone-source-name').textContent = target;
-            document.getElementById('clone-project-name').value = target + '-copy';
+            const source = projectById(target);
+            document.getElementById('clone-source-name').textContent = labelOf(target);
+            document.getElementById('clone-project-name').value = source ? source.name : target;
             document.getElementById('modal-clone-project').style.display = 'flex';
             document.getElementById('clone-project-name').focus();
             document.getElementById('clone-project-name').select();
         });
-        
+
+        // Rename project modal: the project chosen in the selector, its current
+        // name prefilled. The button is enabled only for its owner.
+        document.getElementById('btn-rename-project').addEventListener('click', function() {
+            const target = getTargetProject();
+            const current = projectById(target);
+            if (!current || current.my_role !== 'owner') return;
+            document.getElementById('rename-project-current').textContent = labelOf(target);
+            const input = document.getElementById('rename-project-name');
+            input.value = current.name;
+            document.getElementById('modal-rename-project').style.display = 'flex';
+            input.focus();
+            input.select();
+        });
+
+        document.getElementById('btn-confirm-rename').addEventListener('click', async function() {
+            const target = getTargetProject();
+            const name = cleanProjectName(document.getElementById('rename-project-name').value);
+            if (!name) {
+                QuickSiteAdmin.showToast(proj.nameRequired || 'Project name is required', 'error');
+                return;
+            }
+            const originalText = QSDom.setButtonBusy(this, proj.renaming || 'Renaming...');
+            let result = null;
+            try {
+                result = await QuickSiteAdmin.apiRequest('renameProject', 'POST', { name: name }, [], {}, { project: target });
+            } catch (error) {
+                console.error('Rename error:', error);
+            }
+            if (result && result.ok) {
+                // Full reload: the name shows in the header picker, which the
+                // server renders, as well as on this page.
+                const d = result.data?.data || {};
+                reloadWithMessage((proj.renamed || 'Project renamed') + ': ' + QuickSiteAdmin.projectLabel(d.project || target, d.name || name));
+                return;
+            }
+            QuickSiteAdmin.showToast(result?.data?.message || 'Failed to rename project', 'error');
+            this.disabled = false;
+            this.textContent = originalText;
+        });
+
         // Confirm clone project
         document.getElementById('btn-confirm-clone').addEventListener('click', async function() {
             const nameInput = document.getElementById('clone-project-name');
             const activateCheckbox = document.getElementById('clone-project-activate');
-            const name = normalizeProjectName(nameInput.value);
+            const name = cleanProjectName(nameInput.value);
             
             if (!name) {
                 QuickSiteAdmin.showToast(proj.nameRequired || 'Project name is required', 'error');
@@ -1261,8 +1386,10 @@
                 }, [], {}, { project: target });
                 
                 if (result.ok) {
-                    const filesCopied = result.data?.data?.files_copied || '';
-                    const msg = (proj.cloned || 'Project cloned') + ': ' + name + (filesCopied ? ' (' + filesCopied + ' files)' : '');
+                    const d = result.data?.data || {};
+                    const filesCopied = d.files_copied || '';
+                    const msg = (proj.cloned || 'Project cloned') + ': ' + QuickSiteAdmin.projectLabel(d.project, d.name || name)
+                        + (filesCopied ? ' (' + filesCopied + ' files)' : '');
                     closeAllModals();
                     if (activateCheckbox.checked) {
                         reloadWithMessage(msg);
@@ -1288,7 +1415,7 @@
         document.getElementById('btn-confirm-create').addEventListener('click', async function() {
             const nameInput = document.getElementById('create-project-name');
             const activateCheckbox = document.getElementById('create-project-activate');
-            const name = normalizeProjectName(nameInput.value);
+            const name = cleanProjectName(nameInput.value);
             
             if (!name) {
                 QuickSiteAdmin.showToast(proj.nameRequired || 'Project name is required', 'error');
@@ -1305,7 +1432,8 @@
                 const result = await QuickSiteAdmin.apiRequest('createProject', 'POST', body);
                 
                 if (result.ok) {
-                    const msg = (proj.created || 'Project created') + ': ' + name;
+                    const d = result.data?.data || {};
+                    const msg = (proj.created || 'Project created') + ': ' + QuickSiteAdmin.projectLabel(d.project, d.name || name);
                     closeAllModals();
                     if (activateCheckbox.checked) {
                         reloadWithMessage(msg);
@@ -1355,24 +1483,28 @@
         });
         
         // Import project: choose the archive, then name the project it becomes.
-        // The name is pre-filled from the archive's file name (importNameFromFile);
-        // the server still validates it and refuses an id already in use (409), so
-        // on any refusal the modal stays open to try another name with the same file.
+        // The name is pre-filled from the archive's own name (readArchiveProjectName),
+        // else its file name; the imported project always gets an id of its own,
+        // drawn by the server. On any refusal the modal stays open to try again
+        // with the same file.
         let importFile = null;
 
         document.getElementById('btn-import-project').addEventListener('click', function() {
             document.getElementById('import-file-input').click();
         });
 
-        document.getElementById('import-file-input').addEventListener('change', function() {
+        document.getElementById('import-file-input').addEventListener('change', async function() {
             if (!this.files || !this.files[0]) return;
-            importFile = this.files[0];
+            const file = this.files[0];
+            importFile = file;
             // Cleared now, so choosing the same archive again still fires `change`.
             this.value = '';
 
+            const fromArchive = await readArchiveProjectName(file);
+            if (importFile !== file) return;   // another archive was chosen meanwhile
             const nameInput = document.getElementById('import-project-name');
-            document.getElementById('import-file-name').textContent = importFile.name;
-            nameInput.value = importNameFromFile(importFile.name);
+            document.getElementById('import-file-name').textContent = file.name;
+            nameInput.value = fromArchive || importNameFromFile(file.name);
             document.getElementById('modal-import-project').style.display = 'flex';
             nameInput.focus();
             nameInput.select();
@@ -1380,7 +1512,7 @@
 
         document.getElementById('btn-confirm-import').addEventListener('click', async function() {
             if (!importFile) return;
-            const name = normalizeProjectName(document.getElementById('import-project-name').value);
+            const name = cleanProjectName(document.getElementById('import-project-name').value);
             if (!name) {
                 QuickSiteAdmin.showToast(proj.nameRequired || 'Project name is required', 'error');
                 return;
@@ -1483,7 +1615,7 @@
             // The modal warns in general terms; this names the project, the last
             // step before it is gone for good.
             const confirmed = await QuickSiteAdmin.confirm(
-                t('dashboard.projects.deleteConfirmNamed', 'dashboard.projects.deleteConfirmNamed').replace(':name', projectToDelete),
+                t('dashboard.projects.deleteConfirmNamed', 'dashboard.projects.deleteConfirmNamed').replace(':name', labelOf(projectToDelete)),
                 {
                     title: t('dashboard.projects.deleteTitle', 'dashboard.projects.deleteTitle'),
                     type: 'danger',

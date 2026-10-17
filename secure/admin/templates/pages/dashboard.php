@@ -293,7 +293,16 @@ if (isset($_GET['denied'])): ?>
                             </svg>
                             <?= __admin('dashboard.projects.clone') ?>
                         </button>
-                        
+
+                        <!-- Rename Project — enabled by dashboard.js only when you own the
+                             project chosen in the selector (renameProject is owner-only). -->
+                        <button type="button" id="btn-rename-project" class="admin-btn admin-btn--ghost" title="<?= __admin('dashboard.projects.renameTooltip') ?>" disabled>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                            </svg>
+                            <?= __admin('dashboard.projects.rename') ?>
+                        </button>
+
                         <!-- Backup/Restore Group -->
                         <div class="project-manager__action-divider"></div>
                         
@@ -473,8 +482,8 @@ if (isset($_GET['denied'])): ?>
         </div>
         <div class="admin-modal__body">
             <div class="admin-form-group">
-                <label class="admin-label"><?= __admin('dashboard.projects.nameLabel') ?></label>
-                <input type="text" id="create-project-name" class="admin-input" placeholder="my-new-site" pattern="[a-z0-9_\-]+" />
+                <label class="admin-label" for="create-project-name"><?= __admin('dashboard.projects.nameLabel') ?></label>
+                <input type="text" id="create-project-name" class="admin-input" maxlength="60" autocomplete="off" />
                 <small class="admin-hint"><?= __admin('dashboard.projects.nameHelp') ?></small>
             </div>
             <div class="admin-form-group">
@@ -512,9 +521,9 @@ if (isset($_GET['denied'])): ?>
                 <?= __admin('dashboard.projects.cloneFrom') ?>: <strong id="clone-source-name"></strong>
             </p>
             <div class="admin-form-group">
-                <label class="admin-label"><?= __admin('dashboard.projects.cloneNameLabel') ?></label>
-                <input type="text" id="clone-project-name" class="admin-input" placeholder="my-project-copy" pattern="[a-z0-9_\-]+" />
-                <small class="admin-hint"><?= __admin('dashboard.projects.nameHelp') ?></small>
+                <label class="admin-label" for="clone-project-name"><?= __admin('dashboard.projects.cloneNameLabel') ?></label>
+                <input type="text" id="clone-project-name" class="admin-input" maxlength="60" autocomplete="off" />
+                <small class="admin-hint"><?= __admin('dashboard.projects.cloneNameHelp') ?></small>
             </div>
             <div class="admin-form-group">
                 <label class="admin-checkbox">
@@ -537,7 +546,8 @@ if (isset($_GET['denied'])): ?>
 </div>
 
 <!-- Import Project Modal — opened once an archive is chosen; the name is
-     pre-filled from the archive's file name by dashboard.js. -->
+     pre-filled from the archive's own name (its config/project.json, read in the
+     browser), else its file name, by dashboard.js. -->
 <div id="modal-import-project" class="admin-modal" style="display: none;">
     <div class="admin-modal__backdrop"></div>
     <div class="admin-modal__content">
@@ -551,7 +561,7 @@ if (isset($_GET['denied'])): ?>
             </p>
             <div class="admin-form-group">
                 <label class="admin-label" for="import-project-name"><?= __admin('dashboard.projects.nameLabel') ?></label>
-                <input type="text" id="import-project-name" class="admin-input" pattern="[a-z0-9_\-]+" />
+                <input type="text" id="import-project-name" class="admin-input" maxlength="60" autocomplete="off" />
                 <small class="admin-hint"><?= __admin('dashboard.projects.importNameHelp') ?></small>
             </div>
             <div class="admin-form-group">
@@ -564,6 +574,30 @@ if (isset($_GET['denied'])): ?>
         <div class="admin-modal__footer">
             <button type="button" class="admin-btn admin-btn--ghost" data-close-modal><?= __admin('common.cancel') ?></button>
             <button type="button" id="btn-confirm-import" class="admin-btn admin-btn--primary"><?= __admin('dashboard.projects.importBtn') ?></button>
+        </div>
+    </div>
+</div>
+
+<!-- Rename Project Modal — opened from the Project Manager for the project chosen
+     there; prefilled with its current name by dashboard.js. -->
+<div id="modal-rename-project" class="admin-modal" style="display: none;">
+    <div class="admin-modal__backdrop"></div>
+    <div class="admin-modal__content">
+        <div class="admin-modal__header">
+            <h3 class="admin-modal__title"><?= __admin('dashboard.projects.renameTitle') ?></h3>
+            <button type="button" class="admin-modal__close" data-close-modal>×</button>
+        </div>
+        <div class="admin-modal__body">
+            <p style="margin-bottom: var(--space-md);"><strong id="rename-project-current"></strong></p>
+            <div class="admin-form-group">
+                <label class="admin-label" for="rename-project-name"><?= __admin('dashboard.projects.renameNameLabel') ?></label>
+                <input type="text" id="rename-project-name" class="admin-input" maxlength="60" autocomplete="off" />
+                <small class="admin-hint" id="rename-project-help"><?= __admin('dashboard.projects.renameHelp') ?></small>
+            </div>
+        </div>
+        <div class="admin-modal__footer">
+            <button type="button" class="admin-btn admin-btn--ghost" data-close-modal><?= __admin('common.cancel') ?></button>
+            <button type="button" id="btn-confirm-rename" class="admin-btn admin-btn--primary"><?= __admin('dashboard.projects.renameBtn') ?></button>
         </div>
     </div>
 </div>

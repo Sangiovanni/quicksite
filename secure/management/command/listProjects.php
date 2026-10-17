@@ -20,6 +20,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/projectLanguage.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_format_size
 require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php'; // getDirectorySize
+require_once SECURE_FOLDER_PATH . '/src/functions/projectIdentity.php';
 
 /**
  * Count routes recursively in a nested routes structure
@@ -87,9 +88,9 @@ function __command_listProjects(array $params = [], array $urlParams = []): ApiR
     }
     
     // No project is privileged, so there is no "active first" ordering
-    // to apply: alphabetical is the only meaningful order.
+    // to apply: by name, then by id (two projects may share a name).
     usort($projects, function($a, $b) {
-        return strcasecmp($a['name'], $b['name']);
+        return [mb_strtolower($a['name'], 'UTF-8'), $a['project']] <=> [mb_strtolower($b['name'], 'UTF-8'), $b['project']];
     });
 
     return ApiResponse::create(200, 'operation.success')
@@ -105,12 +106,13 @@ function __command_listProjects(array $params = [], array $urlParams = []): ApiR
  * Get detailed info about a project
  * 
  * @param string $projectPath Full path to project folder
- * @param string $projectName Project folder name
- * @return array Project metadata
+ * @param string $projectName The project's id (its folder's name)
+ * @return array Project metadata: `project` is the id, `name` its name (the id when it has none)
  */
 function getProjectInfo(string $projectPath, string $projectName): array {
     $info = [
-        'name' => $projectName,
+        'project' => $projectName,
+        'name' => qs_project_name_in($projectPath) ?? $projectName,
         'path' => SECURE_FOLDER_NAME . '/projects/' . $projectName,
         'exists' => true,
         'has_config' => file_exists($projectPath . '/config.php'),
@@ -124,7 +126,6 @@ function getProjectInfo(string $projectPath, string $projectName): array {
     if ($info['has_config']) {
         $config = @include($projectPath . '/config.php');
         if (is_array($config)) {
-            $info['site_name'] = $config['SITE_NAME'] ?? null;
             $info['default_language'] = qs_project_default_language($config);
             $info['languages'] = qs_project_language_codes($config);
             $info['multilingual'] = $config['MULTILINGUAL_SUPPORT'] ?? false;
@@ -142,10 +143,17 @@ function getProjectInfo(string $projectPath, string $projectName): array {
         }
     }
     
-    // Get pages count (JSON files)
+    // Get pages count: one JSON file per page, at any depth (a page lives in
+    // its own folder, pages/<route>/<leaf>.json)
     $pagesDir = $projectPath . '/templates/model/json/pages';
     if (is_dir($pagesDir)) {
-        $info['pages_count'] = count(glob($pagesDir . '/*.json'));
+        $info['pages_count'] = 0;
+        $pages = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($pagesDir, FilesystemIterator::SKIP_DOTS));
+        foreach ($pages as $file) {
+            if ($file->isFile() && strtolower($file->getExtension()) === 'json') {
+                $info['pages_count']++;
+            }
+        }
     }
     
     // Get translations count

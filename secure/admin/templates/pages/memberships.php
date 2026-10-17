@@ -175,7 +175,7 @@ window.QS_MEMBERSHIPS_I18N = <?= json_encode([
             <p class="admin-hint"><?= __admin('memberships.request.hint', 'Ask to join a project by its id. The project must have an open join policy; your note is shown to its admins.') ?></p>
             <div class="admin-form-group">
                 <label class="admin-label" for="request-project-id"><?= __admin('memberships.request.projectLabel', 'Project id') ?> <span class="admin-text-danger">*</span></label>
-                <input type="text" id="request-project-id" class="admin-input" placeholder="my-project" autocomplete="off">
+                <input type="text" id="request-project-id" class="admin-input" placeholder="#k7m2p9xq4" autocomplete="off">
             </div>
             <div class="admin-form-group">
                 <label class="admin-label" for="request-note"><?= __admin('memberships.request.noteLabel', 'Why do you want to join?') ?> <span class="admin-text-danger">*</span></label>

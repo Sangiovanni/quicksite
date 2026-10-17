@@ -47,7 +47,8 @@ require_once SECURE_FOLDER_PATH . '/src/functions/securityLog.php';
  * @return ApiResponse|null The refusal to send, or null when both are resolved
  */
 function qs_membership_resolve(array $params, ?string &$project, ?string &$userId): ?ApiResponse {
-    $project = trim((string)($params['project'] ?? ''));
+    // The id as a person typed it: a leading `#` is the way a project is shown.
+    $project = qs_project_id_from_input((string)($params['project'] ?? ''));
     if ($project === '') {
         return ApiResponse::create(400, 'validation.missing_field')
             ->withMessage('project is required')
@@ -127,11 +128,7 @@ function qs_membership_list_invitations(): ApiResponse {
             // accept landed but the mirror write was lost) → upgrade the
             // entry; a membership is not an inbox item.
             if (isset($authority['members'][$userId])) {
-                $heal[$projectId] = [
-                    'name'    => qs_project_site_name($projectId),
-                    'created' => $today,
-                    'status'  => 'member',
-                ];
+                $heal[$projectId] = qs_membership_mirror_entry('member', $today);
                 continue;
             }
 
@@ -141,15 +138,13 @@ function qs_membership_list_invitations(): ApiResponse {
             if ($direction === 'invite') {
                 if ($status !== 'pending_invite') {
                     // mirror said request, authority says invite → heal
-                    $heal[$projectId] = [
-                        'name'   => qs_project_site_name($projectId),
-                        'status' => 'pending_invite',
-                        'at'     => $inv['at'] ?? $today,
-                    ];
+                    $heal[$projectId] = qs_membership_mirror_entry('pending_invite', $inv['at'] ?? $today);
                 }
+                // An invitation is the authority's consent: the invitee sees
+                // the project's name, read now.
                 $row = [
                     'project'      => $projectId,
-                    'project_name' => ($heal[$projectId]['name'] ?? null) ?? ($entry['name'] ?? $projectId),
+                    'project_name' => qs_project_display_name($projectId),
                     'role'         => $inv['role'] ?? null,
                     'invited_by'   => isset($inv['by']) ? qs_public_user_ref((string)$inv['by'], $usersCfg) : null,
                     'at'           => $inv['at'] ?? ($entry['at'] ?? null),
@@ -166,17 +161,14 @@ function qs_membership_list_invitations(): ApiResponse {
                 // never mine to see: falls to the prune below)
                 if ($status !== 'pending_request') {
                     // mirror said invite, authority says self-request → heal
-                    // (name privacy: SITE_NAME only on a public project)
-                    $heal[$projectId] = [
-                        'name'   => (($authority['visibility'] ?? 'private') === 'public')
-                            ? qs_project_site_name($projectId) : $projectId,
-                        'status' => 'pending_request',
-                        'at'     => $inv['at'] ?? $today,
-                    ];
+                    $heal[$projectId] = qs_membership_mirror_entry('pending_request', $inv['at'] ?? $today);
                 }
+                // Name privacy: the project's name only when it is public; a
+                // private project shows the id the requester typed.
                 $row = [
                     'project'      => $projectId,
-                    'project_name' => ($heal[$projectId]['name'] ?? null) ?? ($entry['name'] ?? $projectId),
+                    'project_name' => (($authority['visibility'] ?? 'private') === 'public')
+                        ? qs_project_display_name($projectId) : $projectId,
                     'role'         => $inv['role'] ?? null,
                     'at'           => $inv['at'] ?? ($entry['at'] ?? null),
                 ];
@@ -188,6 +180,8 @@ function qs_membership_list_invitations(): ApiResponse {
                 $prune[] = $projectId; // withdrawn/denied/not mine → self-heal
             }
         } elseif (in_array($status, ['refused', 'removed', 'deleted'], true)) {
+            // A notice keeps the name it was written with (the project may be
+            // gone, or no longer the caller's to read).
             $row = [
                 'project'      => $projectId,
                 'project_name' => $entry['name'] ?? $projectId,
@@ -324,11 +318,7 @@ function qs_membership_accept(array $params): ApiResponse {
     }
 
     // Status mirror: the caller is now a real member.
-    $mirror = [
-        'name'    => qs_project_site_name($project),
-        'created' => date('Y-m-d'),
-        'status'  => 'member',
-    ];
+    $mirror = qs_membership_mirror_entry('member', date('Y-m-d'));
     if (!qs_membership_cache_set($userId, $project, $mirror)) {
         error_log("membership accept: cache mirror write failed for '{$userId}' on '{$project}'");
     }
@@ -531,13 +521,14 @@ function qs_membership_dismiss_notice(array $params): ApiResponse {
  *   private+closed  → 404 join.unavailable, IDENTICAL to a nonexistent project
  *                     (no existence oracle).
  *   private+open    → 201; the owner OPTED into knockability-by-id. The
- *                     caller's own cache mirror carries the PROJECT ID as its
- *                     display name, never SITE_NAME — a knock may confirm
- *                     existence, not the site's name.
+ *                     caller's inbox shows the PROJECT ID, never the
+ *                     project's name — a knock may confirm existence, not the
+ *                     name.
  *   public+closed   → honest 403 join.requests_closed (existence is already
  *                     public via /p/<id>/ serving; a uniform 404 would be
  *                     theater).
- *   public+open     → 201; mirror carries SITE_NAME (public anyway).
+ *   public+open     → 201; the inbox shows the project's name (public anyway).
+ * The project is the id as typed, with or without a leading `#`.
  * Self-knowledge is never an oracle: already-member → 409; my own pending
  * invite/request → 409. A SPONSORED proposal about the caller is NOT
  * self-knowledge (they were never engaged): it is treated as absent — uniform
@@ -553,7 +544,7 @@ function qs_membership_dismiss_notice(array $params): ApiResponse {
  * @return ApiResponse
  */
 function qs_membership_request_join(array $params): ApiResponse {
-    $project = trim((string)($params['project'] ?? ''));
+    $project = qs_project_id_from_input((string)($params['project'] ?? ''));
     // Refuse an unstorable note HERE, naming the field, rather than letting it
     // reach the roster writer (which refuses it too, as a backstop).
     if (qs_note_encoding_invalid($params['note'] ?? null)) {
@@ -669,14 +660,9 @@ function qs_membership_request_join(array $params): ApiResponse {
         return ApiResponse::create($status, $code)->withMessage($message);
     }
 
-    // Status mirror (secondary write, silent-failure by ruling). Name privacy:
-    // SITE_NAME only when the project is public; a private project's mirror
-    // carries the id the caller already typed.
-    $mirror = [
-        'name'   => ($visibility === 'public') ? qs_project_site_name($project) : $project,
-        'status' => 'pending_request',
-        'at'     => $today,
-    ];
+    // Status mirror (secondary write, silent-failure by ruling). No name: the
+    // inbox reads it when it lists, and only for a public project.
+    $mirror = qs_membership_mirror_entry('pending_request', $today);
     if (!qs_membership_cache_set($userId, $project, $mirror)) {
         error_log("membership request: cache mirror write failed for '{$userId}' on '{$project}'");
     }
@@ -774,7 +760,7 @@ function qs_membership_withdraw_request(array $params): ApiResponse {
  * directly. No cache writes (proposals are mirrored nowhere by design).
  *
  * PRIVACY: proposed users are {user_id, name} public references — the PRIVATE
- * username never appears. Project names are SITE_NAMEs: the caller is a member
+ * username never appears. Project names are read from each project: the caller is a member
  * of every project listed, so the display name is theirs to see.
  *
  * @return ApiResponse proposals[] + proposal_count
@@ -812,7 +798,7 @@ function qs_membership_list_proposals(): ApiResponse {
 
             $row = [
                 'project'      => $projectId,
-                'project_name' => qs_project_site_name($projectId),
+                'project_name' => qs_project_display_name($projectId),
                 'user'         => qs_public_user_ref($targetId, $usersCfg),
                 'role'         => $inv['role'] ?? null,
                 'status'       => $status,
