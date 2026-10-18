@@ -129,7 +129,7 @@
         }
         const cfg = {
             container:   opts.container,
-            placeholder: opts.placeholder || 'Search or type a translation key',
+            placeholder: opts.placeholder || QSComplexWizard.t('textKeyPicker.searchPlaceholder'),
             onChange:    typeof opts.onChange === 'function' ? opts.onChange : function () {},
         };
         let selectedKey = opts.value || '';
@@ -166,13 +166,13 @@
         const createValInput = document.createElement('input');
         createValInput.type = 'text';
         createValInput.className = 'admin-input qs-textkey-picker__create-value';
-        createValInput.placeholder = 'Value (current language only)';
+        createValInput.placeholder = QSComplexWizard.t('textKeyPicker.valuePlaceholder');
         createRow.appendChild(createValInput);
 
         const createBtn = document.createElement('button');
         createBtn.type = 'button';
         createBtn.className = 'admin-btn admin-btn--success admin-btn--sm';
-        createBtn.textContent = 'Create';
+        createBtn.textContent = QSComplexWizard.t('textKeyPicker.create');
         createRow.appendChild(createBtn);
 
         createForm.appendChild(createRow);
@@ -183,7 +183,7 @@
         // ---- rendering ---------------------------------------------------
 
         function renderDropdown(query) {
-            dropdown.innerHTML = '';
+            dropdown.replaceChildren();
             const q = (query || '').toLowerCase().trim();
             let exactMatch = false;
             let count = 0;
@@ -223,7 +223,7 @@
 
             // Inline create when query is non-empty and no exact match.
             if (q && !exactMatch) {
-                createLabel.textContent = 'Create "' + q + '"';
+                createLabel.textContent = QSComplexWizard.t('textKeyPicker.createQuery', { query: q });
                 createForm.style.display = '';
             } else {
                 createForm.style.display = 'none';
@@ -297,12 +297,12 @@
                 dropdown.style.display = 'none';
                 createForm.style.display = 'none';
                 if (typeof window.showToast === 'function') {
-                    window.showToast('Translation key created', 'success');
+                    window.showToast(QSComplexWizard.t('textKeyPicker.created'), 'success');
                 }
             } catch (err) {
                 console.error('[TextKeyPicker] create failed:', err);
                 if (typeof window.showToast === 'function') {
-                    window.showToast('Failed to create translation key', 'error');
+                    window.showToast(QSComplexWizard.t('textKeyPicker.createFailed'), 'error');
                 }
             } finally {
                 createBtn.disabled = false;

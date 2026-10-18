@@ -143,16 +143,6 @@
         return result;
     }
     
-    /**
-     * Escape arbitrary text for safe HTML rendering (textContent -> innerHTML).
-     */
-    function escapeHtml(text) {
-        if (text === null || text === undefined) return '';
-        const div = document.createElement('div');
-        div.textContent = String(text);
-        return div.innerHTML;
-    }
-    
     // ==================== Public API ====================
     
     window.PreviewState = {
@@ -292,8 +282,7 @@
             getNodeByPath: getNodeByPath,
             sendToIframe: sendToIframe,
             cloneWithoutNodeIds: cloneWithoutNodeIds,
-            parseStylesString: parseStylesString,
-            escapeHtml: escapeHtml
+            parseStylesString: parseStylesString
         },
         
         // Direct access to sendToIframe (commonly used)

@@ -25,7 +25,6 @@ window.PreviewTransitionEditor = (function() {
 
     // Callbacks to parent context
     let showToast = () => {};
-    let escapeHtml = (str) => String(str);
     let parseStylesString = (str) => ({});
     let refreshPreviewFrame = () => {};
     let openAnimationPreviewModal = null;   // takes a keyframe NAME, not a keyframe object
@@ -254,9 +253,10 @@ window.PreviewTransitionEditor = (function() {
                 }
             }
 
-            // Render property panels
+            // Render property panels, then the list of both states' properties (a state with none too)
             renderTransitionBaseProperties();
             renderTransitionHoverProperties();
+            updateSpecificPropertiesCheckboxes();
 
             // Render animation sections
             renderAnimationSection('base');
@@ -392,6 +392,53 @@ window.PreviewTransitionEditor = (function() {
         }
     }
 
+    /** The note a list of the editor shows when it has nothing to list. */
+    function _renderEmptyNote(text) {
+        return QSDom.el('div', { class: 'transition-editor__empty', text: text });
+    }
+
+    /**
+     * One property of a state (`target`: base or trigger): its name, its value (whole in the
+     * tooltip too) and its delete button.
+     */
+    function _renderPropertyRow(prop, value, target) {
+        return QSDom.el('div', { class: 'transition-editor__property', 'data-property': prop, 'data-target': target }, [
+            QSDom.el('div', { class: 'transition-editor__property-info' }, [
+                QSDom.el('span', { class: 'transition-editor__property-name', text: prop }),
+                ' ',
+                QSDom.el('span', { class: 'transition-editor__property-value', title: value, text: value })
+            ]),
+            QSDom.el('div', { class: 'transition-editor__property-actions' }, [
+                QSDom.el('button', {
+                    type: 'button',
+                    class: 'transition-editor__property-btn transition-editor__property-btn--delete',
+                    'data-action': 'delete',
+                    title: PreviewConfig.i18n.delete || 'Delete'
+                }, [QSDom.iconEl(QuickSiteUtils.ICON_PATHS.close, 12)])
+            ])
+        ]);
+    }
+
+    /** One keyframe the animation picker offers. */
+    function _renderAnimationPickerItem(name) {
+        return QSDom.el('div', {
+            class: 'animation-picker-dropdown__item',
+            'data-name': name,
+            style: 'padding: 8px 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--qsb-border, #404040);'
+        }, [
+            QSDom.el('span', { style: 'color: var(--qsb-accent, #4fc3f7);', text: '@keyframes' }),
+            QSDom.el('span', { style: 'color: var(--qsb-text, #fff);', text: name })
+        ]);
+    }
+
+    /** One property the transition can be limited to, ticked. */
+    function _renderPropertyCheckbox(prop) {
+        return QSDom.el('label', { class: 'transition-editor__checkbox-label' }, [
+            QSDom.el('input', { type: 'checkbox', class: 'transition-editor__prop-checkbox', value: prop, checked: '' }),
+            ' ' + prop
+        ]);
+    }
+
     /**
      * Render base state properties panel
      */
@@ -402,26 +449,11 @@ window.PreviewTransitionEditor = (function() {
             .filter(([key]) => key !== 'transition' && key !== 'animation');
 
         if (props.length === 0) {
-            transitionBasePropsEl.innerHTML = `
-                <div class="transition-editor__empty">${PreviewConfig.i18n.noBaseStyles || 'No base styles defined'}</div>
-            `;
+            transitionBasePropsEl.replaceChildren(_renderEmptyNote(PreviewConfig.i18n.noBaseStyles || 'No base styles defined'));
             return;
         }
 
-        transitionBasePropsEl.innerHTML = props.map(([prop, value]) => `
-            <div class="transition-editor__property" data-property="${escapeHtml(prop)}" data-target="base">
-                <div class="transition-editor__property-info">
-                    <span class="transition-editor__property-name">${escapeHtml(prop)}</span>
-                    <span class="transition-editor__property-value" title="${escapeHtml(value)}">${escapeHtml(value)}</span>
-                </div>
-                <div class="transition-editor__property-actions">
-                    <button type="button" class="transition-editor__property-btn transition-editor__property-btn--delete" 
-                            data-action="delete" title="${PreviewConfig.i18n.delete || 'Delete'}">
-                        ${QuickSiteUtils.iconClose(12)}
-                    </button>
-                </div>
-            </div>
-        `).join('');
+        transitionBasePropsEl.replaceChildren(...props.map(([prop, value]) => _renderPropertyRow(prop, value, 'base')));
 
         // Add event listeners for delete buttons
         transitionBasePropsEl.querySelectorAll('[data-action="delete"]').forEach(btn => {
@@ -442,26 +474,11 @@ window.PreviewTransitionEditor = (function() {
         const props = Object.entries(transitionEditorHoverProperties);
 
         if (props.length === 0) {
-            transitionHoverPropsEl.innerHTML = `
-                <div class="transition-editor__empty">${PreviewConfig.i18n.noTriggerStyles || 'No trigger state styles'}</div>
-            `;
+            transitionHoverPropsEl.replaceChildren(_renderEmptyNote(PreviewConfig.i18n.noTriggerStyles || 'No trigger state styles'));
             return;
         }
 
-        transitionHoverPropsEl.innerHTML = props.map(([prop, value]) => `
-            <div class="transition-editor__property" data-property="${escapeHtml(prop)}" data-target="trigger">
-                <div class="transition-editor__property-info">
-                    <span class="transition-editor__property-name">${escapeHtml(prop)}</span>
-                    <span class="transition-editor__property-value" title="${escapeHtml(value)}">${escapeHtml(value)}</span>
-                </div>
-                <div class="transition-editor__property-actions">
-                    <button type="button" class="transition-editor__property-btn transition-editor__property-btn--delete" 
-                            data-action="delete" title="${PreviewConfig.i18n.delete || 'Delete'}">
-                        ${QuickSiteUtils.iconClose(12)}
-                    </button>
-                </div>
-            </div>
-        `).join('');
+        transitionHoverPropsEl.replaceChildren(...props.map(([prop, value]) => _renderPropertyRow(prop, value, 'trigger')));
 
         // Add event listeners for delete buttons
         transitionHoverPropsEl.querySelectorAll('[data-action="delete"]').forEach(btn => {
@@ -471,8 +488,6 @@ window.PreviewTransitionEditor = (function() {
                 if (prop) deleteTransitionProperty('trigger', prop);
             });
         });
-
-        updateSpecificPropertiesCheckboxes();
     }
 
     /**
@@ -797,19 +812,7 @@ window.PreviewTransitionEditor = (function() {
             min-width: 180px;
         `;
 
-        dropdown.innerHTML = keyframesData.map(kf => `
-            <div class="animation-picker-dropdown__item" data-name="${escapeHtml(kf.name)}" style="
-                padding: 8px 12px;
-                cursor: pointer;
-                display: flex;
-                align-items: center;
-                gap: 8px;
-                border-bottom: 1px solid var(--qsb-border, #404040);
-            ">
-                <span style="color: var(--qsb-accent, #4fc3f7);">@keyframes</span>
-                <span style="color: var(--qsb-text, #fff);">${escapeHtml(kf.name)}</span>
-            </div>
-        `).join('');
+        dropdown.replaceChildren(...keyframesData.map(kf => _renderAnimationPickerItem(kf.name)));
 
         dropdown.querySelectorAll('.animation-picker-dropdown__item').forEach(item => {
             item.addEventListener('click', () => {
@@ -1003,18 +1006,11 @@ window.PreviewTransitionEditor = (function() {
         );
 
         if (propsToShow.length === 0) {
-            transitionSpecificProps.innerHTML = `
-                <div class="transition-editor__empty">${PreviewConfig.i18n.noPropertiesToTransition || 'No properties to transition'}</div>
-            `;
+            transitionSpecificProps.replaceChildren(_renderEmptyNote(PreviewConfig.i18n.noPropertiesToTransition || 'No properties to transition'));
             return;
         }
 
-        transitionSpecificProps.innerHTML = propsToShow.map(prop => `
-            <label class="transition-editor__checkbox-label">
-                <input type="checkbox" class="transition-editor__prop-checkbox" value="${escapeHtml(prop)}" checked>
-                ${escapeHtml(prop)}
-            </label>
-        `).join('');
+        transitionSpecificProps.replaceChildren(...propsToShow.map(prop => _renderPropertyCheckbox(prop)));
 
         transitionSpecificProps.querySelectorAll('.transition-editor__prop-checkbox').forEach(cb => {
             cb.addEventListener('change', updateTransitionPreviewCode);
@@ -1342,7 +1338,6 @@ window.PreviewTransitionEditor = (function() {
 
         // Callback setters
         setShowToast: (fn) => { showToast = fn; },
-        setEscapeHtml: (fn) => { escapeHtml = fn; },
         setParseStylesString: (fn) => { parseStylesString = fn; },
         setRefreshPreviewFrame: (fn) => { refreshPreviewFrame = fn; },
         setOpenAnimationPreviewModal: (fn) => { openAnimationPreviewModal = fn; },

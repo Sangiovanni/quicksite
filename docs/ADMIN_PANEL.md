@@ -304,9 +304,13 @@ The sidebar exposes eight modes, each backed by a `data-mode="..."` button. Sour
 | **Translations** | `translation` | Site-wide translation key manager (`preview-translation.js`). Per-language coverage % + counts, scope picker (Pages / Layout / Components), inline row-expand editor, per-row + bulk delete. Mono- and multi-lingual. See §8.9. |
 | **AI tools** | `ai-tools` | In-editor workflow runner. Searchable + tag-filtered list of workflow specs grouped by category; picking one swaps the panel into a 3-zone runner (INPUTS / AI EXCHANGE / EXECUTION). Element clicks in the iframe behave as in Select mode — workflows with a `selector` parameter auto-fill from the current selection. See §8.12. |
 
-**Add-flow + canvas cues.** Adding an element (sibling/child) **auto-selects the newly inserted node** and scrolls it into view, so consecutive adds chain naturally without re-clicking. Empty / zero-size elements get a faint dashed outline — a min-size "empty-element hint" — so they stay visible and clickable on the canvas; it clears once the element gains content. (The hint reveals *empty* elements, not `display:none` ones.)
+**Add-flow + canvas cues.** Adding an element (sibling/child) **auto-selects the newly inserted node** and scrolls it into view, so consecutive adds chain naturally without re-clicking. An element added *inside* one that holds text takes that text (`addNode` moves the target's text into the new element when the new element can hold children), and the canvas shows it there at once, the text once, without a reload. Empty / zero-size elements get a faint dashed outline — a min-size "empty-element hint" — so they stay visible and clickable on the canvas; it clears once the element gains content. (The hint reveals *empty* elements, not `display:none` ones.)
 
 **Saving a selection as a snippet.** Select mode's *save as snippet* flow asks for a name and offers one checkbox: **"Save to my personal snippets (reusable in all my projects)"**. Leave it unchecked and the snippet belongs to the project you are editing, where every member of that project can use it. Tick it and the snippet goes to your own library instead — it follows you into every project you work on, and nobody else can see it, insert it, or delete it. The Add panel's **Snippet** tab lists all three tiers in one picker — the snippets shipped with the engine, your personal ones, and the current project's — with each entry labelled by the tier it came from. See [COMMAND_API.md](COMMAND_API.md) for how a name that exists in more than one tier resolves.
+
+**The snippet preview.** Picking a snippet in the **Snippet** tab shows it in a small frame as a page will render it: a translation key shows its text in the project's default language (then English, then the key itself when the snippet has neither), a raw or literal text (`__RAW__` / `__LIT__`) shows as written, and `alt`, `title`, `placeholder` and the `aria-*` labels translate a key the same way. **Show keys**, under the frame, shows every key and raw text as stored instead (`snippet.card.title`, `__RAW__Hello`). **Without current project style**, shown when the snippet carries CSS of its own, leaves the project's stylesheet out. Neither choice is remembered between visits. The frame is sandboxed without scripts and holds a fixed empty document: the editor builds the snippet in it element by element, so nothing the snippet carries, its CSS included, is ever read as HTML, and a tag the engine does not render is left out of the preview too.
+
+**The tag preview.** Picking a tag in the **HTML Tag** tab shows a small example of it under the picker, and its **`</>`** button switches to the example's HTML as the page holds it once parsed: a boolean attribute reads `open=""`, a table row sits in the `<tbody>` the browser adds, an `<option>` is closed. A tag that renders nothing visible (`script`, `meta`, `template`…) reads "No visual preview". The examples come with the page, one `<template>` per tag written by `_tag-selector.php` from `_tag-examples.php`, so picking a tag copies its example and parses nothing.
 
 **Add-Element conveniences.** The HTML Tag flow carries an optional **ID** field beside CSS Class — validated against CSS-safe id rules (starts with a letter or underscore; then letters, digits, hyphens, underscores; no spaces), flagged red on blur and hard-blocked at add time. A **Save & add another** button (beside Add) keeps the form open for repeated adds — available for HTML Tag, Component, and Complex (not Text or Snippet). For **Tag** it clears the id + params but keeps the tag + class; for **Component** and **Complex** it leaves the previous values in place so the next instance starts pre-filled. In all three the target selection is preserved, so repeated adds land at the same anchor.
 
@@ -342,6 +346,11 @@ Menu and footer are global — editing them in any page's preview applies site-w
 3. Sidebar shows properties of the selected node.
 4. Edit → API call to `editStructure` / `editNode` / `setStyleRule` / `setTranslationKeys` / etc.
 5. Preview reloads, or updates inline for text-only changes.
+
+An add, a delete or a duplicate updates the page in place: the engine renders the new node, and the
+editor renumbers the nodes after it **within the same structure only** — the page, the menu and the
+footer each number their nodes from 0, so a change to one never moves the ids of another. When the
+page cannot show an add in place, the editor reloads it.
 
 **A page with no nodes still has something to click.** Selection is anchored to
 elements carrying `data-qs-node`, so a page whose last element was deleted would
@@ -447,8 +456,8 @@ new file, no registration.
 
 ```js
 window.QSComplexWizard.registry['<kind>'] = {
-    label: 'Human label',
-    description: 'Short HTML-safe description.',
+    label: QSComplexWizard.t('<kind>.label'),               // the picker's option
+    description: QSComplexWizard.t('<kind>.description'),   // its tooltip, plain text
     renderWizard: function (container) {
         // Populate `container`. Return:
         return {
@@ -469,13 +478,14 @@ Same auto-discovery pattern client-side — `preview-config.php` globs
 |---|---|
 | `QSComplexWizard.createRowEditor` | Variable-cardinality row list with reorder/add/delete + keyboard nav. Used by every wizard that has a "list of N things" section (Select options, FormScaffold fields, List items). |
 | `QSComplexWizard.createTextKeyPicker` | Translation-key picker — searchable list of existing keys + inline "Create" form for new ones. Matches the component-variables panel UX. |
+| `QSComplexWizard.t` / `codeText` / `requiredMark` | The wizards' words (`wizard-text.js`, loaded first). `t(key, params)` reads the `complexWizard` translations `preview-config.php` emits as `QS_COMPLEX_WIZARD_I18N`; a key the file lacks shows as its path (`complexWizard.<key>`). `codeText(text, codes)` turns a sentence's `{name}` markers into `<code>` elements, so a hint can name an attribute without markup in its translation. `requiredMark()` is the red asterisk of a required field's label. |
 
 **Built-in kinds**
 
 | Kind | Emits | Notes |
 |---|---|---|
 | `field-row` | `<div class="field"><label/><input/><span data-error-for/></div>` | Single form field, ready for `QS.validate` per-field error wiring. Building block for Form Scaffold. |
-| `form-scaffold` | `<form>` + N field rows + submit button, with `onsubmit` chain pre-wired (validate + fetch + optional post-submit actions) | Headline API-objective integration. Reuses `FieldRow` internally for each field. **Auto-seed from request schema**: when the picked API endpoint declares a `requestSchema.properties`, a `⤓ Pre-fill from request schema` button appears in the API group — click to populate every field row with `{name, type, required, labelKey}` inferred from the schema. Type inference: standard JSON Schema (`boolean` → checkbox; `number` / `integer` → number); QuickSite-permissive aliasing — any HTML5 input name typed directly into `type` (`password` / `email` / `tel` / `url` / `date` / `color` / …) maps to that input type; `format` on a `string` (email / tel / url / date / time / date-time / color / **password**) → matching HTML5 type; `writeOnly: true` → password; property name matches `/password/i` → password (last-resort); else `text`. **Reset behaviour**: with fields already populated, the button label flips to `⤴ Reset to schema fields (clears N)` and prompts for confirmation before the destructive replace — useful after picking the wrong endpoint or to recover from typos. |
+| `form-scaffold` | `<form>` + N field rows + submit button, with `onsubmit` chain pre-wired (validate + fetch + optional post-submit actions) | Headline API-objective integration. Reuses `FieldRow` internally for each field. **Auto-seed from request schema**: when the picked API endpoint declares a `requestSchema.properties`, a `⤓ Pre-fill from request schema` button appears in the API group — click to populate every field row with `{name, type, required, labelKey}` inferred from the schema. Type inference: standard JSON Schema (`boolean` → checkbox; `number` / `integer` → number); QuickSite-permissive aliasing — any HTML5 input name typed directly into `type` (`password` / `email` / `tel` / `url` / `date` / `color` / …) maps to that input type; `format` on a `string` (email / tel / url / date / time / date-time / color / **password**) → matching HTML5 type; `writeOnly: true` → password; property name matches `/password/i` → password (last-resort); else `text`. **Reset behaviour**: with fields already populated, the button label flips to `⤴ Reset to schema fields (clears N)` and asks in the panel's own confirmation dialog (**Replace** / **Cancel**) before replacing them — useful after picking the wrong endpoint or to recover from typos. |
 | `select` | `<div class="field"><label/><select/><span data-error-for/></div>` with N `<option>` children | Same outer shape as field-row so a select sits alongside text inputs in a form-scaffold and picks up the same QS.validate hook. Optional placeholder option + required + multiple. |
 | `list` | `<ul>` or `<ol>` with N `<li><textKey/></li>` children | Simple flat list. `<ol>` supports `start` and `reversed`. |
 | `radio-group` | `<fieldset class="field">` + `<legend>` + N (`<label><input type="radio">`) + `<span data-error-for>` | All radios share one `name`. Layout `inline` / `stacked` (adds `field--inline` class). Optional default-selected value (a `<select>` rebuilt from the live option values). |
@@ -494,7 +504,8 @@ Same auto-discovery pattern client-side — `preview-config.php` globs
    class that extends `ComplexElementBuilder`. Auto-loaded.
 2. Drop `public/admin/assets/js/pages/preview/contextual-complex/complex-<my-kind>.js`
    that registers itself under `QSComplexWizard.registry['<my-kind>']`.
-   Auto-loaded.
+   Auto-loaded. Its words go through `QSComplexWizard.t()`, with their keys under
+   `complexWizard.<myKind>` in the panel's translation file.
 3. Reload the admin page. The kind appears in the picker, the wizard
    renders, save dispatches to your builder.
 
@@ -587,7 +598,7 @@ handle just like translation-key text.
 
 A sixth editor mode that **manages translation keys site-wide for the current project** — a dense table view of every key the site references plus every key the chosen language file has, classified into three buckets. Complements Text mode: Text mode edits values inline on the rendered page; Translations mode is the bird's-eye where you find orphans, set bulk values, and audit coverage.
 
-**Where you land it from:** sidebar Translations icon → `setMode('translation')` → `#contextual-translation` shows + `PreviewTranslation.enter()` triggers the lazy data fetch on first entry.
+**Where you land it from:** sidebar Translations icon → `setMode('translation')` → `#contextual-translation` shows + `PreviewTranslation.enter()` fetches the panel's data — at every opening, so a key written elsewhere (the wizards' key picker, Text mode, **Add Element → Text**) shows at the next one. The first opening shows the loading state; a later one keeps the rows and the chosen scope on screen until the new data is in.
 
 **Status taxonomy** — every key is one of:
 

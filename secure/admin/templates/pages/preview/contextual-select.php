@@ -177,16 +177,12 @@
             </div>
         </div>
         
-        <!-- Personal-library scope option. The copy said "all projects", and the
-             storage matched it literally: one installation-wide directory any
-             project could read from and delete from, including other users'.
-             It is the author's OWN library now, so the
-             label says whose. The element id is unchanged — it is referenced by
-             preview.js and by the admin CSS. -->
+        <!-- Checked: the snippet goes to the author's own library (scope "personal"), which
+             every project of theirs can use; unchecked: to this project's snippets. -->
         <div class="preview-contextual-form__field preview-contextual-form__field--inline">
             <label class="admin-checkbox">
-                <input type="checkbox" id="save-snippet-global">
-                <span><?= __admin('preview.saveSnippetGlobal', 'Save to my personal snippets (reusable in all my projects)') ?></span>
+                <input type="checkbox" id="save-snippet-personal">
+                <span><?= __admin('preview.saveSnippetPersonal') ?></span>
             </label>
         </div>
         

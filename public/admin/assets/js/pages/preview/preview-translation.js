@@ -8,7 +8,7 @@
  *
  * Activation surface: sidebar "Translations" tool → setMode('translation')
  * in preview.js shows #contextual-translation and calls
- * PreviewTranslation.enter() (lazy data fetch on first entry).
+ * PreviewTranslation.enter(), which fetches the data again on every entry.
  *
  * Data sources (no new commands — reuses existing):
  *   - QuickSiteAdmin.fetchHelperData('translation-keys-grouped', [lang]):
@@ -34,8 +34,9 @@ window.PreviewTranslation = (function () {
 
     // ──────────────────────────── State ─────────────────────────────────
 
-    // Module-scope cache. Populated on enter(); cleared on language switch
-    // (full refetch) or after writes (partial update).
+    // Module-scope cache. Fetched again on every enter(), so a key written
+    // elsewhere shows at the next opening; refetched on a language switch;
+    // updated in place after the panel's own writes.
     var _grouped = null;       // { used: [...], unset: [...], unused: [...] } for current lang
     var _translations = null;  // full translations object for current lang
     var _keysBySource = null;  // { 'page:home': ['home.title', ...], 'component:card': [...], ... }
@@ -59,7 +60,8 @@ window.PreviewTranslation = (function () {
     // Bulk default ON (orphaned keys are orphaned everywhere).
     var _deleteAllLangs = false;
     var _bulkDeleteAllLangs = true;
-    var _entered = false;      // First-entry guard so we only initialise once
+    var _entered = false;      // set by the first enter(): only that one shows the loading state
+    var _loadSeq = 0;          // the latest load; an older load's answer is dropped
 
     // DOM refs — bound on init().
     var _section = null;
@@ -132,42 +134,43 @@ window.PreviewTranslation = (function () {
     // ──────────────────────────── Public API ────────────────────────────
 
     /**
-     * Called by preview.js when setMode('translation') fires. Lazy-loads
-     * data on first entry; no-op on subsequent entries unless an explicit
-     * refresh is requested.
+     * Called by preview.js when setMode('translation') fires. Fetches the
+     * data on every entry: a key written elsewhere since the last opening
+     * (the wizards' key picker, the Text tool, Add Element → Text) shows
+     * without a reload. The first entry shows the loading state; a later
+     * one keeps the rows on screen until the new data is in.
      */
-    function enter(opts) {
-        opts = opts || {};
+    function enter() {
         if (!_section) return;
-        if (_entered && !opts.refresh) return;
+        var quiet = _entered;
         _entered = true;
-        _initialLoad();
+        _load(quiet);
     }
 
     /**
-     * Called by preview.js when leaving translation mode. Light cleanup —
-     * we keep the module-scope cache so re-entering is fast.
+     * Called by preview.js when leaving translation mode. Nothing to tear
+     * down: the rows stay on screen at the next entry while enter() fetches.
      */
     function leave() {
-        // No teardown needed today; cache persists for fast re-entry.
-        // If this becomes load-bearing later (e.g. iframe detection of
-        // stale language), wire a refresh hook here.
     }
 
     // ──────────────────────────── Data fetch ────────────────────────────
 
     /**
-     * Initial data load on first enter(). Fetches language list + the
+     * The data load of every enter(). Fetches the language list + the
      * site-wide keys_by_source map in parallel (neither depends on a
-     * language). Caches the results so language switches only refetch
-     * the language-dependent data.
+     * language), then the language-dependent data. Caches the results so
+     * language switches only refetch the language-dependent data. `quiet`
+     * keeps the rows on screen instead of the loading state.
      */
-    async function _initialLoad() {
+    async function _load(quiet) {
+        var seq = ++_loadSeq;
         try {
             var results = await Promise.all([
                 QuickSiteAdmin.apiRequest('getLangList', 'GET'),
                 QuickSiteAdmin.apiRequest('getTranslationKeys', 'GET')
             ]);
+            if (seq !== _loadSeq) return;  // a newer load answers instead
             var langData = _unwrap(results[0]);
             var keysData = _unwrap(results[1]);
 
@@ -213,7 +216,7 @@ window.PreviewTranslation = (function () {
                 ? _currentLang
                 : _availableLangs[0];
             if (_langSelect) _langSelect.value = _currentLang;
-            await _refetchAndRender();
+            await _refetchAndRender(quiet);
         } catch (e) {
             console.error('[PreviewTranslation] initial load failed:', e);
             _showLoading(false);
@@ -242,6 +245,7 @@ window.PreviewTranslation = (function () {
     function _populateLangSelect() {
         if (!_langSelect) return;
         _langSelect.textContent = '';
+        _langSelect.disabled = false;
         _availableLangs.forEach(function (lang) {
             var opt = document.createElement('option');
             opt.value = lang;
@@ -305,23 +309,34 @@ window.PreviewTranslation = (function () {
         if (pageGroup.children.length) _scopeSelect.appendChild(pageGroup);
         if (layoutGroup.children.length) _scopeSelect.appendChild(layoutGroup);
         if (componentGroup.children.length) _scopeSelect.appendChild(componentGroup);
+
+        // A reload keeps the scope chosen, unless its source is gone (then the whole site).
+        if (_currentScope !== 'site' && !Object.prototype.hasOwnProperty.call(_keysBySource, _currentScope)) {
+            _currentScope = 'site';
+        }
+        _scopeSelect.value = _currentScope;
     }
 
     /**
      * Refetch the language-dependent data (grouped keys + values), then
-     * render. Called on first load + on language switch.
+     * render. Called by every load, on a language switch and after the
+     * panel's own writes; `quiet` keeps the rows on screen meanwhile.
      *
      * Each call is isolated: one failing sub-call doesn't crash the whole
      * panel. We render whatever data we have (empty fallbacks), and the
      * console log identifies the offending endpoint for root-cause.
      */
-    async function _refetchAndRender() {
+    async function _refetchAndRender(quiet) {
         if (!_currentLang) return;
-        _showLoading(true);
-        _showEmpty(false);
+        var seq = ++_loadSeq;
+        if (!quiet) {
+            _showLoading(true);
+            _showEmpty(false);
+        }
 
         var grouped = await _fetchGroupedSafe(_currentLang);
         var translations = await _fetchTranslationsSafe(_currentLang);
+        if (seq !== _loadSeq) return;  // a newer load answers instead
 
         _grouped = grouped || { used: [], unused: [], unset: [] };
         _translations = translations || {};
@@ -611,23 +626,20 @@ window.PreviewTranslation = (function () {
 
     var _STATUS_DOTS = { used: '🟢', unset: '🔴', unused: '🟡' };
 
-    // Trusted static SVG icons. innerHTML use is fine here per CLAUDE.md
-    // HTML-in-JS hygiene carve-out ("small SVG icons and short trusted snippets").
-    // Stroke + fill set in CSS so a single rule themes both icons.
-    var _ICON_SVG = {
-        edit: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>',
-        setvalue: '<svg viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>',
-        del: '<svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14H7L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>'
-    };
+    // The row actions' own icons, inner SVG markup for QSDom.iconEl ("set value" is the
+    // catalogue's plus). Their size, stroke and fill come from the panel's CSS, one rule
+    // for all three.
+    var _ICON_EDIT = '<path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>';
+    var _ICON_DELETE = '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14H7L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>';
 
-    function _renderActionButton(label, iconKey, modifier, onClick) {
+    function _renderActionButton(label, iconMarkup, modifier, onClick) {
         var btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'preview-contextual-translation__row-action'
             + (modifier ? ' preview-contextual-translation__row-action--' + modifier : '');
         btn.setAttribute('aria-label', label);
         btn.title = label;
-        btn.innerHTML = _ICON_SVG[iconKey];
+        btn.appendChild(QSDom.iconEl(iconMarkup, 0));
         btn.addEventListener('click', onClick);
         return btn;
     }
@@ -681,13 +693,13 @@ window.PreviewTranslation = (function () {
 
         actions.appendChild(_renderActionButton(
             editLabel,
-            entry.status === 'unset' ? 'setvalue' : 'edit',
+            entry.status === 'unset' ? QuickSiteUtils.ICON_PATHS.plus : _ICON_EDIT,
             null,
             function () { _handleEditKey(entry.key); }
         ));
         actions.appendChild(_renderActionButton(
             deleteLabel,
-            'del',
+            _ICON_DELETE,
             'danger',
             function () { _handleDeleteKey(entry.key); }
         ));
@@ -1001,7 +1013,7 @@ window.PreviewTranslation = (function () {
                 language: lang,
                 keys: keys
             });
-            if (!res) return { ok: false, error: 'no response' };
+            if (!res) return { ok: false, error: PreviewConfig.i18n.translationNoResponse };
             if (res.status === 200 || res.status === 404) return { ok: true };
             var envelope = res.data;
             var msg = (envelope && envelope.message)

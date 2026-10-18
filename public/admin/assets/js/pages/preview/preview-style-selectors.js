@@ -176,11 +176,19 @@
             selectorsLoading.style.display = 'none';
             selectorsGroups.style.display = '';
         } else {
-            selectorsLoading.innerHTML = `
-                ${QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.alertCircle, 24, null, 'style="color: #ef4444;"')}
-                <span style="color: #ef4444;">${PreviewConfig.i18n?.selectorsLoadError || 'Failed to load selectors'}</span>
-            `;
+            selectorsLoading.replaceChildren(
+                _renderLoadErrorIcon(),
+                ' ',
+                QSDom.el('span', { style: 'color: #ef4444;', text: PreviewConfig.i18n?.selectorsLoadError || 'Failed to load selectors' })
+            );
         }
+    }
+
+    /** The red alert icon a failed load shows beside its message. */
+    function _renderLoadErrorIcon() {
+        const icon = QSDom.iconEl(QuickSiteUtils.ICON_PATHS.alertCircle, 24);
+        icon.setAttribute('style', 'color: #ef4444;');
+        return icon;
     }
 
     // ==================== Categorize Selectors ====================
@@ -332,11 +340,11 @@
      */
     function populateSelectorBrowser() {
         // Clear existing items
-        if (selectorTagsList) selectorTagsList.innerHTML = '';
-        if (selectorClassesList) selectorClassesList.innerHTML = '';
-        if (selectorIdsList) selectorIdsList.innerHTML = '';
-        if (selectorAttributesList) selectorAttributesList.innerHTML = '';
-        if (selectorMediaList) selectorMediaList.innerHTML = '';
+        if (selectorTagsList) selectorTagsList.replaceChildren();
+        if (selectorClassesList) selectorClassesList.replaceChildren();
+        if (selectorIdsList) selectorIdsList.replaceChildren();
+        if (selectorAttributesList) selectorAttributesList.replaceChildren();
+        if (selectorMediaList) selectorMediaList.replaceChildren();
         
         // Populate Tags
         categorizedSelectors.tags.forEach(item => {
@@ -417,7 +425,7 @@
             chip.classList.add('preview-selector-item--dom-only');
         }
         chip.textContent = selector;
-        chip.title = selector + (mediaQuery ? ` (${mediaQuery})` : '') + (hasRules ? '' : ' — no CSS rules yet');
+        chip.title = selector + (mediaQuery ? ` (${mediaQuery})` : '') + (hasRules ? '' : ' — ' + PreviewConfig.i18n.selectorNoRulesYet);
         chip.dataset.selector = selector;
         chip.dataset.hasRules = hasRules ? '1' : '0';
         if (mediaQuery) chip.dataset.media = mediaQuery;
@@ -1006,13 +1014,15 @@
         
         // Build list of all selectors with rules (excluding the current one)
         const currentSel = currentSelectedSelector?.selector;
-        selectorCopyList.innerHTML = '';
+        selectorCopyList.replaceChildren();
         
         const withRules = getSelectorsWithRules().filter(s => s.selector !== currentSel);
         
         if (withRules.length === 0) {
-            selectorCopyList.innerHTML = '<div class="preview-selector-copy-picker__empty">' +
-                (PreviewConfig.i18n?.noSelectorsWithRules || 'No other selectors with styles found') + '</div>';
+            selectorCopyList.replaceChildren(QSDom.el('div', {
+                class: 'preview-selector-copy-picker__empty',
+                text: PreviewConfig.i18n?.noSelectorsWithRules || 'No other selectors with styles found'
+            }));
         } else {
             withRules.forEach(item => {
                 const btn = document.createElement('button');

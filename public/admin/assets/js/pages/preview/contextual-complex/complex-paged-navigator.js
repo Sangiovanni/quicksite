@@ -108,36 +108,37 @@
     }
 
     function renderWizard(container) {
+        var t = function (key) { return window.QSComplexWizard.t('pagedNavigator.' + key); };
         var wrap = document.createElement('div');
         wrap.className = 'qs-complex-wizard qs-complex-wizard--paged-navigator';
 
         // -- store picker --
         var storeGroup = _renderGroup();
-        storeGroup.appendChild(_renderLabel('Bound state store', true));
+        storeGroup.appendChild(_renderLabel(t('store'), true));
         var storeSelect = document.createElement('select');
         storeSelect.className = 'admin-input';
         storeSelect.id = 'ce-pn-store';
         (function () {
             var loadingOpt = document.createElement('option');
             loadingOpt.value = '';
-            loadingOpt.textContent = '(loading…)';
+            loadingOpt.textContent = t('storeLoading');
             storeSelect.appendChild(loadingOpt);
         })();
         storeGroup.appendChild(storeSelect);
-        storeGroup.appendChild(_renderHint('The store whose fields the navigator reads (totalPages) and writes (page). Configure on this page via JS mode → State stores.'));
+        storeGroup.appendChild(_renderHint(t('storeHint')));
         wrap.appendChild(storeGroup);
 
         // -- page field --
-        var pageFieldInput = _renderTextInput('ce-pn-page-field', 'e.g. page', 'page');
+        var pageFieldInput = _renderTextInput('ce-pn-page-field', t('pageFieldPlaceholder'), 'page');
         var pageFieldGroup = _renderGroup();
-        pageFieldGroup.appendChild(_renderLabel('Page field (REQUEST — buttons WRITE on click)'));
+        pageFieldGroup.appendChild(_renderLabel(t('pageField')));
         pageFieldGroup.appendChild(pageFieldInput);
         wrap.appendChild(pageFieldGroup);
 
         // -- totalPages field --
-        var totalFieldInput = _renderTextInput('ce-pn-total-field', 'e.g. totalPages', 'totalPages');
+        var totalFieldInput = _renderTextInput('ce-pn-total-field', t('totalFieldPlaceholder'), 'totalPages');
         var totalFieldGroup = _renderGroup();
-        totalFieldGroup.appendChild(_renderLabel('Total-pages field (RESPONSE — navigator READS to size itself)'));
+        totalFieldGroup.appendChild(_renderLabel(t('totalField')));
         totalFieldGroup.appendChild(totalFieldInput);
         wrap.appendChild(totalFieldGroup);
 
@@ -151,9 +152,9 @@
         windowInput.value = '2';
         windowInput.style.maxWidth = '120px';
         var windowGroup = _renderGroup();
-        windowGroup.appendChild(_renderLabel('Window size (siblings each side of the current page)'));
+        windowGroup.appendChild(_renderLabel(t('window')));
         windowGroup.appendChild(windowInput);
-        windowGroup.appendChild(_renderHint('Smart-ellipsis layout: always shows first + last + N siblings around the current page (e.g. "1 … 4 5 [6] 7 8 … 100"). 0–10. Default 2.'));
+        windowGroup.appendChild(_renderHint(t('windowHint')));
         wrap.appendChild(windowGroup);
 
         // -- include prev/next --
@@ -164,17 +165,17 @@
         prevNextCb.id = 'ce-pn-prev-next';
         prevNextCb.checked = true;
         var prevNextSpan = document.createElement('span');
-        prevNextSpan.textContent = 'Include ‹ Prev / Next › chevrons';
+        prevNextSpan.textContent = t('prevNext');
         prevNextLabel.appendChild(prevNextCb);
         prevNextLabel.appendChild(prevNextSpan);
         wrap.appendChild(_renderGroup(prevNextLabel));
 
         // -- optional HTML id --
-        var idInput = _renderTextInput('ce-pn-id', 'e.g. results-pager (optional)');
+        var idInput = _renderTextInput('ce-pn-id', t('idPlaceholder'));
         var idGroup = _renderGroup();
-        idGroup.appendChild(_renderLabel('HTML id (optional)'));
+        idGroup.appendChild(_renderLabel(t('id')));
         idGroup.appendChild(idInput);
-        idGroup.appendChild(_renderHint('Set an id only if you need to target the <nav> from CSS / JS / interactions.'));
+        idGroup.appendChild(_renderHint(t('idHint')));
         wrap.appendChild(idGroup);
 
         container.appendChild(wrap);
@@ -183,11 +184,11 @@
         var loadedStoreIds = [];
         _fetchCurrentPageStores().then(function (stores) {
             loadedStoreIds = Object.keys(stores);
-            storeSelect.innerHTML = '';
+            storeSelect.replaceChildren();
             if (loadedStoreIds.length === 0) {
                 var noneOpt = document.createElement('option');
                 noneOpt.value = '';
-                noneOpt.textContent = '(no state stores on this page — add one in JS mode first)';
+                noneOpt.textContent = t('noStores');
                 noneOpt.disabled = true;
                 noneOpt.selected = true;
                 storeSelect.appendChild(noneOpt);
@@ -195,7 +196,7 @@
             }
             var placeholder = document.createElement('option');
             placeholder.value = '';
-            placeholder.textContent = '-- pick a store --';
+            placeholder.textContent = t('pickStore');
             storeSelect.appendChild(placeholder);
             loadedStoreIds.forEach(function (sid) {
                 var opt = document.createElement('option');
@@ -222,21 +223,21 @@
 
         function validate() {
             var cfg = getConfig();
-            if (!cfg.storeId) return 'Pick a state store.';
+            if (!cfg.storeId) return t('errors.store');
             if (!/^[a-zA-Z][\w-]*$/.test(cfg.storeId)) {
-                return 'storeId must start with a letter; use letters, digits, hyphens, underscores.';
+                return t('errors.storeId');
             }
             if (!/^[a-zA-Z_][\w]*$/.test(cfg.pageField)) {
-                return 'pageField must be a valid identifier (letters, digits, _).';
+                return t('errors.pageField');
             }
             if (!/^[a-zA-Z_][\w]*$/.test(cfg.totalPagesField)) {
-                return 'totalPagesField must be a valid identifier.';
+                return t('errors.totalField');
             }
             if (cfg.window < 0 || cfg.window > 10) {
-                return 'window must be between 0 and 10.';
+                return t('errors.window');
             }
             if (cfg.id && !/^[a-zA-Z][\w-]*$/.test(cfg.id)) {
-                return 'HTML id must start with a letter; use letters, digits, hyphens, underscores.';
+                return t('errors.id');
             }
             return null;
         }
@@ -251,7 +252,7 @@
     window.QSComplexWizard = window.QSComplexWizard || {};
     window.QSComplexWizard.registry = window.QSComplexWizard.registry || {};
     window.QSComplexWizard.registry['paged-navigator'] = {
-        label: 'Paged navigator (numbered)',
+        label: window.QSComplexWizard.t('pagedNavigator.label'),
         description: 'A &lt;nav&gt; bound to a state store. Reads `totalPages` to size itself; numbered buttons + optional Prev/Next chevrons. Click a number → setState(page) → fetchState. Hides when totalPages is missing or ≤ 1.',
         renderWizard: renderWizard
     };

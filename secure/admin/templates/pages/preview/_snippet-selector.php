@@ -4,7 +4,7 @@
  * 
  * A searchable dropdown for snippet selection, following the same
  * tag-dropdown pattern used by the HTML Tag selector.
- * Groups snippets by category with source badges (Core/Global/Project).
+ * Groups snippets by category with source badges (Core/Personal/Project).
  * 
  * Usage: include with $selectorId parameter for unique IDs
  *   <?php $selectorId = 'add'; include '_snippet-selector.php'; ?>
@@ -70,11 +70,18 @@ $selectorId = $selectorId ?? 'add';
         </div>
         <p class="snippet-selector__preview-desc" id="<?= $selectorId ?>-snippet-preview-desc"></p>
         <div class="snippet-selector__preview-frame-container">
-            <iframe class="snippet-selector__preview-frame" id="<?= $selectorId ?>-snippet-preview-frame" sandbox="allow-same-origin"></iframe>
+            <!-- A fixed empty document, sandboxed without scripts: preview.js fills it with the
+                 frame's own createElement, so nothing a snippet carries is ever parsed as HTML -->
+            <iframe class="snippet-selector__preview-frame" id="<?= $selectorId ?>-snippet-preview-frame" sandbox="allow-same-origin"
+                    srcdoc="<?= htmlspecialchars('<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>body { margin: 8px; font-family: system-ui, -apple-system, sans-serif; }</style></head><body></body></html>', ENT_QUOTES) ?>"></iframe>
         </div>
         <label class="snippet-selector__style-toggle" id="<?= $selectorId ?>-snippet-style-toggle" style="display: none;">
             <input type="checkbox" id="<?= $selectorId ?>-snippet-style-toggle-input">
             <span><?= __admin('preview.withoutProjectStyle', 'Without current project style') ?></span>
+        </label>
+        <label class="snippet-selector__style-toggle" id="<?= $selectorId ?>-snippet-keys-toggle">
+            <input type="checkbox" id="<?= $selectorId ?>-snippet-keys-toggle-input">
+            <span><?= __admin('preview.snippetShowKeys') ?></span>
         </label>
         <!-- CSS Selector Status (populated by JS from getSnippet response) -->
         <div class="snippet-selector__css-status" id="<?= $selectorId ?>-snippet-css-status" style="display: none;">

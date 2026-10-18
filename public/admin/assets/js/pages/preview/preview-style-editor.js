@@ -46,64 +46,6 @@
         'text-decoration-color', 'column-rule-color'
     ];
     
-    /**
-     * CSS Properties organized by category for the property selector dropdown
-     */
-    const CSS_PROPERTIES_BY_CATEGORY = {
-        'Layout': [
-            'display', 'width', 'height', 'min-width', 'min-height', 'max-width', 'max-height',
-            'margin', 'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
-            'padding', 'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
-            'box-sizing', 'overflow', 'overflow-x', 'overflow-y'
-        ],
-        'Flexbox': [
-            'flex-direction', 'flex-wrap', 'justify-content', 'align-items', 'align-content',
-            'gap', 'row-gap', 'column-gap', 'flex', 'flex-grow', 'flex-shrink', 'flex-basis',
-            'align-self', 'order'
-        ],
-        'Grid': [
-            'grid-template-columns', 'grid-template-rows', 'grid-gap', 'grid-column-gap',
-            'grid-row-gap', 'grid-auto-flow', 'grid-column', 'grid-row', 'place-items',
-            'place-content', 'place-self'
-        ],
-        'Position': [
-            'position', 'top', 'right', 'bottom', 'left', 'z-index', 'inset'
-        ],
-        'Typography': [
-            'font-family', 'font-size', 'font-weight', 'font-style', 'line-height',
-            'letter-spacing', 'word-spacing', 'text-align', 'text-decoration', 
-            'text-transform', 'white-space', 'word-break', 'text-overflow'
-        ],
-        'Colors': [
-            'color', 'background-color', 'background', 'background-image',
-            'border-color', 'outline-color', 'fill', 'stroke'
-        ],
-        'Borders': [
-            'border', 'border-width', 'border-style', 'border-color', 'border-radius',
-            'border-top', 'border-right', 'border-bottom', 'border-left',
-            'outline', 'outline-width', 'outline-style', 'outline-offset'
-        ],
-        'Effects': [
-            'opacity', 'visibility', 'box-shadow', 'text-shadow', 'filter',
-            'backdrop-filter', 'mix-blend-mode', 'clip-path'
-        ],
-        'Transform': [
-            'transform', 'transform-origin', 'perspective', 'translate', 'rotate', 'scale'
-        ],
-        'Transition': [
-            'transition', 'transition-property', 'transition-duration', 
-            'transition-timing-function', 'transition-delay'
-        ],
-        'Animation': [
-            'animation', 'animation-name', 'animation-duration', 'animation-timing-function',
-            'animation-delay', 'animation-iteration-count', 'animation-direction', 'animation-fill-mode'
-        ],
-        'Other': [
-            'cursor', 'pointer-events', 'user-select', 'content', 'list-style',
-            'object-fit', 'object-position', 'aspect-ratio'
-        ]
-    };
-    
     // ==================== State ====================
     
     let styleEditorVisible = false;
@@ -392,7 +334,7 @@
      */
     function renderStyleProperties() {
         if (!styleEditorProperties) return;
-        styleEditorProperties.innerHTML = '';
+        styleEditorProperties.replaceChildren();
         
         // Render existing properties
         for (const [property, value] of Object.entries(currentStyles)) {
@@ -501,7 +443,7 @@
         const varDropdownBtn = document.createElement('button');
         varDropdownBtn.type = 'button';
         varDropdownBtn.className = 'preview-style-property__var-btn';
-        varDropdownBtn.innerHTML = QuickSiteUtils.iconChevronDown(12);
+        varDropdownBtn.appendChild(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.chevronDown, 12));
         varDropdownBtn.title = PreviewConfig.i18n.selectVariable;
         varDropdownBtn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -524,7 +466,7 @@
         const deleteBtn = document.createElement('button');
         deleteBtn.type = 'button';
         deleteBtn.className = 'preview-style-property__delete';
-        deleteBtn.innerHTML = QuickSiteUtils.iconClose(14);
+        deleteBtn.appendChild(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.close, 14));
         deleteBtn.title = PreviewConfig.i18n.delete;
         deleteBtn.addEventListener('click', () => {
             deleteProperty(row.dataset.property, isNew);
@@ -666,17 +608,17 @@
             const fontVars = allVariables.filter(v => v.includes('font') || v.includes('text') || v.includes('line') || v.includes('letter'));
             const otherVars = allVariables.filter(v => !fontVars.includes(v));
             variables = [...fontVars, ...otherVars];
-            filterHint = fontVars.length > 0 ? ` (${fontVars.length} font vars)` : '';
+            filterHint = fontVars.length > 0 ? ' ' + PreviewConfig.i18n.varFilterFont.replace('{n}', fontVars.length) : '';
         } else if (isColorProperty) {
             const colorVars = allVariables.filter(v => v.includes('color') || v.includes('bg') || v.includes('border') || v.includes('text'));
             const otherVars = allVariables.filter(v => !colorVars.includes(v));
             variables = [...colorVars, ...otherVars];
-            filterHint = colorVars.length > 0 ? ` (${colorVars.length} color vars)` : '';
+            filterHint = colorVars.length > 0 ? ' ' + PreviewConfig.i18n.varFilterColor.replace('{n}', colorVars.length) : '';
         } else if (isSizeProperty) {
             const sizeVars = allVariables.filter(v => v.includes('spacing') || v.includes('gap') || v.includes('size') || v.includes('radius') || v.includes('width') || v.includes('height'));
             const otherVars = allVariables.filter(v => !sizeVars.includes(v));
             variables = [...sizeVars, ...otherVars];
-            filterHint = sizeVars.length > 0 ? ` (${sizeVars.length} size vars)` : '';
+            filterHint = sizeVars.length > 0 ? ' ' + PreviewConfig.i18n.varFilterSize.replace('{n}', sizeVars.length) : '';
         }
         
         // Create dropdown
@@ -694,7 +636,7 @@
         list.className = 'preview-var-dropdown__list';
         
         const renderItems = (filter = '') => {
-            list.innerHTML = '';
+            list.replaceChildren();
             const filterLower = filter.toLowerCase();
             
             for (const varName of variables) {
@@ -1127,11 +1069,7 @@
         setGetIframe: (fn) => { getIframeFn = fn; },
         setGetThemeVariables: (fn) => { getThemeVariablesFn = fn; },
         setGetPropertyTypes: (fn) => { getPropertyTypesFn = fn; },
-        setCurrentSelectedSelector: (selector) => { currentSelectedSelector = selector; },
-        
-        // Constants for external use
-        CSS_PROPERTIES_BY_CATEGORY: CSS_PROPERTIES_BY_CATEGORY,
-        colorProperties: colorProperties
+        setCurrentSelectedSelector: (selector) => { currentSelectedSelector = selector; }
     };
     
     console.log('[PreviewStyleEditor] Module loaded');

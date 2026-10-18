@@ -179,17 +179,17 @@ foreach ($tagCategories as $catId => $category) {
         </div>
     </div>
     
-    <!-- Tag data for JS (categories, examples, suggestions) -->
+    <!-- Each tag's example, parsed once with the page and cloned into the preview by the editor.
+         A tag whose example is false (it renders nothing visible) has none: "No visual preview". -->
+    <?php foreach (getTagExamples() as $exampleTag => $exampleHtml): if ($exampleHtml === false) { continue; } ?>
+    <template id="<?= $selectorId ?>-tag-example-<?= $exampleTag ?>"><?= $exampleHtml ?></template>
+    <?php endforeach; ?>
+
+    <!-- Tag data for JS (categories, each tag's description and parameters) -->
     <script type="application/json" id="<?= $selectorId ?>-tag-data">
     <?php 
-    $examples = getTagExamples();
-    $examplesMap = [];
-    foreach ($examples as $tag => $html) {
-        $examplesMap[$tag] = $html === false ? null : $html;
-    }
     echo json_encode([
         'tags' => $tagDataForJs,
-        'examples' => $examplesMap,
         'categories' => array_map(fn($c) => ['label' => $c['label']], $tagCategories),
     ], JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
     ?>

@@ -1,10 +1,10 @@
 /**
- * Field Row wizard — first real Complex Element kind.
+ * Field Row wizard — kind 'field-row'.
  *
  * Emits one form field row (label + input + [data-error-for] span).
  * Building block for Form Scaffold. The wizard is intentionally small
- * — it's the simplest kind and serves as the reference template for
- * every later kind's renderWizard/getConfig/validate contract.
+ * — it's the simplest kind and the reference for the
+ * renderWizard/getConfig/validate contract every kind follows.
  *
  * Server-side builder: secure/src/classes/complexElements/FieldRow.php
  */
@@ -31,67 +31,66 @@
      * a controller {getConfig, validate, destroy}.
      */
     function renderWizard(container) {
+        const W = window.QSComplexWizard;
+        const t = W.t;
         // ---- markup --------------------------------------------------
         // Translation-key fields are populated with the shared
         // QSComplexWizard.createTextKeyPicker (searchable + inline-create)
         // — same UX as the component-variables panel.
-        const wrap = document.createElement('div');
-        wrap.className = 'qs-complex-wizard qs-complex-wizard--field-row';
-        wrap.innerHTML = [
-            '<div class="admin-form-group">',
-            '  <label class="admin-label" for="ce-fr-name">Field name <span class="admin-text-danger">*</span></label>',
-            '  <input class="admin-input" type="text" id="ce-fr-name" placeholder="e.g. email" autocomplete="off">',
-            '  <p class="admin-hint">HTML <code>name</code> attribute. Letters, digits, hyphens, underscores; starts with a letter.</p>',
-            '</div>',
-            '<div class="admin-form-group">',
-            '  <label class="admin-label" for="ce-fr-type">Type</label>',
-            '  <select class="admin-input" id="ce-fr-type"></select>',
-            '</div>',
-            '<div class="admin-form-group">',
-            '  <label class="admin-label">Label translation key <span class="admin-text-danger">*</span></label>',
-            '  <div id="ce-fr-label-mount"></div>',
-            '  <p class="admin-hint">Pick an existing key or type a new one to create it on save.</p>',
-            '</div>',
-            '<div class="admin-form-group" id="ce-fr-placeholder-group">',
-            '  <label class="admin-label">Placeholder translation key <small>(optional)</small></label>',
-            '  <div id="ce-fr-placeholder-mount"></div>',
-            '</div>',
-            '<div class="admin-form-group">',
-            '  <label class="admin-checkbox">',
-            '    <input type="checkbox" id="ce-fr-required">',
-            '    <span>Required field</span>',
-            '  </label>',
-            '</div>',
-            '<div class="admin-form-group">',
-            '  <label class="admin-label" for="ce-fr-id"><small>Override HTML id (optional)</small></label>',
-            '  <input class="admin-input" type="text" id="ce-fr-id" placeholder="defaults to field name" autocomplete="off">',
-            '</div>'
-        ].join('');
+        const nameEl = QSDom.el('input', { class: 'admin-input', type: 'text', id: 'ce-fr-name', placeholder: t('fieldRow.namePlaceholder'), autocomplete: 'off' });
+        const typeEl = QSDom.el('select', { class: 'admin-input', id: 'ce-fr-type' });
+        const labelMount = QSDom.el('div', { id: 'ce-fr-label-mount' });
+        const placeholderMount = QSDom.el('div', { id: 'ce-fr-placeholder-mount' });
+        const placeholderGroup = QSDom.el('div', { class: 'admin-form-group', id: 'ce-fr-placeholder-group' }, [
+            QSDom.el('label', { class: 'admin-label' }, [t('common.placeholderKey'), ' ', QSDom.el('small', { text: t('common.optional') })]),
+            placeholderMount
+        ]);
+        const requiredEl = QSDom.el('input', { type: 'checkbox', id: 'ce-fr-required' });
+        const idEl = QSDom.el('input', { class: 'admin-input', type: 'text', id: 'ce-fr-id', placeholder: t('common.idPlaceholder'), autocomplete: 'off' });
+
+        const wrap = QSDom.el('div', { class: 'qs-complex-wizard qs-complex-wizard--field-row' }, [
+            QSDom.el('div', { class: 'admin-form-group' }, [
+                QSDom.el('label', { class: 'admin-label', for: 'ce-fr-name' }, [t('common.fieldName'), ' ', W.requiredMark()]),
+                nameEl,
+                QSDom.el('p', { class: 'admin-hint' }, W.codeText(t('common.nameHint'), { name: 'name' }))
+            ]),
+            QSDom.el('div', { class: 'admin-form-group' }, [
+                QSDom.el('label', { class: 'admin-label', for: 'ce-fr-type', text: t('fieldRow.type') }),
+                typeEl
+            ]),
+            QSDom.el('div', { class: 'admin-form-group' }, [
+                QSDom.el('label', { class: 'admin-label' }, [t('common.labelKey'), ' ', W.requiredMark()]),
+                labelMount,
+                QSDom.el('p', { class: 'admin-hint', text: t('fieldRow.labelHint') })
+            ]),
+            placeholderGroup,
+            QSDom.el('div', { class: 'admin-form-group' }, [
+                QSDom.el('label', { class: 'admin-checkbox' }, [requiredEl, QSDom.el('span', { text: t('fieldRow.required') })])
+            ]),
+            QSDom.el('div', { class: 'admin-form-group' }, [
+                QSDom.el('label', { class: 'admin-label', for: 'ce-fr-id' }, [QSDom.el('small', { text: t('common.idOverride') })]),
+                idEl
+            ])
+        ]);
         container.appendChild(wrap);
 
         // Populate the type select.
-        const typeEl = wrap.querySelector('#ce-fr-type');
-        INPUT_TYPES.forEach(t => {
+        INPUT_TYPES.forEach(type => {
             const o = document.createElement('option');
-            o.value = t; o.textContent = t;
-            if (t === 'text') o.selected = true;
+            o.value = type; o.textContent = type;
+            if (type === 'text') o.selected = true;
             typeEl.appendChild(o);
         });
 
-        const nameEl           = wrap.querySelector('#ce-fr-name');
-        const placeholderGroup = wrap.querySelector('#ce-fr-placeholder-group');
-        const requiredEl       = wrap.querySelector('#ce-fr-required');
-        const idEl             = wrap.querySelector('#ce-fr-id');
-
         // ---- textKey pickers ----------------------------------------
         // Shared primitive — searchable list + inline "Create" form.
-        const labelPicker = window.QSComplexWizard.createTextKeyPicker({
-            container: wrap.querySelector('#ce-fr-label-mount'),
-            placeholder: 'e.g. form.contact.email.label',
+        const labelPicker = W.createTextKeyPicker({
+            container: labelMount,
+            placeholder: t('fieldRow.labelKeyPlaceholder'),
         });
-        const placeholderPicker = window.QSComplexWizard.createTextKeyPicker({
-            container: wrap.querySelector('#ce-fr-placeholder-mount'),
-            placeholder: 'e.g. form.contact.email.placeholder',
+        const placeholderPicker = W.createTextKeyPicker({
+            container: placeholderMount,
+            placeholder: t('fieldRow.placeholderKeyPlaceholder'),
         });
 
         // Hide placeholder row when type doesn't support one.
@@ -132,13 +131,13 @@
         }
 
         function validate() {
-            if (!nameEl.value.trim()) return 'Field name is required';
+            if (!nameEl.value.trim()) return t('common.errors.nameRequired');
             if (!/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(nameEl.value.trim())) {
-                return 'Field name must start with a letter and contain only letters, digits, hyphens, underscores';
+                return t('fieldRow.errors.nameFormat');
             }
-            if (!(labelPicker.getValue() || '').trim()) return 'Label translation key is required';
+            if (!(labelPicker.getValue() || '').trim()) return t('common.errors.labelRequired');
             if (idEl.value.trim() && !/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(idEl.value.trim())) {
-                return 'HTML id must start with a letter and contain only letters, digits, hyphens, underscores';
+                return t('fieldRow.errors.idFormat');
             }
             return null;
         }
@@ -146,7 +145,7 @@
         function destroy() {
             try { labelPicker.destroy(); } catch (e) {}
             try { placeholderPicker.destroy(); } catch (e) {}
-            container.innerHTML = '';
+            container.replaceChildren();
         }
 
         return { getConfig, validate, destroy };
@@ -156,8 +155,8 @@
     window.QSComplexWizard = window.QSComplexWizard || {};
     window.QSComplexWizard.registry = window.QSComplexWizard.registry || {};
     window.QSComplexWizard.registry['field-row'] = {
-        label: 'Field row',
-        description: 'A single form field (label + input + error span), ready for QS.validate.',
+        label: window.QSComplexWizard.t('fieldRow.label'),
+        description: window.QSComplexWizard.t('fieldRow.description'),
         renderWizard: renderWizard
     };
 })();

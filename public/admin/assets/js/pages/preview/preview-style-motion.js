@@ -83,15 +83,17 @@
 
     // ==================== Utility Functions ====================
     
-    function escapeHtml(text) {
-        // Delegate to canonical PreviewState.utils.escapeHtml when available.
-        if (window.PreviewState && PreviewState.utils && PreviewState.utils.escapeHtml) {
-            return PreviewState.utils.escapeHtml(text);
+    // The apply arrow, which QuickSiteUtils.ICON_PATHS does not hold, in the shape QSDom.iconEl takes
+    const ICON_APPLY = '<line x1="5" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/>';
+
+    /** An icon as an element; `round` / `round-join`: the rounded line ends (and joins) some of this tab's icons have. */
+    function _icon(paths, size, round, cls) {
+        const svg = QSDom.iconEl(paths, size, cls);
+        if (svg && round) {
+            svg.setAttribute('stroke-linecap', 'round');
+            if (round === 'round-join') svg.setAttribute('stroke-linejoin', 'round');
         }
-        if (!text) return '';
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+        return svg;
     }
     
     function showToast(message, type) {
@@ -240,89 +242,73 @@
     
     function populateKeyframesList() {
         if (!keyframesList || !keyframesCount || !keyframesEmpty) return;
-        
+
         const count = keyframesData.length;
         keyframesCount.textContent = count;
-        
+
         if (count === 0) {
-            keyframesList.innerHTML = '';
+            keyframesList.replaceChildren();
             keyframesEmpty.style.display = '';
             return;
         }
-        
+
         keyframesEmpty.style.display = 'none';
 
         // Build keyframe→users map from cached animatedSelectorsData
         // (no extra fetch — same data drives the Animations sub-group).
         const usersMap = computeKeyframeUsersMap();
+        keyframesList.replaceChildren(...keyframesData.map(kf => _renderKeyframeItem(kf, usersMap[kf.name] || [])));
+    }
 
-        keyframesList.innerHTML = keyframesData.map(kf => {
-            const users = usersMap[kf.name] || [];
-            const usedByCount = users.length;
-            const tplCount = PreviewConfig.i18n.keyframeUsedByCount || 'used by {n}';
-            const usedByLabel = tplCount.replace('{n}', String(usedByCount));
-            const usedByTitle = PreviewConfig.i18n.keyframeUsedByTitle || 'Show selectors using this keyframe';
-            const removeTitle = PreviewConfig.i18n.keyframeRemoveFromSelector || 'Remove animation from this selector';
-            const usedByBadge = usedByCount > 0
-                ? `<button type="button" class="preview-keyframe-item__used-by" data-action="toggle-users" title="${escapeHtml(usedByTitle)}">${escapeHtml(usedByLabel)}</button>`
-                : '';
-            const usersListHtml = usedByCount > 0
-                ? `<div class="preview-keyframe-item__users" data-users hidden>
-                    ${users.map(sel => `
-                        <div class="preview-keyframe-item__user">
-                            <code>${escapeHtml(sel)}</code>
-                            <button type="button" class="preview-keyframe-item__user-remove" data-action="remove-user" data-target="${escapeHtml(sel)}" title="${escapeHtml(removeTitle)}">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="12" height="12">
-                                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                                </svg>
-                            </button>
-                        </div>
-                    `).join('')}
-                </div>`
-                : '';
-        return `
-            <div class="preview-keyframe-item" data-keyframe="${escapeHtml(kf.name)}">
-                <div class="preview-keyframe-item__info">
-                    <span class="preview-keyframe-item__name">@keyframes ${escapeHtml(kf.name)}</span>
-                    <span class="preview-keyframe-item__frames">${kf.frameCount} ${kf.frameCount === 1 ? PreviewConfig.i18n.frame : PreviewConfig.i18n.frames}</span>
-                    ${usedByBadge}
-                </div>
-                <div class="preview-keyframe-item__actions">
-                    <button type="button" class="preview-keyframe-item__btn preview-keyframe-item__btn--preview"
-                            data-action="preview" title="${PreviewConfig.i18n.previewAnimation}">
-                        ${QuickSiteUtils.iconPlay(14)}
-                    </button>
-                    <button type="button" class="preview-keyframe-item__btn preview-keyframe-item__btn--apply"
-                            data-action="apply" title="${PreviewConfig.i18n.applyKeyframeToSelector || 'Apply to selector…'}">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14">
-                            <line x1="5" y1="12" x2="19" y2="12"/>
-                            <polyline points="13 6 19 12 13 18"/>
-                        </svg>
-                    </button>
-                    <button type="button" class="preview-keyframe-item__btn preview-keyframe-item__btn--edit"
-                            data-action="edit" title="${PreviewConfig.i18n.edit}">
-                        ${QuickSiteUtils.iconEdit()}
-                    </button>
-                    <button type="button" class="preview-keyframe-item__btn preview-keyframe-item__btn--delete"
-                            data-action="delete" title="${PreviewConfig.i18n.delete}">
-                        ${QuickSiteUtils.iconTrash()}
-                    </button>
-                </div>
-                ${usersListHtml}
-            </div>
-        `;
-        }).join('');
-        
-        // Add event listeners — row actions (preview / apply / edit / delete)
-        keyframesList.querySelectorAll('.preview-keyframe-item__btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
+    /** One keyframe row: its name, frame count and "used by" badge, its four actions, the selectors using it. */
+    function _renderKeyframeItem(kf, users) {
+        const i18n = PreviewConfig.i18n;
+        const info = QSDom.el('div', { class: 'preview-keyframe-item__info' }, [
+            QSDom.el('span', { class: 'preview-keyframe-item__name', text: '@keyframes ' + (kf.name || '') }),
+            QSDom.el('span', { class: 'preview-keyframe-item__frames', text: kf.frameCount + ' ' + (kf.frameCount === 1 ? i18n.frame : i18n.frames) })
+        ]);
+        const item = QSDom.el('div', { class: 'preview-keyframe-item', dataset: { keyframe: kf.name || '' } }, [
+            info,
+            QSDom.el('div', { class: 'preview-keyframe-item__actions' }, [
+                _renderKeyframeAction(kf.name, 'preview', i18n.previewAnimation, _icon(QuickSiteUtils.ICON_PATHS.play, 14)),
+                _renderKeyframeAction(kf.name, 'apply', i18n.applyKeyframeToSelector || 'Apply to selector…', _icon(ICON_APPLY, 14, 'round-join')),
+                _renderKeyframeAction(kf.name, 'edit', i18n.edit, _icon(QuickSiteUtils.ICON_PATHS.edit)),
+                _renderKeyframeAction(kf.name, 'delete', i18n.delete, _icon(QuickSiteUtils.ICON_PATHS.trash))
+            ])
+        ]);
+        if (users.length > 0) {
+            // "used by N" badge toggles the inline user list
+            const usersDiv = QSDom.el('div', { class: 'preview-keyframe-item__users', 'data-users': '', hidden: '' },
+                users.map(sel => _renderKeyframeUser(kf.name, sel)));
+            const tplCount = i18n.keyframeUsedByCount || 'used by {n}';
+            const badge = QSDom.el('button', {
+                type: 'button',
+                class: 'preview-keyframe-item__used-by',
+                'data-action': 'toggle-users',
+                title: i18n.keyframeUsedByTitle || 'Show selectors using this keyframe',
+                text: tplCount.replace('{n}', String(users.length)),
+                onclick: (e) => {
+                    e.stopPropagation();
+                    usersDiv.hidden = !usersDiv.hidden;
+                    badge.classList.toggle('preview-keyframe-item__used-by--open', !usersDiv.hidden);
+                }
+            });
+            info.appendChild(badge);
+            item.appendChild(usersDiv);
+        }
+        return item;
+    }
+
+    /** One of a keyframe row's action buttons: preview, apply, edit, delete. */
+    function _renderKeyframeAction(keyframeName, action, title, icon) {
+        return QSDom.el('button', {
+            type: 'button',
+            class: 'preview-keyframe-item__btn preview-keyframe-item__btn--' + action,
+            'data-action': action,
+            title: title,
+            onclick: (e) => {
                 e.stopPropagation();
-                const item = btn.closest('.preview-keyframe-item');
-                const keyframeName = item?.dataset.keyframe;
-                const action = btn.dataset.action;
-
                 if (!keyframeName) return;
-
                 switch (action) {
                     case 'preview':
                         previewKeyframe(keyframeName);
@@ -337,33 +323,27 @@
                         deleteKeyframe(keyframeName);
                         break;
                 }
-            });
-        });
+            }
+        }, [icon]);
+    }
 
-        // "used by N" badge toggles the inline user list.
-        keyframesList.querySelectorAll('.preview-keyframe-item__used-by').forEach(badge => {
-            badge.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const item = badge.closest('.preview-keyframe-item');
-                const usersDiv = item?.querySelector('[data-users]');
-                if (!usersDiv) return;
-                usersDiv.hidden = !usersDiv.hidden;
-                badge.classList.toggle('preview-keyframe-item__used-by--open', !usersDiv.hidden);
-            });
-        });
-
-        // ✕ button on each user row removes the animation from
-        // that selector via setStyleRule + removeProperties.
-        keyframesList.querySelectorAll('.preview-keyframe-item__user-remove').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const item = btn.closest('.preview-keyframe-item');
-                const keyframeName = item?.dataset.keyframe;
-                const targetSelector = btn.dataset.target;
-                if (!keyframeName || !targetSelector) return;
-                removeKeyframeFromSelector(keyframeName, targetSelector);
-            });
-        });
+    /** A selector using a keyframe; its ✕ removes the animation from that selector (setStyleRule + removeProperties). */
+    function _renderKeyframeUser(keyframeName, selector) {
+        return QSDom.el('div', { class: 'preview-keyframe-item__user' }, [
+            QSDom.el('code', { text: selector }),
+            QSDom.el('button', {
+                type: 'button',
+                class: 'preview-keyframe-item__user-remove',
+                'data-action': 'remove-user',
+                'data-target': selector,
+                title: PreviewConfig.i18n.keyframeRemoveFromSelector || 'Remove animation from this selector',
+                onclick: (e) => {
+                    e.stopPropagation();
+                    if (!keyframeName || !selector) return;
+                    removeKeyframeFromSelector(keyframeName, selector);
+                }
+            }, [_icon(QuickSiteUtils.ICON_PATHS.close, 12, 'round')])
+        ]);
     }
 
     // ==================== Keyframe Editor Initialization ====================
@@ -416,170 +396,156 @@
             const transitions = animatedSelectorsData.transitions || [];
             transitionsCount.textContent = transitions.length;
 
-            // "+ Add transition" button prepended to the list so it
-            // shows whether the group has existing transitions or not, and
-            // hides naturally when the group is collapsed (same parent).
-            const addBtnHtml = `
-                <button type="button" class="preview-animations-group__add" data-action="add-transition">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="14" height="14">
-                        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-                    </svg>
-                    <span>${PreviewConfig.i18n.addTransition || 'Add transition'}</span>
-                </button>
-            `;
-
-            if (transitions.length === 0) {
-                transitionsList.innerHTML = addBtnHtml +
-                    `<p class="preview-animated-empty">${PreviewConfig.i18n.noTransitions}</p>`;
-            } else {
-                transitionsList.innerHTML = addBtnHtml + transitions.map(item =>
-                    renderAnimatedSelectorGroup(item, 'transition')
-                ).join('');
-            }
-
-            // Wire the add-transition trigger (re-queried because innerHTML
-            // just rebuilt the list).
-            const addBtn = transitionsList.querySelector('[data-action="add-transition"]');
-            if (addBtn) {
-                addBtn.addEventListener('click', (e) => {
+            // "+ Add transition" button first in the list, so it shows whether the group has
+            // transitions or not, and folds away with the group (same parent).
+            const addBtn = QSDom.el('button', {
+                type: 'button',
+                class: 'preview-animations-group__add',
+                'data-action': 'add-transition',
+                onclick: (e) => {
                     e.stopPropagation();
                     openTransitionWizard();
-                });
-            }
+                }
+            }, [
+                _icon(QuickSiteUtils.ICON_PATHS.plus, 14, 'round'),
+                QSDom.el('span', { text: PreviewConfig.i18n.addTransition || 'Add transition' })
+            ]);
+            transitionsList.replaceChildren(addBtn, ...(transitions.length === 0
+                ? [QSDom.el('p', { class: 'preview-animated-empty', text: PreviewConfig.i18n.noTransitions })]
+                : transitions.map(item => _renderAnimatedSelectorGroup(item, 'transition'))));
         }
-        
+
         // Animations
         if (animationsList && animationsCount) {
             const animations = animatedSelectorsData.animations || [];
             animationsCount.textContent = animations.length;
-            
-            if (animations.length === 0) {
-                animationsList.innerHTML = `<p class="preview-animated-empty">${PreviewConfig.i18n.noAnimations}</p>`;
-            } else {
-                animationsList.innerHTML = animations.map(item => 
-                    renderAnimatedSelectorGroup(item, 'animation')
-                ).join('');
-            }
+            animationsList.replaceChildren(...(animations.length === 0
+                ? [QSDom.el('p', { class: 'preview-animated-empty', text: PreviewConfig.i18n.noAnimations })]
+                : animations.map(item => _renderAnimatedSelectorGroup(item, 'animation'))));
         }
-        
+
         // Show/hide empty message
-        const totalCount = (animatedSelectorsData.transitions?.length || 0) + 
+        const totalCount = (animatedSelectorsData.transitions?.length || 0) +
                           (animatedSelectorsData.animations?.length || 0);
         if (animatedEmpty) {
             animatedEmpty.style.display = totalCount === 0 ? '' : 'none';
         }
-        
-        // Add click listeners for selector items
-        document.querySelectorAll('.preview-animated-selector--clickable, .preview-animated-selector-group__header--clickable, .preview-animated-selector-state--clickable').forEach(item => {
-            item.addEventListener('click', (e) => {
-                if (e.target.closest('.preview-animated-selector-group__toggle')) return;
-                
-                const selector = item.dataset.selector;
-                if (selector) {
-                    // Open transition editor (delegate to main preview.js)
-                    const baseSelector = selector.replace(/:(hover|focus|active|visited|focus-within|focus-visible)$/i, '');
-                    if (typeof window.openTransitionEditor === 'function') {
-                        window.openTransitionEditor(baseSelector);
-                    }
+    }
+
+    /** A click on a selector (an item, a group header, a state) opens the transition editor on its base selector. */
+    function _openSelectorOnClick(el) {
+        el.addEventListener('click', (e) => {
+            if (e.target.closest('.preview-animated-selector-group__toggle')) return;
+
+            const selector = el.dataset.selector;
+            if (selector) {
+                // Open transition editor (delegate to main preview.js)
+                const baseSelector = selector.replace(/:(hover|focus|active|visited|focus-within|focus-visible)$/i, '');
+                if (typeof window.openTransitionEditor === 'function') {
+                    window.openTransitionEditor(baseSelector);
                 }
-            });
+            }
         });
-        
-        // Add toggle listeners for groups with states
-        document.querySelectorAll('.preview-animated-selector-group__toggle').forEach(toggle => {
-            toggle.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const group = toggle.closest('.preview-animated-selector-group');
-                if (group) {
-                    group.classList.toggle('preview-animated-selector-group--collapsed');
-                }
-            });
-        });
+        return el;
     }
 
     // ==================== Render Animated Selector Group ====================
-    
-    function renderAnimatedSelectorGroup(item, type) {
+
+    /** One animated selector: a single row, or (with states) a group whose states fold under its header. */
+    function _renderAnimatedSelectorGroup(item, type) {
         const hasStates = item.states && item.states.length > 0;
-        
+        const selector = item.selector || item.baseSelector || '';
+
         // Details for the base selector
-        let detailsHtml = '';
+        let details = '';
         if (type === 'transition' && item.parsed) {
-            detailsHtml = formatTransitionDetails(item.parsed);
+            details = formatTransitionDetails(item.parsed);
         } else if (type === 'animation' && item.parsed) {
-            detailsHtml = formatAnimationDetails(item.parsed);
+            details = formatAnimationDetails(item.parsed);
         } else if (item.properties) {
             const prop = type === 'transition' ? item.properties.transition : item.properties.animation;
-            detailsHtml = escapeHtml(prop || '');
+            details = prop || '';
         }
-        
-        // Orphan hint HTML
-        let orphanHintHtml = '';
-        if (item.isOrphan && item.relatedTriggers && item.relatedTriggers.length > 0) {
-            const relatedList = item.relatedTriggers.map(r => `<code>${escapeHtml(r.selector)}</code>`).join(', ');
-            orphanHintHtml = `
-                <div class="preview-animated-selector__orphan-hint">
-                    ${QuickSiteUtils.iconInfo(12)}
-                    <span>${PreviewConfig.i18n.mayBeTriggeredVia}: ${relatedList}</span>
-                </div>
-            `;
-        } else if (item.isOrphan) {
-            orphanHintHtml = `
-                <div class="preview-animated-selector__orphan-hint preview-animated-selector__orphan-hint--warning">
-                    ${QuickSiteUtils.iconWarning(12)}
-                    <span>${PreviewConfig.i18n.noDirectTrigger}</span>
-                </div>
-            `;
-        }
-        
+        const name = () => QSDom.el('code', { class: 'preview-animated-selector__name', text: item.baseSelector || '' });
+        const detailsEl = () => QSDom.el('span', { class: 'preview-animated-selector__details', text: details });
+        const arrow = () => _icon(QuickSiteUtils.ICON_PATHS.arrowRight, 12, null, 'preview-animated-selector__arrow');
+
         if (!hasStates) {
-            return `
-                <div class="preview-animated-selector preview-animated-selector--clickable ${item.isOrphan ? 'preview-animated-selector--orphan' : ''}" data-selector="${escapeHtml(item.selector || item.baseSelector)}" data-type="${type}">
-                    <div class="preview-animated-selector__main">
-                        <code class="preview-animated-selector__name">${escapeHtml(item.baseSelector)}</code>
-                        <span class="preview-animated-selector__details">${detailsHtml}</span>
-                        ${QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.arrowRight, 12, 'preview-animated-selector__arrow')}
-                    </div>
-                    ${orphanHintHtml}
-                </div>
-            `;
+            return _openSelectorOnClick(QSDom.el('div', {
+                class: 'preview-animated-selector preview-animated-selector--clickable' + (item.isOrphan ? ' preview-animated-selector--orphan' : ''),
+                'data-selector': selector,
+                'data-type': type
+            }, [
+                QSDom.el('div', { class: 'preview-animated-selector__main' }, [name(), detailsEl(), arrow()]),
+                _renderOrphanHint(item)
+            ]));
         }
-        
+
         // Group with states - render as tree
-        const statesHtml = item.states.map(state => {
-            const changedProps = Object.entries(state.properties || {})
-                .filter(([prop]) => !prop.startsWith('transition') && !prop.startsWith('animation'))
-                .map(([prop, val]) => `${prop}: ${val}`)
-                .slice(0, 3);
-            
-            const propsDisplay = changedProps.length > 0 
-                ? changedProps.join('; ') + (Object.keys(state.properties || {}).length > 3 ? '...' : '')
-                : '';
-                
-            return `
-                <div class="preview-animated-selector-state preview-animated-selector-state--clickable" data-selector="${escapeHtml(state.selector)}">
-                    <code class="preview-animated-selector-state__pseudo">${escapeHtml(state.pseudo)}</code>
-                    <span class="preview-animated-selector-state__props">${escapeHtml(propsDisplay)}</span>
-                </div>
-            `;
-        }).join('');
-        
-        return `
-            <div class="preview-animated-selector-group" data-type="${type}">
-                <div class="preview-animated-selector-group__header preview-animated-selector-group__header--clickable" data-selector="${escapeHtml(item.selector || item.baseSelector)}">
-                    <button type="button" class="preview-animated-selector-group__toggle" title="${PreviewConfig.i18n.toggleStates}">
-                        ${QuickSiteUtils.iconChevronDown(12)}
-                    </button>
-                    <code class="preview-animated-selector__name">${escapeHtml(item.baseSelector)}</code>
-                    <span class="preview-animated-selector__details">${detailsHtml}</span>
-                    <span class="preview-animated-selector__state-count">${item.states.length} ${PreviewConfig.i18n.states}</span>
-                    ${QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.arrowRight, 12, 'preview-animated-selector__arrow')}
-                </div>
-                <div class="preview-animated-selector-group__states">
-                    ${statesHtml}
-                </div>
-            </div>
-        `;
+        const toggle = QSDom.el('button', {
+            type: 'button',
+            class: 'preview-animated-selector-group__toggle',
+            title: PreviewConfig.i18n.toggleStates,
+            onclick: (e) => {
+                e.stopPropagation();
+                toggle.closest('.preview-animated-selector-group')?.classList.toggle('preview-animated-selector-group--collapsed');
+            }
+        }, [_icon(QuickSiteUtils.ICON_PATHS.chevronDown, 12)]);
+        return QSDom.el('div', { class: 'preview-animated-selector-group', 'data-type': type }, [
+            _openSelectorOnClick(QSDom.el('div', {
+                class: 'preview-animated-selector-group__header preview-animated-selector-group__header--clickable',
+                'data-selector': selector
+            }, [
+                toggle,
+                name(),
+                detailsEl(),
+                QSDom.el('span', { class: 'preview-animated-selector__state-count', text: item.states.length + ' ' + PreviewConfig.i18n.states }),
+                arrow()
+            ])),
+            QSDom.el('div', { class: 'preview-animated-selector-group__states' }, item.states.map(_renderAnimatedState))
+        ]);
+    }
+
+    /** A state of a group (`:hover`…), with up to three of the properties it changes. */
+    function _renderAnimatedState(state) {
+        const changedProps = Object.entries(state.properties || {})
+            .filter(([prop]) => !prop.startsWith('transition') && !prop.startsWith('animation'))
+            .map(([prop, val]) => `${prop}: ${val}`)
+            .slice(0, 3);
+
+        const propsDisplay = changedProps.length > 0
+            ? changedProps.join('; ') + (Object.keys(state.properties || {}).length > 3 ? '...' : '')
+            : '';
+
+        return _openSelectorOnClick(QSDom.el('div', {
+            class: 'preview-animated-selector-state preview-animated-selector-state--clickable',
+            'data-selector': state.selector || ''
+        }, [
+            QSDom.el('code', { class: 'preview-animated-selector-state__pseudo', text: state.pseudo || '' }),
+            QSDom.el('span', { class: 'preview-animated-selector-state__props', text: propsDisplay })
+        ]));
+    }
+
+    /** An orphan's hint: the selectors that may trigger it, or a warning that none does (null when not an orphan). */
+    function _renderOrphanHint(item) {
+        if (item.isOrphan && item.relatedTriggers && item.relatedTriggers.length > 0) {
+            const related = [];
+            item.relatedTriggers.forEach((r, i) => {
+                if (i > 0) related.push(', ');
+                related.push(QSDom.el('code', { text: r.selector || '' }));
+            });
+            return QSDom.el('div', { class: 'preview-animated-selector__orphan-hint' }, [
+                _icon(QuickSiteUtils.ICON_PATHS.info, 12),
+                QSDom.el('span', null, [PreviewConfig.i18n.mayBeTriggeredVia + ': ', ...related])
+            ]);
+        }
+        if (item.isOrphan) {
+            return QSDom.el('div', { class: 'preview-animated-selector__orphan-hint preview-animated-selector__orphan-hint--warning' }, [
+                _icon(QuickSiteUtils.ICON_PATHS.warning, 12),
+                QSDom.el('span', { text: PreviewConfig.i18n.noDirectTrigger })
+            ]);
+        }
+        return null;
     }
 
     // ==================== Format Details ====================
@@ -985,7 +951,7 @@
     // ==================== Keyframe Timeline ====================
     
     function renderKeyframeTimeline() {
-        keyframeTimeline.innerHTML = '';
+        keyframeTimeline.replaceChildren();
         
         const bar = document.createElement('div');
         bar.className = 'preview-keyframe-modal__timeline-bar';
@@ -1091,44 +1057,60 @@
     // ==================== Keyframe Frames Editor ====================
     
     function renderKeyframeFrames() {
-        keyframeFramesContainer.innerHTML = '';
-        
         const commonProperties = [
             '', 'opacity', 'transform', 'background-color', 'color', 'width', 'height',
             'top', 'left', 'right', 'bottom', 'margin', 'padding', 'border-radius',
             'box-shadow', 'filter', 'clip-path', 'scale', 'rotate', 'translate', 'skew',
             'visibility', 'z-index', 'font-size', 'letter-spacing', 'line-height', 'text-shadow'
         ];
-        
-        keyframeFrames.forEach((frame, frameIndex) => {
-            const frameEl = document.createElement('div');
-            frameEl.className = 'preview-keyframe-modal__frame';
-            if (frame.percent === selectedFramePercent) {
-                frameEl.classList.add('preview-keyframe-modal__frame--selected');
-            }
-            
-            // Frame header
-            const header = document.createElement('div');
-            header.className = 'preview-keyframe-modal__frame-header';
-            header.innerHTML = `
-                <div class="preview-keyframe-modal__frame-percent-group">
-                    <input type="number" class="preview-keyframe-modal__frame-percent-input" 
-                           value="${frame.percent}" min="0" max="100" step="1"
-                           title="${PreviewConfig.i18n.enterFramePercent}">
-                    <span class="preview-keyframe-modal__frame-percent-symbol">%</span>
-                </div>
-                <div class="preview-keyframe-modal__frame-actions">
-                    ${keyframeFrames.length > 1 ? `
-                        <button type="button" class="preview-keyframe-modal__delete-frame" title="${PreviewConfig.i18n.deleteFrame}">
-                            ${QuickSiteUtils.iconTrash()}
-                        </button>
-                    ` : ''}
-                </div>
-            `;
-            
-            // Percent input change handler
-            const percentInput = header.querySelector('.preview-keyframe-modal__frame-percent-input');
-            percentInput.addEventListener('change', (e) => {
+
+        const frameEls = keyframeFrames.map((frame, frameIndex) => {
+            const frameEl = QSDom.el('div', {
+                class: 'preview-keyframe-modal__frame' + (frame.percent === selectedFramePercent ? ' preview-keyframe-modal__frame--selected' : '')
+            }, [_renderFrameHeader(frame)]);
+
+            // Properties container
+            const propsContainer = QSDom.el('div', { class: 'preview-keyframe-modal__properties' },
+                frame.properties.map((prop, propIndex) => _renderFrameProperty(commonProperties, prop, frameIndex, propIndex)));
+
+            // Add property button
+            propsContainer.appendChild(QSDom.el('button', {
+                type: 'button',
+                class: 'preview-keyframe-modal__add-property',
+                onclick: () => addKeyframeProperty(frameIndex)
+            }, [_icon(QuickSiteUtils.ICON_PATHS.plus, 12), PreviewConfig.i18n.addKeyframeProperty]));
+            frameEl.appendChild(propsContainer);
+            return frameEl;
+        });
+
+        // Add frame button at the end
+        const addFrameBtn = QSDom.el('button', {
+            type: 'button',
+            class: 'preview-keyframe-modal__add-frame',
+            onclick: () => promptAddFrame()
+        }, [_icon(QuickSiteUtils.ICON_PATHS.plus, 14), PreviewConfig.i18n.addFrame]);
+        keyframeFramesContainer.replaceChildren(...frameEls, addFrameBtn);
+    }
+
+    /**
+     * A frame's header: its position in percent (any decimal CSS accepts: `12.5%`) and, when
+     * there is more than one frame, its delete button. A click elsewhere on it selects the frame.
+     *
+     * The field's `min` of 0 is set on a whole-number position only: a browser that moves a
+     * `step="any"` field by 1 with its arrows aligns the result to the step base, which is `min`
+     * when there is one, so a decimal position would lose its decimal (12.5 would go to 13).
+     * Without `min` the base is the field's value attribute, the frame's position, and the arrows
+     * go from 12.5 to 13.5. The change handler keeps a position between 0 and 100.
+     */
+    function _renderFrameHeader(frame) {
+        const percentInput = QSDom.el('input', {
+            type: 'number',
+            class: 'preview-keyframe-modal__frame-percent-input',
+            value: String(frame.percent),
+            max: '100',
+            step: 'any',
+            title: PreviewConfig.i18n.enterFramePercent,
+            onchange: (e) => {
                 const newPercent = parseFloat(e.target.value);
                 if (isNaN(newPercent) || newPercent < 0 || newPercent > 100) {
                     e.target.value = frame.percent;
@@ -1148,121 +1130,94 @@
                 keyframeFrames.sort((a, b) => a.percent - b.percent);
                 renderKeyframeTimeline();
                 renderKeyframeFrames();
-            });
-            
-            header.addEventListener('click', (e) => {
+            }
+        });
+        if (Number.isInteger(frame.percent)) {
+            percentInput.setAttribute('min', '0');
+        }
+        const actions = QSDom.el('div', { class: 'preview-keyframe-modal__frame-actions' });
+        if (keyframeFrames.length > 1) {
+            actions.appendChild(QSDom.el('button', {
+                type: 'button',
+                class: 'preview-keyframe-modal__delete-frame',
+                title: PreviewConfig.i18n.deleteFrame,
+                onclick: (e) => {
+                    e.stopPropagation();
+                    deleteKeyframeFrame(frame.percent);
+                }
+            }, [_icon(QuickSiteUtils.ICON_PATHS.trash)]));
+        }
+        return QSDom.el('div', {
+            class: 'preview-keyframe-modal__frame-header',
+            onclick: (e) => {
                 if (!e.target.closest('input') && !e.target.closest('button')) {
                     selectFrame(frame.percent);
                 }
-            });
-            
-            const deleteBtn = header.querySelector('.preview-keyframe-modal__delete-frame');
-            if (deleteBtn) {
-                deleteBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    deleteKeyframeFrame(frame.percent);
-                });
             }
-            
-            frameEl.appendChild(header);
-            
-            // Properties container
-            const propsContainer = document.createElement('div');
-            propsContainer.className = 'preview-keyframe-modal__properties';
-            
-            frame.properties.forEach((prop, propIndex) => {
-                const propEl = document.createElement('div');
-                propEl.className = 'preview-keyframe-modal__property';
-                
-                const isCommonProp = commonProperties.includes(prop.property);
-                
-                let selectOptions = commonProperties.map(p => {
-                    if (p === '') {
-                        return `<option value="" ${!isCommonProp ? 'selected' : ''}>${PreviewConfig.i18n.customProperty}</option>`;
-                    }
-                    return `<option value="${p}" ${prop.property === p ? 'selected' : ''}>${p}</option>`;
-                }).join('');
-                
-                propEl.innerHTML = `
-                    <div class="preview-keyframe-modal__property-name-group">
-                        <select class="preview-keyframe-modal__property-select" 
-                                data-frame="${frameIndex}" data-prop="${propIndex}">
-                            ${selectOptions}
-                        </select>
-                        <input type="text" class="preview-keyframe-modal__property-name ${isCommonProp ? 'preview-keyframe-modal__property-name--hidden' : ''}" 
-                               value="${escapeHtml(prop.property)}" 
-                               placeholder="${PreviewConfig.i18n.keyframePropertyName}"
-                               data-frame="${frameIndex}" data-prop="${propIndex}" data-field="property">
-                    </div>
-                    <span class="preview-keyframe-modal__property-colon">:</span>
-                    <input type="text" class="preview-keyframe-modal__property-value" 
-                           value="${escapeHtml(prop.value)}" 
-                           placeholder="${PreviewConfig.i18n.keyframePropertyValue}"
-                           data-frame="${frameIndex}" data-prop="${propIndex}" data-field="value">
-                    <button type="button" class="preview-keyframe-modal__delete-property" title="${PreviewConfig.i18n.deleteKeyframeProperty}">
-                        ${QuickSiteUtils.iconClose(12)}
-                    </button>
-                `;
-                
-                const propSelect = propEl.querySelector('.preview-keyframe-modal__property-select');
-                const nameInput = propEl.querySelector('.preview-keyframe-modal__property-name');
-                const valueInput = propEl.querySelector('.preview-keyframe-modal__property-value');
-                const deletePropertyBtn = propEl.querySelector('.preview-keyframe-modal__delete-property');
-                
-                propSelect.addEventListener('change', (e) => {
-                    if (e.target.value === '') {
-                        nameInput.classList.remove('preview-keyframe-modal__property-name--hidden');
-                        nameInput.focus();
-                    } else {
-                        nameInput.classList.add('preview-keyframe-modal__property-name--hidden');
-                        nameInput.value = e.target.value;
-                        keyframeFrames[frameIndex].properties[propIndex].property = e.target.value;
-                    }
-                });
-                
-                nameInput.addEventListener('input', (e) => {
-                    keyframeFrames[frameIndex].properties[propIndex].property = e.target.value;
-                });
-                
-                valueInput.addEventListener('input', (e) => {
-                    keyframeFrames[frameIndex].properties[propIndex].value = e.target.value;
-                });
-                
-                deletePropertyBtn.addEventListener('click', () => {
-                    deleteKeyframeProperty(frameIndex, propIndex);
-                });
-                
-                propsContainer.appendChild(propEl);
-            });
-            
-            // Add property button
-            const addPropBtn = document.createElement('button');
-            addPropBtn.type = 'button';
-            addPropBtn.className = 'preview-keyframe-modal__add-property';
-            addPropBtn.innerHTML = `
-                ${QuickSiteUtils.iconPlus(12)}
-                ${PreviewConfig.i18n.addKeyframeProperty}
-            `;
-            addPropBtn.addEventListener('click', () => addKeyframeProperty(frameIndex));
-            
-            propsContainer.appendChild(addPropBtn);
-            frameEl.appendChild(propsContainer);
-            
-            keyframeFramesContainer.appendChild(frameEl);
-        });
-        
-        // Add frame button at the end
-        const addFrameBtn = document.createElement('button');
-        addFrameBtn.type = 'button';
-        addFrameBtn.className = 'preview-keyframe-modal__add-frame';
-        addFrameBtn.innerHTML = `
-            ${QuickSiteUtils.iconPlus(14)}
-            ${PreviewConfig.i18n.addFrame}
-        `;
-        addFrameBtn.addEventListener('click', () => promptAddFrame());
-        keyframeFramesContainer.appendChild(addFrameBtn);
+        }, [
+            QSDom.el('div', { class: 'preview-keyframe-modal__frame-percent-group' }, [
+                percentInput,
+                QSDom.el('span', { class: 'preview-keyframe-modal__frame-percent-symbol', text: '%' })
+            ]),
+            actions
+        ]);
     }
-    
+
+    /** One property of a frame: a common property or a custom name, its value, its delete button. */
+    function _renderFrameProperty(commonProperties, prop, frameIndex, propIndex) {
+        const isCommonProp = commonProperties.includes(prop.property);
+        const index = { 'data-frame': String(frameIndex), 'data-prop': String(propIndex) };
+
+        const propSelect = QSDom.el('select', Object.assign({ class: 'preview-keyframe-modal__property-select' }, index),
+            commonProperties.map(p => {
+                const selected = p === '' ? !isCommonProp : prop.property === p;
+                return QSDom.el('option', Object.assign({ value: p, text: p === '' ? PreviewConfig.i18n.customProperty : p }, selected ? { selected: '' } : {}));
+            }));
+        const nameInput = QSDom.el('input', Object.assign({
+            type: 'text',
+            class: 'preview-keyframe-modal__property-name' + (isCommonProp ? ' preview-keyframe-modal__property-name--hidden' : ''),
+            value: prop.property || '',
+            placeholder: PreviewConfig.i18n.keyframePropertyName
+        }, index, { 'data-field': 'property' }));
+        const valueInput = QSDom.el('input', Object.assign({
+            type: 'text',
+            class: 'preview-keyframe-modal__property-value',
+            value: prop.value || '',
+            placeholder: PreviewConfig.i18n.keyframePropertyValue
+        }, index, { 'data-field': 'value' }));
+
+        propSelect.addEventListener('change', (e) => {
+            if (e.target.value === '') {
+                nameInput.classList.remove('preview-keyframe-modal__property-name--hidden');
+                nameInput.focus();
+            } else {
+                nameInput.classList.add('preview-keyframe-modal__property-name--hidden');
+                nameInput.value = e.target.value;
+                keyframeFrames[frameIndex].properties[propIndex].property = e.target.value;
+            }
+        });
+
+        nameInput.addEventListener('input', (e) => {
+            keyframeFrames[frameIndex].properties[propIndex].property = e.target.value;
+        });
+
+        valueInput.addEventListener('input', (e) => {
+            keyframeFrames[frameIndex].properties[propIndex].value = e.target.value;
+        });
+
+        return QSDom.el('div', { class: 'preview-keyframe-modal__property' }, [
+            QSDom.el('div', { class: 'preview-keyframe-modal__property-name-group' }, [propSelect, nameInput]),
+            QSDom.el('span', { class: 'preview-keyframe-modal__property-colon', text: ':' }),
+            valueInput,
+            QSDom.el('button', {
+                type: 'button',
+                class: 'preview-keyframe-modal__delete-property',
+                title: PreviewConfig.i18n.deleteKeyframeProperty,
+                onclick: () => deleteKeyframeProperty(frameIndex, propIndex)
+            }, [_icon(QuickSiteUtils.ICON_PATHS.close, 12)])
+        ]);
+    }
+
     function promptAddFrame() {
         const percent = prompt(PreviewConfig.i18n.enterFramePercent, '50');
         if (percent !== null) {
@@ -1645,7 +1600,7 @@
         // would show the "No selectors yet" empty state spuriously.
         _apply.modal.hidden = false;
         if (_apply.list) {
-            _apply.list.innerHTML = '';
+            _apply.list.replaceChildren();
             const loading = document.createElement('div');
             loading.className = 'apply-keyframe-modal__empty';
             loading.textContent = (PreviewConfig.i18n && PreviewConfig.i18n.loading) || 'Loading…';
@@ -1686,7 +1641,7 @@
             catch (e) { selectors = []; }
         }
         if (!selectors.length) {
-            _apply.list.innerHTML = '';
+            _apply.list.replaceChildren();
             const empty = document.createElement('div');
             empty.className = 'apply-keyframe-modal__empty';
             empty.textContent = i18n.applyKeyframeNoSelectors || 'No selectors yet — add one via the Selectors tab.';
@@ -1698,7 +1653,7 @@
             ? selectors.filter(s => (s.selector || s).toLowerCase().indexOf(needle) !== -1)
             : selectors.slice();
 
-        _apply.list.innerHTML = '';
+        _apply.list.replaceChildren();
         if (!matched.length) {
             const empty = document.createElement('div');
             empty.className = 'apply-keyframe-modal__empty';
@@ -1981,7 +1936,7 @@
         _wizard.modal.hidden = false;
         // Selector list shows "Loading…" until the cache is ready.
         if (_wizard.selectorList) {
-            _wizard.selectorList.innerHTML = '';
+            _wizard.selectorList.replaceChildren();
             const loading = document.createElement('div');
             loading.className = 'add-transition-modal__empty';
             loading.textContent = (PreviewConfig.i18n && PreviewConfig.i18n.loading) || 'Loading…';
@@ -2005,7 +1960,7 @@
             catch (e) { selectors = []; }
         }
         if (!selectors.length) {
-            _wizard.selectorList.innerHTML = '';
+            _wizard.selectorList.replaceChildren();
             const empty = document.createElement('div');
             empty.className = 'add-transition-modal__empty';
             empty.textContent = i18n.applyKeyframeNoSelectors || 'No selectors yet — add one via the Selectors tab.';
@@ -2017,7 +1972,7 @@
             ? selectors.filter(s => (s.selector || s).toLowerCase().indexOf(needle) !== -1)
             : selectors.slice();
 
-        _wizard.selectorList.innerHTML = '';
+        _wizard.selectorList.replaceChildren();
         if (!matched.length) {
             const empty = document.createElement('div');
             empty.className = 'add-transition-modal__empty';

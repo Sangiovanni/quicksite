@@ -10,6 +10,9 @@
 (function() {
     'use strict';
 
+    // A response-binding row's delete cross (inner SVG markup for QSDom.iconEl).
+    const ICON_ROW_DELETE = '<path d="M18 6L6 18M6 6l12 12"/>';
+
     // ==================== Module State ====================
     
     let currentJsContext = null;
@@ -647,6 +650,52 @@
         p.textContent = text;
         return p;
     }
+
+    /** One event's interactions: its header, then one row per interaction. */
+    function _renderEventGroup(event, interactions) {
+        return QSDom.el('div', { class: 'preview-js-event-group' }, [
+            QSDom.el('div', { class: 'preview-js-event-header', text: event })
+        ].concat(interactions.map((interaction, indexInEvent) => _renderInteractionRow(event, interaction, indexInEvent))));
+    }
+
+    /** One interaction: its call (the function and its params, as text) and its Edit and Delete buttons. */
+    function _renderInteractionRow(event, interaction, indexInEvent) {
+        const button = (cls, label) => QSDom.el('button', {
+            type: 'button', class: 'admin-btn admin-btn--xs ' + cls, 'data-event': event, 'data-index': String(indexInEvent)
+        }, [label]);
+        return QSDom.el('div', { class: 'preview-js-interaction', 'data-event': event, 'data-index': String(indexInEvent) }, [
+            QSDom.el('div', { class: 'preview-js-interaction__body' }, [
+                QSDom.el('div', { class: 'preview-js-interaction__function', text: interaction.function + '(' + (interaction.params?.join(', ') || '') + ')' })
+            ]),
+            QSDom.el('div', { class: 'preview-js-interaction__actions' }, [
+                button('admin-btn--secondary js-edit-btn', PreviewConfig.i18n?.edit || 'Edit'),
+                ' ',
+                button('admin-btn--danger js-delete-btn', PreviewConfig.i18n?.delete || 'Delete')
+            ])
+        ]);
+    }
+
+    /**
+     * One page event: its event, its call (as text) and its edit and delete buttons. Both buttons
+     * carry the `__delete` class (their size and place); the `--edit` modifier tells them apart.
+     */
+    function _renderPageEventItem(interaction) {
+        const button = (cls, title, iconPaths) => QSDom.el('button', {
+            type: 'button', class: cls, 'data-event': interaction.event, 'data-index': String(interaction.index), title: title
+        }, [QSDom.iconEl(iconPaths, 14)]);
+        return QSDom.el('div', { class: 'preview-contextual-js-page-events__item' }, [
+            QSDom.el('span', { class: 'preview-contextual-js-page-events__event-badge', text: interaction.event }),
+            QSDom.el('code', { class: 'preview-contextual-js-page-events__code', text: interaction.function + '(' + (interaction.params?.join(', ') || '') + ')' }),
+            button('preview-contextual-js-page-events__delete preview-contextual-js-page-events__edit', PreviewConfig.i18n?.edit || 'Edit', QuickSiteUtils.ICON_PATHS.edit),
+            button('preview-contextual-js-page-events__delete', PreviewConfig.i18n?.delete || 'Delete', QuickSiteUtils.ICON_PATHS.close)
+        ]);
+    }
+
+    /** A picker's option: the kind's mark (`#`, `.`, `<>`…) and the label, both as text. */
+    function _renderPickerOption(option, typeClass, mark, label) {
+        option.append(QSDom.el('span', { class: typeClass, text: mark }), QSDom.el('span', { text: label }));
+        return option;
+    }
     
     /**
      * Display interactions in the panel
@@ -656,7 +705,7 @@
         if (!listEl) return;
         
         if (!data.interactions || data.interactions.length === 0) {
-            listEl.innerHTML = `<p class="preview-contextual-js-empty">${PreviewConfig.i18n?.noInteractions || 'No interactions'}</p>`;
+            listEl.replaceChildren(_renderEmptyNote(PreviewConfig.i18n?.noInteractions || 'No interactions'));
             return;
         }
         
@@ -668,36 +717,8 @@
             byEvent[event].push(interaction);
         });
         
-        // Build interactions list HTML
-        let html = '<div class="preview-js-interactions">';
-        
-        Object.entries(byEvent).forEach(([event, interactions]) => {
-            html += `<div class="preview-js-event-group">
-                <div class="preview-js-event-header">${event}</div>`;
-            
-            interactions.forEach((interaction, indexInEvent) => {
-                html += `
-                    <div class="preview-js-interaction" data-event="${event}" data-index="${indexInEvent}">
-                        <div class="preview-js-interaction__body">
-                            <div class="preview-js-interaction__function">${interaction.function}(${interaction.params?.join(', ') || ''})</div>
-                        </div>
-                        <div class="preview-js-interaction__actions">
-                            <button type="button" class="admin-btn admin-btn--xs admin-btn--secondary js-edit-btn" data-event="${event}" data-index="${indexInEvent}">
-                                ${PreviewConfig.i18n?.edit || 'Edit'}
-                            </button>
-                            <button type="button" class="admin-btn admin-btn--xs admin-btn--danger js-delete-btn" data-event="${event}" data-index="${indexInEvent}">
-                                ${PreviewConfig.i18n?.delete || 'Delete'}
-                            </button>
-                        </div>
-                    </div>
-                `;
-            });
-            
-            html += '</div>';
-        });
-        
-        html += '</div>';
-        listEl.innerHTML = html;
+        listEl.replaceChildren(QSDom.el('div', { class: 'preview-js-interactions' },
+            Object.entries(byEvent).map(([event, interactions]) => _renderEventGroup(event, interactions))));
         
         // Attach event listeners to edit/delete buttons
         listEl.querySelectorAll('.js-edit-btn').forEach(btn => {
@@ -1116,7 +1137,7 @@
         postFetchActionsState = [];
         renderActionsList();
         if (jsFormAuthHint) jsFormAuthHint.style.display = 'none';
-        if (jsFormParams) jsFormParams.innerHTML = '';
+        if (jsFormParams) jsFormParams.replaceChildren();
         if (jsPreviewCode) jsPreviewCode.textContent = '-';
         if (jsFormSave) jsFormSave.disabled = true;
     }
@@ -1128,7 +1149,7 @@
         if (jsAddForm) jsAddForm.style.display = 'none';
         if (jsPanelActions) jsPanelActions.style.display = 'flex';
         if (elBindingsContainer) elBindingsContainer.style.display = 'none';
-        if (elBindingsRows) elBindingsRows.innerHTML = '';
+        if (elBindingsRows) elBindingsRows.replaceChildren();
         editingInteraction = null;
     }
     
@@ -1142,7 +1163,7 @@
             if (jsFormFunctionSection) jsFormFunctionSection.style.display = 'none';
             if (jsFormApiSection) jsFormApiSection.classList.add('visible');
             if (jsFormFunction) jsFormFunction.value = '';
-            if (jsFormParams) jsFormParams.innerHTML = '';
+            if (jsFormParams) jsFormParams.replaceChildren();
 
             // Lazy-load the API dropdown if it hasn't been populated yet
             // (the Edit flow doesn't proactively call populateApiDropdown
@@ -1169,7 +1190,7 @@
             }
             // Hide bindings when switching away from API
             if (elBindingsContainer) elBindingsContainer.style.display = 'none';
-            if (elBindingsRows) elBindingsRows.innerHTML = '';
+            if (elBindingsRows) elBindingsRows.replaceChildren();
         }
         
         updatePreview();
@@ -1183,7 +1204,7 @@
         populateEndpointDropdown(apiName);
         // Reset bindings when API changes (endpoint is reset)
         if (elBindingsContainer) elBindingsContainer.style.display = 'none';
-        if (elBindingsRows) elBindingsRows.innerHTML = '';
+        if (elBindingsRows) elBindingsRows.replaceChildren();
         syncTargetLabel();
         updatePreview();
     }
@@ -1506,7 +1527,7 @@
      * blank first option.
      */
     function _populateVerbSelect(selectEl, fns, placeholderText) {
-        selectEl.innerHTML = '';
+        selectEl.replaceChildren();
         var placeholderOpt = document.createElement('option');
         placeholderOpt.value = '';
         placeholderOpt.textContent = placeholderText;
@@ -1878,7 +1899,7 @@
         var label = document.createElement('label');
         label.className = 'preview-contextual-js-form-label';
         label.textContent = arg.name || ('Param ' + (paramIndex + 1));
-        if (arg.required !== false) label.innerHTML += ' <span class="required">*</span>';
+        if (arg.required !== false) label.append(' ', QSDom.el('span', { class: 'required', text: '*' }));
         row.appendChild(label);
 
         if (inputType === 'store') {
@@ -2657,8 +2678,8 @@
         var toggle = document.createElement('button');
         toggle.type = 'button';
         toggle.className = 'preview-contextual-js-form-advanced-toggle';
-        toggle.innerHTML = QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.chevronRight, 14, 'preview-contextual-js-form-advanced-chevron') +
-            (PreviewConfig.i18n?.advanced || 'Advanced');
+        toggle.append(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.chevronRight, 14, 'preview-contextual-js-form-advanced-chevron'),
+            PreviewConfig.i18n?.advanced || 'Advanced');
         
         var content = document.createElement('div');
         content.className = 'preview-contextual-js-form-advanced-content';
@@ -2688,7 +2709,7 @@
         const example = selectedOption?.dataset?.example || '';
         if (!selectedOption || !selectedOption.value || (!desc && !example)) {
             jsFormFunctionDetails.hidden = true;
-            jsFormFunctionDetails.innerHTML = '';
+            jsFormFunctionDetails.replaceChildren();
             return;
         }
         const i18n = PreviewConfig.i18n || {};
@@ -2712,7 +2733,7 @@
             wrap.appendChild(code);
             parts.push(wrap);
         }
-        jsFormFunctionDetails.innerHTML = '';
+        jsFormFunctionDetails.replaceChildren();
         parts.forEach(el => jsFormFunctionDetails.appendChild(el));
         jsFormFunctionDetails.hidden = false;
     }
@@ -2728,11 +2749,10 @@
 
         if (!jsFormParams) return;
         
-        jsFormParams.innerHTML = '';
+        jsFormParams.replaceChildren();
         
         if (args.length === 0) {
-            jsFormParams.innerHTML = '<p class="preview-contextual-js-form-hint">' +
-                (PreviewConfig.i18n?.noParams || 'No parameters') + '</p>';
+            jsFormParams.replaceChildren(QSDom.el('p', { class: 'preview-contextual-js-form-hint', text: PreviewConfig.i18n?.noParams || 'No parameters' }));
         } else {
             var requiredArgs = [];
             var optionalArgs = [];
@@ -3281,7 +3301,7 @@
         const tag = currentJsContext?.tag || 'element';
         const buckets = currentAvailableEventsGrouped || bucketsFromFlat(currentAvailableEvents);
 
-        jsFormEvent.innerHTML = '<option value="">' + (i18n.selectEvent || 'Select event...') + '</option>';
+        QSDom.setSelectPlaceholder(jsFormEvent, i18n.selectEvent || 'Select event...');
 
         const groups = [
             { key: 'common',     label: (i18n.eventsCommonFor || 'Common for') + ' <' + tag + '>' },
@@ -3353,8 +3373,8 @@
     function populateApiDropdown() {
         if (!jsFormApi || !jsFormEndpoint) return;
         
-        jsFormApi.innerHTML = `<option value="">${PreviewConfig.i18n?.selectApi || 'Select API...'}</option>`;
-        jsFormEndpoint.innerHTML = `<option value="">${PreviewConfig.i18n?.selectEndpoint || 'Select endpoint...'}</option>`;
+        QSDom.setSelectPlaceholder(jsFormApi, PreviewConfig.i18n?.selectApi || 'Select API...');
+        QSDom.setSelectPlaceholder(jsFormEndpoint, PreviewConfig.i18n?.selectEndpoint || 'Select endpoint...');
         jsFormEndpoint.disabled = true;
         
         const uniqueApis = [...new Set(availableApiEndpoints.map(ep => ep.api))];
@@ -3373,7 +3393,7 @@
     function populateEndpointDropdown(apiName) {
         if (!jsFormEndpoint) return;
         
-        jsFormEndpoint.innerHTML = `<option value="">${PreviewConfig.i18n?.selectEndpoint || 'Select endpoint...'}</option>`;
+        QSDom.setSelectPlaceholder(jsFormEndpoint, PreviewConfig.i18n?.selectEndpoint || 'Select endpoint...');
         
         if (!apiName) {
             jsFormEndpoint.disabled = true;
@@ -3647,7 +3667,7 @@
         }
         
         function renderDropdown(filter = '') {
-            dropdown.innerHTML = '';
+            dropdown.replaceChildren();
             const items = getItems();
             const filterLower = filter.toLowerCase();
             const filtered = items.filter(item => 
@@ -3673,7 +3693,7 @@
                                  item.type === 'common' ? '★' : 
                                  item.type === 'attr' ? '[ ]' : 
                                  item.type === 'tag' ? '<>' : '';
-                option.innerHTML = `<span class="preview-js-picker-type">${typeIcon}</span><span>${item.label}</span>`;
+                _renderPickerOption(option, 'preview-js-picker-type', typeIcon, item.label);
                 
                 // Prevent input blur on click — otherwise the typing buffer
                 // would be committed as a chip *before* applyPickedValue runs,
@@ -4341,33 +4361,11 @@
         if (peCount) peCount.textContent = String(interactions.length);
         
         if (interactions.length === 0) {
-            peList.innerHTML = '<p class="preview-contextual-js-empty">' +
-                (PreviewConfig.i18n?.noInteractions || 'No page events') + '</p>';
+            peList.replaceChildren(_renderEmptyNote(PreviewConfig.i18n?.noInteractions || 'No page events'));
             return;
         }
         
-        var html = '';
-        interactions.forEach(function(interaction) {
-            var label = interaction.function + '(' + (interaction.params?.join(', ') || '') + ')';
-            // Edit + Delete buttons share the existing `__delete` class for
-            // consistent sizing/positioning; a `--edit` modifier lets future
-            // styling distinguish them if needed without breaking layout.
-            html += '<div class="preview-contextual-js-page-events__item">' +
-                '<span class="preview-contextual-js-page-events__event-badge">' + interaction.event + '</span>' +
-                '<code class="preview-contextual-js-page-events__code">' + label + '</code>' +
-                '<button type="button" class="preview-contextual-js-page-events__delete preview-contextual-js-page-events__edit" ' +
-                    'data-event="' + interaction.event + '" data-index="' + interaction.index + '" ' +
-                    'title="' + (PreviewConfig.i18n?.edit || 'Edit') + '">' +
-                    QuickSiteUtils.iconEdit(14) +
-                '</button>' +
-                '<button type="button" class="preview-contextual-js-page-events__delete" ' +
-                    'data-event="' + interaction.event + '" data-index="' + interaction.index + '" ' +
-                    'title="' + (PreviewConfig.i18n?.delete || 'Delete') + '">' +
-                    QuickSiteUtils.iconClose(14) +
-                '</button></div>';
-        });
-
-        peList.innerHTML = html;
+        peList.replaceChildren(...interactions.map(_renderPageEventItem));
 
         // Attach edit handlers (must run BEFORE the delete-handler selector so
         // the more-specific `--edit` selector wins).
@@ -4583,7 +4581,7 @@
         if (peFormFunctionSection) peFormFunctionSection.style.display = '';
         if (peFormApiSection) peFormApiSection.classList.remove('visible');
         if (peFormFunction) peFormFunction.value = '';
-        if (peFormParams) peFormParams.innerHTML = '';
+        if (peFormParams) peFormParams.replaceChildren();
         if (peFormPreview) peFormPreview.textContent = '-';
         if (peFormSave) {
             peFormSave.disabled = true;
@@ -4598,7 +4596,7 @@
         if (peForm) peForm.style.display = 'none';
         if (peAddBtn?.parentElement) peAddBtn.parentElement.style.display = '';
         if (peBindingsContainer) peBindingsContainer.style.display = 'none';
-        if (peBindingsRows) peBindingsRows.innerHTML = '';
+        if (peBindingsRows) peBindingsRows.replaceChildren();
         // Drop any in-progress edit so the next form open starts clean and
         // handlePageEventSave routes to POST /addPageEvent (the default).
         editingPageEvent = null;
@@ -4620,7 +4618,7 @@
             if (peFormApiSection) peFormApiSection.classList.remove('visible');
             // Hide bindings when switching away from API
             if (peBindingsContainer) peBindingsContainer.style.display = 'none';
-            if (peBindingsRows) peBindingsRows.innerHTML = '';
+            if (peBindingsRows) peBindingsRows.replaceChildren();
         }
         updatePageEventPreview();
     }
@@ -4633,11 +4631,10 @@
         var args = selectedOption?.dataset?.args ? JSON.parse(selectedOption.dataset.args) : [];
         
         if (!peFormParams) return;
-        peFormParams.innerHTML = '';
+        peFormParams.replaceChildren();
         
         if (args.length === 0) {
-            peFormParams.innerHTML = '<p class="preview-contextual-js-form-hint">' +
-                (PreviewConfig.i18n?.noParams || 'No parameters') + '</p>';
+            peFormParams.replaceChildren(QSDom.el('p', { class: 'preview-contextual-js-form-hint', text: PreviewConfig.i18n?.noParams || 'No parameters' }));
         } else {
             var requiredArgs = [];
             var optionalArgs = [];
@@ -4669,8 +4666,7 @@
         var apiName = peFormApi?.value || '';
         if (!peFormEndpoint) return;
         
-        peFormEndpoint.innerHTML = '<option value="">' +
-            (PreviewConfig.i18n?.selectEndpoint || 'Select endpoint...') + '</option>';
+        QSDom.setSelectPlaceholder(peFormEndpoint, PreviewConfig.i18n?.selectEndpoint || 'Select endpoint...');
         
         if (!apiName) {
             peFormEndpoint.disabled = true;
@@ -4687,7 +4683,7 @@
         
         // Reset bindings when API changes (endpoint is reset)
         if (peBindingsContainer) peBindingsContainer.style.display = 'none';
-        if (peBindingsRows) peBindingsRows.innerHTML = '';
+        if (peBindingsRows) peBindingsRows.replaceChildren();
         
         updatePageEventPreview();
     }
@@ -4979,7 +4975,7 @@
         editBtn.type = 'button';
         editBtn.className = 'preview-contextual-js-page-events__delete';
         editBtn.title = PreviewConfig.i18n?.edit || 'Edit';
-        editBtn.innerHTML = QuickSiteUtils.iconEdit(12);
+        editBtn.appendChild(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.edit, 12));
         editBtn.addEventListener('click', function(e) { e.stopPropagation(); handleStateStoreEdit(id); });
         card.appendChild(editBtn);
 
@@ -4987,7 +4983,7 @@
         delBtn.type = 'button';
         delBtn.className = 'preview-contextual-js-page-events__delete';
         delBtn.title = PreviewConfig.i18n?.delete || 'Delete';
-        delBtn.innerHTML = QuickSiteUtils.iconClose(12);
+        delBtn.appendChild(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.close, 12));
         delBtn.addEventListener('click', function(e) { e.stopPropagation(); deleteStore(id); });
         card.appendChild(delBtn);
 
@@ -5142,7 +5138,7 @@
     }
 
     /**
-     * Build one editable field card (createElement; no innerHTML except icons).
+     * Build one editable field card (createElement only).
      * `def` pre-fills the row when editing an existing store.
      */
     function _renderSsFieldRow(name, def) {
@@ -5164,7 +5160,7 @@
         removeBtn.type = 'button';
         removeBtn.className = 'preview-contextual-js-page-events__delete ss-field-remove';
         removeBtn.title = PreviewConfig.i18n?.delete || 'Remove';
-        removeBtn.innerHTML = QuickSiteUtils.iconClose(12);
+        removeBtn.appendChild(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.close, 12));
         removeBtn.addEventListener('click', function() { row.remove(); updateStateStorePreview(); });
         head.appendChild(removeBtn);
         row.appendChild(head);
@@ -5742,7 +5738,7 @@
             // reason, with no rows to add — every field the picker offers comes
             // from the schema, so there is nothing to choose from.
             container.style.display = epData ? '' : 'none';
-            rowsEl.innerHTML = '';
+            rowsEl.replaceChildren();
             if (epData) rowsEl.appendChild(_renderNoSchemaNotice());
             if (addBtn) addBtn.style.display = 'none';
             return;
@@ -5750,7 +5746,7 @@
 
         container.style.display = '';
         if (addBtn) addBtn.style.display = '';
-        rowsEl.innerHTML = '';
+        rowsEl.replaceChildren();
         
         // Load existing bindings if any
         var existing = epData.responseBindings || [];
@@ -6561,7 +6557,7 @@
         }
         
         function renderSelectorDropdown(filter) {
-            selectorDropdown.innerHTML = '';
+            selectorDropdown.replaceChildren();
             var items = getSelectorItems();
             var fl = (filter || '').toLowerCase();
             var filtered = items.filter(function(it) {
@@ -6574,7 +6570,7 @@
                 opt.className = 'preview-contextual-js-response-bindings__picker-option';
                 opt.dataset.value = item.value;
                 var icon = item.type === 'id' ? '#' : item.type === 'class' ? '.' : item.type === 'dom' ? '◇' : item.type === 'tag' ? '<>' : '';
-                opt.innerHTML = '<span class="preview-contextual-js-response-bindings__picker-type">' + icon + '</span><span>' + item.label + '</span>';
+                _renderPickerOption(opt, 'preview-contextual-js-response-bindings__picker-type', icon, item.label);
                 opt.addEventListener('mousedown', function(e) {
                     e.preventDefault();
                     selectorInput.value = item.value;
@@ -6700,7 +6696,7 @@
          *   array+count    → format radio + (optional sentence subblock) + fallback
          */
         function updateRowMode(fieldType, mode) {
-            bottomRow.innerHTML = '';
+            bottomRow.replaceChildren();
             // Default row layout is horizontal flex. componentList and
             // count modes need vertical so their (wide) inner blocks
             // don't squeeze the rest to the right edge — toggled via a
@@ -6807,7 +6803,7 @@
         deleteBtn.type = 'button';
         deleteBtn.className = 'preview-contextual-js-response-bindings__row-delete';
         deleteBtn.title = PreviewConfig.i18n?.delete || 'Remove';
-        deleteBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>';
+        deleteBtn.appendChild(QSDom.iconEl(ICON_ROW_DELETE, 0));
         deleteBtn.addEventListener('click', function() { row.remove(); });
         row.appendChild(deleteBtn);
         
@@ -6976,7 +6972,7 @@
         } else {
             placeholderText = PreviewConfig.i18n?.selectFunction || '-- Select function --';
         }
-        selectEl.innerHTML = '';
+        selectEl.replaceChildren();
         var placeholderOpt = document.createElement('option');
         placeholderOpt.value = '';
         placeholderOpt.textContent = placeholderText;
@@ -7044,8 +7040,7 @@
      */
     function _populateApiSelects(apiSelect, endpointSelect) {
         if (apiSelect) {
-            apiSelect.innerHTML = '<option value="">' +
-                (PreviewConfig.i18n?.selectApi || 'Select API...') + '</option>';
+            QSDom.setSelectPlaceholder(apiSelect, PreviewConfig.i18n?.selectApi || 'Select API...');
             var seen = {};
             availableApiEndpoints.forEach(function(ep) {
                 if (!seen[ep.api]) {
@@ -7058,8 +7053,7 @@
             });
         }
         if (endpointSelect) {
-            endpointSelect.innerHTML = '<option value="">' +
-                (PreviewConfig.i18n?.selectEndpoint || 'Select endpoint...') + '</option>';
+            QSDom.setSelectPlaceholder(endpointSelect, PreviewConfig.i18n?.selectEndpoint || 'Select endpoint...');
             endpointSelect.disabled = true;
         }
     }

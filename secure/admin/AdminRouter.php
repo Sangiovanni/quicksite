@@ -560,29 +560,6 @@ class AdminRouter {
     }
 
     /**
-     * The management API base carrying the project marker —
-     * `<base>/management/p/<id>/`, or a bare `<base>/management/` when no project is
-     * resolvable. A different URL family from projectSiteBase() (that one is where the
-     * SITE is; this one is where its COMMANDS are), and the second thing admin templates
-     * used to hand-roll.
-     *
-     * With no marker the dispatcher refuses project-scoped commands with
-     * `400 project.required`, which is the correct answer for a caller who has no project
-     * to edit — the URL is deliberately still well-formed rather than empty.
-     *
-     * @param string|null $project project id; defaults to the EDITED project.
-     * @return string WITH a trailing slash, so callers append the command name directly.
-     */
-    public function projectManagementBase(?string $project = null): string {
-        $base    = rtrim(BASE_URL, '/') . '/management/';
-        $project = $project ?? $this->getCurrentProject();
-        if ($project === null || $project === '') {
-            return $base;
-        }
-        return $base . 'p/' . rawurlencode($project) . '/';
-    }
-
-    /**
      * Pages that require at least one specific command in the token's role.
      * A role must hold at least one listed command (owner/admin do, via their
      * expanded categories). Pages not listed here are open to all authenticated users.

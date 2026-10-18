@@ -58,73 +58,82 @@
     // ---------------------------------------------------------------------
 
     function renderWizard(container) {
+        const W = window.QSComplexWizard;
+        const t = W.t;
         // ===== top-level form (id / method / submit mode) ================
-        const wrap = document.createElement('div');
-        wrap.className = 'qs-complex-wizard qs-complex-wizard--form-scaffold';
-        wrap.innerHTML = [
-            '<div class="admin-form-group">',
-            '  <label class="admin-label" for="ce-fs-id">Form id <span class="admin-text-danger">*</span></label>',
-            '  <input class="admin-input" type="text" id="ce-fs-id" placeholder="e.g. contact-form" autocomplete="off">',
-            '  <p class="admin-hint">Used for the HTML <code>id</code> AND as the validation/fetch target selector.</p>',
-            '</div>',
-            '<div class="admin-form-group">',
-            '  <label class="admin-label" for="ce-fs-method">HTML method</label>',
-            '  <select class="admin-input" id="ce-fs-method"><option value="POST">POST</option><option value="GET">GET</option></select>',
-            '</div>',
-            '<div class="admin-form-group">',
-            '  <label class="admin-label">Submit to</label>',
-            '  <div class="qs-radio-row">',
-            '    <label><input type="radio" name="ce-fs-mode" value="api" checked> API endpoint</label>',
-            '    <label><input type="radio" name="ce-fs-mode" value="url"> Direct URL</label>',
-            '    <label><input type="radio" name="ce-fs-mode" value="none"> Nothing yet (wire later)</label>',
-            '  </div>',
-            '</div>',
-            '<div class="admin-form-group" id="ce-fs-api-group">',
-            '  <label class="admin-label" for="ce-fs-api">API</label>',
-            '  <select class="admin-input" id="ce-fs-api"><option value="">— pick an API —</option></select>',
-            '  <label class="admin-label" for="ce-fs-endpoint" style="margin-top:6px">Endpoint</label>',
-            '  <select class="admin-input" id="ce-fs-endpoint"><option value="">— pick an endpoint —</option></select>',
-            '</div>',
-            '<div class="admin-form-group" id="ce-fs-url-group" style="display:none;">',
-            '  <label class="admin-label" for="ce-fs-url">Submit URL</label>',
-            '  <input class="admin-input" type="text" id="ce-fs-url" placeholder="/api/contact" autocomplete="off">',
-            '  <label class="admin-label" for="ce-fs-url-method" style="margin-top:6px">HTTP method (override)</label>',
-            '  <select class="admin-input" id="ce-fs-url-method"><option value="POST">POST</option><option value="GET">GET</option><option value="PUT">PUT</option><option value="PATCH">PATCH</option><option value="DELETE">DELETE</option></select>',
-            '</div>',
-            '<div class="admin-form-group">',
-            '  <label class="admin-checkbox"><input type="checkbox" id="ce-fs-validate" checked><span>Add <code>validate()</code> on submit</span></label>',
-            '  <label class="admin-checkbox" style="margin-left:12px"><input type="checkbox" id="ce-fs-fetch" checked><span>Add <code>fetch()</code> on submit</span></label>',
-            '</div>',
+        const option = (value) => QSDom.el('option', { value: value, text: value });
+        const modeRadio = (value, label, checked) => QSDom.el('label', null, [
+            QSDom.el('input', Object.assign({ type: 'radio', name: 'ce-fs-mode', value: value }, checked ? { checked: '' } : {})),
+            ' ' + label
+        ]);
+        const onSubmitBox = (id, call, style) => QSDom.el('label', Object.assign({ class: 'admin-checkbox' }, style ? { style: style } : {}), [
+            QSDom.el('input', { type: 'checkbox', id: id, checked: '' }),
+            QSDom.el('span', null, W.codeText(t('formScaffold.addOnSubmit'), { call: call }))
+        ]);
 
-            '<hr style="margin:12px 0">',
+        const idEl        = QSDom.el('input', { class: 'admin-input', type: 'text', id: 'ce-fs-id', placeholder: t('formScaffold.idPlaceholder'), autocomplete: 'off' });
+        const methodEl    = QSDom.el('select', { class: 'admin-input', id: 'ce-fs-method' }, [option('POST'), option('GET')]);
+        const apiEl       = QSDom.el('select', { class: 'admin-input', id: 'ce-fs-api' });
+        const endpointEl  = QSDom.el('select', { class: 'admin-input', id: 'ce-fs-endpoint' });
+        QSDom.setSelectPlaceholder(apiEl, t('formScaffold.pickApi'));
+        QSDom.setSelectPlaceholder(endpointEl, t('formScaffold.pickEndpoint'));
+        const apiGroup    = QSDom.el('div', { class: 'admin-form-group', id: 'ce-fs-api-group' }, [
+            QSDom.el('label', { class: 'admin-label', for: 'ce-fs-api', text: t('formScaffold.api') }),
+            apiEl,
+            QSDom.el('label', { class: 'admin-label', for: 'ce-fs-endpoint', style: 'margin-top:6px', text: t('formScaffold.endpoint') }),
+            endpointEl
+        ]);
+        const urlEl       = QSDom.el('input', { class: 'admin-input', type: 'text', id: 'ce-fs-url', placeholder: '/api/contact', autocomplete: 'off' });
+        const urlMethodEl = QSDom.el('select', { class: 'admin-input', id: 'ce-fs-url-method' }, ['POST', 'GET', 'PUT', 'PATCH', 'DELETE'].map(option));
+        const urlGroup    = QSDom.el('div', { class: 'admin-form-group', id: 'ce-fs-url-group', style: 'display:none;' }, [
+            QSDom.el('label', { class: 'admin-label', for: 'ce-fs-url', text: t('formScaffold.submitUrl') }),
+            urlEl,
+            QSDom.el('label', { class: 'admin-label', for: 'ce-fs-url-method', style: 'margin-top:6px', text: t('formScaffold.httpMethod') }),
+            urlMethodEl
+        ]);
+        const validateBox = onSubmitBox('ce-fs-validate', 'validate()');
+        const fetchBox    = onSubmitBox('ce-fs-fetch', 'fetch()', 'margin-left:12px');
+        const fieldsContainer = QSDom.el('div', { id: 'ce-fs-fields-rows' });
+        const submitLabelMount = QSDom.el('div', { id: 'ce-fs-submit-label-mount' });
 
-            '<div class="admin-form-group">',
-            '  <label class="admin-label">Fields <span class="admin-text-danger">*</span></label>',
-            '  <p class="admin-hint">Each field becomes a <code>&lt;label&gt; + &lt;input&gt; + [data-error-for]</code> row. Reorder with the ↑↓ buttons, delete with ×.</p>',
-            '  <div id="ce-fs-fields-rows"></div>',
-            '</div>',
-
-            '<hr style="margin:12px 0">',
-
-            '<div class="admin-form-group">',
-            '  <label class="admin-label">Submit button label <span class="admin-text-danger">*</span></label>',
-            '  <div id="ce-fs-submit-label-mount"></div>',
-            '</div>',
-        ].join('');
+        const wrap = QSDom.el('div', { class: 'qs-complex-wizard qs-complex-wizard--form-scaffold' }, [
+            QSDom.el('div', { class: 'admin-form-group' }, [
+                QSDom.el('label', { class: 'admin-label', for: 'ce-fs-id' }, [t('formScaffold.formId'), ' ', W.requiredMark()]),
+                idEl,
+                QSDom.el('p', { class: 'admin-hint' }, W.codeText(t('formScaffold.idHint'), { id: 'id' }))
+            ]),
+            QSDom.el('div', { class: 'admin-form-group' }, [
+                QSDom.el('label', { class: 'admin-label', for: 'ce-fs-method', text: t('formScaffold.htmlMethod') }),
+                methodEl
+            ]),
+            QSDom.el('div', { class: 'admin-form-group' }, [
+                QSDom.el('label', { class: 'admin-label', text: t('formScaffold.submitTo') }),
+                QSDom.el('div', { class: 'qs-radio-row' }, [
+                    modeRadio('api', t('formScaffold.modeApi'), true),
+                    modeRadio('url', t('formScaffold.modeUrl'), false),
+                    modeRadio('none', t('formScaffold.modeNone'), false)
+                ])
+            ]),
+            apiGroup,
+            urlGroup,
+            QSDom.el('div', { class: 'admin-form-group' }, [validateBox, ' ', fetchBox]),
+            QSDom.el('hr', { style: 'margin:12px 0' }),
+            QSDom.el('div', { class: 'admin-form-group' }, [
+                QSDom.el('label', { class: 'admin-label' }, [t('formScaffold.fields'), ' ', W.requiredMark()]),
+                QSDom.el('p', { class: 'admin-hint' }, W.codeText(t('formScaffold.fieldsHint'), { row: '<label> + <input> + [data-error-for]' })),
+                fieldsContainer
+            ]),
+            QSDom.el('hr', { style: 'margin:12px 0' }),
+            QSDom.el('div', { class: 'admin-form-group' }, [
+                QSDom.el('label', { class: 'admin-label' }, [t('formScaffold.submitLabel'), ' ', W.requiredMark()]),
+                submitLabelMount
+            ])
+        ]);
         container.appendChild(wrap);
 
         // ===== element refs ==============================================
-        const idEl       = wrap.querySelector('#ce-fs-id');
-        const methodEl   = wrap.querySelector('#ce-fs-method');
-        const apiGroup   = wrap.querySelector('#ce-fs-api-group');
-        const urlGroup   = wrap.querySelector('#ce-fs-url-group');
-        const apiEl      = wrap.querySelector('#ce-fs-api');
-        const endpointEl = wrap.querySelector('#ce-fs-endpoint');
-        const urlEl      = wrap.querySelector('#ce-fs-url');
-        const urlMethodEl = wrap.querySelector('#ce-fs-url-method');
-        const validateEl = wrap.querySelector('#ce-fs-validate');
-        const fetchEl    = wrap.querySelector('#ce-fs-fetch');
-        const fieldsContainer = wrap.querySelector('#ce-fs-fields-rows');
+        const validateEl = validateBox.querySelector('input');
+        const fetchEl    = fetchBox.querySelector('input');
 
         // ===== submit-mode visibility ====================================
         function getMode() {
@@ -145,7 +154,7 @@
         function populateApiDropdown() {
             loadApisOnce().then(apis => {
                 const prev = apiEl.value;
-                apiEl.innerHTML = '<option value="">— pick an API —</option>';
+                QSDom.setSelectPlaceholder(apiEl, t('formScaffold.pickApi'));
                 apis.forEach(api => {
                     const opt = document.createElement('option');
                     opt.value = api.apiId;
@@ -159,7 +168,7 @@
         function populateEndpointDropdown() {
             const apiId = apiEl.value;
             const prev = endpointEl.value;
-            endpointEl.innerHTML = '<option value="">— pick an endpoint —</option>';
+            QSDom.setSelectPlaceholder(endpointEl, t('formScaffold.pickEndpoint'));
             if (!apiId || !_apisCache) return;
             const api = _apisCache.find(a => a.apiId === apiId);
             (api && Array.isArray(api.endpoints) ? api.endpoints : []).forEach(ep => {
@@ -174,9 +183,9 @@
         populateApiDropdown();
 
         // ===== submit-label textKey picker ===============================
-        const submitLabelPicker = window.QSComplexWizard.createTextKeyPicker({
-            container: wrap.querySelector('#ce-fs-submit-label-mount'),
-            placeholder: 'e.g. form.contact.submit',
+        const submitLabelPicker = W.createTextKeyPicker({
+            container: submitLabelMount,
+            placeholder: t('formScaffold.submitKeyPlaceholder'),
         });
 
         // ===== fields list (WizardRowEditor) =============================
@@ -184,9 +193,9 @@
         // picker + required checkbox. Per-field textKey pickers wired
         // through the same shared primitive as Field Row standalone.
         const fieldPickers = new WeakMap();   // rowEl → labelPicker controller
-        const fieldsEditor = window.QSComplexWizard.createRowEditor({
+        const fieldsEditor = W.createRowEditor({
             container: fieldsContainer,
-            addButtonLabel: '+ Add field',
+            addButtonLabel: t('formScaffold.addField'),
             minRows: 1,
             initialRows: [
                 // Sensible starter row so the user has something to fill in
@@ -195,32 +204,30 @@
             ],
             renderRow: function (data) {
                 const d = data || { type: 'text' };
-                const row = document.createElement('div');
-                row.className = 'qs-fs-field-row';
-                row.innerHTML = [
-                    '<div class="qs-fs-field-row__line">',
-                    '  <input class="admin-input qs-fs-field-row__name" type="text" placeholder="field name" autocomplete="off">',
-                    '  <select class="admin-input qs-fs-field-row__type">' +
-                        INPUT_TYPES.map(t =>
-                            '<option value="' + t + '"' + (t === (d.type || 'text') ? ' selected' : '') + '>' + t + '</option>'
-                        ).join('') +
-                    '  </select>',
-                    '  <label class="qs-fs-field-row__required"><input type="checkbox" class="qs-fs-field-row__required-input"><span>required</span></label>',
-                    '</div>',
-                    '<div class="qs-fs-field-row__line">',
-                    '  <span class="qs-fs-field-row__label-label">Label key:</span>',
-                    '  <div class="qs-fs-field-row__label-mount"></div>',
-                    '</div>',
-                ].join('');
+                const nameInput = QSDom.el('input', { class: 'admin-input qs-fs-field-row__name', type: 'text', placeholder: t('formScaffold.fieldNamePlaceholder'), autocomplete: 'off' });
+                const requiredInput = QSDom.el('input', { type: 'checkbox', class: 'qs-fs-field-row__required-input' });
+                const labelMount = QSDom.el('div', { class: 'qs-fs-field-row__label-mount' });
+                const row = QSDom.el('div', { class: 'qs-fs-field-row' }, [
+                    QSDom.el('div', { class: 'qs-fs-field-row__line' }, [
+                        nameInput,
+                        QSDom.el('select', { class: 'admin-input qs-fs-field-row__type' }, INPUT_TYPES.map(type =>
+                            QSDom.el('option', Object.assign({ value: type, text: type }, type === (d.type || 'text') ? { selected: '' } : {})))),
+                        QSDom.el('label', { class: 'qs-fs-field-row__required' }, [requiredInput, QSDom.el('span', { text: t('formScaffold.required') })])
+                    ]),
+                    QSDom.el('div', { class: 'qs-fs-field-row__line' }, [
+                        QSDom.el('span', { class: 'qs-fs-field-row__label-label', text: t('common.rowLabelKey') }),
+                        labelMount
+                    ])
+                ]);
 
                 // Restore values from `data`
-                if (d.name) row.querySelector('.qs-fs-field-row__name').value = d.name;
-                if (d.required) row.querySelector('.qs-fs-field-row__required-input').checked = true;
+                if (d.name) nameInput.value = d.name;
+                if (d.required) requiredInput.checked = true;
 
                 // Wire label textKey picker per row.
-                const labelPicker = window.QSComplexWizard.createTextKeyPicker({
-                    container: row.querySelector('.qs-fs-field-row__label-mount'),
-                    placeholder: 'e.g. form.contact.email.label',
+                const labelPicker = W.createTextKeyPicker({
+                    container: labelMount,
+                    placeholder: t('fieldRow.labelKeyPlaceholder'),
                     value: d.labelKey || '',
                 });
                 fieldPickers.set(row, labelPicker);
@@ -229,7 +236,6 @@
                 let userTouchedLabel = !!d.labelKey;
                 const _origLabelSet = labelPicker.setValue;
                 labelPicker.setValue = function (v) { if (v) userTouchedLabel = true; _origLabelSet(v); };
-                const nameInput = row.querySelector('.qs-fs-field-row__name');
                 nameInput.addEventListener('input', function () {
                     if (!userTouchedLabel && nameInput.value) {
                         const fid = idEl.value.trim() || 'form';
@@ -240,11 +246,9 @@
                 return row;
             },
             readRow: function (contentEl) {
-                // WizardRowEditor calls readRow with the content element
-                // (the one renderRow returned), not its outer wrapper.
-                // Earlier code used .parentElement which pointed at the
-                // qs-wizard-row wrapper — the WeakMap missed the entry
-                // and labelKey came back empty even when a key was picked.
+                // WizardRowEditor hands readRow the content element (what
+                // renderRow returned), not its qs-wizard-row wrapper: the
+                // WeakMap is keyed by that element.
                 const labelPicker = fieldPickers.get(contentEl);
                 return {
                     name: contentEl.querySelector('.qs-fs-field-row__name').value.trim(),
@@ -256,13 +260,10 @@
         });
 
         // ===== auto-seed from endpoint request schema =====================
-        // When the picked endpoint declares a requestSchema.properties, we
-        // surface a single button + hint inside the API group letting the
-        // user pre-fill every field row from the schema. "Never clobber":
-        // the button is disabled while any field has a name typed (user
-        // must clear first to overwrite). All createElement-based per
-        // CLAUDE.md HTML-in-JS hygiene (the surrounding wizard still uses
-        // innerHTML).
+        // When the picked endpoint declares a requestSchema.properties, a
+        // button + hint inside the API group pre-fills every field row from
+        // the schema. With fields already named the button resets them, and
+        // asks first.
         const autoseedGroup = document.createElement('div');
         autoseedGroup.style.marginTop = '8px';
         autoseedGroup.style.padding = '6px 8px';
@@ -278,7 +279,7 @@
         const autoseedBtn = document.createElement('button');
         autoseedBtn.type = 'button';
         autoseedBtn.className = 'admin-btn admin-btn--sm';
-        autoseedBtn.textContent = '⤓ Pre-fill from request schema';  // ⤓ glyph
+        autoseedBtn.textContent = t('formScaffold.prefill');
         autoseedGroup.appendChild(autoseedBtn);
 
         apiGroup.appendChild(autoseedGroup);
@@ -331,19 +332,19 @@
         //   D. Unknown shapes (arrays / objects / null) → text fallback.
         function _inferInputType(prop, propName) {
             if (!prop || typeof prop !== 'object') return 'text';
-            const t = prop.type;
+            const type = prop.type;
             // A: standard JSON Schema types.
-            if (t === 'boolean') return 'checkbox';
-            if (t === 'number' || t === 'integer') return 'number';
+            if (type === 'boolean') return 'checkbox';
+            if (type === 'number' || type === 'integer') return 'number';
             // B: permissive aliasing — accept any supported HTML5
             // input name typed directly into `type` (non-standard but
             // intuitive). Order matters: comes AFTER (A) so JSON
             // Schema's `number` stays a number, not "fall through to
             // INPUT_TYPES check"; comes BEFORE (C) so `type=password`
             // wins without needing format/writeOnly/name signals.
-            if (typeof t === 'string' && INPUT_TYPES.indexOf(t) !== -1) return t;
+            if (typeof type === 'string' && INPUT_TYPES.indexOf(type) !== -1) return type;
             // C: standard string + format / signals.
-            if (t === 'string') {
+            if (type === 'string') {
                 const f = (prop.format || '').toLowerCase();
                 if (f === 'password') return 'password';
                 if (prop.writeOnly === true) return 'password';
@@ -375,9 +376,8 @@
         //      + re-pre-fills if they renamed the form).
         //
         // The button is ALWAYS clickable when the auto-seed group is
-        // visible (Flavor B from the design discussion). When fields are
-        // already populated, the label flips to a destructive-style "Reset"
-        // and the click handler prompts for confirmation before clobbering.
+        // visible. When fields are already populated, its label turns to a
+        // destructive-style "Reset" and the click asks before replacing them.
         function _syncAutoSeedUI() {
             const ep = _getPickedEndpointData();
             const props = (ep && ep.requestSchema && ep.requestSchema.properties) || {};
@@ -387,31 +387,31 @@
                 return;
             }
             autoseedGroup.style.display = '';
-            autoseedHint.textContent = 'Endpoint declares ' + propNames.length
-                + ' request field' + (propNames.length === 1 ? '' : 's') + '.';
+            autoseedHint.textContent = propNames.length === 1
+                ? t('formScaffold.schemaFieldsOne')
+                : t('formScaffold.schemaFieldsMany', { n: propNames.length });
 
             const namedCount = _currentNamedFieldCount();
             if (namedCount > 0) {
-                autoseedBtn.textContent = '⤴ Reset to schema fields (clears ' + namedCount + ')';
-                autoseedBtn.title = 'Replaces the ' + namedCount + ' current field(s) with schema defaults. Confirmation required.';
+                autoseedBtn.textContent = t('formScaffold.reset', { n: namedCount });
+                autoseedBtn.title = t('formScaffold.resetTitle', { n: namedCount });
             } else {
-                autoseedBtn.textContent = '⤓ Pre-fill from request schema';
+                autoseedBtn.textContent = t('formScaffold.prefill');
                 autoseedBtn.title = '';
             }
             autoseedBtn.disabled = false;   // always clickable when group is visible
         }
 
-        function _autoseedNow() {
-            // Destructive-replace confirmation when there's anything to clobber.
-            // `window.confirm` matches how `deletePageEvent` already prompts
-            // for destructive actions in the same admin layer — keeps the
-            // wizard zero-dependency.
+        async function _autoseedNow() {
+            // Replacing fields the user has named asks first, with the panel's own dialog.
             const namedCount = _currentNamedFieldCount();
             if (namedCount > 0) {
-                const ok = window.confirm(
-                    'Replace ' + namedCount + ' current field(s) with schema defaults?\n\n'
-                    + 'This can\'t be undone.'
-                );
+                const ok = await QuickSiteUtils.confirm(t('formScaffold.confirmMessage', { n: namedCount }), {
+                    title: t('formScaffold.confirmTitle'),
+                    type: 'danger',
+                    confirmText: t('formScaffold.confirmButton'),
+                    confirmClass: 'danger'
+                });
                 if (!ok) return;
             }
 
@@ -489,32 +489,32 @@
 
         function validate() {
             const cfg = getConfig();
-            if (!cfg.id) return 'Form id is required';
+            if (!cfg.id) return t('formScaffold.errors.idRequired');
             if (!/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(cfg.id)) {
-                return 'Form id must start with a letter (letters, digits, hyphens, underscores)';
+                return t('formScaffold.errors.idFormat');
             }
-            if (!cfg.submitLabelKey) return 'Submit button label key is required';
-            if (cfg.fields.length === 0) return 'Add at least one named field';
+            if (!cfg.submitLabelKey) return t('formScaffold.errors.submitLabelRequired');
+            if (cfg.fields.length === 0) return t('formScaffold.errors.noField');
             // Per-field — same rules as Field Row standalone
             for (let i = 0; i < cfg.fields.length; i++) {
                 const f = cfg.fields[i];
                 if (!/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(f.name)) {
-                    return 'Field "' + f.name + '" (row ' + (i + 1) + '): invalid name';
+                    return t('formScaffold.errors.fieldName', { name: f.name, row: i + 1 });
                 }
                 if (!f.labelKey) {
-                    return 'Field "' + f.name + '" (row ' + (i + 1) + '): label key is required';
+                    return t('formScaffold.errors.fieldLabel', { name: f.name, row: i + 1 });
                 }
             }
             if (cfg.fetchOnSubmit && cfg.submitMode === 'api' && (!cfg.apiId || !cfg.endpointId)) {
-                return 'Pick an API and endpoint, or uncheck "Add fetch()"';
+                return t('formScaffold.errors.noEndpoint');
             }
             if (cfg.fetchOnSubmit && cfg.submitMode === 'url' && !cfg.submitUrl) {
-                return 'Submit URL is required, or uncheck "Add fetch()"';
+                return t('formScaffold.errors.noUrl');
             }
             // Duplicate field names — server rejects too, fail-fast here.
             const seen = new Set();
             for (const f of cfg.fields) {
-                if (seen.has(f.name)) return 'Duplicate field name: "' + f.name + '"';
+                if (seen.has(f.name)) return t('formScaffold.errors.duplicate', { name: f.name });
                 seen.add(f.name);
             }
             return null;
@@ -523,7 +523,7 @@
         function destroy() {
             try { submitLabelPicker.destroy(); } catch (e) {}
             try { fieldsEditor.destroy(); } catch (e) {}
-            container.innerHTML = '';
+            container.replaceChildren();
         }
 
         return { getConfig, validate, destroy };
@@ -532,8 +532,8 @@
     window.QSComplexWizard = window.QSComplexWizard || {};
     window.QSComplexWizard.registry = window.QSComplexWizard.registry || {};
     window.QSComplexWizard.registry['form-scaffold'] = {
-        label: 'Form scaffold',
-        description: 'Complete <form> with N fields and validate+fetch pre-wired on submit.',
+        label: window.QSComplexWizard.t('formScaffold.label'),
+        description: window.QSComplexWizard.t('formScaffold.description'),
         renderWizard: renderWizard
     };
 })();

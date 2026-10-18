@@ -18,58 +18,58 @@
     'use strict';
 
     function renderWizard(container) {
-        const wrap = document.createElement('div');
-        wrap.className = 'qs-complex-wizard qs-complex-wizard--select';
-        wrap.innerHTML = [
-            '<div class="admin-form-group">',
-            '  <label class="admin-label" for="ce-sel-name">Field name <span class="admin-text-danger">*</span></label>',
-            '  <input class="admin-input" type="text" id="ce-sel-name" placeholder="e.g. country" autocomplete="off">',
-            '  <p class="admin-hint">HTML <code>name</code> attribute. Letters, digits, hyphens, underscores; starts with a letter.</p>',
-            '</div>',
-            '<div class="admin-form-group">',
-            '  <label class="admin-label">Label translation key <span class="admin-text-danger">*</span></label>',
-            '  <div id="ce-sel-label-mount"></div>',
-            '</div>',
-            '<div class="admin-form-group">',
-            '  <label class="admin-checkbox"><input type="checkbox" id="ce-sel-required"><span>Required</span></label>',
-            '  <label class="admin-checkbox" style="margin-left:12px"><input type="checkbox" id="ce-sel-multiple"><span>Multiple (multi-select)</span></label>',
-            '</div>',
-            '<div class="admin-form-group" id="ce-sel-placeholder-group">',
-            '  <label class="admin-label">Placeholder translation key <small>(optional — empty first option)</small></label>',
-            '  <div id="ce-sel-placeholder-mount"></div>',
-            '  <p class="admin-hint">When set, the first option is empty/disabled/selected and shows this translated text. Ignored if "Multiple" is checked (browser limitation).</p>',
-            '</div>',
+        const W = window.QSComplexWizard;
+        const t = W.t;
+        const nameEl     = QSDom.el('input', { class: 'admin-input', type: 'text', id: 'ce-sel-name', placeholder: t('select.namePlaceholder'), autocomplete: 'off' });
+        const requiredEl = QSDom.el('input', { type: 'checkbox', id: 'ce-sel-required' });
+        const multipleEl = QSDom.el('input', { type: 'checkbox', id: 'ce-sel-multiple' });
+        const labelMount = QSDom.el('div', { id: 'ce-sel-label-mount' });
+        const placeholderMount = QSDom.el('div', { id: 'ce-sel-placeholder-mount' });
+        const placeholderGroup = QSDom.el('div', { class: 'admin-form-group', id: 'ce-sel-placeholder-group' }, [
+            QSDom.el('label', { class: 'admin-label' }, [t('common.placeholderKey'), ' ', QSDom.el('small', { text: t('select.placeholderOptional') })]),
+            placeholderMount,
+            QSDom.el('p', { class: 'admin-hint', text: t('select.placeholderHint') })
+        ]);
+        const optionsContainer = QSDom.el('div', { id: 'ce-sel-options-rows' });
+        const idEl       = QSDom.el('input', { class: 'admin-input', type: 'text', id: 'ce-sel-id', placeholder: t('common.idPlaceholder'), autocomplete: 'off' });
 
-            '<hr style="margin:12px 0">',
-
-            '<div class="admin-form-group">',
-            '  <label class="admin-label">Options <span class="admin-text-danger">*</span></label>',
-            '  <p class="admin-hint">Each option has a literal <code>value</code> (submitted on form post) and a translation key for the visible label.</p>',
-            '  <div id="ce-sel-options-rows"></div>',
-            '</div>',
-
-            '<div class="admin-form-group">',
-            '  <label class="admin-label" for="ce-sel-id"><small>Override HTML id (optional)</small></label>',
-            '  <input class="admin-input" type="text" id="ce-sel-id" placeholder="defaults to field name" autocomplete="off">',
-            '</div>',
-        ].join('');
+        const wrap = QSDom.el('div', { class: 'qs-complex-wizard qs-complex-wizard--select' }, [
+            QSDom.el('div', { class: 'admin-form-group' }, [
+                QSDom.el('label', { class: 'admin-label', for: 'ce-sel-name' }, [t('common.fieldName'), ' ', W.requiredMark()]),
+                nameEl,
+                QSDom.el('p', { class: 'admin-hint' }, W.codeText(t('common.nameHint'), { name: 'name' }))
+            ]),
+            QSDom.el('div', { class: 'admin-form-group' }, [
+                QSDom.el('label', { class: 'admin-label' }, [t('common.labelKey'), ' ', W.requiredMark()]),
+                labelMount
+            ]),
+            QSDom.el('div', { class: 'admin-form-group' }, [
+                QSDom.el('label', { class: 'admin-checkbox' }, [requiredEl, QSDom.el('span', { text: t('select.required') })]),
+                ' ',
+                QSDom.el('label', { class: 'admin-checkbox', style: 'margin-left:12px' }, [multipleEl, QSDom.el('span', { text: t('select.multiple') })])
+            ]),
+            placeholderGroup,
+            QSDom.el('hr', { style: 'margin:12px 0' }),
+            QSDom.el('div', { class: 'admin-form-group' }, [
+                QSDom.el('label', { class: 'admin-label' }, [t('select.options'), ' ', W.requiredMark()]),
+                QSDom.el('p', { class: 'admin-hint' }, W.codeText(t('select.optionsHint'), { value: 'value' })),
+                optionsContainer
+            ]),
+            QSDom.el('div', { class: 'admin-form-group' }, [
+                QSDom.el('label', { class: 'admin-label', for: 'ce-sel-id' }, [QSDom.el('small', { text: t('common.idOverride') })]),
+                idEl
+            ])
+        ]);
         container.appendChild(wrap);
 
-        const nameEl     = wrap.querySelector('#ce-sel-name');
-        const requiredEl = wrap.querySelector('#ce-sel-required');
-        const multipleEl = wrap.querySelector('#ce-sel-multiple');
-        const placeholderGroup = wrap.querySelector('#ce-sel-placeholder-group');
-        const optionsContainer = wrap.querySelector('#ce-sel-options-rows');
-        const idEl       = wrap.querySelector('#ce-sel-id');
-
         // ---- textKey pickers (shared primitive) ----
-        const labelPicker = window.QSComplexWizard.createTextKeyPicker({
-            container: wrap.querySelector('#ce-sel-label-mount'),
-            placeholder: 'e.g. form.contact.country',
+        const labelPicker = W.createTextKeyPicker({
+            container: labelMount,
+            placeholder: t('select.labelKeyPlaceholder'),
         });
-        const placeholderPicker = window.QSComplexWizard.createTextKeyPicker({
-            container: wrap.querySelector('#ce-sel-placeholder-mount'),
-            placeholder: 'e.g. form.contact.country.choose',
+        const placeholderPicker = W.createTextKeyPicker({
+            container: placeholderMount,
+            placeholder: t('select.placeholderKeyPlaceholder'),
         });
 
         // Hide placeholder row when multi-select (browser ignores the
@@ -92,9 +92,9 @@
 
         // ---- options list (WizardRowEditor) ----
         const optionPickers = new WeakMap();
-        const optionsEditor = window.QSComplexWizard.createRowEditor({
+        const optionsEditor = W.createRowEditor({
             container: optionsContainer,
-            addButtonLabel: '+ Add option',
+            addButtonLabel: t('select.addOption'),
             minRows: 1,
             initialRows: [
                 { value: '', labelKey: '' },
@@ -102,23 +102,21 @@
             ],
             renderRow: function (data) {
                 const d = data || {};
-                const row = document.createElement('div');
-                row.className = 'qs-sel-option-row';
-                row.innerHTML = [
-                    '<div class="qs-sel-option-row__line">',
-                    '  <input class="admin-input qs-sel-option-row__value" type="text" placeholder="value (literal, e.g. us)" autocomplete="off">',
-                    '</div>',
-                    '<div class="qs-sel-option-row__line">',
-                    '  <span class="qs-sel-option-row__label-label">Label key:</span>',
-                    '  <div class="qs-sel-option-row__label-mount"></div>',
-                    '</div>',
-                ].join('');
+                const valEl = QSDom.el('input', { class: 'admin-input qs-sel-option-row__value', type: 'text', placeholder: t('select.valuePlaceholder'), autocomplete: 'off' });
+                const labelMountEl = QSDom.el('div', { class: 'qs-sel-option-row__label-mount' });
+                const row = QSDom.el('div', { class: 'qs-sel-option-row' }, [
+                    QSDom.el('div', { class: 'qs-sel-option-row__line' }, [valEl]),
+                    QSDom.el('div', { class: 'qs-sel-option-row__line' }, [
+                        QSDom.el('span', { class: 'qs-sel-option-row__label-label', text: t('common.rowLabelKey') }),
+                        labelMountEl
+                    ])
+                ]);
 
-                if (d.value) row.querySelector('.qs-sel-option-row__value').value = d.value;
+                if (d.value) valEl.value = d.value;
 
-                const optLabelPicker = window.QSComplexWizard.createTextKeyPicker({
-                    container: row.querySelector('.qs-sel-option-row__label-mount'),
-                    placeholder: 'e.g. form.country.us',
+                const optLabelPicker = W.createTextKeyPicker({
+                    container: labelMountEl,
+                    placeholder: t('select.optionKeyPlaceholder'),
                     value: d.labelKey || '',
                 });
                 optionPickers.set(row, optLabelPicker);
@@ -127,7 +125,6 @@
                 let touched = !!d.labelKey;
                 const _origOpt = optLabelPicker.setValue;
                 optLabelPicker.setValue = function (v) { if (v) touched = true; _origOpt(v); };
-                const valEl = row.querySelector('.qs-sel-option-row__value');
                 valEl.addEventListener('input', function () {
                     if (!touched && valEl.value) {
                         const fname = nameEl.value.trim() || 'select';
@@ -166,19 +163,19 @@
 
         function validate() {
             const cfg = getConfig();
-            if (!cfg.name) return 'Field name is required';
+            if (!cfg.name) return t('common.errors.nameRequired');
             if (!/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(cfg.name)) {
-                return 'Field name: invalid format';
+                return t('select.errors.nameFormat');
             }
-            if (!cfg.labelKey) return 'Label translation key is required';
-            if (cfg.options.length === 0) return 'Add at least one option with a label key';
+            if (!cfg.labelKey) return t('common.errors.labelRequired');
+            if (cfg.options.length === 0) return t('select.errors.noOption');
             if (cfg.id && !/^[a-zA-Z][a-zA-Z0-9_-]*$/.test(cfg.id)) {
-                return 'HTML id: invalid format';
+                return t('select.errors.idFormat');
             }
             // Duplicate values check (server enforces too — fail-fast in UI).
             const seen = new Set();
             for (const o of cfg.options) {
-                if (seen.has(o.value)) return 'Duplicate option value: "' + o.value + '"';
+                if (seen.has(o.value)) return t('select.errors.duplicate', { value: o.value });
                 seen.add(o.value);
             }
             return null;
@@ -188,7 +185,7 @@
             try { labelPicker.destroy(); } catch (e) {}
             try { placeholderPicker.destroy(); } catch (e) {}
             try { optionsEditor.destroy(); } catch (e) {}
-            container.innerHTML = '';
+            container.replaceChildren();
         }
 
         return { getConfig, validate, destroy };
@@ -197,8 +194,8 @@
     window.QSComplexWizard = window.QSComplexWizard || {};
     window.QSComplexWizard.registry = window.QSComplexWizard.registry || {};
     window.QSComplexWizard.registry['select'] = {
-        label: 'Select (dropdown)',
-        description: '<select> with options, wrapped as a form field (label + select + error span).',
+        label: window.QSComplexWizard.t('select.label'),
+        description: window.QSComplexWizard.t('select.description'),
         renderWizard: renderWizard
     };
 })();

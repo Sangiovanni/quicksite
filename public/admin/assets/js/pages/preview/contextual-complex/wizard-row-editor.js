@@ -30,8 +30,8 @@
  * toolbar (↑ ↓ ×). The user's renderRow returns the row's CONTENT;
  * the toolbar is attached automatically.
  *
- * Loaded by: secure/admin/templates/pages/preview/contextual-add.php
- * (Step 3 of the Complex Element MVP wires it in).
+ * Loaded by: secure/admin/templates/pages/preview-config.php, after
+ * wizard-text.js (its words) and before every complex-*.js file.
  */
 (function () {
     'use strict';
@@ -60,13 +60,14 @@
         if (typeof opts.readRow !== 'function') {
             throw new Error('[WizardRowEditor] readRow (function) is required');
         }
+        const t = window.QSComplexWizard.t;
         const cfg = {
             container:      opts.container,
             renderRow:      opts.renderRow,
             readRow:        opts.readRow,
             minRows:        Number.isFinite(opts.minRows) ? opts.minRows : 0,
             maxRows:        Number.isFinite(opts.maxRows) ? opts.maxRows : Infinity,
-            addButtonLabel: opts.addButtonLabel === null ? null : (opts.addButtonLabel || '+ Add row'),
+            addButtonLabel: opts.addButtonLabel === null ? null : (opts.addButtonLabel || t('rowEditor.addRow')),
             keyboardNav:    opts.keyboardNav !== false,
             onChange:       typeof opts.onChange === 'function' ? opts.onChange : noop,
         };
@@ -96,14 +97,14 @@
             try { cfg.onChange(getRows()); } catch (e) { console.warn('[WizardRowEditor] onChange threw:', e); }
         }
 
+        /** A row's side toolbar: move up, move down, remove (the clicks are delegated below). */
         function buildToolbar() {
-            const tools = document.createElement('div');
-            tools.className = ROW_TOOLS_CLASS;
-            tools.innerHTML =
-                '<button type="button" class="' + BTN_UP_CLASS + '" title="Move up" aria-label="Move up">&uarr;</button>' +
-                '<button type="button" class="' + BTN_DOWN_CLASS + '" title="Move down" aria-label="Move down">&darr;</button>' +
-                '<button type="button" class="' + BTN_DELETE_CLASS + '" title="Remove" aria-label="Remove">&times;</button>';
-            return tools;
+            const tool = (cls, label, symbol) => QSDom.el('button', { type: 'button', class: cls, title: label, 'aria-label': label, text: symbol });
+            return QSDom.el('div', { class: ROW_TOOLS_CLASS }, [
+                tool(BTN_UP_CLASS, t('rowEditor.moveUp'), '↑'),
+                tool(BTN_DOWN_CLASS, t('rowEditor.moveDown'), '↓'),
+                tool(BTN_DELETE_CLASS, t('rowEditor.remove'), '×')
+            ]);
         }
 
         /**

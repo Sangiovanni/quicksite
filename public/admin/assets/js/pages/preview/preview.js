@@ -110,7 +110,7 @@
     const saveSnippetPreview = document.getElementById('save-snippet-structure-preview');
     const saveSnippetCancel = document.getElementById('save-snippet-cancel');
     const saveSnippetSubmit = document.getElementById('save-snippet-submit');
-    const saveSnippetGlobal = document.getElementById('save-snippet-global');
+    const saveSnippetPersonal = document.getElementById('save-snippet-personal');
     
     // Save as Component form elements
     const ctxNodeSaveComponent = document.getElementById('ctx-node-save-component');
@@ -340,6 +340,7 @@
     const addSnippetCssWarning = document.getElementById('add-snippet-css-warning');
     const addSnippetStyleToggle = document.getElementById('add-snippet-style-toggle');
     const addSnippetStyleToggleInput = document.getElementById('add-snippet-style-toggle-input');
+    const addSnippetKeysToggleInput = document.getElementById('add-snippet-keys-toggle-input');
     const addSnippetPreviewActions = document.getElementById('add-snippet-preview-actions');
     const deleteSnippetBtn = document.getElementById('delete-snippet-btn');
     const addPositionPicker = document.getElementById('add-position-picker');
@@ -406,11 +407,12 @@
     const baseUrl = PreviewConfig.baseUrl;
     // The base the preview iframe navigates under: the edited project's own
     // '/p/<id>' view (surface B).
-    // (No parse-time authToken capture here: the access token is short-lived
-    // and renewed in place — modules read PreviewConfig.authToken at call time.)
+    // (PreviewConfig.authToken is read where it is used, never captured here: it is
+    // the per-session token this page embeds, which authorizes nothing on its own —
+    // the session cookie is the credential — and api.js replaces it when a
+    // deployment plugs in its own token source.)
     const previewBase = PreviewConfig.previewBase || PreviewConfig.baseUrl;
     const adminUrl = PreviewConfig.adminUrl;
-    const managementUrl = PreviewConfig.managementUrl;
     const structureUrl = PreviewConfig.structureUrl;
     const multilingual = PreviewConfig.multilingual;
     const defaultLang = PreviewConfig.defaultLang;
@@ -650,17 +652,18 @@
         
         render() {
             // Clear container
-            this.container.innerHTML = '';
+            this.container.replaceChildren();
             this.container.className = 'qs-property-selector';
             
             // Create trigger button
             this.triggerEl = document.createElement('button');
             this.triggerEl.type = 'button';
             this.triggerEl.className = 'qs-property-selector__trigger';
-            this.triggerEl.innerHTML = `
-                <span class="qs-property-selector__text">${this.currentValue || this.placeholder}</span>
-                ${QuickSiteUtils.iconChevronDown(12)}
-            `;
+            this.triggerEl.append(
+                QSDom.el('span', { class: 'qs-property-selector__text', text: this.currentValue || this.placeholder }),
+                ' ',
+                QSDom.iconEl(QuickSiteUtils.ICON_PATHS.chevronDown, 12)
+            );
             
             this.triggerEl.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -793,11 +796,11 @@
         
         destroy() {
             this.close();
-            this.container.innerHTML = '';
+            this.container.replaceChildren();
         }
         
         _renderList(listEl, filter = '') {
-            listEl.innerHTML = '';
+            listEl.replaceChildren();
             this.allItems = [];
             const filterLower = filter.toLowerCase().trim();
             
@@ -833,10 +836,8 @@
                     const propType = KEYFRAME_PROPERTY_TYPES[prop];
                     const typeLabel = propType?.type && propType.type !== 'text' ? propType.type : '';
                     
-                    item.innerHTML = `
-                        <span>${prop}</span>
-                        ${typeLabel ? `<span class="qs-property-selector__item-type">${typeLabel}</span>` : ''}
-                    `;
+                    item.append(QSDom.el('span', { text: prop }));
+                    if (typeLabel) item.append(' ', QSDom.el('span', { class: 'qs-property-selector__item-type', text: typeLabel }));
                     
                     item.addEventListener('click', () => this.select(prop));
                     item.addEventListener('mouseenter', () => {
@@ -857,18 +858,14 @@
                     // Show warning
                     const warningItem = document.createElement('div');
                     warningItem.className = 'qs-property-selector__warning';
-                    warningItem.innerHTML = `
-                        ${QuickSiteUtils.iconAlertCircle(14)}
-                        <span>${PreviewConfig.i18n.propertyAlreadyExists}</span>
-                    `;
+                    warningItem.append(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.alertCircle, 14), ' ',
+                        QSDom.el('span', { text: PreviewConfig.i18n.propertyAlreadyExists }));
                     listEl.appendChild(warningItem);
                 } else {
                     const customItem = document.createElement('button');
                     customItem.type = 'button';
                     customItem.className = 'qs-property-selector__item qs-property-selector__item--custom';
-                    customItem.innerHTML = `
-                        <span>${PreviewConfig.i18n.useCustomProperty} <strong>${filter}</strong></span>
-                    `;
+                    customItem.appendChild(QSDom.el('span', {}, [PreviewConfig.i18n.useCustomProperty + ' ', QSDom.el('strong', { text: filter })]));
                     customItem.addEventListener('click', () => this.select(filter));
                     listEl.appendChild(customItem);
                     this.allItems.push(customItem);
@@ -877,7 +874,7 @@
             
             // Show empty state
             if (this.allItems.length === 0 && !filterLower) {
-                listEl.innerHTML = `<div class="qs-property-selector__empty">${PreviewConfig.i18n.noPropertiesFound}</div>`;
+                listEl.replaceChildren(QSDom.el('div', { class: 'qs-property-selector__empty', text: PreviewConfig.i18n.noPropertiesFound }));
             }
             
             this.focusedIndex = -1;
@@ -972,7 +969,7 @@
         }
         
         _render() {
-            this.container.innerHTML = '';
+            this.container.replaceChildren();
             this.colorSwatchEl = null;
             this.container.className = this.useLegacyClasses ? '' : this.classPrefix;
             
@@ -1270,7 +1267,7 @@
          * Destroy and cleanup
          */
         destroy() {
-            this.container.innerHTML = '';
+            this.container.replaceChildren();
         }
     }
     
@@ -1288,7 +1285,7 @@
             PreviewTransitionEditor.open(selector, onSave);
         }
     }
-    // Expose for cross-module callers (e.g. preview-style-animations.js animated-selector clicks)
+    // Exposed for the other modules (the Motion tab's animated selectors open it)
     window.openTransitionEditor = openTransitionEditor;
     
     /**
@@ -1306,7 +1303,6 @@
     function initTransitionEditor() {
         if (window.PreviewTransitionEditor) {
             PreviewTransitionEditor.setShowToast(showToast);
-            PreviewTransitionEditor.setEscapeHtml(escapeHTML);
             PreviewTransitionEditor.setParseStylesString(parseStylesString);
             PreviewTransitionEditor.setRefreshPreviewFrame(() => {
                 if (iframe?.contentWindow) {
@@ -2764,31 +2760,12 @@
                 if (animationsPanel) animationsPanel.style.display = tabName === 'animations' ? '' : 'none';
             });
         });
-
-        // Initialize animations group collapsing
-        initAnimationsGroups();
-    }
-    
-    // ==================== Animations Tab ====================
-    // Animation functionality has been extracted to preview-style-animations.js
-    // See: /admin/assets/js/pages/preview/preview-style-animations.js
-    // Public API: PreviewStyleMotion.init(), .load(), .isLoaded(), .reset()
-    
-    // Delegate to animations module
-    function loadAnimationsTab() {
-        if (window.PreviewStyleMotion) {
-            PreviewStyleMotion.load();
-        }
-    }
-    
-    function initAnimationsGroups() {
-        // Handled by PreviewStyleMotion module during init
     }
     
     // ==================== Selector Browser ====================
-    // Selector browser functionality has been extracted to preview-style-selectors.js
-    // See: /admin/assets/js/pages/preview/preview-style-selectors.js
-    // Public API: PreviewSelectorBrowser.init(), .load(), .loadData(), .isLoaded()
+    // The Selectors tab is preview-style-selectors.js (PreviewSelectorBrowser: init, load, loadData,
+    // isLoaded); the Motion tab is preview-style-motion.js (PreviewStyleMotion). Both are loaded by
+    // their tab (moduleByTab above).
     
     // Delegate to selector browser module
     function loadSelectorsData() {
@@ -2796,12 +2773,6 @@
             return PreviewSelectorBrowser.loadData();
         }
         return Promise.resolve(false);
-    }
-    
-    function loadStyleSelectors() {
-        if (window.PreviewSelectorBrowser) {
-            PreviewSelectorBrowser.load();
-        }
     }
     
     function initSelectorBrowser() {
@@ -3080,7 +3051,7 @@
                 const sel = document.getElementById('preview-lang-select');
                 return sel && sel.value ? sel.value : (window.PreviewConfig && window.PreviewConfig.defaultLang) || 'en';
             })();
-            translateCsvLang.innerHTML = '';
+            translateCsvLang.replaceChildren();
             langs.forEach(function (lang) {
                 const opt = document.createElement('option');
                 opt.value = lang;
@@ -3555,6 +3526,10 @@
                 // renders the placeholder that lets the author select its root again.
                 reloadPreview();
             }
+            if (e.data.action === 'insertNodeFailed') {
+                // The node is saved, but the page could not show it in place: a reload does.
+                reloadPreview();
+            }
         }
     });
     
@@ -3773,15 +3748,101 @@
 
     // ==================== Utility Functions ====================
     
-    /**
-     * Escape HTML for safe rendering. Delegates to PreviewState.utils.escapeHtml.
-     */
-    function escapeHTML(str) {
-        return PreviewState.utils.escapeHtml(str);
+    // ==================== DOM helpers (each returns ONE Element) ====================
+
+    // The editor's own icons, inner SVG markup for QSDom.iconEl (the others are QuickSiteUtils.ICON_PATHS).
+    const ICON_RESET = '<polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>';
+    const ICON_TEXT_VARIABLES = '<polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/>';
+    const ICON_PARAM = '<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>';
+    const ICON_NODE_PATH = '<circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6m-7-7H1m22 0h-4"/>';
+
+    /** One <option>; `selected` sets the attribute, so the select starts on it. */
+    function _renderOption(value, text, selected) {
+        const option = QSDom.el('option', { value: value, text: text });
+        if (selected) option.setAttribute('selected', '');
+        return option;
     }
-    
-    // Alias for modules that use lowercase
-    const escapeHtml = escapeHTML;
+
+    /** An icon sized by its style (the enums and emulation panels' small buttons). */
+    function _renderSizedIcon(paths, px) {
+        const icon = QSDom.iconEl(paths, 0);
+        icon.setAttribute('style', 'width:' + px + 'px;height:' + px + 'px;');
+        return icon;
+    }
+
+    /** The icon in front of a variables panel section's title. */
+    function _renderSectionIcon(paths) {
+        const icon = QSDom.iconEl(paths, 0);
+        icon.setAttribute('style', 'width:14px;height:14px;vertical-align:middle;margin-right:4px;');
+        return icon;
+    }
+
+    /** The line a panel shows when it failed to load: "Error: <message>". */
+    function _renderPanelError(error) {
+        return QSDom.el('div', {
+            style: 'color:var(--admin-danger);font-size:var(--font-size-sm);padding:var(--space-sm);',
+            text: (PreviewConfig.i18n?.error || 'Error') + ': ' + error.message
+        });
+    }
+
+    /** The note a component or snippet list shows when it is empty or failed to load. */
+    function _renderSelectorNote(text) {
+        return QSDom.el('div', { class: 'snippet-selector__empty' }, [
+            QSDom.iconEl(QuickSiteUtils.ICON_PATHS.ban, 0),
+            ' ',
+            QSDom.el('span', { text: text })
+        ]);
+    }
+
+    /** The spinner a component or snippet list shows while it loads. */
+    function _renderSelectorLoading() {
+        return QSDom.el('div', { class: 'snippet-selector__loading' }, [
+            QSDom.el('div', { class: 'spinner' }),
+            PreviewConfig.i18n.loading || 'Loading...'
+        ]);
+    }
+
+    /** The note the asset picker shows when it has nothing to list. */
+    function _renderAssetPickerNote(text) {
+        return QSDom.el('div', { class: 'preview-asset-picker__empty', text: text });
+    }
+
+    /** The Complex tab's line when a kind cannot draw its wizard. */
+    function _renderComplexError(text) {
+        return QSDom.el('p', { class: 'admin-hint admin-text-danger', text: text });
+    }
+
+    /** A section title of a component's variables in the Add form. */
+    function _renderVariablesSectionTitle(text) {
+        return QSDom.el('div', { class: 'preview-variables-section__title', text: text });
+    }
+
+    /**
+     * One labelled parameter row of the Add form or of a component's variables: the field, an
+     * asset browse button when `browseCategory` is not null, and a route datalist when
+     * `datalistId` is set.
+     */
+    function _renderParamRow(labelText, inputProps, browseCategory, datalistId) {
+        const input = QSDom.el('input', Object.assign({ type: 'text', class: 'admin-input admin-input--sm preview-contextual-form__param-input' }, inputProps));
+        if (datalistId) input.setAttribute('list', datalistId);
+        const group = QSDom.el('div', { class: 'preview-contextual-form__param-input-group' }, [input]);
+        if (browseCategory !== null) {
+            group.append(' ', QSDom.el('button', {
+                type: 'button', class: 'admin-btn admin-btn--sm admin-btn--outline preview-asset-browse-btn',
+                'data-category': browseCategory, title: PreviewConfig.i18n.browseAssets
+            }, ['📁']));
+        }
+        return QSDom.el('div', { class: 'preview-contextual-form__param-row' }, [
+            QSDom.el('label', { class: 'preview-contextual-form__param-label', text: labelText + ':' }),
+            group,
+            datalistId ? QSDom.el('datalist', { id: datalistId }) : null
+        ]);
+    }
+
+    /** "N variable(s)" for a component in the Add form's list. */
+    function componentVariablesLabel(count) {
+        return (count === 1 ? PreviewConfig.i18n.componentVariableCountOne : PreviewConfig.i18n.componentVariableCount).replace('{n}', count);
+    }
     
     /**
      * Parse a CSS styles string into an object.
@@ -4626,7 +4687,7 @@
         if (classCombobox) classCombobox.reset();
         else if (addClassInput) addClassInput.value = '';
         if (addIdInput) addIdInput.value = '';
-        if (addCustomParamsList) addCustomParamsList.innerHTML = '';
+        if (addCustomParamsList) addCustomParamsList.replaceChildren();
         if (addComponentSelector) addComponentSelector.reset();
         else if (addComponentSelect) addComponentSelect.value = '';
 
@@ -4799,7 +4860,7 @@
         if (classCombobox) classCombobox.reset();
         else if (addClassInput) addClassInput.value = '';
         if (addIdInput) addIdInput.value = '';
-        if (addCustomParamsList) addCustomParamsList.innerHTML = '';
+        if (addCustomParamsList) addCustomParamsList.replaceChildren();
 
         // Tear down any prior Complex wizard mount. #add-complex-body is a
         // SIBLING of #add-complex-field in contextual-add.php — hiding only
@@ -5170,7 +5231,7 @@
         }
         
         addMandatoryParams.style.display = 'block';
-        addMandatoryParamsContainer.innerHTML = '';
+        addMandatoryParamsContainer.replaceChildren();
 
         // ---- Special case: <input> wizard ----------------------------
         // 'type' becomes a <select>, and we always render a 'name' row
@@ -5182,25 +5243,13 @@
         // --------------------------------------------------------------
 
         mandatoryParams.forEach(param => {
-            const row = document.createElement('div');
-            row.className = 'preview-contextual-form__param-row';
-            
             const showBrowse = param === 'src' && tag in ASSET_BROWSABLE_TAGS;
             const showRouteList = param === 'href' && tag === 'a';
             const datalistId = showRouteList ? 'add-mandatory-href-routes' : '';
-            
-            row.innerHTML = `
-                <label class="preview-contextual-form__param-label">${param}:</label>
-                <div class="preview-contextual-form__param-input-group">
-                    <input type="text" 
-                           id="add-mandatory-${param}"
-                           class="admin-input admin-input--sm preview-contextual-form__param-input" 
-                           placeholder="${showRouteList ? (PreviewConfig.i18n.hrefPlaceholder || 'Select route or type URL') : (PreviewConfig.i18n.required || 'Required')}"
-                           ${showRouteList ? `list="${datalistId}"` : ''}>
-                    ${showBrowse ? `<button type="button" class="admin-btn admin-btn--sm admin-btn--outline preview-asset-browse-btn" data-category="${ASSET_BROWSABLE_TAGS[tag] || ''}" title="Browse assets">📁</button>` : ''}
-                </div>
-                ${showRouteList ? `<datalist id="${datalistId}"></datalist>` : ''}
-            `;
+            const row = _renderParamRow(param, {
+                id: 'add-mandatory-' + param,
+                placeholder: showRouteList ? (PreviewConfig.i18n.hrefPlaceholder || 'Select route or type URL') : (PreviewConfig.i18n.required || 'Required')
+            }, showBrowse ? (ASSET_BROWSABLE_TAGS[tag] || '') : null, datalistId);
             addMandatoryParamsContainer.appendChild(row);
             
             if (showBrowse) {
@@ -5309,38 +5358,32 @@
         // --- type row ---
         const typeRow = document.createElement('div');
         typeRow.className = 'preview-contextual-form__param-row';
-        const typeOpts = INPUT_TYPES_GROUP_A
-            .map(t => `<option value="${t}">${t}</option>`)
-            .join('');
-        typeRow.innerHTML = `
-            <label class="preview-contextual-form__param-label" for="add-mandatory-type">type:</label>
-            <div class="preview-contextual-form__param-input-group">
-                <select id="add-mandatory-type"
-                        class="admin-input admin-input--sm preview-contextual-form__param-input">
-                    ${typeOpts}
-                </select>
-            </div>
-        `;
+        typeRow.append(
+            QSDom.el('label', { class: 'preview-contextual-form__param-label', for: 'add-mandatory-type', text: 'type:' }),
+            QSDom.el('div', { class: 'preview-contextual-form__param-input-group' }, [
+                QSDom.el('select', { id: 'add-mandatory-type', class: 'admin-input admin-input--sm preview-contextual-form__param-input' },
+                    INPUT_TYPES_GROUP_A.map(t => QSDom.el('option', { value: t, text: t })))
+            ])
+        );
         addMandatoryParamsContainer.appendChild(typeRow);
 
         // --- name row ---
         const nameRow = document.createElement('div');
         nameRow.className = 'preview-contextual-form__param-row';
         nameRow.id = 'add-mandatory-name-row';
-        nameRow.innerHTML = `
-            <label class="preview-contextual-form__param-label" for="add-mandatory-name">
-                name<span class="preview-contextual-form__param-required" id="add-mandatory-name-star">*</span>:
-            </label>
-            <div class="preview-contextual-form__param-input-group">
-                <input type="text"
-                       id="add-mandatory-name"
-                       class="admin-input admin-input--sm preview-contextual-form__param-input"
-                       placeholder="${PreviewConfig.i18n.required || 'Required'}">
-            </div>
-            <small class="preview-contextual-form__param-hint" id="add-mandatory-name-hint">
-                ${PreviewConfig.i18n.nameRequiredForInput || 'Required so the field is submitted with the form.'}
-            </small>
-        `;
+        nameRow.append(
+            QSDom.el('label', { class: 'preview-contextual-form__param-label', for: 'add-mandatory-name' }, [
+                'name',
+                QSDom.el('span', { class: 'preview-contextual-form__param-required', id: 'add-mandatory-name-star', text: '*' }),
+                ':'
+            ]),
+            QSDom.el('div', { class: 'preview-contextual-form__param-input-group' }, [
+                QSDom.el('input', { type: 'text', id: 'add-mandatory-name', class: 'admin-input admin-input--sm preview-contextual-form__param-input',
+                    placeholder: PreviewConfig.i18n.required || 'Required' })
+            ]),
+            QSDom.el('small', { class: 'preview-contextual-form__param-hint', id: 'add-mandatory-name-hint',
+                text: PreviewConfig.i18n.nameRequiredForInput || 'Required so the field is submitted with the form.' })
+        );
         addMandatoryParamsContainer.appendChild(nameRow);
 
         // Wire dynamic required-state on type change.
@@ -5395,7 +5438,7 @@
         
         const picker = document.createElement('div');
         picker.className = 'preview-asset-picker';
-        picker.innerHTML = `<div class="preview-asset-picker__loading">${PreviewConfig.i18n.loading || 'Loading...'}</div>`;
+        picker.appendChild(QSDom.el('div', { class: 'preview-asset-picker__loading', text: PreviewConfig.i18n.loading || 'Loading...' }));
         
         // Position near the input, clamped to viewport
         const rect = targetInput.getBoundingClientRect();
@@ -5432,7 +5475,7 @@
             const response = await QuickSiteAdmin.apiRequest('listAssets', 'GET', null, urlParams);
             
             if (!response.ok || !response.data?.data) {
-                picker.innerHTML = '<div class="preview-asset-picker__empty">Could not load assets</div>';
+                picker.replaceChildren(_renderAssetPickerNote(PreviewConfig.i18n.assetsLoadFailed));
                 return;
             }
             
@@ -5446,11 +5489,11 @@
                 }
             }
             if (assets.length === 0) {
-                picker.innerHTML = '<div class="preview-asset-picker__empty">No assets found</div>';
+                picker.replaceChildren(_renderAssetPickerNote(PreviewConfig.i18n.assetsNone));
                 return;
             }
             
-            picker.innerHTML = '';
+            picker.replaceChildren();
             const list = document.createElement('div');
             list.className = 'preview-asset-picker__list';
             
@@ -5461,10 +5504,13 @@
                 const isImage = asset.mime_type?.startsWith('image/');
                 const displayPath = previewBase + path; // project assets live under /p/<id>/ for a non-served project
                 
-                item.innerHTML = `
-                    ${isImage ? `<img class="preview-asset-picker__thumb" src="${displayPath}" alt="" loading="lazy">` : `<span class="preview-asset-picker__icon">📄</span>`}
-                    <span class="preview-asset-picker__name" title="${path}">${asset.filename || path.split('/').pop()}</span>
-                `;
+                item.append(
+                    isImage
+                        ? QSDom.el('img', { class: 'preview-asset-picker__thumb', src: displayPath, alt: '', loading: 'lazy' })
+                        : QSDom.el('span', { class: 'preview-asset-picker__icon', text: '📄' }),
+                    ' ',
+                    QSDom.el('span', { class: 'preview-asset-picker__name', title: path, text: asset.filename || path.split('/').pop() })
+                );
                 
                 item.addEventListener('click', () => {
                     targetInput.value = path;
@@ -5491,7 +5537,7 @@
             
             picker.appendChild(list);
         } catch (err) {
-            picker.innerHTML = '<div class="preview-asset-picker__empty">Error loading assets</div>';
+            picker.replaceChildren(_renderAssetPickerNote(PreviewConfig.i18n.assetsLoadError));
             console.error('[Preview] Asset picker error:', err);
         }
     }
@@ -5521,13 +5567,13 @@
         const mime = (mimeType || '').split('/')[0];
         
         if (mime === 'image' || imageExts.includes(ext)) {
-            container.innerHTML = `<img src="${displayPath}" alt="Preview" class="preview-asset-inline__media">`;
+            container.appendChild(QSDom.el('img', { src: displayPath, alt: PreviewConfig.i18n.assetPreviewAlt, class: 'preview-asset-inline__media' }));
         } else if (mime === 'video' || videoExts.includes(ext)) {
-            container.innerHTML = `<video src="${displayPath}" controls class="preview-asset-inline__media"></video>`;
+            container.appendChild(QSDom.el('video', { src: displayPath, controls: '', class: 'preview-asset-inline__media' }));
         } else if (mime === 'audio' || audioExts.includes(ext)) {
-            container.innerHTML = `<audio src="${displayPath}" controls class="preview-asset-inline__audio"></audio>`;
+            container.appendChild(QSDom.el('audio', { src: displayPath, controls: '', class: 'preview-asset-inline__audio' }));
         } else {
-            container.innerHTML = `<span class="preview-asset-inline__file">📄 ${path.split('/').pop()}</span>`;
+            container.appendChild(QSDom.el('span', { class: 'preview-asset-inline__file', text: '📄 ' + path.split('/').pop() }));
         }
         
         row.appendChild(container);
@@ -5606,7 +5652,7 @@
         const previous = addComplexKindSelect.value;
         // Keep the leading "— pick a kind —" placeholder; rebuild the rest.
         const placeholder = addComplexKindSelect.querySelector('option[value=""]');
-        addComplexKindSelect.innerHTML = '';
+        addComplexKindSelect.replaceChildren();
         if (placeholder) addComplexKindSelect.appendChild(placeholder);
         Object.keys(registry).sort().forEach(kind => {
             const entry = registry[kind] || {};
@@ -5636,7 +5682,7 @@
             try { addComplexController.destroy(); } catch (e) { console.warn('[CE] destroy threw:', e); }
         }
         addComplexController = null;
-        addComplexBody.innerHTML = '';
+        addComplexBody.replaceChildren();
 
         if (!kind) {
             addComplexBody.style.display = 'none';
@@ -5645,7 +5691,7 @@
         const registry = (window.QSComplexWizard && window.QSComplexWizard.registry) || {};
         const entry = registry[kind];
         if (!entry || typeof entry.renderWizard !== 'function') {
-            addComplexBody.innerHTML = '<p class="admin-hint admin-text-danger">Kind "' + kind + '" has no renderWizard.</p>';
+            addComplexBody.replaceChildren(_renderComplexError(PreviewConfig.i18n.complexKindNoWizard.replace('{kind}', kind)));
             addComplexBody.style.display = '';
             return;
         }
@@ -5653,7 +5699,7 @@
             addComplexController = entry.renderWizard(addComplexBody) || null;
         } catch (e) {
             console.error('[CE] renderWizard for "' + kind + '" threw:', e);
-            addComplexBody.innerHTML = '<p class="admin-hint admin-text-danger">Wizard failed to render. See console.</p>';
+            addComplexBody.replaceChildren(_renderComplexError(PreviewConfig.i18n.complexWizardFailed));
         }
         addComplexBody.style.display = '';
     }
@@ -5727,10 +5773,8 @@
             btn.dataset.componentName = comp.name;
             const varCount = (comp.variables || []).length;
             if (hiddenInput?.value === comp.name) btn.classList.add('selected');
-            btn.innerHTML = `
-                <span class="tag-dropdown__option-tag">${escapeHTML(comp.name)}</span>
-                ${varCount > 0 ? `<span class="tag-dropdown__option-desc">${varCount} variable${varCount > 1 ? 's' : ''}</span>` : ''}
-            `;
+            btn.appendChild(QSDom.el('span', { class: 'tag-dropdown__option-tag', text: comp.name }));
+            if (varCount > 0) btn.append(' ', QSDom.el('span', { class: 'tag-dropdown__option-desc', text: componentVariablesLabel(varCount) }));
             btn.addEventListener('click', () => {
                 selectComponent(comp);
                 closeDropdown();
@@ -5740,14 +5784,11 @@
         
         function renderOptions() {
             if (!optionsContainer) return;
-            optionsContainer.innerHTML = '';
+            optionsContainer.replaceChildren();
             
             const validComponents = componentsData.filter(c => c.valid);
             if (validComponents.length === 0) {
-                optionsContainer.innerHTML = `<div class="snippet-selector__empty">
-                    ${QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.ban, null)}
-                    <span>${PreviewConfig.i18n.noComponentsFound || 'No components found'}</span>
-                </div>`;
+                optionsContainer.replaceChildren(_renderSelectorNote(PreviewConfig.i18n.noComponentsFound || 'No components found'));
                 return;
             }
             
@@ -5763,7 +5804,7 @@
             if (displayValue) displayValue.textContent = comp.name;
             
             const varCount = (comp.variables || []).length;
-            if (displayDesc) displayDesc.textContent = varCount > 0 ? `${varCount} variable${varCount > 1 ? 's' : ''}` : '';
+            if (displayDesc) displayDesc.textContent = varCount > 0 ? componentVariablesLabel(varCount) : '';
             
             optionsContainer?.querySelectorAll('.tag-dropdown__option').forEach(o => {
                 o.classList.toggle('selected', o.dataset.componentName === comp.name);
@@ -5791,7 +5832,7 @@
             if (addComponentVars) addComponentVars.style.display = 'block';
             
             if (vars.length === 0) {
-                if (addComponentVarsContainer) addComponentVarsContainer.innerHTML = '';
+                if (addComponentVarsContainer) addComponentVarsContainer.replaceChildren();
                 if (addComponentNoVars) addComponentNoVars.style.display = 'flex';
                 return;
             }
@@ -5799,7 +5840,7 @@
             if (addComponentNoVars) addComponentNoVars.style.display = 'none';
             if (!addComponentVarsContainer) return;
             
-            addComponentVarsContainer.innerHTML = '';
+            addComponentVarsContainer.replaceChildren();
             
             const enumVars = vars.filter(v => v.type === 'enum');
             const paramVars = vars.filter(v => v.type === 'param');
@@ -5809,20 +5850,18 @@
             if (enumVars.length > 0) {
                 const enumSection = document.createElement('div');
                 enumSection.className = 'preview-variables-section';
-                enumSection.innerHTML = `<div class="preview-variables-section__title">${PreviewConfig.i18n.variablesSectionEnums || 'Enums'}</div>`;
+                enumSection.appendChild(_renderVariablesSectionTitle(PreviewConfig.i18n.variablesSectionEnums || 'Enums'));
                 
                 enumVars.forEach(v => {
                     const options = v.options || [];
                     const defaultVal = v.default || options[0] || '';
                     const row = document.createElement('div');
                     row.className = 'preview-contextual-form__param-row';
-                    row.innerHTML = `
-                        <label class="preview-contextual-form__param-label">${escapeHTML(v.name)}:</label>
-                        <select class="admin-input admin-input--sm preview-contextual-form__param-input"
-                                data-var-name="${escapeHTML(v.name)}">
-                            ${options.map(opt => `<option value="${escapeHTML(opt)}"${opt === defaultVal ? ' selected' : ''}>${escapeHTML(opt)}</option>`).join('')}
-                        </select>
-                    `;
+                    row.append(
+                        QSDom.el('label', { class: 'preview-contextual-form__param-label', text: v.name + ':' }),
+                        QSDom.el('select', { class: 'admin-input admin-input--sm preview-contextual-form__param-input', 'data-var-name': v.name },
+                            options.map(opt => _renderOption(opt, opt, opt === defaultVal)))
+                    );
                     enumSection.appendChild(row);
                 });
                 addComponentVarsContainer.appendChild(enumSection);
@@ -5832,29 +5871,17 @@
             if (paramVars.length > 0) {
                 const paramSection = document.createElement('div');
                 paramSection.className = 'preview-variables-section';
-                paramSection.innerHTML = `<div class="preview-variables-section__title">${PreviewConfig.i18n.variablesSectionParams || 'Parameters'}</div>`;
+                paramSection.appendChild(_renderVariablesSectionTitle(PreviewConfig.i18n.variablesSectionParams || 'Parameters'));
                 
                 paramVars.forEach(v => {
-                    const row = document.createElement('div');
-                    row.className = 'preview-contextual-form__param-row';
-                    
                     // Check if this param variable should show an asset browse button
                     const showBrowse = v.paramName === 'src' && v.parentTag in ASSET_BROWSABLE_TAGS;
                     const showRouteList = v.paramName === 'href' && v.parentTag === 'a';
                     const datalistId = showRouteList ? `add-comp-${v.name}-routes` : '';
-                    
-                    row.innerHTML = `
-                        <label class="preview-contextual-form__param-label">${escapeHTML(v.name)}:</label>
-                        <div class="preview-contextual-form__param-input-group">
-                            <input type="text" 
-                                   class="admin-input admin-input--sm preview-contextual-form__param-input" 
-                                   data-var-name="${escapeHTML(v.name)}"
-                                   placeholder="${showRouteList ? (PreviewConfig.i18n.hrefPlaceholder || 'Select route or type URL') : `{{${escapeHTML(v.name)}}}`}"
-                                   ${showRouteList ? `list="${datalistId}"` : ''}>
-                            ${showBrowse ? `<button type="button" class="admin-btn admin-btn--sm admin-btn--outline preview-asset-browse-btn" data-category="${ASSET_BROWSABLE_TAGS[v.parentTag] || ''}" title="Browse assets">📁</button>` : ''}
-                        </div>
-                        ${showRouteList ? `<datalist id="${datalistId}"></datalist>` : ''}
-                    `;
+                    const row = _renderParamRow(v.name, {
+                        'data-var-name': v.name,
+                        placeholder: showRouteList ? (PreviewConfig.i18n.hrefPlaceholder || 'Select route or type URL') : '{{' + v.name + '}}'
+                    }, showBrowse ? (ASSET_BROWSABLE_TAGS[v.parentTag] || '') : null, datalistId);
                     paramSection.appendChild(row);
                     
                     if (showBrowse) {
@@ -5874,17 +5901,17 @@
             if (textKeyVars.length > 0) {
                 const textSection = document.createElement('div');
                 textSection.className = 'preview-variables-section';
-                textSection.innerHTML = `<div class="preview-variables-section__title">${PreviewConfig.i18n.variablesSectionText || 'Text Variables'}</div>`;
+                textSection.appendChild(_renderVariablesSectionTitle(PreviewConfig.i18n.variablesSectionText || 'Text Variables'));
                 
                 const infoRow = document.createElement('div');
                 infoRow.className = 'preview-contextual-form__info';
                 infoRow.style.margin = '0';
-                infoRow.innerHTML = `
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
-                    </svg>
-                    <span style="font-size:0.75rem;">${textKeyVars.map(v => escapeHTML(v.name)).join(', ')} — ${PreviewConfig.i18n.textKeyAutoGenerated || 'auto-generated text keys, editable in Text mode'}</span>
-                `;
+                infoRow.append(
+                    QSDom.iconEl(QuickSiteUtils.ICON_PATHS.info, 14),
+                    ' ',
+                    QSDom.el('span', { style: 'font-size:0.75rem;', text: textKeyVars.map(v => v.name).join(', ') + ' — '
+                        + (PreviewConfig.i18n.textKeyAutoGenerated || 'auto-generated text keys, editable in Text mode') })
+                );
                 textSection.appendChild(infoRow);
                 
                 // Hidden inputs for data collection
@@ -5931,13 +5958,10 @@
         return {
             renderOptions,
             showLoading: function() {
-                if (optionsContainer) optionsContainer.innerHTML = `<div class="snippet-selector__loading"><div class="spinner"></div>${PreviewConfig.i18n.loading || 'Loading...'}</div>`;
+                if (optionsContainer) optionsContainer.replaceChildren(_renderSelectorLoading());
             },
             showError: function() {
-                if (optionsContainer) optionsContainer.innerHTML = `<div class="snippet-selector__empty">
-                    ${QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.ban, null)}
-                    <span>${PreviewConfig.i18n.errorLoadingComponents || 'Error loading components'}</span>
-                </div>`;
+                if (optionsContainer) optionsContainer.replaceChildren(_renderSelectorNote(PreviewConfig.i18n.errorLoadingComponents || 'Error loading components'));
             },
             reset: function() {
                 sidebarAddSelectedComponentData = null;
@@ -5946,7 +5970,7 @@
                 if (displayDesc) displayDesc.textContent = '';
                 if (previewPanel) previewPanel.style.display = 'none';
                 if (addComponentVars) addComponentVars.style.display = 'none';
-                if (addComponentVarsContainer) addComponentVarsContainer.innerHTML = '';
+                if (addComponentVarsContainer) addComponentVarsContainer.replaceChildren();
             },
             getValue: () => hiddenInput?.value || ''
         };
@@ -5984,6 +6008,7 @@
     let selectedSnippetId = null;
     let selectedSnippetData = null;
     let snippetPreviewWithProjectStyle = true;
+    let snippetPreviewShowKeys = false;
     
     // Searchable snippet dropdown (tag-dropdown pattern)
     function initSnippetSelector(selectorId) {
@@ -6008,9 +6033,9 @@
         
         // Source label helper: the three tiers a listed snippet comes from.
         function sourceLabel(source) {
-            if (source === 'core') return 'Core';
-            if (source === 'personal') return 'Personal';
-            return 'Project';
+            if (source === 'core') return PreviewConfig.i18n.snippetSourceCore;
+            if (source === 'personal') return PreviewConfig.i18n.snippetSourcePersonal;
+            return PreviewConfig.i18n.snippetSourceProject;
         }
         
         function sourceFromSnippet(snippet) {
@@ -6064,11 +6089,13 @@
             
             const src = sourceFromSnippet(snippet);
             const srcText = sourceLabel(src);
-            btn.innerHTML = `
-                <span class="tag-dropdown__option-tag">${escapeHTML(snippet.name || snippet.id)}</span>
-                <span class="tag-dropdown__option-desc">${escapeHTML(snippet.description || '')}</span>
-                <span class="snippet-selector__option-source snippet-selector__option-source--${src}">${srcText}</span>
-            `;
+            btn.append(
+                QSDom.el('span', { class: 'tag-dropdown__option-tag', text: snippet.name || snippet.id }),
+                ' ',
+                QSDom.el('span', { class: 'tag-dropdown__option-desc', text: snippet.description || '' }),
+                ' ',
+                QSDom.el('span', { class: 'snippet-selector__option-source snippet-selector__option-source--' + src, text: srcText })
+            );
             btn.addEventListener('click', () => {
                 selectSnippet(snippet);
                 closeDropdown();
@@ -6079,14 +6106,11 @@
         // Render options grouped by category
         function renderOptions() {
             if (!optionsContainer) return;
-            optionsContainer.innerHTML = '';
+            optionsContainer.replaceChildren();
             
             const categories = Object.keys(snippetsData.byCategory || {});
             if (categories.length === 0) {
-                optionsContainer.innerHTML = `<div class="snippet-selector__empty">
-                    ${QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.ban, null)}
-                    <span>${PreviewConfig.i18n.noSnippetsFound || 'No snippets found'}</span>
-                </div>`;
+                optionsContainer.replaceChildren(_renderSelectorNote(PreviewConfig.i18n.noSnippetsFound || 'No snippets found'));
                 return;
             }
             
@@ -6097,8 +6121,8 @@
                 const header = document.createElement('button');
                 header.type = 'button';
                 header.className = 'tag-dropdown__group-header';
-                header.innerHTML = `<span>${cat.charAt(0).toUpperCase() + cat.slice(1)}</span>
-                    <svg class="tag-dropdown__group-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>`;
+                header.append(QSDom.el('span', { text: cat.charAt(0).toUpperCase() + cat.slice(1) }), ' ',
+                    QSDom.iconEl(QuickSiteUtils.ICON_PATHS.chevronDown, 0, 'tag-dropdown__group-chevron'));
                 header.addEventListener('click', () => group.classList.toggle('collapsed'));
                 group.appendChild(header);
                 
@@ -6169,13 +6193,10 @@
             updateTriggerDisplay,
             updateOptionHighlight,
             showLoading: function() {
-                if (optionsContainer) optionsContainer.innerHTML = `<div class="snippet-selector__loading"><div class="spinner"></div>${PreviewConfig.i18n.loading || 'Loading...'}</div>`;
+                if (optionsContainer) optionsContainer.replaceChildren(_renderSelectorLoading());
             },
             showError: function() {
-                if (optionsContainer) optionsContainer.innerHTML = `<div class="snippet-selector__empty">
-                    ${QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.ban, null)}
-                    <span>${PreviewConfig.i18n.errorLoadingSnippets || 'Error loading snippets'}</span>
-                </div>`;
+                if (optionsContainer) optionsContainer.replaceChildren(_renderSelectorNote(PreviewConfig.i18n.errorLoadingSnippets || 'Error loading snippets'));
             },
             reset: function() {
                 selectedSnippetId = null;
@@ -6326,11 +6347,10 @@
         
         // Render selector badges
         if (addSnippetCssSelectors) {
-            addSnippetCssSelectors.innerHTML = selectors.map(s => {
-                const icon = s.exists ? '✓' : '✗';
-                const cls = s.exists ? 'snippet-selector__css-badge--found' : 'snippet-selector__css-badge--missing';
-                return `<span class="snippet-selector__css-badge ${cls}">${icon} ${escapeHTML(s.selector)}</span>`;
-            }).join('');
+            addSnippetCssSelectors.replaceChildren(...selectors.map(s => QSDom.el('span', {
+                class: 'snippet-selector__css-badge ' + (s.exists ? 'snippet-selector__css-badge--found' : 'snippet-selector__css-badge--missing'),
+                text: (s.exists ? '✓' : '✗') + ' ' + s.selector
+            })));
         }
         
         // Show/hide CSS action radio group
@@ -6384,6 +6404,17 @@
             }
         });
         addSnippetStyleToggleInput._bound = true;
+    }
+
+    // "Show keys" handler — re-render preview with every key and raw text as stored
+    if (addSnippetKeysToggleInput && !addSnippetKeysToggleInput._bound) {
+        addSnippetKeysToggleInput.addEventListener('change', function() {
+            snippetPreviewShowKeys = this.checked;
+            if (selectedSnippetData) {
+                renderSnippetPreview(selectedSnippetData);
+            }
+        });
+        addSnippetKeysToggleInput._bound = true;
     }
     
     // Inject snippet CSS into target project stylesheet
@@ -6445,112 +6476,166 @@
         });
     }
 
-    // Render snippet preview in iframe
+    // Render the snippet preview. The frame (`_snippet-selector.php`) holds a fixed empty
+    // document; each render rebuilds what the snippet brings with the frame's OWN document, so
+    // nothing the snippet carries is ever parsed as HTML: its CSS is a <style> element's text,
+    // its texts are text nodes, an attribute name the browser refuses is left out. The frame is
+    // sandboxed without scripts, and its elements belong to it, never to the panel's document.
     function renderSnippetPreview(snippetData) {
         if (!addSnippetPreviewFrame) return;
-        
-        // Use expanded preview structure if available (for component-based snippets)
-        const structureToRender = snippetData.previewStructure || snippetData.structure;
-        
-        // Build HTML from structure
-        const html = buildSnippetHtml(structureToRender, snippetData);
-        
-        // Get project CSS URL — include only when toggle is not active
-        const projectStyleUrl = PreviewConfig.projectStyleUrl || '';
-        const includeProjectStyle = snippetPreviewWithProjectStyle && projectStyleUrl;
-        
+
         // Show/hide the style toggle when snippet has its own CSS
         if (addSnippetStyleToggle) {
             addSnippetStyleToggle.style.display = snippetData.css ? '' : 'none';
         }
-        
-        // Create preview document
-        const previewDoc = `<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    ${includeProjectStyle ? `<link rel="stylesheet" href="${projectStyleUrl}">` : ''}
-    <style>
-        body { margin: 8px; font-family: system-ui, -apple-system, sans-serif; }
-        ${snippetData.css || ''}
-    </style>
-</head>
-<body>${html}</body>
-</html>`;
-        
-        // Write to iframe
-        addSnippetPreviewFrame.srcdoc = previewDoc;
+
+        whenSnippetFrameReady(function(doc) {
+            fillSnippetFrame(doc, snippetData);
+        });
     }
-    
-    // Build HTML from snippet structure (recursive)
-    function buildSnippetHtml(structure, snippetData, depth = 0) {
-        if (!structure) return '';
-        
-        // Handle array of nodes
+
+    /** Run `fn` with the preview frame's document once its fixed empty document has loaded. */
+    function whenSnippetFrameReady(fn) {
+        const doc = addSnippetPreviewFrame.contentDocument;
+        if (doc && doc.URL === 'about:srcdoc' && doc.readyState === 'complete' && doc.body) {
+            fn(doc);
+            return;
+        }
+        addSnippetPreviewFrame.addEventListener('load', function() {
+            fn(addSnippetPreviewFrame.contentDocument);
+        }, { once: true });
+    }
+
+    /**
+     * Rebuild the frame: the project's stylesheet (unless "Without current project style"),
+     * the snippet's own CSS after the frame's base rules, and the snippet's nodes.
+     */
+    function fillSnippetFrame(doc, snippetData) {
+        doc.head.querySelectorAll('[data-snippet-preview]').forEach(function(el) { el.remove(); });
+
+        const projectStyleUrl = PreviewConfig.projectStyleUrl || '';
+        if (snippetPreviewWithProjectStyle && projectStyleUrl) {
+            const link = doc.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = projectStyleUrl;
+            link.setAttribute('data-snippet-preview', '');
+            // Before the frame's base rules: the snippet's own CSS comes after both
+            doc.head.insertBefore(link, doc.head.querySelector('style'));
+        }
+        if (snippetData.css) {
+            const style = doc.createElement('style');
+            style.setAttribute('data-snippet-preview', '');
+            style.textContent = snippetData.css;
+            doc.head.appendChild(style);
+        }
+
+        // Use expanded preview structure if available (for component-based snippets)
+        const structure = snippetData.previewStructure || snippetData.structure;
+        doc.body.replaceChildren(...snippetPreviewNodes(doc, structure, snippetData));
+    }
+
+    // What the engine's renderer does with a node's text and attributes (JsonToHtmlRenderer
+    // renderTextNode() / renderAttribute()), so the preview shows what the page will. Keep in step.
+    const SNIPPET_TRANSLATABLE_ATTRIBUTES = ['placeholder', 'title', 'alt', 'aria-label', 'aria-placeholder', 'aria-description'];
+    const SNIPPET_EMPTY_MEANINGFUL_ATTRIBUTES = ['alt', 'aria-label'];
+    const SNIPPET_TRANSLATION_KEY = /^[a-z0-9_]+(\.[a-z0-9_]+)+$/i;
+
+    /** The text of a raw (`__RAW__`) or literal (`__LIT__`) value, or null for any other value. */
+    function snippetLiteral(value) {
+        return value.startsWith('__RAW__') || value.startsWith('__LIT__') ? value.slice(7) : null;
+    }
+
+    /** A key's text in the project's default language, then in English; the key itself when neither has it. */
+    function snippetTranslation(snippetData, key) {
+        const lang = PreviewConfig.defaultLang || 'en';
+        return snippetData.translations?.[lang]?.[key] ||
+               snippetData.translations?.['en']?.[key] ||
+               key;
+    }
+
+    /** A text node's text: as stored with "Show keys"; else a raw or literal text as written, a key translated. */
+    function snippetText(snippetData, textKey) {
+        if (snippetPreviewShowKeys) return textKey;
+        const literal = snippetLiteral(textKey);
+        return literal !== null ? literal : snippetTranslation(snippetData, textKey);
+    }
+
+    /** An attribute's value as the page renders it; null when the page renders no such attribute. */
+    function snippetAttributeValue(snippetData, name, value) {
+        // A handler never runs in the preview (no scripts), so it is not written at all
+        if (/^on/i.test(name)) return null;
+        if (value === true) return '';
+        if (value === false || value === null || value === undefined || typeof value === 'object') return null;
+        value = String(value);
+        if (value === '' && !SNIPPET_EMPTY_MEANINGFUL_ATTRIBUTES.includes(name)) return null;
+        if (snippetPreviewShowKeys) return value;
+        if (SNIPPET_TRANSLATABLE_ATTRIBUTES.includes(name)) {
+            const literal = snippetLiteral(value);
+            if (literal !== null) return literal;
+            if (SNIPPET_TRANSLATION_KEY.test(value)) return snippetTranslation(snippetData, value);
+        }
+        return value.startsWith('__LIT__') ? value.slice(7) : value;
+    }
+
+    /** The snippet's structure (a node or a list of nodes) as nodes of the frame's document. */
+    function snippetPreviewNodes(doc, structure, snippetData) {
+        if (!structure || typeof structure !== 'object') return [];
         if (Array.isArray(structure)) {
-            return structure.map(node => buildSnippetHtml(node, snippetData, depth)).join('');
+            return structure.flatMap(node => snippetPreviewNodes(doc, node, snippetData));
         }
-        
-        // Handle text-only node (no tag, just textKey)
-        if (!structure.tag && structure.textKey) {
-            const lang = PreviewConfig.defaultLang || 'en';
-            return snippetData.translations?.[lang]?.[structure.textKey] || 
-                   snippetData.translations?.['en']?.[structure.textKey] || 
-                   structure.textKey;
+        // A node carrying a text key is a text, whatever else it carries, as the renderer reads it
+        if (structure.textKey !== undefined && structure.textKey !== null) {
+            const text = String(snippetText(snippetData, String(structure.textKey)));
+            return text === '' ? [] : [doc.createTextNode(text)];
         }
-        
-        // Handle single node with tag
-        const tag = structure.tag || 'div';
-        const attrs = [];
-        
-        // Build attributes from params (our structure format)
-        if (structure.params) {
-            Object.entries(structure.params).forEach(([key, value]) => {
-                if (typeof value === 'string') {
-                    // Handle translatable params like {{textKey:...}}
-                    if (value.startsWith('{{textKey:') && value.endsWith('}}')) {
-                        const transKey = value.slice(10, -2);
-                        const lang = PreviewConfig.defaultLang || 'en';
-                        const translated = snippetData.translations?.[lang]?.[transKey] || 
-                                          snippetData.translations?.['en']?.[transKey] || 
-                                          transKey;
-                        attrs.push(`${key}="${escapeHTML(translated)}"`);
-                    } else {
-                        attrs.push(`${key}="${escapeHTML(value)}"`);
-                    }
+        const el = _renderSnippetElement(doc, structure, snippetData);
+        return el ? [el] : [];
+    }
+
+    /** One tag node as an element of the frame's document; null for a tag the engine does not render. */
+    function _renderSnippetElement(doc, node, snippetData) {
+        const tag = String(node.tag || 'div').toLowerCase();
+        if ((TAG_INFO.BLOCKED_TAGS || []).includes(tag)) return null;
+        if (TAG_INFO.ALLOWED_TAGS && !TAG_INFO.ALLOWED_TAGS.includes(tag)) return null;
+        let el;
+        try {
+            el = doc.createElement(tag);
+        } catch (e) {
+            return null;
+        }
+        Object.entries(node.params || {}).forEach(([name, value]) => {
+            const shown = snippetAttributeValue(snippetData, name, value);
+            if (shown === null) return;
+            try {
+                el.setAttribute(name, shown);
+            } catch (e) {
+                // a name the browser refuses: left out
+            }
+        });
+        // A void element (img, br, input...) takes no children
+        if ((TAG_INFO.SELF_CLOSING_TAGS || []).includes(tag)) return el;
+        const children = snippetPreviewNodes(doc, node.children, snippetData);
+        el.append(...(tag === 'table' ? snippetTableRows(doc, children) : children));
+        return el;
+    }
+
+    /** Rows straight inside a table, in the <tbody> the browser's parser gives them on the page. */
+    function snippetTableRows(doc, children) {
+        const out = [];
+        let tbody = null;
+        children.forEach(function(child) {
+            if (child.nodeType === 1 && child.localName === 'tr') {
+                if (!tbody) {
+                    tbody = doc.createElement('tbody');
+                    out.push(tbody);
                 }
-            });
-        }
-        
-        // Also check for legacy attrs format
-        if (structure.attrs) {
-            Object.entries(structure.attrs).forEach(([key, value]) => {
-                if (typeof value === 'string') {
-                    attrs.push(`${key}="${escapeHTML(value)}"`);
-                }
-            });
-        }
-        
-        // Get direct text content (if textKey is on the node itself)
-        let textContent = '';
-        if (structure.textKey && snippetData.translations) {
-            const lang = PreviewConfig.defaultLang || 'en';
-            textContent = snippetData.translations[lang]?.[structure.textKey] || 
-                         snippetData.translations['en']?.[structure.textKey] || 
-                         structure.textKey;
-        }
-        
-        // Self-closing tags
-        const selfClosing = ['img', 'br', 'hr', 'input', 'meta', 'link', 'source', 'track', 'wbr', 'area', 'base', 'col', 'embed', 'param'];
-        if (selfClosing.includes(tag)) {
-            return `<${tag}${attrs.length ? ' ' + attrs.join(' ') : ''}>`;
-        }
-        
-        // Build children
-        const children = structure.children ? buildSnippetHtml(structure.children, snippetData, depth + 1) : '';
-        
-        return `<${tag}${attrs.length ? ' ' + attrs.join(' ') : ''}>${textContent}${children}</${tag}>`;
+                tbody.appendChild(child);
+            } else {
+                tbody = null;
+                out.push(child);
+            }
+        });
+        return out;
     }
     
     // ==================== Unified Tag Dropdown ====================
@@ -6607,13 +6692,11 @@
         
         // Load tag data from embedded JSON
         let tagData = {};
-        let tagExamples = {};
         const dataEl = document.getElementById(`${selectorId}-tag-data`);
         if (dataEl) {
             try {
                 const parsed = JSON.parse(dataEl.textContent);
                 tagData = parsed.tags || {};
-                tagExamples = parsed.examples || {};
             } catch (e) {
                 console.error('Failed to parse tag data:', e);
             }
@@ -6684,7 +6767,7 @@
                 return;
             }
             favoritesGroup.style.display = '';
-            favoritesItems.innerHTML = '';
+            favoritesItems.replaceChildren();
             favs.forEach(tag => {
                 const info = tagData[tag];
                 if (!info) return;
@@ -6707,7 +6790,7 @@
             }
             
             suggestedGroup.style.display = '';
-            suggestedItems.innerHTML = '';
+            suggestedItems.replaceChildren();
             suggestions.forEach(tag => {
                 const info = tagData[tag];
                 if (!info) return;
@@ -6726,11 +6809,14 @@
             btn.dataset.desc = info.desc;
             if (info.required) btn.dataset.required = 'true';
             if (hiddenInput?.value === tag) btn.classList.add('selected');
-            btn.innerHTML = `
-                <code class="tag-dropdown__option-tag">&lt;${tag}&gt;</code>
-                <span class="tag-dropdown__option-desc">${info.desc}</span>
-                ${info.required ? `<span class="tag-dropdown__option-required" title="${PreviewConfig?.i18n?.requiresParams || 'Requires additional parameters'}">*</span>` : ''}
-            `;
+            btn.append(
+                QSDom.el('code', { class: 'tag-dropdown__option-tag', text: '<' + tag + '>' }),
+                ' ',
+                QSDom.el('span', { class: 'tag-dropdown__option-desc', text: info.desc })
+            );
+            if (info.required) btn.append(' ', QSDom.el('span', {
+                class: 'tag-dropdown__option-required', title: PreviewConfig?.i18n?.requiresParams || 'Requires additional parameters', text: '*'
+            }));
             btn.addEventListener('click', () => selectTag(tag));
             return btn;
         }
@@ -6838,19 +6924,20 @@
             const info = tagData[tagName];
             if (previewDesc && info) previewDesc.textContent = info.desc;
             
-            const exampleHtml = tagExamples[tagName];
-            if (exampleHtml === null || exampleHtml === undefined) {
+            // The example is the <template> _tag-selector.php wrote for this tag; none means no visual preview.
+            const example = document.getElementById(`${selectorId}-tag-example-${tagName}`);
+            if (!example) {
                 if (previewRender) previewRender.style.display = 'none';
                 if (previewNoRender) previewNoRender.style.display = 'flex';
                 if (codeView) codeView.style.display = 'none';
             } else {
                 if (previewRender) {
                     previewRender.style.display = '';
-                    previewRender.innerHTML = exampleHtml;
+                    previewRender.replaceChildren(example.content.cloneNode(true));
                 }
                 if (previewNoRender) previewNoRender.style.display = 'none';
                 if (codeContent) {
-                    codeContent.textContent = formatHtmlForDisplay(exampleHtml);
+                    codeContent.textContent = formatHtmlForDisplay(example.innerHTML);
                 }
                 if (codeView && showHtmlCode) codeView.style.display = '';
             }
@@ -7010,11 +7097,14 @@
         }
         
         function renderChips() {
-            chipsEl.innerHTML = '';
+            chipsEl.replaceChildren();
             selectedClasses.forEach(cls => {
                 const chip = document.createElement('span');
                 chip.className = 'class-combobox__chip';
-                chip.innerHTML = `<span class="class-combobox__chip-text">${cls}</span><button type="button" class="class-combobox__chip-remove" data-class="${cls}" title="Remove">&times;</button>`;
+                chip.append(
+                    QSDom.el('span', { class: 'class-combobox__chip-text', text: cls }),
+                    QSDom.el('button', { type: 'button', class: 'class-combobox__chip-remove', 'data-class': cls, title: PreviewConfig.i18n.remove }, ['×'])
+                );
                 chipsEl.appendChild(chip);
             });
         }
@@ -7047,7 +7137,7 @@
                 return;
             }
             
-            suggestionsEl.innerHTML = '';
+            suggestionsEl.replaceChildren();
             const maxShow = 30;
             const displayed = matches.slice(0, maxShow);
             
@@ -7153,7 +7243,7 @@
             if (!iframeInfo) {
                 iframeInfo = document.createElement('div');
                 iframeInfo.className = 'preview-iframe-info';
-                iframeInfo.innerHTML = `<small>ℹ️ Iframes load external content. Only use trusted HTTPS sources. The iframe is sandboxed within your page's same-origin policy.</small>`;
+                iframeInfo.appendChild(QSDom.el('small', { text: PreviewConfig.i18n.iframeInfo }));
                 addMandatoryParamsContainer?.parentElement?.appendChild(iframeInfo);
             }
             iframeInfo.style.display = 'block';
@@ -7192,8 +7282,7 @@
         removeBtn.type = 'button';
         removeBtn.className = 'preview-contextual-form__remove-param';
         removeBtn.title = PreviewConfig.i18n.remove || 'Remove';
-        // Small SVG icon snippet — exempt from the createElement rule.
-        removeBtn.innerHTML = QuickSiteUtils.iconClose(14);
+        removeBtn.appendChild(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.close, 14));
         removeBtn.addEventListener('click', () => row.remove());
 
         row.appendChild(keyInput);
@@ -7358,10 +7447,7 @@
             position: position
         };
 
-        // Use the shared helper for URL joining + auth header consistency.
-        // (Don't hand-build URLs: managementUrl already ends with '/', so
-        // string concatenation produces "/management//addComplexElement"
-        // which the dispatcher treats as missing command.)
+        // The shared helper joins the URL and sends the auth header.
         const result = await QuickSiteAdmin.apiRequest('addComplexElement', 'POST', body);
         if (!result || !result.ok) {
             const msg = (result && result.data && result.data.message)
@@ -7479,21 +7565,21 @@
                 // alt / title are per-instance like the mandatory fields — the
                 // next image is not the same image.
                 Object.keys(transKeyPickers).forEach(k => transKeyPickers[k].setValue(''));
-                if (addCustomParamsList) addCustomParamsList.innerHTML = '';
+                if (addCustomParamsList) addCustomParamsList.replaceChildren();
                 if (addIdInput) addIdInput.focus();
             });
             if (!keptOpen) {
                 // Live DOM update if HTML returned (auto-selects the new node). An add
                 // inside an element holding text moves that text into the new element
-                // (movedTextKeyChildren); the live insert places one element and would
-                // leave the moved text where it was, so the preview reloads instead.
-                if (data.html && targetNode && !(data.movedTextKeyChildren > 0)) {
+                // (movedTextKeyChildren): the iframe takes it out of the target as it inserts.
+                if (data.html && targetNode) {
                     sendToIframe('insertNode', {
                         struct: targetStruct,
                         targetNode: targetNode,
                         position: position,
                         html: data.html,
-                        newNodeId: data.newNodeId
+                        newNodeId: data.newNodeId,
+                        movedText: data.movedTextKeyChildren || 0
                     });
                 } else {
                     reloadPreview();
@@ -7797,15 +7883,16 @@
         return { nodeData: JSON.parse(JSON.stringify(nodeData)), structInfo };
     }
 
-    /**
-     * Build a structure preview HTML string for a node.
-     */
-    function buildStructurePreviewHtml(nodeData) {
+    /** Show a node's structure line (`<tag class="…">` and its child count) in `container`, as text. */
+    function showStructurePreview(container, nodeData) {
         const tag = nodeData.tag || nodeData.component || '?';
         const classes = nodeData.params?.class || '';
         const childCount = (nodeData.children || []).length;
-        return `<code>&lt;${tag}${classes ? ' class="' + classes + '"' : ''}&gt;</code>` +
-            (childCount > 0 ? ` <small>(${childCount} children)</small>` : '');
+        container.replaceChildren(QSDom.el('code', { text: '<' + tag + (classes ? ' class="' + classes + '"' : '') + '>' }));
+        if (childCount > 0) {
+            const label = childCount === 1 ? PreviewConfig.i18n.structureChildrenOne : PreviewConfig.i18n.structureChildren;
+            container.append(' ', QSDom.el('small', { text: label.replace('{n}', childCount) }));
+        }
     }
 
     // Show save snippet form
@@ -7833,7 +7920,7 @@
 
             // Show structure preview
             if (saveSnippetPreview) {
-                saveSnippetPreview.innerHTML = buildStructurePreviewHtml(nodeData);
+                showStructurePreview(saveSnippetPreview, nodeData);
             }
 
             if (saveSnippetName) saveSnippetName.focus();
@@ -7881,7 +7968,7 @@
 
             // Show structure preview
             if (saveComponentPreview) {
-                saveComponentPreview.innerHTML = buildStructurePreviewHtml(nodeData);
+                showStructurePreview(saveComponentPreview, nodeData);
             }
 
             if (saveComponentName) saveComponentName.focus();
@@ -8280,7 +8367,7 @@
         // Show loading
         if (variablesPanelLoading) variablesPanelLoading.style.display = '';
         if (variablesPanelEmpty) variablesPanelEmpty.style.display = 'none';
-        if (variablesPanelCards) variablesPanelCards.innerHTML = '';
+        if (variablesPanelCards) variablesPanelCards.replaceChildren();
         if (variablesPanelFooter) variablesPanelFooter.style.display = 'none';
         
         try {
@@ -8353,8 +8440,7 @@
             console.error('[Preview] Variables panel error:', error);
             if (variablesPanelLoading) variablesPanelLoading.style.display = 'none';
             if (variablesPanelCards) {
-                variablesPanelCards.innerHTML = '<div style="color:var(--admin-danger);font-size:var(--font-size-sm);padding:var(--space-sm);">' + 
-                    (PreviewConfig.i18n?.error || 'Error') + ': ' + error.message + '</div>';
+                variablesPanelCards.replaceChildren(_renderPanelError(error));
             }
         }
     }
@@ -8397,7 +8483,7 @@
             
             // Build filtered option list
             function buildDropdown(query) {
-                dropdown.innerHTML = '';
+                dropdown.replaceChildren();
                 const q = (query || '').toLowerCase();
                 let hasExact = false;
                 let count = 0;
@@ -8620,7 +8706,7 @@
      */
     function renderVariableSections(textKeyNodes, paramNodes) {
         if (!variablesPanelCards) return;
-        variablesPanelCards.innerHTML = '';
+        variablesPanelCards.replaceChildren();
         
         // Text Variables section
         if (textKeyNodes.length > 0) {
@@ -8629,8 +8715,7 @@
             
             const title = document.createElement('h5');
             title.className = 'preview-variables-section__title';
-            title.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;vertical-align:middle;margin-right:4px;"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>' +
-                (PreviewConfig.i18n?.variablesSectionText || 'Text Variables');
+            title.append(_renderSectionIcon(ICON_TEXT_VARIABLES), PreviewConfig.i18n?.variablesSectionText || 'Text Variables');
             section.appendChild(title);
             
             renderVariableCards(textKeyNodes, section);
@@ -8644,8 +8729,7 @@
             
             const title = document.createElement('h5');
             title.className = 'preview-variables-section__title';
-            title.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;vertical-align:middle;margin-right:4px;"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>' +
-                (PreviewConfig.i18n?.variablesSectionParams || 'Parameters');
+            title.append(_renderSectionIcon(ICON_PARAM), PreviewConfig.i18n?.variablesSectionParams || 'Parameters');
             section.appendChild(title);
             
             renderParamCards(paramNodes, section);
@@ -8668,8 +8752,7 @@
             // Path (clickable to select node)
             const pathEl = document.createElement('div');
             pathEl.className = 'preview-variable-card__path';
-            pathEl.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v6m-7-7H1m22 0h-4"/></svg>' +
-                '<span>' + escapeHtml(item.path + ' [' + item.nodeId + ']') + '</span>';
+            pathEl.append(QSDom.iconEl(ICON_NODE_PATH, 0), QSDom.el('span', { text: item.path + ' [' + item.nodeId + ']' }));
             pathEl.title = PreviewConfig.i18n?.variablesClickToSelect || 'Click to select this node';
             pathEl.addEventListener('click', function() {
                 hideVariablesPanel();
@@ -8684,11 +8767,12 @@
             const typeDiv = document.createElement('div');
             typeDiv.className = 'preview-variable-card__type';
             const typeSelect = document.createElement('select');
-            typeSelect.innerHTML = 
-                '<option value="translation"' + (type === 'translation' ? ' selected' : '') + '>' + (PreviewConfig.i18n?.variablesTypeTranslation || 'Translation Key') + '</option>' +
-                '<option value="variable"' + (type === 'variable' ? ' selected' : '') + '>' + (PreviewConfig.i18n?.variablesTypeVariable || 'Variable {{...}}') + '</option>' +
-                '<option value="enum"' + (type === 'enum' ? ' selected' : '') + '>' + (PreviewConfig.i18n?.variablesTypeEnum || 'Enum') + '</option>' +
-                '<option value="raw"' + (type === 'raw' ? ' selected' : '') + '>' + (PreviewConfig.i18n?.variablesTypeRaw || 'Raw Text') + '</option>';
+            typeSelect.append(
+                _renderOption('translation', PreviewConfig.i18n?.variablesTypeTranslation || 'Translation Key', type === 'translation'),
+                _renderOption('variable', PreviewConfig.i18n?.variablesTypeVariable || 'Variable {{...}}', type === 'variable'),
+                _renderOption('enum', PreviewConfig.i18n?.variablesTypeEnum || 'Enum', type === 'enum'),
+                _renderOption('raw', PreviewConfig.i18n?.variablesTypeRaw || 'Raw Text', type === 'raw')
+            );
             typeDiv.appendChild(typeSelect);
             card.appendChild(typeDiv);
             
@@ -8777,18 +8861,18 @@
             // Param name header
             const pathEl = document.createElement('div');
             pathEl.className = 'preview-variable-card__path';
-            pathEl.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>' +
-                '<span>' + escapeHtml(item.paramName) + '</span>';
+            pathEl.append(QSDom.iconEl(ICON_PARAM, 0), QSDom.el('span', { text: item.paramName }));
             card.appendChild(pathEl);
             
             // Type selector (string / variable / enum)
             const typeDiv = document.createElement('div');
             typeDiv.className = 'preview-variable-card__type';
             const typeSelect = document.createElement('select');
-            typeSelect.innerHTML = 
-                '<option value="string"' + (initialType === 'string' ? ' selected' : '') + '>' + (PreviewConfig.i18n?.variablesTypeString || 'Literal String') + '</option>' +
-                '<option value="variable"' + (initialType === 'variable' ? ' selected' : '') + '>' + (PreviewConfig.i18n?.variablesTypeVariable || 'Variable {{...}}') + '</option>' +
-                '<option value="enum"' + (initialType === 'enum' ? ' selected' : '') + '>' + (PreviewConfig.i18n?.variablesTypeEnum || 'Enum') + '</option>';
+            typeSelect.append(
+                _renderOption('string', PreviewConfig.i18n?.variablesTypeString || 'Literal String', initialType === 'string'),
+                _renderOption('variable', PreviewConfig.i18n?.variablesTypeVariable || 'Variable {{...}}', initialType === 'variable'),
+                _renderOption('enum', PreviewConfig.i18n?.variablesTypeEnum || 'Enum', initialType === 'enum')
+            );
             typeDiv.appendChild(typeSelect);
             card.appendChild(typeDiv);
             
@@ -9066,7 +9150,7 @@
         // Show loading
         if (enumsPanelLoading) enumsPanelLoading.style.display = '';
         if (enumsPanelEmpty) enumsPanelEmpty.style.display = 'none';
-        if (enumsPanelCards) enumsPanelCards.innerHTML = '';
+        if (enumsPanelCards) enumsPanelCards.replaceChildren();
         if (enumsPanelAdd) enumsPanelAdd.style.display = 'none';
         
         try {
@@ -9113,8 +9197,7 @@
             console.error('[Preview] Enums panel error:', error);
             if (enumsPanelLoading) enumsPanelLoading.style.display = 'none';
             if (enumsPanelCards) {
-                enumsPanelCards.innerHTML = '<div style="color:var(--admin-danger);font-size:var(--font-size-sm);padding:var(--space-sm);">' +
-                    (PreviewConfig.i18n?.error || 'Error') + ': ' + error.message + '</div>';
+                enumsPanelCards.replaceChildren(_renderPanelError(error));
             }
         }
     }
@@ -9139,7 +9222,7 @@
      */
     function renderEnumCards(enums) {
         if (!enumsPanelCards) return;
-        enumsPanelCards.innerHTML = '';
+        enumsPanelCards.replaceChildren();
         
         for (const [varName, enumDef] of Object.entries(enums)) {
             if (!enumDef || typeof enumDef !== 'object' || !enumDef.source || !enumDef.map) continue;
@@ -9184,7 +9267,7 @@
         editBtn.type = 'button';
         editBtn.className = 'preview-enum-card__edit-name-btn';
         editBtn.title = PreviewConfig.i18n?.enumRenameTip || 'Rename';
-        editBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+        editBtn.appendChild(_renderSizedIcon(QuickSiteUtils.ICON_PATHS.edit, 12));
 
         const nameInput = document.createElement('input');
         nameInput.type = 'text';
@@ -9196,13 +9279,13 @@
         const confirmBtn = document.createElement('button');
         confirmBtn.type = 'button';
         confirmBtn.className = 'preview-enum-card__name-confirm';
-        confirmBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><polyline points="20 6 9 17 4 12"/></svg>';
+        confirmBtn.appendChild(_renderSizedIcon(QuickSiteUtils.ICON_PATHS.check, 12));
         confirmBtn.style.display = 'none';
 
         const cancelBtn = document.createElement('button');
         cancelBtn.type = 'button';
         cancelBtn.className = 'preview-enum-card__name-cancel';
-        cancelBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+        cancelBtn.appendChild(_renderSizedIcon(QuickSiteUtils.ICON_PATHS.close, 12));
         cancelBtn.style.display = 'none';
 
         function startRename() {
@@ -9261,10 +9344,11 @@
         // Source key field
         const sourceRow = document.createElement('div');
         sourceRow.className = 'preview-enum-card__field';
-        sourceRow.innerHTML = `
-            <label class="preview-enum-card__label">${PreviewConfig.i18n?.enumSource || 'Source key'}:</label>
-            <input type="text" class="admin-input admin-input--sm preview-enum-card__source-input" value="${escapeHTML(source)}" placeholder="e.g. method">
-        `;
+        sourceRow.append(
+            QSDom.el('label', { class: 'preview-enum-card__label', text: (PreviewConfig.i18n?.enumSource || 'Source key') + ':' }),
+            QSDom.el('input', { type: 'text', class: 'admin-input admin-input--sm preview-enum-card__source-input', value: source,
+                placeholder: PreviewConfig.i18n.enumSourcePlaceholder })
+        );
         card.appendChild(sourceRow);
         
         // Detect default type from existing values
@@ -9282,25 +9366,24 @@
         const litLabel = PreviewConfig.i18n?.enumTypeLiteral || 'Literal';
         const rawLabel = PreviewConfig.i18n?.variablesTypeRaw || 'Raw Text';
         const transLabel = PreviewConfig.i18n?.variablesTypeTranslation || 'Translation Key';
-        typeRow.innerHTML = `
-            <label class="preview-enum-card__label">${PreviewConfig.i18n?.enumValueType || 'Value type'}:</label>
-            <select class="admin-input admin-input--sm preview-enum-card__type-select">
-                <option value="literal" ${detectedDefault === 'literal' ? 'selected' : ''}>${escapeHTML(litLabel)}</option>
-                <option value="raw" ${detectedDefault === 'raw' ? 'selected' : ''}>${escapeHTML(rawLabel)}</option>
-                <option value="translation" ${detectedDefault === 'translation' ? 'selected' : ''}>${escapeHTML(transLabel)}</option>
-            </select>
-        `;
+        typeRow.append(
+            QSDom.el('label', { class: 'preview-enum-card__label', text: (PreviewConfig.i18n?.enumValueType || 'Value type') + ':' }),
+            QSDom.el('select', { class: 'admin-input admin-input--sm preview-enum-card__type-select' }, [
+                _renderOption('literal', litLabel, detectedDefault === 'literal'),
+                _renderOption('raw', rawLabel, detectedDefault === 'raw'),
+                _renderOption('translation', transLabel, detectedDefault === 'translation')
+            ])
+        );
         card.appendChild(typeRow);
         
         // Default dropdown
         const defaultRow = document.createElement('div');
         defaultRow.className = 'preview-enum-card__field';
-        defaultRow.innerHTML = `
-            <label class="preview-enum-card__label">${PreviewConfig.i18n?.enumDefault || 'Default'}:</label>
-            <select class="admin-input admin-input--sm preview-enum-card__default-select">
-                ${mapKeys.map(k => `<option value="${escapeHTML(k)}" ${k === defaultKey ? 'selected' : ''}>${escapeHTML(k)}</option>`).join('')}
-            </select>
-        `;
+        defaultRow.append(
+            QSDom.el('label', { class: 'preview-enum-card__label', text: (PreviewConfig.i18n?.enumDefault || 'Default') + ':' }),
+            QSDom.el('select', { class: 'admin-input admin-input--sm preview-enum-card__default-select' },
+                mapKeys.map(k => _renderOption(k, k, k === defaultKey)))
+        );
         card.appendChild(defaultRow);
         
         // Map table
@@ -9309,16 +9392,12 @@
         
         const table = document.createElement('table');
         table.className = 'preview-enum-card__table';
-        table.innerHTML = `
-            <thead>
-                <tr>
-                    <th>${PreviewConfig.i18n?.enumKey || 'Key'}</th>
-                    <th>${PreviewConfig.i18n?.enumValue || 'Value'}</th>
-                    <th>${PreviewConfig.i18n?.enumType || 'Type'}</th>
-                    <th></th>
-                </tr>
-            </thead>
-        `;
+        table.appendChild(QSDom.el('thead', {}, [QSDom.el('tr', {}, [
+            QSDom.el('th', { text: PreviewConfig.i18n?.enumKey || 'Key' }),
+            QSDom.el('th', { text: PreviewConfig.i18n?.enumValue || 'Value' }),
+            QSDom.el('th', { text: PreviewConfig.i18n?.enumType || 'Type' }),
+            QSDom.el('th')
+        ])]));
         const tbody = document.createElement('tbody');
         tbody.className = 'preview-enum-card__tbody';
         
@@ -9356,7 +9435,7 @@
         const addOptionBtn = document.createElement('button');
         addOptionBtn.type = 'button';
         addOptionBtn.className = 'admin-btn admin-btn--sm admin-btn--outline preview-enum-card__add-option';
-        addOptionBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> ${PreviewConfig.i18n?.enumAddOption || 'Add Option'}`;
+        addOptionBtn.append(_renderSizedIcon(QuickSiteUtils.ICON_PATHS.plus, 12), ' ' + (PreviewConfig.i18n?.enumAddOption || 'Add Option'));
         addOptionBtn.addEventListener('click', () => {
             const currentCardType = card.querySelector('.preview-enum-card__type-select')?.value || 'literal';
             tbody.appendChild(createEnumMapRow('', '', null, currentCardType));
@@ -9377,7 +9456,7 @@
         const deleteBtn = document.createElement('button');
         deleteBtn.type = 'button';
         deleteBtn.className = 'admin-btn admin-btn--sm admin-btn--danger';
-        deleteBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>`;
+        deleteBtn.appendChild(_renderSizedIcon(QuickSiteUtils.ICON_PATHS.trash, 14));
         deleteBtn.title = PreviewConfig.i18n?.delete || 'Delete';
         deleteBtn.addEventListener('click', () => deleteEnumCard(varName));
         
@@ -9406,7 +9485,8 @@
         
         // Key cell
         const keyTd = document.createElement('td');
-        keyTd.innerHTML = `<input type="text" class="admin-input admin-input--sm preview-enum-card__key-input" value="${escapeHTML(String(key))}" placeholder="${PreviewConfig.i18n?.enumKeyPlaceholder || 'key'}">`;
+        keyTd.appendChild(QSDom.el('input', { type: 'text', class: 'admin-input admin-input--sm preview-enum-card__key-input', value: String(key),
+            placeholder: PreviewConfig.i18n?.enumKeyPlaceholder || 'key' }));
         
         // Value cell — contains both a text input and a translation select, one visible at a time
         const valueTd = document.createElement('td');
@@ -9457,12 +9537,12 @@
         
         const typeSelect = document.createElement('select');
         typeSelect.className = 'admin-input admin-input--sm preview-enum-card__row-type-select';
-        typeSelect.innerHTML = `
-            <option value="">${escapeHTML(defaultLabel)}</option>
-            <option value="literal">${escapeHTML(litLabel)}</option>
-            <option value="raw">${escapeHTML(rawLabel)}</option>
-            <option value="translation">${escapeHTML(transLabel)}</option>
-        `;
+        typeSelect.append(
+            _renderOption('', defaultLabel, false),
+            _renderOption('literal', litLabel, false),
+            _renderOption('raw', rawLabel, false),
+            _renderOption('translation', transLabel, false)
+        );
         
         if (typeOverride) {
             typeSelect.value = typeOverride;
@@ -9497,7 +9577,7 @@
         
         // Remove cell
         const removeTd = document.createElement('td');
-        removeTd.innerHTML = `<button type="button" class="preview-enum-card__remove-row" title="${PreviewConfig.i18n?.remove || 'Remove'}">&times;</button>`;
+        removeTd.appendChild(QSDom.el('button', { type: 'button', class: 'preview-enum-card__remove-row', title: PreviewConfig.i18n?.remove || 'Remove' }, ['×']));
         
         tr.appendChild(keyTd);
         tr.appendChild(valueTd);
@@ -9550,9 +9630,7 @@
             if (k) keys.push(k);
         });
         
-        select.innerHTML = keys.map(k =>
-            `<option value="${escapeHTML(k)}" ${k === currentDefault ? 'selected' : ''}>${escapeHTML(k)}</option>`
-        ).join('');
+        select.replaceChildren(...keys.map(k => _renderOption(k, k, k === currentDefault)));
         
         // If previous default no longer exists, select first
         if (!keys.includes(currentDefault) && keys.length > 0) {
@@ -9772,7 +9850,7 @@
         // Show loading
         if (emulationPanelLoading) emulationPanelLoading.style.display = '';
         if (emulationPanelEmpty) emulationPanelEmpty.style.display = 'none';
-        if (emulationPanelFields) emulationPanelFields.innerHTML = '';
+        if (emulationPanelFields) emulationPanelFields.replaceChildren();
         if (emulationPanelActions) emulationPanelActions.style.display = 'none';
 
         // ── Page emulation branch ──
@@ -9845,8 +9923,7 @@
                 console.error('[Preview] Page emulation panel error:', error);
                 if (emulationPanelLoading) emulationPanelLoading.style.display = 'none';
                 if (emulationPanelFields) {
-                    emulationPanelFields.innerHTML = '<div style="color:var(--admin-danger);font-size:var(--font-size-sm);padding:var(--space-sm);">'
-                        + (PreviewConfig.i18n?.error || 'Error') + ': ' + error.message + '</div>';
+                    emulationPanelFields.replaceChildren(_renderPanelError(error));
                 }
             }
             return;
@@ -9916,8 +9993,7 @@
             console.error('[Preview] Emulation panel error:', error);
             if (emulationPanelLoading) emulationPanelLoading.style.display = 'none';
             if (emulationPanelFields) {
-                emulationPanelFields.innerHTML = '<div style="color:var(--admin-danger);font-size:var(--font-size-sm);padding:var(--space-sm);">' +
-                    (PreviewConfig.i18n?.error || 'Error') + ': ' + error.message + '</div>';
+                emulationPanelFields.replaceChildren(_renderPanelError(error));
             }
         }
     }
@@ -9984,9 +10060,7 @@
         if (type === 'enum' && enumKeys && enumKeys.length > 0) {
             input = document.createElement('select');
             input.className = 'admin-input admin-input--sm preview-emulation-field__input';
-            input.innerHTML = '<option value="">— {{' + escapeHTML(varName) + '}} —</option>' +
-                enumKeys.map(k => '<option value="' + escapeHTML(k) + '"' +
-                    (k === savedValue ? ' selected' : '') + '>' + escapeHTML(k) + '</option>').join('');
+            input.append(_renderOption('', '— {{' + varName + '}} —', false), ...enumKeys.map(k => _renderOption(k, k, k === savedValue)));
         } else {
             input = document.createElement('input');
             input.type = 'text';
@@ -9999,7 +10073,7 @@
         resetBtn.type = 'button';
         resetBtn.className = 'preview-emulation-field__reset';
         resetBtn.title = PreviewConfig.i18n?.emulationResetField || 'Reset';
-        resetBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>';
+        resetBtn.appendChild(_renderSizedIcon(ICON_RESET, 12));
         resetBtn.addEventListener('click', () => {
             if (input.tagName === 'SELECT') {
                 input.value = '';
@@ -10054,7 +10128,7 @@
         resetBtn.type = 'button';
         resetBtn.className = 'preview-emulation-field__reset';
         resetBtn.title = PreviewConfig.i18n?.emulationResetField || 'Reset';
-        resetBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>';
+        resetBtn.appendChild(_renderSizedIcon(ICON_RESET, 12));
         resetBtn.addEventListener('click', () => { input.value = ''; });
 
         row.appendChild(label);
@@ -10554,7 +10628,7 @@
             
             // Call createSnippet API. 'personal' = the author's own library,
             // reusable across THEIR projects.
-            const scope = saveSnippetGlobal?.checked ? 'personal' : 'project';
+            const scope = saveSnippetPersonal?.checked ? 'personal' : 'project';
             
             const requestData = {
                 id: id,

@@ -56,10 +56,8 @@
     }
     
     function showToast(message, type) {
-        // Resolve a REAL toast. The prior `QuickSiteAdmin?.toast` was a wrong method
-        // name (the shipped method is `.showToast`, 12 callers vs this lone `.toast`),
-        // so every theme toast silently went to the console — including the save-error
-        // shown when a variable is refused (e.g. a brace, now rejected server-side).
+        // The panel's own toast, else the admin's, else the console: a theme message
+        // (a save refused for a brace in a value, for instance) is always seen.
         if (window.QuickSiteUtils && typeof QuickSiteUtils.showToast === 'function') {
             QuickSiteUtils.showToast(message, type);
         } else if (window.QuickSiteAdmin && typeof QuickSiteAdmin.showToast === 'function') {
@@ -204,10 +202,11 @@
         } catch (error) {
             if (error.name === 'AbortError') return; // superseded by a newer load — ignore silently
             console.error('[PreviewStyleTheme] Error loading theme variables:', error);
-            themeLoading.innerHTML = `
-                ${QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.alertCircle, 24, null, 'style="color: #ef4444;"')}
-                <span style="color: #ef4444;">${i18n.themeLoadError || 'Failed to load theme'}</span>
-            `;
+            themeLoading.replaceChildren(
+                _renderLoadErrorIcon(),
+                ' ',
+                QSDom.el('span', { style: 'color: #ef4444;', text: i18n.themeLoadError || 'Failed to load theme' })
+            );
             if (themeSaveBtn) themeSaveBtn.disabled = true;
             if (themeResetBtn) themeResetBtn.disabled = true;
         }
@@ -260,6 +259,18 @@
     // + textContent + property assignment; a value like `red" onmouseover=…` lands
     // in `input.value` / `el.style` as inert data, never parsed as markup. Static
     // structure stays here; nothing user-derived touches innerHTML.
+
+    /** The red alert icon a failed load shows beside its message. */
+    function _renderLoadErrorIcon() {
+        const icon = QSDom.iconEl(QuickSiteUtils.ICON_PATHS.alertCircle, 24);
+        icon.setAttribute('style', 'color: #ef4444;');
+        return icon;
+    }
+
+    /** The note a variable section shows when it has nothing to list. */
+    function _renderEmptyNote(text) {
+        return QSDom.el('p', { class: 'preview-theme-empty', text: text });
+    }
 
     /**
      * Build one color-variable row. Returns { item, swatch, input } so the caller
@@ -325,12 +336,12 @@
      */
     function renderColorInputs(container, variables) {
         if (!container) return;
-        container.innerHTML = '';
+        container.replaceChildren();
 
         const i18n = getI18n();
 
         if (variables.length === 0) {
-            container.innerHTML = `<p class="preview-theme-empty">${i18n.noColorVariables || 'No color variables'}</p>`;
+            container.replaceChildren(_renderEmptyNote(i18n.noColorVariables || 'No color variables'));
             return;
         }
 
@@ -371,10 +382,10 @@
      */
     function renderTextInputs(container, variables, emptyMsg, placeholder) {
         if (!container) return;
-        container.innerHTML = '';
+        container.replaceChildren();
 
         if (variables.length === 0) {
-            if (emptyMsg) container.innerHTML = `<p class="preview-theme-empty">${emptyMsg}</p>`;
+            if (emptyMsg) container.replaceChildren(_renderEmptyNote(emptyMsg));
             return;
         }
 
@@ -393,7 +404,7 @@
     
     function renderSpacingInputs(container, variables) {
         const i18n = getI18n();
-        renderTextInputs(container, variables, i18n.noSpacingVariables || 'No spacing variables', 'e.g. 1rem, 16px');
+        renderTextInputs(container, variables, i18n.noSpacingVariables || 'No spacing variables', i18n.themeSpacingPlaceholder);
     }
     
     function renderOtherInputs(container, variables) {
@@ -883,7 +894,7 @@
 
         const result = await QuickSiteAdmin.apiRequest('setRootVariables', 'POST', body);
         if (!result.ok) {
-            throw new Error((result.data && (result.data.message || result.data.error)) || 'Save failed');
+            throw new Error((result.data && (result.data.message || result.data.error)) || getI18n().saveFailed);
         }
         return result.data;
     }

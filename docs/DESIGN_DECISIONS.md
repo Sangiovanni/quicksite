@@ -13663,3 +13663,124 @@ proposed"), and the proposals ruled one by one on 2026-10-16 during beta.12; fir
 (`qs_membership_mirror_entry()`), `projectBackup.php`; the panel's `dashboard.js`, `memberships.js`,
 `layout.php`. Behaviour: COMMAND_API.md (*Projects*, *Export / Import*), ARCHITECTURE.md §2 and §7,
 ADMIN_PANEL.md, the `help` entries of those commands.
+
+### The snippet preview is built in its frame element by element, shows what the page will render, and can show the keys instead (locked 2026-10-17)
+
+**Decision**: The Add panel's snippet preview no longer writes an HTML string into its frame. The
+frame (`_snippet-selector.php`) holds a fixed empty document, sandboxed without scripts, and
+`preview.js` fills it with the frame's own `createElement`: the snippet's CSS is a `<style>`
+element's text, its texts are text nodes, an attribute is set by name (one the browser refuses is
+left out), and an event-handler attribute is not written. What it shows follows the renderer: a
+node carrying a text key is text; a raw or literal text (`__RAW__` / `__LIT__`) shows as written; a
+key shows its translation in the project's default language, then English, then the key itself;
+`alt`, `title`, `placeholder` and the `aria-*` labels translate a key the same way; `true` is a bare
+attribute and an empty value is dropped (but on `alt` and `aria-label`); a tag the engine does not
+render is left out; a void element takes no children (the engine's list,
+`TAG_INFO.SELF_CLOSING_TAGS`); a row straight in a table gets the `tbody` the page's parser gives
+it. Where the browser's parser would rearrange other markup on the page (a block inside a `p`
+closes the `p`), the preview keeps the saved shape. A **Show keys** checkbox under the frame shows
+every key and raw text as stored instead. Neither it nor the style toggle is remembered.
+
+**Reasoning**: The previous builder glued markup in template strings. A translation holding markup
+became markup, a quote in an attribute value ended the value, an attribute name was written as
+given, and `</style>` in a snippet's CSS closed the style element so the rest became elements:
+inert, because the frame runs no script, but a preview that was not the page. It also showed the
+`__RAW__` prefix before every raw text and a translatable attribute's key as its value. Building the
+document element by element removes every one of those defects at once: nothing a snippet carries
+is parsed as HTML, so nothing is left to escape. Escaping `</` in the CSS, the narrower fix first
+planned, would have closed one of them and left the others. The nodes are made by the frame's own
+document, never the panel's, because an element the panel's document makes starts loading what it
+points at before it is inserted anywhere. Following the renderer makes the preview answer the
+author's question, what will this look like; the toggle answers the other one, which key is which.
+
+**Alternatives considered**: keeping the string and escaping each value (rejected: every value kind
+needs its own escaper, and the CSS one would change the CSS); building the nodes in the panel's
+document and moving them in (rejected, see above); serialising a document built off-page back into
+`srcdoc` (rejected: the CSS goes back through the parser); dropping `allow-same-origin` to make the
+frame an opaque origin (rejected: the panel could no longer build in it, and the project's fonts
+would stop loading); reproducing every rearrangement the parser makes (rejected: which tag may hold
+which is its own design question; only the `tbody` a plain table needs is reproduced); remembering
+"Show keys" between visits (not wanted, as the style toggle is not remembered).
+
+**Source**: design round 2026-10-17 (Sangio), after a UX run on 2026-10-11 showed `__RAW__` in the
+preview and asked for a way to see the keys. `public/admin/assets/js/pages/preview/preview.js`,
+`secure/admin/templates/pages/preview/_snippet-selector.php`.
+
+### A tag's example is a template the page parses once, and the code view shows what it holds (locked 2026-10-17)
+
+**Decision**: The examples the Add form shows under its tag picker are no longer HTML strings carried
+in the selector's JSON and parsed into the preview each time a tag is picked. `_tag-selector.php`
+writes each example as a `<template>` (`<selectorId>-tag-example-<tag>`), parsed once with the page,
+and `preview.js` clones the template's content into the preview. A tag whose example is `false` has
+no template and reads "No visual preview", as before. The **Show HTML** view formats the template's
+markup as the browser holds it: a boolean attribute reads `open=""`, a table row sits in the
+`<tbody>` the parser adds, an SVG shape and an `<option>` carry their end tag. Each translation
+inside an example passes through `adminEscape()` where it enters the markup.
+
+**Reasoning**: The examples were the last HTML strings the editor parsed while it ran. A template
+keeps them static structure in PHP, where the hygiene rule puts it, and makes picking a tag a clone
+instead of a parse. Reading the code view back from the template keeps one copy of each example and
+shows the markup the preview actually holds. Escaping the translations changes nothing today (no
+example translation holds `<`, `>`, `&` or `"` in either language) and keeps a future one from
+becoming markup. A template keeps a fragment as it is written: a `<tr>` with no `<table>` around it
+stays a `<tr>`, where a parse into a `div` drops it, so an example is written as a whole fragment.
+
+**Alternatives considered**: keeping the strings in the JSON as an accepted exception (rejected: the
+hygiene rule's exceptions are small icons and the engine's own HTML); the templates plus a text copy
+of each example's source on its template, read by the code view (offered, not chosen: the code view
+would not have changed, at the cost of every example shipping twice); building each example with
+`createElement` in JS (rejected: about a hundred static structures written as code).
+
+**Source**: design round 2026-10-17 (Sangio); the code view chosen on 2026-10-18.
+`secure/admin/templates/pages/preview/_tag-selector.php`, `_tag-examples.php`,
+`public/admin/assets/js/pages/preview/preview.js`.
+
+### The visual editor parses no markup but the engine's own, and builds every icon as an element (locked 2026-10-18)
+
+**Decision**: No file of the visual editor (`public/admin/assets/js/pages/preview/`) writes
+`innerHTML`, `outerHTML`, `insertAdjacentHTML` or `srcdoc`, and none clears a node with
+`innerHTML = ''` (`replaceChildren()` does). The one kind of markup write left is
+`preview-iframe-inject.js`'s three parses of the HTML the engine renders for `addNode`, `editNode`
+and `duplicateNode`. Every icon, the small trusted SVGs the hygiene rule would allow as strings
+included, is built by `QSDom.iconEl()` from the shared catalogue (`QuickSiteUtils.ICON_PATHS`) or
+from a local constant holding the icon's inner markup. Reads stay: the tag picker's code view reads a
+template, the void check reads `outerHTML`. The text escapers the string builders needed
+(`escapeHTML` in `preview.js`, `PreviewState.utils.escapeHtml`, the copy handed to the transition
+editor) are removed with their last caller.
+
+**Reasoning**: With no exception left in the editor, "the only markup the editor parses is the
+engine's" is a fact a census checks in one line rather than a list to keep. The escapers were text
+escapers used inside attributes, where they leave `"` alone, so a stored value holding a double
+quote was cut there: an enum key was shown cut in its field and saved cut on the next save, a
+`font-family` value's tooltip came out empty. Building the elements removes the whole class, and
+with it the reason to keep an escaper. An icon built by `QSDom.iconEl()` also carries
+`aria-hidden="true"`; the translation rows' icons gain `fill` and `stroke` attributes equal to the
+CSS that already styles them, so nothing changes on screen.
+
+**Alternatives considered**: keeping the fourteen icon-only writes as listed exceptions (allowed by
+the rule, not chosen: each would carry its reason in every census, and the catalogue already makes
+the element version as short); keeping the escapers for a future caller (rejected: dead code is
+removed, not kept).
+
+**Source**: the preview subsystem's queue verification, 2026-10-18 (Sangio). The files of
+`public/admin/assets/js/pages/preview/`, and `public/admin/assets/js/core/dom.js` (`iconEl`).
+
+### The Translations panel fetches its data at every opening (locked 2026-10-18)
+
+**Decision**: `PreviewTranslation.enter()` fetches the language list, the keys by source and the chosen
+language's grouped keys and values each time Translations mode opens, not only the first time. The first
+opening shows the loading state; a later one keeps the rows on screen until the new data is in, keeps the
+scope chosen (the whole site when its source is gone), and drops an older opening's answer that arrives
+after a newer one's.
+
+**Reasoning**: Keys are written by other parts of the editor (the wizards' key picker, Text mode, **Add
+Element → Text**, a deletion that leaves a key unused), and a copy kept from the first opening showed none
+of them until a reload. Fetching at the opening keeps the panel true for every writer, the ones to come
+included, at the cost of three small requests per opening.
+
+**Alternatives considered**: each writer announcing its change to the panel (rejected: every writer, present
+and future, would have to remember to, and one that forgets brings the stale list back).
+
+**Source**: Sangio's UX run of the preview subsystem's rewrite, 2026-10-18 (a key created in the List
+wizard showed in Translations only after a reload).
+`public/admin/assets/js/pages/preview/preview-translation.js`.

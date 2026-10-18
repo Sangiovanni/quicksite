@@ -110,7 +110,7 @@
                 selectByNode(e.data.struct, e.data.node);
             }
             if (e.data.action === 'insertNode') {
-                insertNodeIntoDom(e.data.struct, e.data.targetNode, e.data.position, e.data.html, e.data.newNodeId);
+                insertNodeIntoDom(e.data.struct, e.data.targetNode, e.data.position, e.data.html, e.data.newNodeId, e.data.movedText || 0);
             }
             if (e.data.action === 'updateNode') {
                 updateNodeInDom(e.data.struct, e.data.nodeId, e.data.html);
@@ -295,9 +295,52 @@
         }
     }
     
-    // Insert a new node into the DOM without full page reload
-    function insertNodeIntoDom(struct, targetNode, position, html, newNodeId) {
-        console.log('[QuickSite] Inserting node:', { struct, targetNode, position, newNodeId });
+    /** The id of child `index` of node `parentPath` ('' is the structure's top level). */
+    function childId(parentPath, index) {
+        return parentPath ? parentPath + '.' + index : String(index);
+    }
+
+    /** The direct children of node `parentPath` in ONE structure, each with its index. */
+    function childrenOf(struct, parentPath) {
+        return Array.from(document.querySelectorAll(qsStructSel(struct) + '[data-qs-node]'))
+            .map(function(el) {
+                const parts = el.getAttribute('data-qs-node').split('.');
+                return { el: el, parent: parts.slice(0, -1).join('.'), index: parseInt(parts[parts.length - 1], 10) };
+            })
+            .filter(function(child) { return child.parent === parentPath && !isNaN(child.index); });
+    }
+
+    /** Give a node a new id, its subtree with it. */
+    function renameNode(el, struct, newId) {
+        const oldId = el.getAttribute('data-qs-node');
+        if (oldId === newId) return;
+        el.setAttribute('data-qs-node', newId);
+        if (el.getAttribute('data-qs-component-node') === oldId) {
+            el.setAttribute('data-qs-component-node', newId);
+        }
+        reindexChildNodes(el, struct, oldId, newId);
+    }
+
+    /**
+     * Shift by `delta` the children of node `parentPath` numbered `fromIndex` and up, in ONE
+     * structure: +1 after an insert, -1 after a removal. The page, the menu and the footer each
+     * number their nodes from 0, so a node of another structure with the same id never moves.
+     */
+    function renumberSiblings(struct, parentPath, fromIndex, delta) {
+        const siblings = childrenOf(struct, parentPath)
+            .filter(function(child) { return child.index >= fromIndex; })
+            .sort(function(a, b) { return delta > 0 ? b.index - a.index : a.index - b.index; });
+        siblings.forEach(function(child) {
+            renameNode(child.el, struct, childId(parentPath, child.index + delta));
+        });
+        console.log('[QuickSite] Renumbered', siblings.length, 'sibling(s) of', JSON.stringify(parentPath), 'in', struct, 'by', delta);
+    }
+
+    // Insert a new node into the DOM without full page reload. `movedText`: how many text
+    // children of the target the engine moved into the new node (an add inside an element
+    // holding text), 0 for any other add.
+    function insertNodeIntoDom(struct, targetNode, position, html, newNodeId, movedText) {
+        console.log('[QuickSite] Inserting node:', { struct, targetNode, position, newNodeId, movedText });
         
         // Find the target element - try direct match first, then within struct container
         let targetEl = document.querySelector(qsNodeSel(struct, targetNode));
@@ -318,75 +361,52 @@
             return;
         }
         
+        // The engine rendered the new node: parse it first, so an answer that cannot be shown
+        // changes nothing on the page
+        const temp = document.createElement('div');
+        temp.innerHTML = html;
+        const newElement = temp.firstElementChild;
+
+        if (!newElement) {
+            console.error('[QuickSite] Invalid HTML for new node');
+            window.parent.postMessage({
+                source: 'quicksite-preview',
+                action: 'insertNodeFailed',
+                error: 'Invalid HTML'
+            }, ALLOWED_ORIGIN);
+            return;
+        }
+
         // Parse newNodeId to get the inserted index
         const newIdParts = newNodeId.split('.');
         const insertedIndex = parseInt(newIdParts[newIdParts.length - 1], 10);
         const parentPath = newIdParts.slice(0, -1).join('.');
-        
-        // FIRST: Reindex existing siblings BEFORE inserting the new element
-        // Search ALL elements with data-qs-node in the entire document for maximum coverage
-        const allNodeElements = Array.from(document.querySelectorAll('[data-qs-node]'));
-        
-        console.log('[QuickSite] Total elements with data-qs-node:', allNodeElements.length);
-        console.log('[QuickSite] Looking for siblings with parentPath:', parentPath, 'and index >=', insertedIndex);
-        
-        // Find and reindex siblings with index >= insertedIndex
-        const siblingsToReindex = allNodeElements
-            .filter(function(el) {
-                const elNodeId = el.getAttribute('data-qs-node');
-                if (!elNodeId) return false;
-                const elParts = elNodeId.split('.');
-                const elParentPath = elParts.slice(0, -1).join('.');
-                const elIndex = parseInt(elParts[elParts.length - 1], 10);
-                const shouldReindex = elParentPath === parentPath && elIndex >= insertedIndex;
-                if (shouldReindex) {
-                    console.log('[QuickSite] Will reindex:', elNodeId, '(parent:', elParentPath, 'index:', elIndex, ')');
-                }
-                return shouldReindex;
-            })
-            .sort(function(a, b) {
-                // Sort descending to avoid conflicts when incrementing
-                const aIndex = parseInt(a.getAttribute('data-qs-node').split('.').pop(), 10);
-                const bIndex = parseInt(b.getAttribute('data-qs-node').split('.').pop(), 10);
-                return bIndex - aIndex;
-            });
-        
-        console.log('[QuickSite] Found', siblingsToReindex.length, 'siblings to reindex');
-        
-        // Reindex BEFORE inserting the new element
-        siblingsToReindex.forEach(function(el) {
-            const elNodeId = el.getAttribute('data-qs-node');
-            const elParts = elNodeId.split('.');
-            const elIndex = parseInt(elParts[elParts.length - 1], 10);
-            const incrementedIndex = elIndex + 1;
-            const incrementedNodeId = parentPath ? parentPath + '.' + incrementedIndex : String(incrementedIndex);
-            el.setAttribute('data-qs-node', incrementedNodeId);
-            // Also update data-qs-component-node if it matches
-            const elCompNode = el.getAttribute('data-qs-component-node');
-            if (elCompNode === elNodeId) {
-                el.setAttribute('data-qs-component-node', incrementedNodeId);
+
+        // The engine moves the target's text children into the new node only when that node can
+        // hold children; the new node then carries the text, so the target's copy goes and the
+        // target's other children follow the new node. A tag that holds no children took nothing.
+        const carried = (position === 'inside' && movedText > 0)
+            ? Array.from(newElement.children).filter(function(c) { return c.hasAttribute('data-qs-textonly'); })
+            : [];
+        if (carried.length > 0) {
+            const leftBehind = childrenOf(struct, targetNode).filter(function(c) { return c.el.hasAttribute('data-qs-textonly'); });
+            if (carried.length !== movedText || leftBehind.length !== movedText) {
+                console.error('[QuickSite] The moved text does not match the page:', { movedText, carried: carried.length, onPage: leftBehind.length });
+                window.parent.postMessage({
+                    source: 'quicksite-preview',
+                    action: 'insertNodeFailed',
+                    error: 'Moved text not found'
+                }, ALLOWED_ORIGIN);
+                return;
             }
-            console.log('[QuickSite] Reindexed sibling:', elNodeId, '->', incrementedNodeId);
-            
-            // Also reindex any child elements within this element
-            reindexChildNodes(el, struct, elNodeId, incrementedNodeId);
-        });
-        
-        // NOW create and insert the new element
-        const temp = document.createElement('div');
-        temp.innerHTML = html;
-        const newElement = temp.firstElementChild;
-        
-        if (!newElement) {
-            console.error('[QuickSite] Invalid HTML for new node');
-            window.parent.postMessage({ 
-                source: 'quicksite-preview', 
-                action: 'insertNodeFailed', 
-                error: 'Invalid HTML' 
-            }, ALLOWED_ORIGIN);
-            return;
+            leftBehind.forEach(function(c) { c.el.remove(); });
+            childrenOf(struct, targetNode)
+                .sort(function(a, b) { return a.index - b.index; })
+                .forEach(function(c, rank) { renameNode(c.el, struct, childId(targetNode, rank + 1)); });
+        } else {
+            renumberSiblings(struct, parentPath, insertedIndex, 1);
         }
-        
+
         // Insert based on position
         if (position === 'before') {
             targetEl.parentNode.insertBefore(newElement, targetEl);
@@ -473,68 +493,14 @@
             return;
         }
         
-        // Get parent element and identify siblings that need reindexing
-        const parent = targetEl.parentNode;
         const nodeIdParts = nodeId.split('.');
         const deletedIndex = parseInt(nodeIdParts[nodeIdParts.length - 1], 10);
         const parentPath = nodeIdParts.slice(0, -1).join('.');
-        
-        // Remove the element first
+
+        // Remove the element, then move its later siblings up one
         targetEl.remove();
-        
-        // Reindex siblings with higher indices
-        // Search ALL elements with data-qs-node in the entire document for maximum coverage
-        const allNodeElements = Array.from(document.querySelectorAll('[data-qs-node]'));
-        
-        console.log('[QuickSite] Total elements with data-qs-node:', allNodeElements.length);
-        console.log('[QuickSite] Looking for siblings with parentPath:', parentPath, 'and index >', deletedIndex);
-        
-        // Find siblings that need to be decremented (index > deletedIndex)
-        const siblingsToReindex = allNodeElements
-            .filter(function(el) {
-                const elNodeId = el.getAttribute('data-qs-node');
-                if (!elNodeId) return false;
-                
-                const elParts = elNodeId.split('.');
-                const elParentPath = elParts.slice(0, -1).join('.');
-                const elIndex = parseInt(elParts[elParts.length - 1], 10);
-                
-                // Same parent path, and index is greater than deleted
-                const shouldReindex = elParentPath === parentPath && elIndex > deletedIndex;
-                if (shouldReindex) {
-                    console.log('[QuickSite] Will reindex:', elNodeId, '(parent:', elParentPath, 'index:', elIndex, ')');
-                }
-                return shouldReindex;
-            })
-            .sort(function(a, b) {
-                // Sort ascending for decrement (process lower indices first to avoid conflicts)
-                const aIndex = parseInt(a.getAttribute('data-qs-node').split('.').pop(), 10);
-                const bIndex = parseInt(b.getAttribute('data-qs-node').split('.').pop(), 10);
-                return aIndex - bIndex;
-            });
-        
-        console.log('[QuickSite] Found', siblingsToReindex.length, 'siblings to reindex after delete');
-        
-        siblingsToReindex.forEach(function(el) {
-            const elNodeId = el.getAttribute('data-qs-node');
-            const elParts = elNodeId.split('.');
-            const elIndex = parseInt(elParts[elParts.length - 1], 10);
-            
-            // Decrement the index
-            const newIndex = elIndex - 1;
-            const newNodeId = parentPath ? parentPath + '.' + newIndex : String(newIndex);
-            el.setAttribute('data-qs-node', newNodeId);
-            // Also update data-qs-component-node if it matches
-            const elCompNode = el.getAttribute('data-qs-component-node');
-            if (elCompNode === elNodeId) {
-                el.setAttribute('data-qs-component-node', newNodeId);
-            }
-            console.log('[QuickSite] Reindexed node:', elNodeId, '->', newNodeId);
-            
-            // Also reindex any child elements within this element
-            reindexChildNodes(el, struct, elNodeId, newNodeId);
-        });
-        
+        renumberSiblings(struct, parentPath, deletedIndex + 1, -1);
+
         console.log('[QuickSite] Node removed successfully:', nodeId);
         
         // Notify parent of success
@@ -704,53 +670,9 @@
         const newIndex = parseInt(nodeIdParts[nodeIdParts.length - 1], 10);
         const parentPath = nodeIdParts.slice(0, -1).join('.');
         
-        // FIRST: Reindex siblings that need to shift (index >= newIndex)
-        // Search ALL elements with data-qs-node in the entire document for maximum coverage
-        const allNodeElements = Array.from(document.querySelectorAll('[data-qs-node]'));
-        
-        console.log('[QuickSite] Total elements with data-qs-node:', allNodeElements.length);
-        console.log('[QuickSite] Looking for siblings with parentPath:', parentPath, 'and index >=', newIndex);
-        
-        // Process in reverse order (highest index first) to avoid conflicts
-        const siblingsToReindex = allNodeElements
-            .filter(function(el) {
-                const elNodeId = el.getAttribute('data-qs-node');
-                if (!elNodeId) return false;
-                const elParts = elNodeId.split('.');
-                const elParentPath = elParts.slice(0, -1).join('.');
-                const elIndex = parseInt(elParts[elParts.length - 1], 10);
-                const shouldReindex = elParentPath === parentPath && elIndex >= newIndex;
-                if (shouldReindex) {
-                    console.log('[QuickSite] Will reindex:', elNodeId, '(parent:', elParentPath, 'index:', elIndex, ')');
-                }
-                return shouldReindex;
-            })
-            .sort(function(a, b) {
-                const aIndex = parseInt(a.getAttribute('data-qs-node').split('.').pop(), 10);
-                const bIndex = parseInt(b.getAttribute('data-qs-node').split('.').pop(), 10);
-                return bIndex - aIndex; // Descending order
-            });
-        
-        console.log('[QuickSite] Found', siblingsToReindex.length, 'siblings to reindex');
-        
-        siblingsToReindex.forEach(function(el) {
-            const elNodeId = el.getAttribute('data-qs-node');
-            const elParts = elNodeId.split('.');
-            const elIndex = parseInt(elParts[elParts.length - 1], 10);
-            const incrementedIndex = elIndex + 1;
-            const incrementedNodeId = parentPath ? parentPath + '.' + incrementedIndex : String(incrementedIndex);
-            el.setAttribute('data-qs-node', incrementedNodeId);
-            // Also update data-qs-component-node if it matches
-            const elCompNode = el.getAttribute('data-qs-component-node');
-            if (elCompNode === elNodeId) {
-                el.setAttribute('data-qs-component-node', incrementedNodeId);
-            }
-            console.log('[QuickSite] Reindexed sibling:', elNodeId, '->', incrementedNodeId);
-            
-            // Also reindex any child elements
-            reindexChildNodes(el, struct, elNodeId, incrementedNodeId);
-        });
-        
+        // FIRST: the siblings from the new index on move down one
+        renumberSiblings(struct, parentPath, newIndex, 1);
+
         // THEN: Insert the new element using server-rendered HTML (correct translations)
         // or fall back to cloneNode if no HTML provided
         let newEl;

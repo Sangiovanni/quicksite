@@ -114,14 +114,9 @@ if (!empty($__previewRouteResolvers)) {
 
 // The project this panel works with (getCurrentProject = the caller's own
 // selected_project, same as the editor marker + the preview iframe, so edit and preview
-// never diverge). The visual-editor STYLE panels (preview-style-*/transition) hand-build
-// fetch(managementUrl + cmd) for project-scoped commands, so the '/management/p/<id>/'
-// marker is baked into managementUrl here (every command reached this way is
-// project-scoped). No edited project → no marker, so those calls fall back to
-// '/management/' and the dispatcher refuses them as project-scoped, which is correct:
-// a caller with no project has nothing to edit.
+// never diverge). Management commands go through QuickSiteAdmin.apiRequest, which adds
+// the project marker itself.
 $__previewProject  = $router->getCurrentProject();
-$__previewMgmtBase = $router->projectManagementBase($__previewProject);
 ?>
 <!-- Preview Configuration (needed before preview.js) -->
 <script>
@@ -133,7 +128,6 @@ window.PreviewConfig = {
     // toolbar silently navigates the iframe out of the project being edited.
     previewBase: <?= json_encode($router->projectSiteBase($__previewProject)) ?>,
     adminUrl: <?= json_encode($router->url('')) ?>,
-    managementUrl: <?= json_encode($__previewMgmtBase) ?>,
     currentProject: <?= json_encode($__previewProject) ?>,
 
     // Tag classification, mandatory params, per-tag defaults and the
@@ -278,6 +272,9 @@ window.PreviewConfig = {
         stylesReset: <?= json_encode(__admin('preview.stylesReset', 'Styles reset')) ?>,
         stylesSaved: <?= json_encode(__admin('preview.stylesSaved', 'Styles saved')) ?>,
         useCustomProperty: <?= json_encode(__admin('preview.useCustomProperty', 'Use custom:')) ?>,
+        varFilterColor: <?= qs_inline_script_json(__admin('preview.varFilterColor')) ?>,
+        varFilterFont: <?= qs_inline_script_json(__admin('preview.varFilterFont')) ?>,
+        varFilterSize: <?= qs_inline_script_json(__admin('preview.varFilterSize')) ?>,
         varReplacementWarning: <?= json_encode(__admin('preview.varReplacementWarning', 'CSS variables will be replaced with actual values')) ?>,
 
         // ── Transition editor (floating panel, on-demand) ──
@@ -456,7 +453,25 @@ window.PreviewConfig = {
         unstarTag: <?= json_encode(__admin('preview.unstarTag', 'Remove from favorites')) ?>,
         requiresParams: <?= json_encode(__admin('preview.requiresParams', 'Requires additional parameters')) ?>,
         noPropertiesFound: <?= json_encode(__admin('preview.noPropertiesFound', 'No properties found')) ?>,
-        noComponents: <?= json_encode(__admin('preview.noComponents', 'No components')) ?>
+        noComponents: <?= json_encode(__admin('preview.noComponents', 'No components')) ?>,
+
+        // ── The Add form's pickers, the save forms' structure line, the enums panel ──
+        assetPreviewAlt: <?= qs_inline_script_json(__admin('preview.assetPreviewAlt')) ?>,
+        assetsLoadError: <?= qs_inline_script_json(__admin('preview.assetsLoadError')) ?>,
+        assetsLoadFailed: <?= qs_inline_script_json(__admin('preview.assetsLoadFailed')) ?>,
+        assetsNone: <?= qs_inline_script_json(__admin('preview.assetsNone')) ?>,
+        browseAssets: <?= qs_inline_script_json(__admin('preview.browseAssets')) ?>,
+        complexKindNoWizard: <?= qs_inline_script_json(__admin('preview.complexKindNoWizard')) ?>,
+        complexWizardFailed: <?= qs_inline_script_json(__admin('preview.complexWizardFailed')) ?>,
+        componentVariableCount: <?= qs_inline_script_json(__admin('preview.componentVariableCount')) ?>,
+        componentVariableCountOne: <?= qs_inline_script_json(__admin('preview.componentVariableCountOne')) ?>,
+        enumSourcePlaceholder: <?= qs_inline_script_json(__admin('preview.enumSourcePlaceholder')) ?>,
+        iframeInfo: <?= qs_inline_script_json(__admin('preview.iframeInfo')) ?>,
+        snippetSourceCore: <?= qs_inline_script_json(__admin('preview.snippetSourceCore')) ?>,
+        snippetSourcePersonal: <?= qs_inline_script_json(__admin('preview.snippetSourcePersonal')) ?>,
+        snippetSourceProject: <?= qs_inline_script_json(__admin('preview.snippetSourceProject')) ?>,
+        structureChildren: <?= qs_inline_script_json(__admin('preview.structureChildren')) ?>,
+        structureChildrenOne: <?= qs_inline_script_json(__admin('preview.structureChildrenOne')) ?>
     },
 
     // Panel-specific i18n keys, merged into PreviewConfig.i18n on first tab activation.
@@ -470,6 +485,7 @@ window.PreviewConfig = {
             noColorVariables: <?= json_encode(__admin('preview.noColorVariables', 'No color variables')) ?>,
             noFontVariables: <?= json_encode(__admin('preview.noFontVariables', 'No font variables')) ?>,
             noSpacingVariables: <?= json_encode(__admin('preview.noSpacingVariables', 'No spacing variables')) ?>,
+            themeSpacingPlaceholder: <?= qs_inline_script_json(__admin('preview.themeSpacingPlaceholder')) ?>,
             themeLoadError: <?= json_encode(__admin('preview.themeLoadError', 'Failed to load theme')) ?>,
             themeReset: <?= json_encode(__admin('preview.themeReset', 'Theme reset')) ?>,
             themeSaved: <?= json_encode(__admin('preview.themeSaved', 'Theme saved')) ?>,
@@ -504,10 +520,11 @@ window.PreviewConfig = {
             searchSelectors: <?= json_encode(__admin('preview.searchSelectors', 'Search selectors…')) ?>,
             selectorCreated: <?= json_encode(__admin('preview.selectorCreated', 'Selector created')) ?>,
             selectorCreateError: <?= json_encode(__admin('preview.selectorCreateError', 'Failed to create selector')) ?>,
+            selectorNoRulesYet: <?= qs_inline_script_json(__admin('preview.selectorNoRulesYet')) ?>,
             selectorsLoadError: <?= json_encode(__admin('preview.selectorsLoadError', 'Failed to load selectors')) ?>
         },
 
-        // ── Animations tab (preview-style-animations.js) ──
+        // ── Animations tab (preview-style-motion.js) ──
         animations: {
             addFrame: <?= json_encode(__admin('preview.addFrame', 'Add Frame')) ?>,
             addKeyframeProperty: <?= json_encode(__admin('preview.addKeyframeProperty', 'Add Property')) ?>,
@@ -754,6 +771,7 @@ window.PreviewConfig = {
             translationConfirmDelete: <?= json_encode(__admin('preview.translationConfirmDelete', 'Delete')) ?>,
             translationDeleting: <?= json_encode(__admin('preview.translationDeleting', 'Deleting…')) ?>,
             translationDeleteError: <?= json_encode(__admin('preview.translationDeleteError', 'Failed to delete: {error}')) ?>,
+            translationNoResponse: <?= qs_inline_script_json(__admin('preview.translationNoResponse')) ?>,
             translationBulkDeleteHeader: <?= json_encode(__admin('preview.translationBulkDeleteHeader', 'These {n} unused keys will be deleted from {lang}.json:')) ?>,
             translationBulkDeleteConfirm: <?= json_encode(__admin('preview.translationBulkDeleteConfirm', 'Delete {n} keys')) ?>,
             translationDeleteAllLangs: <?= json_encode(__admin('preview.translationDeleteAllLangs', 'Delete from all {n} languages ({list})')) ?>,
@@ -795,8 +813,13 @@ window.PreviewConfig = {
 <!-- Complex Element wizards (Add Element → Complex tab).
      Loaded BEFORE preview.js so the Complex-tab handler can call into
      window.QSComplexWizard during init.
-     Order matters: shared helpers (row editor + textKey picker) before
-     the per-kind `complex-*.js` files (each kind may use them on parse). -->
+     Order matters: the wizards' words (wizard-text.js over the complexWizard
+     translations below), then the shared helpers (row editor + textKey picker),
+     then the per-kind `complex-*.js` files (each kind may use them on parse). -->
+<script>
+window.QS_COMPLEX_WIZARD_I18N = <?= qs_inline_script_json(['complexWizard' => AdminTranslation::getInstance()->getRaw('complexWizard') ?: new stdClass()]) ?>;
+</script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/contextual-complex/wizard-text.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/contextual-complex/wizard-text.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/contextual-complex/wizard-row-editor.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/contextual-complex/wizard-row-editor.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/contextual-complex/text-key-picker.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/contextual-complex/text-key-picker.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/contextual-complex/route-input.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/contextual-complex/route-input.js') ?>"></script>
