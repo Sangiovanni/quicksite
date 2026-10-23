@@ -315,7 +315,7 @@
     window.QSComplexWizard.registry = window.QSComplexWizard.registry || {};
     window.QSComplexWizard.registry['radio-group'] = {
         label: 'Radio group',
-        description: 'A &lt;fieldset&gt; with N &lt;input type=radio&gt; sharing the same name, plus a per-group error span.',
+        description: window.QSComplexWizard.t('radioGroup.description'),
         renderWizard: renderWizard
     };
 })();

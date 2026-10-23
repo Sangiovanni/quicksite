@@ -13,6 +13,10 @@
 $baseUrl = rtrim(BASE_URL, '/');
 ?>
 
+<script>
+// The words of the page's dialogs and error toasts (`storage` in the panel's translations).
+window.QS_STORAGE_I18N = <?= qs_inline_script_json(['storage' => AdminTranslation::getInstance()->getRaw('storage') ?: new stdClass()]) ?>;
+</script>
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/storage.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/storage.js') ?>"></script>
 
 <div class="admin-page-header">

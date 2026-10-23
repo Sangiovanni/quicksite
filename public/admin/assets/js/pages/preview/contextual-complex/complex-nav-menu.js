@@ -160,7 +160,7 @@
     window.QSComplexWizard.registry = window.QSComplexWizard.registry || {};
     window.QSComplexWizard.registry['nav-menu'] = {
         label: 'Nav menu',
-        description: 'A &lt;nav&gt; with a &lt;ul&gt; of N &lt;li&gt; entries, each a single &lt;a&gt;. Per-item external-link toggle.',
+        description: window.QSComplexWizard.t('navMenu.description'),
         renderWizard: renderWizard
     };
 })();

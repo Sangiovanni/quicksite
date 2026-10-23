@@ -1325,7 +1325,7 @@
 
     // ─── Single Delete ───────────────────────────────────────────────────────
     async function deleteSingle(filename) {
-        if (!confirm(t('media.confirmDeleteOne', { name: filename }))) return;
+        if (!(await QuickSiteUtils.confirm(t('media.confirmDeleteOne', { name: filename }), { type: 'danger' }))) return;
 
         try {
             const result = await QuickSiteAdmin.apiRequest('deleteAsset', 'POST', { filename });
@@ -1472,9 +1472,9 @@
     async function deleteSelected() {
         if (selectedFiles.size === 0) return;
         const filenames = Array.from(selectedFiles);
-        if (!confirm(t(filenames.length !== 1
+        if (!(await QuickSiteUtils.confirm(t(filenames.length !== 1
             ? 'media.confirmDeleteManyMany'
-            : 'media.confirmDeleteManyOne', { count: filenames.length }))) return;
+            : 'media.confirmDeleteManyOne', { count: filenames.length }), { type: 'danger' }))) return;
 
         try {
             const result = await QuickSiteAdmin.apiRequest('deleteAsset', 'POST', { filenames });

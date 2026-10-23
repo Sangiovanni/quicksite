@@ -1218,8 +1218,8 @@
         ]);
     }
 
-    function promptAddFrame() {
-        const percent = prompt(PreviewConfig.i18n.enterFramePercent, '50');
+    async function promptAddFrame() {
+        const percent = await QuickSiteUtils.prompt(PreviewConfig.i18n.enterFramePercent, { defaultValue: '50' });
         if (percent !== null) {
             const percentNum = parseFloat(percent);
             if (!isNaN(percentNum) && percentNum >= 0 && percentNum <= 100) {
@@ -1412,9 +1412,9 @@
         if (keyframeEditorMode === 'create') {
             const existingKeyframe = keyframesData.find(kf => kf.name === name);
             if (existingKeyframe) {
-                const confirmOverwrite = confirm(
+                const confirmOverwrite = await QuickSiteUtils.confirm(
                     PreviewConfig.i18n.keyframeExistsConfirm +
-                    `\n\n@keyframes ${name}`
+                    `\n\n@keyframes ${name}`, { type: 'danger' }
                 );
                 if (!confirmOverwrite) {
                     keyframeNameInput.focus();
@@ -1456,9 +1456,9 @@
             const data = response.data || {};
             
             if (data.status === 409) {
-                const confirmOverwrite = confirm(
+                const confirmOverwrite = await QuickSiteUtils.confirm(
                     PreviewConfig.i18n.keyframeExistsConfirm +
-                    `\n\n@keyframes ${name}`
+                    `\n\n@keyframes ${name}`, { type: 'danger' }
                 );
                 if (confirmOverwrite) {
                     const retryResponse = await QuickSiteAdmin.apiRequest('setKeyframes', 'POST', {
@@ -1505,7 +1505,7 @@
     }
     
     async function deleteKeyframe(keyframeName) {
-        if (!confirm(PreviewConfig.i18n.confirmDeleteKeyframe + `\n\n@keyframes ${keyframeName}`)) {
+        if (!(await QuickSiteUtils.confirm(PreviewConfig.i18n.confirmDeleteKeyframe + `\n\n@keyframes ${keyframeName}`, { type: 'danger' }))) {
             return;
         }
         
@@ -1769,7 +1769,7 @@
     async function removeKeyframeFromSelector(keyframeName, selector) {
         const i18n = PreviewConfig.i18n || {};
         const confirmTpl = i18n.keyframeRemoveConfirm || 'Remove animation from {selector}?';
-        if (!confirm(confirmTpl.replace('{selector}', selector))) return;
+        if (!(await QuickSiteUtils.confirm(confirmTpl.replace('{selector}', selector), { type: 'danger' }))) return;
 
         try {
             // Empty styles + removeProperties:['animation'] tells setStyleRule

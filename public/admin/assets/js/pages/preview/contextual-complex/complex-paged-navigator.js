@@ -253,7 +253,7 @@
     window.QSComplexWizard.registry = window.QSComplexWizard.registry || {};
     window.QSComplexWizard.registry['paged-navigator'] = {
         label: window.QSComplexWizard.t('pagedNavigator.label'),
-        description: 'A &lt;nav&gt; bound to a state store. Reads `totalPages` to size itself; numbered buttons + optional Prev/Next chevrons. Click a number → setState(page) → fetchState. Hides when totalPages is missing or ≤ 1.',
+        description: window.QSComplexWizard.t('pagedNavigator.description'),
         renderWizard: renderWizard
     };
 })();

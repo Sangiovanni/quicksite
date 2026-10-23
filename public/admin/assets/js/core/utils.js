@@ -271,90 +271,200 @@ window.QuickSiteUtils = (function() {
     }
 
     // ============================================
-    // Confirmation Dialogs
+    // The panel's dialogs: confirm() and prompt()
     // ============================================
 
+    /** The dialogs open now, the newest last: only the newest answers the keyboard. */
+    const openDialogs = [];
+    let dialogSeq = 0;
+
     /**
-     * Show a confirmation dialog
-     * 
-     * @param {string} message - Message to display
+     * The one modal dialog behind confirm() and prompt().
+     *
+     * It stands in for the browser's own, so it behaves like one: it opens above
+     * every layer of the panel (a modal included), takes the focus (the confirm
+     * button; Cancel for a 'danger' one; the text field of a prompt), keeps Tab
+     * inside, and lets no key reach the page while it is open: the editor's
+     * shortcuts (Delete, Escape), the panel's (g d, ?) and a modal underneath
+     * would otherwise act behind it. Escape and the backdrop cancel. Closing
+     * gives the focus back where it was and drops every listener it added. The
+     * message keeps its line breaks.
+     *
+     * @param {string} message
+     * @param {Object} options   see confirm() and prompt()
+     * @param {boolean} withInput true: a text field (prompt)
+     * @returns {Promise<string|null>} the field's text ('' for a confirm) on OK, null on cancel
+     */
+    function openDialog(message, options, withInput) {
+        return new Promise((resolve) => {
+            const id = 'qs-dialog-' + (++dialogSeq);
+            const type = options.type || 'warning';
+            const previous = document.activeElement;
+
+            const overlay = QSDom.el('div', { class: 'admin-modal-overlay admin-modal-overlay--dialog' });
+            const modal = QSDom.el('div', {
+                class: 'admin-modal-dialog ' + (withInput ? 'admin-modal-dialog--prompt' : 'admin-modal-dialog--confirm'),
+                role: 'dialog',
+                'aria-modal': 'true',
+                'aria-labelledby': id + '-title',
+                'aria-describedby': id + '-message'
+            });
+            const content = QSDom.el('div', { class: 'admin-modal-dialog__content' });
+            if (!withInput) {
+                const iconBox = QSDom.el('div', { class: 'admin-modal-dialog__icon admin-modal-dialog__icon--' + type });
+                // size 0: sized by CSS, as this dialog's inline <svg> always was.
+                const warnIcon = QSDom.iconEl(ICON_PATHS.warning, 0);
+                if (warnIcon) iconBox.appendChild(warnIcon);
+                content.appendChild(iconBox);
+            }
+            // A prompt has no title of its own unless asked: its question is the field's label.
+            const title = withInput ? (options.title || '') : (options.title || tCommon('confirmAction'));
+            if (title) content.appendChild(QSDom.el('h3', { class: 'admin-modal-dialog__title', id: id + '-title', text: title }));
+            let input = null;
+            if (withInput) {
+                content.appendChild(QSDom.el('label', {
+                    class: 'admin-modal-dialog__message', id: title ? id + '-message' : id + '-title', for: id + '-input', text: message
+                }));
+                input = QSDom.el('input', {
+                    class: 'admin-input admin-modal-dialog__input', id: id + '-input', type: 'text', autocomplete: 'off'
+                });
+                input.value = options.defaultValue == null ? '' : String(options.defaultValue);
+                if (options.placeholder) input.placeholder = options.placeholder;
+                content.appendChild(input);
+                if (!title) modal.removeAttribute('aria-describedby');
+            } else {
+                content.appendChild(QSDom.el('p', { class: 'admin-modal-dialog__message', id: id + '-message', text: message }));
+            }
+            const cancelBtn = QSDom.el('button', {
+                type: 'button',
+                class: 'admin-btn admin-btn--secondary admin-modal-dialog__cancel',
+                text: options.cancelText || tCommon('cancel')
+            });
+            const confirmBtn = QSDom.el('button', {
+                type: 'button',
+                class: 'admin-btn admin-btn--' + (options.confirmClass || (type === 'danger' ? 'danger' : 'primary'))
+                    + ' admin-modal-dialog__confirm',
+                text: options.confirmText || tCommon('confirm')
+            });
+            content.appendChild(QSDom.el('div', { class: 'admin-modal-dialog__actions' }, [cancelBtn, confirmBtn]));
+            modal.appendChild(content);
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+
+            const focusable = () => (input ? [input, cancelBtn, confirmBtn] : [cancelBtn, confirmBtn]);
+            const first = input || (type === 'danger' ? cancelBtn : confirmBtn);
+            const entry = { overlay };
+            let closed = false;
+
+            const close = (result) => {
+                if (closed) return;
+                closed = true;
+                window.removeEventListener('keydown', onKey, true);
+                openDialogs.splice(openDialogs.indexOf(entry), 1);
+                overlay.classList.remove('admin-modal-overlay--visible');
+                setTimeout(() => overlay.remove(), 300);
+                if (previous && previous !== document.body && previous.isConnected && typeof previous.focus === 'function') {
+                    previous.focus();
+                }
+                resolve(result);
+            };
+            const ok = () => close(input ? input.value : '');
+            const cancel = () => close(null);
+
+            // Window, capture phase: before any listener of the page sees the key.
+            function onKey(e) {
+                if (openDialogs[openDialogs.length - 1] !== entry) return;
+                e.stopPropagation();
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    cancel();
+                    return;
+                }
+                if (!modal.contains(e.target)) {
+                    // The focus got out (a script moved it): the key is not the page's either.
+                    e.preventDefault();
+                    first.focus();
+                    return;
+                }
+                if (e.key === 'Enter' && e.target === input) {
+                    e.preventDefault();
+                    ok();
+                    return;
+                }
+                if (e.key === 'Tab') {
+                    const list = focusable();
+                    const at = list.indexOf(e.target);
+                    const next = e.shiftKey
+                        ? (at <= 0 ? list[list.length - 1] : null)
+                        : (at === list.length - 1 || at < 0 ? list[0] : null);
+                    if (next) {
+                        e.preventDefault();
+                        next.focus();
+                    }
+                }
+            }
+
+            cancelBtn.addEventListener('click', cancel);
+            confirmBtn.addEventListener('click', ok);
+            overlay.addEventListener('click', (e) => {
+                if (e.target === overlay) cancel();
+            });
+            openDialogs.push(entry);
+            window.addEventListener('keydown', onKey, true);
+            first.focus();
+            if (input) input.select();
+
+            // Animate in
+            requestAnimationFrame(() => overlay.classList.add('admin-modal-overlay--visible'));
+        });
+    }
+
+    /**
+     * Ask the user to confirm: the panel's dialog in place of the browser's
+     * window.confirm(), as a promise of the answer.
+     *
+     * @param {string} message - Message to display (its line breaks are kept)
      * @param {Object} [options={}] - Dialog options
      * @param {string} [options.title='Confirm Action'] - Dialog title
-     * @param {string} [options.type='warning'] - Icon type: warning, danger, info
+     * @param {string} [options.type='warning'] - Icon type: warning, danger, info. 'danger' is
+     *        for an action that destroys or overwrites: Cancel takes the focus, the button is red.
      * @param {string} [options.confirmText='Confirm'] - Confirm button text
      * @param {string} [options.cancelText='Cancel'] - Cancel button text
-     * @param {string} [options.confirmClass='primary'] - Confirm button class
+     * @param {string} [options.confirmClass] - Confirm button class ('danger' for a 'danger'
+     *        dialog, else 'primary')
      * @returns {Promise<boolean>} True if confirmed, false if cancelled
-     * 
+     *
      * @example
      * const confirmed = await QuickSiteUtils.confirm('Delete this item?', {
      *     title: 'Confirm Delete',
      *     type: 'danger',
-     *     confirmText: 'Delete',
-     *     confirmClass: 'danger'
+     *     confirmText: 'Delete'
      * });
      */
     async function confirm(message, options = {}) {
-        return new Promise((resolve) => {
-            const overlay = document.createElement('div');
-            overlay.className = 'admin-modal-overlay';
-            
-            const modal = document.createElement('div');
-            modal.className = 'admin-modal-dialog admin-modal-dialog--confirm';
-            const iconBox = QSDom.el('div', {
-                class: 'admin-modal-dialog__icon admin-modal-dialog__icon--' + (options.type || 'warning')
-            });
-            // size 0: sized by CSS, as this dialog's inline <svg> always was.
-            const warnIcon = QSDom.iconEl(ICON_PATHS.warning, 0);
-            if (warnIcon) iconBox.appendChild(warnIcon);
+        return (await openDialog(message, options, false)) !== null;
+    }
 
-            modal.appendChild(QSDom.el('div', { class: 'admin-modal-dialog__content' }, [
-                iconBox,
-                QSDom.el('h3', {
-                    class: 'admin-modal-dialog__title',
-                    text: options.title || tCommon('confirmAction')
-                }),
-                QSDom.el('p', { class: 'admin-modal-dialog__message', text: message }),
-                QSDom.el('div', { class: 'admin-modal-dialog__actions' }, [
-                    QSDom.el('button', {
-                        class: 'admin-btn admin-btn--secondary admin-modal-dialog__cancel',
-                        text: options.cancelText || tCommon('cancel')
-                    }),
-                    QSDom.el('button', {
-                        class: 'admin-btn admin-btn--' + (options.confirmClass || 'primary')
-                            + ' admin-modal-dialog__confirm',
-                        text: options.confirmText || tCommon('confirm')
-                    })
-                ])
-            ]));
-
-            overlay.appendChild(modal);
-            document.body.appendChild(overlay);
-
-            // Animate in
-            requestAnimationFrame(() => overlay.classList.add('admin-modal-overlay--visible'));
-
-            const cleanup = (result) => {
-                overlay.classList.remove('admin-modal-overlay--visible');
-                setTimeout(() => overlay.remove(), 300);
-                resolve(result);
-            };
-
-            modal.querySelector('.admin-modal-dialog__cancel').addEventListener('click', () => cleanup(false));
-            modal.querySelector('.admin-modal-dialog__confirm').addEventListener('click', () => cleanup(true));
-            overlay.addEventListener('click', (e) => {
-                if (e.target === overlay) cleanup(false);
-            });
-
-            // Close on Escape
-            const escHandler = (e) => {
-                if (e.key === 'Escape') {
-                    cleanup(false);
-                    document.removeEventListener('keydown', escHandler);
-                }
-            };
-            document.addEventListener('keydown', escHandler);
-        });
+    /**
+     * Ask the user for a line of text: the panel's dialog in place of the
+     * browser's window.prompt(), as a promise of the text.
+     *
+     * @param {string} message - The question, the text field's label (its line breaks are kept)
+     * @param {Object} [options={}] - Dialog options
+     * @param {string} [options.defaultValue=''] - The field's text when it opens (selected)
+     * @param {string} [options.placeholder] - The field's placeholder
+     * @param {string} [options.title] - A title above the question (none by default)
+     * @param {string} [options.confirmText='Confirm'] - OK button text
+     * @param {string} [options.cancelText='Cancel'] - Cancel button text
+     * @returns {Promise<string|null>} The text on OK (Enter in the field is OK; '' when left
+     *          empty), null on Cancel, Escape or the backdrop
+     *
+     * @example
+     * const name = await QuickSiteUtils.prompt('Component name:', { defaultValue: 'card' });
+     * if (name === null) return;
+     */
+    async function prompt(message, options = {}) {
+        return openDialog(message, options, true);
     }
 
     // ============================================
@@ -536,9 +646,10 @@ window.QuickSiteUtils = (function() {
         // Toast Notifications
         showToast,
         
-        // Confirmation Dialogs
+        // Dialogs
         confirm,
-        
+        prompt,
+
         // Clipboard
         copyToClipboard,
         

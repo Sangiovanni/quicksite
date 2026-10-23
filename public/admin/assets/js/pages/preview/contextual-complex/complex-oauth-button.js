@@ -518,7 +518,7 @@
     window.QSComplexWizard.registry = window.QSComplexWizard.registry || {};
     window.QSComplexWizard.registry['oauth-button'] = {
         label: 'Sign in with OAuth',
-        description: 'A &lt;a&gt; "Sign in with X" button. The wizard also creates the start + callback routes and attaches the matching oauth resolvers in one pass — only the secrets file needs manual setup.',
+        description: window.QSComplexWizard.t('oauthButton.description'),
         renderWizard: renderWizard
     };
 })();

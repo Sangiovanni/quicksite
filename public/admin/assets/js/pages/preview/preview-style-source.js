@@ -18,7 +18,7 @@
  *   PreviewStyleSource.leave()        — Source deactivates; unsaved edits are kept
  *   PreviewStyleSource.isActive()     — current activation state
  *   PreviewStyleSource.getEditor()    — QSCodeEditor instance or null
- *   PreviewStyleSource.isDirty() / canLeave() / save() / cancel()
+ *   PreviewStyleSource.isDirty() / canLeave() / confirmLeave() / save() / cancel()
  */
 (function () {
     'use strict';
@@ -322,14 +322,17 @@
         // the current page.
         if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
         if (!_isDirty) return;
-        if (!window.confirm(t('styleSourceLeaveConfirm'))) {
-            e.preventDefault();
-            return;
-        }
-        // User confirmed — the draft takes the edits (Source offers them back on return), and the
-        // native beforeunload prompt is suppressed so they are not asked twice.
-        flushDraft();
-        _navigationConsented = true;
+        // The panel's dialog answers later, so the click is held and the link followed once confirmed.
+        e.preventDefault();
+        var href = _refineLink.href;
+        QuickSiteUtils.confirm(t('styleSourceLeaveConfirm')).then(function (ok) {
+            if (!ok) return;
+            // The draft takes the edits (Source offers them back on return), and the browser's
+            // beforeunload prompt is suppressed so they are not asked twice.
+            flushDraft();
+            _navigationConsented = true;
+            window.location.href = href;
+        });
     }
 
     // Build a save-error message that surfaces the SPECIFIC reason the server gave (e.g. "Remote
@@ -423,8 +426,9 @@
 
     function cancelEdit() {
         if (!_isDirty || _isSaving) return;
-        if (!window.confirm(t('styleSourceCancelConfirm'))) return;
-        reloadFromServer();
+        QuickSiteUtils.confirm(t('styleSourceCancelConfirm'), { type: 'danger' }).then(function (ok) {
+            if (ok) reloadFromServer();
+        });
     }
 
     // Discard the unsaved edits and load style.css as it is now: the conflict notice's Reload, and
@@ -642,12 +646,16 @@
     }
 
     // ── Cross-tab / cross-mode guard ──
-    // Returns true if the caller may leave Source; false if the user answered the prompt by staying.
-    // Leaving discards nothing: the prompt says where unsaved edits go.
+    // canLeave(): true when the caller may leave Source without asking. When it is false the caller
+    // asks with confirmLeave(), a promise of the answer, and leaves only on true. Leaving discards
+    // nothing: the dialog says where unsaved edits go.
     function canLeave() {
         if (!_isDirty) return true;
-        if (_isSaving) return true;  // let in-flight save finish naturally
-        return window.confirm(t('styleSourceSwitchConfirm'));
+        return _isSaving;  // let an in-flight save finish naturally
+    }
+
+    function confirmLeave() {
+        return QuickSiteUtils.confirm(t('styleSourceSwitchConfirm'));
     }
 
     // ── Search ──
@@ -908,6 +916,7 @@
         getEditor: getEditor,
         isDirty:   function () { return _isDirty; },
         canLeave:  canLeave,
+        confirmLeave: confirmLeave,
         save:      saveStyles,
         cancel:    cancelEdit
     };

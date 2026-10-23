@@ -165,7 +165,8 @@ foreach ($tagCategories as $catId => $category) {
         <p class="tag-selector__preview-desc" id="<?= $selectorId ?>-tag-preview-desc">
             <?= __admin('preview.tagDesc.div') ?? 'Generic container' ?>
         </p>
-        <div class="tag-selector__preview-render" id="<?= $selectorId ?>-tag-preview-render">
+        <!-- The example is a visitor's markup: its titles stay the browser's, never the panel's bubble -->
+        <div class="tag-selector__preview-render" id="<?= $selectorId ?>-tag-preview-render" data-qs-native-title>
             <?= getTagExample('div') ?>
         </div>
         <div class="tag-selector__preview-code" id="<?= $selectorId ?>-tag-preview-code" style="display: none;">

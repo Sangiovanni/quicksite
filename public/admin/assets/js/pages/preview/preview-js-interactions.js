@@ -57,6 +57,7 @@
     // dropdown with inline search. Refresh() called after every
     // populate so the dropdown stays in sync with rebuilt options.
     let jsFnPicker = null; // wraps jsFormFunction
+    let jsEventPicker = null; // wraps jsFormEvent
     let peFnPicker = null; // wraps peFormFunction
     let jsFormApi = null;
     let jsFormEndpoint = null;
@@ -178,6 +179,17 @@
         jsFormFunction = document.getElementById('js-form-function');
         jsFormFunctionShowAll = document.getElementById('js-form-function-show-all');
         jsFormFunctionDetails = document.getElementById('js-form-function-details');
+
+        // The event list is the panel's own dropdown: a native list is drawn
+        // outside the page, where neither an event's description line nor the
+        // bubble reaches.
+        if (jsFormEvent && window.QSSearchableSelect && !jsEventPicker) {
+            jsEventPicker = new window.QSSearchableSelect(jsFormEvent, {
+                placeholder: PreviewConfig.i18n.selectEvent,
+                searchPlaceholder: PreviewConfig.i18n.searchEvents,
+                emptyText: PreviewConfig.i18n.noEventsMatch
+            });
+        }
 
         // Wrap the function select with the searchable combobox.
         // Idempotent — load-guard on the class itself prevents double-wrap.
@@ -743,7 +755,7 @@
         if (!currentJsContext) return;
         
         const confirmMsg = PreviewConfig.i18n?.confirmDeleteInteraction || 'Delete this interaction?';
-        if (!confirm(confirmMsg)) {
+        if (!(await QuickSiteUtils.confirm(confirmMsg, { type: 'danger' }))) {
             return;
         }
         
@@ -869,6 +881,7 @@
 
         // Pre-fill event dropdown
         if (jsFormEvent) jsFormEvent.value = interaction.event;
+        if (jsEventPicker) jsEventPicker.refresh();
 
         // Saved interactions don't carry an explicit "authored in API
         // mode" marker — both modes serialise identically as
@@ -1102,6 +1115,7 @@
 
         // Reset form
         if (jsFormEvent) jsFormEvent.value = '';
+        if (jsEventPicker) jsEventPicker.refresh();
         if (jsFormActionType) jsFormActionType.value = 'function';
         if (jsFormFunctionSection) jsFormFunctionSection.style.display = '';
         if (jsFormApiSection) jsFormApiSection.classList.remove('visible');
@@ -3292,7 +3306,8 @@
 
     /**
      * Populate event dropdown as three <optgroup>s: Common / Less common / Advanced.
-     * Each <option> carries a `title` attribute for native browser tooltips.
+     * Each <option> carries its event's tooltip as data-description, which the
+     * event picker shows under the event (and whole in the bubble).
      */
     function populateEventDropdown() {
         if (!jsFormEvent) return;
@@ -3318,11 +3333,13 @@
                 const option = document.createElement('option');
                 option.value = ev;
                 option.textContent = ev;
-                option.title = eventTooltip(ev);
+                const tooltip = eventTooltip(ev);
+                if (tooltip !== ev) option.dataset.description = tooltip;
                 optgroup.appendChild(option);
             });
             jsFormEvent.appendChild(optgroup);
         });
+        if (jsEventPicker) jsEventPicker.refresh();
     }
     
     /**
@@ -4391,7 +4408,7 @@
      */
     async function deletePageEvent(eventName, index) {
         if (!currentPageName) return;
-        if (!confirm(PreviewConfig.i18n?.confirmDeleteInteraction || 'Delete this interaction?')) return;
+        if (!(await QuickSiteUtils.confirm(PreviewConfig.i18n?.confirmDeleteInteraction || 'Delete this interaction?', { type: 'danger' }))) return;
         
         try {
             var response = await QuickSiteAdmin.apiRequest('deletePageEvent', 'DELETE', { pageName: currentPageName, event: eventName, index: index });
@@ -4995,7 +5012,7 @@
      */
     async function deleteStore(id) {
         if (!currentPageName) return;
-        if (!confirm((PreviewConfig.i18n?.confirmDeleteStateStore || 'Delete state store "%s"?').replace('%s', id))) return;
+        if (!(await QuickSiteUtils.confirm((PreviewConfig.i18n?.confirmDeleteStateStore || 'Delete state store "%s"?').replace('%s', id), { type: 'danger' }))) return;
         var stores = Object.assign({}, ssCurrentStores);
         delete stores[id];
         try {

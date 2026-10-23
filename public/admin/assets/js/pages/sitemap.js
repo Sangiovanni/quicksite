@@ -987,7 +987,7 @@
             ? t('deleteConfirmChildren', 'Delete route and children?').replace('{route}', route).replace('{count}', childCount)
             : t('deleteConfirm', 'Delete route?').replace('{route}', route);
 
-        if (!confirm(message)) return;
+        if (!(await QuickSiteUtils.confirm(message, { type: 'danger' }))) return;
 
         try {
             const body = { route };
@@ -2956,7 +2956,7 @@
     async function clearResolverFromModal() {
         const refs = _ensureResolverRefs();
         if (!_resolverCurrentRoute) return;
-        if (!confirm(t('resolverClearConfirm', 'Clear the resolver from this route? The route will render again without server-side data.'))) {
+        if (!(await QuickSiteUtils.confirm(t('resolverClearConfirm', 'Clear the resolver from this route? The route will render again without server-side data.'), { type: 'danger' }))) {
             return;
         }
 
@@ -3254,7 +3254,7 @@
         const confirmMsg = isLast
             ? t('resolverListRemoveLastConfirm', 'Remove the only resolver on this route? The route will render without server-side data.')
             : t('resolverListRemoveConfirm', 'Remove resolver r' + idx + ' from this route?');
-        if (!confirm(confirmMsg)) return;
+        if (!(await QuickSiteUtils.confirm(confirmMsg, { type: 'danger' }))) return;
 
         refs.status.textContent = t('removing', 'Removing…');
         refs.status.style.color = '';

@@ -17,6 +17,28 @@
     var DEFAULT_LANG = (window.QUICKSITE_CONFIG && window.QUICKSITE_CONFIG.defaultLang) || 'en';
 
     var RETENTION_PRESETS = ['session', '1d', '7d', '30d', '90d', '1y', 'persistent'];
+
+    // The words of this page's dialogs and error toasts: window.QS_STORAGE_I18N, the `storage` translations
+    // storage.php writes verbatim. t(path, params) substitutes `:name` markers and returns the
+    // path itself when nothing resolves, so an untranslated string shows on screen.
+    function t(path, params) {
+        var node = window.QS_STORAGE_I18N || {};
+        var parts = String(path).split('.');
+        for (var i = 0; i < parts.length; i++) {
+            if (node === null || typeof node !== 'object' || !(parts[i] in node)) return path;
+            node = node[parts[i]];
+        }
+        if (typeof node !== 'string') return path;
+        Object.keys(params || {}).forEach(function (name) {
+            node = node.split(':' + name).join(String(params[name]));
+        });
+        return node;
+    }
+
+    /** A failure the user must see: the panel's error toast. */
+    function showError(text) {
+        QuickSiteUtils.showToast(text, 'error');
+    }
     var SAMESITE_OPTIONS = ['Lax', 'Strict', 'None'];
 
     var state = {
@@ -315,19 +337,18 @@
             var pdata = (preview && preview.data && (preview.data.data || preview.data)) || {};
             var moved = pdata.moved || 0;
             var overwrites = pdata.overwrites || 0;
-            var msg = 'Change the description language from "' + current + '" to "' + target + '"?\n\n'
-                + 'This moves ' + moved + ' description' + (moved === 1 ? '' : 's') + ' into "' + target + '".';
+            var msg = t('storage.dialogs.descLangChange', { from: current, to: target }) + '\n\n'
+                + t(moved === 1 ? 'storage.dialogs.descLangMovesOne' : 'storage.dialogs.descLangMovesMany', { n: moved, to: target });
             if (overwrites > 0) {
-                msg += '\n\n⚠ ' + overwrites + ' existing "' + target + '" description'
-                    + (overwrites === 1 ? '' : 's') + ' will be OVERWRITTEN.';
+                msg += '\n\n' + t(overwrites === 1 ? 'storage.dialogs.descLangOverwritesOne' : 'storage.dialogs.descLangOverwritesMany', { n: overwrites, to: target });
             }
-            if (!window.confirm(msg)) {
+            if (!(await QuickSiteUtils.confirm(msg, { type: overwrites > 0 ? 'danger' : 'warning' }))) {
                 sel.value = current; sel.disabled = false; return;
             }
             var done = await api('setStorageDescLang', 'POST', { lang: target, confirm: true });
             if (!done || !done.ok) {
                 sel.value = current; sel.disabled = false;
-                window.alert((done && done.data && done.data.message) || 'Failed to change description language');
+                showError((done && done.data && done.data.message) || t('storage.errors.descLangFailed'));
                 return;
             }
             await refresh();
@@ -883,7 +904,7 @@
         if (hasPage) {
             var delBtn = QSDom.el('button', { class: 'admin-btn admin-btn--ghost storage-modal-actions__btn--danger', type: 'button', text: 'Delete page' });
             delBtn.addEventListener('click', async function () {
-                if (!window.confirm('Delete the cookie-policy page at ' + status.policyRoute + '? This removes the route and its page.')) return;
+                if (!(await QuickSiteUtils.confirm(t('storage.dialogs.deletePage', { route: status.policyRoute }), { type: 'danger' }))) return;
                 delBtn.disabled = true; errBox.hidden = true;
                 try {
                     var dr = await api('deleteCookiePolicy', 'POST', {});
@@ -933,7 +954,7 @@
                 var pr = await api('generateCookiePolicy', 'POST', opts.isUpdate ? { route: policyRoute, overwrite: true } : { route: policyRoute });
                 var pd = (pr && pr.data && (pr.data.data || pr.data)) || {};
                 if (pr && !pr.ok && pd.needsConfirm) {
-                    if (window.confirm('Route /' + policyRoute + ' already exists. Overwrite its content with the cookie-policy page?')) {
+                    if (await QuickSiteUtils.confirm(t('storage.dialogs.overwritePage', { route: policyRoute }), { type: 'danger' })) {
                         pr = await api('generateCookiePolicy', 'POST', { route: policyRoute, overwrite: true });
                         pd = (pr && pr.data && (pr.data.data || pr.data)) || {};
                     } else {

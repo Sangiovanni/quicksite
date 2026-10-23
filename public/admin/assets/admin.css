@@ -5683,6 +5683,21 @@ kbd {
     visibility: visible;
 }
 
+/* The panel's own dialogs (QuickSiteUtils.confirm / prompt) stand in for the
+   browser's, so they open above every layer of the panel, a modal included (the
+   keyframe editor and the resolver modals sit at 10000 to 10002, the property
+   selector's dropdown at 100002), and below the hover bubble (100100). Visible
+   from the start, so the dialog can take the focus at once (it fades in by its
+   opacity); while it fades out it lets the pointer through. */
+.admin-modal-overlay--dialog {
+    z-index: 100050;
+    visibility: visible;
+}
+
+.admin-modal-overlay--dialog:not(.admin-modal-overlay--visible) {
+    pointer-events: none;
+}
+
 .admin-modal-dialog {
     background: var(--admin-bg-secondary);
     border: 1px solid var(--admin-border);
@@ -5720,6 +5735,21 @@ kbd {
 .admin-modal-dialog__message {
     margin: 0 0 var(--space-xl);
     color: var(--admin-text-muted);
+    /* A message keeps its line breaks, as the browser's dialog kept them. */
+    white-space: pre-line;
+}
+
+/* A prompt: the question is the field's label, the field under it. */
+.admin-modal-dialog--prompt .admin-modal-dialog__message {
+    display: block;
+    margin-bottom: var(--space-md);
+}
+
+.admin-modal-dialog__input {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    margin: 0 0 var(--space-xl);
 }
 
 .admin-modal-dialog__actions {

@@ -42,14 +42,15 @@ The requirement lives at the shared account-creation path rather than in the pag
 2. `core/storage-keys.js` → defines `window.QuickSiteStorageKeys` (single source of truth for localStorage / sessionStorage key strings).
 3. `core/dom.js` → defines `window.QSDom`, in `<head>` so page scripts can use it at parse time.
 4. `core/searchable-select.js` → the type-ahead select widget.
-5. Inline `<script>` defines `window.QUICKSITE_CONFIG` (apiBase, adminBase, baseUrl, publicSpace, defaultLang, multilingual, translations, token, …). The `token` is the panel session's **per-session token**, sent back on every management call as `Authorization: Bearer` so the server can tell the call came from a page of this session. It is not a credential on its own — the session cookie is — and it MUST come before the scripts below, because `api.js` seeds from it and `admin.js` loads permissions at parse time.
-6. `core/api.js` → defines `window.QuickSiteAPI` (`request()`, `upload()`; emits `quicksite:command-executed` after every successful write). Holds the session token in memory and sends it with every call alongside the session cookie. There is nothing to refresh or expire client-side: a session ends by signing out, by going idle, or by the account's session generation being bumped, and all three surface as a `401` that sends the user to the login page. `setTokenSource(fn)` lets an embedding platform plug its own token provider, and that is the only case with a transparent retry.
-7. `core/utils.js` → defines `window.QuickSiteUtils` (toasts, confirms, escaping, prefs, pending messages).
-8. `core/members-badge.js` → the membership counts behind the Members nav badge.
-9. `admin.js` → defines `window.QuickSiteAdmin` (singleton: permissions load, user badge, nav, page utility delegation).
-10. `core/update-notice.js` → emitted **only** for an account named in `operator.php`, so nobody else downloads it. After `api.js`, which is where its helper call comes from.
-11. Inline `<script>` sets `QUICKSITE_CONFIG.apiUrl` (skipped on the login page).
-12. The page template loads its page-specific module(s). For preview pages, `preview-config.php` runs first and exposes `window.PreviewConfig`.
+5. `core/bubble.js` → the panel's hover bubble (§5.1, *Tooltips*). Defines no global: it listens on the document and builds its element on first use.
+6. Inline `<script>` defines `window.QUICKSITE_CONFIG` (apiBase, adminBase, baseUrl, publicSpace, defaultLang, multilingual, translations, token, …). The `token` is the panel session's **per-session token**, sent back on every management call as `Authorization: Bearer` so the server can tell the call came from a page of this session. It is not a credential on its own — the session cookie is — and it MUST come before the scripts below, because `api.js` seeds from it and `admin.js` loads permissions at parse time.
+7. `core/api.js` → defines `window.QuickSiteAPI` (`request()`, `upload()`; emits `quicksite:command-executed` after every successful write). Holds the session token in memory and sends it with every call alongside the session cookie. There is nothing to refresh or expire client-side: a session ends by signing out, by going idle, or by the account's session generation being bumped, and all three surface as a `401` that sends the user to the login page. `setTokenSource(fn)` lets an embedding platform plug its own token provider, and that is the only case with a transparent retry.
+8. `core/utils.js` → defines `window.QuickSiteUtils` (toasts, the panel's dialogs `confirm()` and `prompt()`, escaping, prefs, pending messages).
+9. `core/members-badge.js` → the membership counts behind the Members nav badge.
+10. `admin.js` → defines `window.QuickSiteAdmin` (singleton: permissions load, user badge, nav, page utility delegation).
+11. `core/update-notice.js` → emitted **only** for an account named in `operator.php`, so nobody else downloads it. After `api.js`, which is where its helper call comes from.
+12. Inline `<script>` sets `QUICKSITE_CONFIG.apiUrl` (skipped on the login page).
+13. The page template loads its page-specific module(s). For preview pages, `preview-config.php` runs first and exposes `window.PreviewConfig`.
 
 Any reorder breaks the chain. Treat the load order as a published contract.
 
@@ -99,13 +100,45 @@ File lists are grouped by role. Where useful, the entry point or main exported f
 | File | Purpose |
 |---|---|
 | `js/core/api.js` | `QuickSiteAPI.request` + `upload`; in-memory session token sent with the session cookie (`setTokenSource` seam for embedders); emits `quicksite:command-executed`; keeps the write allowance current from each answer's headers (`getWriteRate`, `countsAsWrite`) and emits `quicksite:write-rate`. |
-| `js/core/utils.js` | `QuickSiteUtils`: toasts, confirms, escaping, prefs storage, pending messages. |
+| `js/core/utils.js` | `QuickSiteUtils`: toasts, the panel's dialogs (`confirm()`, `prompt()`: *Dialogs* below), escaping, prefs storage, pending messages. |
 | `js/core/storage-keys.js` | Constants for every localStorage / sessionStorage key (`window.QuickSiteStorageKeys`). |
 | `js/core/dom.js` | `window.QSDom`: shared `el()` element factory + `svgIcon()` + `clear()` + `setSelectPlaceholder()` (resets a `<select>` to a single placeholder option) — the createElement/textContent idiom for dynamic DOM. Loaded in `<head>` so page scripts can use it at parse time. |
+| `js/core/bubble.js` + `css/bubble.css` | The panel's hover bubble: every `title` in the panel shows through it (*Tooltips* below). Loaded in `<head>`; exposes nothing — it listens on the document. |
 | `js/core/members-badge.js` | Membership counts (inbox awaiting me + queue awaiting my adjudication) → the Members nav badge; publishes `window.QSMembershipCounts` + the `quicksite:membership-counts-updated` event; recomputes on `quicksite:memberships-changed`. |
-| `js/core/searchable-select.js` | Type-ahead select widget for long option lists; loaded by `layout.php` and used by the visual editor's pickers. |
+| `js/core/searchable-select.js` | Type-ahead select widget for long option lists; loaded by `layout.php` and used by the visual editor's pickers. An option's description shows as a line under it and, whole, in the bubble (§9.9.2). |
 | `js/core/update-notice.js` | The operator update banner (§9.14). Loaded **only** for an account named in `operator.php`; calls the `update-check` helper arm, throttles to one call per six hours, and renders a dismissible notice. |
 | `admin.js` | Singleton `QuickSiteAdmin`: permissions, user badge, nav, delegation. |
+
+**Tooltips: the panel's bubble.** A tooltip in the panel is a plain `title` attribute, in a
+template or written by a script; `bubble.js` shows it instead of the browser. It shows on mouse
+hover after half a second (at once when moving from one titled element to the next) and at once
+on keyboard focus, below the element or above it when there is no room, always inside the
+window. It shows the title as text, never markup, with its line breaks. It hides when the
+pointer leaves or the focus moves on; Escape and a click hide it until the pointer leaves; so
+does a scroll. A touch shows nothing, as a title never did.
+
+| Case | What happens |
+|---|---|
+| Hover | The nearest title up the tree, as the browser picks it: an empty `title=""` on the way means none. |
+| Keyboard focus | The focused element's own title, or that of the `<label>` it sits in. A title on a larger group does not show for each control inside it. A focus by mouse shows nothing. |
+| While it shows | The element's `title` is set to `""` (which keeps the browser from drawing its own tooltip beside the bubble) and given back afterwards. A script that changes the title meanwhile is shown at once; one that clears or removes it leaves it cleared. |
+| Screen readers | Nothing changes at rest. While it shows, the element is described by the bubble (`aria-describedby`), or named by its text (`aria-label`) when the title was its only name. |
+| Stays the browser's | An `<iframe>`'s title (its accessible name), an `<option>`'s (a native list is drawn outside the page), and any title inside an element marked `data-qs-native-title` — the tag preview, which shows a visitor's markup as a browser shows it. |
+
+**Dialogs: the panel's own.** The panel never calls the browser's `confirm()`, `prompt()` or
+`alert()`. It asks with `QuickSiteUtils.confirm(message, options)`, a promise of `true` or `false`,
+and `QuickSiteUtils.prompt(message, options)`, a promise of the text typed (`''` when left empty)
+or `null`. A failure it must report goes to the error toast (`showToast(text, 'error')`). Because
+the answer comes later, the action a question guards runs only once the answer is yes: a link
+whose click it holds is followed afterwards, a mode or tab switch happens afterwards.
+
+| | The panel's dialog |
+|---|---|
+| Where | Above every layer of the panel, a modal included (the keyframe editor, the resolver modals), and under the bubble. |
+| Focus | It takes the focus: the confirm button, **Cancel** for a `type: 'danger'` one (a question before a delete or an overwrite: its button is red), the text field of a prompt (Enter there is OK). Tab stays inside. Closing gives the focus back where it was. |
+| Keys | While it is open no key reaches the page: not the editor's shortcuts (Delete, Escape), not the panel's (`g d`, `?`), not a modal underneath. Escape and a click on the backdrop answer no. |
+| Words | Its message keeps its line breaks and is shown as text. Default title *Confirm Action* and buttons *Confirm* / *Cancel* (`common`), or the `title`, `confirmText`, `cancelText` given; a prompt has no title unless given, its question is the field's label, and `defaultValue` / `placeholder` fill the field. |
+| The one exception | Leaving the page with unsaved CSS Source edits (closing the tab, reloading) is the browser's own `beforeunload` question: a page cannot replace it (§8.10). |
 
 ### 5.2 Shared components
 
@@ -259,6 +292,8 @@ Two other cookies exist, both HttpOnly and neither readable by page scripts. `QS
 | `templates/pages/apis.php` | `window.QS_APIS_I18N` | the `apis` and `common` sub-trees, verbatim |
 | `templates/pages/embed-security.php` | extends `QUICKSITE_CONFIG` + `window.QS_EMBED_SECURITY_I18N` | `baseUrl`; the `embedSecurity` sub-tree, verbatim |
 | `templates/pages/media.php` | `window.QS_MEDIA_I18N` | the `media` and `common` sub-trees, verbatim |
+| `templates/pages/privacy.php` | `window.QS_PRIVACY_I18N` | the `privacy` sub-tree, verbatim: the words of the page's dialogs and error toasts (the rest of the page is written in the code) |
+| `templates/pages/storage.php` | `window.QS_STORAGE_I18N` | the `storage` sub-tree, verbatim: the words of the page's dialogs and error toasts (likewise) |
 | `templates/pages/preview-config.php` | `window.PreviewConfig` | full preview runtime data — routes, components, settings, i18n, token (200+ fields), plus `tagInfo` (`TagRegistry::editorPayload()` — the tag classification, mandatory params, per-tag defaults and translation-key params the editor works from) |
 | `templates/pages/ai-connections.php` | `window.QSAC_ASSET_BASE` + `window.QS_AI_CONNECTIONS_I18N` | the asset base the provider logos load from, so they resolve when the panel is not served from the domain root; the `aiConnections` and `common` sub-trees, verbatim |
 | `templates/pages/optimize.php` | `data-lib-ready` on `.optimize-page` + `window.CSSRefiner.t` + `window.QS_OPTIMIZE_I18N` | `data-lib-ready` is `"true"` only when the CSS Refiner library is installed, and `optimize.js` does nothing otherwise; `CSSRefiner.t` is a passthrough that returns its key unchanged; the `optimize` and `common` sub-trees, verbatim |
@@ -271,7 +306,7 @@ A sub-tree emitted **verbatim** is the output of `AdminTranslation::getRaw()`, u
 
 `currentProject` is the user's **edited** project (their `selected_project`, §8.0) — the client prepends a `p/<currentProject>/` marker to project-scoped Management calls so the server acts on it; `globalCommands` is the set of commands called without that marker. There is no schema or runtime validation on injected objects, and page-level extensions of `QUICKSITE_CONFIG` can silently overwrite global fields. Treat the injected globals as read-only by convention.
 
-`writeRate` is the account's write rate as the page loads (COMMAND_API.md *Per-user resource limits*): every window with what is left of it and when it frees, the batch runner's wait limit, the commands that never count, and a short tag naming the account in browser storage (never its id). It is `null` on the sign-in pages. From then on `js/core/api.js` keeps it current from the `RateLimit` / `RateLimit-Policy` headers of every counted answer (`QuickSiteAPI.getWriteRate()`, `countsAsWrite()`), and says a write-rate refusal in the panel's language. Whenever a window is set, the **header shows what is left** of the window closest to its limit — every window on hover — and redraws when an answer moves it or a window refills; with no window it shows nothing. Every Management call in the panel goes through the API client, so no write escapes the figure.
+`writeRate` is the account's write rate as the page loads (COMMAND_API.md *Per-user resource limits*): every window with what is left of it and when it frees, the batch runner's wait limit, the commands that never count, and a short tag naming the account in browser storage (never its id). It is `null` on the sign-in pages. From then on `js/core/api.js` keeps it current from the `RateLimit` / `RateLimit-Policy` headers of every counted answer (`QuickSiteAPI.getWriteRate()`, `countsAsWrite()`), and says a write-rate refusal in the panel's language. Whenever a window is set, the **header shows what is left** of the window closest to its limit — every window, one per line, in the panel's bubble on hover and on keyboard focus — and redraws when an answer moves it or a window refills; with no window it shows nothing. Every Management call in the panel goes through the API client, so no write escapes the figure.
 
 ---
 
@@ -416,7 +451,11 @@ selects with all their options, lists, field rows with the
 
 `secure/admin/templates/pages/preview/contextual-add.php` adds the
 "Complex" tab. When selected, the wizard area shows:
-1. A **kind picker** (dropdown) listing every registered wizard.
+1. A **kind picker** listing every registered wizard: the panel's own
+   dropdown (`QSSearchableSelect`, §9.9.2), with a search field. Under
+   each kind its description shows as a line (two lines at most), and
+   whole in the bubble on hover — a browser's native list is drawn outside
+   the page, where neither could reach.
 2. The **kind-specific form** rendered by that wizard's
    `renderWizard(container)`.
 3. The standard footer **Save** button calls the controller's
@@ -456,8 +495,8 @@ new file, no registration.
 
 ```js
 window.QSComplexWizard.registry['<kind>'] = {
-    label: QSComplexWizard.t('<kind>.label'),               // the picker's option
-    description: QSComplexWizard.t('<kind>.description'),   // its tooltip, plain text
+    label: QSComplexWizard.t('<kind>.label'),               // its name in the kind picker
+    description: QSComplexWizard.t('<kind>.description'),   // its line there, plain text (`<nav>`, not `&lt;nav&gt;`)
     renderWizard: function (container) {
         // Populate `container`. Return:
         return {
@@ -732,8 +771,8 @@ Match highlighting paints into a separate `<pre>` overlay layer (between the hig
 Selectors, media queries, variable names, and declaration blocks additionally may not contain a raw `{` or `}` (which would break out of the rule) — the `>` child combinator, pseudo-classes, and attribute selectors are all fine.
 
 **Dirty guards.** Leaving Source discards nothing: the edits stay in the editor, in the draft and in the preview.
-- Closing Source while dirty — its **Source** button again, the way back to Theme / Selectors / Motion, whose tabs are hidden while Source is shown → a confirm says the edits are not saved and stay in Source, shown in the preview, until they are saved or cancelled. Cancelling it stays in Source.
-- Switching to another sidebar mode while dirty → same prompt (via `setMode`'s guard).
+- Closing Source while dirty — its **Source** button again, the way back to Theme / Selectors / Motion, whose tabs are hidden while Source is shown → the panel's confirmation dialog says the edits are not saved and stay in Source, shown in the preview, until they are saved or cancelled. Source closes (and the tab opens) once the answer is yes; Cancel stays in Source.
+- Switching to another sidebar mode while dirty → the same question (`setMode`'s guard); the mode switches once the answer is yes.
 - Closing the browser tab / refreshing while dirty → the draft is written at once, then the native `beforeunload` prompt.
 
 **Cross-tab cache invalidation.** A Source save, Reload or Cancel rewrites or re-reads the whole `style.css`, so the three structured tabs' caches are invalidated (`PreviewStyleTheme.invalidate()` + `PreviewSelectorBrowser.reset()` + `PreviewStyleMotion.reset()`). The next view of any tab triggers a fresh fetch — visible both from the tab-click handler and from `deactivateSource()` so all exit paths converge. See `DESIGN_DECISIONS.md` "Source / structured-tabs cross-tab cache invalidation" for the accepted trade-off (a structured tab's unsaved edits are lost on the next view after a Source save). The other direction needs no hook in those tabs: Source reads the file again every time it opens.
@@ -2589,7 +2628,9 @@ LAST so authors notice that the verb forgot to declare a category.
 Every dropdown in the picker (verb selection, apiEndpoint, route,
 routeParam, translationKey) is wrapped with `QSSearchableSelect` — a
 reusable combobox primitive at
-`public/admin/assets/js/core/searchable-select.js`. Behaviours:
+`public/admin/assets/js/core/searchable-select.js`. So are the event of an
+element's interaction (each event's explanation as its description) and
+the Complex tab's kind picker (§8.7). Behaviours:
 
 - Wraps a native `<select>` (kept in DOM as data store, visually hidden).
   All existing code that reads `.value`, listens to `change`, or
@@ -2599,6 +2640,9 @@ reusable combobox primitive at
 - **Search matches**: case-insensitive substring against option
   `value`, `textContent`, AND `data-description` (either field counts).
   Empty query shows everything.
+- An option's `data-description` shows as a line under its item (two
+  lines at most) and, whole, as the item's `title`, which the panel's
+  bubble shows on hover (§5.1, *Tooltips*).
 - Optgroups become labeled categories; empty groups hidden when
   filtering; empty result shows `No matches for "<query>"`.
 - Keyboard nav: ArrowUp/Down move focus, Enter selects, Escape closes

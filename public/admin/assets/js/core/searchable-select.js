@@ -6,8 +6,13 @@
  * untouched. The wrapper just renders a custom trigger + dropdown
  * with inline search on top of it.
  *
+ * An option's data-description is shown as a line under its item (two lines
+ * at most) and, whole, as the item's title, which the panel's bubble shows.
+ *
  * Used by:
  *   - the JS-function picker (preview-js-interactions.js)
+ *   - the event picker of an element's interaction (preview-js-interactions.js)
+ *   - the Complex tab's kind picker (preview.js)
  *   - the route inputType picker
  *   - future surfaces where the existing tag/property picker pattern
  *     applies but a fully custom DOM stack would be overkill
@@ -405,6 +410,8 @@
                 descEl.className = 'qs-searchable-select__item-desc';
                 descEl.textContent = desc;
                 item.appendChild(descEl);
+                // The line stops at two lines; the bubble shows the whole text on hover.
+                item.title = desc;
             }
 
             item.addEventListener('click', () => this._selectValue(optionEl.value));

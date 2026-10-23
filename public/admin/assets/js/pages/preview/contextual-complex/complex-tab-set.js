@@ -161,7 +161,7 @@
     window.QSComplexWizard.registry = window.QSComplexWizard.registry || {};
     window.QSComplexWizard.registry['tab-set'] = {
         label: 'Tab set',
-        description: 'An ARIA tab set: &lt;div role="tablist"&gt; + N &lt;button role="tab"&gt; + N &lt;div role="tabpanel"&gt;. Click-to-switch wired with QS verbs (no extra runtime).',
+        description: window.QSComplexWizard.t('tabSet.description'),
         renderWizard: renderWizard
     };
 })();

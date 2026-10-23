@@ -14,6 +14,10 @@
 $baseUrl = rtrim(BASE_URL, '/');
 ?>
 
+<script>
+// The words of the page's dialogs and error toasts (`privacy` in the panel's translations).
+window.QS_PRIVACY_I18N = <?= qs_inline_script_json(['privacy' => AdminTranslation::getInstance()->getRaw('privacy') ?: new stdClass()]) ?>;
+</script>
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/privacy.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/privacy.js') ?>"></script>
 
 <div class="admin-page-header">

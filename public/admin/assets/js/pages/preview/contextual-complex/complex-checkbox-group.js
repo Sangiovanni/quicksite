@@ -304,7 +304,7 @@
     window.QSComplexWizard.registry = window.QSComplexWizard.registry || {};
     window.QSComplexWizard.registry['checkbox-group'] = {
         label: 'Checkbox group',
-        description: 'A &lt;fieldset&gt; with N &lt;input type=checkbox&gt; sharing the same name, plus a per-group error span. Optional name[] suffix for PHP-array submission.',
+        description: window.QSComplexWizard.t('checkboxGroup.description'),
         renderWizard: renderWizard
     };
 })();

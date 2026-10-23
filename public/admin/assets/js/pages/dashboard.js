@@ -938,7 +938,7 @@
         }
 
         delBtn.addEventListener('click', async function () {
-            if (!confirm(t('dashboard.storage.confirmDelete', 'Delete this item?') + '\n' + build.name)) return;
+            if (!(await QuickSiteUtils.confirm(t('dashboard.storage.confirmDelete', 'Delete this item?') + '\n' + build.name, { type: 'danger' }))) return;
             this.disabled = true;
             try {
                 const res = await QuickSiteAdmin.apiRequest('deleteBuild', 'POST', {});
@@ -1011,7 +1011,7 @@
         ]);
 
         clearBtn.addEventListener('click', async function () {
-            if (!confirm(t('dashboard.storage.confirmClearExports', 'Clear all export files?'))) return;
+            if (!(await QuickSiteUtils.confirm(t('dashboard.storage.confirmClearExports', 'Clear all export files?'), { type: 'danger' }))) return;
             this.disabled = true;
             try {
                 const res = await QuickSiteAdmin.apiRequest('clearExports', 'POST', { confirm: true });
@@ -1086,7 +1086,7 @@
             delBtn,
         ]);
         delBtn.addEventListener('click', async function () {
-            if (!confirm(t('dashboard.storage.confirmDelete', 'Delete this item?') + '\n' + b.name)) return;
+            if (!(await QuickSiteUtils.confirm(t('dashboard.storage.confirmDelete', 'Delete this item?') + '\n' + b.name, { type: 'danger' }))) return;
             this.disabled = true;
             try {
                 const res = await QuickSiteAdmin.apiRequest('deleteBackup', 'DELETE', { backup: b.name }, [], {}, { project: managed });
@@ -1763,7 +1763,7 @@
 
         restoreBtn.addEventListener('click', () => openRestoreConfirmModal(backup.name));
         delBtn.addEventListener('click', async function () {
-            if (!confirm((proj.confirm_delete_backup || 'Delete backup') + ': ' + backup.name + '?')) return;
+            if (!(await QuickSiteUtils.confirm((proj.confirm_delete_backup || 'Delete backup') + ': ' + backup.name + '?', { type: 'danger' }))) return;
             this.disabled = true;
             try {
                 const res = await QuickSiteAdmin.apiRequest('deleteBackup', 'DELETE', { backup: backup.name }, [], {}, { project: target });

@@ -130,7 +130,7 @@
     window.QSComplexWizard.registry = window.QSComplexWizard.registry || {};
     window.QSComplexWizard.registry['definition-list'] = {
         label: 'Definition list (dl)',
-        description: 'A &lt;dl&gt; with N (&lt;dt&gt;, &lt;dd&gt;) pairs. One translation key per term and per description.',
+        description: window.QSComplexWizard.t('definitionList.description'),
         renderWizard: renderWizard
     };
 })();

@@ -98,6 +98,27 @@
             "textRegisterOpen": "Use the link above to create your account. If you lost your password, ask your administrator to reset it."
         }
     },
+    "privacy": {
+        "dialogs": {
+            "deleteDatum": "Delete \":name\"? Any field mapped to it becomes unset.",
+            "descLangChange": "Change description language from \":from\" to \":to\"?",
+            "descLangMovesOne": "This moves :n value into \":to\".",
+            "descLangMovesMany": "This moves :n values into \":to\".",
+            "descLangOverwritesOne": "⚠ :n existing \":to\" value will be OVERWRITTEN.",
+            "descLangOverwritesMany": "⚠ :n existing \":to\" values will be OVERWRITTEN.",
+            "overwritePage": "Route /:route already exists. Overwrite its content with the privacy-policy page?",
+            "deletePage": "Delete the generated privacy page? This removes the route and its page."
+        },
+        "errors": {
+            "deleteFailed": "Delete failed",
+            "network": "Network error",
+            "descLangFailed": "Failed to change language",
+            "mappingFailed": "Mapping failed",
+            "generateFailed": "Generate failed",
+            "cookieSectionFailed": "Failed to update cookie section",
+            "routeRequired": "Enter a route, e.g. privacy"
+        }
+    },
     "register": {
         "title": "Create your account",
         "subtitle": "Choose a public name and a password",
@@ -1548,6 +1569,20 @@
         "loadingPermissions": "Loading permissions...",
         "title": "Settings"
     },
+    "storage": {
+        "dialogs": {
+            "descLangChange": "Change the description language from \":from\" to \":to\"?",
+            "descLangMovesOne": "This moves :n description into \":to\".",
+            "descLangMovesMany": "This moves :n descriptions into \":to\".",
+            "descLangOverwritesOne": "⚠ :n existing \":to\" description will be OVERWRITTEN.",
+            "descLangOverwritesMany": "⚠ :n existing \":to\" descriptions will be OVERWRITTEN.",
+            "deletePage": "Delete the cookie-policy page at :route? This removes the route and its page.",
+            "overwritePage": "Route /:route already exists. Overwrite its content with the cookie-policy page?"
+        },
+        "errors": {
+            "descLangFailed": "Failed to change description language"
+        }
+    },
     "structure": {
         "title": "Structure Viewer",
         "subtitle": "Visual tree view of page and component structures",
@@ -2387,6 +2422,10 @@
         "snippetIdInvalid": "ID must start with a letter and contain only letters, numbers, dashes",
         "deleteSnippet": "Delete Snippet",
         "confirmDeleteSnippet": "Delete snippet \"%s\"? This action cannot be undone.",
+        "switchToMenuConfirm": "This element belongs to the Menu (shared across all pages). Switch to Menu editing?",
+        "switchToFooterConfirm": "This element belongs to the Footer (shared across all pages). Switch to Footer editing?",
+        "switchToPageConfirm": "This element belongs to the page \"{page}\". Switch to page editing?",
+        "snippetCssConfirm": "This will permanently modify the project's CSS stylesheet and may affect the style of all pages.\n\nThe page will reload after insertion to apply the new styles.\n\nContinue?",
         "snippetDeleted": "Snippet deleted successfully",
         "cannotDeleteCore": "Cannot delete core snippets",
         "deleteSnippetFailed": "Failed to delete snippet",
@@ -2705,6 +2744,8 @@
         "assetPreviewAlt": "Preview",
         "complexKindNoWizard": "Kind \"{kind}\" has no renderWizard.",
         "complexWizardFailed": "Wizard failed to render. See console.",
+        "complexKindSearch": "Search kinds…",
+        "complexKindNoMatch": "No kinds match",
         "iframeInfo": "ℹ️ Iframes load external content. Only use trusted HTTPS sources. The iframe is sandboxed within your page's same-origin policy.",
         "errorLoadingComponents": "Error loading components",
         "componentVariables": "Component Variables",
@@ -2771,6 +2812,8 @@
         "showAllFunctions": "Show all functions",
         "searchFunctions": "Search functions… (matches name + description)",
         "noFunctionsMatch": "No functions match",
+        "searchEvents": "Search events… (matches name + description)",
+        "noEventsMatch": "No events match",
         "selectApi": "-- Select API --",
         "selectEndpoint": "-- Select endpoint --",
         "searchApis": "Search APIs…",
@@ -3744,6 +3787,7 @@
         },
         "pagedNavigator": {
             "label": "Paged navigator (numbered)",
+            "description": "A <nav> bound to a state store. Reads `totalPages` to size itself; numbered buttons + optional Prev/Next chevrons. Click a number → setState(page) → fetchState. Hides when totalPages is missing or ≤ 1.",
             "store": "Bound state store",
             "storeLoading": "(loading…)",
             "storeHint": "The store whose fields the navigator reads (totalPages) and writes (page). Configure on this page via JS mode → State stores.",
@@ -3881,6 +3925,33 @@
                 "noUrl": "Submit URL is required, or uncheck \"Add fetch()\"",
                 "duplicate": "Duplicate field name: \"{name}\""
             }
+        },
+        "accordion": {
+            "description": "A <div class=\"accordion\"> with N native <details>/<summary> disclosure items. No JS or ARIA wiring — the browser handles toggling."
+        },
+        "breadcrumb": {
+            "description": "A <nav aria-label=\"Breadcrumb\">/<ol> with N items. The last item renders as plain text (aria-current=\"page\") with no link."
+        },
+        "checkboxGroup": {
+            "description": "A <fieldset> with N <input type=checkbox> sharing the same name, plus a per-group error span. Optional name[] suffix for PHP-array submission."
+        },
+        "definitionList": {
+            "description": "A <dl> with N (<dt>, <dd>) pairs. One translation key per term and per description."
+        },
+        "navMenu": {
+            "description": "A <nav> with a <ul> of N <li> entries, each a single <a>. Per-item external-link toggle."
+        },
+        "oauthButton": {
+            "description": "A <a> \"Sign in with X\" button. The wizard also creates the start + callback routes and attaches the matching oauth resolvers in one pass — only the secrets file needs manual setup."
+        },
+        "radioGroup": {
+            "description": "A <fieldset> with N <input type=radio> sharing the same name, plus a per-group error span."
+        },
+        "tabSet": {
+            "description": "An ARIA tab set: <div role=\"tablist\"> + N <button role=\"tab\"> + N <div role=\"tabpanel\">. Click-to-switch wired with QS verbs (no extra runtime)."
+        },
+        "table": {
+            "description": "A <table> with optional caption, optional thead, and N×M tbody cells. Each cell is a translation key. Spreadsheet paste (TSV/CSV) supported."
         }
     }
 }

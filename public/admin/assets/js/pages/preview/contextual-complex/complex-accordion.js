@@ -156,7 +156,7 @@
     window.QSComplexWizard.registry = window.QSComplexWizard.registry || {};
     window.QSComplexWizard.registry['accordion'] = {
         label: 'Accordion (FAQ)',
-        description: 'A &lt;div class="accordion"&gt; with N native &lt;details&gt;/&lt;summary&gt; disclosure items. No JS or ARIA wiring — the browser handles toggling.',
+        description: window.QSComplexWizard.t('accordion.description'),
         renderWizard: renderWizard
     };
 })();

@@ -13784,3 +13784,79 @@ and future, would have to remember to, and one that forgets brings the stale lis
 **Source**: Sangio's UX run of the preview subsystem's rewrite, 2026-10-18 (a key created in the List
 wizard showed in Translations only after a reload).
 `public/admin/assets/js/pages/preview/preview-translation.js`.
+
+### Every title in the panel shows through the panel's own bubble, taken over by one listener (locked 2026-10-22)
+
+**Decision**: A tooltip in the admin panel is a plain `title` attribute, and `public/admin/assets/js/core/bubble.js`,
+loaded in the layout's `<head>` on every page, shows it instead of the browser: on mouse hover after 500 ms (at
+once when moving from one titled element to the next), at once on keyboard focus (`:focus-visible`: the focused
+element's own title or its `<label>`'s), as text with its line breaks, placed inside the window; hidden on leave,
+blur, Escape, a press and a scroll. One set of listeners on the document does it; no element is marked. While the
+bubble shows an element's title, that title is set to `""` (an empty title is what keeps the browser's own tooltip
+from showing beside it) and given back afterwards; an observer on that one element shows a title the page writes
+meanwhile, and leaves one it clears or removes cleared. While the title is held, a screen reader is given its text
+as the element's name (`aria-label`) when the title was its only name, otherwise as its description
+(`aria-describedby`, the bubble). An `<iframe>`'s title, an `<option>`'s and any title inside
+`[data-qs-native-title]` (the tag preview, a visitor's markup) stay the browser's. The two native lists whose
+options carried tooltips, the Complex tab's kind picker and the event of an element's interaction, became the
+panel's `QSSearchableSelect`: each option's description is a line under it, and whole in the bubble. A touch shows
+nothing.
+
+**Reasoning**: A native tooltip shows on hover only, never on keyboard focus; it cannot hold the header allowance's
+several windows legibly; and a native list's options are drawn outside the page, where nothing of the page reaches.
+Taking titles over in one place means the 250 tooltips the panel had, and every one written later, reach the
+bubble with no edit and nothing to remember: a new tooltip is a `title`. Emptying the title only while it shows
+keeps the page's own model intact at rest: code that reads, rewrites or removes a title keeps working (the
+allowance reads its title back for its `aria-label`; the command console removes its Execute button's title once
+the command can run), and a screen reader at rest reads what it always read. Emptying rather than removing is what
+lets the observer see the page remove a title while it is held.
+
+**Alternatives considered**: a `data-` attribute per site carrying the text, with an `aria-label` added by hand
+(about 250 edits, every reader, writer and remover of a title rewritten, and every new tooltip has to know the
+attribute); a page-wide observer converting every title into such an attribute as it appears (no per-site edit,
+but the DOM is rewritten for good, a `removeAttribute('title')` stops working and a reader of `el.title` reads
+nothing); showing on touch too (declined: the admin panel is a desktop tool, a title never showed on touch, and a
+tap would leave the bubble up).
+
+**Source**: the admin panel's hover bubble and dialogs, design round 2026-10-22 (Sangio: every title through the
+bubble, one shared listener, nothing on touch). `public/admin/assets/js/core/bubble.js`,
+`public/admin/assets/css/bubble.css`, `secure/admin/templates/layout.php`; the two pickers in `preview.js` and
+`preview-js-interactions.js`, over `public/admin/assets/js/core/searchable-select.js`.
+
+### The panel asks with its own dialogs, which block the page as the browser's did (locked 2026-10-22)
+
+**Decision**: The admin panel calls no `window.confirm()`, `window.prompt()` or `window.alert()`.
+A question goes through `QuickSiteUtils.confirm()` (a promise of true or false) or `QuickSiteUtils.prompt()`
+(a promise of the text, or `null`), both in `public/admin/assets/js/core/utils.js`, on one dialog body; a
+failure to report goes to the error toast. The dialog stands in for the browser's, so it behaves like one:
+it opens above every layer of the panel (its overlay's `--dialog` modifier, `z-index` 100050, under the
+hover bubble at 100100), takes the focus (the confirm button; Cancel for a `danger` question, whose
+button is red; the field of a prompt), keeps Tab inside, and lets no key reach the page while it is open
+(one listener on the window, capture phase, stops every key and answers Escape); closing gives the focus
+back and removes the listener. Every caller waits for the answer, and the action runs only after a yes:
+a link whose click it holds is followed afterwards (CSS Source's Refine link), a mode or tab switch
+happens afterwards (`setMode()` hands its body to `switchMode()`; CSS Source's `canLeave()` is now a
+synchronous "may leave without asking" and `confirmLeave()` asks). The words of each dialog are kept; the
+ones that were English literals became keys (four in `preview`, and the `privacy` and `storage`
+sub-trees their pages now write). The one exception is the browser's own `beforeunload` question when the
+page is left with unsaved CSS Source edits: a page cannot replace it.
+
+**Reasoning**: The browser's dialogs blocked everything while they were open, which the panel's code had
+quietly relied on. A dialog that only looks modal does not: the editor's Delete shortcut would delete
+again behind it, its Escape would clear the selection while cancelling, the panel's `g d` would navigate,
+and five of the questions are raised from modals at 10000 (the keyframe editor, the two resolver modals),
+which the old dialog, at 1001, opened under.
+Making the dialog modal for the keyboard, the focus and the stacking keeps every caller's old assumption
+true instead of auditing each one. An alert reports a failure, which is what the panel's error toast is for.
+
+**Alternatives considered**: the native `<dialog>` element's `showModal()` (the top layer and an inert page
+for free, but its stacking with the panel's own fixed layers and its focus rules differ between browsers,
+and the panel's dialogs already had their look and markup); keeping a synchronous wrapper around the
+browser's dialogs for the handlers that must decide at once (rejected: those are exactly the places the
+browser's dialog was replaced to reach); leaving `alert()` (declined by Sangio: it is the same box).
+
+**Source**: the admin panel's hover bubble and dialogs, design round 2026-10-22 (Sangio: the dialogs as
+proposed, the alerts converted). `public/admin/assets/js/core/utils.js`, `public/admin/assets/admin.css`,
+and the ten files whose questions moved (`preview.js`, `preview-style-source.js`,
+`preview-style-motion.js`, `preview-js-interactions.js`, `dashboard.js`, `assets.js`, `sitemap.js`,
+`privacy.js`, `storage.js`, `ai/ai-connections.js`) with `templates/layout.php`.

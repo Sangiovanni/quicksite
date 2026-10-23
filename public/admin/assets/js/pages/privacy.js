@@ -19,6 +19,28 @@
         languages: [DEFAULT_LANG],
     };
 
+    // The words of this page's dialogs and error toasts: window.QS_PRIVACY_I18N, the `privacy` translations
+    // privacy.php writes verbatim. t(path, params) substitutes `:name` markers and returns the
+    // path itself when nothing resolves, so an untranslated string shows on screen.
+    function t(path, params) {
+        var node = window.QS_PRIVACY_I18N || {};
+        var parts = String(path).split('.');
+        for (var i = 0; i < parts.length; i++) {
+            if (node === null || typeof node !== 'object' || !(parts[i] in node)) return path;
+            node = node[parts[i]];
+        }
+        if (typeof node !== 'string') return path;
+        Object.keys(params || {}).forEach(function (name) {
+            node = node.split(':' + name).join(String(params[name]));
+        });
+        return node;
+    }
+
+    /** A failure the user must see: the panel's error toast. */
+    function showError(text) {
+        QuickSiteUtils.showToast(text, 'error');
+    }
+
     function api(cmd, method, body) {
         var adminApi = window.QuickSiteAdmin;
         if (!adminApi || typeof adminApi.apiRequest !== 'function') {
@@ -257,12 +279,12 @@
     }
 
     async function onDeleteDatum(d) {
-        if (!window.confirm('Delete "' + (d.label || d.id) + '"? Any field mapped to it becomes unset.')) return;
+        if (!(await QuickSiteUtils.confirm(t('privacy.dialogs.deleteDatum', { name: d.label || d.id }), { type: 'danger' }))) return;
         try {
             var r = await api('deleteCollectedDatum', 'POST', { id: d.id });
-            if (!r || !r.ok) { window.alert((r && r.data && r.data.message) || 'Delete failed'); return; }
+            if (!r || !r.ok) { showError((r && r.data && r.data.message) || t('privacy.errors.deleteFailed')); return; }
             await refresh();
-        } catch (e) { window.alert((e && e.message) || 'Network error'); }
+        } catch (e) { showError((e && e.message) || t('privacy.errors.network')); }
     }
 
     async function onDescLangChange(sel) {
@@ -273,11 +295,12 @@
             var preview = await api('setPrivacyDescLang', 'POST', { lang: target });
             var pdata = (preview && preview.data && (preview.data.data || preview.data)) || {};
             var moved = pdata.moved || 0, overwrites = pdata.overwrites || 0;
-            var msg = 'Change description language from "' + current + '" to "' + target + '"?\n\nThis moves ' + moved + ' value' + (moved === 1 ? '' : 's') + ' into "' + target + '".';
-            if (overwrites > 0) msg += '\n\n⚠ ' + overwrites + ' existing "' + target + '" value' + (overwrites === 1 ? '' : 's') + ' will be OVERWRITTEN.';
-            if (!window.confirm(msg)) { sel.value = current; sel.disabled = false; return; }
+            var msg = t('privacy.dialogs.descLangChange', { from: current, to: target })
+                + '\n\n' + t(moved === 1 ? 'privacy.dialogs.descLangMovesOne' : 'privacy.dialogs.descLangMovesMany', { n: moved, to: target });
+            if (overwrites > 0) msg += '\n\n' + t(overwrites === 1 ? 'privacy.dialogs.descLangOverwritesOne' : 'privacy.dialogs.descLangOverwritesMany', { n: overwrites, to: target });
+            if (!(await QuickSiteUtils.confirm(msg, { type: overwrites > 0 ? 'danger' : 'warning' }))) { sel.value = current; sel.disabled = false; return; }
             var done = await api('setPrivacyDescLang', 'POST', { lang: target, confirm: true });
-            if (!done || !done.ok) { sel.value = current; sel.disabled = false; window.alert((done && done.data && done.data.message) || 'Failed to change language'); return; }
+            if (!done || !done.ok) { sel.value = current; sel.disabled = false; showError((done && done.data && done.data.message) || t('privacy.errors.descLangFailed')); return; }
             await refresh();
         } catch (e) { sel.value = current; sel.disabled = false; console.warn('[privacy] descLang change failed:', e); }
     }
@@ -333,10 +356,10 @@
     function setMapping(endpoint, field, datumId) {
         return api('setPrivacyMapping', 'POST', { endpoint: endpoint, field: field, datum: datumId || '__unset__' })
             .then(function (r) {
-                if (!r || !r.ok) { window.alert((r && r.data && r.data.message) || 'Mapping failed'); return; }
+                if (!r || !r.ok) { showError((r && r.data && r.data.message) || t('privacy.errors.mappingFailed')); return; }
                 return refresh();
             })
-            .catch(function (e) { window.alert((e && e.message) || 'Network error'); });
+            .catch(function (e) { showError((e && e.message) || t('privacy.errors.network')); });
     }
 
     // ---- hosts ------------------------------------------------------------
@@ -462,7 +485,7 @@
             sec.appendChild(QSDom.el('p', { class: 'admin-hint', text: 'Update refreshes the page from the current data. Descriptions edit live; regenerate only after data changes (new mappings, host changes).' }));
         } else {
             var input = QSDom.el('input', { type: 'text', class: 'admin-input', placeholder: 'e.g. privacy', value: s.privacyRoute ? String(s.privacyRoute).replace(/^\/+/, '') : '' });
-            var gen = QSDom.el('button', { class: 'admin-btn admin-btn--primary', type: 'button', text: 'Generate', onclick: function () { var r = input.value.trim().replace(/^\/+|\/+$/g, ''); if (!r) { window.alert('Enter a route, e.g. privacy'); return; } onGeneratePrivacy(r, false); } });
+            var gen = QSDom.el('button', { class: 'admin-btn admin-btn--primary', type: 'button', text: 'Generate', onclick: function () { var r = input.value.trim().replace(/^\/+|\/+$/g, ''); if (!r) { showError(t('privacy.errors.routeRequired')); return; } onGeneratePrivacy(r, false); } });
             sec.appendChild(QSDom.el('label', { class: 'admin-label', text: 'Page route' }));
             sec.appendChild(QSDom.el('div', { class: 'privacy-page-gen' }, [input, gen]));
             if (s.privacyRoute && !s.privacyRouteExists) {
@@ -483,30 +506,34 @@
         return api('generatePrivacyPolicy', 'POST', body).then(function (r) {
             var d = (r && r.data && (r.data.data || r.data)) || {};
             if (r && !r.ok && d.needsConfirm) {
-                if (!window.confirm('Route /' + route + ' already exists. Overwrite its content with the privacy-policy page?')) return;
-                return api('generatePrivacyPolicy', 'POST', { route: route, overwrite: true }).then(function (r2) {
-                    if (!r2 || !r2.ok) { window.alert((r2 && r2.data && r2.data.message) || 'Generate failed'); return; }
-                    return refresh();
+                return QuickSiteUtils.confirm(t('privacy.dialogs.overwritePage', { route: route }), { type: 'danger' }).then(function (ok) {
+                    if (!ok) return;
+                    return api('generatePrivacyPolicy', 'POST', { route: route, overwrite: true }).then(function (r2) {
+                        if (!r2 || !r2.ok) { showError((r2 && r2.data && r2.data.message) || t('privacy.errors.generateFailed')); return; }
+                        return refresh();
+                    });
                 });
             }
-            if (!r || !r.ok) { window.alert((r && r.data && r.data.message) || 'Generate failed'); return; }
+            if (!r || !r.ok) { showError((r && r.data && r.data.message) || t('privacy.errors.generateFailed')); return; }
             return refresh();
-        }).catch(function (e) { window.alert((e && e.message) || 'Network error'); });
+        }).catch(function (e) { showError((e && e.message) || t('privacy.errors.network')); });
     }
 
     function onDeletePrivacy() {
-        if (!window.confirm('Delete the generated privacy page? This removes the route and its page.')) return;
-        return api('deletePrivacyPolicy', 'POST', {}).then(function (r) {
-            if (!r || !r.ok) { window.alert((r && r.data && r.data.message) || 'Delete failed'); return; }
-            return refresh();
-        }).catch(function (e) { window.alert((e && e.message) || 'Network error'); });
+        return QuickSiteUtils.confirm(t('privacy.dialogs.deletePage'), { type: 'danger' }).then(function (ok) {
+            if (!ok) return;
+            return api('deletePrivacyPolicy', 'POST', {}).then(function (r) {
+                if (!r || !r.ok) { showError((r && r.data && r.data.message) || t('privacy.errors.deleteFailed')); return; }
+                return refresh();
+            });
+        }).catch(function (e) { showError((e && e.message) || t('privacy.errors.network')); });
     }
 
     function onToggleCookieSection(omit) {
         return api('setPrivacyCookieSection', 'POST', { cookieSection: omit ? 'omit' : 'auto' }).then(function (r) {
-            if (!r || !r.ok) { window.alert((r && r.data && r.data.message) || 'Failed to update cookie section'); }
+            if (!r || !r.ok) { showError((r && r.data && r.data.message) || t('privacy.errors.cookieSectionFailed')); }
             return refresh();
-        }).catch(function (e) { window.alert((e && e.message) || 'Network error'); });
+        }).catch(function (e) { showError((e && e.message) || t('privacy.errors.network')); });
     }
 
     function renderHint() {

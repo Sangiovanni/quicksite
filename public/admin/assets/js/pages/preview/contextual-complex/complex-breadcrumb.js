@@ -167,7 +167,7 @@
     window.QSComplexWizard.registry = window.QSComplexWizard.registry || {};
     window.QSComplexWizard.registry['breadcrumb'] = {
         label: 'Breadcrumb',
-        description: 'A &lt;nav aria-label="Breadcrumb"&gt;/&lt;ol&gt; with N items. The last item renders as plain text (aria-current="page") with no link.',
+        description: window.QSComplexWizard.t('breadcrumb.description'),
         renderWizard: renderWizard
     };
 })();

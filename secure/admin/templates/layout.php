@@ -157,6 +157,7 @@ $langNames = [
     <link rel="stylesheet" href="<?= $versionedAsset('/css/members-admin.css') ?>">
     <link rel="stylesheet" href="<?= $versionedAsset('/css/builds-admin.css') ?>">
     <link rel="stylesheet" href="<?= $versionedAsset('/css/searchable-select.css') ?>">
+    <link rel="stylesheet" href="<?= $versionedAsset('/css/bubble.css') ?>">
     <link rel="stylesheet" href="<?= $versionedAsset('/css/preview-ai-tools.css') ?>">
     <!-- Storage key registry — must load before any page script that references QuickSiteStorageKeys -->
     <script src="<?= $versionedAsset('/js/core/storage-keys.js') ?>"></script>
@@ -164,6 +165,8 @@ $langNames = [
     <script src="<?= $versionedAsset('/js/core/dom.js') ?>"></script>
     <!-- Reusable searchable combobox. Wraps a native <select> — page scripts construct QSSearchableSelect after locating their select element. -->
     <script src="<?= $versionedAsset('/js/core/searchable-select.js') ?>"></script>
+    <!-- The panel's hover bubble: every title shows through it. Listens on the document; builds its element on first use. -->
+    <script src="<?= $versionedAsset('/js/core/bubble.js') ?>"></script>
 </head>
 <body class="admin-body<?= $isLoginPage ? ' admin-body--login' : '' ?>" data-page="<?= adminEscape($currentPage) ?>">
     
@@ -858,12 +861,12 @@ $langNames = [
                             window.location.href = window.location.pathname + '?t=' + Date.now();
                         } else {
                             picker.disabled = false;
-                            alert('<?= __adminJs('nav.switchProjectFailed') ?>' + ((res && res.data && res.data.message) || '<?= __adminJs('common.unknownError') ?>'));
+                            QuickSiteUtils.showToast('<?= __adminJs('nav.switchProjectFailed') ?>' + ((res && res.data && res.data.message) || '<?= __adminJs('common.unknownError') ?>'), 'error');
                         }
                     })
                     .catch(function (err) {
                         picker.disabled = false;
-                        alert('<?= __adminJs('nav.switchProjectFailed') ?>' + ((err && err.message) || err));
+                        QuickSiteUtils.showToast('<?= __adminJs('nav.switchProjectFailed') ?>' + ((err && err.message) || err), 'error');
                     });
             });
         }

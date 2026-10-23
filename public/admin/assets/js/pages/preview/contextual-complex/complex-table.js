@@ -710,7 +710,7 @@
     window.QSComplexWizard.registry = window.QSComplexWizard.registry || {};
     window.QSComplexWizard.registry['table'] = {
         label: 'Table',
-        description: 'A &lt;table&gt; with optional caption, optional thead, and N×M tbody cells. Each cell is a translation key. Spreadsheet paste (TSV/CSV) supported.',
+        description: window.QSComplexWizard.t('table.description'),
         renderWizard: renderWizard
     };
 })();

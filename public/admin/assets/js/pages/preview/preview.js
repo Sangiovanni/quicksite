@@ -400,6 +400,15 @@
     // own renderWizard(container) factory.
     const addComplexField = document.getElementById('add-complex-field');
     const addComplexKindSelect = document.getElementById('add-complex-kind');
+    // The kind list is the panel's own dropdown: a native list is drawn outside
+    // the page, where neither a kind's description line nor the bubble reaches.
+    const addComplexKindPicker = addComplexKindSelect && window.QSSearchableSelect
+        ? new window.QSSearchableSelect(addComplexKindSelect, {
+            placeholder: addComplexKindSelect.options[0] ? addComplexKindSelect.options[0].textContent : '',
+            searchPlaceholder: PreviewConfig.i18n.complexKindSearch,
+            emptyText: PreviewConfig.i18n.complexKindNoMatch
+        })
+        : null;
     const addComplexBody = document.getElementById('add-complex-body');
     let addComplexController = null;  // controller returned by the active kind's renderWizard
     
@@ -1844,7 +1853,7 @@
             
             const name = currentEditName;
             const msg = (PreviewConfig.i18n.confirmDeleteComponent || 'Delete component "%s"? This cannot be undone.').replace('%s', name);
-            if (!confirm(msg)) return;
+            if (!(await QuickSiteUtils.confirm(msg, { type: 'danger' }))) return;
             
             try {
                 // Send empty structure to delete
@@ -2034,7 +2043,7 @@
     if (createComponentBtn) {
         createComponentBtn.addEventListener('click', async function() {
             const namePrompt = PreviewConfig.i18n.componentNamePrompt || 'Component name (letters, numbers, hyphens):';
-            const name = prompt(namePrompt);
+            const name = await QuickSiteUtils.prompt(namePrompt);
             if (!name) return;
             
             // Validate name: alphanumeric, hyphens, underscores only
@@ -2115,14 +2124,22 @@
     function setMode(mode, preselect = null) {
         // Debounce rapid mode switches to prevent layout thrashing
         if (isSwitchingMode) return;
-        // Dirty guard for Source. If leaving style mode
-        // while Source is active and has unsaved edits, prompt the user.
-        // canLeave() returns false if the user cancels the prompt.
+        // Dirty guard for Source. Leaving style mode while Source is active
+        // with unsaved edits asks first (the panel's dialog); the switch
+        // runs once the answer is yes, and not at all on a no.
         if (currentMode === 'style' && mode !== 'style'
             && window.PreviewStyleSource && PreviewStyleSource.isActive()
             && !PreviewStyleSource.canLeave()) {
+            PreviewStyleSource.confirmLeave().then(ok => {
+                if (ok) switchMode(mode, preselect);
+            });
             return;
         }
+        switchMode(mode, preselect);
+    }
+
+    /** setMode() once nothing is left to ask. */
+    function switchMode(mode, preselect) {
         isSwitchingMode = true;
         
         // "Preview" mode: just reload the iframe to show the page as a real
@@ -2699,8 +2716,13 @@
         sourceBtn.addEventListener('click', () => {
             if (!window.PreviewStyleSource) return;
             if (PreviewStyleSource.isActive()) {
-                // Dirty guard — confirm before discarding edits.
-                if (!PreviewStyleSource.canLeave()) return;
+                // Dirty guard: unsaved edits ask first; Source closes on a yes.
+                if (!PreviewStyleSource.canLeave()) {
+                    PreviewStyleSource.confirmLeave().then(ok => {
+                        if (ok) deactivateSource();
+                    });
+                    return;
+                }
                 deactivateSource();
             } else {
                 activateSource();
@@ -2717,49 +2739,61 @@
         const tabs = styleTabs.querySelectorAll('.preview-contextual-style-tab');
         tabs.forEach(tab => {
             tab.addEventListener('click', () => {
-                const tabName = tab.dataset.tab;
                 // Clicking a tab while Source is active returns to
                 // the structured editor surface. Deactivate Source first so
-                // the tab panel becomes visible. Prompt if Source
-                // has unsaved edits — user can cancel and stay.
+                // the tab panel becomes visible. With unsaved edits Source
+                // asks first; the tab opens on a yes, the user stays on a no.
                 if (window.PreviewStyleSource && PreviewStyleSource.isActive()) {
-                    if (!PreviewStyleSource.canLeave()) return;
+                    if (!PreviewStyleSource.canLeave()) {
+                        PreviewStyleSource.confirmLeave().then(ok => {
+                            if (!ok) return;
+                            deactivateSource();
+                            openStyleTab(tab);
+                        });
+                        return;
+                    }
                     deactivateSource();
                 }
-
-                // Merge panel-specific i18n keys (cheap + idempotent).
-                ensureI18nPanel(tabName);
-
-                // Reload-on-stale check must run
-                // BEFORE the `tabName === activeStyleTab` early return.
-                // After exiting Source, the user is typically clicking
-                // back to the same tab they were on — activeStyleTab is
-                // unchanged, but the module's cache may have been
-                // invalidated by Source's save / cancel. Each module's
-                // isLoaded() is the source of truth.
-                const moduleByTab = {
-                    theme:      window.PreviewStyleTheme,
-                    selectors:  window.PreviewSelectorBrowser,
-                    animations: window.PreviewStyleMotion
-                };
-                const targetMod = moduleByTab[tabName];
-                if (targetMod && targetMod.isLoaded && !targetMod.isLoaded() && targetMod.load) {
-                    targetMod.load();
-                }
-
-                if (tabName === activeStyleTab) return;
-
-                // Update active tab button
-                tabs.forEach(t => t.classList.remove('preview-contextual-style-tab--active'));
-                tab.classList.add('preview-contextual-style-tab--active');
-
-                // Show/hide panels
-                activeStyleTab = tabName;
-                if (themePanel) themePanel.style.display = tabName === 'theme' ? '' : 'none';
-                if (selectorsPanel) selectorsPanel.style.display = tabName === 'selectors' ? '' : 'none';
-                if (animationsPanel) animationsPanel.style.display = tabName === 'animations' ? '' : 'none';
+                openStyleTab(tab);
             });
         });
+
+        /** Show a tab's panel (after Source, if it was open, has closed). */
+        function openStyleTab(tab) {
+            const tabName = tab.dataset.tab;
+
+            // Merge panel-specific i18n keys (cheap + idempotent).
+            ensureI18nPanel(tabName);
+
+            // Reload-on-stale check must run
+            // BEFORE the `tabName === activeStyleTab` early return.
+            // After exiting Source, the user is typically clicking
+            // back to the same tab they were on — activeStyleTab is
+            // unchanged, but the module's cache may have been
+            // invalidated by Source's save / cancel. Each module's
+            // isLoaded() is the source of truth.
+            const moduleByTab = {
+                theme:      window.PreviewStyleTheme,
+                selectors:  window.PreviewSelectorBrowser,
+                animations: window.PreviewStyleMotion
+            };
+            const targetMod = moduleByTab[tabName];
+            if (targetMod && targetMod.isLoaded && !targetMod.isLoaded() && targetMod.load) {
+                targetMod.load();
+            }
+
+            if (tabName === activeStyleTab) return;
+
+            // Update active tab button
+            tabs.forEach(t => t.classList.remove('preview-contextual-style-tab--active'));
+            tab.classList.add('preview-contextual-style-tab--active');
+
+            // Show/hide panels
+            activeStyleTab = tabName;
+            if (themePanel) themePanel.style.display = tabName === 'theme' ? '' : 'none';
+            if (selectorsPanel) selectorsPanel.style.display = tabName === 'selectors' ? '' : 'none';
+            if (animationsPanel) animationsPanel.style.display = tabName === 'animations' ? '' : 'none';
+        }
     }
     
     // ==================== Selector Browser ====================
@@ -2829,14 +2863,16 @@
         if (!skipStructPrompts && clickedStruct && currentEditType !== 'layout') {
             // User is editing a page/component but clicked on menu or footer
             if (clickedStruct === 'menu' || clickedStruct === 'footer') {
-                const structLabel = clickedStruct === 'menu' ? 'Menu' : 'Footer';
-                const msg = `This element belongs to the ${structLabel} (shared across all pages). Switch to ${structLabel} editing?`;
-                if (confirm(msg)) {
+                const msg = clickedStruct === 'menu'
+                    ? PreviewConfig.i18n.switchToMenuConfirm
+                    : PreviewConfig.i18n.switchToFooterConfirm;
+                QuickSiteUtils.confirm(msg).then(ok => {
+                    if (!ok) return;
                     // Switch dropdown and navigate to layout target
                     const layoutValue = 'layout:' + clickedStruct;
                     if (targetSelect) targetSelect.value = layoutValue;
                     navigateTo('layout', clickedStruct);
-                }
+                });
                 // Either way, don't process this selection (it came from the wrong context)
                 return;
             }
@@ -2845,12 +2881,13 @@
         // Reverse: user is editing layout (menu/footer) but clicked a page element
         if (!skipStructPrompts && clickedStruct && currentEditType === 'layout' && clickedStruct.startsWith('page-')) {
             const routeName = clickedStruct.substring(5);
-            const msg = `This element belongs to the page "${routeName}". Switch to page editing?`;
-            if (confirm(msg)) {
+            const msg = PreviewConfig.i18n.switchToPageConfirm.replace('{page}', routeName);
+            QuickSiteUtils.confirm(msg).then(ok => {
+                if (!ok) return;
                 const pageValue = 'page:' + routeName;
                 if (targetSelect) targetSelect.value = pageValue;
                 navigateTo('page', routeName);
-            }
+            });
             return;
         }
         
@@ -4115,7 +4152,7 @@
         if (!struct || node == null) return;
         
         const confirmMsg = PreviewConfig.i18n.confirmDeleteTextNode || 'Delete this text node?';
-        if (!confirm(confirmMsg)) return;
+        if (!(await QuickSiteUtils.confirm(confirmMsg, { type: 'danger' }))) return;
         
         const structInfo = parseStruct(struct);
         if (!structInfo || !structInfo.type) {
@@ -4202,7 +4239,7 @@
                         if (deletingNode && hasTextKey(deletingNode) && childrenWithText.length <= 1) {
                             const forceMsg = PreviewConfig.i18n?.deleteLastTextWarning 
                                 || 'This is the last element containing text content. Deleting it will create a text-less component (styling shape only). The resulting element must have dimensions set via CSS to remain visible.\n\nContinue?';
-                            if (!confirm(forceMsg)) return;
+                            if (!(await QuickSiteUtils.confirm(forceMsg, { type: 'danger' }))) return;
                         }
                     }
                 }
@@ -4213,7 +4250,7 @@
         
         // Confirm deletion
         const confirmMsg = PreviewConfig.i18n.confirmDeleteNode;
-        if (!confirm(confirmMsg)) return;
+        if (!(await QuickSiteUtils.confirm(confirmMsg, { type: 'danger' }))) return;
         
         // Parse struct to get type and name
         const structInfo = parseStruct(selectedStruct);
@@ -4372,11 +4409,11 @@
         // Back to Select button (from Add mode). In Edit mode this is also
         // a "discard" path — prompt if the form has unsaved changes.
         if (addBackToSelect) {
-            addBackToSelect.addEventListener('click', function() {
+            addBackToSelect.addEventListener('click', async function() {
                 if (_isEditModeDirty()) {
                     const msg = PreviewConfig.i18n.discardUnsavedParams
                         || 'You have unsaved param changes. Discard?';
-                    if (!confirm(msg)) return;
+                    if (!(await QuickSiteUtils.confirm(msg, { type: 'danger' }))) return;
                 }
                 setMode('select');
             });
@@ -5641,10 +5678,11 @@
 
     /**
      * Read window.QSComplexWizard.registry and (re)populate the kind
-     * <select>. Each registry entry must have at least { label,
-     * renderWizard(container) }. Called every time the user opens the
-     * Complex tab so newly-shipped kinds appear without page reload
-     * during development.
+     * <select> the kind picker wraps. Each registry entry must have at
+     * least { label, renderWizard(container) }; its description becomes
+     * the option's data-description, which the picker shows under the
+     * kind. Called every time the user opens the Complex tab so
+     * newly-shipped kinds appear without page reload during development.
      */
     function populateComplexKindPicker() {
         if (!addComplexKindSelect) return;
@@ -5659,7 +5697,7 @@
             const opt = document.createElement('option');
             opt.value = kind;
             opt.textContent = entry.label || kind;
-            if (entry.description) opt.title = entry.description;
+            if (entry.description) opt.dataset.description = entry.description;
             addComplexKindSelect.appendChild(opt);
         });
         // Restore previous selection if it still exists, else clear.
@@ -5669,6 +5707,7 @@
             addComplexKindSelect.value = '';
             renderComplexWizardBody(null);
         }
+        if (addComplexKindPicker) addComplexKindPicker.refresh();
     }
 
     /**
@@ -6304,7 +6343,7 @@
         const snippetName = selectedSnippetData.name || selectedSnippetId;
         const confirmMsg = (PreviewConfig.i18n.confirmDeleteSnippet || 'Delete snippet "%s"?').replace('%s', snippetName);
         
-        if (!confirm(confirmMsg)) return;
+        if (!(await QuickSiteUtils.confirm(confirmMsg, { type: 'danger' }))) return;
         
         try {
             const response = await QuickSiteAdmin.apiRequest('deleteSnippet', 'DELETE', null, [], { id: selectedSnippetId });
@@ -7310,11 +7349,11 @@
     });
     
     // Cancel button — in edit mode, prompt if the form has unsaved changes.
-    addCancelBtn?.addEventListener('click', function() {
+    addCancelBtn?.addEventListener('click', async function() {
         if (_isEditModeDirty()) {
             const msg = PreviewConfig.i18n.discardUnsavedParams
                 || 'You have unsaved param changes. Discard?';
-            if (!confirm(msg)) return;
+            if (!(await QuickSiteUtils.confirm(msg, { type: 'danger' }))) return;
         }
         hideSidebarAddForm();
     });
@@ -7760,9 +7799,7 @@
         const cssAction = getSelectedCssAction();
         let cssWasInjected = false;
         if (cssAction === 'missing' || cssAction === 'replace') {
-            const confirmed = confirm(
-                'This will permanently modify the project\'s CSS stylesheet and may affect the style of all pages.\n\nThe page will reload after insertion to apply the new styles.\n\nContinue?'
-            );
+            const confirmed = await QuickSiteUtils.confirm(PreviewConfig.i18n.snippetCssConfirm, { type: 'danger' });
             if (!confirmed) return;
 
             // Perform CSS injection first
@@ -9753,7 +9790,7 @@
         if (!enumsPanelStructure) return;
         
         const confirmMsg = (PreviewConfig.i18n?.enumConfirmDelete || 'Delete enum "%s"?').replace('%s', varName);
-        if (!confirm(confirmMsg)) return;
+        if (!(await QuickSiteUtils.confirm(confirmMsg, { type: 'danger' }))) return;
         
         try {
             if (enumsPanelStructure.__enums__) {

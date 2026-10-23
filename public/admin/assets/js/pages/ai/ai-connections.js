@@ -234,7 +234,7 @@
         return k.slice(0, 4) + '…' + k.slice(-4);
     }
 
-    function onCardAction(ev) {
+    async function onCardAction(ev) {
         const card = ev.currentTarget.closest('.qsac-card');
         if (!card) return;
         const id = card.dataset.connId;
@@ -246,7 +246,7 @@
             window.QSConnectionsStore.setDefault(id);
             renderList();
         } else if (action === 'delete') {
-            if (!window.confirm(t('aiConnections.confirmDelete', { name: conn.name }))) return;
+            if (!(await QuickSiteUtils.confirm(t('aiConnections.confirmDelete', { name: conn.name }), { type: 'danger' }))) return;
             window.QSConnectionsStore.removeConnection(id);
             renderList();
         } else if (action === 'edit') {
