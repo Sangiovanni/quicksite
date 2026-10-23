@@ -48,8 +48,10 @@ finish.** Editing source without re-checking the doc it is documented in is how
 
 ## Runtime floor
 
-**PHP 8.0.30 is the supported floor.** The engine uses `match()` and other 8.0+
-syntax, so 7.4 cannot boot it.
+**PHP 8.3 is the supported floor**, decided 2026-10-23: PHP 8.1 and older get no
+security fixes from the PHP project, and 8.2's end in December 2026. Test on the latest
+patch release of the floor's branch (8.3.36 as of that date), and tell users to run a
+patched release of their branch.
 
 ⚠ **Run every test suite on the floor AND on whatever your Apache actually
 serves.** A suite green on only one proves nothing about deployments at the other
