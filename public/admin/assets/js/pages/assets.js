@@ -585,7 +585,7 @@
         btn.disabled = true;
         btn.textContent = t('media.uploading');
         progressDiv.style.display = '';
-        progressDiv.innerHTML = '';
+        progressDiv.replaceChildren();
 
         const total = uploadQueue.length;
         let successCount = 0;
@@ -1323,14 +1323,25 @@
         saveBtn.disabled = false;
     }
 
+    // deleteAsset's 500 server.file_write_failed: the files are deleted, only the asset list
+    // could not be saved. The page follows the delete (one file or a batch) and says what failed.
+    function deletedButListNotSaved(result) {
+        return result.status === 500 && result.data?.code === 'server.file_write_failed';
+    }
+
     // ─── Single Delete ───────────────────────────────────────────────────────
     async function deleteSingle(filename) {
         if (!(await QuickSiteUtils.confirm(t('media.confirmDeleteOne', { name: filename }), { type: 'danger' }))) return;
 
         try {
             const result = await QuickSiteAdmin.apiRequest('deleteAsset', 'POST', { filename });
-            if (result.ok || result.status === 204) {
-                QuickSiteAdmin.showToast(t('media.deleted', { name: filename }), 'success');
+            const listNotSaved = deletedButListNotSaved(result);
+            if (result.ok || result.status === 204 || listNotSaved) {
+                if (listNotSaved) {
+                    QuickSiteAdmin.showToast(result.data.message || t('media.deleteFailed'), 'error');
+                } else {
+                    QuickSiteAdmin.showToast(t('media.deleted', { name: filename }), 'success');
+                }
                 if (editingAsset?.filename === filename) closeEditArea();
                 await loadAssets();
             } else {
@@ -1478,10 +1489,15 @@
 
         try {
             const result = await QuickSiteAdmin.apiRequest('deleteAsset', 'POST', { filenames });
-            if (result.ok || result.status === 204) {
-                QuickSiteAdmin.showToast(t(filenames.length !== 1
-                    ? 'media.deletedManyMany'
-                    : 'media.deletedManyOne', { count: filenames.length }), 'success');
+            const listNotSaved = deletedButListNotSaved(result);
+            if (result.ok || result.status === 204 || listNotSaved) {
+                if (listNotSaved) {
+                    QuickSiteAdmin.showToast(result.data.message || t('media.deleteFailed'), 'error');
+                } else {
+                    QuickSiteAdmin.showToast(t(filenames.length !== 1
+                        ? 'media.deletedManyMany'
+                        : 'media.deletedManyOne', { count: filenames.length }), 'success');
+                }
                 selectedFiles.clear();
                 toggleSelectMode();
                 if (editingAsset && filenames.includes(editingAsset.filename)) closeEditArea();

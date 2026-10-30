@@ -14,6 +14,10 @@
     // ==================== Module State ====================
     
     let selectorsLoaded = false;
+    // Whether the Selectors list is drawn from that data. The Interactions tool and Motion's
+    // apply-keyframe picker load the data without drawing it, and the Style tool opens the tab's
+    // load only while isLoaded() is false: so isLoaded() answers this.
+    let selectorsShown = false;
     // Set by the qs:editor:structure-changed listener (bottom of file).
     // Producers: preview.js broadcastStructureChanged() after each
     // addNode / editNode / deleteNode / duplicateNode / addComponentToNode
@@ -175,6 +179,7 @@
             // Show content, hide loading
             selectorsLoading.style.display = 'none';
             selectorsGroups.style.display = '';
+            selectorsShown = true;
         } else {
             selectorsLoading.replaceChildren(
                 _renderLoadErrorIcon(),
@@ -1116,9 +1121,12 @@
         init: init,
         load: loadStyleSelectors,
         loadData: loadSelectorsData,
-        isLoaded: function() { return selectorsLoaded; },
+        // The list is drawn (what the Style tool's tabs ask); a reader of the data alone calls loadData(),
+        // which answers at once when the data is in
+        isLoaded: function() { return selectorsLoaded && selectorsShown; },
         reset: function() {
             selectorsLoaded = false;
+            selectorsShown = false;
             allSelectors = [];
             categorizedSelectors = { tags: [], classes: [], ids: [], attributes: [], media: {} };
             currentSelectedSelector = null;

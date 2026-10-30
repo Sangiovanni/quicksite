@@ -48,7 +48,10 @@ For a deeper view of how QuickSite is organized:
 
 ## Requirements
 
-- **PHP** 8.0+ (tested on 8.0 and 8.4)
+- **PHP** 8.3 or later (tested on 8.3 and 8.4)
+  - Run a patched release of your branch — at least 8.3.36, 8.4.27 or 8.5.12:
+    the PHP security release of 21 October 2026 fixed two remote code execution
+    flaws in every PHP that serves web pages.
 - **Web server**: Apache with `mod_rewrite`, **or** nginx
 - **PHP extensions**: json, mbstring, fileinfo, zip, curl — all five ship
   enabled in a stock PHP build and in every mainstream distribution package.
@@ -127,6 +130,13 @@ chmod +x setup.sh
 setup.bat
 ```
 
+Both scripts first check PHP: they ask the `php` on your PATH — or the one the
+`PHP` variable names (`PHP=/usr/bin/php8.3 ./setup.sh`; on Windows, before `setup.bat`,
+`set PHP=C:\php\php.exe` in Command Prompt or `$env:PHP = 'C:\php\php.exe'` in PowerShell) — for its version, and stop at once, before writing anything,
+when it is older than 8.3. When they find no `php` they say the version could not
+be checked and go on: the web server's own PHP is what serves QuickSite, and it
+must be 8.3 or later too.
+
 You get a **menu**, not a fixed sequence. Every item is independent and safe to
 re-run, so changing one setting later never means answering the others again:
 
@@ -141,6 +151,8 @@ re-run, so changing one setting later never means answering the others again:
 | **7** | Storage quotas | per-account ceilings on total size and upload rate. Leave both blank for none, which is the default. The size cap on each kind of file and the write rate (1,000 commands an hour per account) apply either way, at the defaults `quota.php.example` documents |
 | **8** | Self-deploy on / off | may this installation copy a built site onto a filesystem path? **Default off** — building and downloading still work either way |
 | **9** | Command console on / off | should the panel offer the raw command runner at `/admin/command`? **Default on.** Turning it off removes reach and discoverability, not access — every command stays reachable at `/management/` to any caller whose role allows it, and the command history stays either way |
+| **10** | Default language for new projects | the language a new project starts in when nobody chooses one: the New Project dialog preselects it, and an imported archive that names none gets it. A code from the installation's language list; default `en` |
+| **11** | Idle sign-out | how long the admin panel may go unused before it signs you out: a number and `m`, `h` or `d` (`90m`, `2h`, `1d`), at least 5 minutes; default 1 day. *Keep me signed in* keeps a session across browser restarts, never past this limit, and the login page states it under that box |
 
 The menu header always shows the values currently on disk, so nothing is
 guessed. Every item is optional — skip anything you do not need.
@@ -160,11 +172,12 @@ see *Create your first account* below for the order.
 
 Items 1–3 update `init.php` constants and the `.htaccess` routing, and drop the
 generated nginx routing config so the engine rebuilds it for the new layout on
-the next page load. Item 4 writes `environment.php` and item 5 edits `auth.php`.
-Items 7, 8 and 9 write a config file only when you ask for something other than
-the default — accept the default and the file stays absent, which is already
-what it means, so an install that never opted out never looks as though somebody
-opted in. Item 6 only reads.
+the next page load. Item 4 writes `environment.php`, and items 5 and 11 edit
+`auth.php`. Items 7 to 10 write a config file only when you ask for something
+other than the default — accept the default and the file stays absent, which is
+already what it means, so an install that never opted out never looks as though
+somebody opted in; item 11 does the same while `auth.php` does not exist yet.
+Item 6 only reads.
 
 Outside the menu, the **first** run does one thing more: if the web root has no
 index file, it copies `secure/deploy/index.html.example` to `public/index.html`

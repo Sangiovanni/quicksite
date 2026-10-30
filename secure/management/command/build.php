@@ -1215,7 +1215,7 @@ DEPLOYMENT STEPS:
    Then check that styling loads, and language switching if multilingual.
 
 REQUIREMENTS:
-- PHP 8.0 or newer, with mod_php / php-fpm serving the document root
+- PHP 8.3 or newer, with mod_php / php-fpm serving the document root
 - No PHP extensions beyond the defaults, no Composer, no database
 
 NOTES:

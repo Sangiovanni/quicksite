@@ -1065,9 +1065,10 @@
                 this.popup.parentNode.removeChild(this.popup);
             }
             
-            // Unwrap input
+            // Unwrap input, while the wrapper is still in the page: once the field it sat in was
+            // rebuilt, the wrapper went with it and there is nothing to put back
             const wrapper = this.input.parentNode;
-            if (wrapper && wrapper.classList.contains('qs-cp-input-wrap')) {
+            if (wrapper && wrapper.classList.contains('qs-cp-input-wrap') && wrapper.parentNode) {
                 wrapper.parentNode.insertBefore(this.input, wrapper);
                 wrapper.parentNode.removeChild(wrapper);
             }

@@ -128,10 +128,11 @@ function __command_editNode(array $params = [], array $urlParams = []): ApiRespo
     $removeParams = $params['removeParams'] ?? [];
     $newTextKey = $params['textKey'] ?? null;
     
-    // Filter out reserved params (translatable attributes) from addParams
-    // These are auto-managed and cannot be set manually
-    foreach (TagRegistry::RESERVED_PARAMS as $reserved) {
-        unset($addParams[$reserved]);
+    // Reserved params (translatable attributes) are dropped before any check, except a
+    // translation-key param the node's tag declares (an iframe's title). With no new tag named,
+    // one some tag declares waits until the node's tag is known (below).
+    if (is_array($addParams)) {
+        $addParams = TagRegistry::withoutReservedParams(is_string($newTag) ? $newTag : null, $addParams);
     }
     
     // SECURITY: Validate no reserved data-qs-* attributes in addParams
@@ -301,6 +302,11 @@ function __command_editNode(array $params = [], array $urlParams = []): ApiRespo
     
     $currentTag = $targetNode['tag'];
     $finalTag = $newTag ?? $currentTag;
+
+    // The tag the node ends with is known: a reserved param it does not declare goes too.
+    if (is_array($addParams)) {
+        $addParams = TagRegistry::withoutReservedParams($finalTag, $addParams);
+    }
     
     // Build the new params
     $currentParams = $targetNode['params'] ?? [];

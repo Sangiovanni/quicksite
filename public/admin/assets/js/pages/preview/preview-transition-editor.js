@@ -38,6 +38,10 @@ window.PreviewTransitionEditor = (function() {
     let transitionEditorHoverProperties = {};
     let transitionEditorCurrentPseudo = ':hover';
     let transitionEditorCallback = null;
+    // The transition's settings as the editor opened: Save writes the transition only when they changed
+    let transitionEditorOpenedValue = null;
+    // The properties the rule's transition names, read on opening ([] when it names all)
+    let transitionEditorTransitionProps = [];
     let transitionEditorBaseAnimation = null;
     let transitionEditorTriggerAnimation = null;
 
@@ -50,6 +54,10 @@ window.PreviewTransitionEditor = (function() {
     let transitionPseudoSelect = null;
     let transitionPropertySelect = null;
     let transitionSpecificProps = null;
+    let transitionRowsEl = null;
+    let transitionAddRowBtn = null;
+    let transitionRowTemplate = null;
+    let transitionAllSettings = [];
     let transitionDuration = null;
     let transitionDurationUnit = null;
     let transitionDelay = null;
@@ -105,6 +113,9 @@ window.PreviewTransitionEditor = (function() {
     let activeTransitionColorPicker = null;
     let activeTransitionColorPickerInput = null;
 
+    // Each Specific Properties row's property picker
+    const transitionRowPickers = new Map();
+
     /**
      * Initialize DOM references
      */
@@ -117,6 +128,10 @@ window.PreviewTransitionEditor = (function() {
         transitionPseudoSelect = document.getElementById('transition-pseudo-select');
         transitionPropertySelect = document.getElementById('transition-property-select');
         transitionSpecificProps = document.getElementById('transition-specific-props');
+        transitionRowsEl = document.getElementById('transition-rows');
+        transitionAddRowBtn = document.getElementById('transition-add-row');
+        transitionRowTemplate = document.getElementById('transition-row-template');
+        transitionAllSettings = Array.from(document.querySelectorAll('#transition-editor-modal .transition-editor__all-setting'));
         transitionDuration = document.getElementById('transition-duration');
         transitionDurationUnit = document.getElementById('transition-duration-unit');
         transitionDelay = document.getElementById('transition-delay');
@@ -181,13 +196,12 @@ window.PreviewTransitionEditor = (function() {
         transitionEditorHoverProperties = {};
         transitionEditorCurrentPseudo = transitionPseudoSelect?.value || ':hover';
 
-        // Reset controls to defaults
-        if (transitionDuration) transitionDuration.value = 0.3;
-        if (transitionDelay) transitionDelay.value = 0;
-        if (transitionTimingSelect) transitionTimingSelect.value = 'ease';
+        // Reset controls to defaults: All Properties at 0.3s ease, no row (the previous rule's go)
         if (transitionPropertySelect) transitionPropertySelect.value = 'all';
-        if (transitionCubicBezier) transitionCubicBezier.style.display = 'none';
-        if (transitionSpecificProps) transitionSpecificProps.style.display = 'none';
+        _setSettings(_allControls(), { duration: '0.3s', delay: '0s', timing: 'ease' });
+        _showSpecific(false);
+        _setTransitionRows([]);
+        transitionEditorTransitionProps = [];
 
         // Update labels to match current pseudo-class
         updateTriggerStateLabels();
@@ -195,8 +209,9 @@ window.PreviewTransitionEditor = (function() {
         // Show modal
         transitionEditorModal?.classList.add('preview-keyframe-modal--visible');
 
-        // Load selector states
-        await loadTransitionSelectorStates(selector);
+        // Load selector states, and the rule's own transition into the controls
+        await loadTransitionSelectorStates(selector, true);
+        transitionEditorOpenedValue = buildTransitionValue();
 
         // Update preview
         updateTransitionPreviewCode();
@@ -212,9 +227,11 @@ window.PreviewTransitionEditor = (function() {
     }
 
     /**
-     * Load base and pseudo-state styles for the selector
+     * Load base and pseudo-state styles for the selector. readTransition: also set the transition
+     * controls from the rule's own transition, on opening only: a later reload (an add, a delete, the
+     * trigger state changed) keeps what the author set.
      */
-    async function loadTransitionSelectorStates(selector) {
+    async function loadTransitionSelectorStates(selector, readTransition = false) {
         const pseudoClass = transitionEditorCurrentPseudo;
         const hoverSelector = selector + pseudoClass;
 
@@ -236,7 +253,7 @@ window.PreviewTransitionEditor = (function() {
             if (baseData.status === 200 && baseData.data?.styles) {
                 transitionEditorBaseProperties = parseStylesString(baseData.data.styles);
 
-                if (transitionEditorBaseProperties.transition) {
+                if (readTransition && transitionEditorBaseProperties.transition) {
                     parseExistingTransition(transitionEditorBaseProperties.transition);
                 }
 
@@ -253,10 +270,9 @@ window.PreviewTransitionEditor = (function() {
                 }
             }
 
-            // Render property panels, then the list of both states' properties (a state with none too)
+            // Render property panels (the transition's rows are the author's: a reload leaves them)
             renderTransitionBaseProperties();
             renderTransitionHoverProperties();
-            updateSpecificPropertiesCheckboxes();
 
             // Render animation sections
             renderAnimationSection('base');
@@ -337,59 +353,238 @@ window.PreviewTransitionEditor = (function() {
         }
     }
 
+    // The timing functions the timing picker offers by name (a cubic-bezier() it shows in its fields)
+    const PICKER_TIMINGS = ['ease', 'linear', 'ease-in', 'ease-out', 'ease-in-out'];
+
     /**
-     * Parse existing transition value and populate controls
+     * Set the transition controls from the rule's own transition, as written: a comma list, each
+     * transition its property, duration, timing function and delay in any order (a first time is the
+     * duration, a second the delay; a property left out is all). A single transition of all shows as
+     * All Properties with its settings; anything else as Specific Properties, a row for each
+     * transition with its own settings (all included, as one row's property), so every transition
+     * the controls build again is the one the rule holds.
      */
     function parseExistingTransition(transitionValue) {
-        const parts = transitionValue.trim().split(/\s+/);
+        const items = _splitTopLevel(transitionValue, ',').map(_parseTransitionItem).filter(Boolean);
+        if (!items.length || (items.length === 1 && items[0].property === 'none')) return;
+        if (items.length === 1 && items[0].property === 'all') {
+            _setSettings(_allControls(), items[0]);
+            return;
+        }
+        transitionEditorTransitionProps = items.map(item => item.property);
+        if (transitionPropertySelect) transitionPropertySelect.value = 'specific';
+        _showSpecific(true);
+        _setTransitionRows(items);
+    }
 
-        if (parts.length >= 1) {
-            const prop = parts[0];
-            if (transitionPropertySelect) {
-                if (prop === 'all') {
-                    transitionPropertySelect.value = 'all';
-                } else {
-                    transitionPropertySelect.value = 'all';
+    /** `text` split on `sep` (',' or ' ') outside parentheses: a cubic-bezier() stays whole. */
+    function _splitTopLevel(text, sep) {
+        const out = [];
+        let depth = 0;
+        let current = '';
+        for (const ch of String(text)) {
+            if (ch === '(') depth++;
+            if (ch === ')') depth = Math.max(0, depth - 1);
+            const splits = depth === 0 && (sep === ' ' ? /\s/.test(ch) : ch === sep);
+            if (!splits) {
+                current += ch;
+                continue;
+            }
+            if (current.trim()) out.push(current.trim());
+            current = '';
+        }
+        if (current.trim()) out.push(current.trim());
+        return out;
+    }
+
+    /** One transition of the list: its property, duration, delay and timing, CSS's defaults where left out. */
+    function _parseTransitionItem(item) {
+        const tokens = _splitTopLevel(item, ' ');
+        if (!tokens.length) return null;
+        const times = [];
+        let property = 'all';
+        let timing = 'ease';
+        tokens.forEach(token => {
+            if (/^[+-]?(?:\d+\.?\d*|\.\d+)m?s$/i.test(token)) times.push(token.toLowerCase());
+            else if (/^(?:ease|linear|ease-in|ease-out|ease-in-out|step-start|step-end)$/i.test(token)
+                || /^(?:cubic-bezier|steps|linear)\(/i.test(token)) timing = token.toLowerCase();
+            else if (token !== 'normal' && token !== 'allow-discrete') property = token;
+        });
+        return { property, duration: times[0] || '0s', delay: times[1] || '0s', timing };
+    }
+
+    /** A duration or a delay ("300ms", ".5s") into its number field and its unit picker. */
+    function _setTimeControl(input, unitSelect, time) {
+        const m = /^([+-]?(?:\d+\.?\d*|\.\d+))(m?s)$/i.exec(time);
+        if (!m || !input) return;
+        input.value = parseFloat(m[1]);
+        if (unitSelect) unitSelect.value = m[2].toLowerCase();
+    }
+
+    /**
+     * A timing function into a timing picker, All's or a row's (a cubic-bezier() into its four
+     * fields). One the picker lacks (steps(), step-start…) becomes one more choice of that picker,
+     * as written: kept, never replaced by a timing nobody chose.
+     */
+    function _setTimingControl(select, bezierBox, timing) {
+        if (!select) return;
+        select.querySelectorAll('option[data-as-written]').forEach(option => option.remove());
+        const bezier = /^cubic-bezier\(([^)]*)\)$/.exec(timing);
+        const values = bezier ? bezier[1].split(',').map(v => parseFloat(v.trim())) : [];
+        if (PICKER_TIMINGS.includes(timing)) {
+            select.value = timing;
+        } else if (values.length === 4 && !values.some(v => isNaN(v))) {
+            select.value = 'cubic-bezier';
+            ['x1', 'y1', 'x2', 'y2'].forEach((k, i) => {
+                const field = bezierBox?.querySelector('[data-bezier="' + k + '"]');
+                if (field) field.value = values[i];
+            });
+        } else {
+            select.append(QSDom.el('option', { value: timing, 'data-as-written': '', text: timing }));
+            select.value = timing;
+        }
+        if (bezierBox) bezierBox.style.display = select.value === 'cubic-bezier' ? '' : 'none';
+    }
+
+    /** What a timing picker holds, as CSS writes it (a cubic-bezier() from its four fields). */
+    function _timingOf(select, bezierBox) {
+        const timing = select?.value || 'ease';
+        if (timing !== 'cubic-bezier') return timing;
+        const field = (k, fallback) => bezierBox?.querySelector('[data-bezier="' + k + '"]')?.value || fallback;
+        return `cubic-bezier(${field('x1', 0.4)}, ${field('y1', 0)}, ${field('x2', 0.2)}, ${field('y2', 1)})`;
+    }
+
+    /** All Properties' one set of controls. */
+    function _allControls() {
+        return {
+            duration: transitionDuration, durationUnit: transitionDurationUnit,
+            delay: transitionDelay, delayUnit: transitionDelayUnit,
+            timing: transitionTimingSelect, bezier: transitionCubicBezier
+        };
+    }
+
+    /** A Specific Properties row's own controls. */
+    function _rowControls(row) {
+        const field = (name) => row.querySelector('.transition-editor__row-' + name);
+        return {
+            duration: field('duration'), durationUnit: field('duration-unit'),
+            delay: field('delay'), delayUnit: field('delay-unit'),
+            timing: field('timing'), bezier: field('bezier')
+        };
+    }
+
+    /** What a set of controls holds: {duration, delay, timing}, each as CSS writes it ("0.3s", "100ms", "ease"). */
+    function _settingsOf(controls) {
+        return {
+            duration: (controls.duration?.value || 0.3) + (controls.durationUnit?.value || 's'),
+            delay: (parseFloat(controls.delay?.value || 0) || 0) + (controls.delayUnit?.value || 's'),
+            timing: _timingOf(controls.timing, controls.bezier)
+        };
+    }
+
+    /** A set of settings ({duration, delay, timing}, as CSS writes them) into a set of controls. */
+    function _setSettings(controls, settings) {
+        _setTimeControl(controls.duration, controls.durationUnit, settings.duration);
+        _setTimeControl(controls.delay, controls.delayUnit, settings.delay);
+        _setTimingControl(controls.timing, controls.bezier, settings.timing);
+    }
+
+    /** One transition as CSS writes it: its property, duration and timing, and its delay when it has one. */
+    function _transitionText(property, settings) {
+        return `${property} ${settings.duration} ${settings.timing}` + (parseFloat(settings.delay) > 0 ? ' ' + settings.delay : '');
+    }
+
+    /** Specific Properties shows its rows, All Properties its one set: never both. */
+    function _showSpecific(specific) {
+        if (transitionSpecificProps) transitionSpecificProps.style.display = specific ? '' : 'none';
+        transitionAllSettings.forEach(el => { el.style.display = specific ? 'none' : ''; });
+    }
+
+    /** The Specific Properties rows, in order. */
+    function _rows() {
+        return transitionRowsEl ? Array.from(transitionRowsEl.querySelectorAll('.transition-editor__row')) : [];
+    }
+
+    /** A row's property ('' while none is chosen). */
+    function _rowProperty(row) {
+        return transitionRowPickers.get(row)?.getValue() || '';
+    }
+
+    /** A row as one transition: its property and its own settings. */
+    function _rowItem(row) {
+        return { property: _rowProperty(row), ..._settingsOf(_rowControls(row)) };
+    }
+
+    /**
+     * One Specific Properties row, cloned from the page's template: the property picker the add rows
+     * use (every CSS property, or a custom name), its own duration, delay and timing, and ✕.
+     */
+    function _renderTransitionRow(item) {
+        const row = transitionRowTemplate.content.querySelector('.transition-editor__row').cloneNode(true);
+        const controls = _rowControls(row);
+        _setSettings(controls, item);
+        if (typeof QSPropertySelector !== 'undefined') {
+            transitionRowPickers.set(row, new QSPropertySelector({
+                container: row.querySelector('.transition-editor__row-property'),
+                currentValue: item.property || '',
+                onSelect: () => {
+                    _refreshRowExclusions();
+                    updateTransitionPreviewCode();
                 }
-            }
+            }));
         }
+        row.querySelectorAll('input').forEach(field => field.addEventListener('input', updateTransitionPreviewCode));
+        [controls.durationUnit, controls.delayUnit].forEach(field => field?.addEventListener('change', updateTransitionPreviewCode));
+        controls.timing?.addEventListener('change', () => {
+            if (controls.bezier) controls.bezier.style.display = controls.timing.value === 'cubic-bezier' ? '' : 'none';
+            updateTransitionPreviewCode();
+        });
+        row.querySelector('.transition-editor__row-remove')?.addEventListener('click', () => _removeTransitionRow(row));
+        return row;
+    }
 
-        if (parts.length >= 2) {
-            const dur = parseFloat(parts[1]);
-            if (!isNaN(dur) && transitionDuration) {
-                transitionDuration.value = dur;
-            }
-        }
+    /** The rows, replaced by one for each transition given. */
+    function _setTransitionRows(items) {
+        transitionRowPickers.forEach(picker => picker.destroy());
+        transitionRowPickers.clear();
+        transitionRowsEl?.replaceChildren(...items.map(_renderTransitionRow));
+        _refreshRowExclusions();
+    }
 
-        if (parts.length >= 3) {
-            const timing = parts[2];
-            if (transitionTimingSelect) {
-                const validTimings = ['ease', 'linear', 'ease-in', 'ease-out', 'ease-in-out'];
-                if (validTimings.includes(timing)) {
-                    transitionTimingSelect.value = timing;
-                } else if (timing.startsWith('cubic-bezier')) {
-                    transitionTimingSelect.value = 'cubic-bezier';
-                    const match = timing.match(/cubic-bezier\(([^)]+)\)/);
-                    if (match) {
-                        const vals = match[1].split(',').map(v => parseFloat(v.trim()));
-                        if (vals.length === 4) {
-                            document.getElementById('transition-bezier-x1').value = vals[0];
-                            document.getElementById('transition-bezier-y1').value = vals[1];
-                            document.getElementById('transition-bezier-x2').value = vals[2];
-                            document.getElementById('transition-bezier-y2').value = vals[3];
-                        }
-                    }
-                    if (transitionCubicBezier) transitionCubicBezier.style.display = '';
-                }
-            }
-        }
+    /** Each row's picker leaves out the properties the other rows hold: a property is in one row at most. */
+    function _refreshRowExclusions() {
+        const rows = _rows();
+        rows.forEach(row => transitionRowPickers.get(row)?.setExcludeProperties(
+            rows.filter(other => other !== row).map(_rowProperty).filter(Boolean)));
+    }
 
-        if (parts.length >= 4) {
-            const delay = parseFloat(parts[3]);
-            if (!isNaN(delay) && transitionDelay) {
-                transitionDelay.value = delay;
-            }
-        }
+    /** + Add Property: an empty row with the settings of the row above it (All's when there is none). */
+    function _addTransitionRow() {
+        const rows = _rows();
+        const above = rows.length ? _rowItem(rows[rows.length - 1]) : _settingsOf(_allControls());
+        transitionRowsEl?.append(_renderTransitionRow({ ...above, property: '' }));
+        _refreshRowExclusions();
+        updateTransitionPreviewCode();
+    }
+
+    /** ✕: the row goes; the last one leaves an empty row with its settings, so the list never shows nothing. */
+    function _removeTransitionRow(row) {
+        const settings = _rowItem(row);
+        transitionRowPickers.get(row)?.destroy();
+        transitionRowPickers.delete(row);
+        row.remove();
+        if (!_rows().length) transitionRowsEl?.append(_renderTransitionRow({ ...settings, property: '' }));
+        _refreshRowExclusions();
+        updateTransitionPreviewCode();
+    }
+
+    /** The properties the rule's states set (base and trigger) and its transition names, once each. */
+    function _stateProperties() {
+        return [...new Set([
+            ...Object.keys(transitionEditorBaseProperties),
+            ...Object.keys(transitionEditorHoverProperties),
+            ...transitionEditorTransitionProps
+        ])].filter(prop => prop !== 'transition' && prop !== 'animation' && prop !== 'all');
     }
 
     /** The note a list of the editor shows when it has nothing to list. */
@@ -428,14 +623,6 @@ window.PreviewTransitionEditor = (function() {
         }, [
             QSDom.el('span', { style: 'color: var(--qsb-accent, #4fc3f7);', text: '@keyframes' }),
             QSDom.el('span', { style: 'color: var(--qsb-text, #fff);', text: name })
-        ]);
-    }
-
-    /** One property the transition can be limited to, ticked. */
-    function _renderPropertyCheckbox(prop) {
-        return QSDom.el('label', { class: 'transition-editor__checkbox-label' }, [
-            QSDom.el('input', { type: 'checkbox', class: 'transition-editor__prop-checkbox', value: prop, checked: '' }),
-            ' ' + prop
         ]);
     }
 
@@ -510,6 +697,7 @@ window.PreviewTransitionEditor = (function() {
             if (result.status === 200) {
                 showToast(PreviewConfig.i18n.propertyDeleted || 'Property deleted', 'success');
                 await loadTransitionSelectorStates(transitionEditorSelector);
+                refreshPreviewFrame();
             } else {
                 throw new Error(result.message || 'Failed to delete property');
             }
@@ -520,10 +708,10 @@ window.PreviewTransitionEditor = (function() {
     }
 
     /**
-     * Add a property to base or trigger state
+     * Add a property to base or trigger state. Answers whether it was added.
      */
     async function addTransitionProperty(target, property, value) {
-        if (!property || !value) return;
+        if (!property || !value) return false;
 
 
         const selector = target === 'base'
@@ -542,12 +730,14 @@ window.PreviewTransitionEditor = (function() {
                 showToast(PreviewConfig.i18n.propertyAdded || 'Property added', 'success');
                 await loadTransitionSelectorStates(transitionEditorSelector);
                 refreshPreviewFrame();
+                return true;
             } else {
                 throw new Error(result.message || 'Failed to add property');
             }
         } catch (error) {
             console.error('Failed to add property:', error);
             showToast(PreviewConfig.i18n.addPropertyFailed || 'Failed to add property', 'error');
+            return false;
         }
     }
 
@@ -991,74 +1181,16 @@ window.PreviewTransitionEditor = (function() {
     }
 
     /**
-     * Update specific properties checkboxes
-     */
-    function updateSpecificPropertiesCheckboxes() {
-        if (!transitionSpecificProps) return;
-
-        const allProps = new Set([
-            ...Object.keys(transitionEditorBaseProperties),
-            ...Object.keys(transitionEditorHoverProperties)
-        ]);
-
-        const propsToShow = [...allProps].filter(p =>
-            p !== 'transition' && p !== 'animation'
-        );
-
-        if (propsToShow.length === 0) {
-            transitionSpecificProps.replaceChildren(_renderEmptyNote(PreviewConfig.i18n.noPropertiesToTransition || 'No properties to transition'));
-            return;
-        }
-
-        transitionSpecificProps.replaceChildren(...propsToShow.map(prop => _renderPropertyCheckbox(prop)));
-
-        transitionSpecificProps.querySelectorAll('.transition-editor__prop-checkbox').forEach(cb => {
-            cb.addEventListener('change', updateTransitionPreviewCode);
-        });
-    }
-
-    /**
-     * Build transition value string
+     * The transition the controls hold, as CSS writes it: All's one set for all, or one transition
+     * for each row that has a property, with that row's own settings ("none" when no row has one).
      */
     function buildTransitionValue() {
-        const property = transitionPropertySelect?.value || 'all';
-        const durationVal = transitionDuration?.value || 0.3;
-        const durationUnit = transitionDurationUnit?.value || 's';
-        const duration = durationVal + durationUnit;
-        const delayVal = parseFloat(transitionDelay?.value || 0);
-        const delayUnit = transitionDelayUnit?.value || 's';
-        const delay = delayVal > 0 ? delayVal + delayUnit : null;
-        const timing = transitionTimingSelect?.value || 'ease';
-
-        let timingValue = timing;
-        if (timing === 'cubic-bezier') {
-            const x1 = document.getElementById('transition-bezier-x1')?.value || 0.4;
-            const y1 = document.getElementById('transition-bezier-y1')?.value || 0;
-            const x2 = document.getElementById('transition-bezier-x2')?.value || 0.2;
-            const y2 = document.getElementById('transition-bezier-y2')?.value || 1;
-            timingValue = `cubic-bezier(${x1}, ${y1}, ${x2}, ${y2})`;
+        if (transitionPropertySelect?.value !== 'specific') {
+            return _transitionText('all', _settingsOf(_allControls()));
         }
-
-        if (property === 'specific') {
-            const selectedProps = [];
-            transitionSpecificProps?.querySelectorAll('.transition-editor__prop-checkbox:checked').forEach(cb => {
-                selectedProps.push(cb.value);
-            });
-
-            if (selectedProps.length === 0) {
-                return 'none';
-            }
-
-            return selectedProps.map(prop =>
-                `${prop} ${duration} ${timingValue}${delay ? ' ' + delay : ''}`
-            ).join(', ');
-        }
-
-        let value = `all ${duration} ${timingValue}`;
-        if (delay) {
-            value += ` ${delay}`;
-        }
-        return value;
+        const parts = _rows().map(_rowItem).filter(item => item.property)
+            .map(item => _transitionText(item.property, item));
+        return parts.length ? parts.join(', ') : 'none';
     }
 
     /**
@@ -1087,13 +1219,45 @@ window.PreviewTransitionEditor = (function() {
     }
 
     /**
-     * Save the transition
+     * What an open add row holds (a property and a value), added as its Add button would: Save never
+     * drops what the author typed. Both rows are read before either is added, as an add re-reads the
+     * rule and rebuilds the rows. Answers false when an add failed: Save then stops, the editor open.
+     */
+    async function addPendingProperties() {
+        const rows = [
+            ['base', transitionBaseAddForm, transitionBasePropSelector, transitionBaseValueInput],
+            ['trigger', transitionTriggerAddForm, transitionTriggerPropSelector, transitionTriggerValueInput]
+        ];
+        const pending = [];
+        rows.forEach(([target, form, propSelector, valueInput]) => {
+            if (!form || form.style.display === 'none') return;
+            const property = propSelector?.getValue();
+            const value = valueInput?.getValue();
+            if (property && value) pending.push([target, property, value]);
+        });
+        for (const [target, property, value] of pending) {
+            if (!(await addTransitionProperty(target, property, value))) return false;
+            toggleAddPropertyForm(target, false);
+        }
+        return true;
+    }
+
+    /**
+     * Save: first what an open add row holds, then the transition, only when its settings changed
+     * since the editor opened. A Save with nothing else to do closes, and writes no declaration the
+     * author did not ask for: an untouched rule keeps its own transition as written.
      */
     async function saveTransition() {
         if (!transitionEditorSelector) return;
 
-
+        // The settings as they stand, read before an add re-reads the rule (which sets them from the
+        // rule's own transition)
         const transitionValue = buildTransitionValue();
+        if (!(await addPendingProperties())) return;
+        if (transitionValue === transitionEditorOpenedValue) {
+            close();
+            return;
+        }
 
         try {
             const response = await QuickSiteAdmin.apiRequest('setStyleRule', 'POST', {
@@ -1219,15 +1383,25 @@ window.PreviewTransitionEditor = (function() {
             await loadTransitionSelectorStates(transitionEditorSelector);
         });
 
-        // Property select change
+        // Properties: to Specific, a row for each property the rule's states set, each with All's
+        // settings (none set: one empty row); back to All, one set, the first row's
         transitionPropertySelect?.addEventListener('change', (e) => {
-            if (e.target.value === 'specific') {
-                transitionSpecificProps.style.display = '';
+            const specific = e.target.value === 'specific';
+            if (specific) {
+                const settings = _settingsOf(_allControls());
+                const props = _stateProperties();
+                _setTransitionRows((props.length ? props : ['']).map(property => ({ ...settings, property })));
             } else {
-                transitionSpecificProps.style.display = 'none';
+                const first = _rows()[0];
+                if (first) _setSettings(_allControls(), _rowItem(first));
+                _setTransitionRows([]);
             }
+            _showSpecific(specific);
             updateTransitionPreviewCode();
         });
+
+        // + Add Property, under the rows
+        transitionAddRowBtn?.addEventListener('click', _addTransitionRow);
 
         // Timing function change
         transitionTimingSelect?.addEventListener('change', (e) => {

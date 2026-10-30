@@ -71,7 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <?php if ($registerError === 'csrf'): ?>
             <div class="admin-alert admin-alert--error"><?= __admin('login.csrfFailed') ?></div>
             <?php elseif ($registerError === 'throttled'): ?>
-            <div class="admin-alert admin-alert--error"><?= __admin('register.throttled', ['seconds' => $registerRetryAfter]) ?></div>
+            <div class="admin-alert admin-alert--error"><?= __admin('register.throttled', ['duration' => __adminDuration($registerRetryAfter)]) ?></div>
             <?php elseif ($registerError === 'password_too_short'): ?>
             <div class="admin-alert admin-alert--error"><?= __admin('register.passwordTooShort', ['min' => $registerMinLength]) ?></div>
             <?php elseif ($registerError === 'password_mismatch'): ?>

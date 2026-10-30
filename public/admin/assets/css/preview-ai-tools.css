@@ -783,7 +783,6 @@
 /* Your prompt + General prompt textareas */
 
 .preview-contextual-ai-tools__user-prompt {
-    width: 100%;
     min-height: 70px;
     padding: 6px 8px;
     background: var(--admin-bg);
@@ -801,7 +800,6 @@
 }
 
 .preview-contextual-ai-tools__general-prompt {
-    width: 100%;
     min-height: 140px;
     padding: 8px;
     background: var(--admin-bg);
@@ -976,7 +974,6 @@
 /* AI response textarea + parse status */
 
 .preview-contextual-ai-tools__ai-response {
-    width: 100%;
     min-height: 90px;
     padding: 6px 8px;
     background: var(--admin-bg);

@@ -5,8 +5,19 @@
 require_once __DIR__ . '/../functions/projectLanguage.php';
 
 class Translator {
+    /** What translate() answers for a key it cannot resolve starts with this; the key and a closing brace follow. */
+    public const MISSING_PREFIX = '{translation missing: ';
+
     private static $translations = null;
     private static $lang = null;
+
+    /**
+     * Whether a text is translate()'s answer for a key it could not resolve — any key, or
+     * one starting with $keyPrefix ('page.titles.' asks about a page title).
+     */
+    public static function isMissing(string $text, string $keyPrefix = ''): bool {
+        return strpos($text, self::MISSING_PREFIX . $keyPrefix) === 0;
+    }
 
     /**
      * @param string|null $langFromRouter The language the router already
@@ -87,7 +98,7 @@ class Translator {
                 error_log("Missing translation key: {$key} for language: " . self::$lang);
                 
                 // Return key itself wrapped in marker if no default provided
-                return "{translation missing: {$key}}";
+                return self::MISSING_PREFIX . $key . '}';
             }
             $current = $current[$segment];
         }
@@ -106,7 +117,7 @@ class Translator {
                 . "(likely a string-vs-nested collision in the translation file). "
                 . "Lang: " . self::$lang
             );
-            return "{translation missing: {$key}}";
+            return self::MISSING_PREFIX . $key . '}';
         }
 
         $result = (string) $current;
@@ -114,7 +125,7 @@ class Translator {
         // Empty string is considered "untranslated" - treat like missing
         if ($result === '') {
             error_log("Empty translation for key: {$key} for language: " . self::$lang);
-            return "{translation missing: {$key}}";
+            return self::MISSING_PREFIX . $key . '}';
         }
         
         // Handle i18next-style interpolation: {{variable}}

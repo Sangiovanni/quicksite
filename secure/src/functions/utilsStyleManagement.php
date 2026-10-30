@@ -14,12 +14,12 @@
  * CssParser will process. The two are ONE number on purpose: every writer must
  * produce a file the parser can then read back.
  *
- * Sized to the parser's real capacity, not to taste. CssParser peaks at ~140-210x
- * the input in memory (block-tree + substr copies), so at the install's 128 MB
- * limit the 8.0.30 FLOOR fatals around 0.9 MB. 512 KB parses at ~77 MB peak on the
- * floor (≈40% headroom) and is still 12x the largest real stylesheet on this
- * install (quicksite, 40 KB). A cap the floor cannot parse would let one oversized
- * write break every CssParser-using command for that project.
+ * Sized to the parser's real capacity, not to taste. CssParser peaks at ~150x
+ * the input in memory for the worst sheet (block-tree + substr copies), so at the
+ * install's 128 MB limit the 8.3 FLOOR fatals around 0.9 MB. 512 KB parses at
+ * ~74 MB peak on the floor (≈40% headroom) and is still 12x the largest real
+ * stylesheet on this install (quicksite, 40 KB). A cap the floor cannot parse would
+ * let one oversized write break every CssParser-using command for that project.
  */
 const CSS_MAX_BYTES = 512 * 1024;
 

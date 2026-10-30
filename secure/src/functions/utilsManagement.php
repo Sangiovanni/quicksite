@@ -16,27 +16,6 @@ require_once __DIR__ . '/jsonIo.php';
 const SPECIAL_PAGES = ['404', '500', '403', '401'];
 
 /**
- * array_is_list() polyfill — PHP 8.1+ builtin, and 8.0.30 is the supported floor.
- * Guarded so 8.1+ keeps the (faster) engine implementation.
- *
- * Semantics match the builtin exactly, INCLUDING the empty case: array_is_list([])
- * is true. Note `range(0, -1)` is [0, -1], not [], so the empty array has to be
- * special-cased rather than falling through to the key comparison.
- *
- * Declared here so it is available tree-wide (utilsManagement is the shared
- * utility home). Do not confuse it with resolverHelpers' _isResolverArrayShape,
- * which deliberately answers FALSE for an empty array — see the note there.
- */
-if (!function_exists('array_is_list')) {
-    function array_is_list(array $array): bool {
-        if ($array === []) {
-            return true;
-        }
-        return array_keys($array) === range(0, count($array) - 1);
-    }
-}
-
-/**
  * Read a request parameter that MUST be a string, coercing nothing.
  *
  * `?name[]=x` (and its JSON equivalent) delivers an ARRAY where a command expects
@@ -183,13 +162,11 @@ function generate_page_template(string $route): string {
     //   - static route 'home' → routePath() === 'home', routeParams() === []
     //   - param  route 'test/:slug' → routePath() === 'test/:slug',
     //                                routeParams() === ['slug' => 'red-vase']
-    // Behaviour for static routes is identical to the prior hardcoded
-    // form. Existing per-route .php files (generated before this
-    // change) keep their hardcoded shape — no migration needed.
     //
     // Page title key uses the route LITERAL ('page.titles.test/:slug')
-    // so authors can localise per-pattern. Falls back to a sensible
-    // default when no translation key is set.
+    // so authors can localise per-pattern. A page with no title in the
+    // language served gets a readable one from the shell (qs_page_title()),
+    // whatever shape its template has.
     return <<<'PHP'
 <?php
 
@@ -211,15 +188,8 @@ $content = $renderer->renderPage($trimParameters->routePath());
 require_once SECURE_FOLDER_PATH . '/src/classes/PageManagement.php';
 
 // Page title — lookup uses the route PATTERN ('page.titles.test/:slug').
-// Translator returns the key itself when no translation is found; in
-// that case fall back to the route's leaf segment as a reasonable default.
-$titleKey = 'page.titles.' . $trimParameters->routePath();
-$pageTitle = $translator->translate($titleKey);
-if ($pageTitle === $titleKey || $pageTitle === '') {
-    $segments = $trimParameters->route();
-    $leaf = end($segments) ?: 'page';
-    $pageTitle = ucfirst(str_replace(['-', ':'], [' ', ''], $leaf));
-}
+// A page with none shows the last segment of its address (qs_page_title()).
+$pageTitle = $translator->translate('page.titles.' . $trimParameters->routePath());
 
 $page = new PageManagement($pageTitle, $content, $lang);
 $page->render();

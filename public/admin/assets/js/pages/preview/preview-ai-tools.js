@@ -2457,7 +2457,10 @@ window.PreviewAiTools = (function () {
         Object.keys(_paramValues).forEach(function (k) {
             var v = _paramValues[k];
             if (Array.isArray(v)) {
-                v.forEach(function (item) { qs.append(k, String(item)); });
+                // A list (a tag-select's values) ships as JSON, as a structured value does
+                // below: sent as repeated keys it would reach the server as its last value
+                // only (PHP keeps the last of a repeated key).
+                qs.append(k, JSON.stringify(v));
             } else if (v !== null && v !== undefined) {
                 if (typeof v === 'object') {
                     // selector params + any structured value: ship as JSON

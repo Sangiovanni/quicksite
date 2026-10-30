@@ -43,7 +43,8 @@
  * projectLanguage.php and aliasRouting.php: the renderer is on the request path
  * of every preview render and does not require utilsManagement.php, and pulling
  * that file in for one predicate would put its whole dependency tail there. This
- * file has one dependency — the pattern registry — and nothing else.
+ * file has two dependencies — the pattern registry and the tag registry (which
+ * attributes are translated) — and nothing else.
  *
  * It does NOT travel into a build: a built site serves COMPILED pages, so
  * neither the renderer nor the compiler ships, and no compiled page resolves a
@@ -51,6 +52,7 @@
  */
 
 require_once __DIR__ . '/../classes/RegexPatterns.php';
+require_once __DIR__ . '/../classes/TagRegistry.php';
 
 if (!function_exists('qs_is_valid_component_reference')) {
     /**
@@ -190,5 +192,89 @@ if (!function_exists('qs_resolve_component_placeholders')) {
             },
             $template
         );
+    }
+}
+
+if (!function_exists('qs_component_variables')) {
+    /**
+     * The slots a component leaves open, each with its type: a `{{name}}` in a
+     * translatable attribute (TagRegistry::TRANSLATABLE_ATTRIBUTES), a text or a nested
+     * call's data is a text slot ("textKey": its value is a translation key), one in any
+     * other attribute a "param". Read by addComponentToNode, which makes a text slot's
+     * key, and editComponentToNode, which lets only a param change.
+     *
+     * Left out: system placeholders (starting with __, e.g. __current_page) and
+     * placeholders with parameters (containing ;), which are fixed values.
+     *
+     * @param mixed $node      a component structure or one of its nodes
+     * @param array $variables the slots found so far, by name (first found wins)
+     * @return array name => [name, type, paramName]
+     */
+    function qs_component_variables($node, array &$variables = []): array {
+        if (!is_array($node)) {
+            return $variables;
+        }
+
+        // Check params for placeholders
+        if (isset($node['params']) && is_array($node['params'])) {
+            foreach ($node['params'] as $paramName => $value) {
+                if (is_string($value) && preg_match_all('/\{\{([^}]+)\}\}/', $value, $matches)) {
+                    foreach ($matches[1] as $varName) {
+                        // Skip system placeholders (start with __) and fixed placeholders (contain ;)
+                        if (str_starts_with($varName, '__') || strpos($varName, ';') !== false) {
+                            continue;
+                        }
+
+                        if (!isset($variables[$varName])) {
+                            $type = in_array($paramName, TagRegistry::TRANSLATABLE_ATTRIBUTES, true) ? 'textKey' : 'param';
+                            $variables[$varName] = ['name' => $varName, 'type' => $type, 'paramName' => $paramName];
+                        }
+                    }
+                }
+            }
+        }
+
+        // Check textKey for placeholders
+        if (isset($node['textKey']) && is_string($node['textKey'])) {
+            if (preg_match_all('/\{\{([^}]+)\}\}/', $node['textKey'], $matches)) {
+                foreach ($matches[1] as $varName) {
+                    // Skip system placeholders (start with __) and fixed placeholders (contain ;)
+                    if (str_starts_with($varName, '__') || strpos($varName, ';') !== false) {
+                        continue;
+                    }
+
+                    if (!isset($variables[$varName])) {
+                        $variables[$varName] = ['name' => $varName, 'type' => 'textKey', 'paramName' => null];
+                    }
+                }
+            }
+        }
+
+        // Check component data for placeholders
+        if (isset($node['data']) && is_array($node['data'])) {
+            foreach ($node['data'] as $value) {
+                if (is_string($value) && preg_match_all('/\{\{([^}]+)\}\}/', $value, $matches)) {
+                    foreach ($matches[1] as $varName) {
+                        // Skip system placeholders (start with __) and fixed placeholders (contain ;)
+                        if (str_starts_with($varName, '__') || strpos($varName, ';') !== false) {
+                            continue;
+                        }
+
+                        if (!isset($variables[$varName])) {
+                            $variables[$varName] = ['name' => $varName, 'type' => 'textKey', 'paramName' => null];
+                        }
+                    }
+                }
+            }
+        }
+
+        // Recurse into children
+        if (isset($node['children']) && is_array($node['children'])) {
+            foreach ($node['children'] as $child) {
+                qs_component_variables($child, $variables);
+            }
+        }
+
+        return $variables;
     }
 }

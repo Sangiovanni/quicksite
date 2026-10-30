@@ -323,7 +323,6 @@ code,
 
 .admin-btn__icon,
 .preview-nav-btn svg,
-.preview-node-panel__close svg,
 .preview-contextual-form__close svg {
     width: 16px;
     height: 16px;
@@ -560,8 +559,7 @@ code,
 }
 
 .admin-checkbox-group,
-.ai-browser__step,
-.preview-node-panel__row {
+.ai-browser__step {
     display: flex;
     align-items: flex-start;
     gap: var(--space-sm);
@@ -888,26 +886,6 @@ input.admin-checkbox {
     .preview-contextual-content {
         padding: var(--space-sm);
     }
-    .preview-node-panel {
-        right: 5%;
-        left: 5%;
-        width: 90%;
-        transform: translateY(-50%) translateX(120%);
-    }
-    .preview-node-panel--visible {
-        transform: translateY(-50%) translateX(0);
-    }
-    .preview-node-panel__actions {
-        justify-content: center;
-    }
-    .preview-node-panel__actions .admin-btn {
-        flex: 1 1 calc(50% - var(--space-sm));
-        min-width: 0;
-    }
-    .preview-node-panel__actions .admin-btn--sm:has(svg):not(:has(span)) {
-        flex: 0 0 auto;
-        min-width: 36px;
-    }
     .preview-page--miniplayer .preview-container,
 .global-miniplayer {
         width: 280px;
@@ -1006,8 +984,7 @@ input.admin-checkbox {
 
 .admin-link:hover,
 .ai-spec__breadcrumb a:hover,
-.preview-contextual-form__add-param-btn:hover,
-.preview-add-node-modal__add-param-btn:hover {
+.preview-contextual-form__add-param-btn:hover {
     text-decoration: underline;
 }
 
@@ -1129,7 +1106,6 @@ input.admin-checkbox {
 .preview-miniplayer-text--expand,
 .preview-page--miniplayer .preview-toolbar,
 .preview-page--miniplayer .admin-page-header,
-.preview-page--miniplayer .preview-node-panel,
 .preview-page--miniplayer .preview-miniplayer-icon--minimize,
 .preview-page--miniplayer .preview-miniplayer-text--minimize {
     display: none;
@@ -1731,7 +1707,6 @@ kbd {
 .preview-contextual-form__component-vars-list,
 .preview-variables-panel__cards,
 .tag-selector,
-.preview-add-node-modal__mandatory-fields,
 .admin-data-table,
 .asset-url-inputs {
     display: flex;
@@ -1757,8 +1732,6 @@ kbd {
 .preview-selector-selected__header,
 .preview-keyframe-modal__frame-title,
 .preview-keyframe-modal__property,
-.preview-add-node-modal__param-row,
-.preview-add-node-modal__param-row--new,
 .asset-queue__row,
 .asset-browser__actions {
     display: flex;
@@ -1800,10 +1773,7 @@ kbd {
 .admin-datetime-picker__inputs input,
 .preview-component-warning__text,
 .preview-contextual-form__param-input,
-.preview-contextual-form__actions .admin-btn,
-.preview-add-node-modal__param-input,
-.preview-add-node-modal__param-row--edit .preview-add-node-modal__param-input,
-.preview-add-node-modal__param-row--new .preview-add-node-modal__param-value {
+.preview-contextual-form__actions .admin-btn {
     flex: 1;
 }
 
@@ -2582,6 +2552,13 @@ kbd {
     margin-bottom: var(--space-xs);
 }
 
+/* The links' hint, under their header: inset like the rows */
+.sitemap-generator__list-hint {
+    margin: 0;
+    padding: var(--space-xs) var(--space-md);
+    border-bottom: 1px solid var(--admin-border);
+}
+
 .sitemap-generator__textarea {
     width: 100%;
     font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
@@ -2667,7 +2644,6 @@ kbd {
 .transition-editor__animation-config,
 .preview-contextual-form__text-content,
 .preview-contextual-form__component-var-row,
-.preview-add-node-modal__text-content,
 .admin-data-label,
 .admin-data-input,
 .admin-textkey-selector {
@@ -3054,8 +3030,7 @@ kbd {
 .preview-element-info--expanded .preview-element-info__arrow,
 .preview-property-selector__trigger--open svg,
 .qs-property-selector__trigger--open svg,
-.preview-contextual-js-page-events--expanded .preview-contextual-js-page-events__toggle,
-.preview-add-node-modal__context--expanded .preview-add-node-modal__context-arrow {
+.preview-contextual-js-page-events--expanded .preview-contextual-js-page-events__toggle {
     transform: rotate(180deg);
 }
 
@@ -3070,8 +3045,7 @@ kbd {
 .admin-error-list li:last-child,
 .preview-js-event-group:last-child,
 .preview-js-interaction:last-child,
-.preview-contextual-form__field:last-child,
-.preview-add-node-modal__field:last-child {
+.preview-contextual-form__field:last-child {
     margin-bottom: 0;
 }
 
@@ -3260,8 +3234,7 @@ kbd {
     transition: background 0.2s;
 }
 
-.admin-card__toggle,
-.preview-add-node-modal__expand-btn svg {
+.admin-card__toggle {
     transition: transform 0.2s;
 }
 
@@ -3401,8 +3374,7 @@ kbd {
 .preview-animations-content,
 .preview-keyframe-modal__frames,
 .transition-editor__body,
-.animation-preview__body,
-.preview-add-node-modal__component-vars-list {
+.animation-preview__body {
     display: flex;
     flex-direction: column;
     gap: var(--space-md);
@@ -3707,9 +3679,7 @@ kbd {
 .apis-test-params-form,
 .apis-test-details,
 .apis-import-warning,
-.preview-keyframe-modal__field,
-.preview-add-node-modal__field,
-.preview-add-node-modal__section {
+.preview-keyframe-modal__field {
     margin-bottom: var(--space-md);
 }
 
@@ -4485,8 +4455,7 @@ kbd {
     font-size: var(--font-size-sm);
 }
 
-.api-integration-controls select optgroup,
-.preview-add-node-modal__info--node code {
+.api-integration-controls select optgroup {
     font-weight: 600;
     color: var(--admin-text);
 }
@@ -4514,7 +4483,6 @@ kbd {
 .ai-spec-command:hover,
 .preview-contextual-style-tab--active,
 .preview-contextual-form__tab.active,
-.preview-add-node-modal__tab.active,
 .admin-tabs__tab--active {
     background: var(--admin-primary);
     color: #ffffff;
@@ -4599,8 +4567,7 @@ kbd {
     user-select: none;
 }
 
-.ai-auto-option input[type="checkbox"],
-.preview-add-node-modal__radio input[type="radio"] {
+.ai-auto-option input[type="checkbox"] {
     width: 16px;
     height: 16px;
     accent-color: var(--admin-primary);
@@ -6360,6 +6327,24 @@ kbd {
     box-shadow: 0 0 0 3px #d9770633;
 }
 
+/* The page title field: the toolbar's select look, as a text field */
+.preview-toolbar__input {
+    width: 220px;
+    padding: var(--space-xs) var(--space-sm);
+    font-size: var(--font-size-sm);
+    color: var(--admin-text);
+    background: var(--admin-bg-secondary);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-md);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.preview-toolbar__input:focus {
+    outline: none;
+    border-color: var(--admin-primary);
+    box-shadow: 0 0 0 3px #d9770633;
+}
+
 /* Create Component Button (+ next to dropdown) */
 .preview-toolbar__add-btn {
     display: flex;
@@ -6487,7 +6472,6 @@ kbd {
 .preview-style-editor__back:hover,
 .preview-keyframe-modal__close:hover,
 .transition-editor__property-btn:hover,
-.preview-node-panel__close:hover,
 .asset-tabs__tab:hover {
     color: var(--admin-text);
     background: var(--admin-surface-hover);
@@ -6948,7 +6932,6 @@ kbd {
 .preview-keyframe-item:hover,
 .transition-editor__property:hover,
 .transition-editor__unit-select:hover,
-.transition-editor__checkbox-label:hover,
 .preview-animations-group__header:hover,
 .preview-animated-selector:hover,
 .preview-animated-selector--clickable:hover,
@@ -7011,7 +6994,6 @@ kbd {
 .preview-keyframe-modal.preview-keyframe-modal--visible,
 .transition-editor__property:hover .transition-editor__property-actions,
 .preview-contextual-js-page-events__actions,
-.preview-add-node-modal__context--expanded .preview-add-node-modal__context-details,
 .preview-page--miniplayer .preview-miniplayer-controls {
     display: flex;
 }
@@ -7030,8 +7012,7 @@ kbd {
     min-width: 55px;
 }
 
-.preview-mobile-section__value,
-.preview-add-node-modal__context-value {
+.preview-mobile-section__value {
     color: var(--admin-text);
     font-family: var(--font-family-mono, monospace);
     word-break: break-all;
@@ -7193,8 +7174,7 @@ kbd {
 }
 
 .preview-mobile-tool svg,
-.preview-keyframe-modal__close svg,
-.preview-add-node-modal__close svg {
+.preview-keyframe-modal__close svg {
     width: 20px;
     height: 20px;
 }
@@ -7424,8 +7404,7 @@ code.preview-contextual-info__value {
     font-weight: 500;
 }
 
-.preview-contextual-info__value--component,
-.preview-node-panel__value--component {
+.preview-contextual-info__value--component {
     background: #2563eb1a;
     color: #2563eb;
     border: 1px solid #2563eb4d;
@@ -7961,9 +7940,7 @@ code.preview-contextual-info__value {
 .preview-contextual-style-tab:hover,
 .preview-contextual-form__tab:hover,
 .preview-contextual-form__close:hover,
-.tag-selector__search-clear:hover,
-.preview-add-node-modal__close:hover,
-.preview-add-node-modal__tab:hover {
+.tag-selector__search-clear:hover {
     color: var(--admin-text);
     background: var(--admin-hover);
 }
@@ -8152,8 +8129,7 @@ code.preview-contextual-info__value {
 }
 
 /* Color Picker Items */
-.preview-theme-grid--colors .preview-theme-item,
-.preview-node-panel__actions .admin-btn {
+.preview-theme-grid--colors .preview-theme-item {
     flex: 0 0 auto;
 }
 
@@ -10530,8 +10506,7 @@ code.preview-contextual-info__value {
     justify-content: center;
 }
 
-.preview-keyframe-modal__backdrop,
-.preview-add-node-modal__backdrop {
+.preview-keyframe-modal__backdrop {
     position: absolute;
     top: 0;
     left: 0;
@@ -10582,8 +10557,7 @@ code.preview-contextual-info__value {
     transition: all 0.15s;
 }
 
-.preview-keyframe-modal__body,
-.preview-add-node-modal__body {
+.preview-keyframe-modal__body {
     flex: 1;
     padding: var(--space-lg);
     overflow-y: auto;
@@ -10878,10 +10852,6 @@ code.preview-contextual-info__value {
     background: var(--admin-surface);
 }
 
-.preview-node-panel__header:active {
-    cursor: grabbing;
-}
-
 .transition-editor__setting,
 .animation-preview__control,
 .animation-preview__css-preview {
@@ -11094,29 +11064,32 @@ code.preview-contextual-info__value {
     width: 100%;
 }
 
-.transition-editor__specific-props {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-xs);
-    margin-top: var(--space-xs);
-}
-
-.transition-editor__checkbox-label {
-    display: flex;
+/* Specific Properties: a row per property (its picker, duration, delay, timing and remove
+   button). The column heads and the rows share one grid; a row's cubic-bezier fields take a
+   line of their own. */
+.transition-editor__rows-head,
+.transition-editor__row {
+    display: grid;
+    grid-template-columns: minmax(140px, 1fr) auto auto auto 24px;
     align-items: center;
-    gap: var(--space-2xs);
-    font-size: var(--font-size-xs);
-    color: var(--admin-text);
-    background: var(--admin-card-bg);
-    padding: var(--space-2xs) var(--space-xs);
-    border-radius: var(--radius-sm);
-    cursor: pointer;
+    gap: var(--space-xs);
 }
 
-.transition-editor__prop-checkbox {
-    width: 14px;
-    height: 14px;
-    accent-color: var(--admin-primary);
+.transition-editor__rows-head span {
+    font-size: var(--font-size-xs);
+    color: var(--admin-text-muted);
+    font-weight: 500;
+}
+
+.transition-editor__rows {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+    margin-bottom: var(--space-xs);
+}
+
+.transition-editor__row-bezier {
+    grid-column: 1 / -1;
 }
 
 /* Timing function row */
@@ -11210,38 +11183,17 @@ code.preview-contextual-info__value {
     width: 100%;
 }
 
-.transition-editor__add-property-confirm,
-.transition-editor__add-property-cancel {
-    padding: var(--space-2xs);
-    border: none;
-    border-radius: var(--radius-sm);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
+/* An add row's Cancel / + Add: under the property and its value, at the right. Each row of
+   the form is already a flex line (.transition-editor__add-property-form > div). */
+.transition-editor__add-property-actions {
+    justify-content: flex-end;
 }
 
-.transition-editor__add-property-confirm {
-    background: var(--admin-success);
-    color: #ffffff;
-}
-
-.transition-editor__add-property-confirm:hover {
-    background: var(--admin-success-hover);
-}
-
-.transition-editor__add-property-cancel,
 .preview-animations-group__count--muted,
 .preview-animated-selector__state-count--muted,
 .preview-animated-selector-state--trigger .preview-animated-selector-state__pseudo {
     background: var(--admin-surface-hover);
     color: var(--admin-text-muted);
-}
-
-.transition-editor__add-property-cancel:hover {
-    background: var(--admin-danger);
-    color: #ffffff;
 }
 
 /* Property item with edit/delete actions */
@@ -11545,8 +11497,7 @@ code.preview-contextual-info__value {
 
 /* Play button special styling */
 
-#animation-preview-play svg,
-.preview-add-node-modal__tab svg {
+#animation-preview-play svg {
     flex-shrink: 0;
 }
 
@@ -11832,144 +11783,6 @@ code.preview-contextual-info__value {
 .preview-animated-selector-group--trigger {
     border-left: 2px solid var(--admin-border);
 }
-
-/* Node Info Panel (DEPRECATED - superseded by the contextual area) */
-.preview-node-panel {
-    position: fixed;
-    right: var(--space-lg);
-    top: 50%;
-    transform: translateY(-50%) translateX(120%);
-    width: 320px;
-    background: var(--admin-surface);
-    border: 1px solid var(--admin-border);
-    border-radius: var(--radius-lg);
-    box-shadow: 0 8px 32px #0000004d;
-    z-index: 1000;
-    opacity: 0;
-    visibility: hidden;
-    transition: transform 0.3s ease, opacity 0.3s ease, visibility 0.3s ease;
-}
-
-.preview-node-panel--visible {
-    transform: translateY(-50%) translateX(0);
-    opacity: 1;
-    visibility: visible;
-}
-
-/* When panel has been dragged, disable the default positioning */
-.preview-node-panel--dragged {
-    right: auto;
-    top: auto;
-    transform: none;
-}
-
-.preview-node-panel__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: var(--space-md);
-    border-bottom: 1px solid var(--admin-border);
-    cursor: grab;
-}
-
-/* Drag grip icon for panels */
-.preview-panel-drag-icon {
-    width: 14px;
-    height: 14px;
-    color: var(--admin-text-muted);
-    opacity: 0.5;
-    flex-shrink: 0;
-    margin-right: var(--space-xs);
-}
-
-.preview-node-panel__title {
-    margin: 0;
-    font-size: var(--font-size-base);
-    font-weight: var(--font-weight-semibold);
-    color: var(--admin-text);
-}
-
-.preview-node-panel__close {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    padding: 0;
-    background: transparent;
-    border: none;
-    border-radius: var(--radius-sm);
-    color: var(--admin-text-muted);
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.preview-node-panel__content {
-    padding: var(--space-md);
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-sm);
-}
-
-.preview-node-panel__label {
-    flex-shrink: 0;
-    width: 80px;
-    font-size: var(--font-size-sm);
-    color: var(--admin-text-muted);
-}
-
-.preview-node-panel__value {
-    flex: 1;
-    font-size: var(--font-size-sm);
-    color: var(--admin-text);
-    word-break: break-all;
-}
-
-.preview-node-panel__value--truncate {
-    max-height: 40px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-}
-
-code.preview-node-panel__value {
-    padding: 2px 6px;
-    background: var(--admin-bg-secondary);
-    border-radius: var(--radius-sm);
-    font-family: 'Fira Code', 'Monaco', monospace;
-    font-size: var(--font-size-xs);
-}
-
-.preview-node-panel__value--highlight {
-    color: var(--admin-primary);
-    font-weight: 500;
-}
-
-.preview-node-panel__value--textkey {
-    background: #eab3081a;
-    color: #b45309;
-    border: 1px solid #eab3084d;
-    font-size: 0.75rem;
-    word-break: break-all;
-}
-
-.preview-node-panel__actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-sm);
-    padding: var(--space-md);
-    border-top: 1px solid var(--admin-border);
-}
-
-/* Make text buttons take more space, icon buttons stay small */
-.preview-node-panel__actions .admin-btn--primary,
-.preview-node-panel__actions .admin-btn--ghost {
-    flex: 1 1 auto;
-    min-width: 100px;
-}
-
-/* Node panel responsive - centered on small screens */
 
 /* JS Mode Contextual Section */
 
@@ -13070,8 +12883,7 @@ code.preview-node-panel__value {
 .preview-contextual-js-response-bindings__picker-option:hover,
 .preview-contextual-js-response-bindings__picker-option--active,
 .preview-js-picker-option:hover,
-.preview-js-picker-option--active,
-.preview-add-node-modal__context-toggle:hover {
+.preview-js-picker-option--active {
     background: var(--admin-hover);
 }
 .preview-contextual-js-response-bindings__picker-type {
@@ -13115,8 +12927,7 @@ code.preview-node-panel__value {
 }
 
 .preview-contextual-js-form-actions .admin-btn--primary:disabled,
-.preview-variable-card__save-btn:disabled,
-.preview-add-node-modal__radio--disabled {
+.preview-variable-card__save-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }
@@ -13312,8 +13123,7 @@ code.preview-node-panel__value {
     font-size: 0.8rem;
 }
 
-.preview-contextual-form__field label small,
-.preview-add-node-modal__field label small {
+.preview-contextual-form__field label small {
     font-weight: 400;
     color: var(--admin-text-muted);
 }
@@ -13568,8 +13378,7 @@ code.preview-node-panel__value {
     transition: all 0.2s;
 }
 
-.preview-contextual-form__remove-param:hover,
-.preview-add-node-modal__remove-param:hover {
+.preview-contextual-form__remove-param:hover {
     background: var(--admin-danger-bg, rgba(239, 68, 68, 0.1));
     opacity: 1;
 }
@@ -13591,8 +13400,7 @@ code.preview-node-panel__value {
     justify-content: center;
 }
 
-.preview-contextual-form__expand-btn:hover,
-.preview-add-node-modal__expand-btn:hover {
+.preview-contextual-form__expand-btn:hover {
     border-color: var(--admin-primary);
     color: var(--admin-primary);
     background: var(--admin-primary-bg, rgba(79, 70, 229, 0.05));
@@ -13612,8 +13420,7 @@ code.preview-node-panel__value {
     border-radius: var(--radius-md);
 }
 
-.preview-contextual-form__param-list,
-.preview-add-node-modal__param-list {
+.preview-contextual-form__param-list {
     display: flex;
     flex-direction: column;
     gap: var(--space-sm);
@@ -13681,8 +13488,7 @@ code.preview-node-panel__value {
     margin-top: 2px;
 }
 
-.preview-contextual-form__warning--collision,
-.preview-add-node-modal__warning--collision {
+.preview-contextual-form__warning--collision {
     background: var(--admin-warning-bg, rgba(245, 158, 11, 0.15));
     border-color: var(--admin-warning, #f59e0b);
 }
@@ -15034,8 +14840,7 @@ code.preview-node-panel__value {
     border-radius: var(--radius-md);
 }
 
-.tag-selector__preview-header,
-.preview-add-node-modal__param-row--edit {
+.tag-selector__preview-header {
     display: flex;
     align-items: center;
     gap: var(--space-sm);
@@ -15856,351 +15661,9 @@ code.preview-node-panel__value {
     word-break: break-all;
 }
 
-/* Add Node Modal */
-.preview-add-node-modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 10000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.preview-add-node-modal__content {
-    position: relative;
-    background: var(--admin-card-bg);
-    border-radius: var(--radius-lg);
-    box-shadow: 0 20px 60px #0000004d;
-    width: 90%;
-    max-width: 480px;
-    max-height: 90vh;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-}
-
-.preview-add-node-modal__header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: var(--space-md) var(--space-lg);
-    border-bottom: 1px solid var(--admin-border);
-}
-
-.preview-add-node-modal__header h3 {
-    margin: 0;
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: var(--admin-text);
-}
-
-.preview-add-node-modal__close {
-    background: transparent;
-    border: none;
-    padding: var(--space-xs);
-    cursor: pointer;
-    color: var(--admin-text-muted);
-    border-radius: var(--radius-sm);
-    transition: all 0.2s;
-}
-
-.preview-add-node-modal__field label {
-    display: block;
-    margin-bottom: var(--space-xs);
-    font-weight: 500;
-    color: var(--admin-text);
-    font-size: 0.9rem;
-}
-
-.preview-add-node-modal__tabs {
-    display: flex;
-    gap: var(--space-xs);
-    background: var(--admin-bg);
-    padding: var(--space-xs);
-    border-radius: var(--radius-md);
-}
-
-.preview-add-node-modal__tab {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--space-xs);
-    padding: var(--space-sm) var(--space-md);
-    background: transparent;
-    border: none;
-    border-radius: var(--radius-sm);
-    font-size: 0.85rem;
-    font-weight: 500;
-    color: var(--admin-text-muted);
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-/* Selection Context Section (collapsible) */
-.preview-add-node-modal__context {
-    border-bottom: 1px solid var(--admin-border);
-    background: var(--admin-bg);
-}
-
-.preview-add-node-modal__context-toggle {
-    display: flex;
-    align-items: center;
-    gap: var(--space-sm);
-    width: 100%;
-    padding: var(--space-sm) var(--space-lg);
-    background: transparent;
-    border: none;
-    color: var(--admin-text);
-    font-size: 0.85rem;
-    cursor: pointer;
-    text-align: left;
-}
-
-.preview-add-node-modal__context-arrow {
-    width: 14px;
-    height: 14px;
-    flex-shrink: 0;
-    color: var(--admin-text-muted);
-    transition: transform 0.2s;
-}
-
-.preview-add-node-modal__context-title {
-    font-weight: 500;
-    color: var(--admin-text-muted);
-    font-size: 0.75rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.preview-add-node-modal__context-summary {
-    margin-left: auto;
-    font-family: var(--font-family-mono, monospace);
-    font-size: 0.8rem;
-    color: var(--admin-primary);
-    background: var(--admin-bg-secondary);
-    padding: 2px 8px;
-    border-radius: var(--radius-sm);
-}
-
-.preview-add-node-modal__context-details {
-    display: none;
-    flex-direction: column;
-    gap: var(--space-xs);
-    padding: 0 var(--space-lg) var(--space-sm);
-}
-
-.preview-add-node-modal__context-row {
-    display: flex;
-    align-items: baseline;
-    gap: var(--space-sm);
-    font-size: 0.8rem;
-}
-
-.preview-add-node-modal__context-label {
-    color: var(--admin-text-muted);
-    min-width: 50px;
-}
-
-.preview-add-node-modal__footer {
-    display: flex;
-    gap: var(--space-sm);
-    justify-content: flex-end;
-    padding: var(--space-md) var(--space-lg);
-    border-top: 1px solid var(--admin-border);
-    background: var(--admin-bg);
-}
-
-/* Radio button type selector */
-.preview-add-node-modal__type-selector {
-    display: flex;
-    gap: var(--space-lg);
-}
-
-.preview-add-node-modal__radio {
-    display: flex;
-    align-items: center;
-    gap: var(--space-xs);
-    cursor: pointer;
-    font-weight: 400;
-}
-
-.preview-add-node-modal__radio--disabled small {
-    font-size: 0.75rem;
-    color: var(--admin-text-muted);
-    margin-left: var(--space-xs);
-}
-
 /* Hint text below fields */
 
-/* Section for grouped fields */
-
-.preview-add-node-modal__section-label {
-    display: block;
-    margin-bottom: var(--space-sm);
-    font-weight: 500;
-    color: var(--admin-text);
-    font-size: 0.9rem;
-}
-
-/* Text content section for components */
-
-.preview-add-node-modal__hint {
-    display: block;
-    margin-top: var(--space-xs);
-    font-size: 0.8rem;
-    color: var(--admin-text-muted);
-    line-height: 1.3;
-}
-
 /* Mandatory params container */
-
-/* Parameter row (key: value) */
-
-.preview-add-node-modal__param-label {
-    min-width: 60px;
-    font-weight: 500;
-    font-size: 0.85rem;
-    color: var(--admin-text);
-}
-
-/* Custom param row with key/value/remove */
-.preview-add-node-modal__param-row--custom {
-    display: grid;
-    grid-template-columns: 1fr 1fr auto;
-    gap: var(--space-sm);
-}
-
-.preview-add-node-modal__param-key,
-.preview-add-node-modal__param-value {
-    font-size: 0.9rem;
-}
-
-.preview-add-node-modal__remove-param {
-    background: transparent;
-    border: none;
-    padding: var(--space-xs);
-    cursor: pointer;
-    color: var(--admin-danger);
-    border-radius: var(--radius-sm);
-    opacity: 0.7;
-    transition: all 0.2s;
-}
-
-/* Expand button for custom params */
-.preview-add-node-modal__expand-btn {
-    display: flex;
-    align-items: center;
-    gap: var(--space-xs);
-    background: transparent;
-    border: 1px dashed var(--admin-border);
-    border-radius: var(--radius-sm);
-    padding: var(--space-sm) var(--space-md);
-    color: var(--admin-text-muted);
-    font-size: 0.85rem;
-    cursor: pointer;
-    transition: all 0.2s;
-    width: 100%;
-    justify-content: center;
-}
-
-/* Custom params container */
-.preview-add-node-modal__custom-params {
-    margin-top: var(--space-sm);
-    padding: var(--space-md);
-    background: var(--admin-bg);
-    border-radius: var(--radius-md);
-}
-
-.preview-add-node-modal__add-param-btn {
-    background: transparent;
-    border: none;
-    color: var(--admin-primary);
-    font-size: 0.85rem;
-    cursor: pointer;
-    padding: var(--space-xs) 0;
-}
-
-/* TextKey info box */
-.preview-add-node-modal__info {
-    display: flex;
-    align-items: center;
-    gap: var(--space-sm);
-    padding: var(--space-sm) var(--space-md);
-    background: var(--admin-info-bg, rgba(59, 130, 246, 0.1));
-    border: 1px solid var(--admin-info-border, rgba(59, 130, 246, 0.2));
-    border-radius: var(--radius-md);
-    font-size: 0.85rem;
-    color: var(--admin-text-muted);
-    margin-top: var(--space-md);
-}
-
-.preview-add-node-modal__info code {
-    background: var(--admin-bg);
-    padding: 2px 6px;
-    border-radius: var(--radius-sm);
-    font-family: monospace;
-    font-size: 0.8rem;
-    color: var(--admin-primary);
-}
-
-.preview-add-node-modal__info svg {
-    color: var(--admin-info, #3b82f6);
-}
-
-/* Node info variant */
-.preview-add-node-modal__info--node {
-    background: var(--admin-bg-alt, rgba(0, 0, 0, 0.05));
-    border: 1px solid var(--admin-border);
-    margin-top: 0;
-    margin-bottom: var(--space-md);
-}
-
-/* Warning message box */
-.preview-add-node-modal__warning {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--space-sm);
-    padding: var(--space-md);
-    background: var(--admin-warning-bg, rgba(245, 158, 11, 0.1));
-    border: 1px solid var(--admin-warning-border, rgba(245, 158, 11, 0.3));
-    border-radius: var(--radius-md);
-    font-size: 0.9rem;
-    color: var(--admin-text);
-    margin-bottom: var(--space-md);
-}
-
-.preview-add-node-modal__warning svg {
-    color: var(--admin-warning, #f59e0b);
-    flex-shrink: 0;
-    margin-top: 2px;
-}
-
-/* Variable collision warning - slightly more prominent */
-
-.preview-add-node-modal__warning--collision code {
-    background: #0000001a;
-    padding: 2px 6px;
-    border-radius: 3px;
-    font-family: monospace;
-    font-size: 0.9em;
-}
-
-/* Edit param row styles */
-
-.preview-add-node-modal__param-row--edit .preview-add-node-modal__param-label {
-    min-width: 80px;
-    font-size: 0.9rem;
-    color: var(--admin-text-muted);
-}
-
-.preview-add-node-modal__param-row--new .preview-add-node-modal__param-key {
-    width: 120px;
-    flex-shrink: 0;
-}
 
 /* Component variables list */
 
@@ -17413,10 +16876,9 @@ body[data-page="preview"] .global-miniplayer {
     color: inherit; padding: 0 4px;
 }
 
-/* Translate-from-CSV modal.
-   Mirrors .preview-add-node-modal layout — same fixed overlay + centered
-   card pattern. The inner form uses the project's shared .admin-* classes
-   so visual styling stays consistent with every other admin form. */
+/* Translate-from-CSV modal: a fixed overlay with a centered card. The inner
+   form uses the project's shared .admin-* classes so visual styling stays
+   consistent with every other admin form. */
 .preview-translate-csv-modal {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
     z-index: 10000;

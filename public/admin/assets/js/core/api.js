@@ -331,6 +331,40 @@ window.QuickSiteAPI = (function() {
 
     let redirectingToLogin = false;
 
+    // Firefox rejects every request still in flight when the page navigates
+    // away, a reload included, with the same TypeError a real network failure
+    // raises. beforeunload fires before that, so a failure soon after it is the
+    // page leaving, not the network, and it gets no console error. The listener
+    // is attached only while a request is out: a page with one in flight is kept
+    // out of the back/forward cache anyway, and a page with none keeps its place
+    // there. A navigation that does not happen after all (an attachment link,
+    // "stay on this page") stops counting after LEAVING_MS.
+    const LEAVING_MS = 10000;
+    let leavingAt = 0;
+    let requestsOut = 0;
+    const noteLeaving = () => { leavingAt = Date.now(); };
+
+    /** fetch(), watching for the page leaving while the request is out. */
+    async function watchedFetch(url, options) {
+        if (requestsOut++ === 0) {
+            window.addEventListener('beforeunload', noteLeaving);
+        }
+        try {
+            return await fetch(url, options);
+        } finally {
+            if (--requestsOut === 0) {
+                window.removeEventListener('beforeunload', noteLeaving);
+            }
+        }
+    }
+
+    /** A failed request's console error, unless the page is leaving (see above). */
+    function logRequestError(label, error) {
+        if (Date.now() - leavingAt >= LEAVING_MS) {
+            console.error(label, error);
+        }
+    }
+
     /**
      * Make an API request to the QuickSite management API
      * 
@@ -407,7 +441,7 @@ window.QuickSiteAPI = (function() {
         }
 
         try {
-            const response = await fetch(url, options);
+            const response = await watchedFetch(url, options);
             
             // Handle 204 No Content responses
             let result = null;
@@ -462,7 +496,7 @@ window.QuickSiteAPI = (function() {
                 data: result
             };
         } catch (error) {
-            console.error('API request error:', error);
+            logRequestError('API request error:', error);
             return clientError('client.network_error', error.message || 'Network error', 0);
         }
     }
@@ -526,13 +560,13 @@ window.QuickSiteAPI = (function() {
 
         let response;
         try {
-            response = await fetch(url, {
+            response = await watchedFetch(url, {
                 method: 'GET',
                 credentials: 'same-origin',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
         } catch (error) {
-            console.error('Download error:', error);
+            logRequestError('Download error:', error);
             return clientError('client.network_error', error.message || 'Network error', 0);
         }
 
@@ -605,7 +639,7 @@ window.QuickSiteAPI = (function() {
         }
 
         try {
-            const response = await fetch(url, {
+            const response = await watchedFetch(url, {
                 method: 'POST',
                 credentials: 'same-origin', // the session cookie is the credential
                 headers: {
@@ -657,7 +691,7 @@ window.QuickSiteAPI = (function() {
                 data: result
             };
         } catch (error) {
-            console.error('API upload error:', error);
+            logRequestError('API upload error:', error);
             return clientError('client.upload_failed', error.message || 'Upload failed', 0);
         }
     }
@@ -751,7 +785,7 @@ window.QuickSiteAPI = (function() {
         }
 
         try {
-            const response = await fetch(`${config.adminBase}/state/selected-project`, {
+            const response = await watchedFetch(`${config.adminBase}/state/selected-project`, {
                 method: 'POST',
                 credentials: 'same-origin',   // the session cookie is the credential
                 headers: {
@@ -766,7 +800,7 @@ window.QuickSiteAPI = (function() {
                 data: await readResponseBody(response)
             };
         } catch (error) {
-            console.error('Panel state request error:', error);
+            logRequestError('Panel state request error:', error);
             return clientError('client.network_error', error.message || 'Network error', 0);
         }
     }
@@ -812,7 +846,7 @@ window.QuickSiteAPI = (function() {
             // '/self', NOT '/account': /admin/account is the My Account PAGE, and a
             // directory of that name under public/admin/ shadows it (Apache resolves
             // a real directory before the panel's FallbackResource).
-            const response = await fetch(`${config.adminBase}/self/${route}`, options);
+            const response = await watchedFetch(`${config.adminBase}/self/${route}`, options);
             const body = await readResponseBody(response);
 
             // A 2xx is NOT enough to call this a success. Every route here answers
@@ -842,7 +876,7 @@ window.QuickSiteAPI = (function() {
                 data: body
             };
         } catch (error) {
-            console.error('Account request error:', error);
+            logRequestError('Account request error:', error);
             return clientError('client.network_error', error.message || 'Network error', 0);
         }
     }

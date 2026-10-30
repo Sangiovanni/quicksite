@@ -213,6 +213,7 @@
                         </div>
                     </label>
                 </div>
+                <p class="preview-contextual-form__hint" id="add-position-none" style="display: none;"><?= __admin('preview.textPositionNone') ?></p>
             </div>
         </div>
         

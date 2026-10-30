@@ -22,8 +22,9 @@
     // Helpers
     // ========================================================================
 
+    // A word of the page: the `sitemapPage` translations sitemap.php writes as QS_SITEMAP_I18N.
     function t(key, fallback) {
-        const translations = window.QUICKSITE_CONFIG?.translations?.sitemapPage || {};
+        const translations = window.QS_SITEMAP_I18N || {};
         return translations[key] || fallback || key;
     }
 
@@ -90,22 +91,20 @@
     //
     // The render functions below build DOM trees via createElement +
     // textContent + setAttribute, returning Elements / DocumentFragments.
-    // Trusted SVG snippets from QuickSiteUtils are injected via
-    // wrapper.innerHTML and then unwrapped — the CLAUDE.md exemption
-    // covers small static icons. No user data flows through innerHTML.
+    // An icon is QSDom.iconEl() of a constant: a QuickSiteUtils.ICON_PATHS
+    // entry, or one of the sitemap's own below. iconEl parses its argument
+    // as markup, so it is never given a value from data.
 
-    /**
-     * Convert a trusted HTML string (typically a QuickSiteUtils icon helper
-     * return value) into a live Element. Pulls out the first child of a
-     * staging wrapper so the caller gets the element directly, not the
-     * wrapper. Returns null when the input is empty / unparseable.
-     */
-    function _htmlToEl(html) {
-        if (!html) return null;
-        const tmp = document.createElement('span');
-        tmp.innerHTML = html;
-        return tmp.firstElementChild;
-    }
+    /** The sitemap's icons that QuickSiteUtils.ICON_PATHS does not hold: the inner markup of an <svg>. */
+    const ICONS = {
+        menu: '<line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>',
+        footer: '<rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="15" x2="21" y2="15"/>',
+        actions: '<circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/>',
+        allReachable: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
+        viewInEditor: '<rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>',
+        editTitle: '<path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>',
+        resolver: '<rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>',
+    };
 
     /**
      * Render the route path with param-segment styling +
@@ -210,7 +209,7 @@
         menuBtn.setAttribute('data-action', 'toggle-menu');
         menuBtn.setAttribute('data-route', routePath);
         menuBtn.title = layout.menu ? t('menuOn', 'Menu: visible') : t('menuOff', 'Menu: hidden');
-        menuBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>';
+        menuBtn.appendChild(QSDom.iconEl(ICONS.menu, 13));
         wrap.appendChild(menuBtn);
 
         const footerBtn = document.createElement('button');
@@ -219,7 +218,7 @@
         footerBtn.setAttribute('data-action', 'toggle-footer');
         footerBtn.setAttribute('data-route', routePath);
         footerBtn.title = layout.footer ? t('footerOn', 'Footer: visible') : t('footerOff', 'Footer: hidden');
-        footerBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="13" height="13"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="15" x2="21" y2="15"/></svg>';
+        footerBtn.appendChild(QSDom.iconEl(ICONS.footer, 13));
         wrap.appendChild(footerBtn);
 
         return wrap;
@@ -239,7 +238,7 @@
             addBtn.setAttribute('data-action', 'add-child');
             addBtn.setAttribute('data-route', routePath);
             addBtn.title = t('addChild');
-            addBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
+            addBtn.appendChild(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.plus, 14));
             wrap.appendChild(addBtn);
         }
 
@@ -252,7 +251,7 @@
         ctxBtn.setAttribute('data-has-children', String(hasChildren));
         ctxBtn.setAttribute('data-depth', String(routeDepth));
         ctxBtn.title = 'Actions';
-        ctxBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>';
+        ctxBtn.appendChild(QSDom.iconEl(ICONS.actions, 14));
         wrap.appendChild(ctxBtn);
 
         return wrap;
@@ -291,7 +290,7 @@
             const isHome = name === 'home';
             const routePath = route.name;
             const routeDepth = getRouteDepth(routePath);
-            const canAddChild = routeDepth < 4 && !isHome; // max depth 5 = index 4
+            const canAddChild = routeDepth < 4; // max depth 5 = index 4
             const isExpanded = expandedNodes.has(routePath) || (expandedNodes.size === 0 && depth === 0);
             const layout = layouts[routePath] || { menu: true, footer: true };
 
@@ -308,13 +307,12 @@
                 toggleBtn.className = 'sitemap__tree-toggle';
                 toggleBtn.type = 'button';
                 toggleBtn.setAttribute('aria-label', 'Toggle');
-                toggleBtn.innerHTML = QuickSiteUtils.iconChevronRight(12);
+                toggleBtn.appendChild(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.chevronRight, 12));
                 header.appendChild(toggleBtn);
 
                 const routeSpan = document.createElement('span');
                 routeSpan.className = 'sitemap__route sitemap__route--parent';
-                const folderIcon = _htmlToEl(QuickSiteUtils.svgIcon(QuickSiteUtils.ICON_PATHS.folder, 14, 'sitemap__route-icon'));
-                if (folderIcon) routeSpan.appendChild(folderIcon);
+                routeSpan.appendChild(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.folder, 14, 'sitemap__route-icon'));
                 const nameSpan = document.createElement('span');
                 nameSpan.className = 'sitemap__route-name';
                 nameSpan.textContent = name;
@@ -339,8 +337,7 @@
                 leafNode.setAttribute('data-route-path', routePath);
 
                 const iconPath = isHome ? QuickSiteUtils.ICON_PATHS.home : QuickSiteUtils.ICON_PATHS.file;
-                const leafIcon = _htmlToEl(QuickSiteUtils.svgIcon(iconPath, 14, 'sitemap__route-icon'));
-                if (leafIcon) leafNode.appendChild(leafIcon);
+                leafNode.appendChild(QSDom.iconEl(iconPath, 14, 'sitemap__route-icon'));
 
                 const nameSpan = document.createElement('span');
                 nameSpan.className = 'sitemap__route-name';
@@ -663,15 +660,11 @@
         const banner = document.createElement('div');
         banner.className = 'admin-alert ' + (allGood ? 'admin-alert--success' : 'admin-alert--warning');
         banner.style.marginBottom = 'var(--space-lg)';
-        const bannerIconHtml = allGood
-            ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>'
-            : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
-        const bannerIcon = _htmlToEl(bannerIconHtml);
-        if (bannerIcon) banner.appendChild(bannerIcon);
+        banner.appendChild(QSDom.iconEl(allGood ? ICONS.allReachable : QuickSiteUtils.ICON_PATHS.warning, 20));
         const bannerStrong = document.createElement('strong');
         bannerStrong.textContent = allGood
             ? t('allReachable')
-            : orphan_count + ' ' + t('orphansFound', 'orphan route(s) found').replace('{count}', orphan_count);
+            : t('orphansFound').replace('{count}', orphan_count);
         banner.appendChild(bannerStrong);
         fragment.appendChild(banner);
 
@@ -687,6 +680,14 @@
     // ========================================================================
     // Step 4: Inline Add Route Form
     // ========================================================================
+
+    /**
+     * The route an "Add child" adds under. Home is the site's root: its children are the top-level
+     * routes, so on home Add child opens the form "Add root route" opens.
+     */
+    function _addChildParent(route) {
+        return route === 'home' ? null : route;
+    }
 
     function showInlineAddForm(parentRoute) {
         // Remove any existing inline form
@@ -777,11 +778,7 @@
                 return;
             }
 
-            createBtn.disabled = true;
-            createBtn.textContent = '';
-            const spinnerEl = _htmlToEl(QuickSiteUtils.htmlSpinner());
-            if (spinnerEl) createBtn.appendChild(spinnerEl);
-            createBtn.appendChild(document.createTextNode(' ' + t('create')));
+            QSDom.setButtonBusy(createBtn, t('create'));
 
             try {
                 // Build full route path — addRoute handles cascade parent creation
@@ -847,11 +844,11 @@
     // ========================================================================
 
     /**
-     * Build one context-menu button. iconSvg is a trusted static SVG
-     * string (from QuickSiteUtils.* OR inline). data-ctx-action +
-     * data-route attrs feed the delegated click handler below.
+     * Build one context-menu button. icon is the inner markup of its <svg>,
+     * a constant (a QuickSiteUtils.ICON_PATHS entry or one of ICONS).
+     * data-ctx-action + data-route attrs feed the delegated click handler below.
      */
-    function _ctxMenuItem({ action, route, iconSvg, label, danger, disabled, hasChildren }) {
+    function _ctxMenuItem({ action, route, icon, label, danger, disabled, hasChildren }) {
         const btn = document.createElement('button');
         btn.className = 'sitemap-ctx__item'
             + (danger ? ' sitemap-ctx__item--danger' : '')
@@ -860,14 +857,10 @@
         if (route !== undefined) btn.setAttribute('data-route', route);
         if (hasChildren !== undefined) btn.setAttribute('data-has-children', String(hasChildren));
         if (disabled) btn.disabled = true;
-        const iconEl = _htmlToEl(iconSvg);
-        if (iconEl) btn.appendChild(iconEl);
+        btn.appendChild(QSDom.iconEl(icon, 14));
         btn.appendChild(document.createTextNode(' ' + label));
         return btn;
     }
-
-    // Trash icon used by both the delete + disabled-home items.
-    const _CTX_TRASH_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
 
     function showContextMenu(button) {
         closeContextMenu();
@@ -876,7 +869,7 @@
         const isHome = button.dataset.isHome === 'true';
         const hasChildren = button.dataset.hasChildren === 'true';
         const depth = parseInt(button.dataset.depth || '0');
-        const canAddChild = depth < 4 && !isHome;
+        const canAddChild = depth < 4;
 
         const menu = document.createElement('div');
         menu.className = 'sitemap-ctx';
@@ -885,26 +878,26 @@
             menu.appendChild(_ctxMenuItem({
                 action: 'add-child', route,
                 label: t('addChild', 'Add child'),
-                iconSvg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>',
+                icon: QuickSiteUtils.ICON_PATHS.plus,
             }));
         }
 
         menu.appendChild(_ctxMenuItem({
             action: 'view-in-editor', route,
             label: t('viewInEditor', 'View in editor'),
-            iconSvg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>',
+            icon: ICONS.viewInEditor,
         }));
 
         menu.appendChild(_ctxMenuItem({
             action: 'open-page', route,
             label: t('openPage', 'Open page'),
-            iconSvg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>',
+            icon: QuickSiteUtils.ICON_PATHS.externalLink,
         }));
 
         menu.appendChild(_ctxMenuItem({
             action: 'edit-title', route,
             label: t('editTitle', 'Edit title'),
-            iconSvg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>',
+            icon: ICONS.editTitle,
         }));
 
         // Configure-resolver opens the per-route data
@@ -914,7 +907,7 @@
         menu.appendChild(_ctxMenuItem({
             action: 'configure-resolver', route,
             label: t('configureResolver', 'Configure resolver'),
-            iconSvg: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>',
+            icon: ICONS.resolver,
         }));
 
         const divider = document.createElement('div');
@@ -925,13 +918,13 @@
             menu.appendChild(_ctxMenuItem({
                 action: 'delete', route, hasChildren,
                 label: t('deleteRoute', 'Delete route'),
-                danger: true, iconSvg: _CTX_TRASH_SVG,
+                danger: true, icon: QuickSiteUtils.ICON_PATHS.trash,
             }));
         } else {
             menu.appendChild(_ctxMenuItem({
                 disabled: true,
                 label: t('cannotDeleteHome', 'Cannot delete home'),
-                iconSvg: _CTX_TRASH_SVG,
+                icon: QuickSiteUtils.ICON_PATHS.trash,
             }));
         }
 
@@ -1087,6 +1080,8 @@
         } catch (err) {
             console.error('Sitemap refresh error:', err);
         }
+        // A route added or deleted: the Sitemap File's links follow, the choices on screen kept
+        if (sitemapLinksShown) await loadSitemapLinks();
     }
 
     // ========================================================================
@@ -1140,7 +1135,7 @@
     function handleContextAction(action, route, element) {
         switch (action) {
             case 'add-child':
-                showInlineAddForm(route);
+                showInlineAddForm(_addChildParent(route));
                 break;
             case 'view-in-editor':
                 window.location.href = QUICKSITE_CONFIG.adminBase + '/preview?target=page-' + encodeURIComponent(route);
@@ -1270,7 +1265,7 @@
 
         // Reset modal UI.
         refs.route.textContent = '"' + route + '"';
-        refs.rows.innerHTML = '';
+        refs.rows.replaceChildren();
         refs.status.textContent = 'Loading…';
         refs.status.style.color = '';
         refs.save.disabled = true;
@@ -2071,8 +2066,7 @@
         removeBtn.type = 'button';
         removeBtn.className = 'sitemap-resolver-input-row__remove admin-btn admin-btn--ghost admin-btn--sm';
         removeBtn.title = t('resolverRemoveInput', 'Remove input');
-        const xIcon = _htmlToEl('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>');
-        if (xIcon) removeBtn.appendChild(xIcon);
+        removeBtn.appendChild(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.close, 14));
         removeBtn.addEventListener('click', () => row.remove());
         row.appendChild(removeBtn);
 
@@ -2129,8 +2123,7 @@
         const addBtn = document.createElement('button');
         addBtn.type = 'button';
         addBtn.className = 'sitemap-resolver-add admin-btn admin-btn--ghost admin-btn--sm';
-        const plus = _htmlToEl('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>');
-        if (plus) addBtn.appendChild(plus);
+        addBtn.appendChild(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.plus, 14));
         addBtn.appendChild(document.createTextNode(' ' + t('resolverInputAdd', 'Add input')));
         addBtn.addEventListener('click', () => {
             // New row uses the most up-to-date endpoint parameters so it
@@ -2374,8 +2367,7 @@
         removeBtn.type = 'button';
         removeBtn.className = 'sitemap-resolver-expose-row__remove admin-btn admin-btn--ghost admin-btn--sm';
         removeBtn.title = t('resolverRemoveExpose', 'Remove expose');
-        const xIcon = _htmlToEl('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>');
-        if (xIcon) removeBtn.appendChild(xIcon);
+        removeBtn.appendChild(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.close, 14));
         removeBtn.addEventListener('click', () => row.remove());
         row.appendChild(removeBtn);
 
@@ -2437,8 +2429,7 @@
         const addBtn = document.createElement('button');
         addBtn.type = 'button';
         addBtn.className = 'sitemap-resolver-add admin-btn admin-btn--ghost admin-btn--sm';
-        const plus = _htmlToEl('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>');
-        if (plus) addBtn.appendChild(plus);
+        addBtn.appendChild(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.plus, 14));
         addBtn.appendChild(document.createTextNode(' ' + t('resolverExposeAdd', 'Add expose')));
         addBtn.addEventListener('click', () => {
             // New row uses the most up-to-date schema paths so it gets
@@ -3164,8 +3155,7 @@
         removeBtn.type = 'button';
         removeBtn.className = 'sitemap-resolver-list-row__remove admin-btn admin-btn--ghost admin-btn--sm';
         removeBtn.title = t('resolverListRemove', 'Remove this resolver');
-        const xIcon = _htmlToEl('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>');
-        if (xIcon) removeBtn.appendChild(xIcon);
+        removeBtn.appendChild(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.close, 14));
         removeBtn.addEventListener('click', () => _handleResolverListRemove(idx));
         row.appendChild(removeBtn);
 
@@ -3345,7 +3335,7 @@
                 e.preventDefault();
                 e.stopPropagation();
                 closeContextMenu();
-                showInlineAddForm(addBtn.dataset.route);
+                showInlineAddForm(_addChildParent(addBtn.dataset.route));
                 return;
             }
 
@@ -3375,168 +3365,174 @@
             showInlineAddForm(null);
         });
 
-        // Sitemap.txt generator
-        document.getElementById('sitemap-generate-btn')?.addEventListener('click', previewSitemap);
-        document.getElementById('sitemap-save-btn')?.addEventListener('click', saveSitemapFile);
+        // Sitemap File: another base URL rewrites the links (its change event: Enter, or leaving
+        // the field); Generate writes the file; Copy copies the file written
+        document.getElementById('sitemap-base-url')?.addEventListener('change', loadSitemapLinks);
+        document.getElementById('sitemap-generate-btn')?.addEventListener('click', generateSitemapFile);
+        document.getElementById('sitemap-file-copy')?.addEventListener('click', copyGeneratedSitemap);
 
         // Delegate clicks inside the URL list (exclude/include toggles)
         document.getElementById('sitemap-url-list')?.addEventListener('click', (e) => {
             const row = e.target.closest('[data-sitemap-route]');
             if (!row) return;
             e.preventDefault();
-            const route = row.dataset.sitemapRoute;
             row.classList.toggle('sitemap-url--excluded');
-            updateUrlCount();
+            updatePagesKept();
         });
     }
 
     // ========================================================================
-    // Sitemap.txt Generator (preview → save flow)
+    // Sitemap File: the links to select, the custom URLs, Generate, the file
     // ========================================================================
 
-    let sitemapPreviewData = null; // stores last preview data for save
+    // Whether the links are on screen: a later load (another base URL, a route added or
+    // deleted) keeps the choices made there rather than the saved ones.
+    let sitemapLinksShown = false;
 
-    function updateUrlCount() {
-        const countEl = document.getElementById('sitemap-url-count');
-        if (!countEl) return;
-        const included = document.querySelectorAll('#sitemap-url-list [data-sitemap-route]:not(.sitemap-url--excluded)').length;
-        const customText = (document.getElementById('sitemap-custom-urls')?.value || '').trim();
-        const customCount = customText ? customText.split('\n').filter(l => l.trim()).length : 0;
-        const total = included + customCount;
-        countEl.textContent = total + ' ' + (total === 1 ? 'URL' : 'URLs');
+    /** The route names struck out of the links. */
+    function excludedRoutesShown() {
+        return Array.from(document.querySelectorAll('#sitemap-url-list .sitemap-url--excluded'))
+            .map((el) => el.dataset.sitemapRoute)
+            .filter(Boolean);
     }
 
-    async function previewSitemap() {
-        const baseUrlInput = document.getElementById('sitemap-base-url');
-        const preview = document.getElementById('sitemap-preview');
-        const urlList = document.getElementById('sitemap-url-list');
-        const customUrlsArea = document.getElementById('sitemap-custom-urls');
-        const btn = document.getElementById('sitemap-generate-btn');
+    function updatePagesKept() {
+        const countEl = document.getElementById('sitemap-pages-kept');
+        if (!countEl) return;
+        const kept = document.querySelectorAll('#sitemap-url-list [data-sitemap-route]:not(.sitemap-url--excluded)').length;
+        countEl.textContent = t('pagesKept').replace('{count}', kept);
+    }
 
-        const baseUrl = baseUrlInput?.value?.trim() || '';
+    /**
+     * One page of the links: its first URL and how many languages it has; struck out, it is left
+     * out of the file. Each toggle icon carries its class (sitemap-url__check / __cross) for the
+     * CSS-driven toggle reveal; the check is drawn at stroke-width 2.5 for visual emphasis
+     * (QSDom.iconEl draws 2).
+     */
+    function _renderSitemapLink(route, excluded) {
+        const urls = Object.values(route.urls || {});
+        const row = document.createElement('div');
+        row.className = 'sitemap-url' + (excluded ? ' sitemap-url--excluded' : '');
+        row.setAttribute('data-sitemap-route', route.name);
+
+        const toggle = document.createElement('span');
+        toggle.className = 'sitemap-url__toggle';
+        toggle.title = t('toggleInclude');
+        const checkEl = QSDom.iconEl(QuickSiteUtils.ICON_PATHS.check, 14, 'sitemap-url__check');
+        checkEl.setAttribute('stroke-width', '2.5');
+        toggle.appendChild(checkEl);
+        toggle.appendChild(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.close, 14, 'sitemap-url__cross'));
+        row.appendChild(toggle);
+
+        const text = document.createElement('span');
+        text.className = 'sitemap-url__text';
+        text.textContent = urls[0] || route.path;
+        if (urls.length > 1) {
+            text.appendChild(document.createTextNode(' '));
+            const langCount = document.createElement('span');
+            langCount.className = 'sitemap-url__lang-count';
+            langCount.textContent = '×' + urls.length + ' ' + t('langs');
+            text.appendChild(langCount);
+        }
+        row.appendChild(text);
+        return row;
+    }
+
+    /**
+     * The links, one per page, written with the base URL in its field. The first load strikes
+     * out the pages the saved configuration leaves out and fills the custom URLs from it; a later
+     * one keeps what is on screen.
+     */
+    async function loadSitemapLinks() {
+        const baseUrl = (document.getElementById('sitemap-base-url')?.value || '').trim();
+        if (!baseUrl) return;
+        try {
+            const result = await QuickSiteAdmin.apiRequest('getSiteMap', 'POST', { baseUrl });
+            if (!result.ok || !result.data?.data) {
+                QuickSiteAdmin.showToast(result.data?.message || t('error'), 'error');
+                return;
+            }
+            const data = result.data.data;
+            const config = data.sitemapConfig || { excludedRoutes: [], customUrls: [] };
+            const excluded = new Set(sitemapLinksShown ? excludedRoutesShown() : (config.excludedRoutes || []));
+            const links = document.createDocumentFragment();
+            (data.routes || []).forEach((route) => links.appendChild(_renderSitemapLink(route, excluded.has(route.name))));
+            document.getElementById('sitemap-url-list').replaceChildren(links);
+            if (!sitemapLinksShown) {
+                document.getElementById('sitemap-custom-urls').value = (config.customUrls || []).join('\n');
+            }
+            sitemapLinksShown = true;
+            document.getElementById('sitemap-links').hidden = false;
+            updatePagesKept();
+        } catch (err) {
+            QuickSiteAdmin.showToast(err.message, 'error');
+        }
+    }
+
+    /**
+     * Generate: setSiteMapConfig saves the pages struck out and the custom URLs and writes the
+     * site's sitemap.txt (getSiteMap is read-only, so both writes are its), then the file written
+     * is shown.
+     */
+    async function generateSitemapFile() {
+        const baseUrlInput = document.getElementById('sitemap-base-url');
+        const btn = document.getElementById('sitemap-generate-btn');
+        const baseUrl = (baseUrlInput?.value || '').trim();
         if (!baseUrl) {
-            QuickSiteAdmin.showToast(t('baseUrlRequired', 'Please enter a base URL'), 'error');
+            QuickSiteAdmin.showToast(t('baseUrlRequired'), 'error');
             baseUrlInput?.focus();
             return;
         }
+        const customUrls = (document.getElementById('sitemap-custom-urls')?.value || '')
+            .split('\n').map((line) => line.trim()).filter(Boolean);
 
         btn.disabled = true;
         try {
-            // Fetch with no exclusions applied (we get all routes + stored config)
-            const result = await QuickSiteAdmin.apiRequest('getSiteMap', 'POST', { baseUrl });
-
-            if (!result.ok || !result.data?.data) {
-                QuickSiteAdmin.showToast(result.data?.message || 'Error', 'error');
+            const result = await QuickSiteAdmin.apiRequest('setSiteMapConfig', 'POST', {
+                baseUrl,
+                save: true,
+                excludedRoutes: excludedRoutesShown(),
+                customUrls
+            });
+            if (!result.ok) {
+                QuickSiteAdmin.showToast(result.data?.message || QuickSiteAdmin.t('common.error'), 'error');
                 return;
             }
-
-            const data = result.data.data;
-            sitemapPreviewData = data;
-            const config = data.sitemapConfig || { excludedRoutes: [], customUrls: [] };
-            const excludedSet = new Set(config.excludedRoutes || []);
-
-            // Render interactive URL list — one row per route with all its URLs.
-            // Inline SVGs preserved here (not via QuickSiteUtils.iconCheck) because
-            // they carry specific classes (sitemap-url__check / __cross) for the
-            // CSS-driven toggle reveal AND the check uses stroke-width 2.5 for
-            // visual emphasis (the QuickSiteUtils helpers hardcode 2).
-            const urlsFragment = document.createDocumentFragment();
-            const allRoutes = data.routes || [];
-            const checkSvgHtml = '<svg class="sitemap-url__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><polyline points="20 6 9 17 4 12"/></svg>';
-            const crossSvgHtml = '<svg class="sitemap-url__cross" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
-            allRoutes.forEach(route => {
-                const isExcluded = excludedSet.has(route.name);
-                const urls = Object.values(route.urls || {});
-                const displayUrl = urls[0] || route.path;
-
-                const row = document.createElement('div');
-                row.className = 'sitemap-url' + (isExcluded ? ' sitemap-url--excluded' : '');
-                row.setAttribute('data-sitemap-route', route.name);
-
-                const toggle = document.createElement('span');
-                toggle.className = 'sitemap-url__toggle';
-                toggle.title = t('toggleInclude', 'Toggle include/exclude');
-                const checkEl = _htmlToEl(checkSvgHtml);
-                const crossEl = _htmlToEl(crossSvgHtml);
-                if (checkEl) toggle.appendChild(checkEl);
-                if (crossEl) toggle.appendChild(crossEl);
-                row.appendChild(toggle);
-
-                const text = document.createElement('span');
-                text.className = 'sitemap-url__text';
-                text.textContent = displayUrl;
-                if (urls.length > 1) {
-                    text.appendChild(document.createTextNode(' '));
-                    const langCount = document.createElement('span');
-                    langCount.className = 'sitemap-url__lang-count';
-                    langCount.textContent = '×' + urls.length + ' ' + t('langs', 'langs');
-                    text.appendChild(langCount);
-                }
-                row.appendChild(text);
-
-                urlsFragment.appendChild(row);
-            });
-            urlList.replaceChildren(urlsFragment);
-
-            // Populate custom URLs textarea from config
-            customUrlsArea.value = (config.customUrls || []).join('\n');
-
-            // Listen for textarea changes to update count
-            customUrlsArea.oninput = updateUrlCount;
-
-            preview.style.display = '';
-            updateUrlCount();
+            QuickSiteAdmin.showToast(t('sitemapSaved'), 'success');
+            // A custom URL that is not a full address never reaches the file: the command names it
+            const rejected = result.data?.data?.rejectedUrls || [];
+            if (rejected.length) {
+                QuickSiteAdmin.showToast(t('customUrlsRejected').replace('{urls}', rejected.join(', ')), 'warning');
+            }
+            await showGeneratedSitemap(baseUrl);
         } catch (err) {
-            QuickSiteAdmin.showToast('Error: ' + err.message, 'error');
+            QuickSiteAdmin.showToast(err.message, 'error');
         } finally {
             btn.disabled = false;
         }
     }
 
-    async function saveSitemapFile() {
-        const baseUrlInput = document.getElementById('sitemap-base-url');
-        const customUrlsArea = document.getElementById('sitemap-custom-urls');
-        const btn = document.getElementById('sitemap-save-btn');
-
-        const baseUrl = baseUrlInput?.value?.trim() || '';
-        if (!baseUrl) {
-            QuickSiteAdmin.showToast(t('baseUrlRequired', 'Please enter a base URL'), 'error');
+    /**
+     * The sitemap.txt Generate wrote, read back as getSiteMap's text form: the saved configuration
+     * applied to the routes, one URL a line, as setSiteMapConfig writes the file. A plain-text
+     * answer reaches apiRequest as `message`.
+     */
+    async function showGeneratedSitemap(baseUrl) {
+        const result = await QuickSiteAdmin.apiRequest('getSiteMap', 'POST', { baseUrl }, ['text']);
+        const text = result.ok && typeof result.data?.message === 'string' ? result.data.message : null;
+        if (text === null) {
+            QuickSiteAdmin.showToast(result.data?.message || t('error'), 'error');
             return;
         }
+        const urls = text.split('\n').filter(Boolean);
+        document.getElementById('sitemap-file-text').textContent = urls.join('\n');
+        document.getElementById('sitemap-file-count').textContent = t('urlCount').replace('{count}', urls.length);
+        document.getElementById('sitemap-file').hidden = false;
+    }
 
-        // Collect excluded routes from UI
-        const excludedEls = document.querySelectorAll('#sitemap-url-list .sitemap-url--excluded');
-        const excludedRoutes = Array.from(excludedEls).map(el => el.dataset.sitemapRoute).filter(Boolean);
-
-        // Collect custom URLs from textarea
-        const customUrls = (customUrlsArea?.value || '').split('\n').map(l => l.trim()).filter(l => l);
-
-        btn.disabled = true;
-        try {
-            // setSiteMapConfig owns both sitemap writes (the config sidecar and the
-            // published sitemap.txt) — getSiteMap is read-only, so saving goes here.
-            const result = await QuickSiteAdmin.apiRequest('setSiteMapConfig', 'POST', {
-                baseUrl,
-                save: true,
-                excludedRoutes,
-                customUrls
-            });
-
-            if (result.ok) {
-                const data = result.data?.data || {};
-                const urlCount = data.urlCount || 0;
-                QuickSiteAdmin.showToast(
-                    t('sitemapSaved', 'sitemap.txt saved successfully') + ` (${urlCount} URLs)`,
-                    'success'
-                );
-            } else {
-                QuickSiteAdmin.showToast(result.data?.message || 'Error saving sitemap', 'error');
-            }
-        } catch (err) {
-            QuickSiteAdmin.showToast('Error: ' + err.message, 'error');
-        } finally {
-            btn.disabled = false;
-        }
+    function copyGeneratedSitemap() {
+        const btn = document.getElementById('sitemap-file-copy');
+        QuickSiteUtils.copyToClipboard(document.getElementById('sitemap-file-text').textContent, btn.dataset.copied);
     }
 
     // ========================================================================
@@ -3545,6 +3541,8 @@
 
     async function init() {
         bindEvents();
+        // The Sitemap File's links come with the page (their own getSiteMap, with the base URL field's)
+        loadSitemapLinks();
 
         try {
             const data = await loadSitemapData();

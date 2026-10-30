@@ -166,8 +166,9 @@ function __command_moveNode(array $params = [], array $urlParams = []): ApiRespo
     $sourceIndices = array_map('intval', explode('.', $sourceNodeId));
     $targetIndices = array_map('intval', explode('.', $targetNodeId));
     
-    // Step 1: Remove source node from its current position
-    $removeResult = removeNodeFromStructure($structure, $sourceIndices);
+    // Step 1: Remove source node from its current position (NodeNavigator::removeNode, the
+    // removal every command shares)
+    $removeResult = NodeNavigator::removeNode($structure, $sourceNodeId);
     if (!$removeResult['success']) {
         return ApiResponse::create(400, 'operation.failed')
             ->withMessage("Failed to remove source node: " . $removeResult['error']);
@@ -268,82 +269,6 @@ function __command_moveNode(array $params = [], array $urlParams = []): ApiRespo
             'newNodeId' => $newNodeId,
             'file' => $json_file
         ]);
-}
-
-/**
- * Remove a node from the structure at the given indices path
- */
-function removeNodeFromStructure(array $structure, array $indices): array {
-    if (empty($indices)) {
-        return ['success' => false, 'error' => 'Empty indices'];
-    }
-    
-    // Detect if root is a single object (component) or array of nodes (page)
-    $isRootObject = isset($structure['tag']);
-    
-    // Navigate to the parent and remove the node
-    $ref = &$structure;
-    
-    for ($i = 0; $i < count($indices) - 1; $i++) {
-        $idx = $indices[$i];
-        
-        if ($i === 0) {
-            // First level access
-            if ($isRootObject) {
-                // Component: first index accesses children directly
-                if (!isset($ref['children'][$idx])) {
-                    return ['success' => false, 'error' => "Node not found at index {$idx}"];
-                }
-                $ref = &$ref['children'][$idx];
-            } else {
-                // Page: direct array access
-                if (!isset($ref[$idx])) {
-                    return ['success' => false, 'error' => "Node not found at index {$idx}"];
-                }
-                $ref = &$ref[$idx];
-            }
-        } else {
-            // Deeper levels - access children
-            if (!isset($ref['children']) || !isset($ref['children'][$idx])) {
-                return ['success' => false, 'error' => "Node not found in children at index {$idx}"];
-            }
-            $ref = &$ref['children'][$idx];
-        }
-    }
-    
-    // Now $ref is the parent, remove the node at final index
-    $finalIndex = end($indices);
-    
-    if (count($indices) === 1) {
-        // Root level removal
-        if ($isRootObject) {
-            // Component: remove from children array
-            if (!isset($structure['children']) || !isset($structure['children'][$finalIndex])) {
-                return ['success' => false, 'error' => "Root child node not found at index {$finalIndex}"];
-            }
-            $removedNode = $structure['children'][$finalIndex];
-            array_splice($structure['children'], $finalIndex, 1);
-        } else {
-            // Page: remove from root array
-            if (!isset($structure[$finalIndex])) {
-                return ['success' => false, 'error' => "Root node not found at index {$finalIndex}"];
-            }
-            $removedNode = $structure[$finalIndex];
-            array_splice($structure, $finalIndex, 1);
-        }
-    } else {
-        // Nested level
-        if (!isset($ref['children']) || !isset($ref['children'][$finalIndex])) {
-            return ['success' => false, 'error' => "Child node not found at index {$finalIndex}"];
-        }
-        $removedNode = $ref['children'][$finalIndex];
-        array_splice($ref['children'], $finalIndex, 1);
-        
-        // If children is now empty, we could optionally remove it
-        // but let's keep it for consistency
-    }
-    
-    return ['success' => true, 'structure' => $structure, 'node' => $removedNode];
 }
 
 // Execute via HTTP

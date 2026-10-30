@@ -42,6 +42,16 @@
         "status": {
             "success": "Succès",
             "error": "Erreur"
+        },
+        "duration": {
+            "second": ":count seconde",
+            "seconds": ":count secondes",
+            "minute": ":count minute",
+            "minutes": ":count minutes",
+            "hour": ":count heure",
+            "hours": ":count heures",
+            "day": ":count jour",
+            "days": ":count jours"
         }
     },
     "writeRate": {
@@ -67,12 +77,13 @@
         "usernamePlaceholder": "votre-identifiant",
         "passwordLabel": "Mot de passe",
         "rememberSession": "Rester connecté sur cet appareil",
-        "rememberHint": "Votre session reste active sur cet appareil (cookie sécurisé) ; rien n'est stocké dans les scripts du navigateur.",
+        "rememberHint": "Cochée, vous restez connecté sur cet appareil à la fermeture du navigateur. Dans les deux cas, vous êtes déconnecté après environ :duration sans utiliser le panneau.",
+        "rememberHintBoth": "Cochée, vous restez connecté sur cet appareil à la fermeture du navigateur, et êtes déconnecté après environ :remember sans utiliser le panneau ; décochée, après environ :idle.",
         "submit": "Se connecter",
         "invalidCredentials": "Nom d'utilisateur ou mot de passe invalide",
         "missingFields": "Le formulaire est arrivé sans nom d'utilisateur ou mot de passe — rechargez la page (Ctrl+F5) et réessayez",
         "csrfFailed": "Votre session n'a pas pu être vérifiée — le formulaire était trop ancien, ou il provenait d'un autre site. Rechargez cette page et réessayez.",
-        "throttled": "Trop de tentatives échouées — réessayez dans :seconds secondes",
+        "throttled": "Trop de tentatives échouées — réessayez dans :duration",
         "serverError": "Impossible de créer la session — réessayez",
         "showPassword": "Afficher le mot de passe",
         "hidePassword": "Masquer le mot de passe",
@@ -104,7 +115,7 @@
         "nameEqualsUsername": "Votre nom public doit être différent de votre nom d'utilisateur (votre nom d'utilisateur reste privé)",
         "passwordTooShort": "Mot de passe trop court — au moins :min caractères",
         "missingFields": "Le formulaire est arrivé incomplet — rechargez la page (Ctrl+F5) et réessayez",
-        "throttled": "Trop de tentatives — réessayez dans :seconds secondes",
+        "throttled": "Trop de tentatives — réessayez dans :duration",
         "closed": "Les inscriptions sont fermées sur cette installation (limite de comptes atteinte)",
         "disabled": "L'auto-inscription est désactivée sur cette installation",
         "serverError": "Impossible de créer le compte — réessayez"
@@ -136,7 +147,7 @@
         "nameEqualsUsername": "Votre nom affiché doit être différent de votre identifiant (votre identifiant reste privé)",
         "passwordTooShort": "Mot de passe trop court — au moins :min caractères",
         "missingFields": "Tous les champs sont obligatoires — complétez-les puis réessayez",
-        "throttled": "Trop de tentatives — réessayez dans :seconds secondes",
+        "throttled": "Trop de tentatives — réessayez dans :duration",
         "alreadyDone": "Un compte existe déjà sur cette installation — connectez-vous à la place",
         "serverError": "Le compte n'a pas pu être créé — réessayez",
         "help": {
@@ -950,9 +961,7 @@
         "sitemapFileDesc": "Générer un fichier sitemap.txt pour les moteurs de recherche. Définissez l'URL de base de votre domaine de production.",
         "baseUrl": "URL de base",
         "baseUrlRequired": "Veuillez saisir une URL de base",
-        "generatePreview": "Aperçu",
         "generateSitemap": "Générer sitemap.txt",
-        "saveSitemap": "Enregistrer sitemap.txt",
         "sitemapSaved": "sitemap.txt enregistré avec succès",
         "customUrls": "URLs personnalisées",
         "customUrlsHint": "Ajoutez des URLs supplémentaires non générées par les routes (une par ligne)",
@@ -1420,11 +1429,6 @@
                     "multilingual": {
                         "label": "Activer le multilingue",
                         "help": "Créer avec support de plusieurs langues"
-                    },
-                    "languages": {
-                        "label": "Langues",
-                        "placeholder": "en, fr, es, ja, de...",
-                        "help": "Codes ISO 639-1 séparés par des virgules"
                     }
                 },
                 "examples": {
@@ -1841,14 +1845,12 @@
         "modeText": "Texte (modifier le contenu)",
         "modeStyle": "Style (modifier le CSS)",
         "modeJs": "JS (gérer les interactions)",
-        "nodeInfo": "Info Élément",
         "structure": "Structure",
         "nodeId": "ID Nœud",
         "componentName": "Composant",
         "nodeTag": "Balise",
         "nodeClasses": "Classes",
         "nodeChildren": "Enfants",
-        "nodeText": "Texte",
         "editStructure": "Modifier Structure",
         "copyNodeId": "Copier ID Nœud",
         "miniplayer": "Mini-lecteur",
@@ -2369,7 +2371,6 @@
         "optional": "Optionnel",
         "eventsCommonFor": "Courants pour",
         "eventsLessCommon": "Moins courants",
-        "eventsAdvanced": "Avancés",
         "functionExample": "Exemple",
         "eventTooltips": {
             "onclick": "Quand l'utilisateur clique sur l'élément",
@@ -2396,16 +2397,7 @@
             "onscroll": "Quand l'utilisateur fait défiler la page",
             "onmousemove": "Quand le curseur se déplace sur l'élément",
             "onmousedown": "Quand un bouton de la souris est enfoncé sur l'élément",
-            "onmouseup": "Quand un bouton de la souris est relâché sur l'élément",
-            "oncontextmenu": "Quand le menu contextuel (clic droit) est demandé",
-            "ontouchstart": "Quand un doigt touche l'élément",
-            "ontouchend": "Quand un doigt est levé de l'élément",
-            "ontouchmove": "Quand un doigt se déplace sur l'élément",
-            "onfocusin": "Le focus est entré dans l'élément ou un de ses enfants (remonte)",
-            "onfocusout": "Le focus a quitté l'élément ou un de ses enfants (remonte)",
-            "onpaste": "Quand l'utilisateur colle du contenu dans le champ",
-            "oncopy": "Quand l'utilisateur copie du contenu depuis le champ",
-            "oncut": "Quand l'utilisateur coupe du contenu depuis le champ"
+            "onmouseup": "Quand un bouton de la souris est relâché sur l'élément"
         },
         "selectorOrThis": "Rechercher un sélecteur ou tapez \"this\"",
         "searchClass": "Rechercher une classe CSS...",
@@ -2667,7 +2659,6 @@
         "openTransitionEditor": "Modifier la transition",
         "loadTransitionFailed": "Échec du chargement des données de transition",
         "noBaseStyles": "Aucun style de base défini",
-        "noPropertiesToTransition": "Aucune propriété à transitionner",
         "transitionSaved": "Transition enregistrée avec succès",
         "saveTransitionFailed": "Échec de l'enregistrement de la transition",
         "noElementsFound": "Aucun élément trouvé pour ce sélecteur",

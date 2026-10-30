@@ -210,7 +210,9 @@ class AdminRouter {
      * only a keyed digest of the username typed.
      *
      * @return string|null null on success, else an error key:
-     *                     'invalid_credentials' | 'missing_fields' | 'throttled:<seconds>'
+     *                     'invalid_credentials' | 'invalid_credentials:<seconds>'
+     *                     (the refusal that started a wait) | 'missing_fields'
+     *                     | 'throttled:<seconds>'
      */
     public function attemptLogin(string $username, string $password, bool $remember = false): ?string {
         require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
@@ -229,6 +231,9 @@ class AdminRouter {
             qs_security_log_signin($attempt, $username);
             if ($attempt['error'] === 'throttled') {
                 return 'throttled:' . (int)($attempt['retry_after'] ?? 60);
+            }
+            if ($attempt['error'] === 'invalid_credentials' && !empty($attempt['retry_after'])) {
+                return 'invalid_credentials:' . (int)$attempt['retry_after'];
             }
             return $attempt['error'];
         }

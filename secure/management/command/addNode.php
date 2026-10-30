@@ -34,10 +34,6 @@ require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_
 // HELPER FUNCTIONS
 // =============================================================================
 
-function isComponentNode(array $node): bool {
-    return isset($node['component']);
-}
-
 function findDirectTextKeyChildren(array $children): array {
     $indices = [];
     foreach ($children as $index => $child) {
@@ -102,10 +98,10 @@ function __command_addNode(array $params = [], array $urlParams = []): ApiRespon
     $textValue = isset($params['textValue']) ? (string) $params['textValue'] : '';
     $textRaw = !empty($params['textRaw']);
     
-    // Filter out reserved params (translatable attributes) from nodeParams
-    // These are auto-managed and cannot be set manually
-    foreach (TagRegistry::RESERVED_PARAMS as $reserved) {
-        unset($nodeParams[$reserved]);
+    // Reserved params (translatable attributes) are dropped, except a translation-key param
+    // the tag declares (an iframe's title): TagRegistry::withoutReservedParams().
+    if (is_array($nodeParams)) {
+        $nodeParams = TagRegistry::withoutReservedParams($tag, $nodeParams);
     }
     
     // SECURITY: Validate no reserved data-qs-* attributes
@@ -157,10 +153,11 @@ function __command_addNode(array $params = [], array $urlParams = []): ApiRespon
             ->withErrors([RegexPatterns::validationError('node_id', 'targetNodeId', $targetNodeId)]);
     }
     
-    // Validate position
-    if (!in_array($position, ['before', 'after', 'inside'], true)) {
+    // Validate position: inside puts the node first in the target, inside-end last (the
+    // editor's Text tab adds there, so a sentence grows in the order it is written).
+    if (!in_array($position, ['before', 'after', 'inside', 'inside-end'], true)) {
         return ApiResponse::create(400, 'validation.invalid_value')
-            ->withMessage("Invalid position. Must be 'before', 'after', or 'inside'")
+            ->withMessage("Invalid position. Must be 'before', 'after', 'inside' or 'inside-end'")
             ->withErrors([['field' => 'position', 'value' => $position]]);
     }
     
@@ -285,18 +282,6 @@ function __command_addNode(array $params = [], array $urlParams = []): ApiRespon
         if ($targetNode === null) {
             return ApiResponse::create(404, 'node.not_found')
                 ->withMessage("Target node not found at: {$targetNodeId}");
-        }
-    }
-    
-    // Position "inside" validation
-    if ($position === 'inside') {
-        if (isComponentNode($targetNode)) {
-            return ApiResponse::create(400, 'validation.invalid_value')
-                ->withMessage("Cannot insert inside a component. Components are atomic.");
-        }
-        if (isset($targetNode['textKey']) && !isset($targetNode['tag'])) {
-            return ApiResponse::create(400, 'validation.invalid_value')
-                ->withMessage("Cannot insert inside a text node.");
         }
     }
     

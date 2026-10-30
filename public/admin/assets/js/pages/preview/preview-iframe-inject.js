@@ -415,6 +415,9 @@
         } else if (position === 'inside') {
             // Insert as first child
             targetEl.insertBefore(newElement, targetEl.firstChild);
+        } else if (position === 'inside-end') {
+            // Insert as last child (the Text tab's Inside)
+            targetEl.appendChild(newElement);
         }
         
         console.log('[QuickSite] Node inserted successfully:', newNodeId);
@@ -1089,7 +1092,10 @@
             hasChildren: hasChildren,
             // Whether an insert INSIDE this node is one the server accepts: the rule the drag
             // follows, read by the Add panel to offer "Inside" only where it can land.
-            holdsChildren: !cannotHoldChildren(el)
+            holdsChildren: !cannotHoldChildren(el),
+            // Whether text placed beside this node continues its line, read by the Add panel's
+            // Text tab to offer Before / After there.
+            inline: isInlineLevel(el)
         };
     }
     
@@ -1528,9 +1534,12 @@
         const node = editingElement.getAttribute('data-qs-node')
             || editingElement.closest('[data-qs-node]')?.getAttribute('data-qs-node') || '';
 
-        // Clean up editing state
+        // Clean up editing state. The element is left holding exactly the text that is saved:
+        // whatever else reached it while it was editable (a drop of formatted text, a
+        // bold shortcut) leaves the page now rather than at the next reload.
         editingElement.classList.remove('qs-text-editing');
         editingElement.setAttribute('contenteditable', 'false');
+        editingElement.textContent = newText;
 
         // Only save if text actually changed
         if (newText !== originalText) {
@@ -1780,6 +1789,14 @@
      * children. The browser's own serializer says which tags are void (it writes no
      * closing tag for one), so the editor keeps no copy of the list.
      */
+    // Whether the page shows this element inline-level (inline, inline-block, inline-flex…): the
+    // browser's own answer, after the author's CSS — a link styled as a block is not inline, a
+    // bold word is. Text placed beside an inline element continues the same line.
+    function isInlineLevel(el) {
+        const display = String(window.getComputedStyle(el).display || '').trim();
+        return /^inline(?:$|[\s-])/.test(display);
+    }
+
     function cannotHoldChildren(el) {
         if (el.hasAttribute('data-qs-textonly') || el.hasAttribute('data-qs-component')) return true;
         const tag = el.tagName.toLowerCase();
@@ -2540,6 +2557,24 @@
         }
     }, true);
     
+    // A paste into the text being edited is plain text: the clipboard's text, each run of
+    // line breaks one space (a text is one line; Enter saves), inserted by the browser so
+    // Ctrl+Z undoes it. A rich paste would otherwise put its markup and styles in the page.
+    document.addEventListener('paste', function(e) {
+        if (currentMode !== 'text' || !editingElement || !editingElement.contains(e.target)) return;
+        e.preventDefault();
+        const text = ((e.clipboardData && e.clipboardData.getData('text/plain')) || '').replace(/[\r\n]+/g, ' ');
+        if (!document.execCommand('insertText', false, text)) {
+            const selection = window.getSelection();
+            if (selection && selection.rangeCount > 0) {
+                const range = selection.getRangeAt(0);
+                range.deleteContents();
+                range.insertNode(document.createTextNode(text));
+                range.collapse(false);
+            }
+        }
+    }, true);
+
     // Blur handling for text editing
     document.addEventListener('blur', function(e) {
         if (currentMode === 'text' && editingElement && e.target === editingElement) {

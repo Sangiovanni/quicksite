@@ -120,7 +120,7 @@ function qs_operator_ids(): array {
     // character in it is an ordinary event, and every authenticated admin page
     // calls this function. Without the catch, one typo here takes down the
     // entire panel — including the pages someone would use to work out why.
-    // Verified catchable on 8.0.30 and 8.4.0.
+    // Measured catchable on PHP 8.3, 8.4 and 8.5.
     try {
         $cfg = @include $path;
     } catch (\Throwable $e) {

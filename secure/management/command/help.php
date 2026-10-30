@@ -968,7 +968,7 @@ $GLOBALS['__help_commands'] = [
                 'type' => 'page',
                 'name' => 'home',
                 'structure' => '(JSON structure with optional _nodeId on each node)',
-                'file' => '/path/to/home.json',
+                'file' => 'templates/model/json/pages/home/home.json',
                 'nodeIds' => 'included or not included'
             ]
         ],
@@ -1038,7 +1038,7 @@ $GLOBALS['__help_commands'] = [
                 'name' => 'home',
                 'nodeId' => '0.2 (if targeted edit)',
                 'action' => 'updated/deleted/inserted',
-                'file' => '/path/to/home.json'
+                'file' => 'templates/model/json/pages/home/home.json'
             ]
         ],
         'error_responses' => [
@@ -1810,9 +1810,10 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_length' => 'Maximum 50 files per batch delete request.',
             '400.validation.invalid_type' => 'The filenames parameter must be an array of strings. The filename parameter must be a string.',
             '400.validation.invalid_value' => 'The filenames array must not be empty.',
-            '400.validation.missing_field' => 'Neither filename nor filenames was supplied (single delete needs filename; bulk delete needs filenames).'
+            '400.validation.missing_field' => 'Neither filename nor filenames was supplied (single delete needs filename; bulk delete needs filenames).',
+            '500.server.file_write_failed' => 'The file was deleted (batch: every file in data.deleted), but the asset list could not be saved, so it still names it. data is the success answer\'s: filename and category (batch: deleted, failed, total_deleted, total_failed).'
         ],
-        'notes' => 'Category is auto-detected from file extension. Supports batch deletion with filenames array (max 50). In batch mode, partial success is possible — check deleted and failed arrays in the response.'
+        'notes' => 'Category is auto-detected from file extension. Supports batch deletion with filenames array (max 50). In batch mode, partial success is possible — check deleted and failed arrays in the response. The asset list (a file\'s description, alt text and star) is saved only when it has an entry for a deleted file; when that save fails, the files stay deleted and the answer is 500 server.file_write_failed.'
     ],
     
     'listAssets' => [
@@ -1949,7 +1950,7 @@ $GLOBALS['__help_commands'] = [
             'message' => 'Style file retrieved successfully',
             'data' => [
                 'content' => '/* CSS content here */',
-                'file' => '/path/to/style.css',
+                'file' => 'public/style/style.css',
                 'size' => 12345,
                 'modified' => '2025-12-03 10:30:15'
             ]
@@ -1968,9 +1969,9 @@ $GLOBALS['__help_commands'] = [
             'content' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Complete CSS/SCSS content (replaces existing file). Can use "css" as alias.',
+                'description' => 'Complete CSS/SCSS content (replaces existing file). An empty content empties the stylesheet. Can use "css" as alias.',
                 'example' => 'body { margin: 0; }',
-                'validation' => 'A non-empty string of at most 512 KB that passes the stylesheet scan (see notes)',
+                'validation' => 'A string of at most 512 KB that passes the stylesheet scan (see notes); empty is accepted',
                 'alias' => 'css'
             ]
         ],
@@ -1980,7 +1981,8 @@ $GLOBALS['__help_commands'] = [
             'code' => 'operation.success',
             'message' => 'Style file updated successfully',
             'data' => [
-                'file' => '/path/to/style.css',
+                'file' => 'public/style/style.css',
+                'project_file' => 'public/style/style.css',
                 'new_size' => 1234,
                 'old_size' => 1200,
                 'backup_content' => '/* old content */',
@@ -1993,11 +1995,10 @@ $GLOBALS['__help_commands'] = [
             '404.file.not_found' => 'Style file not found',
             '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
             '500.server.file_write_failed' => 'Failed to read or write style file',
-            '400.validation.invalid_length' => 'The content parameter is empty, or larger than 512 KB.',
             '400.validation.invalid_type' => 'The content parameter must be a string.',
             '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
-        'notes' => 'Completely replaces style.css content. Response includes backup_content for manual rollback if needed. Max size: 512 KB. File locking prevents concurrent writes. THE STYLESHEET SCAN — run by every command that writes CSS into a stylesheet (editStyles, setStyleRule, setKeyframes, setRootVariables, injectSnippetCss) and by importProject on every .css entry: with comments removed and CSS escapes decoded, the text may not hold a javascript: or vbscript: URL, expression(, behavior: (scroll-behavior is fine), -moz-binding:, a data:text/html URI, an @import of another host or of a scheme (a relative @import is fine), or an HTML script or style tag; and its raw bytes may not open a PHP block (<?php, <?=, or <? followed by whitespace or the end of the text), which an import refuses.'
+        'notes' => 'Completely replaces style.css content; an empty content leaves the site with no style at all. Response includes backup_content for manual rollback if needed. Max size: 512 KB. File locking prevents concurrent writes. THE STYLESHEET SCAN — run by every command that writes CSS into a stylesheet (editStyles, setStyleRule, setKeyframes, setRootVariables, injectSnippetCss) and by importProject on every .css entry: with comments removed and CSS escapes decoded, the text may not hold a javascript: or vbscript: URL, expression(, behavior: (scroll-behavior is fine), -moz-binding:, a data:text/html URI, an @import of another host or of a scheme (a relative @import is fine), or an HTML script or style tag; and its raw bytes may not open a PHP block (<?php, <?=, or <? followed by whitespace or the end of the text), which an import refuses.'
     ],
     
     // ==========================================================================
@@ -2551,10 +2552,10 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '400.validation.required' => 'username and password are required',
-            '401.auth.invalid_credentials' => 'Invalid username or password (uniform for unknown username, wrong password, externally managed or disabled account - no account oracle)',
+            '401.auth.invalid_credentials' => 'Invalid username or password (uniform for unknown username, wrong password, externally managed or disabled account - no account oracle). When this refusal starts a wait, data.retry_after gives it in seconds',
             '429.auth.throttled' => 'Too many failed attempts - retry_after gives the wait in seconds'
         ],
-        'notes' => 'A command-line client needs a cookie jar (curl -c jar -b jar) as well as the Authorization header: the token authorizes nothing without the session cookie it belongs to, which is what keeps a cookie-authenticated API safe from cross-site request forgery. The response names the account by id and display name (data.user) and never repeats the username - the private login identifier the caller just used. Failed attempts are throttled per username (5 free, then a doubling cooldown); each attempt is counted before it is checked, so simultaneous attempts get no more than what is left. Session lifetimes are configured in auth.php (authentication.session: idle_ttl / remember_ttl). Users with password_hash null are externally managed and cannot log in here.'
+        'notes' => 'A command-line client needs a cookie jar (curl -c jar -b jar) as well as the Authorization header: the token authorizes nothing without the session cookie it belongs to, which is what keeps a cookie-authenticated API safe from cross-site request forgery. The response names the account by id and display name (data.user) and never repeats the username - the private login identifier the caller just used. Failed attempts are throttled per username (5 free, then a doubling cooldown: 30 seconds, 1 minute, 2 minutes, up to 1 hour); each attempt is counted before it is checked, so simultaneous attempts get no more than what is left. The refusal that starts a wait (the fifth failure, and the first after each wait) carries it as retry_after, as the next attempt\'s 429 would. Session lifetimes are configured in auth.php (authentication.session: idle_ttl / remember_ttl). Users with password_hash null are externally managed and cannot log in here.'
     ],
 
     'logoutSession' => [
@@ -2996,7 +2997,7 @@ $GLOBALS['__help_commands'] = [
                 'name' => 'home',
                 'nodeId' => '0.2.1',
                 'deletedNode' => '{tag, params, children info}',
-                'file' => '/path/to/home.json',
+                'file' => 'templates/model/json/pages/home/home.json',
                 'translationKeysRemoved' => 3,
                 'translationKeys' => ['home.item1', 'home.item2', 'home.item3']
             ]
@@ -3045,7 +3046,7 @@ $GLOBALS['__help_commands'] = [
             'position' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => 'Where to insert: before, after, or inside (default after; forced inside when targetNodeId="root"). Inside a target that cannot hold children (a component call, a text node, or a void element such as img, input or br) is refused.',
+                'description' => 'Where to insert: before or after the target (its sibling), inside (its first child) or inside-end (its last child: what the visual editor\'s Text tab sends for Inside). Default "after"; forced inside when targetNodeId="root". Inside or inside-end, a target that cannot hold children (a component call, a text node, or a void element such as img, input or br) is refused with 400 operation.failed.',
                 'example' => 'after',
                 'default' => 'after'
             ],
@@ -3066,7 +3067,7 @@ $GLOBALS['__help_commands'] = [
             'params' => [
                 'required' => false,
                 'type' => 'object',
-                'description' => 'Tag attributes including mandatory ones (href for <a>, src/alt for <img>, etc.). Ignored for nodeKind=text.',
+                'description' => 'Tag attributes including mandatory ones (href for <a>, src/alt for <img>, etc.). Ignored for nodeKind=text. The attributes the translation system fills (placeholder, title, aria-label, aria-placeholder, aria-description) are dropped, except one the tag takes as a translation key: an iframe\'s title is kept, the key its page translates.',
                 'example' => '{"class": "card", "href": "/contact"}'
             ],
             'textKey' => [
@@ -3089,7 +3090,7 @@ $GLOBALS['__help_commands'] = [
                 'default' => false
             ]
         ],
-        'example_post' => 'POST /management/p/<projectId>/addNode — TAG mode: {"type":"page","name":"home","targetNodeId":"0.2","position":"after","tag":"a","params":{"href":"/contact","class":"btn"}}. TEXT RAW: {"type":"page","name":"home","targetNodeId":"0.2","position":"inside","nodeKind":"text","textRaw":true,"textValue":" — "}. TEXT key: {"type":"page","name":"home","targetNodeId":"0.2","position":"inside","nodeKind":"text","textKey":"home.greeting"}.',
+        'example_post' => 'POST /management/p/<projectId>/addNode — TAG mode: {"type":"page","name":"home","targetNodeId":"0.2","position":"after","tag":"a","params":{"href":"/contact","class":"btn"}}. TEXT RAW: {"type":"page","name":"home","targetNodeId":"0.2","position":"inside-end","nodeKind":"text","textRaw":true,"textValue":" — "}. TEXT key: {"type":"page","name":"home","targetNodeId":"0.2","position":"inside","nodeKind":"text","textKey":"home.greeting"}.',
         'success_response' => [
             'status' => 200,
             'code' => 'operation.success',
@@ -3107,9 +3108,8 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_value' => 'Invalid tag, position, or nodeKind',
             '400.validation.missing_params' => 'Missing mandatory params (e.g., href for <a>)',
             '400.validation.unsafe_param' => 'A param the renderer would refuse: an attribute NAME outside [letters, digits, underscore, colon, hyphen]; a raw on* handler (use {{call:...}} syntax); or a disallowed URL scheme (only http, https, mailto, tel)',
-            '400.operation.denied' => 'Cannot insert inside component node',
             '404.resource.not_found' => 'Target node not found',
-            '400.operation.failed' => 'Failed to insert node: inside (or at "root") a target that cannot hold children — a component call, a text node, or a void element such as img, input or br: "The target node is an img element, which cannot hold children" (at "root": "The structure root is …").',
+            '400.operation.failed' => 'Failed to insert node: inside or inside-end (or at "root") a target that cannot hold children — a component call, a text node, or a void element such as img, input or br: "The target node is an img element, which cannot hold children" (at "root": "The structure root is …").',
             '400.validation.blocked_tag' => 'Tag is blocked for security reasons.',
             '400.validation.invalid_format' => 'Invalid targetNodeId format. Use dot notation like \'0.2.1\' or \'root\'. Structure too deeply nested (max 50 levels). A page name with "..", a backslash or a NUL byte (reason path_traversal_attempt), or a segment outside the page-name rule; a component name with "..", a slash, a backslash or a NUL byte (reason path_traversal_attempt), or outside the component-name rule (reason invalid_component_reference, errors[0].expected states it).',
             '400.validation.reserved_attribute' => 'Cannot use reserved attribute. Attributes starting with \'data-qs-\' are reserved for QuickSite. Use a different prefix like \'data-custom-\' or \'data-app-\'.',
@@ -3166,7 +3166,7 @@ $GLOBALS['__help_commands'] = [
             'position' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => 'Where to insert relative to targetNodeId: before, after, or inside. Default "after". Forced to "inside" when targetNodeId="root". Inside a target that cannot hold children (a component call, a text node, or a void element such as img, input or br) is refused.',
+                'description' => 'Where to insert relative to targetNodeId: before, after, or inside. Default "after". Forced to "inside" when targetNodeId="root". Inside a target that cannot hold children (a component call, a text node, or a void element such as img, input or br) is refused with 400 operation.failed.',
                 'default' => 'after',
                 'example' => 'inside'
             ]
@@ -3189,7 +3189,7 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.validation.required' => 'Missing required parameter (kind, config, structType, targetNodeId)',
             '400.validation.invalid_format' => 'Invalid kind format or invalid targetNodeId format, or the builder emitted a component reference that is not a bare component name (see editStructure). A page name with "..", a backslash or a NUL byte (reason path_traversal_attempt), or a segment outside the page-name rule; a component name with "..", a slash, a backslash or a NUL byte (reason path_traversal_attempt), or outside the component-name rule (reason invalid_component_reference, errors[0].expected states it).',
-'400.validation.invalid_value' => 'Invalid structType / position, or attempt to insert inside a component or text node',
+'400.validation.invalid_value' => 'Invalid structType or position',
             '400.complex_element.build_failed' => 'Builder rejected the config (e.g. list with no items, select with duplicate option values)',
             '404.complex_element.unknown_kind' => 'No builder registered for the requested kind (response includes availableKinds list)',
             '404.route.not_found' => 'The page is neither a route of the project nor a special page; data.available_routes and data.special_pages list both, or its route has no structure file.',
@@ -3310,7 +3310,7 @@ $GLOBALS['__help_commands'] = [
             'addParams' => [
                 'required' => false,
                 'type' => 'object',
-                'description' => 'Params to add or update',
+                'description' => 'Params to add or update. The attributes the translation system fills (placeholder, title, aria-label, aria-placeholder, aria-description) are dropped, except one the node\'s tag (the new tag, when tag changes) takes as a translation key: an iframe\'s title is kept, the key its page translates.',
                 'example' => '{"href": "/new-link", "class": "btn"}'
             ],
             'removeParams' => [
@@ -3335,7 +3335,7 @@ $GLOBALS['__help_commands'] = [
                 'type' => 'page',
                 'name' => 'home',
                 'nodeId' => '0.2',
-                'file' => '/path/to/home.json',
+                'file' => 'templates/model/json/pages/home/home.json',
                 'html' => '<div class="highlight">...</div>',
                 'changes' => [
                     'paramsAdded' => ['class'],
@@ -3396,7 +3396,7 @@ $GLOBALS['__help_commands'] = [
             'position' => [
                 'required' => true,
                 'type' => 'string',
-                'description' => 'Where to insert: before, after, or inside (the component becomes the target\'s first child); forced to inside when targetNodeId is "root". Inside a component call or a text node is refused, and inside a void element such as img, input or br.',
+                'description' => 'Where to insert: before, after, or inside (the component becomes the target\'s first child); forced to inside when targetNodeId is "root". Inside a target that cannot hold children (a component call, a text node, or a void element such as img, input or br) is refused with 400 operation.failed.',
                 'example' => 'after'
             ],
             'component' => [
@@ -3437,10 +3437,9 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '400.validation.required' => 'Missing required parameter',
-            '400.validation.invalid_value' => 'Component not found. Inside a component node (reason component_is_atomic) or a text node (reason text_node): neither renders children.',
-            '400.operation.denied' => 'Cannot insert inside component node',
+            '400.validation.invalid_value' => 'Invalid type or position.',
             '404.resource.not_found' => 'Target node not found',
-            '400.operation.failed' => 'Inside (or at "root") a void element such as img, input or br, which cannot hold children: "The target node is an img element, which cannot hold children" (at "root": "The structure root is …").',
+            '400.operation.failed' => 'Inside (or at "root") a target that cannot hold children — a component call, a text node, or a void element such as img, input or br: "The target node is an img element, which cannot hold children" (at "root": "The structure root is …").',
             '400.validation.invalid_format' => 'Invalid targetNodeId format. Use dot notation like \'0.2.1\' or \'root\'. Invalid component name format. Structure too deeply nested (max 50 levels). A page name with "..", a backslash or a NUL byte (reason path_traversal_attempt), or a segment outside the page-name rule; a component name with "..", a slash, a backslash or a NUL byte (reason path_traversal_attempt), or outside the component-name rule (reason invalid_component_reference, errors[0].expected states it).',
             '400.validation.reserved_key' => 'Reserved admin-namespace prefix (quicksite_ / quicksite- / qs_ / qs-). These are used by the admin panel and would collide with admin state. Pick a project-specific prefix.',
             '404.error.notFound' => 'One of the four things the call needs does not exist: the component, the page, the structure file for the given type (and name), or the target node.',
@@ -6691,7 +6690,7 @@ $GLOBALS['__help_commands'] = [
             'position' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => 'Insertion position: inside (the snippet becomes the target\'s first children), before, after. Default: after. Forced to inside when targetNodeId is the literal "root". Inside a component call or a text node is refused, and inside a void element such as img, input or br.',
+                'description' => 'Insertion position: inside (the snippet becomes the target\'s first children), before, after. Default: after. Forced to inside when targetNodeId is the literal "root". Inside a target that cannot hold children (a component call, a text node, or a void element such as img, input or br) is refused with 400 operation.failed.',
                 'example' => 'inside'
             ]
         ],
@@ -6714,7 +6713,7 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '400.validation.missing_field' => 'Missing required parameter',
-            '400.operation.failed' => 'Failed to insert snippet: inside (or at "root") a void element such as img, input or br, which cannot hold children: "The target node is an img element, which cannot hold children" (at "root": "The structure root is …").',
+            '400.operation.failed' => 'Failed to insert snippet: inside (or at "root") a target that cannot hold children — a component call, a text node, or a void element such as img, input or br: "The target node is an img element, which cannot hold children" (at "root": "The structure root is …").',
             '404.snippet.not_found' => 'Snippet not found',
             '404.file.not_found' => 'Target structure file not found',
             '400.project.mismatch' => 'The project named in the body does not match the project in the URL marker. The marker decides; a disagreeing echo is refused rather than ignored.',
@@ -6733,10 +6732,9 @@ $GLOBALS['__help_commands'] = [
             '500.structure.invalid' => 'Invalid structure JSON.',
             '400.validation.invalid_length' => 'A page name longer than 200 bytes.',
             '404.route.not_found' => 'The page is neither a route of the project nor a special page; data.available_routes and data.special_pages list both.',
-            '400.validation.invalid_value' => 'Inside a component call or a text node: neither renders children, so the snippet would never show.',
             '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
-        'notes' => 'Every root of the snippet is inserted, in order, at the position asked (a snippet whose structure is a list of nodes has several roots): newNodeId names the first, newNodeIds every one, and html holds every root\'s HTML in order. Each translatable value (a text node\'s key, an alt / placeholder / title / aria-label key, a component\'s text variable) gets a new key {prefix}.item{N}, numbered on from the highest the project holds and from one root to the next. A raw or literal value (__RAW__ / __LIT__) is kept as written: no key, no translation. The snippet\'s translations are written under the new keys in every project language file, one for each new key (a key the snippet uses twice is written for both copies; keyMapping names the last), only once the insert passes every check, so a refused insert writes nothing. Before, after and inside a node follow the one rule every positional insert shares. targetNodeId "root" inserts at the structure\'s root, by the one rule every command that inserts there shares: a structure whose root is a list of nodes (every page, menu and footer) takes the new node as its first entry; one whose root is a single node (a component) takes it as its first child; either way its id is "0". A root that cannot hold children (a component call, a text node, a void element such as img) is refused with 400 operation.failed.'
+        'notes' => 'Every root of the snippet is inserted, in order, at the position asked (a snippet whose structure is a list of nodes has several roots): newNodeId names the first, newNodeIds every one, and html holds every root\'s HTML in order. Each translatable value (a text node\'s key, the key of a translatable attribute — alt, placeholder, title, aria-label, aria-placeholder or aria-description —, a component\'s text variable) gets a new key {prefix}.item{N}, numbered on from the highest the project holds and from one root to the next. A raw or literal value (__RAW__ / __LIT__) is kept as written: no key, no translation. The snippet\'s translations are written under the new keys in every project language file, one for each new key (a key the snippet uses twice is written for both copies; keyMapping names the last), only once the insert passes every check, so a refused insert writes nothing. Before, after and inside a node follow the one rule every positional insert shares. targetNodeId "root" inserts at the structure\'s root, by the one rule every command that inserts there shares: a structure whose root is a list of nodes (every page, menu and footer) takes the new node as its first entry; one whose root is a single node (a component) takes it as its first child; either way its id is "0". A root that cannot hold children (a component call, a text node, a void element such as img) is refused with 400 operation.failed.'
     ],
 
     'injectSnippetCss' => [

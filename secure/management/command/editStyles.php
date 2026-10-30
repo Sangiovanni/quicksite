@@ -25,17 +25,8 @@ if (!is_string($newContent)) {
         ->send();
 }
 
-// Length validation - cannot be empty
-$contentSize = strlen($newContent);
-
-if ($contentSize === 0) {
-    ApiResponse::create(400, 'validation.invalid_length')
-        ->withMessage('Content cannot be empty')
-        ->withErrors([
-            ['field' => 'content', 'reason' => 'empty']
-        ])
-        ->send();
-}
+// An empty content empties the stylesheet, as one space does: the panel's CSS Source asks
+// before it saves one.
 
 // SECURITY: the scan every stylesheet writer runs (qs_css_first_danger) — one
 // denylist on the normalised text, and a PHP opening tag on the raw bytes.

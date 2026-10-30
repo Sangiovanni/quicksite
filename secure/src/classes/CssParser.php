@@ -649,9 +649,10 @@ class CssParser {
      * @param string $existingStyles Current CSS declarations
      * @param string $newStyles New CSS declarations to merge
      * @param array $removeProperties Properties to remove from the result
+     * @param string $indent What each declaration line starts with: one level in from the selector
      * @return string Merged and formatted CSS declarations; empty when no declaration is left
      */
-    private function mergeStyles(string $existingStyles, string $newStyles, array $removeProperties = []): string {
+    private function mergeStyles(string $existingStyles, string $newStyles, array $removeProperties = [], string $indent = '    '): string {
         $existing = $this->parseStyleDeclarations($existingStyles);
         $new = $this->parseStyleDeclarations($newStyles);
 
@@ -701,14 +702,14 @@ class CssParser {
         $declarations = 0;
         foreach ($merged as $entry) {
             if ($entry['key'] !== null && isset($remove[$entry['key']])) {
-                if ($entry['lead'] !== '') $lines[] = '    ' . $commentOf($entry)['lead'];
+                if ($entry['lead'] !== '') $lines[] = $indent . $commentOf($entry)['lead'];
                 continue;
             }
             if ($entry['key'] === null) {
-                $lines[] = '    ' . $entry['lead'];
+                $lines[] = $indent . $entry['lead'];
                 continue;
             }
-            $lines[] = '    ' . $entry['lead'] . $entry['name'] . ': ' . $entry['value'] . ';';
+            $lines[] = $indent . $entry['lead'] . $entry['name'] . ': ' . $entry['value'] . ';';
             $declarations++;
         }
 
@@ -736,14 +737,14 @@ class CssParser {
                 $rule         = $innerParser->findTopLevelBlock($selector);
 
                 if ($rule !== null) {
+                    // The rule's declarations one level in from its selector, its } at the selector's column
+                    $indent         = self::lineIndent($innerContent, $rule['start']);
                     $existingStyles = substr($innerContent, $rule['innerStart'], $rule['innerEnd'] - $rule['innerStart']);
-                    $mergedStyles   = $this->mergeStyles($existingStyles, $styles, $removeProperties);
+                    $mergedStyles   = $this->mergeStyles($existingStyles, $styles, $removeProperties, $indent . '    ');
 
                     if (trim($mergedStyles) === '') {
-                        // Remove this rule from the media content, with the space before it:
-                        // what follows it starts on its own line already.
-                        $newInnerContent = rtrim(substr($innerContent, 0, $rule['start']))
-                                         . substr($innerContent, $rule['end']);
+                        // Remove this rule from the media content, as deleteStyleRule() does
+                        $newInnerContent = self::withoutBlock($innerContent, $rule);
                         if (trim($newInnerContent) === '') {
                             // Media query is now empty — remove entire block
                             $this->content = substr($this->content, 0, $mediaBlock['start'])
@@ -759,17 +760,18 @@ class CssParser {
                     }
 
                     // Update the rule in inner content
-                    $newRule         = $rule['selector'] . " {\n" . $mergedStyles . "\n}";
+                    $newRule         = $rule['selector'] . " {\n" . $mergedStyles . "\n" . $indent . "}";
                     $newInnerContent = substr($innerContent, 0, $rule['start'])
                                      . $newRule
                                      . substr($innerContent, $rule['end']);
                     $action = 'updated';
 
                 } else {
-                    // Add new rule to existing media block
-                    $formattedStyles = $this->formatStyles($styles);
+                    // Add new rule to existing media block, one level in and after one blank line,
+                    // as a new global rule is written
+                    $formattedStyles = $this->formatStyles($styles, '        ');
                     $newRule         = "    " . $selector . " {\n" . $formattedStyles . "\n    }";
-                    $newInnerContent = rtrim($innerContent) . "\n" . $newRule . "\n";
+                    $newInnerContent = rtrim($innerContent) . (trim($innerContent) === '' ? "\n" : "\n\n") . $newRule . "\n";
                 }
 
                 // The block's inner text keeps the line break that follows its brace, so
@@ -779,9 +781,9 @@ class CssParser {
                                  . $newMediaContent
                                  . substr($this->content, $mediaBlock['end']);
             } else {
-                // Media query doesn't exist — create it
-                $formattedStyles = $this->formatStyles($styles);
-                $newMediaBlock   = "\n\n@media " . $mediaQuery . " {\n    " . $selector . " {\n" . $formattedStyles . "\n    }\n}";
+                // Media query doesn't exist — create it, after one blank line as a new global rule is
+                $formattedStyles = $this->formatStyles($styles, '        ');
+                $newMediaBlock   = "\n@media " . $mediaQuery . " {\n    " . $selector . " {\n" . $formattedStyles . "\n    }\n}";
                 $this->content   = $this->appendToCustomSection($newMediaBlock);
             }
 
@@ -832,16 +834,15 @@ class CssParser {
             $rule         = $innerParser->findTopLevelBlock($selector);
             if ($rule === null) return false;
 
-            $newInnerContent = substr($innerContent, 0, $rule['start'])
-                             . substr($innerContent, $rule['end']);
-            $newInnerContent = preg_replace('/\n{3,}/', "\n\n", $newInnerContent);
+            $newInnerContent = self::withoutBlock($innerContent, $rule);
 
             if (trim($newInnerContent) === '') {
                 // Media query is now empty — remove entire block
                 $this->content = substr($this->content, 0, $mediaBlock['start'])
                                . substr($this->content, $mediaBlock['end']);
             } else {
-                $newMediaBlock = '@media ' . $mediaBlock['prelude'] . " {\n" . $newInnerContent . "\n}";
+                // The inner text keeps the line breaks inside its braces: they are written alone
+                $newMediaBlock = '@media ' . $mediaBlock['prelude'] . ' {' . $newInnerContent . '}';
                 $this->content = substr($this->content, 0, $mediaBlock['start'])
                                . $newMediaBlock
                                . substr($this->content, $mediaBlock['end']);
@@ -1000,6 +1001,27 @@ class CssParser {
     }
     
     /**
+     * $inner with $rule, one of its top-level blocks, taken out, leaving nothing where it was: the
+     * space before the rule goes with it, so what followed it takes its place — and a first rule's
+     * place starts after the line break that opens the block.
+     */
+    private static function withoutBlock(string $inner, array $rule): string {
+        $before = substr($inner, 0, $rule['start']);
+        $after  = substr($inner, $rule['end']);
+        if (trim($before) !== '') {
+            return rtrim($before) . $after;
+        }
+        return rtrim($before, " \t") . preg_replace('/^\s*\n/', '', $after);
+    }
+
+    /** The spaces and tabs the line holding byte $pos of $text starts with. */
+    private static function lineIndent(string $text, int $pos): string {
+        $lineStart = strrpos(substr($text, 0, $pos), "\n");
+        $from = $lineStart === false ? 0 : $lineStart + 1;
+        return preg_match('/^[ \t]*/', substr($text, $from, $pos - $from), $m) ? $m[0] : '';
+    }
+
+    /**
      * Format CSS styles with proper indentation.
      */
     private function formatStyles(string $styles, string $indent = '    '): string {
@@ -1017,7 +1039,9 @@ class CssParser {
      * Append content to the end of the stylesheet.
      */
     private function appendToCustomSection(string $content): string {
-        return rtrim($this->content) . "\n" . $content . "\n";
+        $existing = rtrim($this->content);
+        // An empty stylesheet starts with the new content, not with the blank line that separates it
+        return $existing === '' ? ltrim($content, "\n") . "\n" : $existing . "\n" . $content . "\n";
     }
 
     /**

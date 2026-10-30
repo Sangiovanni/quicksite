@@ -88,8 +88,6 @@ function qs_asset_extension_map(): array
  *     reports for genuine Windows/Google fonts. Without them NO real .ttf or
  *     .otf could be uploaded at all, which is what the engine did until this
  *     list moved here.
- *   - BMP is `image/x-ms-bmp` on PHP 8.0 and `image/bmp` on 8.4. Both are
- *     listed, because both are the same file read by different interpreters.
  *   - `application/octet-stream` stays for fonts, which are routinely detected
  *     as nothing in particular.
  *
@@ -101,7 +99,7 @@ function qs_asset_mime_types(): array
         'images' => [
             'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
             'image/vnd.microsoft.icon', 'image/x-icon',
-            'image/bmp', 'image/x-ms-bmp',
+            'image/bmp',
             'image/avif',
         ],
         'font' => [
@@ -437,7 +435,7 @@ function qs_policy_has_php_open_tag(string $content): bool
  *                  importable again. It must still parse, and detection (rule 3)
  *                  still runs: valid JSON cannot begin with a tag, and finfo was
  *                  measured to report it as application/json with a tag at
- *                  every offset tried, on PHP 8.0 and on 8.4.
+ *                  every offset tried, on PHP 8.3, 8.4 and 8.5.
  *   BINARY class — must satisfy its signature (if one is known), must not be
  *                  detected as text, and — if it DOES look like it opens a PHP
  *                  block — must additionally be detected as a named binary

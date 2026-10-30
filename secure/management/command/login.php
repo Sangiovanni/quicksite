@@ -15,7 +15,8 @@
  * Refusals are uniform (unknown username, wrong password, passwordless/
  * externally managed account, disabled user all yield the same 401) — no
  * account oracle. Brute force is throttled per username (5 free attempts,
- * doubling cooldown), each attempt counted before it is checked.
+ * doubling cooldown), each attempt counted before it is checked; the 401 that
+ * starts a wait carries it as retry_after, as the next attempt's 429 would.
  *
  * The response names the account by id and display name. It never repeats the
  * username: the caller just proved it knows it.
@@ -59,8 +60,12 @@ function __command_login(array $params = [], array $urlParams = []): ApiResponse
                 ->withMessage('Too many failed attempts — try again later')
                 ->withData(['retry_after' => $attempt['retry_after']]);
         }
-        return ApiResponse::create(401, 'auth.invalid_credentials')
+        $refusal = ApiResponse::create(401, 'auth.invalid_credentials')
             ->withMessage('Invalid username or password');
+        if (!empty($attempt['retry_after'])) {
+            $refusal->withData(['retry_after' => $attempt['retry_after']]);
+        }
+        return $refusal;
     }
 
     $user  = $attempt['user'];

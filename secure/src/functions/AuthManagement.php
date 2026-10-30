@@ -265,9 +265,8 @@ function qs_note_encoding_invalid($note): bool {
  * at fault; this fails closed for any that do not, so the value cannot reach
  * json_encode. The control-strip alone was not enough: it removes bytes
  * 0x00-0x1F and 0x7F, and every invalid UTF-8 sequence is made of bytes at or
- * above 0x80. Note that mb_substr's own handling of such bytes differs by PHP
- * version — it preserved them through 8.2 and substitutes from 8.3 — so
- * relying on it would make the behaviour depend on the interpreter.
+ * above 0x80. Nor is mb_substr the guard: it substitutes such bytes, which
+ * would keep the note, altered, instead of refusing it.
  */
 function qs_clean_note($note): ?string {
     if (!is_string($note)) {
@@ -1053,7 +1052,9 @@ function qs_password_rehash(string $userId, string $verifiedHash, string $passwo
  *
  * The attempt is admitted and counted by the throttle before anything is
  * verified (qs_login_throttle_admit), so a refusal needs nothing more recorded;
- * a success clears the count.
+ * a success clears the count. The refusal that starts a wait carries it as
+ * retry_after, as the next attempt's 'throttled' would: the fifth failure, and
+ * the first after each wait, are told at once.
  *
  * @return array {ok:true, user:array}   (user has 'id' attached)
  *             | {ok:false, error:'invalid_credentials'|'throttled', retry_after?:int}
@@ -1064,7 +1065,7 @@ function qs_auth_attempt_login(string $username, string $password): array {
         return ['ok' => false, 'error' => 'invalid_credentials'];
     }
 
-    $wait = qs_login_throttle_admit($username);
+    $wait = qs_login_throttle_admit($username, $starts);
     if ($wait > 0) {
         return ['ok' => false, 'error' => 'throttled', 'retry_after' => $wait];
     }
@@ -1081,7 +1082,9 @@ function qs_auth_attempt_login(string $username, string $password): array {
     }
 
     if (!$verified || ($user['status'] ?? 'active') === 'disabled') {
-        return ['ok' => false, 'error' => 'invalid_credentials'];
+        return $starts > 0
+            ? ['ok' => false, 'error' => 'invalid_credentials', 'retry_after' => $starts]
+            : ['ok' => false, 'error' => 'invalid_credentials'];
     }
 
     qs_login_throttle_clear($username);

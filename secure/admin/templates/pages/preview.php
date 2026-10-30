@@ -131,9 +131,6 @@ if (is_dir($componentsDir)) {
     </div><!-- End preview-contextual-content -->
 </div><!-- End preview-contextual-area -->
 
-<!-- Legacy Panels (deprecated, kept for compatibility) -->
-<?php include __DIR__ . '/preview/deprecated-panels.php'; ?>
-
         </div><!-- End preview-sidebar__options -->
         <div class="preview-sidebar__resize" id="sidebar-resize"></div>
     </aside><!-- End preview-sidebar -->

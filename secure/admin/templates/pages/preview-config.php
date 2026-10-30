@@ -247,6 +247,10 @@ window.PreviewConfig = {
         switchToMenuConfirm: <?= qs_inline_script_json(__admin('preview.switchToMenuConfirm')) ?>,
         switchToFooterConfirm: <?= qs_inline_script_json(__admin('preview.switchToFooterConfirm')) ?>,
         switchToPageConfirm: <?= qs_inline_script_json(__admin('preview.switchToPageConfirm')) ?>,
+        pageTitleSaved: <?= qs_inline_script_json(__admin('preview.pageTitleSaved')) ?>,
+        pageTitleSaveFailed: <?= qs_inline_script_json(__admin('preview.pageTitleSaveFailed')) ?>,
+        positionInside: <?= qs_inline_script_json(__admin('preview.positionInside')) ?>,
+        positionInsideEnd: <?= qs_inline_script_json(__admin('preview.positionInsideEnd')) ?>,
         snippetCssConfirm: <?= qs_inline_script_json(__admin('preview.snippetCssConfirm')) ?>,
         snippetDeleted: <?= json_encode(__admin('preview.snippetDeleted', 'Snippet deleted successfully')) ?>,
         deleteSnippetFailed: <?= json_encode(__admin('preview.deleteSnippetFailed', 'Failed to delete snippet')) ?>,
@@ -295,7 +299,6 @@ window.PreviewConfig = {
         noAnimationToPreview: <?= json_encode(__admin('preview.noAnimationToPreview', 'No animation to preview')) ?>,
         noElementsFound: <?= json_encode(__admin('preview.noElementsFound', 'No elements found')) ?>,
         noKeyframesFound: <?= json_encode(__admin('preview.noKeyframesFound', 'No keyframes found')) ?>,
-        noPropertiesToTransition: <?= json_encode(__admin('preview.noPropertiesToTransition', 'No properties to transition')) ?>,
         noTriggerStyles: <?= json_encode(__admin('preview.noTriggerStyles', 'No trigger styles')) ?>,
         noTriggersWithoutTransition: <?= json_encode(__admin('preview.noTriggersWithoutTransition', 'No triggers without transition')) ?>,
         playsOn: <?= json_encode(__admin('preview.playsOn', 'plays on')) ?>,
@@ -354,7 +357,6 @@ window.PreviewConfig = {
         // ── Bucketed events picker + function details + input wizard ──
         eventsCommonFor: <?= json_encode(__admin('preview.eventsCommonFor', 'Common for')) ?>,
         eventsLessCommon: <?= json_encode(__admin('preview.eventsLessCommon', 'Less common')) ?>,
-        eventsAdvanced: <?= json_encode(__admin('preview.eventsAdvanced', 'Advanced')) ?>,
         functionExample: <?= json_encode(__admin('preview.functionExample', 'Example')) ?>,
         nameRequiredForInput: <?= json_encode(__admin('preview.nameRequiredForInput', 'A name is required so the field is submitted with the form.')) ?>,
         invalidId: <?= json_encode(__admin('preview.invalidId', 'Invalid ID — start with a letter or underscore; letters, digits, hyphens and underscores only (no spaces).')) ?>,
@@ -648,6 +650,9 @@ window.PreviewConfig = {
             styleSourceConflictNotSaved: <?= json_encode(__admin('preview.styleSourceConflictNotSaved')) ?>,
             styleSourceSavedOverChange: <?= json_encode(__admin('preview.styleSourceSavedOverChange')) ?>,
             styleSourceCheckFailed: <?= json_encode(__admin('preview.styleSourceCheckFailed')) ?>,
+            styleSourceEmptyTitle: <?= qs_inline_script_json(__admin('preview.styleSourceEmptyTitle')) ?>,
+            styleSourceEmptyMessage: <?= qs_inline_script_json(__admin('preview.styleSourceEmptyMessage')) ?>,
+            styleSourceEmptyConfirm: <?= qs_inline_script_json(__admin('preview.styleSourceEmptyConfirm')) ?>,
             styleSourceUnknownError: <?= json_encode(__admin('common.unknownError')) ?>
         },
 

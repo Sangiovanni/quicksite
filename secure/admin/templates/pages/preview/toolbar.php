@@ -49,6 +49,13 @@
         </div>
         <?php endif; ?>
 
+        <!-- Page title: the page's title in the language shown (shown while a page is the edit target) -->
+        <div class="preview-toolbar__group" id="preview-page-title-group" style="display: none;">
+            <label class="preview-toolbar__label" for="preview-page-title"><?= __admin('preview.pageTitle') ?>:</label>
+            <input type="text" id="preview-page-title" class="preview-toolbar__input" maxlength="200" autocomplete="off"
+                   title="<?= adminEscape(__admin('preview.pageTitleHint')) ?>">
+        </div>
+
         <!-- Theme Preview Toggle (always rendered; visibility managed by JS/config) -->
         <div class="preview-toolbar__group" id="preview-theme-toggle-group" style="display: <?= ($editConfig['THEME_MODE_ENABLED'] ?? false) ? '' : 'none' ?>;">
             <label class="preview-toolbar__label"><?= __admin('preview.themePreview') ?? 'Theme' ?>:</label>

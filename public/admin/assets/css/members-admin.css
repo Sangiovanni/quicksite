@@ -307,6 +307,13 @@
     margin: 0;
     word-break: break-all;
 }
+/* A link in the block (the site's address) reads in the block's own colour, visited or
+   not, so it stays legible on the public block's red. */
+.members-visibility a,
+.members-visibility a:visited {
+    color: inherit;
+    text-decoration: underline;
+}
 
 /* ---- Join policy ---- */
 .members-policy-row {
@@ -337,6 +344,9 @@
     background: var(--admin-warning-bg);
     color: var(--admin-warning);
 }
+/* Its `display: flex` would beat the browser's `[hidden] { display: none }`: without this the
+   advisory stays on screen after the policy closes (the nav badge's guard, above). */
+.members-policy-advisory[hidden] { display: none; }
 
 /* ---- Transfer (danger zone) ---- */
 .members-danger-zone {

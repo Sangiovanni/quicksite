@@ -43,9 +43,10 @@ class Page {
 
         // The title takes {{param:NAME}} and {{resolved:NAME}} as a page text does, through the
         // same definition: the resolver has run before any page renders, and a name with no
-        // value stays as written. The live render does the same (PageManagement::render()).
+        // value stays as written. A page with no title in this language shows the last segment
+        // of its address, readable. The live render does the same (PageManagement::render()).
         require_once SECURE_FOLDER_PATH . '/src/functions/runtimePlaceholders.php';
-        $title = qs_apply_runtime_placeholders((string) $title, $__tp !== null ? $__tp->routeParams() : []);
+        $title = qs_page_title((string) $title, $__tp);
 
         // The inline-script encoder (the theme script below), the runtime
         // handoff (the end of the body) and the head's icon and `?v=` helpers

@@ -23,6 +23,7 @@
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/NodeNavigator.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/TagRegistry.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/JsonToHtmlRenderer.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';
@@ -91,12 +92,10 @@ function flattenKeys(array $arr, string $prefix = ''): array {
 
 /**
  * Extract component variables with type detection (for snippet component processing).
- * Mirrors extractComponentVariables from addComponentToNode.
+ * A variant of qs_component_variables() (componentPolicy.php): no paramName.
  */
 function extractSnippetComponentVariables(array $node, array &$variables = []): array {
     if (!is_array($node)) return $variables;
-    
-    $translatableParams = ['alt', 'placeholder', 'title', 'aria-label', 'aria-placeholder', 'aria-description'];
     
     if (isset($node['params']) && is_array($node['params'])) {
         foreach ($node['params'] as $paramName => $value) {
@@ -104,7 +103,7 @@ function extractSnippetComponentVariables(array $node, array &$variables = []): 
                 foreach ($matches[1] as $varName) {
                     if (str_starts_with($varName, '__') || strpos($varName, ';') !== false) continue;
                     if (!isset($variables[$varName])) {
-                        $type = in_array($paramName, $translatableParams, true) ? 'textKey' : 'param';
+                        $type = in_array($paramName, TagRegistry::TRANSLATABLE_ATTRIBUTES, true) ? 'textKey' : 'param';
                         $variables[$varName] = ['name' => $varName, 'type' => $type];
                     }
                 }
@@ -183,8 +182,8 @@ function processSnippetStructure(array $node, string $prefix, int &$itemCounter,
         if (isset($node['params'])) {
             $processed['params'] = [];
             foreach ($node['params'] as $key => $value) {
-                // For translatable attributes like alt, placeholder, etc.
-                if (in_array($key, ['alt', 'placeholder', 'title', 'aria-label']) &&
+                // For translatable attributes (TagRegistry's list)
+                if (in_array($key, TagRegistry::TRANSLATABLE_ATTRIBUTES, true) &&
                     is_string($value) && strpos($value, '.') !== false && !qs_is_literal_text($value)) {
                     // This might be a translation key - map it
                     $newKey = $prefix . '.item' . $itemCounter;
@@ -447,21 +446,6 @@ function __command_insertSnippet(array $params = [], array $urlParams = []): Api
     if (!is_array($structure)) {
         return ApiResponse::create(500, 'structure.invalid')
             ->withMessage('Invalid structure JSON');
-    }
-
-    // Inside a component call or a text node, as addNode refuses: neither renders
-    // children, so the snippet would be written and never shown. A target that does
-    // not exist is the insert's own answer below.
-    if (!$isRootTarget && $position === 'inside') {
-        $targetNode = NodeNavigator::getNode($structure, (string) $targetNodeId);
-        if ($targetNode !== null && isset($targetNode['component'])) {
-            return ApiResponse::create(400, 'validation.invalid_value')
-                ->withMessage('Cannot insert inside a component. Components are atomic.');
-        }
-        if ($targetNode !== null && isset($targetNode['textKey']) && !isset($targetNode['tag'])) {
-            return ApiResponse::create(400, 'validation.invalid_value')
-                ->withMessage('Cannot insert inside a text node.');
-        }
     }
 
     // Generate text key prefix and starting item number

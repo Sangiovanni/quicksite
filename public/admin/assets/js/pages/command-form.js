@@ -354,9 +354,9 @@ const ENUM_VALUES = {
         { value: 'after', labelKey: 'commandForm.addComponent.positionAfter' },
         { value: 'inside', labelKey: 'commandForm.addComponent.positionInside' }
     ],
-    // moveNode's four: the three every insert takes, and "inside-end" (the target's
-    // last child), which only a move offers - the editor's drop inside an element.
-    movePosition: [
+    // moveNode's and addNode's four: the three every insert takes, and "inside-end" (the
+    // target's last child) - the editor's drop inside an element, and its Text tab's Inside.
+    positionWithEnd: [
         { value: 'before', labelKey: 'commandForm.addComponent.positionBefore' },
         { value: 'after', labelKey: 'commandForm.addComponent.positionAfter' },
         { value: 'inside', labelKey: 'commandForm.addComponent.positionInside' },
@@ -545,7 +545,7 @@ const FIELD_PICKERS = {
         { kind: 'structure', typeParam: 'type', param: 'name',
           nodeParams: ['sourceNodeId', 'targetNodeId'] },
         // "default: after" — optional, so the select shows what it will send.
-        { kind: 'enum', param: 'position', values: 'movePosition', defaultValue: 'after' }
+        { kind: 'enum', param: 'position', values: 'positionWithEnd', defaultValue: 'after' }
     ],
     deleteNode:        { kind: 'structure', typeParam: 'type', param: 'name',
                          nodeParams: ['nodeId'] },
@@ -555,10 +555,15 @@ const FIELD_PICKERS = {
         { kind: 'structure', typeParam: 'type', param: 'name',
           nodeParams: ['targetNodeId'], allowRoot: true },
         // "default after" — optional, so the select shows what it will send.
-        { kind: 'enum', param: 'position', values: 'position', defaultValue: 'after' }
+        { kind: 'enum', param: 'position', values: 'positionWithEnd', defaultValue: 'after' },
+        { kind: 'tag', param: 'tag' }
     ],
-    editNode:          { kind: 'structure', typeParam: 'type', param: 'name',
-                         nodeParams: ['nodeId'] },
+    // The tag a node becomes; blank keeps the one it has.
+    editNode: [
+        { kind: 'structure', typeParam: 'type', param: 'name',
+          nodeParams: ['nodeId'] },
+        { kind: 'tag', param: 'tag' }
+    ],
     insertSnippet: [
         { kind: 'structure', typeParam: 'type', param: 'name',
           nodeParams: ['targetNodeId'], allowRoot: true },
@@ -1021,6 +1026,31 @@ function _initEnumSelect(form, cfg) {
         t('commandForm.field.selectPlaceholder'));
 
     if (cfg.defaultValue) select.value = cfg.defaultValue;
+}
+
+/**
+ * Tag picker: the tags addNode and editNode take, grouped and described as the
+ * editor's HTML Tag picker shows them, searchable by a tag or its description.
+ * command-form.php writes the groups from TagRegistry, so the page keeps no list of
+ * its own; every tag the commands accept is in them, the ones the editor's picker
+ * leaves out in its last group.
+ *
+ * @param {HTMLFormElement} form
+ * @param {Object} cfg  a FIELD_PICKERS row
+ */
+function _initTagSelect(form, cfg) {
+    const select = _swapForSelect(form, cfg.param);
+    if (!select) return;
+
+    QSDom.setSelectPlaceholder(select, t('commandForm.field.selectPlaceholder'));
+    (window.QS_TAG_GROUPS || []).forEach(group => {
+        select.appendChild(QSDom.el('optgroup', { label: group.label }, (group.tags || []).map(tag => {
+            const props = { value: tag.value, text: '<' + tag.value + '>' };
+            if (tag.description) props['data-description'] = tag.description;
+            return QSDom.el('option', props);
+        })));
+    });
+    _makeSearchable(select, t('commandForm.field.selectPlaceholder'));
 }
 
 /**
@@ -1645,6 +1675,8 @@ async function applyPagePickers() {
             await _initApiEndpointPicker(form, cfg);
         } else if (cfg.kind === 'enum') {
             _initEnumSelect(form, cfg);
+        } else if (cfg.kind === 'tag') {
+            _initTagSelect(form, cfg);
         } else if (cfg.kind === 'jsfunction') {
             await _initJsFunctionSelect(form, cfg);
         } else if (cfg.kind === 'language') {
@@ -3025,25 +3057,20 @@ async function initSetRootVariablesForm() {
 }
 
 /**
- * One URL segment of a getStyleRule call: its selector or its media query. The
- * command decodes a segment once more after the URL itself is decoded (see its
- * help notes), so the segment is encoded once for each decoding. Encoded only once,
- * a "+" would arrive as a space, and "#", "?" or "/" would end or split the path.
- *
- * @param {string} value
- * @returns {string}
- */
-function _styleRuleSegment(value) {
-    return encodeURIComponent(encodeURIComponent(value));
-}
-
-/**
  * Initialize getStyleRule/setStyleRule/deleteStyleRule form with selector picker
  */
 async function initStyleRuleForm() {
     const form = document.getElementById('command-form');
     const selectorInput = form.querySelector('[name="selector"]');
     const mediaQueryInput = form.querySelector('[name="mediaQuery"]');
+    // getStyleRule takes the selector and the media query in its address and decodes each once more
+    // after the dispatcher has, so each is one segment encoded twice (QuickSiteAdmin.urlSegments):
+    // encoded once, a "+" would arrive as a space, and "#", "?" or "/" would end or split the path.
+    if (COMMAND_NAME === 'getStyleRule') {
+        [selectorInput, mediaQueryInput].forEach((input) => {
+            if (input) input.dataset.urlEncode = 'twice';
+        });
+    }
     // setStyleRule: the chosen rule's current declarations fill the styles field, so
     // the rule the command merges into is on screen.
     const stylesInput = COMMAND_NAME === 'setStyleRule' ? form.querySelector('[name="styles"]') : null;
@@ -3113,7 +3140,8 @@ async function initStyleRuleForm() {
         let declarationsRequest = 0;
         async function loadDeclarations(selector, mediaQuery) {
             const request = ++declarationsRequest;
-            const segments = [selector].concat(mediaQuery ? [mediaQuery] : []).map(_styleRuleSegment);
+            const segments = [selector].concat(mediaQuery ? [mediaQuery] : [])
+                .map((value) => QuickSiteAdmin.urlSegments(value, 'twice'));
             let res = null;
             try {
                 res = await QuickSiteAdmin.apiRequest('getStyleRule', 'GET', null, segments);
@@ -4913,9 +4941,12 @@ function renderCommandForm(doc) {
         return;
     }
 
-    // Separate required and optional
-    const required = paramKeys.filter(k => params[k].required);
-    const optional = paramKeys.filter(k => !params[k].required);
+    // Separate required, required in some cases and optional. help marks a parameter only some
+    // requests need 'conditional', its description saying when: it is listed apart and the form
+    // does not require it, or every request would have to send it.
+    const required = paramKeys.filter(k => params[k].required === true);
+    const conditional = paramKeys.filter(k => params[k].required === 'conditional');
+    const optional = paramKeys.filter(k => params[k].required !== true && params[k].required !== 'conditional');
 
     if (required.length > 0) {
         paramsContainer.appendChild(QSDom.el('h4', {
@@ -4923,6 +4954,17 @@ function renderCommandForm(doc) {
         }));
         required.forEach(key => {
             paramsContainer.appendChild(renderFormField(key, params[key], true));
+        });
+    }
+
+    if (conditional.length > 0) {
+        paramsContainer.appendChild(QSDom.el('h4', {
+            class: 'admin-form-section-title',
+            style: 'margin-top: var(--space-lg);',
+            text: t('commands.conditionalParams')
+        }));
+        conditional.forEach(key => {
+            paramsContainer.appendChild(renderFormField(key, params[key], false));
         });
     }
 

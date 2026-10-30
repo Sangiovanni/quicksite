@@ -10,6 +10,10 @@
 $baseUrl = rtrim(BASE_URL, '/');
 ?>
 
+<script>
+// The words sitemap.js shows (`sitemapPage` in the panel's translations).
+window.QS_SITEMAP_I18N = <?= qs_inline_script_json(AdminTranslation::getInstance()->getRaw('sitemapPage') ?: new stdClass()) ?>;
+</script>
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/sitemap.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/sitemap.js') ?>"></script>
 
 <?php include __DIR__ . '/sitemap-edit-title.php'; ?>
@@ -50,7 +54,7 @@ $baseUrl = rtrim(BASE_URL, '/');
     </div>
 </section>
 
-<!-- Sitemap.txt Generator -->
+<!-- Sitemap File: the links to select (shown when the page opens), the custom URLs, Generate, then the file written -->
 <section class="admin-section">
     <h2 class="admin-section__title"><?= __admin('sitemapPage.sitemapFile') ?></h2>
     <div class="admin-card">
@@ -58,37 +62,45 @@ $baseUrl = rtrim(BASE_URL, '/');
             <div class="sitemap-generator">
                 <p class="sitemap-generator__desc"><?= __admin('sitemapPage.sitemapFileDesc') ?></p>
                 <div class="sitemap-generator__controls">
-                    <label class="sitemap-generator__label"><?= __admin('sitemapPage.baseUrl') ?></label>
+                    <label class="sitemap-generator__label" for="sitemap-base-url"><?= __admin('sitemapPage.baseUrl') ?></label>
                     <div class="sitemap-generator__row">
-                        <input type="url" class="admin-input sitemap-generator__input" id="sitemap-base-url" 
-                               value="<?= htmlspecialchars(rtrim(BASE_URL, '/')) ?>" 
+                        <input type="url" class="admin-input sitemap-generator__input" id="sitemap-base-url"
+                               value="<?= htmlspecialchars(rtrim(BASE_URL, '/')) ?>"
                                placeholder="https://example.com" />
-                        <button type="button" class="admin-btn admin-btn--secondary" id="sitemap-generate-btn">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                                <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
-                            </svg>
-                            <?= __admin('sitemapPage.generatePreview') ?>
-                        </button>
                     </div>
                 </div>
-                <div class="sitemap-generator__preview" id="sitemap-preview" style="display:none;">
+                <div class="sitemap-generator__preview" id="sitemap-links" hidden>
                     <div class="sitemap-generator__preview-header">
-                        <span class="sitemap-generator__preview-title">sitemap.txt</span>
-                        <span class="sitemap-generator__preview-count" id="sitemap-url-count"></span>
+                        <span class="sitemap-generator__preview-title"><?= __admin('sitemapPage.selectLinks') ?></span>
+                        <span class="sitemap-generator__preview-count" id="sitemap-pages-kept"></span>
                     </div>
+                    <p class="sitemap-generator__hint sitemap-generator__list-hint"><?= __admin('sitemapPage.selectLinksHint') ?></p>
                     <div class="sitemap-generator__url-list" id="sitemap-url-list"></div>
                     <div class="sitemap-generator__custom-section">
-                        <label class="sitemap-generator__label"><?= __admin('sitemapPage.customUrls') ?></label>
+                        <label class="sitemap-generator__label" for="sitemap-custom-urls"><?= __admin('sitemapPage.customUrls') ?></label>
                         <p class="sitemap-generator__hint"><?= __admin('sitemapPage.customUrlsHint') ?></p>
                         <textarea class="admin-input sitemap-generator__textarea" id="sitemap-custom-urls" rows="3"
                                   placeholder="https://example.com/blog&#10;https://example.com/external-page"></textarea>
                     </div>
                     <div class="sitemap-generator__actions">
-                        <button type="button" class="admin-btn admin-btn--primary" id="sitemap-save-btn">
+                        <button type="button" class="admin-btn admin-btn--primary" id="sitemap-generate-btn">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
                             </svg>
-                            <?= __admin('sitemapPage.saveSitemap') ?>
+                            <?= __admin('sitemapPage.generateSitemap') ?>
+                        </button>
+                    </div>
+                </div>
+                <div class="sitemap-generator__preview" id="sitemap-file" hidden>
+                    <div class="sitemap-generator__preview-header">
+                        <span class="sitemap-generator__preview-title"><?= __admin('sitemapPage.generatedFile') ?></span>
+                        <span class="sitemap-generator__preview-count" id="sitemap-file-count"></span>
+                    </div>
+                    <pre class="sitemap-generator__preview-content" id="sitemap-file-text"></pre>
+                    <div class="sitemap-generator__actions">
+                        <button type="button" class="admin-btn admin-btn--secondary" id="sitemap-file-copy"
+                                data-copied="<?= adminEscape(__admin('common.copied')) ?>">
+                            <?= __admin('common.copy') ?>
                         </button>
                     </div>
                 </div>

@@ -78,7 +78,8 @@ if ($batchFilenames !== null) {
 
 /**
  * Validate and delete a single asset file.
- * Returns ['success' => true/false, ...] result array.
+ * Returns ['success' => true/false, ...] result array; on success 'listChanged' says whether
+ * the asset list had an entry for the file (removed from it, to be saved).
  */
 function validateAndDeleteAsset(string $filename, AssetMetadataManager $metaManager): array {
     // Type check
@@ -133,7 +134,7 @@ function validateAndDeleteAsset(string $filename, AssetMetadataManager $metaMana
     qs_delete_public_artifact('assets/' . $category . '/' . $filename);
 
     // Remove metadata
-    $metaManager->remove($category, $filename);
+    $listChanged = $metaManager->remove($category, $filename);
 
     // editFavicon stores a POINTER, not a copy, so deleting the chosen image
     // would leave the site emitting an icon link to a file that is gone. Only
@@ -142,7 +143,17 @@ function validateAndDeleteAsset(string $filename, AssetMetadataManager $metaMana
         qs_favicon_repoint(PROJECT_PATH, $filename, null);
     }
 
-    return ['success' => true, 'filename' => $filename, 'category' => $category];
+    return ['success' => true, 'filename' => $filename, 'category' => $category, 'listChanged' => $listChanged];
+}
+
+/**
+ * The answer when the files are deleted but the asset list could not be saved: it still names
+ * them, so a file uploaded later under the same name would inherit their entries.
+ */
+function assetListNotSaved(string $message, array $data): ApiResponse {
+    return ApiResponse::create(500, 'server.file_write_failed')
+        ->withMessage($message)
+        ->withData($data);
 }
 
 // === Single file mode ===
@@ -173,7 +184,14 @@ if ($singleFilename !== null) {
             ->send();
     }
 
-    $metaManager->save();
+    // The list is saved only when it named the file: a save that changes nothing cannot leave
+    // it stale, and is not attempted.
+    if ($result['listChanged'] && !$metaManager->save()) {
+        assetListNotSaved('The file was deleted, but the asset list could not be updated.', [
+            'filename' => $result['filename'],
+            'category' => $result['category']
+        ])->send();
+    }
 
     ApiResponse::create(204, 'operation.success')
         ->withMessage("File deleted successfully")
@@ -187,23 +205,32 @@ if ($singleFilename !== null) {
 // === Batch mode ===
 $deleted = [];
 $failed = [];
+$listChanged = false;
 
 foreach ($filenamesToDelete as $fname) {
     $result = validateAndDeleteAsset($fname, $metaManager);
     if ($result['success']) {
         $deleted[] = ['filename' => $result['filename'], 'category' => $result['category']];
+        $listChanged = $listChanged || $result['listChanged'];
     } else {
         $failed[] = ['filename' => $result['filename'], 'error' => $result['error']];
     }
 }
 
-// Save metadata once for all deletions
-if (!empty($deleted)) {
-    $metaManager->save();
-}
-
 $totalDeleted = count($deleted);
 $totalFailed = count($failed);
+
+// Save metadata once for all deletions, when the list named one of the files
+if ($listChanged && !$metaManager->save()) {
+    assetListNotSaved("{$totalDeleted} file" . ($totalDeleted > 1 ? 's were' : ' was')
+        . ' deleted, but the asset list could not be updated'
+        . ($totalFailed > 0 ? " ({$totalFailed} failed)" : '') . '.', [
+        'deleted' => $deleted,
+        'failed' => $failed,
+        'total_deleted' => $totalDeleted,
+        'total_failed' => $totalFailed
+    ])->send();
+}
 
 if ($totalDeleted === 0) {
     ApiResponse::create(400, 'operation.failed')

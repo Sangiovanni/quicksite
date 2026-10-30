@@ -75,10 +75,11 @@ class PageManagement {
 
         // The title takes {{param:NAME}} and {{resolved:NAME}} as a page text does, through the
         // same definition: the resolver (or the editor's emulation) has run before the page's
-        // template, and a name with no value stays as written. A build does the same (Page.php),
-        // and both escape the result alike.
+        // template, and a name with no value stays as written. A page with no title in this
+        // language shows the last segment of its address, readable. A build does the same
+        // (Page.php), and both escape the result alike.
         require_once SECURE_FOLDER_PATH . '/src/functions/runtimePlaceholders.php';
-        $title = qs_apply_runtime_placeholders((string) $this->title, $trimParameters->routeParams());
+        $title = qs_page_title((string) $this->title, $trimParameters);
 
         $header = "<!DOCTYPE html>";
         $header .= '<html lang="' . htmlspecialchars($this->lang) . '"' . $themeAttr . '>';

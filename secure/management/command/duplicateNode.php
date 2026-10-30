@@ -15,17 +15,13 @@
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/NodeNavigator.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/TagRegistry.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/JsonToHtmlRenderer.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
-
-/**
- * Translatable attributes that need new keys when duplicating
- */
-const DUPLICATE_TRANSLATABLE_ATTRS = ['alt', 'placeholder', 'title', 'aria-label', 'aria-placeholder', 'aria-description'];
 
 /**
  * Get all existing translation keys from default.json
@@ -184,9 +180,10 @@ function processNodeTranslationKeys(
         $keyMappings[$oldKey] = $newKey;
     }
     
-    // Process translatable attributes in params
+    // Process translatable attributes in params: each gets a new key, numbered in the order of
+    // TagRegistry's list
     if (isset($node['params']) && is_array($node['params'])) {
-        foreach (DUPLICATE_TRANSLATABLE_ATTRS as $attr) {
+        foreach (TagRegistry::TRANSLATABLE_ATTRIBUTES as $attr) {
             if (isset($node['params'][$attr]) && is_string($node['params'][$attr])
                 && !qs_is_literal_text($node['params'][$attr])) {
                 $oldKey = $node['params'][$attr];

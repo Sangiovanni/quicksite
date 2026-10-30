@@ -86,12 +86,16 @@ class AssetMetadataManager
     }
 
     /**
-     * Remove metadata entry for a specific asset.
+     * Remove metadata entry for a specific asset. True when there was one to remove.
      */
-    public function remove(string $category, string $filename): void
+    public function remove(string $category, string $filename): bool
     {
         $key = $category . '/' . $filename;
+        if (!array_key_exists($key, $this->metadata)) {
+            return false;
+        }
         unset($this->metadata[$key]);
+        return true;
     }
 
     /**

@@ -112,6 +112,14 @@ class NodeNavigator {
      * @return array ['success' => bool, 'structure' => modified structure, 'action' => 'updated'|'deleted']
      */
     public static function updateNode($structure, string $nodeId, ?array $newNode): array {
+        if ($newNode === null || $newNode === []) {
+            $result = self::removeNode($structure, $nodeId);
+            if ($result['success']) {
+                $result['action'] = 'deleted';
+            }
+            return $result;
+        }
+
         $path = self::parseNodeId($nodeId);
         
         if ($path === null) {
@@ -120,20 +128,37 @@ class NodeNavigator {
         
         if (empty($path)) {
             // Replacing root - handle array of roots vs single root
-            if ($newNode === null || $newNode === []) {
-                return ['success' => false, 'error' => 'Cannot delete root node'];
-            }
             return ['success' => true, 'structure' => $newNode, 'action' => 'updated'];
         }
         
-        $isDelete = $newNode === null || $newNode === [];
-        $result = self::modifyNodeAtPath($structure, $path, $newNode, $isDelete);
+        $result = self::modifyNodeAtPath($structure, $path, $newNode, false);
         
         if ($result['success']) {
-            $result['action'] = $isDelete ? 'deleted' : 'updated';
+            $result['action'] = 'updated';
         }
         
         return $result;
+    }
+
+    /**
+     * Remove the node $nodeId names, with its children: the one removal every command
+     * shares (deleteNode, moveNode before it puts the node back, editStructure's delete
+     * through updateNode()). The root itself is never removed.
+     *
+     * @param mixed  $structure The whole structure, as read from its file
+     * @param string $nodeId    Dot-separated indices ("0.2.1")
+     * @return array ['success' => true, 'structure' => array, 'node' => the removed node],
+     *               or ['success' => false, 'error' => string]
+     */
+    public static function removeNode($structure, string $nodeId): array {
+        $path = self::parseNodeId($nodeId);
+        if ($path === null) {
+            return ['success' => false, 'error' => 'Invalid node identifier format'];
+        }
+        if (empty($path)) {
+            return ['success' => false, 'error' => 'Cannot delete root node'];
+        }
+        return self::modifyNodeAtPath($structure, $path, null, true);
     }
     
     /**
@@ -389,7 +414,8 @@ class NodeNavigator {
     }
     
     /**
-     * Modify a node at a specific path
+     * Modify a node at a specific path: replace it with $newNode, or remove it ($isDelete),
+     * the removed node then in the answer's 'node'
      */
     private static function modifyNodeAtPath($structure, array $path, ?array $newNode, bool $isDelete): array {
         // Work with a copy
@@ -409,23 +435,25 @@ class NodeNavigator {
                     return ['success' => false, 'error' => 'Node not found at index ' . $targetIndex];
                 }
                 if ($isDelete) {
+                    $removed = $structure[$targetIndex];
                     array_splice($structure, $targetIndex, 1);
                 } else {
                     $structure[$targetIndex] = $newNode;
                 }
-                return ['success' => true, 'structure' => $structure];
+                return ['success' => true, 'structure' => $structure] + ($isDelete ? ['node' => $removed] : []);
             } else {
                 // Root is a single object (component structure) - target is in children
                 if (!isset($structure['children'][$targetIndex])) {
                     return ['success' => false, 'error' => 'Node not found at index ' . $targetIndex];
                 }
                 if ($isDelete) {
+                    $removed = $structure['children'][$targetIndex];
                     array_splice($structure['children'], $targetIndex, 1);
                     $structure['children'] = array_values($structure['children']);
                 } else {
                     $structure['children'][$targetIndex] = $newNode;
                 }
-                return ['success' => true, 'structure' => $structure];
+                return ['success' => true, 'structure' => $structure] + ($isDelete ? ['node' => $removed] : []);
             }
         }
         
@@ -467,6 +495,7 @@ class NodeNavigator {
         }
         
         if ($isDelete) {
+            $removed = $parent['children'][$targetIndex];
             array_splice($parent['children'], $targetIndex, 1);
             // Reindex array
             $parent['children'] = array_values($parent['children']);
@@ -474,7 +503,7 @@ class NodeNavigator {
             $parent['children'][$targetIndex] = $newNode;
         }
         
-        return ['success' => true, 'structure' => $structure];
+        return ['success' => true, 'structure' => $structure] + ($isDelete ? ['node' => $removed] : []);
     }
     
     /**

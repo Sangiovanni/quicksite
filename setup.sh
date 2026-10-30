@@ -10,6 +10,8 @@
 #   ./setup.sh                        # menu
 #   ./setup.sh <public_name>          # pre-answer the public-folder rename,
 #                                     # then show the menu
+#   PHP=/usr/bin/php8.3 ./setup.sh    # check that PHP's version rather than
+#                                     # the php on the PATH
 #
 # A MENU, NOT A WALK. Every item is independent and re-runnable: come back
 # later to change one thing without answering the other five again. The
@@ -26,9 +28,13 @@
 #   8. Self-deploy          — may this install write a built site onto a path?
 #   9. Command console      — offer the raw command runner at /admin/command?
 #  10. Default language     — the language a new project starts in
+#  11. Idle sign-out        — how long the panel may go unused before it signs
+#                             you out
 #
 # Items 1-3 rewrite init.php constants and the .htaccess routing. Items 4-5 and
-# 7-10 write config files under the secure folder. Item 6 only reads.
+# 7-11 write config files under the secure folder. Item 6 only reads.
+#
+# Before anything else, it checks the PHP version: older than 8.3, it stops.
 #
 # WHAT THIS SCRIPT CANNOT DO: create your account. No account exists yet, so
 # there is nobody to be one. That happens in the browser at /admin/, and the
@@ -44,6 +50,43 @@ YELLOW='\033[0;33m'
 DIM='\033[2m'
 BOLD='\033[1m'
 NC='\033[0m'
+
+# ==========================================================
+# The PHP floor — checked before anything is written
+# ==========================================================
+# QuickSite needs PHP 8.3 or later. This script runs no PHP of its own, so it asks
+# the php on the PATH — or the one the PHP variable names — for its version, and
+# stops at once when it is older, before the ownership fix or any file below.
+# That is the command-line PHP: on some servers the web server's own (mod_php,
+# php-fpm) is a separate install, which is why the README asks for a patched
+# release of the branch either way. Only the floor is checked here: patch numbers
+# change with every advisory, so they live in the README.
+check_php_floor() {
+    local php="${PHP:-}" out=""
+    [ -n "$php" ] || php="$(command -v php 2>/dev/null || true)"
+    if [ -n "$php" ]; then
+        # -n: no php.ini, so an extension that fails to load prints nothing here
+        out="$("$php" -n -r 'echo PHP_VERSION_ID, " ", PHP_VERSION;' 2>/dev/null || true)"
+    fi
+    if [[ ! "$out" =~ ^([0-9]+)\ ([0-9][^[:space:]]*)$ ]]; then
+        echo ""
+        if [ -z "$php" ]; then
+            echo -e "  ${YELLOW}⚠ The PHP version could not be checked: no php command was found${NC}"
+            echo -e "  ${YELLOW}  (name one with PHP=/path/to/php). QuickSite needs PHP 8.3 or later.${NC}"
+        else
+            echo -e "  ${YELLOW}⚠ The PHP version could not be checked: $php answered no version.${NC}"
+            echo -e "  ${YELLOW}  QuickSite needs PHP 8.3 or later.${NC}"
+        fi
+        return 0
+    fi
+    if [ "${BASH_REMATCH[1]}" -lt 80300 ]; then
+        echo ""
+        echo -e "  ${RED}✗ QuickSite needs PHP 8.3 or later; the PHP found here ($php, ${BASH_REMATCH[2]}) is older.${NC}"
+        echo "    Install a supported PHP, a patched release of its branch (see the README), and run setup again."
+        exit 1
+    fi
+}
+check_php_floor
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PUBLIC_DIR="$SCRIPT_DIR/public"
@@ -386,6 +429,59 @@ deflang_label() {
         echo -e "$v"
     else
         echo -e "en   ${YELLOW}(value unusable — check default-language.php)${NC}"
+    fi
+}
+
+# The idle sign-out auth.php sets, in seconds, or '' when auth.php has not been
+# created yet or sets none. Read from its own line, which starts with the key, as
+# quota_setting reads its settings: a value the file's comments quote is not it.
+idle_current() {
+    local file line
+    file="$(CONFIG_DIR)/auth.php"
+    [ -f "$file" ] || { echo ""; return 0; }
+    line=$(grep -E "^[[:space:]]*'idle_ttl'[[:space:]]*=>" "$file" 2>/dev/null | head -n 1 || true)
+    if [[ "$line" =~ =\>[[:space:]]*([0-9]+)[[:space:]]*, ]]; then
+        echo "${BASH_REMATCH[1]}"
+    else
+        echo ""
+    fi
+}
+
+# What the engine applies: auth.php's value, 1 day without one, never under its
+# 5-minute minimum (qs_session_config()).
+idle_effective() {
+    local v; v="$(idle_current)"
+    [ -n "$v" ] || v=86400
+    [ "$v" -ge 300 ] || v=300
+    echo "$v"
+}
+
+# Seconds in the largest unit that holds them whole — 86400 is "1 day", 5400 is
+# "90 minutes": the setting as it is, never rounded.
+idle_words() {
+    local s="$1" n unit
+    if [ $((s % 86400)) -eq 0 ]; then n=$((s / 86400)); unit=day
+    elif [ $((s % 3600)) -eq 0 ]; then n=$((s / 3600)); unit=hour
+    elif [ $((s % 60)) -eq 0 ]; then n=$((s / 60)); unit=minute
+    else n=$s; unit=second
+    fi
+    if [ "$n" -eq 1 ]; then echo "1 $unit"; else echo "$n ${unit}s"; fi
+}
+
+# ABSENT MEANS 1 DAY. The label tells "no auth.php yet" from "an auth.php that sets
+# none", and says when a value is under the minimum the engine raises it to.
+idle_label() {
+    if [ ! -f "$(CONFIG_DIR)/auth.php" ]; then
+        echo -e "1 day  ${DIM}(default — auth.php not created yet)${NC}"
+        return
+    fi
+    local v; v="$(idle_current)"
+    if [ -z "$v" ]; then
+        echo -e "1 day  ${DIM}(default — auth.php does not set it)${NC}"
+    elif [ "$v" -lt 300 ]; then
+        echo -e "5 minutes  ${YELLOW}(auth.php says $(idle_words "$v"); the engine never goes below 5 minutes)${NC}"
+    else
+        echo -e "$(idle_words "$v")"
     fi
 }
 
@@ -1415,6 +1511,101 @@ item_deflang() {
 }
 
 # ==========================================================
+# Item 11 — idle sign-out
+# ==========================================================
+# How long a session may go unused before the panel signs it out: auth.php's
+# session.idle_ttl, in seconds. The login page states it under "Keep me signed
+# in". A free-text value, so Enter KEEPS what is there (item 10's rule). The
+# answer is a number and m, h or d, at least 5 minutes — the engine's own
+# minimum — and written as seconds.
+#
+# ABSENT MEANS 1 DAY, and choosing 1 day when auth.php does not exist yet LEAVES
+# IT ABSENT (item 10's rule). Otherwise auth.php is created from its .example as
+# item 5 creates it, and only the number on the idle_ttl line changes.
+item_idle() {
+    local cfg_dir; cfg_dir="$(CONFIG_DIR)"
+    local live="$cfg_dir/auth.php"
+    local example="$cfg_dir/auth.php.example"
+
+    echo ""
+    echo -e "${BOLD}Idle sign-out${NC}"
+    echo ""
+    echo "  How long the admin panel may go unused before it signs you out. Ticking"
+    echo "  \"Keep me signed in\" keeps a session across browser restarts, never past"
+    echo "  this limit; the login page states it under that box."
+    echo ""
+    echo -e "  Currently: $(idle_label)"
+    echo ""
+
+    local ANSWER
+    read -r -p "  Sign out after how long without using the panel? A number and m, h or d (Enter keeps $(idle_words "$(idle_effective)")): " ANSWER || true
+    local VALUE="${ANSWER:-}"
+    VALUE="${VALUE//[[:space:]]/}"
+    VALUE="$(printf '%s' "$VALUE" | tr '[:upper:]' '[:lower:]')"
+
+    if [ -z "$VALUE" ]; then
+        echo -e "  ${DIM}Unchanged.${NC}"
+        return 0
+    fi
+
+    if [[ ! "$VALUE" =~ ^([0-9]{1,4})([mhd])$ ]]; then
+        echo -e "  ${RED}✗ '$ANSWER' is not a number followed by m, h or d.${NC}"
+        echo "    Nothing was written."
+        return 0
+    fi
+    # 10#: a leading zero is a decimal digit here, not octal
+    local NUM=$((10#${BASH_REMATCH[1]})) MULT=60
+    case "${BASH_REMATCH[2]}" in
+        h) MULT=3600 ;;
+        d) MULT=86400 ;;
+    esac
+    local SECS=$((NUM * MULT))
+
+    if [ "$SECS" -lt 300 ]; then
+        echo -e "  ${RED}✗ The shortest idle sign-out is 5 minutes.${NC}"
+        echo "    Nothing was written."
+        return 0
+    fi
+
+    if [ ! -d "$cfg_dir" ]; then
+        echo -e "  ${RED}✗ Error: config folder not found:${NC} $cfg_dir"
+        return 0
+    fi
+
+    if [ "$SECS" -eq 86400 ] && [ ! -f "$live" ]; then
+        echo ""
+        echo -e "  ${GREEN}✓${NC} Idle sign-out stays 1 day — auth.php left absent, which is what a"
+        echo "    fresh install has."
+        return 0
+    fi
+
+    # auth.php does not exist yet on a fresh clone — item 5 says why creating it
+    # here is safe.
+    if [ ! -f "$live" ]; then
+        if [ -f "$example" ]; then
+            cp "$example" "$live"
+        else
+            echo -e "  ${RED}✗ Error: neither auth.php nor auth.php.example is present${NC}"
+            echo "    $cfg_dir"
+            return 0
+        fi
+    fi
+
+    # Anchored to start-of-line, and only the number changes: the key's spacing and
+    # the comment after it stay. '#' as the delimiter — item 4 says why.
+    sed -i "s#^\([[:space:]]*'idle_ttl'[[:space:]]*=>[[:space:]]*\)[0-9][0-9]*#\1$SECS#" "$live"
+
+    if [ "$(idle_current)" = "$SECS" ]; then
+        echo -e "  ${GREEN}✓${NC} Idle sign-out: ${BOLD}$(idle_words "$SECS")${NC}"
+        echo -e "  ${DIM}  Every session follows it from its next request.${NC}"
+    else
+        echo -e "  ${RED}✗ Could not set the value automatically.${NC}"
+        echo "    Edit this file by hand and set 'idle_ttl' => $SECS:"
+        echo "    $live"
+    fi
+}
+
+# ==========================================================
 # The menu
 # ==========================================================
 show_header() {
@@ -1435,6 +1626,7 @@ show_menu() {
     echo -e "  Self-deploy:        $(deploy_label)"
     echo -e "  Command console:    $(console_label)"
     echo -e "  Default language:   $(deflang_label)"
+    echo -e "  Idle sign-out:      $(idle_label)"
     echo ""
     echo "    1) Rename the public folder"
     echo "    2) Rename the secure folder"
@@ -1446,6 +1638,7 @@ show_menu() {
     echo "    8) Allow / forbid deploying from this install"
     echo "    9) Offer / withhold the command console (/admin/command)"
     echo "   10) Default language for new projects"
+    echo "   11) Idle sign-out (how long the panel may go unused)"
     echo "    q) Finish"
     echo ""
 }
@@ -1475,6 +1668,7 @@ while true; do
         8) item_deploy; pause_for_menu ;;
         9) item_console; pause_for_menu ;;
         10) item_deflang; pause_for_menu ;;
+        11) item_idle; pause_for_menu ;;
         q|Q|"") break ;;
         *) echo -e "  ${RED}Unknown choice: $CHOICE${NC}" ;;
     esac
@@ -1498,6 +1692,7 @@ echo -e "  Storage quotas:     $(quota_label)"
 echo -e "  Self-deploy:        $(deploy_label)"
 echo -e "  Command console:    $(console_label)"
 echo -e "  Default language:   $(deflang_label)"
+echo -e "  Idle sign-out:      $(idle_label)"
 echo ""
 
 if [ -n "$OWNERSHIP_WARNING" ]; then

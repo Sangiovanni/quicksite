@@ -117,11 +117,10 @@ function saveResolversSidecar(array $resolvers): bool {
 /**
  * True when $arr is a NON-EMPTY sequential 0-indexed list.
  *
- * NOT an array_is_list() polyfill, despite what this comment used to claim —
- * array_is_list([]) is TRUE and this deliberately answers FALSE, because an
- * empty sidecar entry means "no resolver", not "an empty list of resolvers".
- * The real polyfill lives in utilsManagement.php. Keep them distinct: swapping
- * this for array_is_list would make an empty entry take the array-shape branch.
+ * NOT array_is_list(): array_is_list([]) is TRUE and this deliberately answers
+ * FALSE, because an empty sidecar entry means "no resolver", not "an empty list
+ * of resolvers". Keep them distinct: swapping this for array_is_list would make
+ * an empty entry take the array-shape branch.
  */
 function _isResolverArrayShape(array $arr): bool {
     return qs_resolver_is_array_shape($arr);

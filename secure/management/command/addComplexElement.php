@@ -283,17 +283,6 @@ function __command_addComplexElement(array $params = [], array $urlParams = []):
             return ApiResponse::create(404, 'node.not_found')
                 ->withMessage("Target node not found at: {$targetNodeId}");
         }
-        if ($position === 'inside') {
-            // Same rejections as addNode — keep the editor's expectations consistent.
-            if (isset($targetNode['component'])) {
-                return ApiResponse::create(400, 'validation.invalid_value')
-                    ->withMessage('Cannot insert inside a component. Components are atomic.');
-            }
-            if (isset($targetNode['textKey']) && !isset($targetNode['tag'])) {
-                return ApiResponse::create(400, 'validation.invalid_value')
-                    ->withMessage('Cannot insert inside a text node.');
-            }
-        }
     }
 
     // ----- Splice the subtree -----

@@ -5,7 +5,8 @@ require_once __DIR__ . '/RegexPatterns.php';
 /**
  * TagRegistry — Single source of truth for ALL HTML tag classification.
  *
- * Used by: addNode, editNode, editStructure, JsonToHtmlRenderer,
+ * Used by: addNode, editNode, editStructure, JsonToHtmlRenderer, JsonToPhpCompiler,
+ *          the commands that make, copy or remove a node's translation keys,
  *          _tag-selector.php, and the visual editor's client-side code
  *          (via editorPayload() → PreviewConfig.tagInfo → preview.js).
  *
@@ -74,25 +75,6 @@ class TagRegistry
     // =========================================================================
     // TAG CLASSIFICATION
     // =========================================================================
-
-    /**
-     * Block-level tags: textKey OPTIONAL if class is provided, REQUIRED if no class.
-     */
-    const BLOCK_TAGS = [
-        'div', 'section', 'article', 'header', 'footer', 'nav', 'main', 'aside',
-        'figure', 'figcaption', 'blockquote', 'pre', 'form', 'fieldset',
-        'ul', 'ol', 'dl', 'table', 'thead', 'tbody', 'tfoot', 'tr'
-    ];
-
-    /**
-     * Inline tags: textKey ALWAYS required (they display text).
-     */
-    const INLINE_TAGS = [
-        'span', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-        'a', 'button', 'label', 'strong', 'em', 'b', 'i', 'u', 'small', 'mark',
-        'li', 'td', 'th', 'dt', 'dd', 'caption', 'legend',
-        'code', 'kbd', 'samp', 'var', 'cite', 'q', 'abbr', 'time', 'address'
-    ];
 
     /**
      * Self-closing / void elements: NO textKey needed (no text content).
@@ -195,7 +177,7 @@ class TagRegistry
      * OPTIONAL params, per tag, whose value is a TRANSLATION KEY.
      *
      * The renderer already translates these attributes when the value looks
-     * like a key (JsonToHtmlRenderer::renderAttribute → $translatableAttributes),
+     * like a key (TRANSLATABLE_ATTRIBUTES below),
      * so the only thing missing was a way for the author to *choose* the key.
      * The editor renders one translation-key selector per entry — the same
      * searchable picker the component-variables panel and the Complex Element
@@ -223,6 +205,25 @@ class TagRegistry
         'placeholder', 'title', 'aria-label',
         'aria-placeholder', 'aria-description'
     ];
+
+    /**
+     * Attributes whose value is translated when it looks like a translation key: the
+     * reserved ones, which the translation system fills, and `alt`, which an author may
+     * also write as text. The renderer and the compiler translate this set (a preview and
+     * a build say the same thing); the commands that make, copy or remove a node's keys
+     * read it, and the editor's snippet preview through editorPayload(). In this order:
+     * duplicateNode numbers the keys it makes in it, deleteNode answers the keys it
+     * removes in it.
+     */
+    const TRANSLATABLE_ATTRIBUTES = ['alt', ...self::RESERVED_PARAMS];
+
+    /**
+     * Attributes written even when empty, where empty is the meaning: `alt=""` marks an
+     * image as decorative (with no alt at all a screen reader reads the file name), and
+     * `aria-label=""` likewise. Every other empty attribute drops, in a preview, in a
+     * build and in the editor's snippet preview.
+     */
+    const EMPTY_MEANINGFUL_ATTRIBUTES = ['alt', 'aria-label'];
 
     // =========================================================================
     // VOID ELEMENTS (for the renderer)
@@ -308,6 +309,26 @@ class TagRegistry
     }
 
     /**
+     * $params without the reserved ones (RESERVED_PARAMS: the translation system owns their
+     * value) — except those $tag declares in TRANSLATION_KEY_PARAMS, whose key the author
+     * chooses in the editor (an iframe's title). addNode and editNode filter a tag's params
+     * through this. A null $tag (not known yet) keeps those any tag declares: call it again
+     * once the tag is known.
+     */
+    public static function withoutReservedParams(?string $tag, array $params): array
+    {
+        $chosen = $tag === null
+            ? array_merge(...array_values(self::TRANSLATION_KEY_PARAMS))
+            : self::TRANSLATION_KEY_PARAMS[strtolower($tag)] ?? [];
+        foreach (self::RESERVED_PARAMS as $reserved) {
+            if (!in_array($reserved, $chosen, true)) {
+                unset($params[$reserved]);
+            }
+        }
+        return $params;
+    }
+
+    /**
      * The params a new node of this tag receives when the author supplied none
      * of them. Returns only the ones actually absent, so an author who set
      * `controls` themselves — or deliberately left it off by passing something
@@ -354,26 +375,15 @@ class TagRegistry
         return [
             'ALLOWED_TAGS'            => self::ALLOWED_TAGS,
             'BLOCKED_TAGS'            => self::BLOCKED_TAGS,
-            'BLOCK_TAGS'              => self::BLOCK_TAGS,
-            'INLINE_TAGS'             => self::INLINE_TAGS,
             'SELF_CLOSING_TAGS'       => self::SELF_CLOSING_TAGS,
             'CONTAINER_TAGS'          => self::CONTAINER_TAGS,
             'MANDATORY_PARAMS'        => self::MANDATORY_PARAMS,
             'DEFAULT_PARAMS'          => self::DEFAULT_PARAMS,
             'TRANSLATION_KEY_PARAMS'  => self::TRANSLATION_KEY_PARAMS,
             'RESERVED_PARAMS'         => self::RESERVED_PARAMS,
+            'TRANSLATABLE_ATTRIBUTES' => self::TRANSLATABLE_ATTRIBUTES,
+            'EMPTY_MEANINGFUL_ATTRIBUTES' => self::EMPTY_MEANINGFUL_ATTRIBUTES,
         ];
-    }
-
-    /**
-     * Get tag category for textKey logic: 'self-closing', 'inline', or 'block'.
-     */
-    public static function getCategory(string $tag): string
-    {
-        if (in_array($tag, self::SELF_CLOSING_TAGS, true)) return 'self-closing';
-        if (in_array($tag, self::INLINE_TAGS, true)) return 'inline';
-        if (in_array($tag, self::BLOCK_TAGS, true)) return 'block';
-        return 'block';
     }
 
     /**

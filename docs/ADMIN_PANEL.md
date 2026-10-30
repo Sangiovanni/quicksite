@@ -26,7 +26,7 @@ public/admin/assets/js/lib/css-refiner/      → CSS analysis library
                                                (consumed by optimize.js)
 ```
 
-Three pages sit outside the authenticated shell: `/admin/login` (username + password form; POSTs to itself, verified through the shared server-side login gate), `/admin/register` (self-registration form: a public name and the password, typed twice — the server assigns the username, and the form says so before it is submitted; the page exists **only** while `auth.php` `registration.allow_self_registration` is true, otherwise it redirects to login; the login page shows a "create one" link under the same condition), and `/admin/setup` (the first-run page). A successful registration redirects to the login page, which shows the assigned username — pre-filled, in one box with a warning that it is private, must be saved now, and is shown for 24 hours at most — on every visit in that browser until a sign-in succeeds there. That sign-in drops it, and so does the login page once the note is 24 hours old, however often the page was visited in between. The note lives in a session id minted for it at registration, so no id the browser held before — or was handed by somebody else — can read it. Registering never logs you in by itself. Creating the first account on `/admin/setup` shows a one-shot "account created" banner instead. All three are plain server-rendered forms with no admin JS beyond a password-visibility toggle, and are served with `Cache-Control: no-store`. A sign-in (or a refused one), a sign-out, a registration and the first account's creation through them are written to the security trail exactly as the `login`, `logoutSession` and `register` commands write them ([COMMAND_API.md](COMMAND_API.md), *The security trail*).
+Three pages sit outside the authenticated shell: `/admin/login` (username + password form; POSTs to itself, verified through the shared server-side login gate), `/admin/register` (self-registration form: a public name and the password, typed twice — the server assigns the username, and the form says so before it is submitted; the page exists **only** while `auth.php` `registration.allow_self_registration` is true, otherwise it redirects to login; the login page shows a "create one" link under the same condition), and `/admin/setup` (the first-run page). A successful registration redirects to the login page, which shows the assigned username — pre-filled, in one box with a warning that it is private, must be saved now, and is shown for 24 hours at most — on every visit in that browser until a sign-in succeeds there. That sign-in drops it, and so does the login page once the note is 24 hours old, however often the page was visited in between. The note lives in a session id minted for it at registration, so no id the browser held before — or was handed by somebody else — can read it. Registering never logs you in by itself. Creating the first account on `/admin/setup` shows a one-shot "account created" banner instead. All three are plain server-rendered forms with no admin JS beyond a password-visibility toggle, and are served with `Cache-Control: no-store`. Under **Keep me signed in**, the login page states how long a session lasts unused — `auth.php`'s `idle_ttl` (setup's item 11 sets it); when `remember_ttl` is the shorter, it names both: ticked, the shorter, unticked, `idle_ttl` — each rounded to the nearest unit and said as *about*, since a session's last use is stamped at most once every tenth of the limit. A refused attempt says how long to wait in the largest unit that fits, rounded up (*try again in 2 minutes*): every attempt during a wait, and the wrong password that starts one, under its *invalid username or password*; the panel's languages carry the words for each unit. A sign-in (or a refused one), a sign-out, a registration and the first account's creation through them are written to the security trail exactly as the `login`, `logoutSession` and `register` commands write them ([COMMAND_API.md](COMMAND_API.md), *The security trail*).
 
 **First run.** QuickSite ships no account, so while the user registry is empty every admin URL renders `/admin/setup` instead. The page asks for a **setup token** along with a display name, a username and the password, twice — the two are compared before anything else is checked, so a slip costs no attempt. The token is 64 hex characters that the engine writes to `secure/management/config/setup-token.txt` on the page's first render — reading that file is the authorisation, which is why creating the first account needs neither a command line nor a shipped default password. It is written once and never regenerated, compared with a constant-time check, and destroyed the moment it is used. Attempts are rate-limited per caller with the same backoff as the login form, and any bad token — wrong, absent, or already used — is refused identically.
 
@@ -99,7 +99,7 @@ File lists are grouped by role. Where useful, the entry point or main exported f
 
 | File | Purpose |
 |---|---|
-| `js/core/api.js` | `QuickSiteAPI.request` + `upload`; in-memory session token sent with the session cookie (`setTokenSource` seam for embedders); emits `quicksite:command-executed`; keeps the write allowance current from each answer's headers (`getWriteRate`, `countsAsWrite`) and emits `quicksite:write-rate`. |
+| `js/core/api.js` | `QuickSiteAPI.request` + `upload`; in-memory session token sent with the session cookie (`setTokenSource` seam for embedders); emits `quicksite:command-executed`; keeps the write allowance current from each answer's headers (`getWriteRate`, `countsAsWrite`) and emits `quicksite:write-rate`. A request still out when the page leaves, a reload included, answers `client.network_error` like any failed request, without a console error. |
 | `js/core/utils.js` | `QuickSiteUtils`: toasts, the panel's dialogs (`confirm()`, `prompt()`: *Dialogs* below), escaping, prefs storage, pending messages. |
 | `js/core/storage-keys.js` | Constants for every localStorage / sessionStorage key (`window.QuickSiteStorageKeys`). |
 | `js/core/dom.js` | `window.QSDom`: shared `el()` element factory + `svgIcon()` + `clear()` + `setSelectPlaceholder()` (resets a `<select>` to a single placeholder option) — the createElement/textContent idiom for dynamic DOM. Loaded in `<head>` so page scripts can use it at parse time. |
@@ -294,6 +294,7 @@ Two other cookies exist, both HttpOnly and neither readable by page scripts. `QS
 | `templates/pages/media.php` | `window.QS_MEDIA_I18N` | the `media` and `common` sub-trees, verbatim |
 | `templates/pages/privacy.php` | `window.QS_PRIVACY_I18N` | the `privacy` sub-tree, verbatim: the words of the page's dialogs and error toasts (the rest of the page is written in the code) |
 | `templates/pages/storage.php` | `window.QS_STORAGE_I18N` | the `storage` sub-tree, verbatim: the words of the page's dialogs and error toasts (likewise) |
+| `templates/pages/sitemap.php` | `window.QS_SITEMAP_I18N` | the `sitemapPage` sub-tree, verbatim: the words `sitemap.js` builds, read by its own `t(key, fallback)` — a key no language holds shows the code's English fallback |
 | `templates/pages/preview-config.php` | `window.PreviewConfig` | full preview runtime data — routes, components, settings, i18n, token (200+ fields), plus `tagInfo` (`TagRegistry::editorPayload()` — the tag classification, mandatory params, per-tag defaults and translation-key params the editor works from) |
 | `templates/pages/ai-connections.php` | `window.QSAC_ASSET_BASE` + `window.QS_AI_CONNECTIONS_I18N` | the asset base the provider logos load from, so they resolve when the panel is not served from the domain root; the `aiConnections` and `common` sub-trees, verbatim |
 | `templates/pages/optimize.php` | `data-lib-ready` on `.optimize-page` + `window.CSSRefiner.t` + `window.QS_OPTIMIZE_I18N` | `data-lib-ready` is `"true"` only when the CSS Refiner library is installed, and `optimize.js` does nothing otherwise; `CSSRefiner.t` is a passthrough that returns its key unchanged; the `optimize` and `common` sub-trees, verbatim |
@@ -333,9 +334,9 @@ The sidebar exposes eight modes, each backed by a `data-mode="..."` button. Sour
 | **Preview** | `preview` | Reloads the iframe and re-enters preview-only behaviour (no selection / hover overlays). |
 | **Select** | `select` | Click an element → inspect node, add a sibling/child (a child only where the element can hold one: not a text, a component or a void element such as an image), **edit its params + class + mandatory attrs in place** (via the Edit Params button), delete, duplicate, or save as snippet / component. |
 | **Drag** | `drag` | Drag an element before, after or into another of the same structure (`preview-drag.js`, the drop zones in `preview-iframe-inject.js`). A drop into an element makes it that element's last child, and is saved as `moveNode`'s `inside-end`. No drop into an element is offered over a text, a component, or a void element such as an image: there, only before and after. |
-| **Text** | `text` | Inline-edit a text node's translation **for the currently selected language**. Intentionally primitive: no rich text, no line breaks. Edits the value, never the key. |
+| **Text** | `text` | Inline-edit a text node's translation **for the currently selected language**. Intentionally primitive: no rich text, no line breaks. Edits the value, never the key. A paste is plain text on one line — the clipboard's text, each run of line breaks a space — inserted as typing is, so Ctrl+Z undoes it; when an edit ends, the element holds exactly the text saved. |
 | **CSS** | `style` | Click an element → CSS panel (Theme / Selectors / Motion tabs); edits apply to the element's selector with full pseudo-state support. The Theme tab includes an inline **+ Add variable** form per section (Colors / Fonts / Spacing) for scope-aware writes (current light/dark scope, optional "also other scope" when dark mode is enabled). The Motion tab carries two sections: **Selectors with motion** (transitions + animations + a "hover-state-only" diagnostic) and the **Keyframes library** below — see §8.11. Designer / developer / admin roles also see a top-row **Source** advanced view that opens the whole `style.css` in a code editor — see §8.10. |
-| **Interactions** | `js` | Event editor (`preview-js-interactions.js`). Three CRUD-capable panels: **per-element interactions** (the selected node's `onclick`/`oninput`/etc.), **Page Events** (page-level `onload`/`onresize`/`onscroll`), and **State Stores** (page-scoped state). Each interaction is a `{{call:fn:args}}` chain using a QS.* verb from the catalog. |
+| **Interactions** | `js` | Event editor (`preview-js-interactions.js`). Three CRUD-capable panels: **per-element interactions** (the selected node's `onclick`/`oninput`/etc.), **Page Events** (page-level `onload`/`onresize`/`onscroll`), and **State Stores** (page-scoped state). Each interaction is a `{{call:fn:args}}` chain using a QS.* verb from the catalog. An element's event list offers the events the interaction commands accept, in two groups: **Common for** the element's tag, and **Less common**. |
 | **Translations** | `translation` | Site-wide translation key manager (`preview-translation.js`). Per-language coverage % + counts, scope picker (Pages / Layout / Components), inline row-expand editor, per-row + bulk delete. Mono- and multi-lingual. See §8.9. |
 | **AI tools** | `ai-tools` | In-editor workflow runner. Searchable + tag-filtered list of workflow specs grouped by category; picking one swaps the panel into a 3-zone runner (INPUTS / AI EXCHANGE / EXECUTION). Element clicks in the iframe behave as in Select mode — workflows with a `selector` parameter auto-fill from the current selection. See §8.12. |
 
@@ -352,6 +353,8 @@ The sidebar exposes eight modes, each backed by a `data-mode="..."` button. Sour
 ### 8.2 Context selectors
 
 The toolbar carries a **Page** dropdown (any route in `routes.php`) and a **Language** dropdown (any active language). Switching either reloads the iframe; in Text mode the language dropdown decides which translation file is being edited.
+
+While a page is the edit target, the toolbar's **Title** field holds that page's title in the language shown — on a one-language site, the title the page reads from `default.json`. **Enter**, or leaving the field, saves it through `editTitle`; **Escape**, or an emptied field, puts the saved title back; a refusal says why in a toast. Its placeholder is the title the preview shows: for a page with no title of its own, the last part of its address, readable — *Get started* for `get-started` (see [ARCHITECTURE.md](ARCHITECTURE.md) §6.3, *How captured params flow*). The field hides for the menu, the footer and a component.
 
 ### 8.3 Device preview
 
@@ -429,11 +432,11 @@ and the field is still empty.
 | Routes / structure | `getRoutes`, `getStructure`, `editStructure`, `addNode`, `editNode`, `deleteNode`, `duplicateNode`, `moveNode`, `addComplexElement`, `addRoute`, `setRouteLayout`, `setRouteResolver` |
 | Components | `listComponents`, `addComponentToNode`, `findComponentUsages` |
 | Snippets | `listSnippets`, `getSnippet`, `createSnippet`, `deleteSnippet`, `insertSnippet`, `injectSnippetCss` |
-| Translations | `getTranslation`, `getTranslations`, `getLangList`, `getTranslationKeys`, `setTranslationKeys`, `deleteTranslationKeys`, `importStructureTranslations` |
-| Styles | `getStyles`, `editStyles`, `listStyleRules`, `setStyleRule` |
+| Translations | `getTranslation`, `getTranslations`, `getLangList`, `getTranslationKeys`, `setTranslationKeys`, `deleteTranslationKeys`, `importStructureTranslations`, `editTitle` |
+| Styles | `getStyles`, `editStyles`, `listStyleRules`, `getStyleRule`, `setStyleRule` |
 | Theme | `getRootVariables`, `setRootVariables`, `setThemeMode` |
 | Animations | `listKeyframes`, `getKeyframes`, `setKeyframes`, `deleteKeyframes`, `getAnimatedSelectors` |
-| Interactions / events | `listJsFunctions`, `listDataBindings`, `addInteraction`, `editInteraction`, `deleteInteraction`, `addPageEvent`, `editPageEvent`, `deletePageEvent` |
+| Interactions / events | `listJsFunctions`, `listDataBindings`, `listInteractions`, `addInteraction`, `editInteraction`, `deleteInteraction`, `addPageEvent`, `editPageEvent`, `deletePageEvent` |
 | State + integrations | `getStateStores`, `setStateStores`, `listApiEndpoints`, `editApi`, `listOAuthProviders`, `setOAuthCredentials`, `listStorageItems`, `addStorageItem` |
 | Assets / misc | `listAssets`, `help`, `backupProject` |
 
@@ -609,7 +612,7 @@ Complex / HTML Tag). Pick the type:
 - **RAW (literal)** — a plain value input. Stored as the node's `textKey` =
   `"__RAW__"+value`, rendered verbatim in every language.
 
-The Add button (bottom Cancel / Add) posts `addNode` with `nodeKind:"text"` plus either `textRaw:true + textValue` (RAW) or the picked `textKey` (key). Default position respects the radio (`after` / `inside` / `before`).
+The Add button (bottom Cancel / Add) posts `addNode` with `nodeKind:"text"` plus either `textRaw:true + textValue` (RAW) or the picked `textKey` (key), at the position the picker holds. The positions follow the selection, as the preview reports it. **Inside**, chosen by default, adds the text at the element's end (`position: "inside-end"`), so a sentence goes on in the order it is written. **Before** and **After** show only beside an element the page displays inline — a bold word, a link, an image, as the browser computes it after the project's CSS — where the new text continues the same line. Beside a block (a paragraph, a section) the text goes inside it; where neither fits (a rule, which holds nothing and displays as a block), the form says so and **Add** is disabled. At a structure's root the text goes in first, as every add there does.
 
 **Text mode — inline editing of both flavours.** The Text-mode tool clicks any
 text node in the preview and makes it `contenteditable`. On commit:
@@ -727,6 +730,8 @@ The **conflict notice** sits between the toolbar and the editor, in the draft ba
 
 **How a save checks first.** Save reads the file again before it writes, and writes (`editStyles`, the whole file) only when it is still the version the edits were made on. If it is not, nothing is written: the conflict notice appears and a toast says the save did not happen. Overwrite writes over the version the notice was raised for, and stops the same way if yet another change lands after it. `editStyles` answers with the content it replaced; if that is not the version Source checked — a change landed in the moment between the check and the write — the save stands and its toast says it replaced that change, instead of *style.css saved*.
 
+**An empty stylesheet is asked about first.** When the text to save is empty or only spaces, Save and Overwrite first ask *Empty the stylesheet?* — saving it removes every style of the site — with **Empty it** and Cancel. Overwrite asks before the conflict notice goes, so Cancel leaves the notice standing; Cancel on Save leaves the edits as they are. `editStyles` itself accepts an empty file.
+
 **Canvas (editor surface):**
 
 | Region | What it shows |
@@ -741,7 +746,7 @@ The **conflict notice** sits between the toolbar and the editor, in the draft ba
 |---|---|
 | File row | Static `File: style.css` label. |
 | Status indicator | Green dot + "All saved" when the content is the version it was read or saved as; amber dot + "Unsaved changes" otherwise, or "Changed elsewhere" while the conflict notice stands. |
-| Save button | Disabled when clean, and while the conflict notice stands. Checks the file first (see *How a save checks first*), saves via `editStyles` (whole-file write), then hot-reloads the iframe's `<link rel="stylesheet">`. |
+| Save button | Disabled when clean, and while the conflict notice stands. Asks first when the text is empty (see *An empty stylesheet is asked about first*), checks the file first (see *How a save checks first*), saves via `editStyles` (whole-file write), then hot-reloads the iframe's `<link rel="stylesheet">`. |
 | Cancel button | Disabled when clean. After a confirm, discards the edits and loads the file as it is now — the conflict notice's Reload, with a confirm. |
 | "Refine in CSS Refiner →" link | Same-tab navigation to `/admin/optimize`. When dirty, a custom confirm says the edits leave the editor and come back as a draft on return; the draft is written at once, and the native `beforeunload` prompt is suppressed once to avoid a double-prompt. Modifier-clicks (Ctrl/Cmd/Shift/middle) skip the confirm — they don't leave the current page. |
 
@@ -815,6 +820,10 @@ The third tab of CSS mode — manages CSS transitions, animations, and the `@key
 
 Clicking any row opens the existing State & Animation Editor (`modals/transition.php`) scoped to that selector.
 
+In the State & Animation Editor (reached too from Selectors → a selector → **Animate**), each state lists its properties. **+ Add Property** opens a row — the property, its value, then **Cancel** and **+ Add** — and a property is written the moment it is added or removed (✕), the preview refreshing. **Save** first adds what an open row still holds, then writes the `transition` declaration only when the transition line under the settings changed since the editor opened: with nothing else to do it closes, so a rule never gains a transition nobody set, and an untouched rule keeps its own as written.
+
+Its **Properties** setting is **All Properties** — one duration, delay and timing for every property — or **Specific Properties**: a row per property, each with its own property (the searchable picker of every CSS property; one already in a row is not offered again), duration and delay with their units, timing (a `cubic-bezier()` in its four fields) and ✕, with **+ Add Property** under the rows, which adds a row with the settings of the row above it; ✕ on the last row leaves one empty row. Switching to Specific gives a row to each property the rule's states set, each with All's settings (none set: one empty row); switching back to All keeps the first row's settings. The editor reads the rule's own transition as written: a single transition of `all` opens as All, anything else as Specific, a row for each transition with its own settings (`all` inside a list as one row's property), its parts in any order, its units kept; a timing the picker does not offer (`steps(4, end)`, `step-start`) stays in its row as written, one more choice of that row's timing list. The line under the settings shows the whole value (`color 300ms linear, background-color 1s ease`), and the rows keep what the author changes while properties are added to or removed from the states.
+
 **Keyframes library** lists `@keyframes` rules with four row actions:
 
 | Action | What it does |
@@ -875,7 +884,7 @@ A persistent amber-bordered banner sits at the top of the panel: `⚠ AI tools m
 #### Runner — INPUTS zone (accent border)
 
 - **Your prompt** (AI workflows only) — free-form textarea for the user's request, appended to the assembled prompt after a `**User Request:**` marker
-- **Parameters** — workflow-declared input form; types include `text`, `textarea`, `select` (inline options or `optionsFrom` data-driven), `tag-select` (scrollable checkbox list), `checkbox` (rendered inline `[☑] Label / help`), `number`, `selector` (read-only card showing the current iframe selection), `hidden`. Validation surfaces per-param with red border + error text; Run is gated on no visible-param validation failing
+- **Parameters** — workflow-declared input form; types include `text`, `textarea`, `select` (inline options or `optionsFrom` data-driven), `tag-select` (scrollable checkbox list), `checkbox` (rendered inline `[☑] Label / help`), `number`, `selector` (read-only card showing the current iframe selection), `hidden`. Validation surfaces per-param with red border + error text; Run is gated on no visible-param validation failing. A `tag-select`'s values travel to the prompt request as one JSON value, and the prompt writes them as a list (`fr, de`)
 - **Model: [dropdown]** (BYOK only) — inline above the action buttons; writes to the active connection's `defaultModel` via `QSConnectionsStore`
 - **Primary action button** — context-aware label: `Run` (deterministic) / `Run with AI` (BYOK + auto-execute on) / `Send to AI` (BYOK + auto-execute off) / `Generate prompt` (no BYOK). Label morphs through phases during execution: `Generating prompt…` → `Sending to {model}…` → `Running…`
 - **Secondary `Generate for copy` button** (AI + BYOK) — assembles the prompt without sending; auto-expands + scrolls + focuses the General prompt section + auto-copies the result to the clipboard with a toast confirmation. Lets BYOK users still inspect / re-use the prompt elsewhere
@@ -2527,7 +2536,9 @@ covers the editor UX.
   affects which routes count as reachable.
 - **Actions** (hover-revealed) — `+` to add a child, `⋯` to open the
   context menu (Add child / View in editor / Open page / Edit title /
-  Delete route, with Delete greyed for the home route).
+  Configure resolver / Delete route, with Delete greyed for the home route).
+  Home is the site's root, so its children are the top-level routes: on home,
+  `+` and Add child open the form `+ Add root route` opens.
 
 The tree-toggle chevron expands / collapses parent nodes. Expanded state is
 remembered locally so re-renders (after add / delete / layout toggle) keep
@@ -2564,19 +2575,28 @@ language and re-fetches on the next open.
 with a hint, the global menu + footer links, and a per-route link graph
 table. The banner turns red when any orphan is detected.
 
-**Sitemap.txt generator**. At the bottom: a base-URL input + Preview
-button calls `getSiteMap` with the base, lists every route's URLs (with
-×N langs counts when multilingual), and lets the user toggle rows to
-exclude. A custom-URLs textarea takes one URL per line (for pages outside
-the route system). Save calls `setSiteMapConfig`, which owns **both**
-writes — the excluded-routes / custom-URLs sidecar and the published
-`sitemap.txt`. Reading and writing are separate commands on purpose:
-`getSiteMap` is a pure read available to every member rank, while what the
-published sitemap contains is a write and needs a write role.
+**Sitemap File**. At the bottom, under a base-URL input: **Select your
+links**, one row per route showing its first URL (and ×N langs when
+multilingual), listed when the page opens by `getSiteMap` with that base. A
+click strikes a route out of the sitemap and a second brings it back; the
+header counts the pages kept. Another base URL (on Enter, or on leaving the
+field) redraws the links, and so does adding or deleting a route on the
+page; both keep the routes struck out and the custom URLs typed, and only
+opening the page reads the saved ones. A custom-URLs textarea takes one URL
+per line (for pages outside the route system). **Generate sitemap.txt**
+calls `setSiteMapConfig`, which owns **both** writes — the excluded-routes /
+custom-URLs sidecar and the published `sitemap.txt` — and a warning names
+any custom URL it left out (not a full address). The page then reads the
+file back through `getSiteMap/text`, which applies the same saved
+configuration to the same routes, and shows it read-only under the button
+with its URL count and a Copy button; the box appears once Generate has
+run. Reading and writing are separate commands on purpose: `getSiteMap` is
+a pure read available to every member rank, while what the published
+sitemap contains is a write and needs a write role.
 
 | Concern | Where |
 |---|---|
-| Tree + reachability + add form logic | `public/admin/assets/js/pages/sitemap.js` |
+| Tree + reachability + add form + Sitemap File logic | `public/admin/assets/js/pages/sitemap.js` |
 | Page shell | `secure/admin/templates/pages/sitemap.php` + `sitemap-edit-title.php` partial |
 | Server commands | `addRoute`, `deleteRoute`, `getSiteMap`, `setSiteMapConfig`, `setRouteLayout`, `analyzeReachability` |
 | Route schema | A project's `secure/management/routes.php` (writable via the commands; `varExportNested()` preserves nested string keys) |
@@ -3204,6 +3224,8 @@ Clicking marks the card immediately and then reconciles against the server's ans
 
 `editFavicon` stores a **pointer** — it writes the asset's path into the project config and copies nothing. Renaming the chosen asset follows the pointer; deleting it clears the pointer. So the grid can never show a favicon that is no longer there, and choosing one does not leave duplicate or backup images cluttering the library.
 
+A delete is a delete once the file is gone. If the asset list (each file's description, alt text and star) cannot be saved after it, `deleteAsset` answers `500 server.file_write_failed`: the page shows that answer's message as an error, then does what a delete does — the edit area of a deleted file closes, a selection is cleared, the grid reloads without the file.
+
 A page links its icon only when the icon's file exists: the chosen asset, or `assets/images/favicon.png` when none is chosen. The preview checks on every view, so an icon added while you work shows on the next one; a build decides once, for the files it copies, and a built page makes no check of its own.
 
 ### 9.16 Builds (/admin/builds)
@@ -3359,6 +3381,12 @@ Each field is built from the parameter's `help` entry:
 | `validation` | Under the field as **Validation:**. |
 
 A field starts empty, JSON boxes included, and a field left empty is not sent: an optional parameter the form was not given is absent from the request, so the command applies its own default.
+
+The fields come in up to three groups, by what `help` says of each parameter: **Required Parameters**, which the form will not send without; **Required in Some Cases** — `help` marks the parameter `conditional`, and its description says when it is needed (`addNode`'s `tag` for an element, `textKey` or `textValue` for a text) — which the form never requires, since a request of the other kind must leave it out; and **Optional Parameters**.
+
+`addNode`'s and `editNode`'s `tag` is a searchable list of every tag the commands accept, grouped and described as the visual editor's **HTML Tag** picker shows them; the tags that picker leaves out sit in its **Other** group. `editNode`'s starts blank, which keeps the node's tag.
+
+A parameter `help` names in braces (`{lang}`, `{name}`) travels in the command's address, and its field says *(URL segment)*. The console encodes each piece between two slashes before sending it, so `#`, `?`, `+` and `%` reach the command as typed and a slash stays a separator: a nested page name (`guides/getting-started`, `products/:slug`) reaches `getStructure` and `getPageEvents`, which take it in several segments. `getStyleRule`'s selector and media query are each one segment encoded twice, because the command decodes them once more: a media query holding a `/` (`(min-aspect-ratio: 16/9)`) stays whole.
 
 `getStyleRule`, `setStyleRule` and `deleteStyleRule` add a **CSS Selector Picker** above the fields, listing every rule of the stylesheet by scope. Choosing a rule fills the selector and the media query; in `setStyleRule` it also fills the styles with the rule's current declarations, one per line. The command merges what is sent into the rule: a property sent replaces that property, and the rule's other properties stay — a line deleted from the box is not a property removed, which is what `removeProperties` is for.
 

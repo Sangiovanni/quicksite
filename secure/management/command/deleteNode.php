@@ -1,16 +1,11 @@
 <?php
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/NodeNavigator.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/TagRegistry.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
-
-/**
- * Translatable attributes that may contain translation keys
- * These are created by addNode and should be cleaned up on delete
- */
-const TRANSLATABLE_ATTRS = ['alt', 'placeholder', 'title', 'aria-label', 'aria-placeholder', 'aria-description'];
 
 /**
  * Collect all translation keys from a node and its children recursively
@@ -26,9 +21,10 @@ function collectTranslationKeysFromNode(array $node): array {
         $keys[] = $node['textKey'];
     }
     
-    // Check for translatable attributes in params
+    // Check for translatable attributes in params (TagRegistry's list: the keys addNode's
+    // picker chose, cleaned up on delete)
     if (isset($node['params']) && is_array($node['params'])) {
-        foreach (TRANSLATABLE_ATTRS as $attr) {
+        foreach (TagRegistry::TRANSLATABLE_ATTRIBUTES as $attr) {
             if (isset($node['params'][$attr]) && is_string($node['params'][$attr])) {
                 // Only add if it looks like a translation key (contains dots)
                 $value = $node['params'][$attr];
@@ -264,11 +260,8 @@ function __command_deleteNode(array $params = [], array $urlParams = []): ApiRes
     // Collect translation keys from the node before deletion
     $translationKeys = collectTranslationKeysFromNode($node);
     
-    // Parse node ID into indices
-    $indices = array_map('intval', explode('.', $nodeId));
-    
-    // Remove the node from structure
-    $removeResult = removeNodeFromStructure($structure, $indices);
+    // Remove the node from structure (NodeNavigator::removeNode, the removal every command shares)
+    $removeResult = NodeNavigator::removeNode($structure, $nodeId);
     if (!$removeResult['success']) {
         return ApiResponse::create(400, 'operation.failed')
             ->withMessage("Failed to delete node: " . $removeResult['error']);
@@ -319,76 +312,6 @@ function __command_deleteNode(array $params = [], array $urlParams = []): ApiRes
             'translationKeysRemoved' => count($translationKeys),
             'translationKeys' => $translationKeys
         ]);
-}
-
-/**
- * Remove a node from the structure at the given indices path
- */
-function removeNodeFromStructure(array $structure, array $indices): array {
-    if (empty($indices)) {
-        return ['success' => false, 'error' => 'Empty indices'];
-    }
-    
-    // Detect if root is a single object (component) or array of nodes (page)
-    $isRootObject = isset($structure['tag']);
-    
-    // Navigate to the parent and remove the node
-    $ref = &$structure;
-    
-    for ($i = 0; $i < count($indices) - 1; $i++) {
-        $idx = $indices[$i];
-        
-        if ($i === 0) {
-            // First level access
-            if ($isRootObject) {
-                // Component: first index accesses children directly
-                if (!isset($ref['children'][$idx])) {
-                    return ['success' => false, 'error' => "Node not found at index {$idx}"];
-                }
-                $ref = &$ref['children'][$idx];
-            } else {
-                // Page: direct array access
-                if (!isset($ref[$idx])) {
-                    return ['success' => false, 'error' => "Node not found at index {$idx}"];
-                }
-                $ref = &$ref[$idx];
-            }
-        } else {
-            // Deeper levels - access children
-            if (!isset($ref['children']) || !isset($ref['children'][$idx])) {
-                return ['success' => false, 'error' => "Node not found in children at index {$idx}"];
-            }
-            $ref = &$ref['children'][$idx];
-        }
-    }
-    
-    // Now $ref is the parent, remove the node at final index
-    $finalIndex = end($indices);
-    
-    if (count($indices) === 1) {
-        // Root level deletion
-        if ($isRootObject) {
-            // Component: delete from children array
-            if (!isset($structure['children']) || !isset($structure['children'][$finalIndex])) {
-                return ['success' => false, 'error' => "Root child node not found at index {$finalIndex}"];
-            }
-            array_splice($structure['children'], $finalIndex, 1);
-        } else {
-            // Page: delete from root array
-            if (!isset($structure[$finalIndex])) {
-                return ['success' => false, 'error' => "Root node not found at index {$finalIndex}"];
-            }
-            array_splice($structure, $finalIndex, 1);
-        }
-    } else {
-        // Nested level
-        if (!isset($ref['children']) || !isset($ref['children'][$finalIndex])) {
-            return ['success' => false, 'error' => "Child node not found at index {$finalIndex}"];
-        }
-        array_splice($ref['children'], $finalIndex, 1);
-    }
-    
-    return ['success' => true, 'structure' => $structure];
 }
 
 // Execute via HTTP

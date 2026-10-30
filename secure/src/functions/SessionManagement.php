@@ -438,11 +438,7 @@ function qs_register_note(): string {
         && is_int($written) && time() - $written <= QS_REGISTER_FLASH_TTL) {
         return $username;
     }
-    // Guarded: a visitor with no session has no $_SESSION at all, and on PHP 8.0
-    // an unset() of an offset on it raises an "undefined variable" warning.
-    if (isset($_SESSION[QS_REGISTER_FLASH]) || isset($_SESSION[QS_REGISTER_FLASH_AT])) {
-        unset($_SESSION[QS_REGISTER_FLASH], $_SESSION[QS_REGISTER_FLASH_AT]);
-    }
+    unset($_SESSION[QS_REGISTER_FLASH], $_SESSION[QS_REGISTER_FLASH_AT]);
     return '';
 }
 
@@ -1031,25 +1027,33 @@ function qs_login_throttle_mutate(callable $fn) {
  * qs_login_throttle_mutate for why no read of this store may happen outside
  * it). A store that cannot be read or written admits the attempt: a broken
  * throttle file must not lock every account out.
+ *
+ * $starts receives the wait an admitted attempt starts — the seconds its
+ * failure leaves the next attempt to wait, 0 when it starts none or nothing
+ * was recorded — so the refusal that starts a wait can say so, instead of the
+ * next attempt being the first to hear of it.
  */
-function qs_login_throttle_admit(string $identifier): int {
-    $key  = qs_throttle_hash(strtolower($identifier));
-    $wait = 0; // set inside the lock; the mutate's own return is not needed
-    qs_login_throttle_mutate(function (array &$data) use ($key, &$wait) {
+function qs_login_throttle_admit(string $identifier, ?int &$starts = null): int {
+    $key     = qs_throttle_hash(strtolower($identifier));
+    $wait    = 0; // set inside the lock
+    $pending = 0;
+    $recorded = qs_login_throttle_mutate(function (array &$data) use ($key, &$wait, &$pending) {
         $now   = time();
         $entry = is_array($data[$key] ?? null) ? $data[$key] : [];
         $wait  = max(0, (int)($entry['until'] ?? 0) - $now);
         if ($wait > 0) {
             return false; // refused: nothing to record
         }
-        $fails = (int)($entry['fails'] ?? 0) + 1;
+        $fails   = (int)($entry['fails'] ?? 0) + 1;
+        $pending = $fails >= 5 ? min(3600, 30 * (2 ** ($fails - 5))) : 0;
         $data[$key] = [
             'fails' => $fails,
             'last'  => $now,
-            'until' => $fails >= 5 ? $now + min(3600, 30 * (2 ** ($fails - 5))) : 0,
+            'until' => $pending > 0 ? $now + $pending : 0,
         ];
         return true;
     });
+    $starts = $recorded === true ? $pending : 0;
     return $wait;
 }
 

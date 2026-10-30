@@ -34,12 +34,20 @@ $assignedUsername = qs_register_note();
 $registerNoteHours = intdiv(QS_REGISTER_FLASH_TTL, 3600);
 $setupUsername = $_SESSION[QS_SETUP_FLASH] ?? '';
 $setupUsername = is_string($setupUsername) ? $setupUsername : '';
-// Guarded: a visitor with no session has no $_SESSION at all, and on PHP 8.0 an
-// unset() of an offset on it raises an "undefined variable" warning.
-if (isset($_SESSION[QS_SETUP_FLASH])) {
-    unset($_SESSION[QS_SETUP_FLASH]);
-}
+unset($_SESSION[QS_SETUP_FLASH]);
 $flashUsername = $assignedUsername !== '' ? $assignedUsername : $setupUsername;
+
+// The hint under "Keep me signed in" states the real limits, from auth.php: a
+// session ends after idle_ttl unused, and a remembered cookie remember_ttl after
+// the last visit, so ticked, the shorter of the two. "About": a session's last use
+// is stamped at most once every tenth of idle_ttl.
+$sessionLimits = qs_session_config();
+$rememberHint = $sessionLimits['remember_ttl'] < $sessionLimits['idle_ttl']
+    ? __admin('login.rememberHintBoth', [
+        'remember' => __adminDuration($sessionLimits['remember_ttl'], 'nearest'),
+        'idle'     => __adminDuration($sessionLimits['idle_ttl'], 'nearest'),
+    ])
+    : __admin('login.rememberHint', ['duration' => __adminDuration($sessionLimits['idle_ttl'], 'nearest')]);
 
 // An install with no accounts never reaches this page: the router sends every
 // admin URL to the first-run page while the registry is empty.
@@ -63,6 +71,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (strpos($result, 'throttled:') === 0) {
             $loginError = 'throttled';
             $loginRetryAfter = (int)substr($result, strlen('throttled:'));
+        } elseif (strpos($result, 'invalid_credentials:') === 0) {
+            // The refusal that started a wait: both are said at once.
+            $loginError = 'invalid_credentials';
+            $loginRetryAfter = (int)substr($result, strlen('invalid_credentials:'));
         } else {
             $loginError = $result; // 'invalid_credentials' | 'server'
         }
@@ -110,13 +122,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <?php if ($loginError === 'csrf'): ?>
             <div class="admin-alert admin-alert--error"><?= __admin('login.csrfFailed') ?></div>
             <?php elseif ($loginError === 'throttled'): ?>
-            <div class="admin-alert admin-alert--error"><?= __admin('login.throttled', ['seconds' => $loginRetryAfter]) ?></div>
+            <div class="admin-alert admin-alert--error"><?= __admin('login.throttled', ['duration' => __adminDuration($loginRetryAfter)]) ?></div>
             <?php elseif ($loginError === 'server'): ?>
             <div class="admin-alert admin-alert--error"><?= __admin('login.serverError') ?></div>
             <?php elseif ($loginError === 'missing_fields'): ?>
             <div class="admin-alert admin-alert--error"><?= __admin('login.missingFields') ?></div>
             <?php elseif ($loginError !== null): ?>
-            <div class="admin-alert admin-alert--error"><?= __admin('login.invalidCredentials') ?></div>
+            <div class="admin-alert admin-alert--error"><?= __admin('login.invalidCredentials') ?><?php if ($loginRetryAfter > 0): ?><br><?= __admin('login.throttled', ['duration' => __adminDuration($loginRetryAfter)]) ?><?php endif; ?></div>
             <?php endif; ?>
 
             <form id="admin-login-form" method="POST" action="">
@@ -189,7 +201,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             <?= __admin('login.rememberSession') ?>
                         </label>
                     </div>
-                    <p class="admin-hint"><?= __admin('login.rememberHint') ?></p>
+                    <p class="admin-hint"><?= $rememberHint ?></p>
                 </div>
 
                 <button type="submit" class="admin-btn admin-btn--primary admin-btn--lg admin-btn--block">

@@ -175,7 +175,7 @@ if (!function_exists('qs_translated_call_argument')) {
         if ($keyword !== null) {
             return qs_call_argument_js($keyword . '=' . $translated);
         }
-        if (strpos($translated, '{translation missing:') === 0) {
+        if (Translator::isMissing($translated)) {
             $translated = $value;
         }
         return qs_call_argument_js($translated);

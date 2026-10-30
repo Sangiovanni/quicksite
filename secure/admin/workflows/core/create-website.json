@@ -29,7 +29,7 @@
                 "value": "code",
                 "label": "name"
             },
-            "default": "en",
+            "default": "{{data.langData.languages}}",
             "condition": "multilingual === true"
         },
         {
@@ -42,7 +42,7 @@
                 "value": "code",
                 "label": "name"
             },
-            "default": "en"
+            "default": "{{data.langData.default_language}}"
         },
         {
             "id": "includeAssets",
@@ -72,6 +72,11 @@
             "id": "allLanguages",
             "command": "getLanguageList",
             "extract": "data.languages"
+        },
+        {
+            "id": "langData",
+            "command": "getLangList",
+            "extract": "data"
         },
         {
             "id": "helpAddRoute",

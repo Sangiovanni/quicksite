@@ -345,7 +345,26 @@
         return detail ? base + ' — ' + detail : base;
     }
 
+    // An empty stylesheet removes every style of the site: Save and Overwrite ask first, in the panel's own
+    // dialog. True when there is nothing to ask.
+    function confirmEmptySave(content) {
+        if (content.trim() !== '') return Promise.resolve(true);
+        return QuickSiteUtils.confirm(t('styleSourceEmptyMessage'), {
+            type: 'danger',
+            title: t('styleSourceEmptyTitle'),
+            confirmText: t('styleSourceEmptyConfirm')
+        });
+    }
+
     function saveStyles() {
+        if (!_editor || _isSaving || !_isDirty || _conflict) return;
+        confirmEmptySave(_editor.getValue()).then(function (ok) {
+            if (ok) writeStyles();
+        });
+    }
+
+    // The save itself, once any question is answered.
+    function writeStyles() {
         if (!_editor || _isSaving || !_isDirty || _conflict) return;
         var content = _editor.getValue();
         var base = _serverContent;
@@ -415,13 +434,17 @@
     }
 
     // The conflict notice's Overwrite: the version the notice spoke about becomes the base, so the save
-    // writes over exactly that version — and stops again if yet another change has landed since.
+    // writes over exactly that version — and stops again if yet another change has landed since. An empty
+    // stylesheet is asked about before the notice goes, so a Cancel leaves it standing.
     function overwrite() {
-        if (!_conflict || _isSaving) return;
-        _serverContent = _conflict.content;
-        setConflict(null);
-        updateDirty();
-        saveStyles();
+        if (!_editor || !_conflict || _isSaving) return;
+        confirmEmptySave(_editor.getValue()).then(function (ok) {
+            if (!ok || !_conflict || _isSaving) return;
+            _serverContent = _conflict.content;
+            setConflict(null);
+            updateDirty();
+            writeStyles();
+        });
     }
 
     function cancelEdit() {

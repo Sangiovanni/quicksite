@@ -299,6 +299,33 @@ function __admin(string $key, array|string $paramsOrFallback = [], array $params
 }
 
 /**
+ * A duration in the panel's words: under a minute in seconds, under an hour in
+ * minutes, under a day in hours, then in days, the unit chosen after rounding —
+ * so 3,599 seconds rounded up is "1 hour", never "60 minutes". A wait rounds UP
+ * ('up': 61 seconds is "2 minutes", so nobody is told to try again too early);
+ * a limit stated as "about" rounds to the nearest ('nearest'). The words are the
+ * common.duration keys, singular for a count of one. Anything under a second
+ * counts as one: a wait the panel shows is never nothing.
+ *
+ * @param int    $seconds
+ * @param string $round   'up' (a wait) or 'nearest' (an "about")
+ */
+function __adminDuration(int $seconds, string $round = 'up'): string {
+    $seconds = max(1, $seconds);
+    $count = static fn(int $unit): int => (int)($round === 'nearest' ? round($seconds / $unit) : ceil($seconds / $unit));
+    if ($seconds < 60) {
+        [$n, $unit] = [$seconds, 'second'];
+    } elseif (($n = $count(60)) < 60) {
+        $unit = 'minute';
+    } elseif (($n = $count(3600)) < 24) {
+        $unit = 'hour';
+    } else {
+        [$n, $unit] = [$count(86400), 'day'];
+    }
+    return __admin('common.duration.' . $unit . ($n === 1 ? '' : 's'), ['count' => (string)$n]);
+}
+
+/**
  * Helper function for translation escaped for JavaScript single-quoted strings
  * Escapes apostrophes, backslashes, and newlines
  */

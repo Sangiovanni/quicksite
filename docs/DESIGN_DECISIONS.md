@@ -13860,3 +13860,480 @@ proposed, the alerts converted). `public/admin/assets/js/core/utils.js`, `public
 and the ten files whose questions moved (`preview.js`, `preview-style-source.js`,
 `preview-style-motion.js`, `preview-js-interactions.js`, `dashboard.js`, `assets.js`, `sitemap.js`,
 `privacy.js`, `storage.js`, `ai/ai-connections.js`) with `templates/layout.php`.
+
+### A page with no title shows its address, readable, and the editor sets a page's title in place (locked 2026-10-23)
+
+**Decision**: A page whose title the language served does not hold no longer shows the Translator's missing marker
+in its tab. Both page shells, `PageManagement::render()` on `/p/` and `Page::render()` in a build, compute the title
+with one function, `qs_page_title()` (`runtimePlaceholders.php`). A title the page has takes the request's
+placeholders as before. A page with none shows the last segment of its address, readable: hyphens, underscores and
+spaces become one space and the first letter is capitalised, so `get-started` reads *Get started*; on a parameter
+route the segment is the value the address carries (`/products/red-vase` on `products/:slug` reads *Red vase*); the
+home page reads *Home*, an address no route matches *404*. That fallback takes no placeholder: it comes from the
+address, and an address carrying `{{resolved:…}}` shows that text as written. Only a page title's marker falls back;
+any other key's marker stays visible. The visual editor's toolbar gains a **Title** field, shown while a page is the
+edit target: it holds the page's title in the language shown (on a one-language site, the one in `default.json`),
+saves it through `editTitle` on Enter or when the field is left, puts the saved title back on Escape or when
+emptied, and shows the fallback as its placeholder. `generate_page_template()` loses its dead fallback branch: a new
+page's template asks for its title like every other. Code that recognises the missing marker asks
+`Translator::isMissing()`.
+
+**Reasoning**: `addRoute` creates a page without a title, so the tab of every new page read
+`{translation missing: page.titles.get-started}` until the author found `editTitle`, which nothing in the editor
+reached. The address is the one title-like thing every page has, in every language, and its readable form is what
+an author would have typed. The router's own answer is used, its segments and captured values, so an address no
+route matches reads *404* rather than whatever was typed, and a multilingual site's language segment is never taken
+for the page. The fallback is never filled because a value in an address is the visitor's, not the author's:
+filling it would let an address bring the request's resolved values into the tab. Doing it in the shells, not in
+each page's template, covers every page made before, with no migration. The field sits where the page and the
+language are chosen, so a title is set where it shows.
+
+**Alternatives considered**: keeping the marker (it is how a missing key is found, but a page title is missing on
+every new page by design, so it only taught authors to ignore it); the site name, or the route pattern
+(`products/:slug`), as the fallback (the first is the same on every page, the second unreadable);
+`{{__current_route}}`, the last segment of the request's path (on an address no route matches, it is whatever the
+visitor typed); writing a title into every new page's translations at `addRoute` (an English text in every
+language, under a key the author did not choose); a title field in a modal or on the Sitemap page (away from the
+page it names).
+
+**Source**: Sangio's list of found defects, design round 2026-10-23 (the field after the Language picker, saved on
+Enter or when left, the address as the fallback). `secure/src/functions/runtimePlaceholders.php`
+(`qs_page_title()`), `secure/src/classes/Translator.php` (`MISSING_PREFIX`, `isMissing()`), `PageManagement.php`,
+`Page.php`, `utilsManagement.php`, `runtimeHandoff.php`; the field in `templates/pages/preview/toolbar.php`,
+`preview.js`, `preview-config.php` and `admin.css`.
+
+### The Text tab adds at the element's end, and beside an element only where it shows inline (locked 2026-10-23)
+
+**Decision**: In the visual editor's Add form, the **Text** tab starts on **Inside**, and its Inside adds the text
+as the element's last child: the editor sends `addNode` `position: "inside-end"`, which `addNode` now accepts (the
+insert every command shares already took it for `moveNode`), and the preview's live insert puts the node last. The
+other tabs keep Inside as the first child. **Before** and **After** show for a text only beside an element the page
+displays inline: the preview reports it from the browser's computed `display` (`inline`, `inline-block`,
+`inline-flex`…), after the project's CSS, and there the new text continues the line. Beside a block the text goes
+inside it; where neither fits (an element that holds nothing and displays as a block, such as a rule), the form
+says so and Add is disabled. At a structure's root a text goes in first, as every add there does.
+`TagRegistry`'s block and inline tag lists and its `getCategory()`, which nothing read, are removed.
+
+**Reasoning**: An author writes a sentence in order. In a paragraph holding "Hello", the text added next belongs
+after it, not before ("worldHello"); and on a block, where Inside is the only place a text can go, a first-child
+Inside left no way to add a sentence's last word. Text beside a block element would be a stray text between blocks,
+rendered as its own anonymous line; beside an inline element (a bold word, a link) it is part of the line, which is
+what Before / After are for. Whether an element is inline is the browser's answer, not the tag's: a link styled as
+a block is a block, a span styled `inline-flex` is still in the line, so no tag list can say it, and the computed
+display keeps no list at all.
+
+**Alternatives considered**: Inside as the first child for the Text tab too (what the other tabs do, and the
+defect); a list of inline tags, `TagRegistry`'s `INLINE_TAGS` or a new one (wrong for every element the project's
+CSS displays otherwise, and one more list to keep); Before / After everywhere (the stray line beside a block);
+hiding the Text tab where nothing fits (the author would not learn why).
+
+**Source**: Sangio, through the manager, in the found-defects round of 2026-10-23 (Inside at the end; the inline
+elements he had in mind were `<b>`, `<i>`, `<u>` and their kind). `secure/management/command/addNode.php`,
+`secure/src/classes/TagRegistry.php`; `preview.js` (`_syncAddPositionOptions()`, `addTextNode()`),
+`preview-iframe-inject.js` (`isInlineLevel()`, `insertNodeIntoDom()`), `contextual-add.php`, `preview-config.php`.
+
+### The editor offers only the events the interaction commands accept (locked 2026-10-23)
+
+**Decision**: An element's event list in the Interactions tool holds two groups, **Common for** the element's tag
+and **Less common**. `listInteractions` also answers an `advanced` bucket (`oncontextmenu`, the three touch events,
+`onfocusin` / `onfocusout`, and for an input or a textarea `onpaste` / `oncopy` / `oncut`); the editor no longer
+offers it, and the nine tooltips only it read are gone from `en.json`, `fr.json` and the editor's fallback map. The
+tooltips are exactly the accepted events'.
+
+**Reasoning**: `addInteraction` and `editInteraction` accept `UNIVERSAL_EVENTS` and the tag-specific events only.
+Every Advanced event answered 400 `validation.invalid_value`, so the group offered a choice that could only fail,
+and only once the author had built the whole interaction.
+
+**Alternatives considered**: making the commands accept the Advanced events (a separate decision about what the
+runtime supports, with every verb's `events` list to extend); showing them disabled, with the reason (a list of
+things one cannot do).
+
+**Source**: Sangio's list of found defects, design round 2026-10-23. `preview-js-interactions.js`
+(`populateEventDropdown()`), `secure/admin/templates/pages/preview-config.php`, `secure/admin/translations/en.json`
+and `fr.json`.
+
+### A paste into the text being edited is plain text on one line, and an ended edit leaves only its text (locked 2026-10-23)
+
+**Decision**: In the visual editor's Text mode, a paste into the text being edited inserts the clipboard's plain
+text, each run of line breaks one space, through the browser's own insertion (`insertText`, so Ctrl+Z undoes it;
+through the selection where a browser has none). A paste anywhere else, or outside Text mode, stays the browser's.
+When an edit ends (Enter, a click away, another text), the element is left holding exactly the text saved, so
+whatever reached it while it was editable (a drop of formatted text, a bold shortcut) leaves the preview at once.
+Escape still restores the original.
+
+**Reasoning**: A text node holds one line of text, and the save takes the element's `textContent`: a rich paste's
+markup and styles were never saved, but they stayed on the canvas until the next reload, showing the author a page
+that did not exist. A line break cannot be kept either (Enter saves). Inserting through the browser keeps its undo;
+replacing the element's content when the edit ends is the one place every way of bringing in markup passes.
+
+**Alternatives considered**: cleaning the pasted HTML down to a few inline tags (the saved text cannot hold them,
+so the canvas would still differ from the page); keeping line breaks as `<br>` (a text node holds no markup);
+blocking the paste (the common way to bring a text in).
+
+**Source**: Sangio's list of found defects, design round 2026-10-23.
+`public/admin/assets/js/pages/preview/preview-iframe-inject.js` (the paste listener, `finishTextEdit()`).
+
+### The State & Animation Editor's Save writes only what the author asked for (locked 2026-10-24)
+
+**Decision**: In the State & Animation Editor, each state's add row ends with its own action row, under the property
+and its value: **Cancel** and **+ Add**, the panel's small buttons with words (`common.cancel`, `common.add`), where a
+bare check mark and cross sat beside the value. **Save** first adds what an open row still holds (a property and a
+value), then writes the `transition` declaration only when its settings changed since the editor opened; with
+nothing else to do it closes. Properties are still written the moment they are added or removed. The editor reads
+the rule's own transition as written, on opening: its properties, its duration and delay with their units, its
+timing (a `cubic-bezier()` in its four fields), the parts in any order; an add or a delete keeps what the author
+set. Each property of a list has its own settings: see the entry below.
+
+**Reasoning**: Save saved the transition and nothing else: a property typed in the add row and not confirmed with
+its unlabelled check mark was dropped, and a `transition: all 0.3s ease` was written into a rule that never had one
+(both happened together in a UX run, the colour lost and the rule changed). The author's intention is plain once a
+property and a value are typed, so Save carries it out rather than losing it. Writing the transition back when only
+the rule already had one would not be safe either: the editor read any transition's property as `all`, so an
+untouched `opacity 1s linear` came back as `all 1s linear`, and even read faithfully a transition can hold more
+than one set of controls shows. Comparing with the settings as the editor opened writes exactly when the author
+changed what the editor shows. Read faithfully, those settings are the rule's: `opacity` stays `opacity` when the
+duration changes, `300ms` stays milliseconds (it had become 300 seconds), and a `cubic-bezier()` written with
+spaces is read whole (its commas had been read as a delay).
+
+**Alternatives considered**: renaming Save to "Save transition" (honest, but what was typed is still lost);
+writing the transition whenever the rule has one (the lossy rewrite above); asking before closing over a typed row
+(one more dialog for an intention already shown); making the transition settings immediate like the properties (a
+redesign of the editor, a decision of its own).
+
+**Source**: Sangio's UX run during beta.12's found-defects round, 2026-10-24 (his layout: the buttons at the right of
+the whole row, larger, a + for Add; then his go to read a rule's transition as written). `secure/admin/templates/pages/preview/modals/transition.php`,
+`public/admin/assets/js/pages/preview/preview-transition-editor.js` (`addPendingProperties()`, `saveTransition()`),
+`public/admin/assets/admin.css`.
+
+### The command console sends a URL field encoded, piece by piece (locked 2026-10-23)
+
+**Decision**: The command console (`/admin/command`) encodes every value it puts in a command's address: each piece
+between two slashes on its own (`encodeURIComponent`), the slash kept as a separator. A field whose command decodes
+its segment once more after the dispatcher has is one segment encoded twice, marked by that command's own console
+form (`data-url-encode="twice"`): today `getStyleRule`'s selector and media query. One encoder,
+`QuickSiteAdmin.urlSegments()`, serves the console's submit and the style-rule picker's own reads.
+
+**Reasoning**: Sent as typed, `#hero` ended the address (a browser keeps a fragment to itself) and `getStyleRule`
+answered 400; a `+` reached `getStyleRule` as a space; a media query's `/` split it into two segments. Keeping the
+slash a separator keeps the commands that take a nested page name in several segments working (`getStructure`,
+`getPageEvents`). Encoded twice, a slash inside a value reaches the server as `%252F`, never as the `%2F` Apache
+refuses by default.
+
+**Alternatives considered**: a key in `help` naming the commands that decode twice (`help` is the API's public
+specification, and the console form already knows its command); encoding each value whole (a nested page name
+would arrive as one segment its command does not split); making `getStyleRule` decode once (a change every caller
+of the API would see, while its picker already encodes twice).
+
+**Source**: beta.12's found-defects round, design round 2026-10-23. `public/admin/assets/admin.js`
+(`urlSegments()`, the console's submit), `public/admin/assets/js/pages/command-form.js` (`initStyleRuleForm()`).
+
+### A workflow's language fields start from the edited project's languages (locked 2026-10-23)
+
+**Decision**: `create-website` and `create-landing` propose the project's languages in the same field, the language
+list (`tag-select`, its options from `getLanguageList`), and its default language in the same **Default language**
+field. Both read them as `setup-languages` does, from an unconditional `langData` requirement (`getLangList`) that the
+runner's `ai-spec-raw?withData=1` resolves before the form is shown; a project with no language setting gets what
+`getLangList` answers for it, the engine's one fallback (its default language, else `en`). `create-landing` sets its
+languages through its AI, as before: its prompt names the project's languages now and asks for `setDefaultLang` when
+the chosen default is another one, in both branches (several languages; one). A list reaches the prompt whole: the
+runner sends it as JSON, which the `ai-spec` arm decodes, and `{{param.x}}` writes it as `{{data.x}}` does ("fr,
+de"). A field is what its workflow's JSON declares: the runner has no code for one workflow.
+
+**Reasoning**: Both workflows proposed `en` whatever the project held, and `create-landing` took its languages as free
+text with no default to choose. Sent as repeated query keys, a list reached the prompt as its last value (PHP keeps the
+last of a repeated key), so the AI was told one language of two.
+
+**Alternatives considered**: the installation's default language (what a new project starts in, not what an existing
+one holds); `create-landing` set up as `create-website` declares it, through the `setup-languages` pre-workflow and a
+prompt that calls the languages configured (the editor's AI tools run only the commands the AI answers, not an AI
+workflow's pre-workflows, so nothing would set them); the list joined into one text value in the runner (the arm
+already takes structured values as JSON, and the same value then serves a condition that reads it as a list).
+
+**Source**: beta.12's found-defects round, design round 2026-10-23; the list, the default and the prompt from Sangio's
+UX runs, 2026-10-24. `secure/admin/workflows/core/create-website.json`, `create-landing.json`, `create-landing.md`;
+`preview-ai-tools.js` (`_buildParamQueryString()`); `WorkflowManager::renderPrompt()`.
+
+### On the Sitemap, Add child on home adds a top-level route (locked 2026-10-24)
+
+**Decision**: Home is the site's root, so its children are the site's top-level routes. Home's row carries its `+`
+and its context menu its **Add child**, as every other route's does; both open the form **+ Add root route** opens,
+and the route made is a top-level one.
+
+**Reasoning**: An author adding a page under the root reaches for Add child on home, where the panel offered
+nothing and sent them to another button for the same act.
+
+**Alternatives considered**: a child under home's own path (`home/x`, an address no author means: home is served
+at the root); leaving it to **+ Add root route** alone.
+
+**Source**: Sangio's UX run during beta.12's found-defects round, 2026-10-24.
+`public/admin/assets/js/pages/sitemap.js` (`_addChildParent()`).
+
+### The Sitemap File shows its links with the page, and the file Generate wrote after Generate only (locked 2026-10-25)
+
+**Decision**: The Sitemap page's Sitemap File section lists its links (one row per route, written with the base URL in
+its field) as soon as the page opens, with no Preview step; a click strikes a route out, another brings it back, and the
+header counts the pages kept. Another base URL, or a route added or deleted on the page, redraws the links and keeps the
+choices on screen; only opening the page reads the saved ones. **Generate sitemap.txt** (`setSiteMapConfig`, with
+`save`) saves the choices and writes the file, a warning names any custom URL the command left out, and the page then
+reads the file back through `getSiteMap/text` and shows it, read-only, with its URL count and a Copy button. The
+written file is shown after Generate only, and it is read back from the engine, never built by the page.
+
+**Reasoning**: The routes to choose sat in a box titled "sitemap.txt", behind a Preview button, and the file Save wrote
+was never shown; the box's count called a page in two languages one URL. `getSiteMap/text` applies the saved
+configuration to the routes with the function `setSiteMapConfig` writes with (`qs_sitemap_apply_config()`, one URL a
+line), so right after Generate it answers the file's bytes. Before Generate it answers what Generate would write now,
+which is not the file on disk once the routes have changed, so the box waits for Generate rather than show, titled as
+the file, something that may not be it.
+
+**Alternatives considered**: the file box on opening too, titled for what it is (what Generate would write); the page
+building the file's lines from its own list (a second implementation of what the engine writes, free to drift);
+`setSiteMapConfig` answering the text it wrote (a command change, for what an existing read already answers); a redraw
+that takes the saved choices again (it would throw away the routes struck and the custom URLs typed whenever the base
+URL changed).
+
+**Source**: beta.12's found-defects round: Sangio's UX run of the Sitemap page, 2026-10-24, and the draft he approved,
+2026-10-25. `secure/admin/templates/pages/sitemap.php`; `public/admin/assets/js/pages/sitemap.js`
+(`loadSitemapLinks()`, `generateSitemapFile()`, `showGeneratedSitemap()`).
+
+### Every insert refuses a target that cannot hold children one way: the shared insert's (locked 2026-10-24)
+
+**Decision**: An insert inside a node that cannot hold children — a text node, a component call, or a void element
+such as `img` — and an insert at a root that is one, is refused by the shared insert alone (`NodeNavigator::insertAt()`
+/ `insertAtRoot()`), with `400 operation.failed` and its sentence ("The target node cannot hold children", "The target
+node is an img element, which cannot hold children"). No command checks it first with an answer of its own: `addNode`,
+`insertSnippet`, `addComplexElement` and `addComponentToNode` answer it as `moveNode` always has.
+
+**Reasoning**: The four commands checked two of the three kinds themselves, earlier, and answered them
+`400 validation.invalid_value`, so one refusal reached a caller with two codes depending on what the target was. Each
+early check refused a subset of what the shared insert refuses, so removing them lets no insert through. Before they
+went, it was proven that none of them was protecting anything: through the real commands, a refused insert (into a
+text node and into a component call; inside, inside-end and at a root) leaves every file of the project as it was,
+bytes and times, and the files the process opens on its way to the refusal are exactly those a void element's refusal
+opened before, none of them for writing.
+
+**Alternatives considered**: `addComponentToNode` alone, the command the split was found in (the other three would
+keep answering two ways); keeping the early checks beside the shared one (two places to keep in step for one rule).
+
+**Source**: beta.12's found-defects round, design round 2026-10-23; the proof's terms agreed 2026-10-24.
+`addNode.php`, `insertSnippet.php`, `addComplexElement.php`, `addComponentToNode.php`;
+`NodeNavigator::insertAt()` / `insertAtRoot()`.
+
+### An empty stylesheet is a stylesheet: the command accepts it, the panel asks first (locked 2026-10-23)
+
+**Decision**: `editStyles` accepts an empty content as it accepts one space: the stylesheet is emptied. CSS Source asks
+before it saves an empty or blank text — *Empty the stylesheet?*, "Saving an empty stylesheet removes every style of
+this site.", **Empty it** — in the panel's own dialog (`danger`), on Save and on the conflict notice's Overwrite, which
+asks before it drops the notice. The console's form and the CSS Refiner send what they send.
+
+**Reasoning**: The command refused an empty content ("Content cannot be empty") while one space passed, and deleting
+rules one by one empties the file anyway: the refusal protected nothing and stopped an author who meant it. The
+question belongs where an empty text can be a slip — a select-all and a delete in Source — not in the API.
+
+**Alternatives considered**: a flag the command needs before it accepts an empty file (a second spelling of a request
+that already says what it means); the question in every surface that writes the whole file (the console sends the
+command as typed, and the CSS Refiner shows its changes before it applies them).
+
+**Source**: beta.12's found-defects round, design round 2026-10-23. `secure/management/command/editStyles.php`;
+`public/admin/assets/js/pages/preview/preview-style-source.js` (`confirmEmptySave()`).
+
+### A delete answers a failed save of the asset list, and the Media page follows the delete (locked 2026-10-25)
+
+**Decision**: `deleteAsset` saves the asset list (each file's description, alt text and star) only when the list named
+a deleted file. When that save fails, the files stay deleted and the answer is `500 server.file_write_failed` — "The
+file was deleted, but the asset list could not be updated." (a batch: "N files were deleted, …") — with the success
+answer's data. On that answer the Media page shows the message as an error and does what a delete does: the deleted
+file's edit area closes, a selection clears, the grid reloads.
+
+**Reasoning**: The command ignored the save's result and answered 204, so the list kept the entry of a file that was
+gone, and a file uploaded later under the same name inherited its description and star. A save attempted when the list
+named none of the files could only fail with nothing stale, so it is not attempted. A deleted file cannot be put back,
+so the page shows what is true — the file gone — beside the error.
+
+**Alternatives considered**: saving the list first and deleting the file after (a failed delete would then leave a
+file the list no longer describes); keeping the deleted file on screen until a reload.
+
+**Source**: beta.12's found-defects round, design round 2026-10-23; the page's part 2026-10-24; the save's condition
+and the words 2026-10-25. `secure/management/command/deleteAsset.php` (`AssetMetadataManager::remove()` answers whether
+it removed an entry); `public/admin/assets/js/pages/assets.js` (`deletedButListNotSaved()`).
+
+### The translatable attributes are one list, in TagRegistry (locked 2026-10-24)
+
+**Decision**: `TagRegistry::TRANSLATABLE_ATTRIBUTES` — `alt` and the reserved params (`placeholder`, `title`,
+`aria-label`, `aria-placeholder`, `aria-description`), in that order — is the one list of attributes whose value is
+translated when it looks like a key, and `TagRegistry::EMPTY_MEANINGFUL_ATTRIBUTES` (`alt`, `aria-label`) the one list
+of attributes written even when empty. The renderer and the compiler read both; `deleteNode`, `duplicateNode`,
+`insertSnippet`, `listComponents` and `qs_component_variables()` (which `addComponentToNode` and
+`editComponentToNode` share) read the first; the editor's snippet preview reads both through `editorPayload()`.
+`insertSnippet` gives a new key to all six, as every other command does.
+
+**Reasoning**: The list was written nine times — eight in PHP, once in the editor — and a tenth time, shorter, in
+`insertSnippet`, which left a snippet's `aria-placeholder` / `aria-description` key as it was, with no translation
+copied. Its order matters twice: `duplicateNode` numbers the keys it makes in it and `deleteNode` answers the keys it
+removes in it, so the one list keeps the commands' order. Written as `alt` and the reserved params, those five are
+never written twice.
+
+**Alternatives considered**: a list beside each reader, kept in step by hand (how they drifted); the renderer's list
+read by the others (the commands do not otherwise load the renderer, and the editor already reads `TagRegistry`).
+
+**Source**: beta.12's found-defects round, design round 2026-10-23; the shorter list and the list of empty ones
+2026-10-24. `secure/src/classes/TagRegistry.php`; `secure/src/functions/componentPolicy.php`
+(`qs_component_variables()`).
+
+### A rule inside @media is written one way (locked 2026-10-25)
+
+**Decision**: Inside an `@media` block, a rule's declarations sit one level (four spaces) in from its selector and its
+`}` at the selector's column, whether the rule is updated, added to a block that exists or written in a new block. An
+added rule and a new block come after one blank line, as a new rule outside any block does. A rule taken out of a
+block — by `deleteStyleRule`, or by `setStyleRule` when it leaves a rule no declaration — leaves nothing where it was:
+the space before it goes with it, and a first rule's place starts after the line break that opens the block.
+
+**Reasoning**: A delete inside `@media` added a line break at each end of the block and left a line of spaces where
+the rule was; an update wrote the rule's declarations at the selector's column and its `}` at column 0; an add and a
+new block wrote declarations at the selector's column, the new block after two blank lines; an update that emptied a
+block's first rule left a blank line after the brace. Every such edit made `style.css` read worse in CSS Source.
+
+**Alternatives considered**: the delete and the update only, as reported (the add paths keeping their own layout); an
+added rule on the line after the block's last one (the starter's sheet separates a block's rules with a blank line,
+and the engine separates rules outside any block the same way).
+
+**Source**: beta.12's found-defects round: the delete and the update from an earlier review, the add paths
+2026-10-24, the first rule and the added rule's blank line 2026-10-25. `CssParser::setStyleRule()`,
+`deleteStyleRule()`, `withoutBlock()`, `lineIndent()`.
+
+### A command's answer names a file relative to the project, so its file field stays (locked 2026-10-25)
+
+**Decision**: The `file` field of `addNode`, `deleteNode`, `moveNode` and `duplicateNode` — and of `getStructure`,
+`editStructure`, `editNode`, `getStyles` and `editStyles`, with `editStyles`' `project_file` — stays in their answers:
+it names the file the command read or wrote, relative to the project (`templates/model/json/pages/home/home.json`,
+`public/style/style.css`), the same on every installation. `help`'s examples show that form.
+
+**Reasoning**: Every value an `ApiResponse` carries — its data, its errors, its message — goes through
+`qs_scrub_paths()` when it is set: a path under the project becomes project-relative, one elsewhere in the
+installation install-relative. The fields read as if they named absolute paths and were to be dropped for it; run
+through the real commands and the real dispatcher, they never do, and no deployment layout makes them, since a
+project command's public folder is the project's own.
+
+**Alternatives considered**: dropping the fields (a change to the answers with nothing left to protect).
+
+**Source**: beta.12's found-defects round, 2026-10-25, measured through the real commands and dispatcher.
+`secure/src/functions/publicPaths.php`; `secure/management/command/help.php`.
+
+### The console shows a parameter required in some cases apart, and offers a tag from the editor's list (locked 2026-10-29)
+
+**Decision**: The command console lists a command's parameters in up to three groups: those `help` marks required,
+which the form will not send without; those it marks `conditional` — needed by some requests, the description saying
+which — under *Required in Some Cases*, which the form never requires; and the optional ones. `addNode`'s and
+`editNode`'s `tag` is a searchable list of every tag the commands accept, grouped and described as the visual editor's
+HTML Tag picker shows them, the tags that picker leaves out in its Other group; `command-form.php` writes it from
+`TagRegistry` (`getUICategories()`, `ALLOWED_TAGS`). `addNode`'s position offers `inside-end`, which the command takes.
+
+**Reasoning**: The console made every truthy `required` a required field, so `addNode` could not be sent for an
+element without a `textKey` — which it then attached as the element's text — nor for a text without a `tag`; `help`
+already said which requests need each. The tag was free text in the console while the editor offers a described list
+of the same tags.
+
+**Alternatives considered**: the conditional parameters under *Optional* with a marker (a field some requests need
+would read as never needed); the form requiring a conditional field by the values of the fields that decide it (a
+second copy of each command's rule, in the page); a text field with suggestions for the tag (every accepted tag is in
+the list, so a value outside it is one the command refuses); the editor's 75 tags only (the console is the whole API:
+ten accepted tags would be out of its reach).
+
+**Source**: Sangio's UX run of beta.12's found-defects round, 2026-10-29. `public/admin/assets/js/pages/command-form.js`
+(`renderParameterForm()`, `_initTagSelect()`), `secure/admin/templates/pages/command-form.php`.
+
+### PHP 8.3 is the floor, and setup checks it before writing anything (locked 2026-10-23)
+
+**Decision**: QuickSite supports PHP 8.3 and later. The README says so ("tested on 8.3 and 8.4") and asks for a
+patched release of the branch — at least 8.3.36, 8.4.27 or 8.5.12, after the PHP security release of 21 October
+2026; a build's deployment notes and the build workflow's requirement say "PHP 8.3 or newer". Both setup scripts ask
+the `php` on the PATH, or the one the `PHP` variable names, for its version before they write anything, and stop
+below 8.3 with a message naming that PHP and its version; when they find no PHP, or one that answers no version,
+they say the version could not be checked and show the menu. What existed only for an older PHP is gone: the
+`array_is_list()` polyfill and the compiler's require of `utilsManagement.php` for it, two `isset()` guards around
+an `unset()` of `$_SESSION`, the `image/x-ms-bmp` upload type. The comments that recorded a behaviour on 8.0 state
+what was measured on 8.3, 8.4 and 8.5, and the stylesheet cap's measurement is restated on 8.3: the worst 512 KB
+sheet peaks at 74 MB under the 128 MB limit, so the cap stays.
+
+**Reasoning**: The 21 October 2026 release fixed two remote code execution flaws in every PHP that serves web
+requests, in 8.2.35, 8.3.36, 8.4.27 and 8.5.12; 8.1 and older get no release, and 8.2's fixes end on 31 December
+2026. Setup is where an operator meets the requirement before anything runs, so it checks at once, before the
+ownership fix and the files its first screen writes. It asks the command-line PHP, which may not be the web
+server's (mod_php, php-fpm): a refusal is certain, a pass is a good sign, and a missing `php` cannot block a
+server whose web PHP is fine. Only the floor is checked: patch numbers change with every advisory, so they live in
+the README. Code kept for a PHP nobody may run is code nobody tests; each removal was measured on the supported
+versions first (a BMP's type comes from the libmagic and database PHP bundles, so it follows PHP's version).
+
+**Alternatives considered**: checking the patch release too (out of date at the next advisory); checking at the
+first menu item (setup writes before the menu); refusing when no PHP is found (it would block a server whose
+command-line PHP is simply not on the PATH); keeping the code for 8.0 to 8.2 (untested code for versions the floor
+excludes).
+
+**Source**: Sangio, 2026-10-23 (beta.12): "everything related to a version lower than 8.3, we remove"; the floor
+in `CLAUDE.md` since then. `README.md`, `setup.sh`, `setup.bat`, `secure/management/command/build.php`,
+`secure/admin/workflows/core/build-quicksite-v2.json`, `secure/src/functions/utilsManagement.php`,
+`secure/src/classes/JsonToPhpCompiler.php`, `secure/src/functions/filePolicy.php`.
+
+### A wait or a limit in time is said in the panel's words, and the login page states the real limit (locked 2026-10-23)
+
+**Decision**: One formatter, `__adminDuration()` beside `__admin()`, says a number of seconds in the panel's
+language: under a minute in seconds, under an hour in minutes, under a day in hours, then in days, the unit chosen
+after rounding (3,599 seconds rounded up is "1 hour", never "60 minutes"), singular for one. A wait rounds up — the
+three "too many attempts" messages (sign-in, registration, first run) say "try again in 2 minutes" for 61 seconds —
+and a limit said as "about" rounds to the nearest. Under **Keep me signed in**, the login page states `auth.php`'s
+`idle_ttl`; when `remember_ttl` is the shorter it names both (ticked, the shorter; unticked, `idle_ttl`). Setup's
+item 11 sets `idle_ttl` from a number and `m`, `h` or `d`, at least 5 minutes (the engine's own minimum); 1 day
+chosen before `auth.php` exists leaves it absent. The duration words and the hint are in English and French.
+The refusal that starts a wait (the fifth wrong password, and the first after each wait) says so under its
+*invalid username or password*, and the `login` command's 401 carries the wait as `retry_after`, as the next
+attempt's 429 would.
+
+**Reasoning**: "Try again in 3599 seconds" is a number nobody reads, and "your session stays active on this device"
+promised nothing an author could plan with: the hint is where they learn when they will be signed out. A wait
+rounded up never tells anyone to try again too early; a limit is approximate anyway (a session's last use is
+stamped at most once every tenth of the limit), hence "about" and the nearest unit. One function keeps every such
+text in step. The words are in both languages — an exception to adding new keys in English only — because the
+panel's front door must read whole in either. A wait nobody announced is met by being refused again: the attempt
+that starts one already knows it, since the throttle counts every attempt before checking it.
+
+**Alternatives considered**: formatting in the browser (the four texts are written by the server); the limit
+exactly, in seconds (precise and unreadable); a hint naming only `idle_ttl` (wrong when the remembered cookie
+expires first); setup asking for seconds (an operator thinks in minutes, hours and days); leaving a wait to the
+next attempt (the throttle's behaviour until then: the refusal that started one read only *invalid*); a wait
+message in place of *invalid* (it would hide that the password was wrong).
+
+**Source**: Sangio, 2026-10-02 and 2026-10-23 (beta.12), the words as proposed; the second sentence and its French
+2026-10-29; the refusal that starts a wait 2026-10-30, after Sangio's test of the login page.
+`secure/admin/functions/AdminTranslation.php`, `secure/admin/templates/pages/login.php`, `register.php`,
+`setup.php`, `secure/admin/translations/en.json`, `fr.json`, `setup.sh`, `setup.bat`,
+`secure/src/functions/SessionManagement.php` (`qs_login_throttle_admit()`), `AuthManagement.php`,
+`secure/admin/AdminRouter.php`, `secure/management/command/login.php`.
+
+### The State & Animation Editor gives each property of a transition its own settings (locked 2026-10-24)
+
+**Decision**: The editor's **Properties** is **All Properties** — one duration, delay and timing, the property
+`all` — or **Specific Properties**: a row per property, each with the searchable picker of every CSS property (one
+already in a row is not offered again), its own duration and delay with their units, its timing (a
+`cubic-bezier()` in four fields) and ✕. **+ Add Property** under the rows adds one with the settings of the row
+above it; ✕ on the last row leaves one empty row. Switching to Specific gives a row to each property the rule's
+states set, each with All's settings (none set: one empty row); switching back to All keeps the first row's
+settings. A rule's transition opens as All only when it is a single transition of `all`; anything else opens as
+rows, `all` inside a list as one row's property. A timing the picker does not offer stays in its row as written,
+one more choice of that row's timing list. The line under the settings shows the whole value, and Save writes it
+only when it changed since the editor opened. The checkboxes, and the note that the settings showed a transition
+in part, are gone.
+
+**Reasoning**: A transition list is a list of properties each timed on its own (`color 300ms linear,
+background-color 1s ease`); one set of controls for all of them rewrote every property's timing whenever one was
+changed. Rows hold the list as CSS holds it, so what the editor builds again is what the rule holds, and a change
+to one row leaves the others as written. A timing kept as written, rather than shown as `ease` beside a warning,
+can no longer be replaced by a change made to another row. A new row usually wants the timing of the one above.
+
+**Alternatives considered**: the boxes and one set of controls (the rewrite above); a note for a timing the picker
+lacks, its row showing `ease` (a change to any other row would replace it); a new row with the editor's defaults
+(retyping for the common case); restoring the rows a switch to All dropped when switching back (state kept for a
+rare round trip).
+
+**Source**: Sangio's design and its defaults, 2026-10-24 (beta.12, after his UX run of the transition parse); the
+timing kept as written and the new row's settings, 2026-10-29.
+`secure/admin/templates/pages/preview/modals/transition.php`,
+`public/admin/assets/js/pages/preview/preview-transition-editor.js`, `public/admin/assets/admin.css`.

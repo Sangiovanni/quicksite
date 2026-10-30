@@ -9,6 +9,9 @@ REM Usage:
 REM   setup.bat                       (menu)
 REM   setup.bat www.example.com       (pre-answer the public-folder rename,
 REM                                    then show the menu)
+REM   set PHP=C:\php83\php.exe        (then setup.bat: check that PHP's version
+REM                                    rather than the php on the PATH; in
+REM                                    PowerShell, $env:PHP = 'C:\php83\php.exe')
 REM
 REM A MENU, NOT A WALK. Every item is independent and re-runnable: come back
 REM later to change one thing without answering the other five again. The
@@ -25,9 +28,13 @@ REM   7. Storage quotas       - per-account size and upload-rate ceilings
 REM   8. Self-deploy          - may this install write a built site onto a path?
 REM   9. Command console      - offer the raw command runner at /admin/command?
 REM  10. Default language     - the language a new project starts in
+REM  11. Idle sign-out        - how long the panel may go unused before it signs
+REM                             you out
 REM
 REM Items 1-3 rewrite init.php constants and the .htaccess routing. Items 4-5
-REM and 7-10 write config files under the secure folder. Item 6 only reads.
+REM and 7-11 write config files under the secure folder. Item 6 only reads.
+REM
+REM Before anything else, it checks the PHP version: older than 8.3, it stops.
 REM
 REM WHAT THIS SCRIPT CANNOT DO: create your account. No account exists yet, so
 REM there is nobody to be one. That happens in the browser at /admin/, and the
@@ -35,6 +42,51 @@ REM setup token (item 6) is what authorises it - see the notes there.
 REM ==========================================================
 
 setlocal enabledelayedexpansion
+
+REM ==========================================================
+REM The PHP floor - checked before anything is written
+REM ==========================================================
+REM QuickSite needs PHP 8.3 or later. This script runs no PHP of its own, so it
+REM asks the php on the PATH - or the one the PHP variable names - for its
+REM version, and stops at once when it is older, before any file below is
+REM written. That is the command-line PHP: the web server's own may be a
+REM separate install, which is why the README asks for a patched release of
+REM the branch either way. Only the floor is checked here: patch numbers change
+REM with every advisory, so they live in the README.
+REM
+REM -n runs it without php.ini, so an extension that fails to load prints
+REM nothing here. The version is read with delayed expansion (!QS_PHP!), so a
+REM path holding parentheses (Program Files (x86)) cannot close the for /f.
+REM A version made of anything but digits is no version.
+set "QS_PHP=%PHP%"
+if not defined QS_PHP for /f "delims=" %%p in ('where php 2^>nul') do if not defined QS_PHP set "QS_PHP=%%p"
+set "QS_PHP_ID="
+set "QS_PHP_VER="
+if defined QS_PHP for /f "tokens=1,2" %%a in ('call "!QS_PHP!" -n -r "echo PHP_VERSION_ID, ' ', PHP_VERSION;" 2^>nul') do if not defined QS_PHP_ID (
+    set "QS_PHP_ID=%%a"
+    set "QS_PHP_VER=%%b"
+)
+if defined QS_PHP_ID for /f "delims=0123456789" %%x in ("!QS_PHP_ID!") do set "QS_PHP_ID="
+if not defined QS_PHP_ID (
+    echo.
+    if defined QS_PHP (
+        echo   ^^! The PHP version could not be checked: !QS_PHP! answered no version.
+        echo     QuickSite needs PHP 8.3 or later.
+    ) else (
+        echo   ^^! The PHP version could not be checked: no php command was found.
+        echo     QuickSite needs PHP 8.3 or later. To have it checked, name one before setup.bat:
+        echo       Command Prompt:  set PHP=C:\path\to\php.exe
+        echo       PowerShell:      $env:PHP = 'C:\path\to\php.exe'
+    )
+) else if !QS_PHP_ID! LSS 80300 (
+    echo.
+    echo   X QuickSite needs PHP 8.3 or later; the PHP found here ^(!QS_PHP!, !QS_PHP_VER!^) is older.
+    echo     Install a supported PHP, a patched release of its branch ^(see the README^), and run setup again.
+    echo.
+    set "QS_ANYKEY="
+    set /p "QS_ANYKEY=  Press Enter to close... "
+    exit /b 1
+)
 
 set "SCRIPT_DIR=%~dp0"
 set "PUBLIC_DIR=%SCRIPT_DIR%public"
@@ -110,6 +162,7 @@ echo   Storage quotas:     !QUOTA_LABEL!
 echo   Self-deploy:        !DEPLOY_LABEL!
 echo   Command console:    !CONSOLE_LABEL!
 echo   Default language:   !DEFLANG_LABEL!
+echo   Idle sign-out:      !IDLE_LABEL!
 echo.
 echo     1^) Rename the public folder
 echo     2^) Rename the secure folder
@@ -121,6 +174,7 @@ echo     7^) Storage quotas (per user)
 echo     8^) Allow / forbid deploying from this install
 echo     9^) Offer / withhold the command console ^(/admin/command^)
 echo    10^) Default language for new projects
+echo    11^) Idle sign-out ^(how long the panel may go unused^)
 echo     q^) Finish
 echo.
 set "CHOICE="
@@ -136,6 +190,7 @@ if "!CHOICE!"=="7" goto :go_quota
 if "!CHOICE!"=="8" goto :go_deploy
 if "!CHOICE!"=="9" goto :go_console
 if "!CHOICE!"=="10" goto :go_deflang
+if "!CHOICE!"=="11" goto :go_idle
 if /i "!CHOICE!"=="q" goto :finish
 if "!CHOICE!"=="" goto :finish
 echo   Unknown choice: !CHOICE!
@@ -195,6 +250,11 @@ call :item_deflang
 call :pause_menu
 goto :menu
 
+:go_idle
+call :item_idle
+call :pause_menu
+goto :menu
+
 REM ==========================================================
 REM Finish
 REM ==========================================================
@@ -215,6 +275,7 @@ echo   Storage quotas:     !QUOTA_LABEL!
 echo   Self-deploy:        !DEPLOY_LABEL!
 echo   Command console:    !CONSOLE_LABEL!
 echo   Default language:   !DEFLANG_LABEL!
+echo   Idle sign-out:      !IDLE_LABEL!
 echo.
 echo   Next steps:
 echo     1. Point your vhost DocumentRoot at the public folder
@@ -434,6 +495,13 @@ if exist "!CONFIG_DIR!\languages.json" set "LANGLIST_FILE=!CONFIG_DIR!\languages
 set "DEFLANG_EFFECTIVE=en"
 set "DEFLANG_LABEL=en   (default - default-language.php not created yet)"
 if exist "!DEFLANG_FILE!" call :deflang_read
+
+REM The idle sign-out: auth.php's session.idle_ttl, in seconds. ABSENT MEANS 1
+REM DAY, and the engine never goes below 5 minutes.
+set "IDLE_SECS="
+set "IDLE_EFFECTIVE=86400"
+set "IDLE_LABEL=1 day  (default - auth.php not created yet)"
+if exist "!AUTH_FILE!" call :idle_read
 goto :eof
 
 REM The code default-language.php names, when it is one the list holds. The
@@ -467,6 +535,48 @@ if not exist "!LANGLIST_FILE!" exit /b 1
 findstr /r /c:"\"!DL_CODE!\" *:" "!LANGLIST_FILE!" >nul 2>&1
 if errorlevel 1 exit /b 1
 exit /b 0
+
+REM The value from its own line, which starts with the key - written '.idle_ttl.'
+REM so no single quote reaches the for /f command line, as deflang_read does: a
+REM value the file's comments quote is not the setting. The label tells "no
+REM auth.php yet" from "an auth.php that sets none", and says when a value is
+REM under the minimum the engine raises it to.
+:idle_read
+set "IDLE_LABEL=1 day  (default - auth.php does not set it)"
+for /f "tokens=2 delims=>," %%a in ('findstr /r /c:"^ *.idle_ttl. *=> *[0-9][0-9]*," "!AUTH_FILE!" 2^>nul') do if not defined IDLE_SECS set "IDLE_SECS=%%a"
+if not defined IDLE_SECS goto :eof
+set "IDLE_SECS=!IDLE_SECS: =!"
+set "IW_SECS=!IDLE_SECS!"
+call :idle_words
+if !IDLE_SECS! LSS 300 (
+    set "IDLE_EFFECTIVE=300"
+    set "IDLE_LABEL=5 minutes  (auth.php says !IDLE_WORDS!; the engine never goes below 5 minutes)"
+    goto :eof
+)
+set "IDLE_EFFECTIVE=!IDLE_SECS!"
+set "IDLE_LABEL=!IDLE_WORDS!"
+goto :eof
+
+REM IDLE_WORDS: IW_SECS seconds in the largest unit that holds them whole - 86400
+REM is "1 day", 5400 is "90 minutes": the setting as it is, never rounded.
+:idle_words
+set "IW_U=second"
+set "IW_N=!IW_SECS!"
+set /a IW_R=IW_SECS %% 60
+if not "!IW_R!"=="0" goto :idle_words_say
+set /a IW_N=IW_SECS / 60
+set "IW_U=minute"
+set /a IW_R=IW_SECS %% 3600
+if not "!IW_R!"=="0" goto :idle_words_say
+set /a IW_N=IW_SECS / 3600
+set "IW_U=hour"
+set /a IW_R=IW_SECS %% 86400
+if not "!IW_R!"=="0" goto :idle_words_say
+set /a IW_N=IW_SECS / 86400
+set "IW_U=day"
+:idle_words_say
+if "!IW_N!"=="1" (set "IDLE_WORDS=1 !IW_U!") else (set "IDLE_WORDS=!IW_N! !IW_U!s")
+goto :eof
 
 REM A line-oriented "press Enter", not `pause`. `pause` consumes a single
 REM CHARACTER, so on a redirected stdin it splits a line in half and the menu
@@ -1310,6 +1420,122 @@ if not "!DEFLANG_EFFECTIVE!"=="!DL_ANSWER!" (
 )
 echo   + Default language for new projects: !DL_ANSWER!
 echo     Only projects created from now on start in it.
+goto :eof
+
+REM ==========================================================
+REM Item 11 - idle sign-out
+REM ==========================================================
+REM How long a session may go unused before the panel signs it out: auth.php's
+REM session.idle_ttl, in seconds. The login page states it under "Keep me signed
+REM in". A free-text value, so Enter KEEPS what is there (item 10's rule). The
+REM answer is a number and m, h or d, at least 5 minutes - the engine's own
+REM minimum - and written as seconds.
+REM
+REM ABSENT MEANS 1 DAY, and choosing 1 day when auth.php does not exist yet
+REM LEAVES IT ABSENT (item 10's rule). Otherwise auth.php is created from its
+REM .example as item 5 creates it, and only the number on the idle_ttl line
+REM changes.
+:item_idle
+call :read_state
+echo.
+echo Idle sign-out
+echo.
+echo   How long the admin panel may go unused before it signs you out. Ticking
+echo   "Keep me signed in" keeps a session across browser restarts, never past
+echo   this limit; the login page states it under that box.
+echo.
+echo   Currently: !IDLE_LABEL!
+echo.
+set "IW_SECS=!IDLE_EFFECTIVE!"
+call :idle_words
+
+set "ID_ANSWER="
+set /p "ID_ANSWER=  Sign out after how long without using the panel? A number and m, h or d (Enter keeps !IDLE_WORDS!): "
+if defined ID_ANSWER set "ID_ANSWER=!ID_ANSWER: =!"
+if not defined ID_ANSWER (
+    echo   Unchanged.
+    goto :eof
+)
+
+REM One to four digits, then m, h or d, in either case. The answer is written to
+REM a file and matched there, never passed on a command line: an & typed at the
+REM prompt would run (item 10's reader says the same).
+set "ID_TMP=%TEMP%\qs_setup_idle.txt"
+> "!ID_TMP!" echo(!ID_ANSWER!
+findstr /r /x /i /c:"[0123456789][0123456789]*[mhd]" "!ID_TMP!" >nul 2>&1
+set "ID_SHAPE=!errorlevel!"
+del "!ID_TMP!" 2>nul
+set "ID_NUM=!ID_ANSWER:~0,-1!"
+if "!ID_SHAPE!"=="0" if not "!ID_NUM:~4!"=="" set "ID_SHAPE=1"
+if not "!ID_SHAPE!"=="0" (
+    echo   X '!ID_ANSWER!' is not a number followed by m, h or d.
+    echo     Nothing was written.
+    goto :eof
+)
+REM A leading zero would make set /a read the number as octal.
+:idle_strip
+if "!ID_NUM:~0,1!"=="0" if not "!ID_NUM!"=="0" (
+    set "ID_NUM=!ID_NUM:~1!"
+    goto :idle_strip
+)
+set "ID_UNIT=!ID_ANSWER:~-1!"
+set "ID_MULT=60"
+if /i "!ID_UNIT!"=="h" set "ID_MULT=3600"
+if /i "!ID_UNIT!"=="d" set "ID_MULT=86400"
+set /a ID_SECS=ID_NUM * ID_MULT
+
+if !ID_SECS! LSS 300 (
+    echo   X The shortest idle sign-out is 5 minutes.
+    echo     Nothing was written.
+    goto :eof
+)
+
+if not exist "!CONFIG_DIR!" (
+    echo   X Error: config folder not found: !CONFIG_DIR!
+    goto :eof
+)
+
+if "!ID_SECS!"=="86400" if not exist "!AUTH_FILE!" (
+    echo.
+    echo   + Idle sign-out stays 1 day - auth.php left absent, which is what a
+    echo     fresh install has.
+    goto :eof
+)
+
+REM auth.php does not exist yet on a fresh clone - item 5 says why creating it
+REM here is safe.
+if not exist "!AUTH_FILE!" (
+    if not exist "!CONFIG_DIR!\auth.php.example" (
+        echo   X Error: neither auth.php nor auth.php.example is present
+        echo     !CONFIG_DIR!
+        goto :eof
+    )
+    copy /y "!CONFIG_DIR!\auth.php.example" "!AUTH_FILE!" >nul
+)
+
+REM Anchored to the start of a line ((?m)^), and only the number changes: the
+REM key's spacing and the comment after it stay. -Encoding UTF8 is load-bearing
+REM - see item 9.
+set "PS_ID_TEMP=%TEMP%\qs_setup_idle.ps1"
+echo $f = '!AUTH_FILE!' > "%PS_ID_TEMP%"
+echo $v = '!ID_SECS!' >> "%PS_ID_TEMP%"
+echo $c = Get-Content $f -Raw -Encoding UTF8 >> "%PS_ID_TEMP%"
+echo $c = $c -replace "(?m)^(\s*'idle_ttl'\s*=>\s*)\d+", ('${1}' + $v) >> "%PS_ID_TEMP%"
+echo [IO.File]::WriteAllText($f, $c, (New-Object System.Text.UTF8Encoding $false)) >> "%PS_ID_TEMP%"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%PS_ID_TEMP%" <nul >nul 2>&1
+del "%PS_ID_TEMP%" 2>nul
+
+call :read_state
+if not "!IDLE_SECS!"=="!ID_SECS!" (
+    echo   X Could not set the value automatically.
+    echo     Edit this file by hand and set 'idle_ttl' =^> !ID_SECS!:
+    echo     !AUTH_FILE!
+    goto :eof
+)
+set "IW_SECS=!ID_SECS!"
+call :idle_words
+echo   + Idle sign-out: !IDLE_WORDS!
+echo     Every session follows it from its next request.
 goto :eof
 
 REM ==========================================================

@@ -22,11 +22,9 @@
     // leading "/"). Used by the route inputType picker.
     let availableRoutes = [];
     let availableStorageItems = [];  // storage registry items — storageKey picker
-    let currentAvailableEvents = [];
     // Bucketed events from listInteractions:
     //   { common: [...], lessCommon: [...], advanced: [...] }
-    // Falls back to a single 'common' bucket built from currentAvailableEvents
-    // if the API didn't ship the grouped shape.
+    // The event picker offers common and lessCommon (populateEventDropdown).
     let currentAvailableEventsGrouped = null;
     let editingInteraction = null;
     let currentInteractionsData = null;
@@ -635,8 +633,7 @@
             const result = response.data || {};
             console.log('[PreviewJsInteractions] Interactions loaded:', result);
             
-            // Store available events for the add form (flat list kept for legacy callers)
-            currentAvailableEvents = result.data?.availableEvents || [];
+            // Store available events for the add form
             currentAvailableEventsGrouped = result.data?.availableEventsGrouped || null;
             
             // Cache interactions data for edit lookups
@@ -3277,17 +3274,7 @@
         // Less common
         onmousemove:    'When the cursor moves over the element',
         onmousedown:    'When a mouse button is pressed over the element',
-        onmouseup:      'When a mouse button is released over the element',
-        // Advanced
-        oncontextmenu:  'When the right-click / context menu is requested',
-        ontouchstart:   'When a finger touches the element',
-        ontouchend:     'When a finger is lifted off the element',
-        ontouchmove:    'When a finger moves across the element',
-        onfocusin:      'Focus entered the element or one of its children (bubbles)',
-        onfocusout:     'Focus left the element or one of its children (bubbles)',
-        onpaste:        'When the user pastes content into the field',
-        oncopy:         'When the user copies content from the field',
-        oncut:          'When the user cuts content from the field'
+        onmouseup:      'When a mouse button is released over the element'
     };
 
     function eventTooltip(ev) {
@@ -3296,32 +3283,25 @@
     }
 
     /**
-     * Build the bucketed shape from a flat list when the API only returned
-     * the legacy availableEvents field. Lets the picker keep working against
-     * a backend that predates the buckets (or a stale cache).
-     */
-    function bucketsFromFlat(flat) {
-        return { common: Array.isArray(flat) ? flat.slice() : [], lessCommon: [], advanced: [] };
-    }
-
-    /**
-     * Populate event dropdown as three <optgroup>s: Common / Less common / Advanced.
-     * Each <option> carries its event's tooltip as data-description, which the
-     * event picker shows under the event (and whole in the bubble).
+     * Populate event dropdown as two <optgroup>s: Common / Less common — the
+     * events the interaction commands accept. listInteractions also returns an
+     * "advanced" bucket; it is not offered, because the commands refuse every
+     * event in it. Each <option> carries its event's tooltip as
+     * data-description, which the event picker shows under the event (and
+     * whole in the bubble).
      */
     function populateEventDropdown() {
         if (!jsFormEvent) return;
 
         const i18n = PreviewConfig.i18n || {};
         const tag = currentJsContext?.tag || 'element';
-        const buckets = currentAvailableEventsGrouped || bucketsFromFlat(currentAvailableEvents);
+        const buckets = currentAvailableEventsGrouped || {};
 
         QSDom.setSelectPlaceholder(jsFormEvent, i18n.selectEvent || 'Select event...');
 
         const groups = [
             { key: 'common',     label: (i18n.eventsCommonFor || 'Common for') + ' <' + tag + '>' },
-            { key: 'lessCommon', label: i18n.eventsLessCommon || 'Less common' },
-            { key: 'advanced',   label: i18n.eventsAdvanced || 'Advanced' }
+            { key: 'lessCommon', label: i18n.eventsLessCommon || 'Less common' }
         ];
 
         groups.forEach(g => {

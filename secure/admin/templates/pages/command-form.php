@@ -130,11 +130,35 @@ foreach (qs_snippet_categories() as $qsCategory) {
         'label' => __admin('preview.snippetCategory' . ucfirst($qsCategory), SNIPPET_CATEGORIES[$qsCategory]),
     ];
 }
+
+// The tags addNode's and editNode's tag field offers: the editor's HTML Tag picker's groups and
+// descriptions (TagRegistry::getUICategories()), and every other tag the commands accept
+// (TagRegistry::ALLOWED_TAGS) in its Other group, so the console offers all of them and keeps no
+// list of its own.
+require_once SECURE_FOLDER_PATH . '/src/classes/TagRegistry.php';
+$qsTagGroups = [];
+$qsTagsListed = [];
+foreach (TagRegistry::getUICategories() as $qsGroupId => $qsGroup) {
+    $qsTags = [];
+    foreach ($qsGroup['tags'] as $qsTag => $qsTagInfo) {
+        $qsTags[] = ['value' => $qsTag, 'description' => (string) ($qsTagInfo['desc'] ?? '')];
+        $qsTagsListed[] = $qsTag;
+    }
+    $qsTagGroups[$qsGroupId] = ['label' => (string) $qsGroup['label'], 'tags' => $qsTags];
+}
+if (!isset($qsTagGroups['other'])) {
+    $qsTagGroups['other'] = ['label' => __admin('preview.otherTags', 'Other'), 'tags' => []];
+}
+foreach (array_diff(TagRegistry::ALLOWED_TAGS, $qsTagsListed) as $qsTag) {
+    // __admin() answers a missing key with the key itself: an empty fallback is no description
+    $qsTagGroups['other']['tags'][] = ['value' => $qsTag, 'description' => __admin('preview.tagDesc.' . $qsTag, '')];
+}
 ?>
 <script>
     window.QS_COMMAND_FORM_I18N = <?= json_encode($qsCommandFormI18n, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
     window.QS_CONSOLE_FLAGS = <?= json_encode($qsConsoleFlags, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     window.QS_SNIPPET_CATEGORIES = <?= json_encode($qsSnippetCategories, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?>;
+    window.QS_TAG_GROUPS = <?= qs_inline_script_json(array_values($qsTagGroups)) ?>;
 </script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/command-form.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/command-form.js') ?>"></script>
 

@@ -12,6 +12,7 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/TagRegistry.php';
 
 /**
  * Extract placeholder variables from component structure with type detection.
@@ -30,9 +31,8 @@ function extractVariables($node, &$variables = []) {
     }
     
     // Check params for placeholders → type depends on attribute name
-    // Translatable attributes (alt, placeholder, title, aria-*) → type: "textKey"
+    // Translatable attributes (TagRegistry::TRANSLATABLE_ATTRIBUTES) → type: "textKey"
     // Other attributes (href, src, etc.) → type: "param"
-    $translatableParams = ['alt', 'placeholder', 'title', 'aria-label', 'aria-placeholder', 'aria-description'];
     
     if (isset($node['params']) && is_array($node['params'])) {
         foreach ($node['params'] as $paramName => $value) {
@@ -53,7 +53,7 @@ function extractVariables($node, &$variables = []) {
                     }
                     if (!$exists) {
                         // Determine type based on attribute name
-                        $type = in_array($paramName, $translatableParams, true) ? 'textKey' : 'param';
+                        $type = in_array($paramName, TagRegistry::TRANSLATABLE_ATTRIBUTES, true) ? 'textKey' : 'param';
                         $entry = ['name' => $varName, 'type' => $type];
                         // Include context for param variables (enables asset picker in frontend)
                         if ($type === 'param') {

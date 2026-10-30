@@ -30,7 +30,7 @@ require_once __DIR__ . '/opcacheHygiene.php';
  * assumed:
  *
  *   - **A syntax error must not take the request down.** `@require` does NOT
- *     suppress a `ParseError` — verified on PHP 8.0.30 and 8.4.0 — so the old
+ *     suppress a `ParseError` — measured on PHP 8.3, 8.4 and 8.5 — so the old
  *     `@require` meant a deployer's typo fatally ended every request that
  *     touched the outbound-URL policy. This is the identical defect
  *     `import-policy.php` had; the precedent set there (`filePolicy.php`: catch,

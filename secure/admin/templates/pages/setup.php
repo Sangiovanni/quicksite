@@ -117,7 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <?php if ($setupError === 'csrf'): ?>
             <div class="admin-alert admin-alert--error"><?= __admin('login.csrfFailed') ?></div>
             <?php elseif ($setupError === 'throttled'): ?>
-            <div class="admin-alert admin-alert--error"><?= __admin('setup.throttled', ['seconds' => $setupRetryAfter]) ?></div>
+            <div class="admin-alert admin-alert--error"><?= __admin('setup.throttled', ['duration' => __adminDuration($setupRetryAfter)]) ?></div>
             <?php elseif ($setupError === 'invalid_token'): ?>
             <div class="admin-alert admin-alert--error"><?= __admin('setup.invalidToken', 'That setup token is not valid. Open the file named below and copy the whole line.') ?></div>
             <?php elseif ($setupError === 'password_too_short'): ?>

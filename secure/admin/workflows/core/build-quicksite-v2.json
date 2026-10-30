@@ -2031,7 +2031,7 @@
                         "requirements": {
                             "title": "Requirements",
                             "desc": "Before installing QuickSite, make sure your environment meets the following requirements:",
-                            "item1": "PHP 8.0 or higher",
+                            "item1": "PHP 8.3 or newer",
                             "item2": "Apache or Nginx web server (with mod_rewrite enabled for Apache)",
                             "item3": "Git (optional, for cloning)"
                         },
@@ -2242,7 +2242,7 @@
                         "requirements": {
                             "title": "Prérequis",
                             "desc": "Avant d'installer QuickSite, vérifiez que votre environnement respecte les exigences suivantes :",
-                            "item1": "PHP 8.0 ou supérieur",
+                            "item1": "PHP 8.3 ou supérieur",
                             "item2": "Serveur web Apache ou Nginx (avec mod_rewrite activé pour Apache)",
                             "item3": "Git (optionnel, pour cloner le dépôt)"
                         },

@@ -1205,10 +1205,11 @@ class WorkflowManager {
             return $this->formatValue($value);
         }, $template);
         
-        // Fifth pass: Replace {{param.xxx}} user parameters
+        // Fifth pass: Replace {{param.xxx}} user parameters. A list (a tag-select's values, sent as JSON)
+        // is written as the data passes write one, its items joined by ", "; any other value as it came.
         $template = preg_replace_callback('/\{\{param\.(\w+)\}\}/', function($matches) use ($userParams) {
-            $key = $matches[1];
-            return $userParams[$key] ?? '';
+            $value = $userParams[$matches[1]] ?? '';
+            return is_array($value) ? $this->formatValue($value) : (string) $value;
         }, $template);
         
         // Sixth pass: Replace {{helpers.xxx}} - static helper values

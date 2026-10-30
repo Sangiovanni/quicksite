@@ -854,15 +854,6 @@ class JsonToHtmlRenderer {
      * @param mixed $value Attribute value
      * @return string Rendered attribute (e.g., ' class="value"')
      */
-    /**
-     * Attributes where an EMPTY value is a statement, not an omission.
-     *
-     * `alt=""` marks an image as decorative so assistive technology skips it;
-     * with no alt at all a screen reader reads the file name instead. Both
-     * surfaces preserve these and drop every other empty attribute.
-     */
-    private const EMPTY_MEANINGFUL_ATTRIBUTES = ['alt', 'aria-label'];
-
     private function renderAttribute(string $name, $value): string {
         // Sanitize attribute name. The charset rule is shared with the compiler
         // and the write-side param check so all three make the same decision
@@ -918,13 +909,12 @@ class JsonToHtmlRenderer {
         if ($value === null) {
             return '';
         }
-        if ($value === '' && !in_array($name, self::EMPTY_MEANINGFUL_ATTRIBUTES, true)) {
+        if ($value === '' && !in_array($name, TagRegistry::EMPTY_MEANINGFUL_ATTRIBUTES, true)) {
             return '';
         }
 
-        // Translatable attributes - auto-translate if value looks like a translation key
-        $translatableAttributes = ['placeholder', 'title', 'alt', 'aria-label', 'aria-placeholder', 'aria-description'];
-        if (in_array($name, $translatableAttributes, true) && is_string($value)) {
+        // Translatable attributes (TagRegistry's list) - auto-translate if value looks like a translation key
+        if (in_array($name, TagRegistry::TRANSLATABLE_ATTRIBUTES, true) && is_string($value)) {
             // Check for __RAW__ prefix - use value as-is without translation
             if (strpos($value, '__RAW__') === 0) {
                 $value = substr($value, 7); // Remove __RAW__ prefix

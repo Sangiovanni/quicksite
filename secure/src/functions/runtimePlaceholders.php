@@ -128,6 +128,42 @@ if (!function_exists('qs_apply_runtime_placeholders')) {
     }
 }
 
+if (!function_exists('qs_page_title')) {
+    /**
+     * The title a page shell writes, before escaping: the page's own title with this
+     * request's placeholders filled — or, when the page has no title in the language served
+     * (translate() answered its missing marker for a page.titles key), the last segment of
+     * the address, readable: "get-started" reads "Get started", a parameter's segment shows
+     * its value ("/products/red-vase" reads "Red vase"), the home page reads "Home" and an
+     * address no route matches "404". Both shells call it, PageManagement on /p/ and Page in
+     * a build, so every page gets the same title whatever its template.
+     *
+     * ⚠ The fallback is never filled: it comes from the address, and an address carrying
+     * `{{resolved:…}}` keeps that text as written.
+     *
+     * @param string $title The title the page's template passed (usually a translate() answer)
+     * @param object|null $route This request's TrimParameters (route(), routeParams(), routeFound())
+     */
+    function qs_page_title(string $title, $route): string
+    {
+        $routeParams = $route !== null ? $route->routeParams() : [];
+        require_once __DIR__ . '/../classes/Translator.php';
+        if (!Translator::isMissing($title, 'page.titles.')) {
+            return qs_apply_runtime_placeholders($title, $routeParams);
+        }
+        $segments = $route !== null ? $route->route() : [];
+        $segment = $segments === [] ? 'home' : (string) $segments[count($segments) - 1];
+        if ($segment !== '' && $segment[0] === ':') {
+            $segment = (string) ($routeParams[substr($segment, 1)] ?? substr($segment, 1));
+        }
+        $text = trim((string) preg_replace('/[\s_-]+/u', ' ', $segment));
+        if ($text === '') {
+            $text = 'home';
+        }
+        return mb_strtoupper(mb_substr($text, 0, 1, 'UTF-8'), 'UTF-8') . mb_substr($text, 1, null, 'UTF-8');
+    }
+}
+
 /**
  * ---------------------------------------------------------------------------
  * SYSTEM PLACEHOLDERS — `{{__lang}}` and friends.

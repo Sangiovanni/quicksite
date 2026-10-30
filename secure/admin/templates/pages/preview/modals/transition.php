@@ -43,15 +43,14 @@
                             <div class="transition-editor__property-selector" id="transition-base-prop-selector"></div>
                             <div class="transition-editor__add-property-row">
                                 <div class="transition-editor__value-container" id="transition-base-value-container"></div>
-                                <button type="button" class="transition-editor__add-property-confirm" id="transition-base-add-confirm">
+                            </div>
+                            <div class="transition-editor__add-property-actions">
+                                <button type="button" class="admin-btn admin-btn--sm admin-btn--ghost" id="transition-base-add-cancel"><?= __admin('common.cancel') ?></button>
+                                <button type="button" class="admin-btn admin-btn--sm admin-btn--primary" id="transition-base-add-confirm">
                                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-                                        <polyline points="20 6 9 17 4 12"/>
+                                        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                                     </svg>
-                                </button>
-                                <button type="button" class="transition-editor__add-property-cancel" id="transition-base-add-cancel">
-                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-                                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                                    </svg>
+                                    <?= __admin('common.add') ?>
                                 </button>
                             </div>
                         </div>
@@ -94,15 +93,14 @@
                             <div class="transition-editor__property-selector" id="transition-trigger-prop-selector"></div>
                             <div class="transition-editor__add-property-row">
                                 <div class="transition-editor__value-container" id="transition-trigger-value-container"></div>
-                                <button type="button" class="transition-editor__add-property-confirm" id="transition-trigger-add-confirm">
+                            </div>
+                            <div class="transition-editor__add-property-actions">
+                                <button type="button" class="admin-btn admin-btn--sm admin-btn--ghost" id="transition-trigger-add-cancel"><?= __admin('common.cancel') ?></button>
+                                <button type="button" class="admin-btn admin-btn--sm admin-btn--primary" id="transition-trigger-add-confirm">
                                     <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-                                        <polyline points="20 6 9 17 4 12"/>
+                                        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                                     </svg>
-                                </button>
-                                <button type="button" class="transition-editor__add-property-cancel" id="transition-trigger-add-cancel">
-                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
-                                        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-                                    </svg>
+                                    <?= __admin('common.add') ?>
                                 </button>
                             </div>
                         </div>
@@ -130,13 +128,10 @@
                             <option value="all"><?= __admin('preview.allProperties') ?? 'All Properties' ?></option>
                             <option value="specific"><?= __admin('preview.specificProperties') ?? 'Specific Properties...' ?></option>
                         </select>
-                        <div class="transition-editor__specific-props" id="transition-specific-props" style="display: none;">
-                            <!-- Checkboxes for specific properties -->
-                        </div>
                     </div>
                     
-                    <!-- Duration -->
-                    <div class="transition-editor__setting">
+                    <!-- Duration, Delay and Timing Function: All Properties' one set (each Specific row has its own) -->
+                    <div class="transition-editor__setting transition-editor__all-setting">
                         <label><?= __admin('preview.transitionDuration') ?? 'Duration' ?>:</label>
                         <div class="transition-editor__input-group">
                             <input type="number" id="transition-duration" class="admin-input" value="0.3" min="0" max="60" step="0.1">
@@ -148,7 +143,7 @@
                     </div>
                     
                     <!-- Delay -->
-                    <div class="transition-editor__setting">
+                    <div class="transition-editor__setting transition-editor__all-setting">
                         <label><?= __admin('preview.transitionDelay') ?? 'Delay' ?>:</label>
                         <div class="transition-editor__input-group">
                             <input type="number" id="transition-delay" class="admin-input" value="0" min="0" max="60" step="0.1">
@@ -160,7 +155,7 @@
                     </div>
                     
                     <!-- Timing Function -->
-                    <div class="transition-editor__setting transition-editor__setting--wide">
+                    <div class="transition-editor__setting transition-editor__setting--wide transition-editor__all-setting">
                         <label><?= __admin('preview.timingFunction') ?? 'Timing Function' ?>:</label>
                         <div class="transition-editor__timing-row">
                             <select class="transition-editor__timing-select" id="transition-timing-select">
@@ -173,18 +168,81 @@
                             </select>
                             <div class="transition-editor__cubic-bezier" id="transition-cubic-bezier" style="display: none;">
                                 <span>cubic-bezier(</span>
-                                <input type="number" id="transition-bezier-x1" class="admin-input admin-input--mini" value="0.4" min="0" max="1" step="0.1">
+                                <input type="number" id="transition-bezier-x1" class="admin-input admin-input--mini" data-bezier="x1" value="0.4" min="0" max="1" step="0.1">
                                 <span>,</span>
-                                <input type="number" id="transition-bezier-y1" class="admin-input admin-input--mini" value="0" step="0.1">
+                                <input type="number" id="transition-bezier-y1" class="admin-input admin-input--mini" data-bezier="y1" value="0" step="0.1">
                                 <span>,</span>
-                                <input type="number" id="transition-bezier-x2" class="admin-input admin-input--mini" value="0.2" min="0" max="1" step="0.1">
+                                <input type="number" id="transition-bezier-x2" class="admin-input admin-input--mini" data-bezier="x2" value="0.2" min="0" max="1" step="0.1">
                                 <span>,</span>
-                                <input type="number" id="transition-bezier-y2" class="admin-input admin-input--mini" value="1" step="0.1">
+                                <input type="number" id="transition-bezier-y2" class="admin-input admin-input--mini" data-bezier="y2" value="1" step="0.1">
                                 <span>)</span>
                             </div>
                         </div>
                     </div>
+
+                    <!-- Specific Properties: a row per property, each with its own duration, delay and timing -->
+                    <div class="transition-editor__setting transition-editor__setting--wide" id="transition-specific-props" style="display: none;">
+                        <div class="transition-editor__rows-head">
+                            <span><?= __admin('preview.transitionProperty') ?></span>
+                            <span><?= __admin('preview.transitionDuration') ?></span>
+                            <span><?= __admin('preview.transitionDelay') ?></span>
+                            <span><?= __admin('preview.timingFunction') ?></span>
+                        </div>
+                        <div class="transition-editor__rows" id="transition-rows"></div>
+                        <button type="button" class="transition-editor__add-property-toggle" id="transition-add-row">
+                            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                            </svg>
+                            <?= __admin('preview.addProperty') ?>
+                        </button>
+                    </div>
                 </div>
+
+                <!-- One Specific Properties row: the script clones it for each property and mounts the
+                     property picker in its first cell -->
+                <template id="transition-row-template">
+                    <div class="transition-editor__row">
+                        <div class="transition-editor__row-property"></div>
+                        <div class="transition-editor__input-group">
+                            <input type="number" class="admin-input transition-editor__row-duration" value="0.3" min="0" max="60" step="0.1" title="<?= adminEscape(__admin('preview.transitionDuration')) ?>">
+                            <select class="transition-editor__unit-select transition-editor__row-duration-unit" title="<?= adminEscape(__admin('preview.transitionDuration')) ?>">
+                                <option value="s">s</option>
+                                <option value="ms">ms</option>
+                            </select>
+                        </div>
+                        <div class="transition-editor__input-group">
+                            <input type="number" class="admin-input transition-editor__row-delay" value="0" min="0" max="60" step="0.1" title="<?= adminEscape(__admin('preview.transitionDelay')) ?>">
+                            <select class="transition-editor__unit-select transition-editor__row-delay-unit" title="<?= adminEscape(__admin('preview.transitionDelay')) ?>">
+                                <option value="s">s</option>
+                                <option value="ms">ms</option>
+                            </select>
+                        </div>
+                        <select class="transition-editor__timing-select transition-editor__row-timing" title="<?= adminEscape(__admin('preview.timingFunction')) ?>">
+                            <option value="ease">ease</option>
+                            <option value="linear">linear</option>
+                            <option value="ease-in">ease-in</option>
+                            <option value="ease-out">ease-out</option>
+                            <option value="ease-in-out">ease-in-out</option>
+                            <option value="cubic-bezier"><?= __admin('preview.customCubicBezier') ?></option>
+                        </select>
+                        <button type="button" class="transition-editor__property-btn transition-editor__property-btn--delete transition-editor__row-remove" title="<?= adminEscape(__admin('common.remove')) ?>">
+                            <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                            </svg>
+                        </button>
+                        <div class="transition-editor__cubic-bezier transition-editor__row-bezier" style="display: none;">
+                            <span>cubic-bezier(</span>
+                            <input type="number" class="admin-input admin-input--mini" data-bezier="x1" value="0.4" min="0" max="1" step="0.1">
+                            <span>,</span>
+                            <input type="number" class="admin-input admin-input--mini" data-bezier="y1" value="0" step="0.1">
+                            <span>,</span>
+                            <input type="number" class="admin-input admin-input--mini" data-bezier="x2" value="0.2" min="0" max="1" step="0.1">
+                            <span>,</span>
+                            <input type="number" class="admin-input admin-input--mini" data-bezier="y2" value="1" step="0.1">
+                            <span>)</span>
+                        </div>
+                    </div>
+                </template>
                 
                 <!-- Transition Preview String -->
                 <div class="transition-editor__preview-value">

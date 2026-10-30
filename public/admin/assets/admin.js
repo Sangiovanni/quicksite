@@ -353,6 +353,26 @@ const QuickSiteAdmin = {
     },
 
     /**
+     * A value as the part of a command's address it is sent as (apiRequest's
+     * urlParams take it as it is). Each piece between two slashes is encoded on
+     * its own, so "#", "?", "+" and "%" arrive as typed while a slash stays a
+     * separator: getStructure and getPageEvents join their segments back into a
+     * nested page name. With mode 'twice' the whole value is ONE segment encoded
+     * twice, for getStyleRule, which decodes its segments once more after the
+     * dispatcher has: a slash inside it (a media query's ratio) then reaches the
+     * server as %252F, never as the %2F Apache refuses.
+     *
+     * @param {string} value
+     * @param {string} [mode] 'twice', or nothing
+     * @returns {string}
+     */
+    urlSegments(value, mode) {
+        const text = String(value);
+        if (mode === 'twice') return encodeURIComponent(encodeURIComponent(text));
+        return text.split('/').map(encodeURIComponent).join('/');
+    },
+
+    /**
      * Download a command's response as a file - delegates to QuickSiteAPI.
      *
      * For the commands that answer BYTES instead of a JSON envelope
@@ -588,10 +608,11 @@ const QuickSiteAdmin = {
         } else {
             // Build JSON data
             for (const [key, value] of formData.entries()) {
-                // Handle URL parameters (marked with data-url-param)
+                // A URL parameter (marked data-url-param) travels in the address, encoded
+                // (urlSegments); its form marks a field its command decodes twice.
                 const input = form.querySelector(`[name="${key}"]`);
                 if (input?.dataset.urlParam !== undefined) {
-                    if (value) urlParams.push(value);
+                    if (value) urlParams.push(this.urlSegments(value, input.dataset.urlEncode));
                 } else if (value) {
                     // Only JSON-parse for JSON editor fields and selects (e.g. booleans)
                     // Plain text inputs/textareas stay as strings to avoid type coercion bugs

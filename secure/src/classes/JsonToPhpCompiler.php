@@ -1,11 +1,6 @@
 <?php
 
 require_once __DIR__ . '/../functions/qsVerbCatalog.php';
-// utilsManagement carries the array_is_list() polyfill compilePage() depends on.
-// Required explicitly rather than relying on build.php's load order: on PHP 8.0.30
-// (the supported floor) the bare call is a fatal, so the dependency has to be
-// stated by the file that uses it.
-require_once __DIR__ . '/../functions/utilsManagement.php';
 require_once __DIR__ . '/../functions/componentPolicy.php';
 require_once __DIR__ . '/Translator.php';
 require_once __DIR__ . '/UrlPolicy.php';
@@ -32,26 +27,6 @@ class JsonToPhpCompiler {
      * handoff (which holds the lookup) only when it calls it.
      */
     private bool $needsRuntimeHandoff = false;
-
-    /**
-     * Attributes where an EMPTY value is a statement, not an omission.
-     *
-     * Mirrors JsonToHtmlRenderer::EMPTY_MEANINGFUL_ATTRIBUTES — `alt=""` marks
-     * an image as decorative, and dropping it makes a screen reader announce the
-     * file name instead. Every other empty attribute drops on both surfaces.
-     */
-    private const EMPTY_MEANINGFUL_ATTRIBUTES = ['alt', 'aria-label'];
-
-    /**
-     * Attributes whose value is translated when it looks like a translation key.
-     *
-     * Mirrors the renderer's list. An attribute translated in preview and left
-     * as its raw key in a build (`alt="parity.altKey"`) is one page saying two
-     * different things, so both writers resolve the same set.
-     */
-    private const TRANSLATABLE_ATTRIBUTES = [
-        'placeholder', 'title', 'alt', 'aria-label', 'aria-placeholder', 'aria-description',
-    ];
 
     /**
      * The system placeholders a compiled page defines as variables.
@@ -681,7 +656,7 @@ class JsonToPhpCompiler {
                 if ($attrValue === null) {
                     continue;
                 }
-                if ($attrValue === '' && !in_array($attrName, self::EMPTY_MEANINGFUL_ATTRIBUTES, true)) {
+                if ($attrValue === '' && !in_array($attrName, TagRegistry::EMPTY_MEANINGFUL_ATTRIBUTES, true)) {
                     continue;
                 }
 
@@ -725,7 +700,7 @@ class JsonToPhpCompiler {
                     } else {
                         $output .= ' ' . $attrName . '=\\"" . htmlspecialchars(' . $phpValue . ', ENT_QUOTES | ENT_HTML5, \'UTF-8\') . "\\"';
                     }
-                } elseif (is_string($attrValue) && in_array($attrName, self::TRANSLATABLE_ATTRIBUTES, true)
+                } elseif (is_string($attrValue) && in_array($attrName, TagRegistry::TRANSLATABLE_ATTRIBUTES, true)
                           && strpos($attrValue, '__RAW__') !== 0 && strpos($attrValue, '__LIT__') !== 0
                           && preg_match('/^[a-z0-9_]+(\.[a-z0-9_]+)+$/iD', $attrValue)) {
                     // A translation KEY in a translatable attribute. Emitted as a
@@ -791,10 +766,8 @@ class JsonToPhpCompiler {
             $output .= '>";' . "\n";
             }
         
-        // Void elements don't have children or closing tags
-        $voidElements = ['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 
-                         'link', 'meta', 'param', 'source', 'track', 'wbr'];
-        $isVoid = in_array(strtolower($tag), $voidElements);
+        // Void elements don't have children or closing tags: TagRegistry's list, the renderer's
+        $isVoid = TagRegistry::isVoidElement($tag);
         
         // Render children
         if (!$isVoid && !empty($children)) {

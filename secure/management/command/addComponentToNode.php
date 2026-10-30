@@ -34,83 +34,6 @@ require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_
  */
 
 /**
- * Extract variables with type detection from component structure
- * 
- * Filters out:
- * - System placeholders starting with __ (e.g., __current_page)
- * - Placeholders with parameters (containing ;) as they are fixed values
- */
-function extractComponentVariables($node, &$variables = []) {
-    if (!is_array($node)) {
-        return $variables;
-    }
-    
-    $translatableParams = ['alt', 'placeholder', 'title', 'aria-label', 'aria-placeholder', 'aria-description'];
-    
-    // Check params for placeholders
-    if (isset($node['params']) && is_array($node['params'])) {
-        foreach ($node['params'] as $paramName => $value) {
-            if (is_string($value) && preg_match_all('/\{\{([^}]+)\}\}/', $value, $matches)) {
-                foreach ($matches[1] as $varName) {
-                    // Skip system placeholders (start with __) and fixed placeholders (contain ;)
-                    if (str_starts_with($varName, '__') || strpos($varName, ';') !== false) {
-                        continue;
-                    }
-                    
-                    if (!isset($variables[$varName])) {
-                        $type = in_array($paramName, $translatableParams, true) ? 'textKey' : 'param';
-                        $variables[$varName] = ['name' => $varName, 'type' => $type, 'paramName' => $paramName];
-                    }
-                }
-            }
-        }
-    }
-    
-    // Check textKey for placeholders
-    if (isset($node['textKey']) && is_string($node['textKey'])) {
-        if (preg_match_all('/\{\{([^}]+)\}\}/', $node['textKey'], $matches)) {
-            foreach ($matches[1] as $varName) {
-                // Skip system placeholders (start with __) and fixed placeholders (contain ;)
-                if (str_starts_with($varName, '__') || strpos($varName, ';') !== false) {
-                    continue;
-                }
-                
-                if (!isset($variables[$varName])) {
-                    $variables[$varName] = ['name' => $varName, 'type' => 'textKey', 'paramName' => null];
-                }
-            }
-        }
-    }
-    
-    // Check component data for placeholders
-    if (isset($node['data']) && is_array($node['data'])) {
-        foreach ($node['data'] as $value) {
-            if (is_string($value) && preg_match_all('/\{\{([^}]+)\}\}/', $value, $matches)) {
-                foreach ($matches[1] as $varName) {
-                    // Skip system placeholders (start with __) and fixed placeholders (contain ;)
-                    if (str_starts_with($varName, '__') || strpos($varName, ';') !== false) {
-                        continue;
-                    }
-                    
-                    if (!isset($variables[$varName])) {
-                        $variables[$varName] = ['name' => $varName, 'type' => 'textKey', 'paramName' => null];
-                    }
-                }
-            }
-        }
-    }
-    
-    // Recurse into children
-    if (isset($node['children']) && is_array($node['children'])) {
-        foreach ($node['children'] as $child) {
-            extractComponentVariables($child, $variables);
-        }
-    }
-    
-    return $variables;
-}
-
-/**
  * Get next unique instance number for a component by scanning translation keys.
  * Prevents key collisions after component deletions by finding the highest
  * existing instance number in the translation file, not counting structure nodes.
@@ -221,7 +144,7 @@ function __command_addComponentToNode(array $params = [], array $urlParams = [])
     
     // Extract variables with type detection
     $variables = [];
-    extractComponentVariables($componentStructure, $variables);
+    qs_component_variables($componentStructure, $variables);
     
     // Extract __enums__ from component definition
     $enums = $componentStructure['__enums__'] ?? [];
@@ -286,7 +209,8 @@ function __command_addComponentToNode(array $params = [], array $urlParams = [])
             ->withMessage("Structure file has invalid JSON");
     }
     
-    // Find target node and check if it's a component (can't insert inside components)
+    // Find target node. Inside one that cannot hold children (a component call, a text node,
+    // a void element) is refused by the shared insert below.
     if ($isRootTarget) {
         $targetNode = $structure;
     } else {
@@ -297,19 +221,6 @@ function __command_addComponentToNode(array $params = [], array $urlParams = [])
         return ApiResponse::create(404, 'error.notFound')
             ->withMessage("Target node not found: {$targetNodeId}")
             ->withErrors([['field' => 'targetNodeId', 'reason' => 'not_found', 'value' => $targetNodeId]]);
-    }
-    
-    // Block "inside" position for component nodes (components are atomic)
-    if ($position === 'inside' && isset($targetNode['component'])) {
-        return ApiResponse::create(400, 'validation.invalid_value')
-            ->withMessage("Cannot insert inside a component node. Components are atomic units.")
-            ->withErrors([['field' => 'position', 'reason' => 'component_is_atomic', 'targetNode' => $targetNodeId]]);
-    }
-    // ...and for text nodes, as addNode refuses them: a text node renders no children.
-    if ($position === 'inside' && isset($targetNode['textKey']) && !isset($targetNode['tag'])) {
-        return ApiResponse::create(400, 'validation.invalid_value')
-            ->withMessage("Cannot insert inside a text node.")
-            ->withErrors([['field' => 'position', 'reason' => 'text_node', 'targetNode' => $targetNodeId]]);
     }
     
     // Get structure name for translation key prefix

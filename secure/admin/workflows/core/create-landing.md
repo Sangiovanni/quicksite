@@ -12,35 +12,43 @@ You are creating a complete single-page landing website from a blank QuickSite p
 
 {{#if param.multilingual === true}}
 1. **Languages FIRST** (required for multilingual):
+   - The project's languages now: {{data.langData.languages}} (default: {{data.langData.default_language}})
    - `addLang` → add each additional language BEFORE enabling multilingual
    - Language codes MUST be valid **ISO 639-1** two-letter codes (e.g. `fr`, `es`, `ja`, `de`). If the user provided an incorrect code (e.g. `jp` instead of `ja`), use the correct ISO 639-1 code.
    - `setMultilingual` → enable multi-language mode AFTER having 2+ languages
    - Languages: {{param.languages}}
-   - **⚠️ The default language already exists, so you MUST produce exactly one `addLang` command for EACH language in the list above EXCEPT the default. Count them — every language must be present. Do NOT skip any.**
+   - **⚠️ You MUST produce exactly one `addLang` command for EACH language in the list above that the project does not have yet. Count them — every language must be present. Do NOT skip any.**
+   - Default language: {{param.defaultLanguage}} — if the project's default is another language, call `setDefaultLang` with `{ "lang": "{{param.defaultLanguage}}" }` AFTER its `addLang`.
 
    **⚠️ CRITICAL: setMultilingual EXACT syntax:**
    ```json
    { "command": "setMultilingual", "params": { "enabled": true } }
    ```
    **DO NOT use:** `{}`, `{"defaultLang": "en"}`, or any other format. ONLY `{"enabled": true}`.
+{{else}}
+1. **Language FIRST**:
+   - The project's language now: {{data.langData.default_language}}
+   - Default language: {{param.defaultLanguage}} — if it is another language, call `addLang` for it (unless the project already has it: {{data.langData.languages}}), then `setDefaultLang` with `{ "lang": "{{param.defaultLanguage}}" }`. If it is the same, no language command.
 {{/if}}
 
-{{#if param.multilingual === true}}2{{else}}1{{/if}}. **Structures** (in this order):
+2. **Structures** (in this order):
    - `editStructure` type="menu" → navigation (can be minimal for landing)
    - `editStructure` type="footer" → footer with copyright, links {{#if param.multilingual === true}}**⚠️ MUST include `{ "component": "lang-switch", "data": {} }`**{{/if}}
    - `editStructure` type="page", name="home" → main landing page content
 
-{{#if param.multilingual === true}}3{{else}}2{{/if}}. **Translations**:
+3. **Translations**:
    - `setTranslationKeys` → MUST cover ALL textKeys used in structures
 {{#if param.multilingual === true}}
    - Repeat for each language: {{param.languages}}
 
    {{> per-language-404-keys}}
+{{else}}
+   - Language: {{param.defaultLanguage}}
 {{/if}}
 
    {{> warning.no-extra-keys}}
 
-{{#if param.multilingual === true}}4{{else}}3{{/if}}. **Styles LAST** (order matters!):
+4. **Styles LAST** (order matters!):
    - `editStyles` → MUST come BEFORE setRootVariables
    - `setRootVariables` → AFTER editStyles (optional helper)
 
@@ -240,7 +248,7 @@ When using a component, the `data` object maps variable names to their values:
 - [ ] Internal links use `#section` format for anchors
 - [ ] External links have `target="_blank"`
 - [ ] All text uses `textKey`, never hardcoded strings
-- [ ] Translations provided for ALL languages: {{param.languages}}
+- [ ] Translations provided for ALL languages: {{param.languages}} (default: {{param.defaultLanguage}})
 {{/if}}
 
 ---

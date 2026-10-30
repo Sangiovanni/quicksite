@@ -40,24 +40,12 @@
     }
 
     const langSelect = document.getElementById('preview-lang');
+    // The page title field (the top bar): the page's title in the language shown
+    const pageTitleGroup = document.getElementById('preview-page-title-group');
+    const pageTitleInput = document.getElementById('preview-page-title');
     const reloadBtn = document.getElementById('preview-reload');
     const deviceBtns = document.querySelectorAll('.preview-device-btn');
     const modeBtns = document.querySelectorAll('.preview-sidebar-tool[data-mode]');
-    
-    // Node panel elements
-    const nodePanel = document.getElementById('preview-node-panel');
-    const nodeClose = document.getElementById('preview-node-close');
-    const nodeStructEl = document.getElementById('node-struct');
-    const nodeIdEl = document.getElementById('node-id');
-    const nodeComponentRow = document.getElementById('node-component-row');
-    const nodeComponentEl = document.getElementById('node-component');
-    const nodeTagEl = document.getElementById('node-tag');
-    const nodeClassesEl = document.getElementById('node-classes');
-    const nodeChildrenEl = document.getElementById('node-children');
-    const nodeTextEl = document.getElementById('node-text');
-    const nodeTextKeyRow = document.getElementById('node-textkey-row');
-    const nodeTextKeyEl = document.getElementById('node-textkey');
-    const nodeDeleteBtn = document.getElementById('node-delete');
     
     // Contextual area elements
     const contextualArea = document.getElementById('preview-contextual-area');
@@ -344,6 +332,7 @@
     const addSnippetPreviewActions = document.getElementById('add-snippet-preview-actions');
     const deleteSnippetBtn = document.getElementById('delete-snippet-btn');
     const addPositionPicker = document.getElementById('add-position-picker');
+    const addPositionNone = document.getElementById('add-position-none');
     const addMandatoryParams = document.getElementById('add-mandatory-params');
     const addMandatoryParamsContainer = document.getElementById('add-mandatory-params-container');
     const addClassField = document.getElementById('add-class-field');
@@ -1346,93 +1335,6 @@
         }
     }
 
-    // ==================== Draggable Panels ====================
-
-    /**
-     * Make a panel draggable by its header
-     * @param {HTMLElement} panel - The panel element
-     * @param {HTMLElement} header - The header element to drag from
-     * @param {string} storageKey - localStorage key for position persistence
-     */
-    function makePanelDraggable(panel, header, storageKey) {
-        if (!panel || !header) return;
-        
-        let isDragging = false;
-        let startX, startY, startLeft, startTop;
-        
-        // Restore saved position
-        const savedPos = localStorage.getItem(storageKey);
-        if (savedPos) {
-            try {
-                const pos = JSON.parse(savedPos);
-                panel.style.left = pos.left + 'px';
-                panel.style.top = pos.top + 'px';
-                panel.classList.add(panel.classList[0] + '--dragged');
-            } catch (e) {}
-        }
-        
-        header.addEventListener('mousedown', (e) => {
-            // Don't drag if clicking on close button
-            if (e.target.closest('button')) return;
-            
-            isDragging = true;
-            startX = e.clientX;
-            startY = e.clientY;
-            
-            const rect = panel.getBoundingClientRect();
-            startLeft = rect.left;
-            startTop = rect.top;
-            
-            // Add dragged class to disable default positioning
-            panel.classList.add(panel.classList[0] + '--dragged');
-            
-            // Disable text selection while dragging
-            document.body.style.userSelect = 'none';
-            
-            e.preventDefault();
-        });
-        
-        document.addEventListener('mousemove', (e) => {
-            if (!isDragging) return;
-            
-            const deltaX = e.clientX - startX;
-            const deltaY = e.clientY - startY;
-            
-            let newLeft = startLeft + deltaX;
-            let newTop = startTop + deltaY;
-            
-            // Keep within viewport
-            const panelRect = panel.getBoundingClientRect();
-            const maxLeft = window.innerWidth - panelRect.width;
-            const maxTop = window.innerHeight - panelRect.height;
-            
-            newLeft = Math.max(0, Math.min(newLeft, maxLeft));
-            newTop = Math.max(0, Math.min(newTop, maxTop));
-            
-            panel.style.left = newLeft + 'px';
-            panel.style.top = newTop + 'px';
-        });
-        
-        document.addEventListener('mouseup', () => {
-            if (!isDragging) return;
-            isDragging = false;
-            
-            // Re-enable text selection
-            document.body.style.userSelect = '';
-            
-            // Save position
-            const rect = panel.getBoundingClientRect();
-            localStorage.setItem(storageKey, JSON.stringify({
-                left: rect.left,
-                top: rect.top
-            }));
-        });
-    }
-    
-    // Initialize draggable panels
-    const nodePanelHeader = nodePanel?.querySelector('.preview-node-panel__header');
-    makePanelDraggable(nodePanel, nodePanelHeader, 'qs_node_panel_pos');
-    
     // ==================== URL Building ====================
     
     function getCurrentLang() {
@@ -1700,6 +1602,8 @@
         
         // Update layout toggles visibility (show only for pages)
         updateLayoutToggles(editType, editName);
+        // The page title field follows the page and the language shown
+        updatePageTitleField(editType, editName);
         
         // For layout (menu/footer), auto-select the element after iframe loads
         if (editType === 'layout') {
@@ -1901,6 +1805,81 @@
         });
     }
     
+    // ==================== Page Title Field ====================
+
+    // The title the field holds as saved (what Escape and an emptied field put back), and a
+    // number that drops a read answering after a newer one.
+    let pageTitleSaved = '';
+    let pageTitleSeq = 0;
+
+    /**
+     * The title field shows while a page is the edit target, holding that page's title in the
+     * language shown, read where the page reads it: the language's file, or default.json on a
+     * one-language site. It hides for the menu, the footer and a component.
+     */
+    async function updatePageTitleField(editType, editName) {
+        if (!pageTitleGroup || !pageTitleInput) return;
+        const seq = ++pageTitleSeq;
+        if (editType !== 'page' || !editName) {
+            pageTitleGroup.style.display = 'none';
+            return;
+        }
+        pageTitleGroup.style.display = '';
+        pageTitleSaved = '';
+        pageTitleInput.value = '';
+        pageTitleInput.placeholder = '';
+        const readLang = PreviewConfig.multilingual ? getCurrentLang() : 'default';
+        const result = await QuickSiteAdmin.apiRequest('getTranslation', 'GET', null, [readLang]);
+        if (seq !== pageTitleSeq) return;
+        const titles = (result.ok && result.data?.data?.translations?.page?.titles) || {};
+        pageTitleSaved = typeof titles[editName] === 'string' ? titles[editName] : '';
+        // A title typed while the read was answering is kept.
+        if (document.activeElement !== pageTitleInput) pageTitleInput.value = pageTitleSaved;
+        syncPageTitlePlaceholder();
+    }
+
+    /**
+     * The placeholder is what the preview's tab shows: with no title saved, the readable one the
+     * page shell gives (the last part of the address).
+     */
+    function syncPageTitlePlaceholder() {
+        if (!pageTitleInput || currentEditType !== 'page') return;
+        let shown = '';
+        try {
+            shown = (iframe.contentDocument && iframe.contentDocument.title) || '';
+        } catch (e) {
+            shown = '';
+        }
+        pageTitleInput.placeholder = shown;
+    }
+
+    /**
+     * Save the field through editTitle when it differs from the saved title, in the language
+     * shown (the default language on a one-language site; editTitle keeps default.json in step).
+     * An emptied field puts the saved title back: editTitle refuses an empty title.
+     */
+    async function savePageTitle() {
+        if (!pageTitleInput || currentEditType !== 'page' || !currentEditName) return;
+        const value = pageTitleInput.value.trim();
+        if (value === '' || value === pageTitleSaved) {
+            pageTitleInput.value = pageTitleSaved;
+            return;
+        }
+        const route = currentEditName;
+        const result = await QuickSiteAdmin.apiRequest('editTitle', 'POST', {
+            route: route,
+            lang: getCurrentLang(),
+            title: value
+        });
+        if (result.ok) {
+            if (route === currentEditName) pageTitleSaved = value;
+            showToast(PreviewConfig.i18n.pageTitleSaved, 'success');
+        } else {
+            const error = (result.data && result.data.message) || String(result.status);
+            showToast(PreviewConfig.i18n.pageTitleSaveFailed.replace('{error}', error), 'error');
+        }
+    }
+
     // ==================== Route Layout Toggles ====================
     
     /**
@@ -2851,6 +2830,7 @@
     let selectedElementClasses = null;  // For style mode preselection
     let selectedElementTag = null;      // For style mode preselection
     let selectedHoldsChildren = true;   // Whether the Add panel may offer "Inside" (the iframe's answer)
+    let selectedIsInline = false;       // Whether text beside it continues its line: the Text tab's Before / After
 
     function showNodePanel(data) {
         // Check if user clicked a menu/footer element while editing a different target
@@ -2898,6 +2878,7 @@
         selectedElementClasses = data.classes || null;  // Store classes for style mode
         selectedElementTag = data.tag || null;          // Store tag for style mode
         selectedHoldsChildren = data.holdsChildren !== false;
+        selectedIsInline = data.inline === true;
         // An Add form left open follows the new selection's positions.
         if (contextualAddMode === 'add' && contextualAddForm && contextualAddForm.style.display !== 'none') {
             _syncAddPositionOptions();
@@ -2949,31 +2930,6 @@
             structDisplay = 'Footer';
         }
         
-        // Update panel fields (deprecated floating panel - kept for compatibility)
-        if (nodeStructEl) nodeStructEl.textContent = structDisplay;
-        if (nodeIdEl) nodeIdEl.textContent = selectedNode === '' ? '(root)' : selectedNode || '-';
-        if (nodeTagEl) nodeTagEl.textContent = data.tag || '-';
-        if (nodeClassesEl) nodeClassesEl.textContent = data.classes || '-';
-        if (nodeChildrenEl) nodeChildrenEl.textContent = data.childCount !== undefined ? data.childCount : '-';
-        if (nodeTextEl) nodeTextEl.textContent = data.textContent || '-';
-        
-        // Show/hide component row
-        if (data.isComponent && data.component) {
-            if (nodeComponentEl) nodeComponentEl.textContent = data.component;
-            if (nodeComponentRow) nodeComponentRow.style.display = '';
-        } else {
-            if (nodeComponentRow) nodeComponentRow.style.display = 'none';
-        }
-        
-        // Show/hide textKey row
-        if (data.textKeys && data.textKeys.length > 0) {
-            // Show first textKey (or comma-separated if multiple)
-            if (nodeTextKeyEl) nodeTextKeyEl.textContent = data.textKeys.join(', ');
-            if (nodeTextKeyRow) nodeTextKeyRow.style.display = '';
-        } else {
-            if (nodeTextKeyRow) nodeTextKeyRow.style.display = 'none';
-        }
-        
         // Update contextual area info
         showContextualInfo(data);
 
@@ -2981,8 +2937,6 @@
         // stamped with data-qs-complex='table'). Queries the iframe DOM
         // for the selected node to read its data attrs + measure dims.
         _updateTranslateCsvButton(data);
-
-        // (deprecated) nodePanel.classList.add('preview-node-panel--visible');
     }
 
     // ============================================================
@@ -3364,13 +3318,13 @@
     }
 
     function hideNodePanel() {
-        // (deprecated) nodePanel.classList.remove('preview-node-panel--visible');
         selectedStruct = null;
         selectedNode = null;
         selectedComponent = null;
         selectedElementClasses = null;
         selectedElementTag = null;
         selectedHoldsChildren = true;
+        selectedIsInline = false;
         
         // Clear navigation states
         if (window.PreviewState) {
@@ -3508,6 +3462,8 @@
                     updateLayoutToggles(currentEditType, currentEditName);
                     // Sync layout toggles from iframe DOM (read actual menu/footer presence)
                     syncLayoutTogglesFromIframe();
+                    // The title field's placeholder: what the preview's tab shows
+                    syncPageTitlePlaceholder();
                 }, 50); // Small delay to ensure iframe is ready to receive messages
             }
             if (e.data.action === 'elementMoved' || e.data.action.startsWith('drag')) {
@@ -4024,6 +3980,20 @@
                 navigateTo(currentEditType, currentEditName);
             });
         }
+
+        if (pageTitleInput) {
+            // Enter saves by leaving the field; Escape puts the saved title back, then leaves it
+            pageTitleInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    pageTitleInput.blur();
+                } else if (e.key === 'Escape') {
+                    pageTitleInput.value = pageTitleSaved;
+                    pageTitleInput.blur();
+                }
+            });
+            pageTitleInput.addEventListener('blur', savePageTitle);
+        }
         
         reloadBtn.addEventListener('click', reloadPreview);
         
@@ -4196,11 +4166,7 @@
         ctxTextDelete.addEventListener('click', deleteTextOnlyNode);
     }
     
-    if (nodeClose) {
-        nodeClose.addEventListener('click', hideNodePanel);
-    }
-    
-    // Delete node function (shared between floating panel and contextual area)
+    // Delete the selected node: the contextual area's and the mobile row's Delete buttons, and the Delete key
     async function deleteSelectedNode() {
         if (selectedStruct == null || selectedNode == null) return;
         if (selectedNode === '') {
@@ -4298,10 +4264,6 @@
             console.error('[Preview] Delete error:', error);
             showToast(PreviewConfig.i18n.error + ': ' + error.message, 'error');
         }
-    }
-    
-    if (nodeDeleteBtn) {
-        nodeDeleteBtn.addEventListener('click', deleteSelectedNode);
     }
     
     // ==================== Duplicate Node ====================
@@ -4664,24 +4626,38 @@
      * The positions the Add form offers for the current selection. At the root only "inside"
      * (before / after hidden). Elsewhere "inside" only where the node can hold children — not a
      * text, a component or a void element such as an image (the iframe's answer, the rule the
-     * drag follows): the server refuses an insert there. Run when the form opens, and again when
-     * the selection changes while it is open.
+     * drag follows): the server refuses an insert there. The Text tab offers before / after only
+     * beside an inline element (a bold word, a link: the iframe's answer), where the new text
+     * continues the line; where neither fits, the form says so and Add is disabled. Run when the
+     * form opens, when its tab changes, and again when the selection changes while it is open.
      */
     function _syncAddPositionOptions() {
         const isAtRoot = selectedNode === '' && currentEditType !== 'component';
+        const isText = sidebarAddNodeType === 'text';
         const insideOffered = isAtRoot || selectedHoldsChildren;
+        const besideOffered = !isAtRoot && (!isText || selectedIsInline);
         if (isAtRoot) {
             setAddPosition('inside');
         } else if (!insideOffered && getAddPosition() === 'inside') {
             setAddPosition('after');
+        } else if (!besideOffered && getAddPosition() !== 'inside') {
+            setAddPosition('inside');
         }
+        const nothingFits = !insideOffered && !besideOffered;
+        if (addPositionNone) addPositionNone.style.display = nothingFits ? '' : 'none';
+        if (addConfirmBtn) addConfirmBtn.disabled = nothingFits;
         if (!addPositionPicker) return;
         addPositionPicker.querySelectorAll('input[name="add-position"]').forEach(radio => {
             const wrapper = radio.closest('label') || radio.parentElement;
             if (radio.value === 'before' || radio.value === 'after') {
-                wrapper.style.display = isAtRoot ? 'none' : '';
+                wrapper.style.display = besideOffered ? '' : 'none';
             } else if (radio.value === 'inside') {
                 wrapper.style.display = insideOffered ? '' : 'none';
+                // The Text tab's Inside is the element's end: its label and its diagram say so
+                const label = wrapper.querySelector('.position-picker__label');
+                if (label) label.textContent = isText ? PreviewConfig.i18n.positionInsideEnd : PreviewConfig.i18n.positionInside;
+                const box = wrapper.querySelector('.position-picker__new');
+                if (box) box.setAttribute('y', isText ? '26' : '10');
             }
         });
     }
@@ -4944,6 +4920,8 @@
         if (addConfirmBtn) {
             addConfirmBtn.classList.remove('admin-btn--success');
             addConfirmBtn.classList.add('admin-btn--primary');
+            // Save works whatever the Add form's Text tab last offered
+            addConfirmBtn.disabled = false;
         }
 
         // Pre-populate from the saved params.
@@ -5634,6 +5612,9 @@
             localStorage.setItem('qs-add-last-tab', sidebarAddNodeType);
             updateSidebarAddTypeTabs(sidebarAddNodeType);
             updateSidebarAddNodeTypeUI();
+            // The Text tab starts on Inside, the other tabs on After (as the form opens)
+            setAddPosition(sidebarAddNodeType === 'text' ? 'inside' : 'after');
+            _syncAddPositionOptions();
             if (sidebarAddNodeType === 'component') {
                 loadSidebarComponentsList();
             } else if (sidebarAddNodeType === 'snippet') {
@@ -6574,9 +6555,9 @@
     }
 
     // What the engine's renderer does with a node's text and attributes (JsonToHtmlRenderer
-    // renderTextNode() / renderAttribute()), so the preview shows what the page will. Keep in step.
-    const SNIPPET_TRANSLATABLE_ATTRIBUTES = ['placeholder', 'title', 'alt', 'aria-label', 'aria-placeholder', 'aria-description'];
-    const SNIPPET_EMPTY_MEANINGFUL_ATTRIBUTES = ['alt', 'aria-label'];
+    // renderTextNode() / renderAttribute()), so the preview shows what the page will. Keep in step;
+    // the attributes translated and the ones written even when empty are TagRegistry's lists
+    // (TAG_INFO, declared further down: read when a preview is built, not at load).
     const SNIPPET_TRANSLATION_KEY = /^[a-z0-9_]+(\.[a-z0-9_]+)+$/i;
 
     /** The text of a raw (`__RAW__`) or literal (`__LIT__`) value, or null for any other value. */
@@ -6606,9 +6587,9 @@
         if (value === true) return '';
         if (value === false || value === null || value === undefined || typeof value === 'object') return null;
         value = String(value);
-        if (value === '' && !SNIPPET_EMPTY_MEANINGFUL_ATTRIBUTES.includes(name)) return null;
+        if (value === '' && !(TAG_INFO.EMPTY_MEANINGFUL_ATTRIBUTES || []).includes(name)) return null;
         if (snippetPreviewShowKeys) return value;
-        if (SNIPPET_TRANSLATABLE_ATTRIBUTES.includes(name)) {
+        if ((TAG_INFO.TRANSLATABLE_ATTRIBUTES || []).includes(name)) {
             const literal = snippetLiteral(value);
             if (literal !== null) return literal;
             if (SNIPPET_TRANSLATION_KEY.test(value)) return snippetTranslation(snippetData, value);
@@ -7663,7 +7644,10 @@
             textPayload = { textRaw: false, textKey: pickedKey };
         }
 
-        const position = getAddPosition();
+        // The Text tab's Inside adds at the end of the element: a sentence grows in the order
+        // it is written (the root keeps its own rule, first).
+        const picked = getAddPosition();
+        const position = picked === 'inside' ? 'inside-end' : picked;
         const structInfo = parseStruct(selectedStruct);
         if (!structInfo || !structInfo.type) {
             throw new Error('Invalid structure type');
@@ -10544,84 +10528,6 @@
         return current;
     }
     
-    // Collect all textKeys from a structure (recursive) - kept for reference
-    function collectTextKeys(node, keys = []) {
-        if (!node || typeof node !== 'object') return keys;
-        
-        // Check for textKey
-        if (node.textKey && !node.textKey.startsWith('__RAW__')) {
-            keys.push(node.textKey);
-        }
-        
-        // Check for altKey (used in img tags)
-        if (node.altKey && !node.altKey.startsWith('__RAW__')) {
-            keys.push(node.altKey);
-        }
-        
-        // Check params for translatable attributes
-        if (node.params) {
-            const translatableParams = ['alt', 'title', 'placeholder', 'aria-label'];
-            for (const param of translatableParams) {
-                const paramKey = node.params[param];
-                if (paramKey && typeof paramKey === 'string' && 
-                    paramKey.startsWith('{{') && paramKey.includes('textKey:')) {
-                    // Extract key from {{textKey:...}}
-                    const match = paramKey.match(/\{\{textKey:([^}]+)\}\}/);
-                    if (match && match[1]) {
-                        keys.push(match[1]);
-                    }
-                }
-            }
-        }
-        
-        // Recurse into children
-        if (node.children && Array.isArray(node.children)) {
-            for (const child of node.children) {
-                collectTextKeys(child, keys);
-            }
-        }
-        
-        return keys;
-    }
-    
-    // Extract translations for a list of keys
-    async function extractTranslationsForKeys(textKeys) {
-        if (!textKeys || textKeys.length === 0) return {};
-        
-        try {
-            // Get all available languages
-            const langResponse = await QuickSiteAdmin.apiRequest('listLangTranslations', 'GET');
-            if (!langResponse.ok || !langResponse.data?.data) {
-                console.warn('[Preview] Could not get languages list');
-                return {};
-            }
-            
-            const languages = langResponse.data.data.languages || ['en'];
-            const translations = {};
-            
-            // For each language, get translations
-            for (const lang of languages) {
-                const transResponse = await QuickSiteAdmin.apiRequest('getProjectTranslations', 'GET', null, [lang]);
-                if (transResponse.ok && transResponse.data?.data?.translations) {
-                    const langTranslations = transResponse.data.data.translations;
-                    
-                    // Extract only the keys we need
-                    for (const key of textKeys) {
-                        if (langTranslations[key] !== undefined) {
-                            if (!translations[lang]) translations[lang] = {};
-                            translations[lang][key] = langTranslations[key];
-                        }
-                    }
-                }
-            }
-            
-            return translations;
-        } catch (error) {
-            console.error('[Preview] Failed to extract translations:', error);
-            return {};
-        }
-    }
-    
     // Submit save snippet form
     async function submitSaveSnippet() {
         if (!saveSnippetStructureData) {
@@ -10839,6 +10745,13 @@
         updateComponentWarning(currentEditType, currentEditName);
         // Update layout toggles visibility on initial load
         updateLayoutToggles(currentEditType, currentEditName);
+        // The title field reads through the panel's API client, which a later script of the
+        // page defines (admin.js): the first read waits for the page's scripts.
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => updatePageTitleField(currentEditType, currentEditName));
+        } else {
+            updatePageTitleField(currentEditType, currentEditName);
+        }
     }
     
     // Ensure mode is reset to 'select' on page load (browser may cache button states)
