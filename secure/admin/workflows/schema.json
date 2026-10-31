@@ -161,6 +161,11 @@
             "enum": ["text", "textarea", "select", "tag-select", "checkbox", "number", "nodeSelector", "selector", "hidden"],
             "description": "Input type for the parameter. `selector` auto-fills from the editor's current iframe selection — a read-only card showing tag/classes/struct/node. Workflow steps reference fields via {{param.X.tag}} etc."
           },
+          "searchable": {
+            "type": "boolean",
+            "default": false,
+            "description": "For `select` and `tag-select`: a search over the list, matching an option's name and its value. A `select` becomes the panel's searchable dropdown; a `tag-select` gets a search field above its list, which hides the options that do not match but never one already ticked. Ignored on any other type."
+          },
           "labelKey": {
             "type": "string",
             "description": "Translation key for the label"

@@ -165,6 +165,10 @@ function __command_deleteProject(array $params = [], array $urlParams = []): Api
             ]);
     }
 
+    // The folder is gone, and every membership its roster held with it: every
+    // account's dashboard repair scans again on its next load.
+    qs_membership_token_bump();
+
     // Destroy this project's command log with it. The log lives in
     // secure/logs/p/<id>/ (deliberately OUTSIDE the project folder, so exports,
     // clones and backups never carry it). A project id is a folder NAME and can

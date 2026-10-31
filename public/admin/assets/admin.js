@@ -489,6 +489,146 @@ const QuickSiteAdmin = {
         return (label === '' || label === pid) ? pid : label + ' #' + pid;
     },
 
+    /** The mark a starred project carries in a list. */
+    PROJECT_STAR: '★',
+
+    /**
+     * The projects this account starred — its users.php `starred_projects`, which
+     * layout.php hands the page. Starred projects come first in each project list;
+     * a list stars only a project it lists.
+     *
+     * @returns {string[]}
+     */
+    starredProjects() {
+        const list = window.QUICKSITE_CONFIG?.starredProjects;
+        return Array.isArray(list) ? list.slice() : [];
+    },
+
+    /** @returns {boolean} */
+    isProjectStarred(id) {
+        return this.starredProjects().indexOf(String(id || '')) !== -1;
+    },
+
+    /**
+     * Star or unstar a project (panel state, /admin/state/project-star). On success
+     * the account's list becomes the server's answer and `quicksite:stars-changed`
+     * fires on the document with it (event.detail.starred), so every list on the
+     * page re-orders. A refusal changes nothing. Resolves with the request's
+     * {ok, status, data}.
+     *
+     * @param {string} id
+     * @param {boolean} starred
+     */
+    async setProjectStar(id, starred) {
+        const res = await window.QuickSiteAPI.setProjectStar(id, starred);
+        const list = res && res.ok ? res.data?.data?.starred_projects : null;
+        if (Array.isArray(list)) {
+            if (window.QUICKSITE_CONFIG) window.QUICKSITE_CONFIG.starredProjects = list.slice();
+            document.dispatchEvent(new CustomEvent('quicksite:stars-changed', { detail: { starred: list.slice() } }));
+        }
+        return res;
+    },
+
+    /**
+     * A project list in its starred order: the starred projects first, then the
+     * rest, each group in the order it came (the server's: by name, then id).
+     *
+     * @param {Array} items
+     * @param {function(*): string} idOf  an item's project id
+     * @returns {Array} a new array
+     */
+    starredFirst(items, idOf) {
+        const starred = this.starredProjects();
+        const isOn = (item) => starred.indexOf(String(idOf(item))) !== -1;
+        return items.filter(isOn).concat(items.filter((item) => !isOn(item)));
+    },
+
+    /** A project's label in a list: the star before it when the account starred it. */
+    starredLabel(id, label) {
+        return this.isProjectStarred(id) ? this.PROJECT_STAR + ' ' + label : label;
+    },
+
+    /**
+     * Put a project <select> in its starred order. Each option's value is a project
+     * id; the first pass keeps its label without the star (data-label) and its place
+     * in the list as written (data-order), so each group stays in that order however
+     * often the stars change. An option with no value (a placeholder) stays first. The
+     * choice is kept, and a searchable select wrapping it is refreshed.
+     *
+     * @param {HTMLSelectElement} select
+     */
+    orderProjectSelect(select) {
+        if (!select) return;
+        const options = Array.from(select.options);
+        const projects = options.filter((o) => o.value !== '');
+        projects.forEach((o, i) => {
+            if (o.dataset.label === undefined) o.dataset.label = o.textContent;
+            if (o.dataset.order === undefined) o.dataset.order = String(i);
+            o.textContent = this.starredLabel(o.value, o.dataset.label);
+        });
+        projects.sort((a, b) => Number(a.dataset.order) - Number(b.dataset.order));
+        const chosen = select.value;
+        options.filter((o) => o.value === '')
+            .concat(this.starredFirst(projects, (o) => o.value))
+            .forEach((o) => select.appendChild(o));
+        select.value = chosen;
+        if (select._qsPicker) select._qsPicker.refresh();
+    },
+
+    /**
+     * Draw a star toggle for a project: ★ and the title "Unstar this project" when the
+     * account starred it, ☆ and "Star this project" when not, aria-pressed to match.
+     * Its name stays "Starred" (common.starred): a toggle says its state by
+     * aria-pressed. With no project the toggle is disabled.
+     *
+     * @param {HTMLButtonElement} button
+     * @param {?string} id
+     */
+    syncStarToggle(button, id) {
+        if (!button) return;
+        const on = !!id && this.isProjectStarred(id);
+        button.textContent = on ? this.PROJECT_STAR : '☆';
+        button.setAttribute('aria-pressed', on ? 'true' : 'false');
+        button.setAttribute('aria-label', this.t('common.starred'));
+        button.title = this.t(on ? 'common.unstarProject' : 'common.starProject');
+        button.dataset.project = id || '';
+        button.disabled = !id;
+    },
+
+    /**
+     * Make a button a star toggle: a click stars or unstars the project it names
+     * (`projectOf()` when given, else its data-project), and it redraws whenever
+     * the account's stars change (`quicksite:stars-changed`) — until the page drops
+     * the button (a list redrawn). A refused star says so in the panel's toast and
+     * changes nothing.
+     *
+     * @param {HTMLButtonElement} button
+     * @param {function(): ?string} [projectOf]
+     */
+    bindStarToggle(button, projectOf) {
+        if (!button || button.dataset.starToggle === 'bound') return;
+        button.dataset.starToggle = 'bound';
+        const current = () => (projectOf ? projectOf() : button.dataset.project) || '';
+        button.addEventListener('click', async () => {
+            const id = current();
+            if (!id) return;
+            button.disabled = true;
+            const res = await this.setProjectStar(id, !this.isProjectStarred(id));
+            if (!res || !res.ok) {
+                this.showToast(this.t('common.starFailed') + ((res && res.data && res.data.message) || ''), 'error');
+            }
+            this.syncStarToggle(button, current());
+        });
+        const redraw = () => {
+            if (!button.isConnected) {
+                document.removeEventListener('quicksite:stars-changed', redraw);
+                return;
+            }
+            this.syncStarToggle(button, current());
+        };
+        document.addEventListener('quicksite:stars-changed', redraw);
+    },
+
     /**
      * Does executing this command warrant an "are you sure"?
      *

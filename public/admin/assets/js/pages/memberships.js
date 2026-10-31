@@ -198,11 +198,20 @@
         return window.QuickSiteAdmin.projectLabel(id, name);
     }
 
+    /** A row's star toggle: the panel's (QuickSiteAdmin.syncStarToggle / bindStarToggle). */
+    function _renderStarToggle(projectId) {
+        var star = el('button', { class: 'admin-btn admin-btn--sm admin-btn--ghost admin-project-star', type: 'button' });
+        window.QuickSiteAdmin.syncStarToggle(star, projectId);
+        window.QuickSiteAdmin.bindStarToggle(star);
+        return star;
+    }
+
     function _renderProjectRow(p) {
         var isOwned = p.my_role === 'owner';
         var isEditing = p.project === CFG.editedProject;
 
         var title = el('span', { class: 'members-row__title' }, [
+            _renderStarToggle(p.project),
             el('strong', { text: projectLabel(p.project, p.name) }),
         ]);
         var chips = el('span', { class: 'members-row__chips' }, [
@@ -234,15 +243,24 @@
         return _renderRow([title, chips], actions);
     }
 
+    // The last list drawn, so a star set anywhere on the page re-orders the rows.
+    var shownProjects = [];
+
+    /** My projects, starred ones first (listProjects answers them by name). */
     function renderProjects(projects) {
+        shownProjects = projects;
         var root = document.getElementById('memberships-projects');
         clearNode(root);
         if (!projects.length) {
             root.appendChild(_renderProjectsEmpty());
             return;
         }
-        projects.forEach(function (p) { root.appendChild(_renderProjectRow(p)); });
+        window.QuickSiteAdmin.starredFirst(projects, function (p) { return p.project; })
+            .forEach(function (p) { root.appendChild(_renderProjectRow(p)); });
     }
+    document.addEventListener('quicksite:stars-changed', function () {
+        if (shownProjects.length) renderProjects(shownProjects);
+    });
 
     function onEditProject(project, btn) {
         if (btn) btn.disabled = true;

@@ -16,7 +16,7 @@
     "parameters": [],
     "steps": [
         { "command": "setMultilingual", "params": { "enabled": true } },
-        { "command": "addLang", "params": { "code": "fr", "name": "Francais" } },
+        { "command": "addLang", "params": { "code": "fr" } },
         { "command": "editStructure", "params": {
             "type": "component",
             "name": "lang-switch",

@@ -9,13 +9,25 @@
  * An option's data-description is shown as a line under its item (two lines
  * at most) and, whole, as the item's title, which the panel's bubble shows.
  *
+ * The trigger takes the select's name — its aria-labelledby or aria-label,
+ * else the <label for> that points at it — with the value kept after it, as a
+ * native select reads ("Kind: Accordion"). A <label for> is pointed at the
+ * trigger, so a click on the label opens the list; destroy() points it back.
+ * A label that wraps the select already has the trigger as its control.
+ *
+ * Its words are the panel's (common.selectPlaceholder, common.search,
+ * common.noResults, common.noMatchesFor, common.createFromSearch, which
+ * layout.php ships on every page); a caller's own option wins.
+ *
  * Used by:
+ *   - every project list: the header's project menu (layout.php), the
+ *     dashboard's Project Manager selector and its Delete list (dashboard.js)
  *   - the JS-function picker (preview-js-interactions.js)
  *   - the event picker of an element's interaction (preview-js-interactions.js)
- *   - the Complex tab's kind picker (preview.js)
- *   - the route inputType picker
- *   - future surfaces where the existing tag/property picker pattern
- *     applies but a fully custom DOM stack would be overkill
+ *   - the Complex tab's kind picker and the preview's target (preview.js)
+ *   - the route, API and storage-key inputType pickers
+ *   - the console's pickers of project data (command-form.js)
+ *   - the New Project dialog's language (dashboard.js)
  *
  * Search behaviour: case-insensitive substring match against the
  * option's value, textContent, AND data-description attribute. Either
@@ -43,6 +55,19 @@
 
     if (window.QSSearchableSelect) return; // load-guard for double include
 
+    /** One of the panel's words; an unset one shows its key, as QuickSiteUtils.tCommon does. */
+    function word(name) {
+        const utils = window.QuickSiteUtils;
+        return utils && typeof utils.tCommon === 'function' ? utils.tCommon(name) : 'common.' + name;
+    }
+
+    let idSeq = 0;
+    /** An id for an element the widget names or points a label at. */
+    function nextId(kind) {
+        idSeq += 1;
+        return 'qs-ss-' + kind + '-' + idSeq;
+    }
+
     class QSSearchableSelect {
         constructor(nativeSelect, options) {
             if (!nativeSelect || nativeSelect.tagName !== 'SELECT') {
@@ -50,9 +75,9 @@
             }
             this.nativeSelect = nativeSelect;
             this.options = options || {};
-            this.placeholder = this.options.placeholder || 'Select…';
-            this.searchPlaceholder = this.options.searchPlaceholder || 'Search…';
-            this.emptyText = this.options.emptyText || 'No matches';
+            this.placeholder = this.options.placeholder || word('selectPlaceholder');
+            this.searchPlaceholder = this.options.searchPlaceholder || word('search');
+            this.emptyText = this.options.emptyText || word('noResults');
 
             this.containerEl = null;
             this.triggerEl = null;
@@ -66,10 +91,14 @@
             this._closeHandler = null;
             this._onNativeChange = null;
             this._onTriggerKeydown = null;
+            this._nameEl = null;
+            this._pointedLabels = []; // [label, the for it had, whether it had an id], put back by destroy()
 
             this._mount();
+            this._takeName();
             this._wireNativeListeners();
             this._updateTriggerLabel();
+            this.triggerEl.disabled = !!this.nativeSelect.disabled;
         }
 
         _mount() {
@@ -112,6 +141,51 @@
             this.nativeSelect.parentNode.insertBefore(this.containerEl, this.nativeSelect);
         }
 
+        /**
+         * Name the trigger after its select. The hidden select keeps no name a
+         * user can reach, so the trigger is labelled by what named the select,
+         * then by its own value text: a screen reader hears "Kind: Accordion".
+         * A <label for> is pointed at the trigger, so clicking it opens the list.
+         */
+        _takeName() {
+            const select = this.nativeSelect;
+            const ids = [];
+            const labelledBy = (select.getAttribute('aria-labelledby') || '').trim();
+            const ariaLabel = (select.getAttribute('aria-label') || '').trim();
+            if (labelledBy !== '') {
+                ids.push(...labelledBy.split(/\s+/));
+            } else if (ariaLabel !== '') {
+                this._nameEl = document.createElement('span');
+                this._nameEl.className = 'qs-searchable-select__name';
+                this._nameEl.id = nextId('name');
+                this._nameEl.textContent = ariaLabel;
+                this.containerEl.appendChild(this._nameEl);
+                ids.push(this._nameEl.id);
+            }
+            const labels = Array.from(select.labels || []).filter((label) => !label.contains(select));
+            if (labels.length > 0) {
+                if (!this.triggerEl.id) this.triggerEl.id = nextId('trigger');
+                labels.forEach((label) => {
+                    const hadId = label.id !== '';
+                    if (labelledBy === '' && ariaLabel === '') {
+                        if (!hadId) label.id = nextId('label');
+                        ids.push(label.id);
+                    }
+                    this._pointedLabels.push([label, label.htmlFor, hadId]);
+                    label.htmlFor = this.triggerEl.id;
+                });
+            }
+            if (ids.length > 0) {
+                this.triggerTextEl.id = nextId('value');
+                this.triggerEl.setAttribute('aria-labelledby', ids.concat(this.triggerTextEl.id).join(' '));
+            }
+        }
+
+        /** Is this element (or what holds it) one of the labels that open this widget? */
+        _isOwnLabel(target) {
+            return this._pointedLabels.some(([label]) => label.contains(target));
+        }
+
         _buildChevronIcon() {
             const ns = 'http://www.w3.org/2000/svg';
             const svg = document.createElementNS(ns, 'svg');
@@ -150,12 +224,15 @@
 
         /**
          * External code that repopulates the native select (clearing
-         * and re-adding options) calls refresh() to nudge the wrapper
-         * into re-reading the new state. The trigger label is updated
-         * and any open dropdown is rebuilt with the new options.
+         * and re-adding options), or changes its value or its disabled
+         * state without a change event, calls refresh() to nudge the
+         * wrapper into re-reading the new state. The trigger label and
+         * the trigger's disabled state are updated, and any open dropdown
+         * is rebuilt with the new options.
          */
         refresh() {
             this._updateTriggerLabel();
+            this.triggerEl.disabled = !!this.nativeSelect.disabled;
             if (this.isOpen && this.listEl && this.searchInputEl) {
                 this._renderList(this.searchInputEl.value.trim().toLowerCase());
             }
@@ -174,12 +251,15 @@
             // Fixed positioning to escape overflow:hidden parents.
             this.dropdownEl.style.position = 'fixed';
 
-            // Width matches the trigger exactly (both min + max). Without
-            // a max-width, long item descriptions push the dropdown past
-            // the trigger's container, across the whole width of the page.
+            // Width matches the trigger exactly (both min + max), or the
+            // caller's minWidth when the trigger is narrower (a compact
+            // badge). Without a max-width, long item descriptions push the
+            // dropdown past the trigger's container, across the whole width
+            // of the page.
             const rect = this.triggerEl.getBoundingClientRect();
-            this.dropdownEl.style.width = rect.width + 'px';
-            this.dropdownEl.style.maxWidth = rect.width + 'px';
+            const width = Math.max(rect.width, Number(this.options.minWidth) || 0);
+            this.dropdownEl.style.width = width + 'px';
+            this.dropdownEl.style.maxWidth = width + 'px';
 
             this.searchInputEl = document.createElement('input');
             this.searchInputEl.type = 'search';
@@ -207,16 +287,26 @@
             this.searchInputEl.addEventListener('keydown', (e) => this._handleSearchKey(e));
 
             // Mount first (positioned via initial top below) so we can
-            // measure the rendered height, then flip up if needed.
+            // measure the rendered height, then flip up if needed. A list
+            // wider than its trigger moves left as far as it must to stay
+            // inside the page.
+            let left = rect.left;
+            if (width > rect.width) {
+                left = Math.max(8, Math.min(rect.left, document.documentElement.clientWidth - 8 - width));
+            }
             this.dropdownEl.style.top = (rect.bottom + 4) + 'px';
-            this.dropdownEl.style.left = rect.left + 'px';
+            this.dropdownEl.style.left = left + 'px';
             document.body.appendChild(this.dropdownEl);
             this._positionDropdown(rect);
 
-            setTimeout(() => this.searchInputEl.focus(), 0);
+            // A close() in the same tick has dropped the field already.
+            setTimeout(() => { if (this.searchInputEl) this.searchInputEl.focus(); }, 0);
 
+            // A click on one of the widget's labels is the widget's own: the
+            // label clicks the trigger next, which toggles the list.
             this._closeHandler = (e) => {
-                if (!this.containerEl.contains(e.target) && (!this.dropdownEl || !this.dropdownEl.contains(e.target))) {
+                if (!this.containerEl.contains(e.target) && (!this.dropdownEl || !this.dropdownEl.contains(e.target))
+                    && !this._isOwnLabel(e.target)) {
                     this.close();
                 }
             };
@@ -361,7 +451,7 @@
                     createItem.setAttribute('role', 'option');
                     createItem.textContent = this.options.createLabel
                         ? this.options.createLabel(rawQuery)
-                        : ('➕ Create "' + rawQuery + '"');
+                        : word('createFromSearch').replace(':query', rawQuery);
                     createItem.addEventListener('click', () => {
                         this.close();
                         this.options.onCreateFromSearch(rawQuery);
@@ -373,7 +463,7 @@
                 } else {
                     const empty = document.createElement('div');
                     empty.className = 'qs-searchable-select__empty';
-                    empty.textContent = filterLower ? ('No matches for "' + filterLower + '"') : this.emptyText;
+                    empty.textContent = rawQuery ? word('noMatchesFor').replace(':query', rawQuery) : this.emptyText;
                     this.listEl.appendChild(empty);
                     this.focusedIndex = -1;
                 }
@@ -456,11 +546,17 @@
 
         /**
          * Tear down the wrapper. Removes the trigger + any open
-         * dropdown, restores the native select's visibility, and
-         * unhooks listeners. Idempotent — safe to call twice.
+         * dropdown, points the labels back at the select, restores the
+         * native select's visibility, and unhooks listeners.
+         * Idempotent — safe to call twice.
          */
         destroy() {
             this.close();
+            this._pointedLabels.forEach(([label, oldFor, hadId]) => {
+                label.htmlFor = oldFor;
+                if (!hadId) label.removeAttribute('id');
+            });
+            this._pointedLabels = [];
             if (this._onNativeChange) {
                 this.nativeSelect.removeEventListener('change', this._onNativeChange);
                 this._onNativeChange = null;

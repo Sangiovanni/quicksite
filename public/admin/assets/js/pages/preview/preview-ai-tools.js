@@ -104,6 +104,12 @@ window.PreviewAiTools = (function () {
         return panel[key] || fallback;
     }
 
+    // One of the panel-wide words layout.php ships (QuickSiteUtils.tCommon): an unset one shows its key.
+    function _commonWord(name) {
+        var utils = window.QuickSiteUtils;
+        return utils && typeof utils.tCommon === 'function' ? utils.tCommon(name) : 'common.' + name;
+    }
+
     // ──────────────────────────── Init ──────────────────────────────────
 
     function init() {
@@ -707,34 +713,89 @@ window.PreviewAiTools = (function () {
         return null;
     }
 
-    function _updateDependentSelects(_changedParamId) {
-        // Rebuild ALL filterFrom-having selects on any param change.
+    function _updateDependentSelects(changedParamId) {
+        // Rebuild ALL filterFrom-having selects on any param change but their own.
         // Why not restrict to selects whose filterFrom === changedParamId?
         // Because the dependency can be transitive: defaultLanguage filters
         // from `languages`, but `languages` becomes hidden when multilingual
         // changes — so defaultLanguage's filter outcome can shift without
         // languages itself being the immediate trigger. Rebuilding all
         // filterFrom selects on any change is cheap (typically 0–2 per
-        // workflow) and side-steps cascade tracking.
+        // workflow) and side-steps cascade tracking. A field's own change
+        // never rebuilds it: its options never depend on its own value
+        // (filterFrom names another parameter), and a searchable one would
+        // be destroyed under the pick that changed it.
         if (!_runnerView) return;
         var params = (_activeWorkflowSpec && _activeWorkflowSpec.parameters) || [];
         for (var i = 0; i < params.length; i++) {
             var p = params[i];
             var of = p.optionsFrom;
-            if (!of || typeof of !== 'object' || !of.filterFrom) continue;
+            if (!of || typeof of !== 'object' || !of.filterFrom || p.id === changedParamId) continue;
             var wrap = _runnerView.querySelector('[data-param-id="' + p.id + '"]');
             if (!wrap) continue;
-            var oldInput = wrap.querySelector('select, .preview-contextual-ai-tools__tag-select, .preview-contextual-ai-tools__param-placeholder, input');
+            // The field's control as a whole: a searchable one holds more than one input.
+            var oldInput = wrap.querySelector('[data-param-control]');
             if (!oldInput) continue;
             var newInput = _renderParamInput(p);
-            if (newInput) oldInput.replaceWith(newInput);
+            if (!newInput) continue;
+            _destroyParamPicker(oldInput);
+            oldInput.replaceWith(newInput);
+            _mountParamPicker(newInput);
         }
+    }
+
+    // ──────────────────────────── Searchable fields ─────────────────────
+
+    var _paramPickers = []; // the QSSearchableSelect over each searchable select on screen
+
+    /** The id of a field's control, which its label points at; the label's own id adds '-label'. */
+    function _paramControlId(pid) {
+        return 'ai-tools-param-' + String(pid).replace(/\s+/g, '-');
+    }
+
+    /** The element of a field's control that its label names (it carries the control's id), or null. */
+    function _labelledControl(control, pid) {
+        var id = _paramControlId(pid);
+        if (control.id === id) return control;
+        var inner = control.querySelectorAll('[id]');
+        for (var i = 0; i < inner.length; i++) {
+            if (inner[i].id === id) return inner[i];
+        }
+        return null;
+    }
+
+    /**
+     * A searchable select's dropdown (the panel's QSSearchableSelect), mounted once its field is
+     * in the page: the widget takes its name from the label that points at its select, and points
+     * that label at itself, so a click on the label opens it.
+     */
+    function _mountParamPicker(control) {
+        if (!control.classList.contains('preview-contextual-ai-tools__param-searchable')
+            || control._qsPicker || !window.QSSearchableSelect) return;
+        var select = control.querySelector('select');
+        if (!select) return;
+        control._qsPicker = new window.QSSearchableSelect(select);
+        _paramPickers.push(control._qsPicker);
+    }
+
+    function _destroyParamPicker(control) {
+        var picker = control._qsPicker;
+        if (!picker) return;
+        picker.destroy();
+        control._qsPicker = null;
+        _paramPickers = _paramPickers.filter(function (p) { return p !== picker; });
+    }
+
+    function _destroyParamPickers() {
+        _paramPickers.forEach(function (p) { p.destroy(); });
+        _paramPickers = [];
     }
 
     // ──────────────────────────── Runner: render shells ─────────────────
 
     function _renderRunnerLoading(workflow) {
         if (!_runnerView) return;
+        _destroyParamPickers();
         _runnerView.replaceChildren();
         _runnerView.appendChild(_renderRunnerHeader(workflow));
         var loading = document.createElement('div');
@@ -745,6 +806,7 @@ window.PreviewAiTools = (function () {
 
     function _renderRunnerError(message) {
         if (!_runnerView) return;
+        _destroyParamPickers();
         _runnerView.replaceChildren();
         _runnerView.appendChild(_renderRunnerHeader(_activeWorkflowSummary || {}));
         var err = document.createElement('div');
@@ -778,6 +840,7 @@ window.PreviewAiTools = (function () {
         _autoExecHintEl = null;
         if (_pasteAutoExecTimer) { clearTimeout(_pasteAutoExecTimer); _pasteAutoExecTimer = null; }
 
+        _destroyParamPickers();
         _runnerView.replaceChildren();
         _runnerView.appendChild(_renderRunnerHeader(workflow));
         if (workflow.description) {
@@ -785,6 +848,11 @@ window.PreviewAiTools = (function () {
         }
 
         _runnerView.appendChild(_renderInputsZone(spec, isAI));
+        // Each searchable select's dropdown, now that its field and its label are in the page.
+        var searchable = _runnerView.querySelectorAll('.preview-contextual-ai-tools__param-searchable');
+        for (var s = 0; s < searchable.length; s++) {
+            _mountParamPicker(searchable[s]);
+        }
         if (isAI) {
             _runnerView.appendChild(_renderAiExchangeZone(spec, conn !== null));
         }
@@ -1113,6 +1181,7 @@ window.PreviewAiTools = (function () {
 
         var label = document.createElement('label');
         label.className = 'preview-contextual-ai-tools__param-label';
+        label.id = _paramControlId(param.id) + '-label';
         label.textContent = param.label || param.labelKey || param.id;
         wrap.appendChild(label);
 
@@ -1124,7 +1193,13 @@ window.PreviewAiTools = (function () {
         }
 
         var input = _renderParamInput(param);
-        if (input) wrap.appendChild(input);
+        if (input) {
+            wrap.appendChild(input);
+            // The label names its control and a click on it reaches it: the select (a
+            // searchable one's dropdown, once mounted), the input or textarea, or a
+            // searchable list's search field. A list of checkboxes is a group it names.
+            if (_labelledControl(input, param.id)) label.htmlFor = _paramControlId(param.id);
+        }
 
         wrap.appendChild(_renderParamErrorSlot());
         return wrap;
@@ -1165,7 +1240,15 @@ window.PreviewAiTools = (function () {
         return p;
     }
 
+    // A field's control carries data-param-control, so the cascade (_updateDependentSelects)
+    // replaces it whole.
     function _renderParamInput(param) {
+        var control = _buildParamInput(param);
+        if (control) control.dataset.paramControl = param.id;
+        return control;
+    }
+
+    function _buildParamInput(param) {
         var type = param.type || 'text';
         var pid = param.id;
         var input;
@@ -1181,21 +1264,29 @@ window.PreviewAiTools = (function () {
         } else if (type === 'select') {
             input = document.createElement('select');
             input.className = 'preview-contextual-ai-tools__param-select';
+            input.id = _paramControlId(pid);
             var options = Array.isArray(param.options)
                 ? param.options
                 : _resolveOptionsFromData(param);
             if (!options || options.length === 0) {
                 return _renderEmptyOptionsPlaceholder();
             }
+            var held = false;
             for (var i = 0; i < options.length; i++) {
                 var opt = options[i];
                 var optEl = document.createElement('option');
                 optEl.value = opt.value;
                 optEl.textContent = opt.label || opt.value;
-                if (opt.value === _paramValues[pid]) optEl.selected = true;
+                if (String(opt.value) === String(_paramValues[pid])) {
+                    optEl.selected = true;
+                    held = true;
+                }
                 input.appendChild(optEl);
             }
-            if (input.selectedIndex < 0 && options.length > 0) {
+            // The value must be one the list offers: one the cascade took out moves to the
+            // first option. A select always shows an option selected, so its state alone
+            // cannot tell.
+            if (!held) {
                 input.selectedIndex = 0;
                 _paramValues[pid] = options[0].value;
             }
@@ -1203,6 +1294,14 @@ window.PreviewAiTools = (function () {
                 _paramValues[pid] = input.value;
                 _onParamChanged(pid);
             });
+            if (param.searchable) {
+                // The panel's searchable dropdown over this select, mounted once the field
+                // is in the page (_mountParamPicker).
+                var holder = document.createElement('div');
+                holder.className = 'preview-contextual-ai-tools__param-searchable';
+                holder.appendChild(input);
+                return holder;
+            }
         } else if (type === 'tag-select') {
             var tagOptions = Array.isArray(param.options)
                 ? param.options
@@ -1214,6 +1313,7 @@ window.PreviewAiTools = (function () {
         } else if (type === 'textarea') {
             input = document.createElement('textarea');
             input.className = 'preview-contextual-ai-tools__param-textarea';
+            input.id = _paramControlId(pid);
             input.rows = 3;
             if (param.placeholder) input.placeholder = param.placeholder;
             input.value = _paramValues[pid] != null ? String(_paramValues[pid]) : '';
@@ -1225,6 +1325,7 @@ window.PreviewAiTools = (function () {
             input = document.createElement('input');
             input.type = 'number';
             input.className = 'preview-contextual-ai-tools__param-input';
+            input.id = _paramControlId(pid);
             if (param.placeholder) input.placeholder = param.placeholder;
             input.value = _paramValues[pid] != null ? String(_paramValues[pid]) : '';
             input.addEventListener('input', function () {
@@ -1239,6 +1340,7 @@ window.PreviewAiTools = (function () {
             input = document.createElement('input');
             input.type = 'text';
             input.className = 'preview-contextual-ai-tools__param-input';
+            input.id = _paramControlId(pid);
             if (param.placeholder) input.placeholder = param.placeholder;
             input.value = _paramValues[pid] != null ? String(_paramValues[pid]) : '';
             input.addEventListener('input', function () {
@@ -1302,6 +1404,9 @@ window.PreviewAiTools = (function () {
     function _renderTagSelect(param, options) {
         var wrap = document.createElement('div');
         wrap.className = 'preview-contextual-ai-tools__tag-select';
+        // A list of checkboxes is a group its field's label names.
+        wrap.setAttribute('role', 'group');
+        wrap.setAttribute('aria-labelledby', _paramControlId(param.id) + '-label');
 
         var current = _paramValues[param.id];
         if (!Array.isArray(current)) {
@@ -1312,7 +1417,47 @@ window.PreviewAiTools = (function () {
         for (var i = 0; i < options.length; i++) {
             wrap.appendChild(_renderTagSelectOption(param.id, options[i], current));
         }
-        return wrap;
+        return param.searchable ? _renderTagSearch(param, wrap) : wrap;
+    }
+
+    /**
+     * A searchable tag-select: a search field above its list. A row matching neither the name
+     * nor the value typed is hidden, a ticked row never is: a search never hides or drops a pick.
+     */
+    function _renderTagSearch(param, list) {
+        var holder = document.createElement('div');
+        holder.className = 'preview-contextual-ai-tools__tag-search';
+        var field = document.createElement('input');
+        field.type = 'search';
+        field.className = 'preview-contextual-ai-tools__param-input preview-contextual-ai-tools__tag-search-field';
+        field.id = _paramControlId(param.id);
+        field.placeholder = _commonWord('search');
+        field.autocomplete = 'off';
+        var none = document.createElement('p');
+        none.className = 'preview-contextual-ai-tools__tag-search-none';
+        none.hidden = true;
+        field.addEventListener('input', function () {
+            _filterTagSelect(list, field.value, none);
+        });
+        holder.appendChild(field);
+        holder.appendChild(list);
+        holder.appendChild(none);
+        return holder;
+    }
+
+    function _filterTagSelect(list, query, none) {
+        var q = query.trim().toLowerCase();
+        var matched = 0;
+        var rows = list.children;
+        for (var i = 0; i < rows.length; i++) {
+            var box = rows[i].querySelector('input');
+            var hit = q === '' || rows[i].textContent.toLowerCase().indexOf(q) !== -1
+                || (!!box && box.value.toLowerCase().indexOf(q) !== -1);
+            if (hit) matched++;
+            rows[i].hidden = !hit && !(box && box.checked);
+        }
+        none.textContent = _commonWord('noMatchesFor').replace(':query', query.trim());
+        none.hidden = q === '' || matched > 0;
     }
 
     function _renderTagSelectOption(pid, opt, current) {

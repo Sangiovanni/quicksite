@@ -827,6 +827,7 @@ the method is enforced per route.
 | Ask to join a project | `POST /admin/self/request-to-join` — `{project, note}` |
 | Withdraw your own ask | `POST /admin/self/withdraw-request` — `{project}`, or `{project, user_id}` for a proposal you sponsored |
 | Change which project the panel edits | `POST /admin/state/selected-project` — `{project}` |
+| Star or unstar a project in your own project lists | `POST /admin/state/project-star` — `{project, starred}` (`starred` true or false) |
 | Check for an update | `GET /admin/api/update-check` |
 
 **Why these and not others.** Managing the login you sign in with, and getting into

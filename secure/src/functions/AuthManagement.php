@@ -209,7 +209,12 @@ function qs_project_birth_write_members(string $projectPath, ?string $ownerId): 
         return false;
     }
     $bytes = file_put_contents($configDir . '/members.json', $json . "\n", LOCK_EX);
-    return $bytes !== false;
+    if ($bytes === false) {
+        return false;
+    }
+    // A roster was born: every account's dashboard repair scans again (qs_membership_repair_account()).
+    qs_membership_token_bump();
+    return true;
 }
 
 /**
@@ -372,6 +377,8 @@ function qs_members_invariant_violation(array $data): ?string {
  *    truncating the authority file (see the check itself).
  *  - temp + rename atomic swap; byte format identical to createProject's
  *    birth-write (JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES + trailing \n).
+ *  - After a write, every account's dashboard repair is dropped
+ *    (qs_membership_token_bump()), as after a birth-write.
  *
  * @param callable    $fn      function(array &$data): mixed — full decoded
  *                             members.json by reference; false aborts.
@@ -447,6 +454,8 @@ function qs_members_mutate(string $project, callable $fn, ?string &$failure = nu
                 return false;
             }
         }
+        // A roster changed: every account's dashboard repair scans again (qs_membership_repair_account()).
+        qs_membership_token_bump();
         return $result;
     } finally {
         flock($lock, LOCK_UN);
@@ -515,6 +524,218 @@ function qs_membership_cache_set(string $userId, string $project, ?array $entry)
         return true;
     });
     return $result === true;
+}
+
+/**
+ * The statuses of a terminal notice in a user's `projects` cache: a refusal, a removal, a deleted
+ * project. members.json keeps no record of them, so no repair rebuilds or prunes one.
+ */
+const QS_MEMBERSHIP_NOTICES = ['refused', 'removed', 'deleted'];
+
+/**
+ * Can a repair trust this roster (loadProjectMembers())? A sound members.json always has an owner
+ * and a members map that is not empty (qs_members_invariant_violation()); anything else is a file
+ * that is missing, corrupt or unreadable, and a repair never prunes a membership off a failed read.
+ */
+function qs_membership_roster_readable(array $members): bool {
+    return is_array($members['members'] ?? null) && $members['members'] !== [] && !empty($members['owner']);
+}
+
+/**
+ * The status each user's cache entry mirrors for one project, from its roster: 'member' for each
+ * member, 'pending_invite' for an invitation, 'pending_request' for the user's own join request. A
+ * sponsored proposal (a request someone else made for the user) was never theirs to see: no status,
+ * as for a user the roster does not list.
+ *
+ * @param array $members a readable roster (qs_membership_roster_readable())
+ * @return array<string, string> user id => status
+ */
+function qs_membership_desired_statuses(array $members): array {
+    $desired = [];
+    foreach ($members['members'] as $uid => $entry) {
+        $desired[(string)$uid] = 'member';
+    }
+    $invitations = $members['invitations'] ?? [];
+    foreach (is_array($invitations) ? $invitations : [] as $uid => $inv) {
+        $uid = (string)$uid;
+        if (isset($desired[$uid])) {
+            continue; // a member already; invitation ∩ member is a backstop violation anyway
+        }
+        $direction = is_array($inv) ? ($inv['direction'] ?? 'invite') : 'invite';
+        if ($direction === 'invite') {
+            $desired[$uid] = 'pending_invite';
+        } elseif ($direction === 'request' && is_array($inv) && ($inv['by'] ?? null) === $uid) {
+            $desired[$uid] = 'pending_request';
+        }
+    }
+    return $desired;
+}
+
+/**
+ * The cache entry a user holds for one project once repaired, from the entry they hold ($current,
+ * null when none) and the status their roster gives them ($status, null when it lists them in no
+ * engaged state). An engaged status gets its mirror entry, keeping the date the current entry
+ * carries (`created` on a member entry, `at` on a pending one); with no status a notice is kept, and
+ * anything else, a member or pending entry the roster contradicts, is dropped (null). The one rule
+ * of reconcileMemberships (per project), qs_membership_sync_account() (per account) and a switch of
+ * the edited project (qs_admin_set_selected_project()).
+ */
+function qs_membership_reconciled_entry($current, ?string $status, string $today): ?array {
+    if ($status !== null) {
+        $want = qs_membership_mirror_entry($status, $today);
+        $dateKey = $status === 'member' ? 'created' : 'at';
+        if (is_array($current) && isset($current[$dateKey]) && is_string($current[$dateKey])) {
+            $want[$dateKey] = $current[$dateKey];
+        }
+        return $want;
+    }
+    $currentStatus = is_array($current) ? ($current['status'] ?? 'member') : 'member';
+    return in_array($currentStatus, QS_MEMBERSHIP_NOTICES, true) ? $current : null;
+}
+
+/**
+ * Repair ONE account's `projects` cache from every project's members.json: the rule above, per
+ * account. The header's project menu reads this cache (getUserProjectIds()), so a membership whose
+ * mirror write was lost, a roster edited by hand or a cascade that failed would otherwise keep a
+ * project out of the menu.
+ *
+ * Every project folder is read. A roster that lists the account in an engaged state gets its
+ * mirror entry (its date kept); an entry a readable roster contradicts is dropped, and so is a member
+ * or pending entry of a project whose folder is gone; a notice is always kept. A project whose
+ * members.json cannot be read keeps whatever entry the account holds for it. One users.php write,
+ * only when something differs; selected_project and every other field are left alone.
+ *
+ * @param int|null $now the clock (the date of a new entry); time() when null
+ * @return bool|null true when the cache was written, false when it already agreed, null when the
+ *                   account has no entry, its cache is not a map, or the write failed
+ */
+function qs_membership_sync_account(string $userId, ?int $now = null): ?bool {
+    $today = date('Y-m-d', $now ?? time());
+    // The authority, read outside the users.php lock, as reconcileMemberships reads it: for each
+    // readable roster, the account's status there (null when it lists the account in none).
+    $readable = [];
+    foreach (glob(SECURE_FOLDER_PATH . '/projects/*', GLOB_ONLYDIR) ?: [] as $dir) {
+        $project = basename($dir);
+        $members = loadProjectMembers($project);
+        if (qs_membership_roster_readable($members)) {
+            $readable[$project] = qs_membership_desired_statuses($members)[$userId] ?? null;
+        }
+    }
+    $agreed = false;
+    $written = qs_users_mutate(function (array &$cfg) use ($userId, $readable, $today, &$agreed) {
+        if (!isset($cfg['users'][$userId])) {
+            return false;
+        }
+        $copy = $cfg['users'][$userId]['projects'] ?? [];
+        if (!is_array($copy)) {
+            return false; // not a map: nothing a repair can merge into
+        }
+        $next = [];
+        foreach ($copy as $project => $current) {
+            $project = (string)$project;
+            if (array_key_exists($project, $readable)) {
+                $want = qs_membership_reconciled_entry($current, $readable[$project], $today);
+            } elseif ($project !== '' && strpbrk($project, "/\\") === false && strpos($project, '..') === false
+                && !is_dir(SECURE_FOLDER_PATH . '/projects/' . $project)) {
+                // The folder is gone, and the roster with it.
+                $want = qs_membership_reconciled_entry($current, null, $today);
+            } else {
+                $want = $current; // a roster that cannot be read, or a key that is no folder name: left alone
+            }
+            if ($want !== null) {
+                $next[$project] = $want;
+            }
+        }
+        foreach ($readable as $project => $status) {
+            if ($status !== null && !array_key_exists((string)$project, $next)) {
+                $next[(string)$project] = qs_membership_reconciled_entry(null, $status, $today);
+            }
+        }
+        if ($next === $copy) {
+            $agreed = true;
+            return false;
+        }
+        $cfg['users'][$userId]['projects'] = $next;
+        return true;
+    });
+    if ($agreed) {
+        return false;
+    }
+    return $written === true ? true : null;
+}
+
+/** How long one dashboard repair of an account's cache stands, in seconds, while no membership changes. */
+const QS_MEMBERSHIP_REPAIR_TTL = 300;
+
+/** The repair's own cache: one small file per account (named by a hash of its id) and the token. */
+function qs_membership_repair_dir(): string {
+    return SECURE_FOLDER_PATH . '/cache/membership';
+}
+
+/** The token every membership change rewrites; null while there is none. */
+function qs_membership_token(): ?string {
+    $raw = @file_get_contents(qs_membership_repair_dir() . '/token');
+    return is_string($raw) && $raw !== '' ? $raw : null;
+}
+
+/**
+ * Rewrite the token, which drops every account's repair: each one's next dashboard load scans
+ * again. Called after every roster write (qs_members_mutate(), qs_project_birth_write_members())
+ * and by deleteProject once the project's folder is gone. Best-effort: a token that cannot be
+ * rewritten is removed, so that no account trusts its repair, and the failure is logged.
+ *
+ * @return string|null the new token, or null when it could not be written
+ */
+function qs_membership_token_bump(): ?string {
+    $dir = qs_membership_repair_dir();
+    $path = $dir . '/token';
+    try {
+        $token = bin2hex(random_bytes(8));
+    } catch (Throwable $e) {
+        $token = uniqid('', true);
+    }
+    if (is_dir($dir) || @mkdir($dir, 0755, true) || is_dir($dir)) {
+        $tmp = $path . '.tmp' . getmypid();
+        if (@file_put_contents($tmp, $token) !== false && @rename($tmp, $path)) {
+            return $token;
+        }
+        @unlink($tmp);
+    }
+    @unlink($path);
+    error_log('membership: the repair token could not be rewritten; every dashboard load scans until it can');
+    return null;
+}
+
+/**
+ * The dashboard's repair of the account's cache (qs_membership_sync_account()), at most once per
+ * QS_MEMBERSHIP_REPAIR_TTL for each account unless a membership changes anywhere (the token): a
+ * reload spree costs one scan, and one's own join or leave shows on the next load. The file kept
+ * for the account holds when it was last repaired and the token it saw. Best-effort: when the cache
+ * cannot be read or written, every load scans.
+ *
+ * @param int|null $now the clock; time() when null
+ * @return array{scanned: bool, written: bool}
+ */
+function qs_membership_repair_account(string $userId, ?int $now = null): array {
+    $now = $now ?? time();
+    $token = qs_membership_token() ?? qs_membership_token_bump();
+    $file = qs_membership_repair_dir() . '/' . hash('sha256', $userId) . '.json';
+    if ($token !== null) {
+        $seen = json_decode((string)@file_get_contents($file), true);
+        if (is_array($seen) && ($seen['token'] ?? null) === $token && is_int($seen['at'] ?? null)
+            && $seen['at'] <= $now && $now - $seen['at'] < QS_MEMBERSHIP_REPAIR_TTL) {
+            return ['scanned' => false, 'written' => false];
+        }
+    }
+    $written = qs_membership_sync_account($userId, $now);
+    // Only a repair that went through is remembered: a failed one is tried again on the next load.
+    if ($token !== null && $written !== null) {
+        $tmp = $file . '.tmp' . getmypid();
+        if (@file_put_contents($tmp, json_encode(['at' => $now, 'token' => $token])) === false || !@rename($tmp, $file)) {
+            @unlink($tmp);
+        }
+    }
+    return ['scanned' => true, 'written' => $written === true];
 }
 
 /**

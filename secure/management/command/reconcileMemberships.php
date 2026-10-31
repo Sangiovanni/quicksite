@@ -31,11 +31,6 @@ require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
 
 /**
- * The terminal tombstone statuses — non-derivable, preserved on reconcile.
- */
-const RECONCILE_TOMBSTONES = ['refused', 'removed', 'deleted'];
-
-/**
  * Command function for internal execution or direct PHP call
  *
  * @param array $params Body parameters (unused)
@@ -59,42 +54,25 @@ function __command_reconcileMemberships(array $params = [], array $urlParams = [
     // AUTHORITY snapshot: members.json. If it is missing/unreadable we refuse
     // rather than guess — reconcile must never invent memberships or, worse,
     // prune real ones off a failed read. loadProjectMembers returns ['members'=>[]]
-    // for a missing/corrupt file; a WELL-FORMED members.json always has a non-empty
-    // members map AND an owner (the invariant backstop guarantees exactly one), so
-    // an empty members map or absent owner here means the authority is unreadable —
-    // abort (pruning every real membership off a failed read would be the bug).
+    // for a missing/corrupt file; a WELL-FORMED members.json always has a members
+    // map that is not empty AND an owner (the invariant backstop guarantees exactly
+    // one), so anything else means the authority is unreadable — abort (pruning
+    // every real membership off a failed read would be the bug).
     $members = loadProjectMembers($project);
-    if (!is_array($members) || empty($members['members']) || empty($members['owner'])) {
+    if (!qs_membership_roster_readable($members)) {
         return ApiResponse::create(500, 'members.unreadable')
             ->withMessage('Project membership authority is missing or unreadable — reconcile aborted');
     }
 
-    $memberIds  = array_keys($members['members']);
-    $today      = date('Y-m-d');
+    $today = date('Y-m-d');
 
-    // Build the DESIRED cache status per user from authority: member, then the
-    // engaged pending states. A SPONSORED proposal target (direction 'request',
-    // by != target) is NOT engaged — it gets NO mirror, so it is absent
-    // from $desired and treated like any other non-listed user (tombstone-preserve
-    // or stale-prune). An entry carries no project name (qs_membership_mirror_entry):
-    // the inbox reads it when it lists, with the private-project rule.
-    $desired = []; // uid => status
-    foreach ($members['members'] as $uid => $entry) {
-        $desired[(string)$uid] = 'member';
-    }
-    foreach (($members['invitations'] ?? []) as $uid => $inv) {
-        $uid = (string)$uid;
-        if (isset($desired[$uid])) {
-            continue; // a member already; invitation∩member is a backstop violation anyway
-        }
-        $direction = is_array($inv) ? ($inv['direction'] ?? 'invite') : 'invite';
-        if ($direction === 'invite') {
-            $desired[$uid] = 'pending_invite';
-        } elseif ($direction === 'request' && (is_array($inv) && ($inv['by'] ?? null) === $uid)) {
-            $desired[$uid] = 'pending_request';
-        }
-        // sponsored proposal (by != uid) → intentionally no desired entry
-    }
+    // The DESIRED cache status per user from authority (qs_membership_desired_statuses()):
+    // member, then the engaged pending states. A SPONSORED proposal target is NOT
+    // engaged — it gets NO mirror, so it is absent from $desired and treated like any
+    // other non-listed user (tombstone-preserve or stale-prune). An entry carries no
+    // project name (qs_membership_mirror_entry): the inbox reads it when it lists,
+    // with the private-project rule.
+    $desired = qs_membership_desired_statuses($members);
 
     $counts = [
         'members'               => 0,
@@ -111,18 +89,15 @@ function __command_reconcileMemberships(array $params = [], array $urlParams = [
             $uid = (string)$uid;
             $has = isset($u['projects'][$project]);
             $current = $has ? $u['projects'][$project] : null;
+            // The one rule (qs_membership_reconciled_entry()): an engaged status gets
+            // its mirror entry with the entry's informational date kept (`created`,
+            // `at`) and any name an older entry carried dropped; with no status a
+            // tombstone is preserved and a stale positive is pruned (null).
+            $want = qs_membership_reconciled_entry($current, $desired[$uid] ?? null, $today);
 
             if (isset($desired[$uid])) {
                 // Authority lists this user in an engaged state — the cache must
-                // match it (heal the status, drop a name an older entry carried;
-                // add if missing).
-                $want = qs_membership_mirror_entry($desired[$uid], $today);
-                // Preserve the entry's benign informational date (`created` on a
-                // member entry, `at` on a pending one).
-                $dateKey = $desired[$uid] === 'member' ? 'created' : 'at';
-                if (is_array($current) && isset($current[$dateKey]) && is_string($current[$dateKey])) {
-                    $want[$dateKey] = $current[$dateKey];
-                }
+                // match it (heal the status; add if missing).
                 if ($current !== $want) {
                     if (!$has) {
                         $counts['added']++;
@@ -141,8 +116,7 @@ function __command_reconcileMemberships(array $params = [], array $urlParams = [
             if (!$has) {
                 continue; // nothing to do
             }
-            $status = is_array($current) ? ($current['status'] ?? 'member') : 'member';
-            if (in_array($status, RECONCILE_TOMBSTONES, true)) {
+            if ($want !== null) {
                 // Non-derivable terminal notice — PRESERVE (the merge rule).
                 $counts['preserved_tombstones']++;
             } else {

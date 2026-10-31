@@ -105,7 +105,7 @@ File lists are grouped by role. Where useful, the entry point or main exported f
 | `js/core/dom.js` | `window.QSDom`: shared `el()` element factory + `svgIcon()` + `clear()` + `setSelectPlaceholder()` (resets a `<select>` to a single placeholder option) — the createElement/textContent idiom for dynamic DOM. Loaded in `<head>` so page scripts can use it at parse time. |
 | `js/core/bubble.js` + `css/bubble.css` | The panel's hover bubble: every `title` in the panel shows through it (*Tooltips* below). Loaded in `<head>`; exposes nothing — it listens on the document. |
 | `js/core/members-badge.js` | Membership counts (inbox awaiting me + queue awaiting my adjudication) → the Members nav badge; publishes `window.QSMembershipCounts` + the `quicksite:membership-counts-updated` event; recomputes on `quicksite:memberships-changed`. |
-| `js/core/searchable-select.js` | Type-ahead select widget for long option lists; loaded by `layout.php` and used by the visual editor's pickers. An option's description shows as a line under it and, whole, in the bubble (§9.9.2). |
+| `js/core/searchable-select.js` | Type-ahead select widget for long option lists; loaded by `layout.php` and used by every project list in the panel and the visual editor's pickers. Named by its select's label, which opens it; an option's description shows as a line under it and, whole, in the bubble (§9.9.2). |
 | `js/core/update-notice.js` | The operator update banner (§9.14). Loaded **only** for an account named in `operator.php`; calls the `update-check` helper arm, throttles to one call per six hours, and renders a dismissible notice. |
 | `admin.js` | Singleton `QuickSiteAdmin`: permissions, user badge, nav, delegation. |
 
@@ -287,7 +287,7 @@ Two other cookies exist, both HttpOnly and neither readable by page scripts. `QS
 
 | PHP file | Injects into | Notable fields |
 |---|---|---|
-| `templates/layout.php` | `window.QUICKSITE_CONFIG` | `apiBase`, `adminBase`, `baseUrl`, `publicSpace`, `currentProject`, `globalCommands`, `writeRate`, `defaultLang`, `multilingual`, `translations`, `token` (the per-session token), `apiUrl`, `isOperator` (§9.14) |
+| `templates/layout.php` | `window.QUICKSITE_CONFIG` | `apiBase`, `adminBase`, `baseUrl`, `publicSpace`, `currentProject`, `globalCommands`, `starredProjects` (the account's starred project ids, §8.0), `writeRate`, `defaultLang`, `multilingual`, `translations`, `token` (the per-session token), `apiUrl`, `isOperator` (§9.14) |
 | `templates/pages/settings.php` | extends `QUICKSITE_CONFIG` + `window.QS_SETTINGS_I18N` | `baseUrl`, `commandUrl`, `aiSettingsUrl`, `quicksiteVersion`; the `settings` and `common` sub-trees, verbatim |
 | `templates/pages/apis.php` | `window.QS_APIS_I18N` | the `apis` and `common` sub-trees, verbatim |
 | `templates/pages/embed-security.php` | extends `QUICKSITE_CONFIG` + `window.QS_EMBED_SECURITY_I18N` | `baseUrl`; the `embedSecurity` sub-tree, verbatim |
@@ -303,7 +303,7 @@ Two other cookies exist, both HttpOnly and neither readable by page scripts. `QS
 | `templates/pages/account.php` | `window.QS_ACCOUNT_CONFIG` + `window.QS_ACCOUNT_I18N` | `minPasswordLength` (from `auth.php`, the same value the password change enforces), `hasLocalPassword`, `loginUrl`; JS-facing strings. Never the username — the deletion's typed confirmation is checked by the server (§9.13) |
 | `templates/pages/command-form.php` | `window.QS_COMMAND_FORM_I18N` | the `commandForm`, `commands` and `common` translation sub-trees, emitted **verbatim under their own dot paths** (`AdminTranslation::getRaw()`) rather than copied field by field — the page's JS asks for the same path PHP would. `JSON_HEX_TAG` keeps a translation value from closing the script element. |
 
-A sub-tree emitted **verbatim** is the output of `AdminTranslation::getRaw()`, unchanged, so the page's JS resolves a string by the same dot path PHP would; each such page reads it through its own `t(path, params)`, which substitutes `:name` markers the way PHP's `t()` does and returns **the path itself** when nothing resolves, so an untranslated string shows on screen instead of hiding behind English. `QUICKSITE_CONFIG.translations` in `layout.php` is a hand-listed subset instead; its `common` branch carries the labels `js/core/utils.js` gives its panel-wide confirm dialog and toasts.
+A sub-tree emitted **verbatim** is the output of `AdminTranslation::getRaw()`, unchanged, so the page's JS resolves a string by the same dot path PHP would; each such page reads it through its own `t(path, params)`, which substitutes `:name` markers the way PHP's `t()` does and returns **the path itself** when nothing resolves, so an untranslated string shows on screen instead of hiding behind English. `QUICKSITE_CONFIG.translations` in `layout.php` is a hand-listed subset instead; its `common` branch carries the labels `js/core/utils.js` gives its panel-wide confirm dialog and toasts, the words of the searchable dropdown (`selectPlaceholder`, `search`, `noResults`, `noMatchesFor`, `createFromSearch`; §9.9.2) and those of the project star (`starred`, `starProject`, `unstarProject`, `starFailed`; §8.0). `QuickSiteUtils.tCommon(name)` reads one; a word the page was not given shows its key.
 
 `currentProject` is the user's **edited** project (their `selected_project`, §8.0) — the client prepends a `p/<currentProject>/` marker to project-scoped Management calls so the server acts on it; `globalCommands` is the set of commands called without that marker. There is no schema or runtime validation on injected objects, and page-level extensions of `QUICKSITE_CONFIG` can silently overwrite global fields. Treat the injected globals as read-only by convention.
 
@@ -320,6 +320,12 @@ The visual editor is the panel's flagship feature. It runs as a sidebar UI in th
 The panel edits one project at a time — the user's **selected project** (a per-user preference; ARCHITECTURE §7). The header carries a **project picker** listing the projects the user is a member of, each as **"Name #id"** and sorted by name (a project without a name of its own is shown by its id; two projects may share a name, the id tells them apart); changing it posts to `/admin/state/selected-project` and does a cache-busted reload, so the header badge, the editor's command target, and the preview iframe all follow together. The dashboard's project switch and the *Edit this project* button on My Memberships go through the same endpoint.
 
 This pointer is **not** a command. Which project a person has open is a fact about the panel, not about any project, so it is panel state — the command API names its project in the URL marker instead and has no notion of a current one. The endpoint is POST-only, takes `{"project": "<id>"}`, and refuses a project the caller is not a member of (`403 authz.not_a_member`), so the panel can never open a project it cannot edit. The value is a UX default and never an authorization input: every request is re-authorized against the target project's `members.json`.
+
+**The header's menu.** It is the panel's searchable dropdown (§9.9.2): type a part of a project's name or its id, and only the matching projects stay. The account's **starred** projects come first, each with ★ before its name, then the others by name. The header sets no star — the ☆ beside the dashboard's Project Manager selector does, and so does the one on each row of My Memberships → *My projects*; a star set there re-orders this menu at once. With one project the header shows a plain badge. A switch the server refuses, or one that fails, puts the menu back on the edited project, under the error toast; choosing the edited project again sends nothing.
+
+**Where the menu reads from.** The menu lists the account's own copy of its memberships, kept in its `users.php` entry (`projects`): drawing a page header reads no project folder. Each project's `members.json` stays the authority — it decides every access, and the dashboard's lists read it (`listProjects`). The two can drift (a membership whose copy was not written, a roster edited by hand), so the copy is **repaired from the authority**: by the **dashboard**'s load, which reads every project's `members.json` before the header is drawn and rewrites the account's entries when they differ, and by a **switch**, which writes the project it opens as a membership in the same write as the selection. The dashboard's repair is kept five minutes per account and dropped by any membership change anywhere, so a burst of reloads costs one scan and your own join or leave shows on the next load. It follows `reconcileMemberships`' rule: a project whose roster lists you (as a member, an invitee or with your own pending request) gets its entry, its date kept; an entry the roster contradicts goes, and so does a member or pending entry of a project that no longer exists; a refused, removed or deleted notice stays; a project whose roster cannot be read is left as it is.
+
+**Starring** is panel state too: `POST /admin/state/project-star` with `{"project": "<id>", "starred": true}` (or `false`; any other value is `400 validation.invalid_type`) writes the account's `starred_projects` in `users.php`. Starring a project you are not a member of is refused as selecting one is (`403 authz.not_a_member`); unstarring always goes through; every write drops the stars of the projects you no longer belong to. A star decides nothing but the order of your own lists. The page receives the stars as `QUICKSITE_CONFIG.starredProjects`; `QuickSiteAdmin.orderProjectSelect()` orders a project dropdown from them and `starredFirst()` a list of rows, each again whenever a star changes (`quicksite:stars-changed`).
 
 An account that is a member of no project has nothing to edit. `/admin/preview` sends it to the dashboard with a note saying the editor needs a project and pointing at creating or joining one — the editor is never opened bound to nothing, and the header's "Back to site" button is hidden, since there is no site to go back to. This applies only when there is no membership at all; asking for a project you are simply not a member of is refused by the usual gates.
 
@@ -884,7 +890,9 @@ A persistent amber-bordered banner sits at the top of the panel: `⚠ AI tools m
 #### Runner — INPUTS zone (accent border)
 
 - **Your prompt** (AI workflows only) — free-form textarea for the user's request, appended to the assembled prompt after a `**User Request:**` marker
-- **Parameters** — workflow-declared input form; types include `text`, `textarea`, `select` (inline options or `optionsFrom` data-driven), `tag-select` (scrollable checkbox list), `checkbox` (rendered inline `[☑] Label / help`), `number`, `selector` (read-only card showing the current iframe selection), `hidden`. Validation surfaces per-param with red border + error text; Run is gated on no visible-param validation failing. A `tag-select`'s values travel to the prompt request as one JSON value, and the prompt writes them as a list (`fr, de`)
+- **Parameters** — workflow-declared input form; types include `text`, `textarea`, `select` (inline options or `optionsFrom` data-driven), `tag-select` (scrollable checkbox list), `checkbox` (rendered inline `[☑] Label / help`), `number`, `selector` (read-only card showing the current iframe selection), `hidden`. Validation surfaces per-param with red border + error text; Run is gated on no visible-param validation failing. A `tag-select`'s values travel to the prompt request as one JSON value, and the prompt writes them as a list (`fr, de`). Each field's label names its control, and a click on it reaches the control; a `tag-select`'s list is a group its label names
+- **`"searchable": true`** on a `select` or a `tag-select` gives the field a search that matches an option's name and its value ([WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md)). A `select` becomes the panel's searchable dropdown (§9.9.2), opened by its label too; a `tag-select` gets a search field above its list, which hides the options that do not match but never one already ticked, so a search never hides or drops a choice, and says so when nothing matches. On any other type the property is ignored. The language fields of `setup-languages`, `create-website` and `create-landing` are searchable
+- **`filterFrom`** — a `select` filtered from another parameter (the three workflows' **Default language**, from **Languages** while *Enable multilingual* is ticked) is drawn again on each change of another parameter, and keeps its value only while its list offers it; otherwise the value moves to the first option, the one the field shows
 - **Model: [dropdown]** (BYOK only) — inline above the action buttons; writes to the active connection's `defaultModel` via `QSConnectionsStore`
 - **Primary action button** — context-aware label: `Run` (deterministic) / `Run with AI` (BYOK + auto-execute on) / `Send to AI` (BYOK + auto-execute off) / `Generate prompt` (no BYOK). Label morphs through phases during execution: `Generating prompt…` → `Sending to {model}…` → `Running…`
 - **Secondary `Generate for copy` button** (AI + BYOK) — assembles the prompt without sending; auto-expands + scrolls + focuses the General prompt section + auto-copies the result to the clipboard with a toast confirmation. Lets BYOK users still inspect / re-use the prompt elsewhere
@@ -942,7 +950,7 @@ The AI call is browser-direct via `QSAiCall.call(...)` (see `public/admin/assets
 
 | Page | What it does |
 |---|---|
-| **Dashboard** (`dashboard.js`) | Stats cards (route count, language count, recent build), command activity feed, recent history. Calls `help`, `getRoutes`, `getCommandHistory`. The **Project Manager** names every project as "Name #id" — the edited project's chip, the project selector (with your role on each), the delete selector, the backups label, the storage rows — reading names from `listProjects` and `/admin/self/space-usage`. The **New Project** dialog asks for the project's name (free text, up to 60 characters) and its first language: a searchable list of the installation's languages with the installation's default language preselected, both read from `getLanguageList`. It creates the project with `createProject`; its id is drawn by the server. **Clone** opens prefilled with the source's name; **Import** reads the chosen archive's own name in the browser (its `config/project.json`, from the ZIP's directory, inflated with the browser's `DecompressionStream` — no library) and opens prefilled with it, or with the file name when the archive carries none. Each copy always gets a new id. **Rename** (`renameProject`) opens prefilled with the current name; it is enabled only when your role on the project chosen in the selector is owner, read from `listProjects` — the panel-wide permission set answers for the edited project only. **New Project**, **Clone** and **Import** each offer to switch to the new project, ticked by default. Deleting a project asks a second confirmation that names it. When an action reloads the page, its success message is shown after the reload. |
+| **Dashboard** (`dashboard.js`) | Stats cards (route count, language count, recent build), command activity feed, recent history. Calls `help`, `getRoutes`, `getCommandHistory`. The **Project Manager** names every project as "Name #id" — the edited project's chip, the project selector (with your role on each), the delete selector, the backups label, the storage rows — reading names from `listProjects` and `/admin/self/space-usage`. The project selector and the **Delete** dialog's list are the panel's searchable dropdown (§9.9.2), your starred projects first; the ☆ beside the selector stars the project chosen in it (§8.0). The Delete list holds only the projects you **own** (the selector keeps every project you work on); it opens with nothing chosen and **Delete Project** off until you pick one, and **Delete** itself is off when you own none. ***My total space*** lists the **five largest** projects you own; **Show all (N)** lists them all (then reads **Show the 5 largest**), and the search above the rows, shown when you own more than five, finds any of them by name or id (a leading `#` allowed) — the total, the bar and the legend always count every project you own. Loading the dashboard repairs the header menu's copy of your memberships (§8.0). The **New Project** dialog asks for the project's name (free text, up to 60 characters) and its first language: a searchable list of the installation's languages with the installation's default language preselected, both read from `getLanguageList`. It creates the project with `createProject`; its id is drawn by the server. **Clone** opens prefilled with the source's name; **Import** reads the chosen archive's own name in the browser (its `config/project.json`, from the ZIP's directory, inflated with the browser's `DecompressionStream` — no library) and opens prefilled with it, or with the file name when the archive carries none. Each copy always gets a new id. **Rename** (`renameProject`) opens prefilled with the current name; it is enabled only when your role on the project chosen in the selector is owner, read from `listProjects` — the panel-wide permission set answers for the edited project only. **New Project**, **Clone** and **Import** each offer to switch to the new project, ticked by default. Deleting a project asks a second confirmation that names it. When an action reloads the page, its success message is shown after the reload. |
 | **Command** (`command.js`) | Permission-filtered command index. An installation can decline to offer the console at all — see §9.17. |
 | **Command form** (`command-form.js`) | Renders a dynamic form for any command from `help` metadata, then executes it. The escape hatch into raw API. Withheld with the rest of the console when the installation turns it off (§9.17). |
 | **History** (`history.js`) | Its own page at `/admin/history` — see §9.18. Browses `getCommandHistory` for the **currently edited project**, exports what is on screen as CSV, and clears the stored trail. The command history is per-project, so switching projects switches the trail. Actions that belong to no project (creating a project, signing out) are recorded server-side but are not shown here; see *Command history storage* in `COMMAND_API.md`. Admin and owner only. |
@@ -2649,14 +2657,32 @@ Every dropdown in the picker (verb selection, apiEndpoint, route,
 routeParam, translationKey) is wrapped with `QSSearchableSelect` — a
 reusable combobox primitive at
 `public/admin/assets/js/core/searchable-select.js`. So are the event of an
-element's interaction (each event's explanation as its description) and
-the Complex tab's kind picker (§8.7). Behaviours:
+element's interaction (each event's explanation as its description),
+the Complex tab's kind picker (§8.7), every project list in the panel
+(the header's menu, the dashboard's Project Manager selector and its
+Delete list; §8.0) and a workflow parameter marked searchable (§8.12).
+Behaviours:
 
 - Wraps a native `<select>` (kept in DOM as data store, visually hidden).
   All existing code that reads `.value`, listens to `change`, or
   inspects `<option>` data-attributes keeps working.
 - Trigger button shows the current value + chevron; clicking opens a
   dropdown with a search input at the top.
+- **Named by its select.** The trigger takes the select's name — its
+  `aria-labelledby`, else its `aria-label`, else the `<label for>` that
+  points at it — with the value after it, as a native select reads
+  ("Kind: Accordion"). A `<label for>` is pointed at the trigger, so a
+  click on the label opens the list and a second click closes it;
+  `destroy()` points it back. A label that wraps the select already has
+  the trigger as its control. A select that nothing names gives a
+  nameless trigger, so every select the panel wraps has one.
+- **Its words are the panel's**: `common.selectPlaceholder`,
+  `common.search`, `common.noResults`, `common.noMatchesFor` and
+  `common.createFromSearch`, which `layout.php` ships on every page
+  (§7); a caller's own option wins.
+- **`refresh()`** re-reads the select after code changed its options,
+  its value or its `disabled` without a `change`: the trigger follows
+  the select's `disabled`, which the constructor mirrors too.
 - **Search matches**: case-insensitive substring against option
   `value`, `textContent`, AND `data-description` (either field counts).
   Empty query shows everything.
@@ -2664,11 +2690,14 @@ the Complex tab's kind picker (§8.7). Behaviours:
   lines at most) and, whole, as the item's `title`, which the panel's
   bubble shows on hover (§5.1, *Tooltips*).
 - Optgroups become labeled categories; empty groups hidden when
-  filtering; empty result shows `No matches for "<query>"`.
+  filtering; empty result shows `No matches for “<query>”`, the query as
+  typed.
 - Keyboard nav: ArrowUp/Down move focus, Enter selects, Escape closes
   + returns focus to trigger.
 - Dropdown uses `position: fixed` to escape `overflow:hidden` parents.
-  Width matches trigger exactly. Flips upward when trigger is low on
+  Width matches trigger exactly, or the caller's `minWidth` when the
+  trigger is narrower (the header's compact menu), moved left as far as
+  it must to stay in the window. Flips upward when trigger is low on
   the viewport. Re-anchors after every filter so a 1-item visible list
   hugs the trigger.
 
@@ -3034,7 +3063,8 @@ every authenticated account — a freshly-registered, 0-membership user lands he
 accept their first invitation, and the page fires only global self-service
 commands (zero 403 noise). Every project is named "Name #id"; a private project you
 have only asked to join shows its id alone, its name not being yours to see.
-Sections: **My projects** (`listProjects` — role chip,
+Sections: **My projects** (`listProjects` — your starred projects first, then
+the others by name, each row starting with its ☆ / ★ toggle (§8.0); role chip,
 OWNED badge, *editing* chip on the current edit target, per-row *Edit this
 project* = the selected-project write + reload, *Leave* with confirm — hidden on
 owned rows), **Invitation inbox** (accept / decline, inviter + note + `sponsored_by`

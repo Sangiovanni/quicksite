@@ -14337,3 +14337,70 @@ rare round trip).
 timing kept as written and the new row's settings, 2026-10-29.
 `secure/admin/templates/pages/preview/modals/transition.php`,
 `public/admin/assets/js/pages/preview/preview-transition-editor.js`, `public/admin/assets/admin.css`.
+
+### A star orders an account's own project lists, and is kept in its account entry (locked 2026-10-30)
+
+**Decision**: An account can star projects. Its starred projects come first in every project list of the panel —
+the header's menu, the dashboard's Project Manager selector and its Delete list, My Memberships → *My projects* —
+each with ★ before its name, then the others in their usual order; *My total space* keeps its order by size. A
+star is set in two places: beside the Project Manager's selector (the project chosen there) and on each row of
+*My projects*; the header's menu shows the order and the ★ but sets no star. It is kept in the account's own `users.php` entry,
+beside `selected_project`, as `starred_projects` (a list of ids), and written by one function,
+`qs_admin_set_project_star()`, through the `users.php` writer, at `POST /admin/state/project-star`. Starring a
+project the account does not belong to is refused as selecting one is; unstarring always goes through; every write
+drops the stars of the projects the account has left. The page receives the list with its configuration
+(`QUICKSITE_CONFIG.starredProjects`) and orders its lists from it.
+
+**Reasoning**: A star is a fact about one person's panel, like the project it has open: panel state, so QuickSite
+plumbing kept in PHP beside `selected_project`, and no data of any project — two people sharing a project each
+star it for themselves. It decides nothing but an order, so a star left on a project the account no longer belongs
+to is harmless until the next write drops it, and no reader has to check one against the roster. One writer keeps
+the rule in one place. The toggles sit beside the lists rather than in a dropdown's rows: a button inside an option
+breaks the list's keyboard and screen-reader model.
+
+**Alternatives considered**: the star in each project's `members.json` (everyone would share one person's stars);
+a file of its own per account (a second store beside the entry that already holds the account's panel state); the
+browser's storage (lost on another browser or device); a toggle inside each dropdown option (the keyboard model
+above); headings splitting the starred projects from the others (more chrome than one ★ needs); a toggle beside
+the header's menu for the edited project (built, then dropped after Sangio's UX run: the header is crowded
+already, and the Project Manager's toggle sets the same star).
+
+**Source**: Sangio, 2026-09-29 ("keep it simple", "OK at the 3 places"); the design as proposed, 2026-10-30
+(beta.12); the header's toggle dropped, 2026-10-31 ("the one in the switch project is enough"). `secure/admin/functions/panelState.php`, `public/admin/state/index.php`,
+`secure/admin/templates/layout.php`, `public/admin/assets/admin.js`, `public/admin/assets/js/core/api.js`,
+`public/admin/assets/js/pages/dashboard.js`, `public/admin/assets/js/pages/memberships.js`.
+
+### The header's project menu reads the account's copy of its memberships, and the dashboard repairs it from the authority (locked 2026-10-30)
+
+**Decision**: Two sources stay. The header's project menu reads the account's copy of its memberships in
+`users.php` (drawing a page header reads no project folder); each project's `members.json` stays the authority,
+which decides every access and from which the dashboard lists. The dashboard's page load repairs the copy before
+the header is drawn: it reads every project's `members.json` and rewrites the account's entries by the rule
+`reconcileMemberships` applies per project — an engaged state gets its entry (member, pending invitation, own
+pending request; its date kept), an entry the roster contradicts is dropped, and so is a member or pending entry of
+a project whose folder is gone; a refused, removed or deleted notice is kept; a project whose roster cannot be read
+is left alone; one `users.php` write, only when something differs. The repair is kept five minutes per account and
+dropped by any membership change: one token, rewritten after every roster write (`qs_members_mutate()`,
+`qs_project_birth_write_members()`) and by `deleteProject` once the project's folder is gone; the account's file
+under `<secure>/cache/membership/` holds when it was last repaired and the token it saw. A switch of the edited
+project repairs the entry of the project it opens, in the same write. The rule lives once, in `AuthManagement.php`
+(`qs_membership_desired_statuses()`, `qs_membership_reconciled_entry()`): `reconcileMemberships` calls it, and
+answers and writes as before.
+
+**Reasoning**: The copy exists so that every page's header stays cheap; it drifts only when a mirror write is lost
+or a roster is edited by hand, and the authority is always there to repair it. The dashboard already lists every
+project from the authority, so it is where the two meet and where a repair is seen first. Reading every roster
+takes a few milliseconds over forty projects, so the five minutes cap a burst of reloads rather than save real
+work; the token makes one's own join or leave, or any change anywhere, show on the next load instead of after them.
+One rule shared with `reconcileMemberships` means a project's reconcile and an account's repair can never disagree.
+
+**Alternatives considered**: the header reading every `members.json` on every page (every page pays for every
+project); the dashboard listing from the copy (a lost membership would hide the project everywhere); the repair with
+no cache (always right, with no hooks in the writers — offered, and the five minutes kept); a second copy of the
+rule beside `reconcileMemberships` (two rules drift); dropping only the repairs of the accounts a change concerns
+(each writer would have to know them all, where one token is one line in each).
+
+**Source**: Sangio, 2026-10-17 (the two sources and the repair, after a project missing from the header menu) and
+2026-10-30 (the cache, its token and the shared rule, as proposed); beta.12. `secure/src/functions/AuthManagement.php`,
+`secure/admin/templates/layout.php`, `secure/admin/functions/panelState.php`,
+`secure/management/command/reconcileMemberships.php`, `secure/management/command/deleteProject.php`, `.gitignore`.

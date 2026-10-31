@@ -779,20 +779,39 @@ window.QuickSiteAPI = (function() {
      * @returns {Promise<{ok: boolean, status: number, data: Object|null}>}
      */
     async function setSelectedProject(projectId) {
+        return postPanelState('selected-project', { project: projectId });
+    }
+
+    /**
+     * Star or unstar a project for THIS user (their `starred_projects`): starred
+     * projects come first in each of their project lists. Panel state, like
+     * setSelectedProject; starring a project you are not a member of is refused.
+     * A success answers the whole list, `data.data.starred_projects`.
+     *
+     * @param {string} projectId
+     * @param {boolean} starred
+     * @returns {Promise<{ok: boolean, status: number, data: Object|null}>}
+     */
+    async function setProjectStar(projectId, starred) {
+        return postPanelState('project-star', { project: projectId, starred: starred === true });
+    }
+
+    /** One POST to /admin/state/<key>, answered in request()'s {ok, status, data} shape. */
+    async function postPanelState(key, body) {
         const token = getToken();
         if (!token) {
             return clientError('client.no_token', 'No authentication token', 401);
         }
 
         try {
-            const response = await watchedFetch(`${config.adminBase}/state/selected-project`, {
+            const response = await watchedFetch(`${config.adminBase}/state/${key}`, {
                 method: 'POST',
                 credentials: 'same-origin',   // the session cookie is the credential
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ project: projectId })
+                body: JSON.stringify(body)
             });
             return {
                 ok: response.ok,
@@ -1063,6 +1082,7 @@ window.QuickSiteAPI = (function() {
 
         // Panel state (/admin/state) — not commands. See setSelectedProject.
         setSelectedProject,
+        setProjectStar,
 
         // Account + membership self-service and directory lookups
         // (/admin/self) — not commands either. See accountRequest.

@@ -58,6 +58,7 @@ $currentProject = $isLoginPage ? null : $router->getCurrentProject();   // the p
 // browser already sends because the panel and surface B share an origin and the
 // cookie's path is '/'. Nothing extra is emitted here.
 $myProjectIds = [];
+$starredProjects = [];
 require_once SECURE_FOLDER_PATH . '/src/functions/projectIdentity.php'; // qs_project_label (the picker)
 // Does THIS account see operator notices? (secure/management/config/operator.php,
 // written at first run.) A DISPLAY PREFERENCE AND NOTHING ELSE: it gates
@@ -73,12 +74,29 @@ if (!$isLoginPage) {
     require_once SECURE_FOLDER_PATH . '/src/functions/firstRun.php';
     $__pkAuth = qs_session_auth();
     if (!empty($__pkAuth['valid'])) {
+        // The header's menu reads the account's users.php copy of its memberships (fast);
+        // the dashboard lists every project from its own members.json (the authority). So
+        // the dashboard's load repairs the copy first, at most once in
+        // QS_MEMBERSHIP_REPAIR_TTL unless a membership changes, and the menu drawn below
+        // lists the repaired copy.
+        if ($currentPage === 'dashboard') {
+            $__pkRepair = qs_membership_repair_account((string)$__pkAuth['userId']);
+            $__pkFresh = $__pkRepair['written'] ? (loadUsersConfig()['users'][$__pkAuth['userId']] ?? null) : null;
+            if (is_array($__pkFresh)) {
+                $__pkFresh['id'] = $__pkAuth['userId'];
+                $__pkAuth['user'] = $__pkFresh;
+            }
+        }
         $myProjectIds = getUserProjectIds($__pkAuth['user']);
         // The picker shows each project as "Name #id", sorted by name, then id:
         // two projects may share a name, the id tells them apart.
         usort($myProjectIds, static function (string $a, string $b): int {
             return [mb_strtolower(qs_project_display_name($a), 'UTF-8'), $a] <=> [mb_strtolower(qs_project_display_name($b), 'UTF-8'), $b];
         });
+        // The projects the account starred come first in every project list; the page
+        // orders its lists (QuickSiteAdmin.orderProjectSelect) from this list.
+        require_once SECURE_FOLDER_PATH . '/admin/functions/panelState.php';
+        $starredProjects = qs_admin_starred_projects($__pkAuth['user']);
         $__pkUserId = (string)($__pkAuth['user']['id'] ?? ($__pkAuth['userId'] ?? ''));
         $isOperator = $__pkUserId !== '' && in_array($__pkUserId, qs_operator_ids(), true);
     }
@@ -614,6 +632,8 @@ $langNames = [
             // globalCommands. Both are UX/plumbing — the server re-authorizes each call.
             currentProject: <?= json_encode($currentProject) ?>,
             globalCommands: <?= json_encode($globalCommands) ?>,
+            // The account's starred projects (panel state): first in each project list.
+            starredProjects: <?= qs_inline_script_json($starredProjects) ?>,
             // The write rate on load (null on the auth pages); api.js keeps it current.
             writeRate: <?= qs_inline_script_json($writeRatePanel) ?>,
             // Operator notices — a DISPLAY flag, never an authorization input.
@@ -641,7 +661,18 @@ $langNames = [
                     cancel: '<?= __adminJs('common.cancel') ?>',
                     confirm: '<?= __adminJs('common.confirm') ?>',
                     confirmAction: '<?= __adminJs('common.confirmAction') ?>',
-                    copyFailed: '<?= __adminJs('common.copyFailed') ?>'
+                    copyFailed: '<?= __adminJs('common.copyFailed') ?>',
+                    // The searchable select's words (core/searchable-select.js),
+                    // for every list in the panel that is one.
+                    selectPlaceholder: '<?= __adminJs('common.selectPlaceholder') ?>',
+                    search: '<?= __adminJs('common.search') ?>',
+                    noMatchesFor: '<?= __adminJs('common.noMatchesFor') ?>',
+                    createFromSearch: '<?= __adminJs('common.createFromSearch') ?>',
+                    // The star toggle (the dashboard's Project Manager, My Memberships).
+                    starred: '<?= __adminJs('common.starred') ?>',
+                    starProject: '<?= __adminJs('common.starProject') ?>',
+                    unstarProject: '<?= __adminJs('common.unstarProject') ?>',
+                    starFailed: '<?= __adminJs('common.starFailed') ?>'
                 },
                 // The write rate's strings: the header's figure and its hover, and
                 // the refusal api.js says in the panel's language.
@@ -688,7 +719,10 @@ $langNames = [
                         ownerOneProject: '<?= __adminJs('dashboard.storage.ownerOneProject') ?>',
                         cachedHint: '<?= __adminJs('dashboard.storage.cachedHint') ?>',
                         backups: '<?= __adminJs('dashboard.storage.backups') ?>',
-                        exports: '<?= __adminJs('dashboard.storage.exports') ?>'
+                        exports: '<?= __adminJs('dashboard.storage.exports') ?>',
+                        showAll: '<?= __adminJs('dashboard.storage.showAll') ?>',
+                        showTop: '<?= __adminJs('dashboard.storage.showTop') ?>',
+                        noMatch: '<?= __adminJs('dashboard.storage.noMatch') ?>'
                     }
                 },
                 history: {
@@ -846,10 +880,27 @@ $langNames = [
         // branch on ok. It is panel state, not a command, so it goes to /admin/state.
         var picker = document.getElementById('admin-project-picker');
         if (picker) {
+            // The project edited when the page loaded: a switch that fails goes back to it.
+            var editing = picker.value;
+            // Starred projects first, as in every project list, behind the panel's
+            // searchable dropdown (the native select stays as its data store). The
+            // header sets no star: the dashboard and My Memberships do, and a star set
+            // on the page re-orders this list too.
+            QuickSiteAdmin.orderProjectSelect(picker);
+            picker._qsPicker = new QSSearchableSelect(picker, { minWidth: 288 });
+            document.addEventListener('quicksite:stars-changed', function () {
+                QuickSiteAdmin.orderProjectSelect(picker);
+            });
+            var backToEditing = function () {
+                picker.disabled = false;
+                picker.value = editing;
+                picker._qsPicker.refresh();
+            };
             picker.addEventListener('change', function () {
                 var project = picker.value;
-                if (!project) { return; }
+                if (!project || project === editing) { return; }
                 picker.disabled = true;
+                picker._qsPicker.refresh();
                 QuickSiteAdmin.setSelectedProject(project)
                     .then(function (res) {
                         if (res && res.ok) {
@@ -860,12 +911,12 @@ $langNames = [
                             // load of the whole page + iframe. Matches the dashboard switch.
                             window.location.href = window.location.pathname + '?t=' + Date.now();
                         } else {
-                            picker.disabled = false;
+                            backToEditing();
                             QuickSiteUtils.showToast('<?= __adminJs('nav.switchProjectFailed') ?>' + ((res && res.data && res.data.message) || '<?= __adminJs('common.unknownError') ?>'), 'error');
                         }
                     })
                     .catch(function (err) {
-                        picker.disabled = false;
+                        backToEditing();
                         QuickSiteUtils.showToast('<?= __adminJs('nav.switchProjectFailed') ?>' + ((err && err.message) || err), 'error');
                     });
             });

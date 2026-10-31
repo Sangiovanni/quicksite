@@ -249,6 +249,7 @@ An account is one entry in `users.php`, keyed by an opaque user id. A credential
 | `password_hash` | `password_hash()` output; `null` marks an externally-managed account whose sessions are minted by an embedding platform |
 | `session_generation` | the kill switch. Each session stamps it at login and the server compares it on every request, so raising it by one ends every session of that account at once |
 | `selected_project` | which project this user's panel opens by default — a preference, never an authorization input (§7) |
+| `starred_projects` | the projects this user starred, first in each of their project lists in the panel — a display preference, never an authorization input |
 | `projects` | a status mirror of "my projects", never authoritative: access always re-reads the project's own `members.json` |
 | `contacts` | people this account has looked up and then named to a project, kept so their exact public name need not be typed again. A private list, not a directory: it holds only `user_id` and the display name as it read at the time, it is never resolved against the registry when read back, and no other account can see it |
 

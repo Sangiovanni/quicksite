@@ -652,12 +652,9 @@ function _makeSearchable(select, placeholder) {
 /**
  * Re-read a wrapped select after its options or its disabled state changed.
  *
- * Two jobs, because the wrapper handles one of them and not the other:
- *   - refresh() re-reads the options and the trigger label;
- *   - `disabled` it does not mirror at all. The native select is hidden, so a
- *     disabled one still looks clickable through the wrapper's own <button>.
- *     The cascade's "pick the level above first" affordance IS that disabled
- *     state, so it is mirrored onto the trigger here.
+ * refresh() re-reads the options, the trigger label and the disabled state:
+ * the native select is hidden, so the cascade's "pick the level above first"
+ * affordance shows on the wrapper's own trigger.
  *
  * A no-op on an unwrapped select, so every call site can be unconditional.
  *
@@ -667,7 +664,6 @@ function _syncPicker(select) {
     const picker = select && select._qsPicker;
     if (!picker) return;
     picker.refresh();
-    if (picker.triggerEl) picker.triggerEl.disabled = !!select.disabled;
 }
 
 /**

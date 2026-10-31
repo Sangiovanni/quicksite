@@ -867,6 +867,29 @@
 .preview-contextual-ai-tools__tag-select-option input {
     margin: 0;
 }
+/* A row the list's search hides (a "searchable" tag-select): the class sets display. */
+.preview-contextual-ai-tools__tag-select-option[hidden] {
+    display: none;
+}
+
+/* "searchable" tag-select: a search field above the list */
+.preview-contextual-ai-tools__tag-search {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.preview-contextual-ai-tools__tag-search-none {
+    margin: 0;
+    font-size: 11px;
+    color: var(--admin-text-muted);
+}
+
+/* "searchable" select: the panel's searchable dropdown, at the size of the other fields */
+.preview-contextual-ai-tools__param-searchable .qs-searchable-select__trigger {
+    min-height: 0;
+    padding: 6px 8px;
+    font-size: 12px;
+}
 
 /* Conditional visibility (param hidden by unsatisfied condition) */
 .preview-contextual-ai-tools__param--hidden {
@@ -884,7 +907,8 @@
 .preview-contextual-ai-tools__param--invalid .preview-contextual-ai-tools__param-input,
 .preview-contextual-ai-tools__param--invalid .preview-contextual-ai-tools__param-textarea,
 .preview-contextual-ai-tools__param--invalid .preview-contextual-ai-tools__param-select,
-.preview-contextual-ai-tools__param--invalid .preview-contextual-ai-tools__tag-select {
+.preview-contextual-ai-tools__param--invalid .preview-contextual-ai-tools__tag-select,
+.preview-contextual-ai-tools__param--invalid .qs-searchable-select__trigger {
     border-color: #ef4444;
 }
 

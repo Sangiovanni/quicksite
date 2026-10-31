@@ -15,6 +15,7 @@
  *
  * ROUTES
  *   POST /admin/state/selected-project   {"project": "<id>"}
+ *   POST /admin/state/project-star       {"project": "<id>", "starred": true|false}
  *
  * AUTH is the shared admin gate (qs_admin_json_boot): the session cookie AND
  * the per-session token as `Authorization: Bearer`. The header is what proves
@@ -68,6 +69,10 @@ require_once SECURE_FOLDER_PATH . '/admin/functions/panelState.php';
 switch ($key) {
     case 'selected-project':
         qs_admin_set_selected_project($tokenInfo, (string)($body['project'] ?? ''))->send();
+        break;
+
+    case 'project-star':
+        qs_admin_set_project_star($tokenInfo, is_string($body['project'] ?? null) ? $body['project'] : '', $body['starred'] ?? null)->send();
         break;
 
     default:

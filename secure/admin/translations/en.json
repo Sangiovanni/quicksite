@@ -26,6 +26,13 @@
         "no": "No",
         "search": "Search...",
         "noResults": "No results found",
+        "selectPlaceholder": "Select…",
+        "noMatchesFor": "No matches for “:query”",
+        "createFromSearch": "➕ Create “:query”",
+        "starred": "Starred",
+        "starProject": "Star this project: it comes first in your project lists",
+        "unstarProject": "Unstar this project",
+        "starFailed": "Could not save the star: ",
         "unknownError": "unknown error",
         "saveFailed": "Save failed",
         "required": "Required",
@@ -556,7 +563,12 @@
             "content": "Content",
             "refresh": "Refresh",
             "cachedHint": "Cached \u2014 refresh to recalculate",
-            "personalSnippets": "Personal snippets"
+            "personalSnippets": "Personal snippets",
+            "searchProjects": "Search your projects…",
+            "searchProjectsLabel": "Search your projects",
+            "showAll": "Show all ({n})",
+            "showTop": "Show the {n} largest",
+            "noMatch": "No project matches “{query}”."
         },
         "structure": {
             "title": "Structure Overview",

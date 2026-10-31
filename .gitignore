@@ -190,6 +190,12 @@ secure/cache/space/
 # committed; deleting it only refills every allowance.
 secure/cache/rate/
 
+# The dashboard's membership repair: one small file per account (named by a hash of
+# its id) holding when its project list was last repaired, and the token every
+# membership change rewrites. Per-deployment runtime state — never committed;
+# deleting it only makes each account's next dashboard load scan again.
+secure/cache/membership/
+
 # Exports folder — legacy shared location. Exports live under each project
 # (secure/projects/<id>/exports/); both are runtime artifacts.
 secure/exports/

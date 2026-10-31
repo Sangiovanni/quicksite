@@ -643,6 +643,9 @@ window.QuickSiteUtils = (function() {
         truncate,
         formatSize,
         
+        // The panel-wide words layout.php ships (the searchable select reads its own here)
+        tCommon,
+        
         // Toast Notifications
         showToast,
         

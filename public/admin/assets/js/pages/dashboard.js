@@ -582,9 +582,11 @@
         if (allProjects.length === 0) {
             infoContainer.appendChild(_renderProjectManagerEmpty(proj));
             selector.disabled = true;
+            if (selector._qsPicker) selector._qsPicker.refresh();
             switchBtn.disabled = true;
             _setProjectActionsEnabled(false);
             _syncRenameButton();
+            _syncStarButton();
             return;
         }
 
@@ -603,11 +605,43 @@
             selector.appendChild(opt);
         });
         selector.disabled = false;
+        // Starred projects first; refreshes the searchable dropdown over it.
+        QuickSiteAdmin.orderProjectSelect(selector);
         switchBtn.disabled = false;
         _setProjectActionsEnabled(true);
         _syncRenameButton();
+        _syncStarButton();
 
         updateDeleteSelector();
+    }
+
+    /** The star beside the selector follows the project chosen in it. */
+    function _syncStarButton() {
+        const selector = document.getElementById('project-selector');
+        QuickSiteAdmin.syncStarToggle(document.getElementById('btn-star-project'), selector && !selector.disabled ? selector.value : null);
+    }
+
+    /**
+     * The dashboard's two project lists as the panel's searchable dropdown (the native
+     * selects stay as their data store), each list's placeholder the words of its blank
+     * option; their order follows the account's stars, and the star beside the selector
+     * stars the project chosen there.
+     */
+    function mountProjectPickers() {
+        ['project-selector', 'delete-project-selector'].forEach(id => {
+            const select = document.getElementById(id);
+            if (!select || !window.QSSearchableSelect || select._qsPicker) return;
+            const blank = select.options[0] && select.options[0].value === '' ? select.options[0].textContent : undefined;
+            select._qsPicker = new window.QSSearchableSelect(select, { placeholder: blank });
+        });
+        document.addEventListener('quicksite:stars-changed', () => {
+            QuickSiteAdmin.orderProjectSelect(document.getElementById('project-selector'));
+            QuickSiteAdmin.orderProjectSelect(document.getElementById('delete-project-selector'));
+        });
+        QuickSiteAdmin.bindStarToggle(document.getElementById('btn-star-project'), () => {
+            const selector = document.getElementById('project-selector');
+            return selector && !selector.disabled ? selector.value : null;
+        });
     }
 
     function _renderProjectChip(edited, proj) {
@@ -690,6 +724,62 @@
         return row;
     }
 
+    // My total space lists its five largest projects (the answer comes largest
+    // first), every one after "Show all", or every match of its search; the total,
+    // the bar and the legend always count every project owned.
+    const OWNER_SPACE_TOP = 5;
+    let ownerSpaceRows = [];
+    let ownerSpaceGrandTotal = 0;
+    let ownerSpaceExpanded = false;
+
+    /** The rows My total space shows now, with its search, its button and its no-match line. */
+    function renderOwnerSpaceRows() {
+        const list = document.getElementById('owner-space-projects');
+        if (!list) return;
+        const searchWrap = document.getElementById('owner-space-search-wrap');
+        const search = document.getElementById('owner-space-search');
+        const more = document.getElementById('owner-space-more');
+        const noMatch = document.getElementById('owner-space-no-match');
+        const many = ownerSpaceRows.length > OWNER_SPACE_TOP;
+        const typed = many && search ? search.value.trim() : '';
+        // a project id may be typed as it is shown, after a #
+        const query = typed.replace(/^#/, '').toLowerCase();
+        let shown;
+        if (query !== '') {
+            shown = ownerSpaceRows.filter(p => String(p.project || '').toLowerCase().includes(query)
+                || String(p.name || '').toLowerCase().includes(query));
+        } else {
+            shown = (ownerSpaceExpanded || !many) ? ownerSpaceRows : ownerSpaceRows.slice(0, OWNER_SPACE_TOP);
+        }
+        list.replaceChildren(...shown.map(p => _renderOwnerSpaceRow(p, ownerSpaceGrandTotal)));
+        if (searchWrap) searchWrap.hidden = !many;
+        if (noMatch) {
+            noMatch.hidden = !(query !== '' && shown.length === 0);
+            noMatch.textContent = noMatch.hidden ? ''
+                : t('dashboard.storage.noMatch', 'dashboard.storage.noMatch').replace('{query}', typed);
+        }
+        if (more) {
+            more.hidden = !many || query !== '';
+            more.textContent = ownerSpaceExpanded
+                ? t('dashboard.storage.showTop', 'dashboard.storage.showTop').replace('{n}', OWNER_SPACE_TOP)
+                : t('dashboard.storage.showAll', 'dashboard.storage.showAll').replace('{n}', ownerSpaceRows.length);
+            more.setAttribute('aria-expanded', ownerSpaceExpanded ? 'true' : 'false');
+        }
+    }
+
+    /** My total space's search and its Show all / Show the 5 largest button. */
+    function setupOwnerSpaceList() {
+        const search = document.getElementById('owner-space-search');
+        if (search) search.addEventListener('input', renderOwnerSpaceRows);
+        const more = document.getElementById('owner-space-more');
+        if (more) {
+            more.addEventListener('click', () => {
+                ownerSpaceExpanded = !ownerSpaceExpanded;
+                renderOwnerSpaceRows();
+            });
+        }
+    }
+
     /**
      * Owner-wide space usage — every project the caller OWNS, above the
      * per-project overview. Loaded independently so a slow disk walk never
@@ -766,10 +856,9 @@
             const overBox = document.getElementById('owner-space-over');
             if (overBox) overBox.style.display = (quota.configured && quota.over) ? '' : 'none';
 
-            const list = document.getElementById('owner-space-projects');
-            list.replaceChildren(
-                ...(data.projects || []).map(p => _renderOwnerSpaceRow(p, total))
-            );
+            ownerSpaceRows = data.projects || [];
+            ownerSpaceGrandTotal = total;
+            renderOwnerSpaceRows();
 
             const hint = document.getElementById('owner-space-hint');
             if (hint) {
@@ -1113,18 +1202,25 @@
     // Delete Selector
     // ========================================================================
 
+    /**
+     * The Delete dialog's list: the projects you OWN (deleteProject is the owner's),
+     * starred first, nothing chosen. Delete itself is off when you own none.
+     */
     function updateDeleteSelector() {
         const deleteSelector = document.getElementById('delete-project-selector');
-        const proj = t('dashboard.projects', {});
+        const placeholder = deleteSelector.options[0] && deleteSelector.options[0].value === '' ? deleteSelector.options[0] : null;
+        const owned = allProjects.filter(p => p.my_role === 'owner');
 
         QSDom.clear(deleteSelector);
-        deleteSelector.appendChild(QSDom.el('option', { value: '', text: proj.selectProject || 'Select a project...' }));
-
-        // Every project you own is deletable: no project is privileged any more, so there
-        // is no "can't delete the active one" case to filter out.
-        allProjects.forEach(p => {
+        if (placeholder) deleteSelector.appendChild(placeholder);
+        owned.forEach(p => {
             deleteSelector.appendChild(QSDom.el('option', { value: p.project, text: QuickSiteAdmin.projectLabel(p.project, p.name) }));
         });
+        deleteSelector.value = '';
+        QuickSiteAdmin.orderProjectSelect(deleteSelector);
+        document.getElementById('btn-confirm-delete').disabled = true;
+        const deleteBtn = document.getElementById('btn-delete-project');
+        if (deleteBtn && owned.length === 0) deleteBtn.disabled = true;
     }
 
     // ========================================================================
@@ -1309,8 +1405,9 @@
             openCreateProjectModal();
         }
         
-        // The selector's choice moves what Rename may act on.
+        // The selector's choice moves what Rename may act on, and what the star stars.
         document.getElementById('project-selector').addEventListener('change', _syncRenameButton);
+        document.getElementById('project-selector').addEventListener('change', _syncStarButton);
 
         // Clone project modal: prefilled with the source's name (the copy gets
         // an id of its own, drawn by the server).
@@ -2141,6 +2238,8 @@
 
     document.addEventListener('DOMContentLoaded', async function() {
         setupRestoreConfirmModal();
+        mountProjectPickers();
+        setupOwnerSpaceList();
 
         // Wait for admin.js to finish loading permissions before checking them
         await (window.QuickSiteAdmin?.permissionsReady || Promise.resolve());

@@ -114,8 +114,17 @@ if (isset($_GET['denied'])): ?>
             </div>
         </div>
 
-        <!-- Per-owned-project rows (built in JS: dynamic structure) -->
+        <!-- Per-owned-project rows (built in JS: dynamic structure): the five largest, all of
+             them after "Show all", or every match of the search. The search and the button
+             show only when there are more than five. -->
+        <div class="owner-space__search" id="owner-space-search-wrap" hidden>
+            <input type="search" id="owner-space-search" class="admin-input" autocomplete="off"
+                   placeholder="<?= adminEscape(__admin('dashboard.storage.searchProjects')) ?>"
+                   aria-label="<?= adminEscape(__admin('dashboard.storage.searchProjectsLabel')) ?>">
+        </div>
         <div class="owner-space__projects" id="owner-space-projects"></div>
+        <p class="owner-space__no-match" id="owner-space-no-match" hidden></p>
+        <button type="button" class="owner-space__more" id="owner-space-more" hidden></button>
 
         <div class="owner-space__footer">
             <span class="owner-space__hint" id="owner-space-hint"></span>
@@ -256,11 +265,13 @@ if (isset($_GET['denied'])): ?>
                 <div class="project-manager__actions">
                     <!-- Switch Project -->
                     <div class="project-manager__action-group">
-                        <label class="admin-label"><?= __admin('dashboard.projects.switch') ?></label>
+                        <label class="admin-label" for="project-selector"><?= __admin('dashboard.projects.switch') ?></label>
                         <div class="project-manager__select-row">
                             <select id="project-selector" class="admin-input admin-input--select" disabled>
                                 <option value=""><?= __admin('common.loading') ?></option>
                             </select>
+                            <!-- Stars the project chosen in the selector; drawn by QuickSiteAdmin.syncStarToggle(). -->
+                            <button type="button" id="btn-star-project" class="admin-btn admin-btn--ghost admin-project-star" disabled></button>
                             <button type="button" id="btn-switch-project" class="admin-btn admin-btn--primary" disabled>
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                                     <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
@@ -613,7 +624,7 @@ if (isset($_GET['denied'])): ?>
         <div class="admin-modal__body">
             <p class="admin-warning"><?= __admin('dashboard.projects.deleteWarning') ?></p>
             <div class="admin-form-group">
-                <label class="admin-label"><?= __admin('dashboard.projects.selectToDelete') ?></label>
+                <label class="admin-label" for="delete-project-selector"><?= __admin('dashboard.projects.selectToDelete') ?></label>
                 <select id="delete-project-selector" class="admin-input admin-input--select">
                     <option value=""><?= __admin('dashboard.projects.selectProject') ?></option>
                 </select>

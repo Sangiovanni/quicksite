@@ -427,7 +427,9 @@ Full form — `data` references a `dataRequirements` ID, `value`/`label` pick fi
 
 `filterFrom` cascades the resolved options from another parameter's value: the option list is restricted to entries whose `value` appears in the referenced parameter's current selection. The cascade only applies when the referenced parameter is currently visible (its own `condition` is truthy) AND has a non-empty value — otherwise the full list is used. The auto-correct rule: when the cascade narrows the option set and the dependent's current value is no longer valid, the dependent flips to the first available option.
 
-Example: setup-languages's `defaultLanguage` uses `filterFrom: "languages"`. With Multilingual unchecked, Languages is hidden, so the cascade is skipped and Default language shows all 40 languages. Check Multilingual and pick `[en, fr]` in Languages, and Default language re-renders with just English + Français.
+Example: setup-languages's `defaultLanguage` uses `filterFrom: "languages"`. With Multilingual unchecked, Languages is hidden, so the cascade is skipped and Default language shows all 230 languages. Check Multilingual and pick `[en, fr]` in Languages, and Default language re-renders with just English + Français.
+
+`"searchable": true` beside the `type` of a `select` or a `tag-select` gives its list a search that matches an option's name and its value: the `select` becomes a dropdown you type in, the `tag-select` gets a search field above its checkboxes that hides the options that do not match but never one already ticked. On any other type it is ignored.
 
 **Conditional visibility:** `"condition": "multilingual === true"` — references another parameter's ID (not prefixed with `param.`).
 

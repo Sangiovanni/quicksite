@@ -21,6 +21,7 @@
         {
             "id": "languages",
             "type": "tag-select",
+            "searchable": true,
             "labelKey": "workflows.specs.setupLanguages.params.languages.label",
             "helpKey": "workflows.specs.setupLanguages.params.languages.help",
             "optionsFrom": {
@@ -37,6 +38,7 @@
         {
             "id": "defaultLanguage",
             "type": "select",
+            "searchable": true,
             "labelKey": "workflows.specs.setupLanguages.params.defaultLanguage.label",
             "helpKey": "workflows.specs.setupLanguages.params.defaultLanguage.help",
             "optionsFrom": {

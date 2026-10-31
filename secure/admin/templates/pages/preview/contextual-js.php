@@ -48,7 +48,7 @@
                 <!-- Function section -->
                 <div id="js-page-event-function-section">
                     <div class="preview-contextual-js-form-row">
-                        <label class="preview-contextual-js-form-label"><?= __admin('preview.function') ?? 'Function' ?></label>
+                        <label class="preview-contextual-js-form-label" for="js-page-event-function"><?= __admin('preview.function') ?? 'Function' ?></label>
                         <select class="preview-contextual-js-form-select" id="js-page-event-function">
                             <option value=""><?= __admin('preview.selectFunction') ?? '-- Select function --' ?></option>
                         </select>
@@ -263,7 +263,7 @@
             </div>
             
             <div class="preview-contextual-js-form-row">
-                <label class="preview-contextual-js-form-label"><?= __admin('preview.event') ?? 'Event' ?></label>
+                <label class="preview-contextual-js-form-label" for="js-form-event"><?= __admin('preview.event') ?? 'Event' ?></label>
                 <select class="preview-contextual-js-form-select" id="js-form-event">
                     <option value=""><?= __admin('preview.selectEvent') ?? '-- Select event --' ?></option>
                 </select>
@@ -280,7 +280,7 @@
             <!-- Function section (shown when action type = function) -->
             <div id="js-form-function-section">
                 <div class="preview-contextual-js-form-row">
-                    <label class="preview-contextual-js-form-label"><?= __admin('preview.function') ?? 'Function' ?></label>
+                    <label class="preview-contextual-js-form-label" for="js-form-function"><?= __admin('preview.function') ?? 'Function' ?></label>
                     <select class="preview-contextual-js-form-select" id="js-form-function">
                         <option value=""><?= __admin('preview.selectFunction') ?? '-- Select function --' ?></option>
                     </select>
