@@ -2,7 +2,7 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/AssetMetadataManager.php';
-require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_favicon_repoint
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_favicon_repoint, qs_asset_write_failed
 require_once SECURE_FOLDER_PATH . '/src/functions/projectPublicArtifacts.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_removal_only
 
@@ -79,7 +79,8 @@ if ($batchFilenames !== null) {
 /**
  * Validate and delete a single asset file.
  * Returns ['success' => true/false, ...] result array; on success 'listChanged' says whether
- * the asset list had an entry for the file (removed from it, to be saved).
+ * the asset list had an entry for the file (removed from it, to be saved), and 'faviconFailed'
+ * whether the favicon setting named the file and could not be cleared.
  */
 function validateAndDeleteAsset(string $filename, AssetMetadataManager $metaManager): array {
     // Type check
@@ -139,21 +140,31 @@ function validateAndDeleteAsset(string $filename, AssetMetadataManager $metaMana
     // editFavicon stores a POINTER, not a copy, so deleting the chosen image
     // would leave the site emitting an icon link to a file that is gone. Only
     // images can be the favicon, so nothing else needs asking.
-    if ($category === 'images') {
-        qs_favicon_repoint(PROJECT_PATH, $filename, null);
-    }
+    $faviconFailed = $category === 'images' && qs_favicon_repoint(PROJECT_PATH, $filename, null) === 'failed';
 
-    return ['success' => true, 'filename' => $filename, 'category' => $category, 'listChanged' => $listChanged];
+    return ['success' => true, 'filename' => $filename, 'category' => $category, 'listChanged' => $listChanged,
+        'faviconFailed' => $faviconFailed];
 }
 
 /**
- * The answer when the files are deleted but the asset list could not be saved: it still names
- * them, so a file uploaded later under the same name would inherit their entries.
+ * The answer when the files are deleted but what names them could not be saved: the asset list
+ * (it still names them, so a file uploaded later under the same name would inherit their entries)
+ * and the favicon setting (it still names a deleted image). $notSaved says which, 'asset_list'
+ * before 'favicon', and the answer carries it as not_saved.
+ *
+ * @param string $deleted what was deleted ("The file was deleted")
+ * @param string $one     the deleted file the favicon names ("it", "one of them")
+ * @param string $tail    what follows the sentence (the batch's failures), or ''
  */
-function assetListNotSaved(string $message, array $data): ApiResponse {
-    return ApiResponse::create(500, 'server.file_write_failed')
-        ->withMessage($message)
-        ->withData($data);
+function deletedButNotSaved(string $deleted, string $one, array $notSaved, string $tail, array $data): ApiResponse {
+    if ($notSaved === ['asset_list']) {
+        $what = 'the asset list could not be updated';
+    } elseif ($notSaved === ['favicon']) {
+        $what = "the project's favicon setting still names $one and could not be updated";
+    } else {
+        $what = "neither the asset list nor the project's favicon setting could be updated";
+    }
+    return qs_asset_write_failed("$deleted, but $what$tail.", $data + ['not_saved' => $notSaved]);
 }
 
 // === Single file mode ===
@@ -186,8 +197,15 @@ if ($singleFilename !== null) {
 
     // The list is saved only when it named the file: a save that changes nothing cannot leave
     // it stale, and is not attempted.
+    $notSaved = [];
     if ($result['listChanged'] && !$metaManager->save()) {
-        assetListNotSaved('The file was deleted, but the asset list could not be updated.', [
+        $notSaved[] = 'asset_list';
+    }
+    if ($result['faviconFailed']) {
+        $notSaved[] = 'favicon';
+    }
+    if ($notSaved !== []) {
+        deletedButNotSaved('The file was deleted', 'it', $notSaved, '', [
             'filename' => $result['filename'],
             'category' => $result['category']
         ])->send();
@@ -206,12 +224,14 @@ if ($singleFilename !== null) {
 $deleted = [];
 $failed = [];
 $listChanged = false;
+$faviconFailed = false;
 
 foreach ($filenamesToDelete as $fname) {
     $result = validateAndDeleteAsset($fname, $metaManager);
     if ($result['success']) {
         $deleted[] = ['filename' => $result['filename'], 'category' => $result['category']];
         $listChanged = $listChanged || $result['listChanged'];
+        $faviconFailed = $faviconFailed || $result['faviconFailed'];
     } else {
         $failed[] = ['filename' => $result['filename'], 'error' => $result['error']];
     }
@@ -221,10 +241,17 @@ $totalDeleted = count($deleted);
 $totalFailed = count($failed);
 
 // Save metadata once for all deletions, when the list named one of the files
+$notSaved = [];
 if ($listChanged && !$metaManager->save()) {
-    assetListNotSaved("{$totalDeleted} file" . ($totalDeleted > 1 ? 's were' : ' was')
-        . ' deleted, but the asset list could not be updated'
-        . ($totalFailed > 0 ? " ({$totalFailed} failed)" : '') . '.', [
+    $notSaved[] = 'asset_list';
+}
+if ($faviconFailed) {
+    $notSaved[] = 'favicon';
+}
+if ($notSaved !== []) {
+    deletedButNotSaved("{$totalDeleted} file" . ($totalDeleted > 1 ? 's were' : ' was') . ' deleted',
+        $totalDeleted > 1 ? 'one of them' : 'it', $notSaved,
+        $totalFailed > 0 ? " ({$totalFailed} failed)" : '', [
         'deleted' => $deleted,
         'failed' => $failed,
         'total_deleted' => $totalDeleted,

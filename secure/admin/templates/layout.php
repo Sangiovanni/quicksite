@@ -674,6 +674,18 @@ $langNames = [
                     unstarProject: '<?= __adminJs('common.unstarProject') ?>',
                     starFailed: '<?= __adminJs('common.starFailed') ?>'
                 },
+                // A wait or a limit in time, in the words __adminDuration() uses on
+                // the pages the server writes: QuickSiteAdmin.durationText() reads them.
+                duration: {
+                    second: '<?= __adminJs('common.duration.second') ?>',
+                    seconds: '<?= __adminJs('common.duration.seconds') ?>',
+                    minute: '<?= __adminJs('common.duration.minute') ?>',
+                    minutes: '<?= __adminJs('common.duration.minutes') ?>',
+                    hour: '<?= __adminJs('common.duration.hour') ?>',
+                    hours: '<?= __adminJs('common.duration.hours') ?>',
+                    day: '<?= __adminJs('common.duration.day') ?>',
+                    days: '<?= __adminJs('common.duration.days') ?>'
+                },
                 // The write rate's strings: the header's figure and its hover, and
                 // the refusal api.js says in the panel's language.
                 writeRate: {

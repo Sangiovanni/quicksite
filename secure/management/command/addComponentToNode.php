@@ -421,7 +421,7 @@ function __command_addComponentToNode(array $params = [], array $urlParams = [])
             'position' => $position,
             'targetNodeId' => $targetNodeId,
             'data' => $finalData,
-            'variables' => array_values($variables),
+            'variables' => qs_component_variable_answer($variables),
             'generatedTextKeys' => $generatedTextKeys,
             'translationsCreated' => $translationsCreated,
             'instanceNumber' => $instanceNumber,

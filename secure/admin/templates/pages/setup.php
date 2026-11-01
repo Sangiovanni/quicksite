@@ -73,6 +73,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (strpos($result, 'throttled:') === 0) {
             $setupError = 'throttled';
             $setupRetryAfter = (int)substr($result, strlen('throttled:'));
+        } elseif (strpos($result, 'invalid_token:') === 0) {
+            // A wrong token whose refusal started a wait: both are said.
+            $setupError = 'invalid_token';
+            $setupRetryAfter = (int)substr($result, strlen('invalid_token:'));
         } elseif (strpos($result, 'password_too_short:') === 0) {
             $setupError = 'password_too_short';
             $setupMinLength = (int)substr($result, strlen('password_too_short:'));
@@ -119,7 +123,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <?php elseif ($setupError === 'throttled'): ?>
             <div class="admin-alert admin-alert--error"><?= __admin('setup.throttled', ['duration' => __adminDuration($setupRetryAfter)]) ?></div>
             <?php elseif ($setupError === 'invalid_token'): ?>
-            <div class="admin-alert admin-alert--error"><?= __admin('setup.invalidToken', 'That setup token is not valid. Open the file named below and copy the whole line.') ?></div>
+            <div class="admin-alert admin-alert--error"><?= __admin('setup.invalidToken', 'That setup token is not valid. Open the file named below and copy the whole line.') ?><?php if ($setupRetryAfter > 0): ?><br><?= __admin('setup.throttled', ['duration' => __adminDuration($setupRetryAfter)]) ?><?php endif; ?></div>
             <?php elseif ($setupError === 'password_too_short'): ?>
             <div class="admin-alert admin-alert--error"><?= __admin('setup.passwordTooShort', ['min' => $setupMinLength]) ?></div>
             <?php elseif ($setupError === 'password_mismatch'): ?>

@@ -10,7 +10,9 @@
  * points at (`qs_resolve_component_path`, and the charset rule under it) and
  * HOW THE `data` MAP BINDS to the slots that file leaves open
  * (`qs_resolve_component_placeholders`). Every reader needs both, and each
- * half had been copied per reader until it was collected here.
+ * half had been copied per reader until it was collected here. So is WHAT THE
+ * SLOTS ARE (`qs_component_variables`): every command that lists a component's
+ * slots or fills them reads them there.
  *
  * WHY A SHARED FUNCTION FILE. Ten call sites resolve a component reference —
  * the `/p/<id>/` renderer, the JSON→PHP compiler, and eight commands. Before
@@ -197,84 +199,253 @@ if (!function_exists('qs_resolve_component_placeholders')) {
 
 if (!function_exists('qs_component_variables')) {
     /**
-     * The slots a component leaves open, each with its type: a `{{name}}` in a
-     * translatable attribute (TagRegistry::TRANSLATABLE_ATTRIBUTES), a text or a nested
-     * call's data is a text slot ("textKey": its value is a translation key), one in any
-     * other attribute a "param". Read by addComponentToNode, which makes a text slot's
-     * key, and editComponentToNode, which lets only a param change.
+     * The slots a component leaves open, each with its type: the one reader of them.
+     * addComponentToNode makes a text slot's key, editComponentToNode lets only a param
+     * change (both answer qs_component_variable_answer()), insertSnippet copies a text
+     * slot's key, and listComponents and getComponent list them
+     * (qs_component_variable_list()).
+     *
+     * $structure is a component as stored, one node or a list of nodes (editStructure
+     * accepts either), or one of its nodes. A `{{name}}` is a slot, the first one found
+     * deciding, in this order in each node: its params, its textKey, its data, its
+     * children.
+     * - In a param: a text slot ("textKey": its value is a translation key) when the
+     *   attribute is translatable (TagRegistry::TRANSLATABLE_ATTRIBUTES), else a "param";
+     *   paramName is the attribute and parentTag the node's tag.
+     * - In a textKey: a text slot.
+     * - In the data of a nested component call (`"key": "{{name}}"`): the slot that
+     *   component gives `key`, read from its file (its type, paramName and parentTag); a
+     *   text slot when the file cannot be read, gives `key` no slot, or sits more than
+     *   ten calls deep or inside a call of itself.
      *
      * Left out: system placeholders (starting with __, e.g. __current_page) and
      * placeholders with parameters (containing ;), which are fixed values.
      *
-     * @param mixed $node      a component structure or one of its nodes
-     * @param array $variables the slots found so far, by name (first found wins)
-     * @return array name => [name, type, paramName]
+     * @param mixed       $structure     a component structure, or one of its nodes
+     * @param array       $variables     the slots found so far, by name (first found wins)
+     * @param string|null $componentsDir where a nested call's component is read; the
+     *                                   project's components folder when null
+     * @return array name => [name, type, paramName, parentTag]
      */
-    function qs_component_variables($node, array &$variables = []): array {
+    function qs_component_variables($structure, array &$variables = [], ?string $componentsDir = null): array {
+        if ($componentsDir === null && defined('PROJECT_PATH')) {
+            $componentsDir = PROJECT_PATH . '/templates/model/json/components';
+        }
+        qs_component_slots_walk($structure, $variables, $componentsDir, []);
+        return $variables;
+    }
+}
+
+if (!function_exists('qs_component_slots_walk')) {
+    /**
+     * qs_component_variables()'s walk. $reading holds the component files the walk is
+     * inside of, read for a nested call: a call of one of them ends there.
+     */
+    function qs_component_slots_walk($node, array &$variables, ?string $componentsDir, array $reading): void {
         if (!is_array($node)) {
-            return $variables;
+            return;
+        }
+        if (array_is_list($node)) {
+            // A structure stored as a list of nodes.
+            foreach ($node as $child) {
+                qs_component_slots_walk($child, $variables, $componentsDir, $reading);
+            }
+            return;
         }
 
-        // Check params for placeholders
         if (isset($node['params']) && is_array($node['params'])) {
             foreach ($node['params'] as $paramName => $value) {
-                if (is_string($value) && preg_match_all('/\{\{([^}]+)\}\}/', $value, $matches)) {
-                    foreach ($matches[1] as $varName) {
-                        // Skip system placeholders (start with __) and fixed placeholders (contain ;)
-                        if (str_starts_with($varName, '__') || strpos($varName, ';') !== false) {
-                            continue;
-                        }
-
-                        if (!isset($variables[$varName])) {
-                            $type = in_array($paramName, TagRegistry::TRANSLATABLE_ATTRIBUTES, true) ? 'textKey' : 'param';
-                            $variables[$varName] = ['name' => $varName, 'type' => $type, 'paramName' => $paramName];
-                        }
+                foreach (qs_component_slot_names($value) as $name) {
+                    if (!isset($variables[$name])) {
+                        $type = in_array($paramName, TagRegistry::TRANSLATABLE_ATTRIBUTES, true) ? 'textKey' : 'param';
+                        $variables[$name] = ['name' => $name, 'type' => $type, 'paramName' => $paramName,
+                            'parentTag' => $node['tag'] ?? null];
                     }
                 }
             }
         }
 
-        // Check textKey for placeholders
         if (isset($node['textKey']) && is_string($node['textKey'])) {
-            if (preg_match_all('/\{\{([^}]+)\}\}/', $node['textKey'], $matches)) {
-                foreach ($matches[1] as $varName) {
-                    // Skip system placeholders (start with __) and fixed placeholders (contain ;)
-                    if (str_starts_with($varName, '__') || strpos($varName, ';') !== false) {
+            foreach (qs_component_slot_names($node['textKey']) as $name) {
+                if (!isset($variables[$name])) {
+                    $variables[$name] = ['name' => $name, 'type' => 'textKey', 'paramName' => null, 'parentTag' => null];
+                }
+            }
+        }
+
+        if (isset($node['data']) && is_array($node['data'])) {
+            $called = null; // the slots of the component this node calls, read once
+            foreach ($node['data'] as $key => $value) {
+                foreach (qs_component_slot_names($value) as $name) {
+                    if (isset($variables[$name])) {
                         continue;
                     }
-
-                    if (!isset($variables[$varName])) {
-                        $variables[$varName] = ['name' => $varName, 'type' => 'textKey', 'paramName' => null];
-                    }
+                    $called ??= qs_component_called_slots($node['component'] ?? null, $componentsDir, $reading);
+                    $slot = $called[$key] ?? null;
+                    $variables[$name] = $slot === null
+                        ? ['name' => $name, 'type' => 'textKey', 'paramName' => null, 'parentTag' => null]
+                        : ['name' => $name, 'type' => $slot['type'], 'paramName' => $slot['paramName'],
+                            'parentTag' => $slot['parentTag']];
                 }
             }
         }
 
-        // Check component data for placeholders
-        if (isset($node['data']) && is_array($node['data'])) {
-            foreach ($node['data'] as $value) {
-                if (is_string($value) && preg_match_all('/\{\{([^}]+)\}\}/', $value, $matches)) {
-                    foreach ($matches[1] as $varName) {
-                        // Skip system placeholders (start with __) and fixed placeholders (contain ;)
-                        if (str_starts_with($varName, '__') || strpos($varName, ';') !== false) {
-                            continue;
-                        }
-
-                        if (!isset($variables[$varName])) {
-                            $variables[$varName] = ['name' => $varName, 'type' => 'textKey', 'paramName' => null];
-                        }
-                    }
-                }
-            }
-        }
-
-        // Recurse into children
         if (isset($node['children']) && is_array($node['children'])) {
             foreach ($node['children'] as $child) {
-                qs_component_variables($child, $variables);
+                qs_component_slots_walk($child, $variables, $componentsDir, $reading);
+            }
+        }
+    }
+}
+
+if (!function_exists('qs_component_slot_names')) {
+    /**
+     * The slot names a value holds: each `{{name}}` that is neither a system placeholder
+     * (starting with __) nor one with parameters (containing ;). None for a value that is
+     * not a string.
+     *
+     * @param mixed $value
+     * @return string[]
+     */
+    function qs_component_slot_names($value): array {
+        if (!is_string($value) || !preg_match_all('/\{\{([^}]+)\}\}/', $value, $matches)) {
+            return [];
+        }
+        return array_values(array_filter($matches[1], static function (string $name): bool {
+            return !str_starts_with($name, '__') && strpos($name, ';') === false;
+        }));
+    }
+}
+
+if (!function_exists('qs_component_called_slots')) {
+    /**
+     * The slots of the component a nested call names, read from its file: none when the
+     * reference resolves to no file (qs_resolve_component_path()), the file is not a
+     * structure, the walk is already inside that file, or ten files deep.
+     *
+     * @param mixed $reference the call's `component` value
+     * @return array name => [name, type, paramName, parentTag]
+     */
+    function qs_component_called_slots($reference, ?string $componentsDir, array $reading): array {
+        if ($componentsDir === null || count($reading) >= 10) {
+            return [];
+        }
+        $path = qs_resolve_component_path($reference, $componentsDir);
+        if ($path === null || in_array($path, $reading, true)) {
+            return [];
+        }
+        $structure = json_decode((string)@file_get_contents($path), true);
+        if (!is_array($structure)) {
+            return [];
+        }
+        $slots = [];
+        $reading[] = $path;
+        qs_component_slots_walk($structure, $slots, $componentsDir, $reading);
+        return $slots;
+    }
+}
+
+if (!function_exists('qs_component_variable_answer')) {
+    /**
+     * The slots as addComponentToNode and editComponentToNode answer them, in the order
+     * found: name, type and paramName.
+     *
+     * @param array $variables qs_component_variables()'s answer
+     * @return array
+     */
+    function qs_component_variable_answer(array $variables): array {
+        $answer = [];
+        foreach ($variables as $slot) {
+            $answer[] = ['name' => $slot['name'], 'type' => $slot['type'], 'paramName' => $slot['paramName']];
+        }
+        return $answer;
+    }
+}
+
+if (!function_exists('qs_component_variable_list')) {
+    /**
+     * The slots as listComponents and getComponent answer them: name and type, and for a
+     * param its paramName and parentTag (the panel offers the asset picker from them), in
+     * the order found. A component's `__enums__` (on its root node) resolves some slots
+     * itself: those are left out, and each enum's source is listed instead, once, as
+     * type "enum" with its options and its default.
+     *
+     * @param mixed       $structure     a component structure as stored
+     * @param string|null $componentsDir see qs_component_variables()
+     * @return array
+     */
+    function qs_component_variable_list($structure, ?string $componentsDir = null): array {
+        $slots = [];
+        qs_component_variables($structure, $slots, $componentsDir);
+
+        $derived = [];
+        $sources = [];
+        $enums = is_array($structure) ? ($structure['__enums__'] ?? []) : [];
+        foreach (is_array($enums) ? $enums : [] as $name => $enum) {
+            if (!is_array($enum) || !isset($enum['source']) || !isset($enum['map']) || !is_array($enum['map'])) {
+                continue;
+            }
+            $derived[] = $name;
+            $options = array_keys($enum['map']);
+            if (!isset($sources[$enum['source']])) {
+                $sources[$enum['source']] = [
+                    'name'    => $enum['source'],
+                    'type'    => 'enum',
+                    'options' => $options,
+                    'default' => $enum['default'] ?? ($options[0] ?? null),
+                ];
             }
         }
 
-        return $variables;
+        $list = [];
+        foreach ($slots as $slot) {
+            if (in_array($slot['name'], $derived, true)) {
+                continue;
+            }
+            $entry = ['name' => $slot['name'], 'type' => $slot['type']];
+            if ($slot['type'] === 'param') {
+                $entry['paramName'] = $slot['paramName'];
+                $entry['parentTag'] = $slot['parentTag'];
+            }
+            $list[] = $entry;
+        }
+        foreach ($sources as $source) {
+            $list[] = $source;
+        }
+        return $list;
+    }
+}
+
+if (!function_exists('qs_components_called')) {
+    /**
+     * The components a structure calls (`{"component": …}` nodes, at any depth, a list of
+     * nodes included), each once, in the order first called.
+     *
+     * @param mixed $structure
+     * @return array
+     */
+    function qs_components_called($structure): array {
+        $called = [];
+        $walk = static function ($node) use (&$walk, &$called): void {
+            if (!is_array($node)) {
+                return;
+            }
+            if (array_is_list($node)) {
+                foreach ($node as $child) {
+                    $walk($child);
+                }
+                return;
+            }
+            if (isset($node['component']) && !in_array($node['component'], $called, true)) {
+                $called[] = $node['component'];
+            }
+            if (isset($node['children']) && is_array($node['children'])) {
+                foreach ($node['children'] as $child) {
+                    $walk($child);
+                }
+            }
+        };
+        $walk($structure);
+        return $called;
     }
 }

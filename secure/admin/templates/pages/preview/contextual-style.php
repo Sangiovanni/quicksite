@@ -368,6 +368,7 @@
                 <div class="preview-selector-selected__header">
                     <span class="preview-selector-selected__label"><?= __admin('preview.selectedSelector') ?? 'Selected' ?>:</span>
                     <code class="preview-selector-selected__value" id="selector-selected-value"></code>
+                    <span class="preview-rule-media" id="selector-selected-media" hidden></span>
                     <button type="button" class="preview-selector-selected__clear" id="selector-selected-clear" title="<?= __admin('common.clear') ?? 'Clear' ?>">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
                             <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -609,6 +610,7 @@
                 <div class="preview-style-editor__title">
                     <span class="preview-style-editor__label" id="style-editor-label" title="<?= __admin('preview.clickToGoBack') ?? 'Click to go back' ?>"><?= __admin('preview.editingSelector') ?? 'Editing' ?>:</span>
                     <code class="preview-style-editor__selector" id="style-editor-selector"></code>
+                    <span class="preview-rule-media" id="style-editor-media" hidden></span>
                 </div>
                 <span class="preview-style-editor__badge" id="style-editor-badge" title="<?= __admin('preview.affectedElementsHint') ?? 'Number of elements affected by this selector' ?>">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">

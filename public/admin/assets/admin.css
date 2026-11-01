@@ -8949,6 +8949,16 @@ code.preview-contextual-info__value {
     white-space: nowrap;
 }
 
+/* The media query of a rule inside @media, beside its selector (the Selected box, the style
+   editor's header, the State & Animation Editor's). Shown and hidden through `hidden`: no display
+   of its own. */
+.preview-rule-media {
+    font-size: var(--font-size-xs);
+    font-family: var(--font-mono);
+    color: var(--admin-text-muted);
+    white-space: nowrap;
+}
+
 .preview-style-editor__badge {
     display: flex;
     align-items: center;
@@ -9480,13 +9490,20 @@ code.preview-contextual-info__value {
 
 /* Range input: slider + value display */
 
+/* min-width: a range input has a width of its own; without it the slider row outgrows its place
+   in a narrow form. The number field and the buttons beside it keep their width. */
 .qs-value-input__range {
     flex: 1;
+    min-width: 0;
     height: 4px;
     background: var(--admin-border);
     border-radius: 2px;
     -webkit-appearance: none;
     appearance: none;
+}
+
+.qs-value-input--range {
+    min-width: 0;
 }
 
 .qs-value-input__range::-webkit-slider-thumb {
@@ -9499,12 +9516,23 @@ code.preview-contextual-info__value {
     border: 2px solid var(--admin-bg);
 }
 
-.qs-value-input__range-value {
+/* The slider's value as a number to type, beside it and kept in step with it */
+.qs-value-input__range-number {
+    flex: 0 0 auto;
+    width: 4.5em;
+    padding: var(--space-2xs) var(--space-xs);
     font-size: var(--font-size-xs);
-    color: var(--admin-text-muted);
-    min-width: 32px;
-    text-align: right;
     font-family: monospace;
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+    background: var(--admin-card-bg);
+    color: var(--admin-text);
+}
+
+.qs-value-input__range-number:focus {
+    outline: none;
+    border-color: var(--admin-accent);
+    box-shadow: 0 0 0 2px rgba(var(--admin-accent-rgb), 0.2);
 }
 
 /* Enum input: dropdown select */
@@ -9539,12 +9567,20 @@ code.preview-contextual-info__value {
     flex: 1;
 }
 
+/* min-width on the slider and its container: a range input has a width of its own, and a slider
+   row would outgrow its column, its variable button landing on the delete button. The slider
+   gives way; the number field and the buttons keep their width. */
 .preview-style-property__range {
     flex: 1;
+    min-width: 0;
     height: 4px;
     background: var(--admin-border);
     border-radius: 2px;
     outline: none;
+}
+
+.preview-style-property__range-container {
+    min-width: 0;
 }
 
 .preview-style-property__range::-webkit-slider-thumb {
@@ -9561,12 +9597,21 @@ code.preview-contextual-info__value {
     transform: scale(1.2);
 }
 
-.preview-style-property__range-value {
-    min-width: 40px;
+.preview-style-property__range-number {
+    flex: 0 0 auto;
+    width: 4.5em;
     font-family: var(--font-mono);
     font-size: var(--font-size-sm);
-    color: var(--admin-text-muted);
-    text-align: right;
+    color: var(--admin-text);
+    background: var(--admin-surface);
+    border: 1px solid var(--admin-border);
+    border-radius: var(--radius-sm);
+    padding: 4px 6px;
+}
+
+.preview-style-property__range-number:focus {
+    outline: none;
+    border-color: var(--admin-accent);
 }
 
 .preview-style-property__length-container {

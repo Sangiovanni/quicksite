@@ -186,16 +186,8 @@ function __command_getComponent(array $params = [], array $urlParams = []): ApiR
             ->withMessage('Invalid JSON: ' . json_last_error_msg());
     }
     
-    // Extract variables using the same logic as listComponents
-    require_once SECURE_FOLDER_PATH . '/management/command/listComponents.php';
-    $variables = [];
-    if (isset($structure['tag']) || isset($structure['component']) || isset($structure['textKey'])) {
-        extractVariables($structure, $variables);
-    } elseif (is_array($structure)) {
-        foreach ($structure as $node) {
-            extractVariables($node, $variables);
-        }
-    }
+    // The slots as listComponents lists them: the one reader (componentPolicy.php)
+    $variables = qs_component_variable_list($structure);
     
     // Build preview: expand nested component references
     $previewStructure = $structure;
@@ -243,7 +235,7 @@ function __command_getComponent(array $params = [], array $urlParams = []): ApiR
         'name' => $componentName,
         'structure' => $structure,
         'variables' => $variables,
-        'uses_components' => findUsedComponents($structure),
+        'uses_components' => qs_components_called($structure),
     ];
     
     if ($hasNestedComponents) {

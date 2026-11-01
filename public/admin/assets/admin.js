@@ -373,6 +373,58 @@ const QuickSiteAdmin = {
     },
 
     /**
+     * getStyleRule's segments for one rule, the way every panel reader sends them:
+     * its selector, then the media query of a rule inside @media, each one segment
+     * encoded twice (urlSegments 'twice': the command decodes its segments once
+     * more, so a '+' in "h1 + p" would arrive as a space and a '/' in a ratio
+     * would split the query).
+     *
+     * @param {string} selector
+     * @param {string|null} [mediaQuery]
+     * @returns {string[]}
+     */
+    styleRuleSegments(selector, mediaQuery) {
+        const segments = [this.urlSegments(selector, 'twice')];
+        if (mediaQuery) segments.push(this.urlSegments(mediaQuery, 'twice'));
+        return segments;
+    },
+
+    /**
+     * A duration in the panel's words, as __adminDuration() (AdminTranslation.php)
+     * says it on the pages the server writes: under a minute in seconds, under an
+     * hour in minutes, under a day in hours, then in days, the unit chosen after
+     * rounding. 'up' (a wait: nobody is told to try again too early) or 'nearest'
+     * (an "about"). Anything under a second counts as one. The words are
+     * common.duration.*, which layout.php ships on every page; the two must keep
+     * the same rule.
+     *
+     * @param {number} seconds
+     * @param {string} [round] 'up' (the default) or 'nearest'
+     * @returns {string}
+     */
+    durationText(seconds, round = 'up') {
+        const s = Math.max(1, Math.floor(Number(seconds) || 0));
+        const count = (unit) => (round === 'nearest' ? Math.round(s / unit) : Math.ceil(s / unit));
+        let n;
+        let unit;
+        if (s < 60) {
+            n = s;
+            unit = 'second';
+        } else if ((n = count(60)) < 60) {
+            unit = 'minute';
+        } else if ((n = count(3600)) < 24) {
+            unit = 'hour';
+        } else {
+            n = count(86400);
+            unit = 'day';
+        }
+        const key = unit + (n === 1 ? '' : 's');
+        const words = (window.QUICKSITE_CONFIG && window.QUICKSITE_CONFIG.translations
+            && window.QUICKSITE_CONFIG.translations.duration) || {};
+        return (words[key] || ':count ' + key).split(':count').join(String(n));
+    },
+
+    /**
      * Download a command's response as a file - delegates to QuickSiteAPI.
      *
      * For the commands that answer BYTES instead of a JSON envelope

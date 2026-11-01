@@ -303,7 +303,8 @@ class AdminRouter {
      *
      * @return string|null null on success, else an error key:
      *                     'setup_complete' | 'missing_fields' | 'password_mismatch' |
-     *                     'invalid_token' | 'invalid_username' | 'name_equals_username' |
+     *                     'invalid_token' | 'invalid_token:<seconds>' (the refusal that
+     *                     started a wait) | 'invalid_username' | 'name_equals_username' |
      *                     'password_too_short:<min>' | 'throttled:<seconds>' | 'server'
      */
     public function attemptSetup(string $name, string $username, string $password, string $passwordConfirm, string $token): ?string {
@@ -333,6 +334,9 @@ class AdminRouter {
         }
         if ($attempt['error'] === 'throttled') {
             return 'throttled:' . (int)($attempt['retry_after'] ?? 60);
+        }
+        if ($attempt['error'] === 'invalid_token' && !empty($attempt['retry_after'])) {
+            return 'invalid_token:' . (int)$attempt['retry_after'];
         }
         if ($attempt['error'] === 'password_too_short') {
             return 'password_too_short:' . (int)($attempt['min_length'] ?? 12);

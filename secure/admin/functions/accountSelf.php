@@ -77,9 +77,10 @@ function qs_account_change_password(array $params): ApiResponse {
     }
 
     // Same brute-force backoff as login, keyed on the same credential target:
-    // admitted and counted before the check, cleared by a success.
+    // admitted and counted before the check, cleared by a success. The refusal
+    // that starts a wait carries it, as the next attempt's 429 would.
     $throttleKey = is_string($user['username'] ?? null) && $user['username'] !== '' ? $user['username'] : $userId;
-    $wait = qs_login_throttle_admit($throttleKey);
+    $wait = qs_login_throttle_admit($throttleKey, $starts);
     if ($wait > 0) {
         return ApiResponse::create(429, 'auth.throttled')
             ->withMessage('Too many failed attempts — try again later')
@@ -87,8 +88,9 @@ function qs_account_change_password(array $params): ApiResponse {
     }
 
     if (!password_verify($current, $hash)) {
-        return ApiResponse::create(401, 'auth.invalid_credentials')
+        $refusal = ApiResponse::create(401, 'auth.invalid_credentials')
             ->withMessage('Current password is incorrect');
+        return $starts > 0 ? $refusal->withData(['retry_after' => $starts]) : $refusal;
     }
     qs_login_throttle_clear($throttleKey);
 
@@ -202,9 +204,11 @@ function qs_account_delete(array $params): ApiResponse {
     }
 
     // Same brute-force backoff as login / the password change, keyed the same way:
-    // admitted and counted before the check, cleared by a success.
+    // admitted and counted before the check, cleared by a success. The refusal
+    // that starts a wait carries it, decided at admission: the same for a wrong
+    // password and a wrong username.
     $throttleKey = is_string($user['username'] ?? null) && $user['username'] !== '' ? $user['username'] : $userId;
-    $wait = qs_login_throttle_admit($throttleKey);
+    $wait = qs_login_throttle_admit($throttleKey, $starts);
     if ($wait > 0) {
         return ApiResponse::create(429, 'auth.throttled')
             ->withMessage('Too many failed attempts — try again later')
@@ -217,8 +221,9 @@ function qs_account_delete(array $params): ApiResponse {
     $stored     = strtolower(trim((string)($user['username'] ?? '')));
     $usernameOk = $stored !== '' && hash_equals($stored, $typed);
     if (!$passwordOk || !$usernameOk) {
-        return ApiResponse::create(401, 'auth.invalid_credentials')
+        $refusal = ApiResponse::create(401, 'auth.invalid_credentials')
             ->withMessage('The current password or the username is incorrect');
+        return $starts > 0 ? $refusal->withData(['retry_after' => $starts]) : $refusal;
     }
     qs_login_throttle_clear($throttleKey);
 

@@ -2,8 +2,8 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/AssetMetadataManager.php';
-require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_favicon_repoint
-require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_favicon_repoint, qs_asset_write_failed
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard / _rollback
 
 /**
  * Edit Asset Command
@@ -19,6 +19,28 @@ require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_
  * 
  * At least one optional parameter must be provided.
  */
+
+/**
+ * Answer an edit that could not be completed, with everything it did taken back. A size check's
+ * refusal is answered as itself: qs_small_write_guard() has put back the guarded files and the
+ * rename already. Any other failed write puts them back the same way (the favicon setting's bytes,
+ * the rename registered with qs_small_write_on_rollback()) and answers 500 server.file_write_failed.
+ */
+function takeBackAssetEdit(string $what, string $category, string $filename, ?string $newFilename, string $sourcePath): void {
+    qs_small_write_send_refusal();
+    qs_small_write_rollback(qs_small_write_journal());
+    if ($newFilename !== null && !is_file($sourcePath)) {
+        // The rename could not be taken back: the answer names the file as it now is.
+        qs_asset_write_failed("$what, and the file could not be renamed back: it is now named $newFilename.", [
+            'category' => $category,
+            'filename' => $newFilename
+        ])->send();
+    }
+    qs_asset_write_failed("$what; nothing was changed.", [
+        'category' => $category,
+        'filename' => $filename
+    ])->send();
+}
 
 $params = $trimParametersManagement->params();
 
@@ -240,8 +262,8 @@ if ($newFilename !== null) {
     // editFavicon stores a POINTER, not a copy, so a rename has to travel to it
     // or the site emits an icon link to the old name. Only images can be the
     // favicon, so nothing else needs asking.
-    if ($category === 'images') {
-        qs_favicon_repoint(PROJECT_PATH, $filename, $newFilename);
+    if ($category === 'images' && qs_favicon_repoint(PROJECT_PATH, $filename, $newFilename) === 'failed') {
+        takeBackAssetEdit("The project's favicon setting could not be updated", $category, $filename, $newFilename, $sourcePath);
     }
 }
 
@@ -306,10 +328,10 @@ if (!empty($metaUpdates)) {
     $metaManager->set($category, $currentFilename, $metaUpdates);
 }
 
-// Save metadata. Its size check refusing (qs_small_write_guard) takes back
-// the rename above too.
+// Save metadata. A save that fails takes the whole edit back: the rename and
+// the favicon setting with it.
 if (!$metaManager->save()) {
-    qs_small_write_send_refusal();
+    takeBackAssetEdit('The asset list could not be saved', $category, $filename, $newFilename, $sourcePath);
 }
 
 // Build response

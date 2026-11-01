@@ -301,7 +301,7 @@ function __command_editComponentToNode(array $params = [], array $urlParams = []
             'component' => $componentName,
             'data' => $updatedData,
             'changes' => $changedVariables,
-            'variables' => array_values($variables),
+            'variables' => qs_component_variable_answer($variables),
             'html' => $renderedHtml
         ]);
 }

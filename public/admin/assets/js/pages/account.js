@@ -48,6 +48,29 @@
         return (res && res.data && (res.data.message || res.data.error)) || fallback || T.error || 'Error';
     }
 
+    /**
+     * The refusal of a credential check (the password change, the deletion), in the panel's words:
+     * a wrong answer (`wrong`), followed by the wait it started when it started one (data.retry_after,
+     * as the sign-in pages say it); a check made during a wait (429) says the wait. Any other
+     * answer is the server's own message.
+     */
+    function credentialRefusal(res, wrong) {
+        var status = res && res.status;
+        var envelope = (res && res.data) || {};
+        var wait = Number((envelope.data && envelope.data.retry_after) || 0);
+        var waitText = wait > 0
+            ? (T.throttled || 'Too many failed attempts — try again in :duration')
+                .split(':duration').join(window.QuickSiteAdmin.durationText(wait))
+            : '';
+        if (status === 401 && envelope.code === 'auth.invalid_credentials') {
+            return waitText !== '' ? wrong + ' ' + waitText : wrong;
+        }
+        if (status === 429 && waitText !== '') {
+            return waitText;
+        }
+        return serverMessage(res);
+    }
+
     /** Send the browser to the login page — the only sane place after a session ends. */
     function toLogin() {
         window.location.href = CFG.loginUrl || '/admin/login';
@@ -173,7 +196,8 @@
                 // A wrong current password is answered 401 auth.invalid_credentials,
                 // which api.js deliberately does NOT treat as a dead session — the
                 // user stays on this page and simply sees the refusal.
-                toast(serverMessage(res), (res && res.status === 429) ? 'warning' : 'error');
+                toast(credentialRefusal(res, T.wrongCurrent || 'Your current password is not correct.'),
+                    (res && res.status === 429) ? 'warning' : 'error');
             }).catch(function (err) {
                 btn.disabled = false;
                 toast((err && err.message) || String(err), 'error');
@@ -259,7 +283,8 @@
                         if (res && res.status === 409 && Array.isArray(data.owned_projects)) {
                             showBlockers(data.owned_projects);
                         }
-                        toast(serverMessage(res), (res && res.status === 409) ? 'warning' : 'error');
+                        toast(credentialRefusal(res, T.wrongCredentials || 'Your current password or your username is not correct.'),
+                            (res && (res.status === 409 || res.status === 429)) ? 'warning' : 'error');
                     }).catch(function (err) {
                         toast((err && err.message) || String(err), 'error');
                     });

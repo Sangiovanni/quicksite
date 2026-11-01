@@ -10,6 +10,7 @@
         <div class="preview-keyframe-modal__header">
             <h3><?= __admin('preview.stateAnimationEditor') ?? 'State & Animation Editor' ?></h3>
             <span class="transition-editor__selector" id="transition-editor-selector">.selector</span>
+            <span class="preview-rule-media" id="transition-editor-media" hidden></span>
             <button type="button" class="preview-keyframe-modal__close" id="transition-editor-close">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="18" y1="6" x2="6" y2="18"/>

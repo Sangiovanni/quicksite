@@ -76,12 +76,15 @@ function qs_membership_resolve(array $params, ?string &$project, ?string &$userI
  * Reads the caller's OWN users.php cache (cheap — no all-projects scan), then
  * hydrates each pending entry from that project's AUTHORITATIVE members.json: a
  * stale mirror can never misrepresent an offer, and drift self-corrects TOWARD
- * AUTHORITY — a dangling pending entry is pruned; a pending mirror whose
- * authority already shows MEMBERSHIP is upgraded to a member entry (restores
- * picker visibility when an approve/accept mirror write was lost); a mirror
- * whose pending KIND disagrees with the authority's direction is healed to the
- * authority's side. Sponsored proposals (`by` != me) are never mine to see: a
- * drifted mirror pointing at one is pruned, and the row is not listed.
+ * AUTHORITY by the shared repair rule (qs_membership_reconciled_entry(), as
+ * reconcileMemberships and the dashboard's repair apply it) — a dangling pending
+ * entry is pruned; a pending mirror whose authority already shows MEMBERSHIP is
+ * upgraded to a member entry (restores picker visibility when an approve/accept
+ * mirror write was lost); a mirror whose pending KIND disagrees with the
+ * authority's direction is healed to the authority's side, keeping its own date.
+ * Sponsored proposals (`by` != me) are never mine to see: a drifted mirror
+ * pointing at one is pruned, and the row is not listed. The heal writes the copy
+ * only, never members.json, so it is no membership change (no token bump).
  *
  * @return ApiResponse invitations[] + requests[] + notices[]
  */
@@ -114,32 +117,37 @@ function qs_membership_list_invitations(): ApiResponse {
             if ($projectId === '' || strpbrk($projectId, "/\\") !== false || strpos($projectId, '..') !== false) {
                 continue;
             }
-            $path = SECURE_FOLDER_PATH . '/projects/' . $projectId . '/config/members.json';
-            if (!is_file($path)) {
-                $prune[] = $projectId; // project gone → the ask died with it
+            // Drift heals toward AUTHORITY by the shared repair rule, as the
+            // dashboard's per-account repair applies it (qs_membership_sync_account()):
+            // a project whose folder is gone takes the ask with it; a roster that
+            // cannot be read leaves the entry alone and lists nothing; a readable one
+            // gives the entry it mirrors, the entry's own date kept.
+            if (!is_dir(SECURE_FOLDER_PATH . '/projects/' . $projectId)) {
+                $prune[] = $projectId;
                 continue;
             }
-            $authority = json_decode((string)@file_get_contents($path), true);
-            if (!is_array($authority)) {
-                continue; // unreadable file: leave the mirror alone, list nothing
+            $authority = loadProjectMembers($projectId);
+            if (!qs_membership_roster_readable($authority)) {
+                continue;
             }
-
-            // Drift heals toward AUTHORITY. Already a member there (approve/
-            // accept landed but the mirror write was lost) → upgrade the
-            // entry; a membership is not an inbox item.
-            if (isset($authority['members'][$userId])) {
-                $heal[$projectId] = qs_membership_mirror_entry('member', $today);
+            $desired = qs_membership_desired_statuses($authority)[$userId] ?? null;
+            $want = qs_membership_reconciled_entry($entry, $desired, $today);
+            if ($want === null) {
+                $prune[] = $projectId; // withdrawn, denied, or a proposal that was never mine
+                continue;
+            }
+            if ($want !== $entry) {
+                $heal[$projectId] = $want;
+            }
+            // Already a member there (approve/accept landed but the mirror write
+            // was lost): a membership is not an inbox item.
+            if ($desired === 'member') {
                 continue;
             }
 
-            $inv = $authority['invitations'][$userId] ?? null;
-            $direction = is_array($inv) ? ($inv['direction'] ?? 'invite') : null;
+            $inv = is_array($authority['invitations'][$userId] ?? null) ? $authority['invitations'][$userId] : [];
 
-            if ($direction === 'invite') {
-                if ($status !== 'pending_invite') {
-                    // mirror said request, authority says invite → heal
-                    $heal[$projectId] = qs_membership_mirror_entry('pending_invite', $inv['at'] ?? $today);
-                }
+            if ($desired === 'pending_invite') {
                 // An invitation is the authority's consent: the invitee sees
                 // the project's name, read now.
                 $row = [
@@ -156,13 +164,9 @@ function qs_membership_list_invitations(): ApiResponse {
                     $row['note'] = $inv['note'];
                 }
                 $invitations[] = $row;
-            } elseif ($direction === 'request' && (($inv['by'] ?? null) === $userId)) {
-                // my own join request (a sponsored proposal — by != me — is
-                // never mine to see: falls to the prune below)
-                if ($status !== 'pending_request') {
-                    // mirror said invite, authority says self-request → heal
-                    $heal[$projectId] = qs_membership_mirror_entry('pending_request', $inv['at'] ?? $today);
-                }
+            } else {
+                // 'pending_request': my own join request (a sponsored proposal,
+                // by != me, was never mine to see: the rule pruned it above).
                 // Name privacy: the project's name only when it is public; a
                 // private project shows the id the requester typed.
                 $row = [
@@ -176,10 +180,8 @@ function qs_membership_list_invitations(): ApiResponse {
                     $row['note'] = $inv['note'];
                 }
                 $requests[] = $row;
-            } else {
-                $prune[] = $projectId; // withdrawn/denied/not mine → self-heal
             }
-        } elseif (in_array($status, ['refused', 'removed', 'deleted'], true)) {
+        } elseif (in_array($status, QS_MEMBERSHIP_NOTICES, true)) {
             // A notice keeps the name it was written with (the project may be
             // gone, or no longer the caller's to read).
             $row = [
@@ -476,7 +478,7 @@ function qs_membership_dismiss_notice(array $params): ApiResponse {
             return false;
         }
         $status = $entry['status'] ?? 'member';
-        if (!in_array($status, ['refused', 'removed', 'deleted'], true)) {
+        if (!in_array($status, QS_MEMBERSHIP_NOTICES, true)) {
             $error = 'notice.not_dismissable';
             return false;
         }

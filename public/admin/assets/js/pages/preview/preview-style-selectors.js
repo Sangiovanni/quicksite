@@ -46,6 +46,7 @@
     let selectorSearchClear = null;
     let selectorSelected = null;
     let selectorSelectedValue = null;
+    let selectorSelectedMedia = null;
     let selectorSelectedClear = null;
     let selectorMatchCount = null;
     let selectorEditBtn = null;
@@ -99,6 +100,7 @@
         selectorSearchClear = document.getElementById('selector-search-clear');
         selectorSelected = document.getElementById('selector-selected');
         selectorSelectedValue = document.getElementById('selector-selected-value');
+        selectorSelectedMedia = document.getElementById('selector-selected-media');
         selectorSelectedClear = document.getElementById('selector-selected-clear');
         selectorMatchCount = document.getElementById('selector-match-count');
         selectorEditBtn = document.getElementById('selector-edit-btn');
@@ -210,12 +212,13 @@
             categorizeSelector(selector, null);
         });
         
-        // Process media query selectors
+        // Process media query selectors: each rule kept as the other groups keep theirs, with
+        // its media query
         const mediaSelectors = data.grouped?.media || {};
         for (const [mediaQuery, selectors] of Object.entries(mediaSelectors)) {
             categorizedSelectors.media[mediaQuery] = [];
             selectors.forEach(selector => {
-                categorizedSelectors.media[mediaQuery].push(selector);
+                categorizedSelectors.media[mediaQuery].push({ selector, mediaQuery, hasRules: true });
             });
         }
     }
@@ -286,9 +289,13 @@
             if (el.closest('#qs-overlay-root') || el.id === 'qs-overlay-root') return;
             if (el.closest('#qs-live-preview-style')) return;
 
-            // Collect tag name
+            // A script or a style is never the page's own (both are blocked tags): the
+            // editor's own, whose ids and classes are no selector to offer
             const tag = el.tagName.toLowerCase();
-            if (tag !== 'script' && tag !== 'link' && tag !== 'meta' && tag !== 'style') {
+            if (tag === 'script' || tag === 'style') return;
+
+            // Collect tag name
+            if (tag !== 'link' && tag !== 'meta') {
                 domTags.add(tag);
             }
 
@@ -389,8 +396,8 @@
             mediaChips.className = 'preview-selectors-group__list';
             mediaChips.style.paddingLeft = '0';
             
-            selectors.forEach(selector => {
-                const chip = createSelectorChip(selector, 'media', mediaQuery);
+            selectors.forEach(item => {
+                const chip = createSelectorChip(item.selector, 'media', mediaQuery, item.hasRules);
                 mediaChips.appendChild(chip);
             });
             
@@ -497,8 +504,12 @@
     function selectSelector(selector, mediaQuery = null, hasRules = true) {
         currentSelectedSelector = { selector, mediaQuery, hasRules };
         
-        // Update UI
+        // Update UI: the selector, and the media query of a rule inside @media
         if (selectorSelectedValue) selectorSelectedValue.textContent = selector;
+        if (selectorSelectedMedia) {
+            selectorSelectedMedia.textContent = mediaQuery ? '@media ' + mediaQuery : '';
+            selectorSelectedMedia.hidden = !mediaQuery;
+        }
         if (selectorSelected) selectorSelected.style.display = '';
         
         // Clear previous active states
@@ -506,8 +517,8 @@
             el.classList.remove('preview-selector-item--active');
         });
         
-        // Mark the clicked selector as active
-        const activeChip = selectorsGroups?.querySelector(`[data-selector="${CSS.escape(selector)}"]`);
+        // Mark the clicked rule's chip as active: this selector, inside this @media or outside any
+        const activeChip = findRuleChip(selector, mediaQuery);
         if (activeChip) activeChip.classList.add('preview-selector-item--active');
         
         // Highlight and count matching elements in iframe
@@ -517,6 +528,16 @@
         countSelectorMatches(selector);
     }
     
+    /**
+     * The chip of one rule: its selector, inside @media <mediaQuery>, or outside any when null.
+     */
+    function findRuleChip(selector, mediaQuery) {
+        const bySelector = `.preview-selector-item[data-selector="${CSS.escape(selector)}"]`;
+        return selectorsGroups?.querySelector(mediaQuery
+            ? `${bySelector}[data-media="${CSS.escape(mediaQuery)}"]`
+            : `${bySelector}:not([data-media])`) || null;
+    }
+
     /**
      * Clear selector selection
      */
@@ -962,7 +983,8 @@
                         currentSelectedSelector.selector,
                         editingSelectorCount || 0,
                         null,
-                        currentSelectedSelector.hasRules !== false
+                        currentSelectedSelector.hasRules !== false,
+                        currentSelectedSelector.mediaQuery || null
                     );
                 }
             });
@@ -972,7 +994,7 @@
         if (selectorAnimateBtn) {
             selectorAnimateBtn.addEventListener('click', () => {
                 if (currentSelectedSelector && onOpenTransitionEditor) {
-                    onOpenTransitionEditor(currentSelectedSelector.selector);
+                    onOpenTransitionEditor(currentSelectedSelector.selector, currentSelectedSelector.mediaQuery || null);
                 }
             });
         }
@@ -1017,11 +1039,13 @@
     function showCopyFromPicker() {
         if (!selectorCopyPicker || !selectorCopyList) return;
         
-        // Build list of all selectors with rules (excluding the current one)
+        // Build list of all rules but the selected one (the same selector in another @media, or
+        // outside any, is another rule)
         const currentSel = currentSelectedSelector?.selector;
+        const currentMedia = currentSelectedSelector?.mediaQuery || null;
         selectorCopyList.replaceChildren();
         
-        const withRules = getSelectorsWithRules().filter(s => s.selector !== currentSel);
+        const withRules = getSelectorsWithRules().filter(s => s.selector !== currentSel || s.mediaQuery !== currentMedia);
         
         if (withRules.length === 0) {
             selectorCopyList.replaceChildren(QSDom.el('div', {
@@ -1095,9 +1119,9 @@
         if (!currentSelectedSelector || !onCopyStyleFrom) return;
         
         try {
-            // Fetch source selector's styles
+            // Fetch the source rule's styles, inside its @media when it has one
             const response = await QuickSiteAdmin.apiRequest('getStyleRule', 'GET', null,
-                [encodeURIComponent(sourceSelector)], mediaQuery ? { mediaQuery: mediaQuery } : {});
+                QuickSiteAdmin.styleRuleSegments(sourceSelector, mediaQuery));
 
             const result = response.data || {};
             
@@ -1108,8 +1132,9 @@
                 return;
             }
             
-            // Open style editor for current selector with copied styles
-            onCopyStyleFrom(currentSelectedSelector.selector, editingSelectorCount || 0, result.data.styles, currentSelectedSelector.hasRules !== false);
+            // Open style editor for the selected rule (inside its @media) with copied styles
+            onCopyStyleFrom(currentSelectedSelector.selector, editingSelectorCount || 0, result.data.styles,
+                currentSelectedSelector.hasRules !== false, currentSelectedSelector.mediaQuery || null);
         } catch (error) {
             console.error('[SelectorBrowser] Copy from error:', error);
         }

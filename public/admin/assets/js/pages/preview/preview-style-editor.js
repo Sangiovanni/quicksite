@@ -20,6 +20,7 @@
     const styleEditorBack = document.getElementById('style-editor-back');
     const styleEditorLabel = document.getElementById('style-editor-label');
     const styleEditorSelector = document.getElementById('style-editor-selector');
+    const styleEditorMedia = document.getElementById('style-editor-media');
     const styleEditorCount = document.getElementById('style-editor-count');
     const styleEditorLoading = document.getElementById('style-editor-loading');
     const styleEditorEmpty = document.getElementById('style-editor-empty');
@@ -50,6 +51,8 @@
     
     let styleEditorVisible = false;
     let editingSelector = null;
+    // The media query of the rule being edited, when it sits inside @media (null: outside any)
+    let editingMediaQuery = null;
     let editingSelectorCount = 0;
     let originalStyles = {};
     let currentStyles = {};
@@ -107,8 +110,10 @@
      * @param {boolean} hasRules - Whether the selector already has a rule on disk.
      *                             When false, we skip the GET getStyleRule call
      *                             (which would 404 for unstyled selectors).
+     * @param {string|null} mediaQuery - The rule's media query when it sits inside
+     *                             @media: read, previewed and saved there
      */
-    async function openStyleEditor(selector, matchCount = 0, initialStylesString = null, hasRules = true) {
+    async function openStyleEditor(selector, matchCount = 0, initialStylesString = null, hasRules = true, mediaQuery = null) {
         if (!styleEditor) return;
         
         // Auto-load theme variables if not already loaded (for CSS var dropdowns)
@@ -117,6 +122,7 @@
         }
         
         editingSelector = selector;
+        editingMediaQuery = mediaQuery || null;
         editingSelectorCount = matchCount;
         originalStyles = {};
         currentStyles = {};
@@ -125,6 +131,10 @@
         
         // Update header
         if (styleEditorSelector) styleEditorSelector.textContent = selector;
+        if (styleEditorMedia) {
+            styleEditorMedia.textContent = editingMediaQuery ? '@media ' + editingMediaQuery : '';
+            styleEditorMedia.hidden = !editingMediaQuery;
+        }
         if (styleEditorCount) styleEditorCount.textContent = matchCount;
         
         // Show loading state
@@ -149,7 +159,8 @@
                 originalStyles = {};
                 currentStyles = {};
             } else {
-                const response = await QuickSiteAdmin.apiRequest('getStyleRule', 'GET', null, [encodeURIComponent(selector)]);
+                const response = await QuickSiteAdmin.apiRequest('getStyleRule', 'GET', null,
+                    QuickSiteAdmin.styleRuleSegments(selector, editingMediaQuery));
 
                 const result = response.data || {};
                 
@@ -194,6 +205,7 @@
     function closeStyleEditor() {
         styleEditorVisible = false;
         editingSelector = null;
+        editingMediaQuery = null;
         
         // Remove live preview styles
         removeLivePreviewStyles();
@@ -910,7 +922,10 @@
                 stylePreviewInjected = true;
             }
             
-            styleEl.textContent = `${editingSelector} { ${cssText} }`;
+            // A rule inside @media is previewed inside it: the page shows the change only where
+            // the saved rule will apply
+            const rule = `${editingSelector} { ${cssText} }`;
+            styleEl.textContent = editingMediaQuery ? `@media ${editingMediaQuery} { ${rule} }` : rule;
             
         } catch (e) {
             console.error('Failed to apply live preview:', e);
@@ -974,6 +989,9 @@
             selector: editingSelector,
             styles: stylesString
         };
+        if (editingMediaQuery) {
+            requestBody.mediaQuery = editingMediaQuery;
+        }
         
         if (deletedProperties.length > 0) {
             requestBody.removeProperties = deletedProperties;

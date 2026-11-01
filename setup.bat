@@ -36,6 +36,12 @@ REM and 7-11 write config files under the secure folder. Item 6 only reads.
 REM
 REM Before anything else, it checks the PHP version: older than 8.3, it stops.
 REM
+REM KNOWN LIMITS ON WINDOWS - what may not work, and when. One line per case;
+REM a case met later is added here.
+REM   - Answers piped in (type answers.txt | setup.bat): cmd's set /p keeps the
+REM     first line only, and every later question reads nothing. Type them, or
+REM     redirect a file: setup.bat < answers.txt
+REM
 REM WHAT THIS SCRIPT CANNOT DO: create your account. No account exists yet, so
 REM there is nobody to be one. That happens in the browser at /admin/, and the
 REM setup token (item 6) is what authorises it - see the notes there.

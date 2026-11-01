@@ -891,7 +891,7 @@
     /**
      * QSValueInput - Reusable CSS value input component
      * Creates appropriate input controls based on CSS property type:
-     * - range: Slider with value display
+     * - range: Slider with a number to type beside it, the two kept in step
      * - length: Number input + unit dropdown
      * - enum: Dropdown with predefined values
      * - number: Number input with step
@@ -930,6 +930,7 @@
             this.inputEl = null;
             this.unitSelectEl = null;
             this.colorSwatchEl = null;
+            this.rangeNumberEl = null;
             
             this._render();
         }
@@ -952,7 +953,7 @@
                 const legacyMap = {
                     'container-range': 'preview-style-property__range-container',
                     'range': 'preview-style-property__range',
-                    'range-value': 'preview-style-property__range-value',
+                    'range-number': 'preview-style-property__range-number',
                     'container-length': 'preview-style-property__length-container',
                     'number': 'preview-style-property__length-input',
                     'unit': 'preview-style-property__unit-select',
@@ -969,6 +970,7 @@
         _render() {
             this.container.replaceChildren();
             this.colorSwatchEl = null;
+            this.rangeNumberEl = null;
             this.container.className = this.useLegacyClasses ? '' : this.classPrefix;
             
             const propType = KEYFRAME_PROPERTY_TYPES[this.property] || { type: 'text' };
@@ -1004,29 +1006,71 @@
                 this.container.classList.add(`${this.classPrefix}--range`);
             }
             
+            const min = propType.min ?? 0;
+            const max = propType.max ?? 1;
+            const step = propType.step ?? 0.01;
+
             const range = document.createElement('input');
             range.type = 'range';
             range.className = this._getClass('range');
-            range.min = propType.min ?? 0;
-            range.max = propType.max ?? 1;
-            range.step = propType.step ?? 0.01;
+            range.min = min;
+            range.max = max;
+            range.step = step;
             range.value = parseFloat(this.currentValue) || propType.min || 0;
-            
-            const valueDisplay = document.createElement('span');
-            valueDisplay.className = this._getClass('range-value');
-            valueDisplay.textContent = range.value;
-            
+
+            // The same value as a number to type, with the slider's bounds and step
+            const number = document.createElement('input');
+            number.type = 'number';
+            number.className = this._getClass('range-number');
+            number.min = min;
+            number.max = max;
+            number.step = step;
+            number.value = range.value;
+            number.setAttribute('aria-label', this.property);
+
             range.addEventListener('input', () => {
                 this.currentValue = range.value;
-                valueDisplay.textContent = range.value;
+                number.value = range.value;
                 this.onChange(range.value);
             });
-            
+
             range.addEventListener('blur', () => this.onBlur(this.currentValue));
-            
+
+            // While typing, a number within the bounds moves the slider at once
+            number.addEventListener('input', () => {
+                const typed = Number(number.value);
+                if (number.value.trim() === '' || !Number.isFinite(typed) || typed < min || typed > max) return;
+                range.value = number.value;
+                this.currentValue = number.value;
+                this.onChange(number.value);
+            });
+
+            // On leaving the field, a number outside the bounds is brought to the nearest
+            // one, and anything that is not a number goes back to the last good value
+            const settle = () => {
+                const typed = Number(number.value);
+                if (number.value.trim() === '' || !Number.isFinite(typed)) {
+                    number.value = range.value;
+                    return;
+                }
+                const clamped = Math.min(max, Math.max(min, typed));
+                if (clamped !== typed) {
+                    number.value = String(clamped);
+                    range.value = String(clamped);
+                    this.currentValue = String(clamped);
+                    this.onChange(this.currentValue);
+                }
+            };
+            number.addEventListener('change', settle);
+            number.addEventListener('blur', () => {
+                settle();
+                this.onBlur(this.currentValue);
+            });
+
             this.inputEl = range;
+            this.rangeNumberEl = number;
             this.container.appendChild(range);
-            this.container.appendChild(valueDisplay);
+            this.container.appendChild(number);
         }
         
         _renderLength(propType) {
@@ -1229,9 +1273,7 @@
             
             if (propType.type === 'range') {
                 if (this.inputEl) this.inputEl.value = parseFloat(value) || 0;
-                const displayClass = this._getClass('range-value');
-                const display = this.container.querySelector(`.${displayClass}`);
-                if (display) display.textContent = value;
+                if (this.rangeNumberEl && this.inputEl) this.rangeNumberEl.value = this.inputEl.value;
             } else if (propType.type === 'length' || propType.type === 'angle') {
                 const parsed = this._parseLength(value, propType);
                 if (this.inputEl) this.inputEl.value = parsed.num;
@@ -1276,11 +1318,12 @@
     // Functionality moved to preview-transition-editor.js module
 
     /**
-     * Open the Transition Editor (delegates to module)
+     * Open the Transition Editor (delegates to module); mediaQuery: the rule's, when it sits
+     * inside @media
      */
-    function openTransitionEditor(selector, onSave = null) {
+    function openTransitionEditor(selector, onSave = null, mediaQuery = null) {
         if (window.PreviewTransitionEditor) {
-            PreviewTransitionEditor.open(selector, onSave);
+            PreviewTransitionEditor.open(selector, onSave, mediaQuery);
         }
     }
     // Exposed for the other modules (the Motion tab's animated selectors open it)
@@ -2796,7 +2839,7 @@
                 PreviewSelectorBrowser.onOpenStyleEditor(PreviewStyleEditor.open);
                 PreviewSelectorBrowser.onCopyStyleFrom(PreviewStyleEditor.open);
             }
-            PreviewSelectorBrowser.onOpenTransitionEditor(openTransitionEditor);
+            PreviewSelectorBrowser.onOpenTransitionEditor((selector, mediaQuery) => openTransitionEditor(selector, null, mediaQuery));
         }
     }
     

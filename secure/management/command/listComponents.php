@@ -12,154 +12,7 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
-require_once SECURE_FOLDER_PATH . '/src/classes/TagRegistry.php';
-
-/**
- * Extract placeholder variables from component structure with type detection.
- * Returns array of ['name' => string, 'type' => 'textKey'|'param']
- * 
- * - Variables found in textKey fields → type: "textKey" (translation values)
- * - Variables found in params fields → type: "param" (attributes like href, src)
- * 
- * Filters out:
- * - System placeholders starting with __ (e.g., __current_page)
- * - Placeholders with parameters (containing ;) as they are fixed values
- */
-function extractVariables($node, &$variables = []) {
-    if (!is_array($node)) {
-        return $variables;
-    }
-    
-    // Check params for placeholders → type depends on attribute name
-    // Translatable attributes (TagRegistry::TRANSLATABLE_ATTRIBUTES) → type: "textKey"
-    // Other attributes (href, src, etc.) → type: "param"
-    
-    if (isset($node['params']) && is_array($node['params'])) {
-        foreach ($node['params'] as $paramName => $value) {
-            if (is_string($value) && preg_match_all('/\{\{([^}]+)\}\}/', $value, $matches)) {
-                foreach ($matches[1] as $varName) {
-                    // Skip system placeholders (start with __) and fixed placeholders (contain ;)
-                    if (str_starts_with($varName, '__') || strpos($varName, ';') !== false) {
-                        continue;
-                    }
-                    
-                    // Only add if not already present (first occurrence wins)
-                    $exists = false;
-                    foreach ($variables as $v) {
-                        if ($v['name'] === $varName) {
-                            $exists = true;
-                            break;
-                        }
-                    }
-                    if (!$exists) {
-                        // Determine type based on attribute name
-                        $type = in_array($paramName, TagRegistry::TRANSLATABLE_ATTRIBUTES, true) ? 'textKey' : 'param';
-                        $entry = ['name' => $varName, 'type' => $type];
-                        // Include context for param variables (enables asset picker in frontend)
-                        if ($type === 'param') {
-                            $entry['paramName'] = $paramName;
-                            $entry['parentTag'] = $node['tag'] ?? null;
-                        }
-                        $variables[] = $entry;
-                    }
-                }
-            }
-        }
-    }
-    
-    // Check textKey for placeholders → type: "textKey"
-    if (isset($node['textKey']) && is_string($node['textKey'])) {
-        if (preg_match_all('/\{\{([^}]+)\}\}/', $node['textKey'], $matches)) {
-            foreach ($matches[1] as $varName) {
-                // Skip system placeholders (start with __) and fixed placeholders (contain ;)
-                if (str_starts_with($varName, '__') || strpos($varName, ';') !== false) {
-                    continue;
-                }
-                
-                // Only add if not already present (first occurrence wins)
-                $exists = false;
-                foreach ($variables as $v) {
-                    if ($v['name'] === $varName) {
-                        $exists = true;
-                        break;
-                    }
-                }
-                if (!$exists) {
-                    $variables[] = ['name' => $varName, 'type' => 'textKey'];
-                }
-            }
-        }
-    }
-    
-    // Check component data for placeholders (nested component usage)
-    if (isset($node['data']) && is_array($node['data'])) {
-        foreach ($node['data'] as $value) {
-            if (is_string($value) && preg_match_all('/\{\{([^}]+)\}\}/', $value, $matches)) {
-                foreach ($matches[1] as $varName) {
-                    // Skip system placeholders (start with __) and fixed placeholders (contain ;)
-                    if (str_starts_with($varName, '__') || strpos($varName, ';') !== false) {
-                        continue;
-                    }
-                    
-                    $exists = false;
-                    foreach ($variables as $v) {
-                        if ($v['name'] === $varName) {
-                            $exists = true;
-                            break;
-                        }
-                    }
-                    if (!$exists) {
-                        // Data bindings are typically text content
-                        $variables[] = ['name' => $varName, 'type' => 'textKey'];
-                    }
-                }
-            }
-        }
-    }
-    
-    // Recurse into children
-    if (isset($node['children']) && is_array($node['children'])) {
-        foreach ($node['children'] as $child) {
-            extractVariables($child, $variables);
-        }
-    }
-    
-    return $variables;
-}
-
-/**
- * Legacy function - extract slot names only (for backwards compatibility)
- */
-function extractSlots($node, &$slots = []) {
-    $variables = extractVariables($node);
-    foreach ($variables as $var) {
-        $slots[] = $var['name'];
-    }
-    return array_unique($slots);
-}
-
-/**
- * Find other components used by this component
- */
-function findUsedComponents($node, &$used = []) {
-    if (!is_array($node)) {
-        return $used;
-    }
-    
-    // Check if this node references a component
-    if (isset($node['component'])) {
-        $used[] = $node['component'];
-    }
-    
-    // Recurse into children
-    if (isset($node['children']) && is_array($node['children'])) {
-        foreach ($node['children'] as $child) {
-            findUsedComponents($child, $used);
-        }
-    }
-    
-    return array_unique($used);
-}
+require_once SECURE_FOLDER_PATH . '/src/functions/componentPolicy.php'; // the one reader of a component's slots
 
 /**
  * Command function for internal execution via CommandRunner
@@ -210,79 +63,18 @@ function __command_listComponents(array $params = [], array $urlParams = []): Ap
             continue;
         }
         
-        // Extract slots (placeholders like {{name}}) - legacy format
-        $slots = [];
-        // Structure can be a single node object OR an array of nodes
-        if (isset($structure['tag']) || isset($structure['component']) || isset($structure['textKey'])) {
-            // Single node object
-            extractSlots($structure, $slots);
-        } else if (is_array($structure)) {
-            // Array of nodes
-            foreach ($structure as $node) {
-                extractSlots($node, $slots);
-            }
-        }
-        
-        // Extract variables with type detection - new format
-        $variables = [];
-        if (isset($structure['tag']) || isset($structure['component']) || isset($structure['textKey'])) {
-            // Single node object
-            extractVariables($structure, $variables);
-        } else if (is_array($structure)) {
-            // Array of nodes
-            foreach ($structure as $node) {
-                extractVariables($node, $variables);
-            }
-        }
-        
-        // Extract __enums__ from root-level component structure
-        $enums = $structure['__enums__'] ?? [];
-        $enumDerivedVars = []; // Variable names auto-resolved by enums
-        $enumSourceVars = [];  // Source keys exposed to frontend as type "enum"
-        
-        if (is_array($enums) && !empty($enums)) {
-            foreach ($enums as $varName => $enumDef) {
-                if (!is_array($enumDef) || !isset($enumDef['source']) || !isset($enumDef['map']) || !is_array($enumDef['map'])) {
-                    continue;
-                }
-                
-                $enumDerivedVars[] = $varName;
-                $sourceKey = $enumDef['source'];
-                $mapKeys = array_keys($enumDef['map']);
-                $defaultKey = $enumDef['default'] ?? ($mapKeys[0] ?? null);
-                
-                // Only add source key once (multiple enums can share the same source)
-                if (!isset($enumSourceVars[$sourceKey])) {
-                    $enumSourceVars[$sourceKey] = [
-                        'name' => $sourceKey,
-                        'type' => 'enum',
-                        'options' => $mapKeys,
-                        'default' => $defaultKey,
-                    ];
-                }
-            }
-            
-            // Remove enum-derived variables from the regular variables list
-            // (they're auto-resolved, not user-fillable)
-            $variables = array_values(array_filter($variables, function ($v) use ($enumDerivedVars) {
-                return !in_array($v['name'], $enumDerivedVars, true);
-            }));
-            
-            // Add enum source keys to the variables list
-            foreach ($enumSourceVars as $enumVar) {
-                $variables[] = $enumVar;
-            }
-        }
-        
-        // Detect if component uses other components
-        $usesComponents = findUsedComponents($structure);
+        // The slots, from the one reader (componentPolicy.php): their names (the legacy
+        // list, every slot), and the list with types, enums resolved
+        $slots = array_map(static fn(array $slot) => $slot['name'], array_values(qs_component_variables($structure)));
+        $variables = qs_component_variable_list($structure);
+        $usesComponents = qs_components_called($structure);
         
         $components[] = [
             'name' => $name,
             'file' => $name . '.json',
             'valid' => true,
             'structure' => $structure,
-            'slots' => array_unique($slots),           // Legacy: just names
+            'slots' => $slots,                          // Legacy: just names
             'variables' => $variables,                  // New: [{name, type}, ...]
             'uses_components' => $usesComponents,
             'size' => filesize($file),

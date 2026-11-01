@@ -2,6 +2,7 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/SvgSanitizer.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/AssetMetadataManager.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_asset_write_failed
 require_once SECURE_FOLDER_PATH . '/src/classes/OutboundUrlPolicy.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/uploadLimits.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/filePolicy.php';
@@ -691,12 +692,16 @@ if (isset($fileInfo['width'])) {
     $assetMeta['dimensions'] = $fileInfo['dimensions'];
 }
 
-// Store metadata. Its size check refusing (qs_small_write_guard) takes the
-// stored file back too: an asset with no metadata entry is not kept.
+// Store metadata. A save that fails takes the stored file back: an asset with
+// no metadata entry is not kept. A size check's refusal is answered as itself.
 $metaManager->set($category, $finalFilename, $assetMeta);
-if (!$metaManager->save() && qs_small_write_refused() !== null) {
+if (!$metaManager->save()) {
     @unlink($targetFile);
     qs_small_write_send_refusal();
+    qs_asset_write_failed('The file could not be added to the asset list; it was not kept.', [
+        'filename' => $finalFilename,
+        'category' => $category
+    ])->send();
 }
 
 // ============================================================

@@ -1017,7 +1017,8 @@
             "mismatch": "The two new passwords do not match.",
             "tooShort": "The new password is too short.",
             "sameAsOld": "The new password is the same as the current one.",
-            "changedMsg": "Password changed — your other sessions have been signed out."
+            "changedMsg": "Password changed — your other sessions have been signed out.",
+            "wrongCurrent": "Your current password is not correct."
         },
         "sessions": {
             "title": "Sessions",
@@ -1040,7 +1041,8 @@
             "doneMsg": "Your account has been deleted.",
             "soleOwnerTitle": "You still own these projects",
             "soleOwnerHint": "Transfer ownership on the Project Members page, or delete the project, then come back.",
-            "memberCount": "members"
+            "memberCount": "members",
+            "wrongCredentials": "Your current password or your username is not correct."
         }
     },
     "builds": {

@@ -14404,3 +14404,116 @@ rule beside `reconcileMemberships` (two rules drift); dropping only the repairs 
 2026-10-30 (the cache, its token and the shared rule, as proposed); beta.12. `secure/src/functions/AuthManagement.php`,
 `secure/admin/templates/layout.php`, `secure/admin/functions/panelState.php`,
 `secure/management/command/reconcileMemberships.php`, `secure/management/command/deleteProject.php`, `.gitignore`.
+
+### The Selectors tab's chip is one rule, inside its @media block or outside any (locked 2026-10-31)
+
+**Decision**: A chip under **Media Queries** is the rule inside that block. **Edit Styles**, **Copy From…** and
+**Animate** read and write it there: every `setStyleRule` carries its `mediaQuery`, and every read sends the query as
+`getStyleRule`'s second segment, through `QuickSiteAdmin.styleRuleSegments()`, which encodes both segments as the
+console does. The chip clicked is the one marked, the Selected box and both editors' headers show the query, and the
+style editor's live preview is wrapped in the block. **Copy From…** offers every other rule, the same selector inside
+another block or outside any included.
+
+**Reasoning**: Edit on a chip under `@media` opened and saved the rule of the same selector outside the block —
+clicked in a browser before the change: the global rule changed, the one inside the block did not — and Animate and
+Copy From did the same. A rule is a selector and the block it sits in; a tab that lists the two apart must edit them
+apart. The three editors' readers encoded the selector once where the command decodes twice, so `h1 + p` read as
+`h1   p` and opened empty; one encoder for every reader ends that too.
+
+**Alternatives considered**: Edit and Copy From only, Animate refused on a chip under `@media`; Edit only.
+
+**Source**: Sangio, 2026-10-30 (the defect, read in the code) and 2026-10-31 ("All three"); beta.12.
+`public/admin/assets/js/pages/preview/preview-style-selectors.js`, `preview-style-editor.js`,
+`preview-transition-editor.js`, `preview.js`, `public/admin/assets/admin.js`,
+`secure/admin/templates/pages/preview/contextual-style.php`, `modals/transition.php`.
+
+### A slider's value has a number field, clamped when it is left (locked 2026-10-31)
+
+**Decision**: `QSValueInput` shows a value set with a slider (`opacity`) as the slider and a number field beside it,
+with the slider's bounds and step. The two move together: a number typed within the bounds moves the slider at once;
+on leaving the field a number outside them becomes the nearest bound, and anything that is not a number goes back to
+the last value.
+
+**Reasoning**: A slider alone cannot reach 0.33 or say it is at 0.35; the field it replaces only showed the value. A
+number outside the bounds is a slip, and the nearest bound is what the slider itself would take.
+
+**Alternatives considered**: refusing a number out of range (an outline, the value not taken); keeping it as typed
+(CSS clamps opacity itself, but the slider would sit at its end showing something else).
+
+**Source**: Sangio, 2026-10-24 (the wish) and 2026-10-31 ("Clamp on leaving"); beta.12.
+`public/admin/assets/js/pages/preview/preview.js`, `public/admin/assets/admin.css`.
+
+### Every asset writer answers a failed save, and an edit or an upload is taken back whole (locked 2026-10-31)
+
+**Decision**: When the asset list (`AssetMetadataManager::save()`) or the favicon setting that names an image
+(`qs_favicon_repoint()`) cannot be written, `uploadAsset`, `editAsset` and `deleteAsset` answer one way,
+`500 server.file_write_failed` (`qs_asset_write_failed()`), unless a size cap refused the write, which is answered
+as itself. An upload is not kept. An edit is taken back whole — the rename and the favicon setting — as a size
+check's refusal already takes it back. A delete, which cannot be taken back, names what was not saved in
+`data.not_saved` (`asset_list`, `favicon`). `qs_favicon_repoint()` answers what happened: `unchanged`, `repointed` or
+`failed`; a project without a favicon is never told it failed.
+
+**Reasoning**: A rename answered 200 while the list still named the old file lost the file's description, alt text
+and star; an upload answered 201 left a file no list knew; a favicon setting that could not follow a rename or a
+delete left the site linking an icon that was gone. Taking the change back keeps the file, its entry and the setting
+saying the same thing, and keeps the Media page truthful with no new branch: it shows a failure and the file as it
+was. A delete is done before the list is written, so its answer can only say what it could not save, and the Media
+page follows a delete on exactly that answer.
+
+**Alternatives considered**: keeping the rename or the upload and answering 500 (the page would show the old name,
+or report a failure for a file it then lists); a success with a warning (a client reading the status would never
+know); a boolean from the repoint (it could not tell "not the favicon" from a failed write, and called a failed write
+a change).
+
+**Source**: Sangio, 2026-10-30 (every writer answers a failed save) and 2026-10-31 ("Take it back"); beta.12.
+`secure/src/functions/utilsManagement.php`, `secure/management/command/editAsset.php`, `uploadAsset.php`,
+`deleteAsset.php`, `public/admin/assets/js/pages/assets.js`.
+
+### A component's slots are read one way, and a slot passed into a nested call is typed by the component it calls (locked 2026-10-31)
+
+**Decision**: `qs_component_variables()` (`componentPolicy.php`) is the one reader of a component's slots for
+`addComponentToNode`, `editComponentToNode`, `insertSnippet`, `listComponents` and `getComponent`; the two copies in
+command files are gone. It reads a component stored as one node or as a list of nodes, and a `{{name}}` passed into a
+nested component call (`"key": "{{name}}"`) takes the slot that component gives `key` — its type, its attribute and its
+tag — read from the called component's file, ten calls deep at most and a call of itself ending there; a text slot
+when there is none. The answers keep their two shapes: name, type and attribute for the two node commands
+(`qs_component_variable_answer()`), and the listings' list (`qs_component_variable_list()`), the `__enums__` resolved
+in both listings.
+
+**Reasoning**: Three copies had drifted. A component stored as a list of nodes had slots for the listings and none
+for the commands that fill them; `insertSnippet` skipped a nested call's data, which the others typed as text; and
+`getComponent` read through `listComponents`' command file, whose last lines answered the components list over HTTP.
+Typing every passed slot as text made `addComponentToNode` write a translation key into an image's `src` (the
+starter's `menu-link`); the called component already says what that slot is.
+
+**Alternatives considered**: one reader with a switch keeping `insertSnippet`'s skip (the same feature acting two
+ways); a passed slot always text (wrong for a `src` or a `class`); always a param (wrong for an `alt`).
+
+**Source**: Sangio, 2026-10-30 (one reader: "centralization is always the best way to avoid equivalent feature to
+act differently") and 2026-10-31 (the three changes it brings, all accepted); beta.12.
+`secure/src/functions/componentPolicy.php`, `secure/management/command/insertSnippet.php`, `listComponents.php`,
+`getComponent.php`, `addComponentToNode.php`, `editComponentToNode.php`.
+
+### A wait the browser says is said in the sign-in pages' words (locked 2026-10-31)
+
+**Extends**: *A wait or a limit in time is said in the panel's words, and the login page states the real limit*
+(above), whose alternatives set formatting in the browser aside for texts the server writes.
+
+**Decision**: My account says its refusals in the panel's words: a wrong current password — for the deletion, a wrong
+password or username — followed by the wait it started (the answer's `retry_after`), and an attempt during a wait says
+how long is left. The duration is said by `QuickSiteAdmin.durationText()`, the browser's twin of `__adminDuration()`:
+the same rule and the same `common.duration.*` words, which `layout.php` ships on every page, checked against the PHP
+on the same seconds. The first-run page says the wait a wrong token starts under its refusal, as the login page does.
+
+**Reasoning**: My account is written in the browser from a JSON answer, and the server's English sentence ("try again
+later") was all it could show. The write rate already says its JSON refusal in the browser; a second formatter is
+acceptable as a twin under a probe. The started wait is the throttle's own, counted at admission, so it tells nothing
+apart: the same for any wrong token, and for a wrong password and a wrong username.
+
+**Alternatives considered**: the server making the sentence (`/admin/self` loading the panel's translations for two
+answers among English ones); the wait in seconds.
+
+**Source**: Sangio, 2026-10-30 (the two doors) and 2026-10-31 ("In the browser"); beta.12.
+`public/admin/assets/admin.js`, `public/admin/assets/js/pages/account.js`, `secure/admin/templates/layout.php`,
+`secure/admin/templates/pages/account.php`, `setup.php`, `secure/admin/functions/accountSelf.php`,
+`secure/src/functions/AuthManagement.php`, `secure/admin/AdminRouter.php`, `secure/admin/translations/en.json`.

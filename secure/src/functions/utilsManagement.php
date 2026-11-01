@@ -1055,29 +1055,32 @@ function qs_config_mutate(string $configPath, callable $patch): array
  * that is not there.
  *
  * Deliberately silent about the common case: if the pointer names some OTHER
- * asset (or is unset), nothing is written and nothing is reported. Callers
- * delete assets in batches, and a config rewrite per file would be wasteful and
- * noisy.
+ * asset (or is unset), nothing is written. Callers delete assets in batches, and
+ * a config rewrite per file would be wasteful and noisy.
  *
  * @param string      $projectPath Project root (the one holding config.php)
  * @param string      $oldName     Asset filename as it was
  * @param string|null $newName     Its new filename, or null when it was deleted
- * @return bool True when the pointer was actually changed
+ * @return string 'unchanged' when the pointer does not name the asset (nothing to
+ *                do), 'repointed' when it was moved to the new name or cleared,
+ *                'failed' when it names the asset and config.php could not be
+ *                locked, read or written: it still names the old file
  */
-function qs_favicon_repoint(string $projectPath, string $oldName, ?string $newName): bool
+function qs_favicon_repoint(string $projectPath, string $oldName, ?string $newName): string
 {
     $configPath = $projectPath . '/config.php';
     if (!is_file($configPath)) {
-        return false;
+        return 'unchanged';
     }
 
     // Cheap pre-check against the request's own snapshot, so the overwhelmingly
-    // common "this asset is not the favicon" case costs no lock and no re-read.
-    // qs_config_mutate re-reads FRESH under the lock and re-tests before
-    // writing, so a stale CONSTANT here can only skip work, never corrupt.
-    $current = (defined('CONFIG') && isset(CONFIG['FAVICON_PATH'])) ? CONFIG['FAVICON_PATH'] : null;
-    if ($current !== null && $current !== '/assets/images/' . $oldName) {
-        return false;
+    // common "this asset is not the favicon" case (another asset's pointer, or
+    // none) costs no lock and no re-read, and a project without a favicon is never
+    // told its favicon could not be updated. qs_config_mutate re-reads FRESH under
+    // the lock and re-tests before writing, so a stale CONSTANT here can only skip
+    // work, never corrupt.
+    if (defined('CONFIG') && (CONFIG['FAVICON_PATH'] ?? null) !== '/assets/images/' . $oldName) {
+        return 'unchanged';
     }
 
     // FAVICON_PATH's one rule (projectSettings.php): a renamed favicon keeps its
@@ -1089,8 +1092,7 @@ function qs_favicon_repoint(string $projectPath, string $oldName, ?string $newNa
         $newPath = null;
     }
 
-    $changed = false;
-    qs_config_mutate($configPath, function (array &$config) use ($oldName, $newPath, &$changed): bool {
+    $result = qs_config_mutate($configPath, function (array &$config) use ($oldName, $newPath): bool {
         if (($config['FAVICON_PATH'] ?? null) !== '/assets/images/' . $oldName) {
             return false;   // not ours — abandon, leave the file untouched
         }
@@ -1099,11 +1101,33 @@ function qs_favicon_repoint(string $projectPath, string $oldName, ?string $newNa
         } else {
             $config['FAVICON_PATH'] = $newPath;
         }
-        $changed = true;
         return true;
     });
 
-    return $changed;
+    if ($result['ok']) {
+        return 'repointed';
+    }
+    // A fresh read that finds another pointer abandons the write: nothing to do.
+    // A lock, a read or a write that failed (a size check's refusal included,
+    // which the caller answers as itself) leaves the old pointer in place.
+    return $result['reason'] === 'abandoned' ? 'unchanged' : 'failed';
+}
+
+/**
+ * The answer of an asset writer (uploadAsset, editAsset, deleteAsset) when the
+ * asset list (AssetMetadataManager::save()) or the favicon setting
+ * (qs_favicon_repoint()) could not be written, for any reason but a size check's
+ * refusal, which is answered as itself. The message says what was kept: an upload
+ * is not kept and an edit is taken back whole, while a delete cannot be, so its
+ * answer names what was not saved. The Media page follows a delete on exactly
+ * this status and code (assets.js deletedButListNotSaved()).
+ */
+function qs_asset_write_failed(string $message, array $data): ApiResponse
+{
+    require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+    return ApiResponse::create(500, 'server.file_write_failed')
+        ->withMessage($message)
+        ->withData($data);
 }
 
 /**

@@ -1763,9 +1763,10 @@ $GLOBALS['__help_commands'] = [
             '500.server.file_verification_failed' => 'File upload failed: file not found after move.',
             '500.server.permission_denied' => 'Target directory is not writable.',
             '500.server.too_many_duplicates' => 'Unable to generate unique filename after 1000 attempts.',
+            '500.server.file_write_failed' => 'The file could not be added to the asset list (where its description, alt text and star are kept), so it was not kept. data: filename and category.',
             '507.quota.storage_exceeded' => 'Storing this file would take the owner over their configured storage quota. Charged to the project owner, so the refusal is generic when the caller is not that owner.'
         ],
-        'notes' => 'Category is auto-detected from file extension (no category parameter needed). Validates MIME type (actual content, not just extension). Sanitizes filename. Auto-renames if file exists (adds _1, _2, etc.). SVG files are sanitized to remove scripts. URL downloads require HTTPS and block private IPs. Either file or url must be provided.'
+        'notes' => 'Category is auto-detected from file extension (no category parameter needed). Validates MIME type (actual content, not just extension). Sanitizes filename. Auto-renames if file exists (adds _1, _2, etc.). SVG files are sanitized to remove scripts. URL downloads require HTTPS and block private IPs. Either file or url must be provided. A file the asset list cannot record is not kept (500 server.file_write_failed).'
     ],
     
     'deleteAsset' => [
@@ -1811,9 +1812,9 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_type' => 'The filenames parameter must be an array of strings. The filename parameter must be a string.',
             '400.validation.invalid_value' => 'The filenames array must not be empty.',
             '400.validation.missing_field' => 'Neither filename nor filenames was supplied (single delete needs filename; bulk delete needs filenames).',
-            '500.server.file_write_failed' => 'The file was deleted (batch: every file in data.deleted), but the asset list could not be saved, so it still names it. data is the success answer\'s: filename and category (batch: deleted, failed, total_deleted, total_failed).'
+            '500.server.file_write_failed' => 'The file was deleted (batch: every file in data.deleted), but the asset list or the project\'s favicon setting could not be saved, so it still names it. data is the success answer\'s, filename and category (batch: deleted, failed, total_deleted, total_failed), and not_saved: asset_list, favicon or both.'
         ],
-        'notes' => 'Category is auto-detected from file extension. Supports batch deletion with filenames array (max 50). In batch mode, partial success is possible — check deleted and failed arrays in the response. The asset list (a file\'s description, alt text and star) is saved only when it has an entry for a deleted file; when that save fails, the files stay deleted and the answer is 500 server.file_write_failed.'
+        'notes' => 'Category is auto-detected from file extension. Supports batch deletion with filenames array (max 50). In batch mode, partial success is possible — check deleted and failed arrays in the response. The asset list (a file\'s description, alt text and star) is saved only when it has an entry for a deleted file, and the favicon setting is cleared when it names a deleted image; when either write fails, the files stay deleted and the answer is 500 server.file_write_failed, its not_saved naming which.'
     ],
     
     'listAssets' => [
@@ -1934,9 +1935,10 @@ $GLOBALS['__help_commands'] = [
             '409.asset.already_exists' => 'Target filename already exists',
             '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
             '500.asset.rename_failed' => 'File system rename failed',
+            '500.server.file_write_failed' => 'The asset list could not be saved, or the image renamed is the favicon and the project\'s favicon setting could not follow it: the edit is taken back whole and the file keeps its name. data: filename and category. When the rename itself cannot be taken back, the message says so and data.filename is the new name.',
             '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
-        'notes' => 'Category is auto-detected from file extension. At least one of newFilename, description, alt, or starred must be provided. If newFilename omits the extension, the original extension is auto-appended. If an extension is provided, it must match the original. Metadata is preserved when renaming. Send empty string for description/alt to remove that field. Starred assets are included in AI workflow prompts when the user enables the option.'
+        'notes' => 'Category is auto-detected from file extension. At least one of newFilename, description, alt, or starred must be provided. If newFilename omits the extension, the original extension is auto-appended. If an extension is provided, it must match the original. Metadata is preserved when renaming. Send empty string for description/alt to remove that field. Starred assets are included in AI workflow prompts when the user enables the option. Renaming the favicon image moves the favicon setting with it; an edit whose asset list or favicon setting cannot be saved changes nothing (500 server.file_write_failed).'
     ],
     
     'getStyles' => [
@@ -2658,7 +2660,7 @@ $GLOBALS['__help_commands'] = [
             ]
         ],
         'error_responses' => [],
-        'notes' => 'Slots are {{placeholder}} names (backwards compatibility). Variables array includes type detection: textKey for translatable content, param for URL/attribute values. System placeholders (__ prefix) are filtered out. Use editStructure with type="component" to create/update/delete components.'
+        'notes' => 'Slots are {{placeholder}} names (backwards compatibility). Variables array includes type detection: textKey for translatable content, param for URL/attribute values (a param carries paramName and parentTag: the attribute and the tag holding it). A placeholder passed into a nested component call takes the type that component gives it; a component stored as a list of nodes is read whole. Variables a component\'s __enums__ resolves are left out, and each enum\'s source is listed once as type enum with its options and default. Every command that lists or fills a component\'s slots reads them the same way (getComponent, addComponentToNode, editComponentToNode, insertSnippet). System placeholders (__ prefix) are filtered out. Use editStructure with type="component" to create/update/delete components.'
     ],
     
     'getComponent' => [
@@ -2699,7 +2701,7 @@ $GLOBALS['__help_commands'] = [
             '422.components.invalid_json' => 'The component file on disk is not valid JSON; the decoder message is returned.',
             '500.components.read_error' => 'Failed to read component file.'
         ],
-        'notes' => 'Returns previewStructure only when nested component references exist. Translations are loaded from project translation files for all textKeys in the expanded structure.'
+        'notes' => 'variables lists the component\'s slots as listComponents lists them. Returns previewStructure only when nested component references exist. Translations are loaded from project translation files for all textKeys in the expanded structure.'
     ],
     
     'findComponentUsages' => [
@@ -6734,7 +6736,7 @@ $GLOBALS['__help_commands'] = [
             '404.route.not_found' => 'The page is neither a route of the project nor a special page; data.available_routes and data.special_pages list both.',
             '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
-        'notes' => 'Every root of the snippet is inserted, in order, at the position asked (a snippet whose structure is a list of nodes has several roots): newNodeId names the first, newNodeIds every one, and html holds every root\'s HTML in order. Each translatable value (a text node\'s key, the key of a translatable attribute — alt, placeholder, title, aria-label, aria-placeholder or aria-description —, a component\'s text variable) gets a new key {prefix}.item{N}, numbered on from the highest the project holds and from one root to the next. A raw or literal value (__RAW__ / __LIT__) is kept as written: no key, no translation. The snippet\'s translations are written under the new keys in every project language file, one for each new key (a key the snippet uses twice is written for both copies; keyMapping names the last), only once the insert passes every check, so a refused insert writes nothing. Before, after and inside a node follow the one rule every positional insert shares. targetNodeId "root" inserts at the structure\'s root, by the one rule every command that inserts there shares: a structure whose root is a list of nodes (every page, menu and footer) takes the new node as its first entry; one whose root is a single node (a component) takes it as its first child; either way its id is "0". A root that cannot hold children (a component call, a text node, a void element such as img) is refused with 400 operation.failed.'
+        'notes' => 'Every root of the snippet is inserted, in order, at the position asked (a snippet whose structure is a list of nodes has several roots): newNodeId names the first, newNodeIds every one, and html holds every root\'s HTML in order. Each translatable value (a text node\'s key, the key of a translatable attribute — alt, placeholder, title, aria-label, aria-placeholder or aria-description —, a component\'s text variable, typed as listComponents types it) gets a new key {prefix}.item{N}, numbered on from the highest the project holds and from one root to the next. A raw or literal value (__RAW__ / __LIT__) is kept as written: no key, no translation. The snippet\'s translations are written under the new keys in every project language file, one for each new key (a key the snippet uses twice is written for both copies; keyMapping names the last), only once the insert passes every check, so a refused insert writes nothing. Before, after and inside a node follow the one rule every positional insert shares. targetNodeId "root" inserts at the structure\'s root, by the one rule every command that inserts there shares: a structure whose root is a list of nodes (every page, menu and footer) takes the new node as its first entry; one whose root is a single node (a component) takes it as its first child; either way its id is "0". A root that cannot hold children (a component call, a text node, a void element such as img) is refused with 400 operation.failed.'
     ],
 
     'injectSnippetCss' => [

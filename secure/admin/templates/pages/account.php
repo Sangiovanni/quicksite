@@ -68,6 +68,11 @@ window.QS_ACCOUNT_I18N = <?= json_encode([
     'passwordRequired'    => __admin('account.password.required', 'Fill in your current password and the new one.'),
     'passwordSameAsOld'   => __admin('account.password.sameAsOld', 'The new password is the same as the current one.'),
     'passwordChanged'     => __admin('account.password.changedMsg', 'Password changed — your other sessions have been signed out.'),
+    // A wrong current password, and the wait a refusal started (:duration, said by
+    // QuickSiteAdmin.durationText(), the words of the sign-in pages).
+    'wrongCurrent'        => __admin('account.password.wrongCurrent', 'Your current password is not correct.'),
+    'wrongCredentials'    => __admin('account.delete.wrongCredentials', 'Your current password or your username is not correct.'),
+    'throttled'           => __admin('login.throttled'),
     'everywhereTitle'     => __admin('account.sessions.confirmTitle', 'Sign out everywhere?'),
     'everywhereBody'      => __admin('account.sessions.confirmBody', 'Every session of your account ends, including this one. You will be asked to sign in again.'),
     'everywhereBtn'       => __admin('account.sessions.submit', 'Sign out everywhere'),

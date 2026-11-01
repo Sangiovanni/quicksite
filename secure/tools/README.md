@@ -46,10 +46,11 @@ php secure/tools/session-sweep.php --help
 ```
 
 If the `secure` folder was renamed at setup, use its new name. On Windows with
-WAMP, call WAMP's PHP:
+WAMP, call WAMP's PHP, a patched release of its branch (`README.md`,
+*Requirements*):
 
 ```bash
-C:\wamp64\bin\php\php8.4.0\php.exe secure\tools\session-sweep.php --dry-run
+C:\wamp64\bin\php\php8.4.27\php.exe secure\tools\session-sweep.php --dry-run
 ```
 
 ### What it prints

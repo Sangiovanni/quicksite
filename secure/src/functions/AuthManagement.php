@@ -1490,7 +1490,8 @@ function qs_user_create(string $name, string $username, ?string $password, int $
  * so someone guessing tokens learns nothing about the install's rules. A token
  * that verifies clears the count: the caller has proved what the throttle
  * guards, so nothing refused after that point — a username that does not fit, a
- * password too short, a creation that lost a race — was a guess.
+ * password too short, a creation that lost a race — was a guess. A wrong token
+ * whose refusal starts a wait carries it as retry_after.
  *
  * Public self-registration is NOT consulted here. Creating the first account is
  * an installation step, not self-registration, and it must work on a default
@@ -1517,13 +1518,17 @@ function qs_auth_attempt_setup(string $name, string $username, string $password,
     // stranger lock the deployer out of their own first-run page. Brute force is
     // not the defence here (256 bits of entropy is) — this is a noise damper.
     $throttleKey = 'setup:' . qs_client_ip();
-    $wait = qs_login_throttle_admit($throttleKey);
+    $wait = qs_login_throttle_admit($throttleKey, $starts);
     if ($wait > 0) {
         return ['ok' => false, 'error' => 'throttled', 'retry_after' => $wait];
     }
 
     if (!qs_setup_token_verify($token)) {
-        return ['ok' => false, 'error' => 'invalid_token']; // counted when admitted
+        // Counted when admitted. The refusal that starts a wait carries it, as the
+        // next attempt's 'throttled' would: it depends on the caller's count alone.
+        return $starts > 0
+            ? ['ok' => false, 'error' => 'invalid_token', 'retry_after' => $starts]
+            : ['ok' => false, 'error' => 'invalid_token'];
     }
     qs_login_throttle_clear($throttleKey);
 

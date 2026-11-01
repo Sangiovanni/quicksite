@@ -91,47 +91,6 @@ function flattenKeys(array $arr, string $prefix = ''): array {
 }
 
 /**
- * Extract component variables with type detection (for snippet component processing).
- * A variant of qs_component_variables() (componentPolicy.php): no paramName.
- */
-function extractSnippetComponentVariables(array $node, array &$variables = []): array {
-    if (!is_array($node)) return $variables;
-    
-    if (isset($node['params']) && is_array($node['params'])) {
-        foreach ($node['params'] as $paramName => $value) {
-            if (is_string($value) && preg_match_all('/\{\{([^}]+)\}\}/', $value, $matches)) {
-                foreach ($matches[1] as $varName) {
-                    if (str_starts_with($varName, '__') || strpos($varName, ';') !== false) continue;
-                    if (!isset($variables[$varName])) {
-                        $type = in_array($paramName, TagRegistry::TRANSLATABLE_ATTRIBUTES, true) ? 'textKey' : 'param';
-                        $variables[$varName] = ['name' => $varName, 'type' => $type];
-                    }
-                }
-            }
-        }
-    }
-    
-    if (isset($node['textKey']) && is_string($node['textKey'])) {
-        if (preg_match_all('/\{\{([^}]+)\}\}/', $node['textKey'], $matches)) {
-            foreach ($matches[1] as $varName) {
-                if (str_starts_with($varName, '__') || strpos($varName, ';') !== false) continue;
-                if (!isset($variables[$varName])) {
-                    $variables[$varName] = ['name' => $varName, 'type' => 'textKey'];
-                }
-            }
-        }
-    }
-    
-    if (isset($node['children']) && is_array($node['children'])) {
-        foreach ($node['children'] as $child) {
-            extractSnippetComponentVariables($child, $variables);
-        }
-    }
-    
-    return $variables;
-}
-
-/**
  * Get a nested value from an array using dot notation
  */
 function getNestedValue(array $arr, string $key) {
@@ -221,7 +180,7 @@ function processSnippetStructure(array $node, string $prefix, int &$itemCounter,
                 if ($compContent !== false) {
                     $compStructure = json_decode($compContent, true);
                     if (is_array($compStructure)) {
-                        extractSnippetComponentVariables($compStructure, $componentVars);
+                        qs_component_variables($compStructure, $componentVars);
                     }
                 }
             }

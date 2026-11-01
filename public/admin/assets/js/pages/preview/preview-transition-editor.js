@@ -34,6 +34,8 @@ window.PreviewTransitionEditor = (function() {
 
     // Transition Editor state
     let transitionEditorSelector = null;
+    // The media query of the rule being edited, when it sits inside @media (null: outside any)
+    let transitionEditorMediaQuery = null;
     let transitionEditorBaseProperties = {};
     let transitionEditorHoverProperties = {};
     let transitionEditorCurrentPseudo = ':hover';
@@ -182,13 +184,21 @@ window.PreviewTransitionEditor = (function() {
      * Open the Transition Editor for a selector
      * @param {string} selector - Base CSS selector (without pseudo-class)
      * @param {function} onSave - Callback when transition is saved
+     * @param {string|null} mediaQuery - The rule's media query when it sits inside @media:
+     *                                   its states are read and written there
      */
-    async function open(selector, onSave = null) {
+    async function open(selector, onSave = null, mediaQuery = null) {
         transitionEditorSelector = selector;
+        transitionEditorMediaQuery = mediaQuery || null;
         transitionEditorCallback = onSave;
 
         // Update header
         if (transitionEditorSelectorEl) transitionEditorSelectorEl.textContent = selector;
+        const mediaEl = document.getElementById('transition-editor-media');
+        if (mediaEl) {
+            mediaEl.textContent = transitionEditorMediaQuery ? '@media ' + transitionEditorMediaQuery : '';
+            mediaEl.hidden = !transitionEditorMediaQuery;
+        }
         if (transitionBaseSelectorEl) transitionBaseSelectorEl.textContent = selector;
 
         // Reset state
@@ -223,7 +233,16 @@ window.PreviewTransitionEditor = (function() {
     function close() {
         transitionEditorModal?.classList.remove('preview-keyframe-modal--visible');
         transitionEditorSelector = null;
+        transitionEditorMediaQuery = null;
         transitionEditorCallback = null;
+    }
+
+    /**
+     * What a setStyleRule body adds for the rule being edited: its media query when it sits
+     * inside @media, so its base and its trigger state are written there.
+     */
+    function ruleMediaQuery() {
+        return transitionEditorMediaQuery ? { mediaQuery: transitionEditorMediaQuery } : {};
     }
 
     /**
@@ -237,8 +256,10 @@ window.PreviewTransitionEditor = (function() {
 
         try {
             const [baseResponse, hoverResponse] = await Promise.all([
-                QuickSiteAdmin.apiRequest('getStyleRule', 'GET', null, [encodeURIComponent(selector)]),
-                QuickSiteAdmin.apiRequest('getStyleRule', 'GET', null, [encodeURIComponent(hoverSelector)])
+                QuickSiteAdmin.apiRequest('getStyleRule', 'GET', null,
+                    QuickSiteAdmin.styleRuleSegments(selector, transitionEditorMediaQuery)),
+                QuickSiteAdmin.apiRequest('getStyleRule', 'GET', null,
+                    QuickSiteAdmin.styleRuleSegments(hoverSelector, transitionEditorMediaQuery))
             ]);
 
             const baseData = baseResponse.data || {};
@@ -687,6 +708,7 @@ window.PreviewTransitionEditor = (function() {
 
         try {
             const response = await QuickSiteAdmin.apiRequest('setStyleRule', 'POST', {
+                ...ruleMediaQuery(),
                 selector: selector,
                 styles: '',
                 removeProperties: [property]
@@ -720,6 +742,7 @@ window.PreviewTransitionEditor = (function() {
 
         try {
             const response = await QuickSiteAdmin.apiRequest('setStyleRule', 'POST', {
+                ...ruleMediaQuery(),
                 selector: selector,
                 styles: `${property}: ${value};`
             });
@@ -1040,6 +1063,7 @@ window.PreviewTransitionEditor = (function() {
 
         try {
             const response = await QuickSiteAdmin.apiRequest('setStyleRule', 'POST', {
+                ...ruleMediaQuery(),
                 selector: selector,
                 styles: `animation: ${animationValue};`
             });
@@ -1076,6 +1100,7 @@ window.PreviewTransitionEditor = (function() {
 
         try {
             const response = await QuickSiteAdmin.apiRequest('setStyleRule', 'POST', {
+                ...ruleMediaQuery(),
                 selector: selector,
                 styles: '',
                 removeProperties: ['animation']
@@ -1159,6 +1184,7 @@ window.PreviewTransitionEditor = (function() {
 
         try {
             const response = await QuickSiteAdmin.apiRequest('setStyleRule', 'POST', {
+                ...ruleMediaQuery(),
                 selector: selector,
                 styles: `animation: ${animationValue};`
             });
@@ -1261,6 +1287,7 @@ window.PreviewTransitionEditor = (function() {
 
         try {
             const response = await QuickSiteAdmin.apiRequest('setStyleRule', 'POST', {
+                ...ruleMediaQuery(),
                 selector: transitionEditorSelector,
                 styles: `transition: ${transitionValue};`
             });

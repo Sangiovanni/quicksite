@@ -1323,8 +1323,9 @@
         saveBtn.disabled = false;
     }
 
-    // deleteAsset's 500 server.file_write_failed: the files are deleted, only the asset list
-    // could not be saved. The page follows the delete (one file or a batch) and says what failed.
+    // deleteAsset's 500 server.file_write_failed: the files are deleted, only the asset list or the
+    // favicon setting could not be saved. The page follows the delete (one file or a batch) and says
+    // what failed. (An edit or an upload that fails the same way is taken back: an ordinary failure.)
     function deletedButListNotSaved(result) {
         return result.status === 500 && result.data?.code === 'server.file_write_failed';
     }
