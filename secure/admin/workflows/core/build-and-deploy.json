@@ -77,7 +77,7 @@
     "relatedCommands": ["build", "deployBuild", "deleteBuild"],
     "steps": [
         {
-            "comment": "=== PHASE 0: DELETE THE EXISTING BUILD (optional) — build refuses while one exists ===",
+            "comment": "=== 0. DELETE THE EXISTING BUILD (optional) — build refuses while one exists ===",
             "command": "deleteBuild",
             "method": "POST",
             "condition": "param.deletePrevious === true",
@@ -85,7 +85,7 @@
             "params": {}
         },
         {
-            "comment": "=== PHASE 1: BUILD — 409s if a build already exists and PHASE 0 was skipped ===",
+            "comment": "=== 1. BUILD — 409s if a build already exists and step 0 was skipped ===",
             "command": "build",
             "method": "POST",
             "abortOnFail": true,
@@ -97,7 +97,7 @@
             }
         },
         {
-            "comment": "=== PHASE 2: DEPLOY ===",
+            "comment": "=== 2. DEPLOY ===",
             "command": "deployBuild",
             "method": "POST",
             "abortOnFail": true,

@@ -4,7 +4,8 @@
  * Source of truth for AI connections in `localStorage` / `sessionStorage`.
  * Replaces the v2 `aiKeysV2` map (1 entry per provider id) with a list of
  * named connections that can be cloud (BYOK) or local. Each connection
- * stores its own endpoint, auth, model selection and streaming flag.
+ * stores its own endpoint, auth, model selection, streaming flag and output
+ * limit (`maxOutputTokens`; null for the provider catalog's default).
  *
  * No DOM, no fetch — pure CRUD over a JSON blob. Caller decides which
  * storage (local vs session) to read/write based on the persist toggle.
@@ -83,6 +84,7 @@
             enabledModels: partial.enabledModels || partial.models || [],
             defaultModel: partial.defaultModel || (partial.models && partial.models[0]) || null,
             streaming: partial.streaming !== false,
+            maxOutputTokens: Number.isInteger(partial.maxOutputTokens) ? partial.maxOutputTokens : null,
             // _preset is the local-runtime id (ollama / lm-studio / null) so
             // the card and CORS hint can pick the right logo / instructions.
             _preset: partial._preset || null,

@@ -9,13 +9,15 @@
  * Activation: sidebar "AI tools" → setMode('ai-tools') in preview.js
  * shows #contextual-ai-tools and calls PreviewAiTools.enter().
  *
- * Workflow runner flow (matches /admin/workflows/{spec}):
- *   1. INPUTS — Your prompt (free-form) + Parameters + [Generate]
+ * Workflow runner flow:
+ *   1. INPUTS — Your prompt (one per AI phase) + Parameters + [Run / Generate prompt / Send to AI]
  *   2. AI EXCHANGE — Generated prompt (copy target) + AI response (paste target)
- *   3. EXECUTION — Toggles + [Run] + Steps (with state header)
- *   Footer — Model + Touches (inline, discreet)
+ *   3. EXECUTION — Run without stopping + the run's phases + the review + Batch (by phase)
+ *   Footer — Touches (inline, discreet)
  *
- * Deterministic workflows (no promptTemplate) skip AI EXCHANGE entirely.
+ * A run goes through the workflow's phases: its pre-workflows, itself, its post-workflows, each
+ * resolved by the server when the run reaches it (workflow-generate-steps). A run with no AI phase
+ * skips AI EXCHANGE entirely.
  */
 window.PreviewAiTools = (function () {
     'use strict';
@@ -44,12 +46,23 @@ window.PreviewAiTools = (function () {
     var _activeTemplate = null;
     var _fetchedData = {};
     var _paramValues = {};
-    var _userPrompt = '';
+    var _requests = {};                      // "Your prompt" of each AI phase, by its key (_requestKey())
     var _generatedPrompt = '';
-    var _promptGenerating = false;
-    var _promptGenerated = false;            // true after first successful Generate
     var _aiResponseText = '';
     var _aiResponseStatus = { type: 'idle' };  // 'idle'|'ok'|'error', + message + commandCount
+
+    // The run's phases (its pre-workflows, the workflow, its post-workflows), as the server last
+    // planned them: the preview before a run, the plan of a run.
+    var _plan = [];
+    var _planSeq = 0;                        // an older plan's answer arriving after a newer one is dropped
+    var _run = null;                         // the run under way (_startRun()), null when none
+    var _answerWaiter = null;                // a run waiting for an AI answer: resolve(commands) on Execute
+    var _answerPhase = null;                 // the AI answer's commands classified by the server (the phase)
+    var _answerSeq = 0;
+    var _continuation = null;                // an answer being put together: { kept: [commands whole so far], cut, parts }
+    var _answerParts = 0;                    // the answer ready was put together from this many answers (0: one); it waits for Execute
+    var _aiSending = false;                  // a send to the AI is under way
+    var _recoveryEls = null;                 // the waiting bar's Continue the answer and Send again ({ continueBtn, sendAgainBtn })
 
     // DOM refs — bound on init().
 
@@ -91,9 +104,13 @@ window.PreviewAiTools = (function () {
     var _secondaryActionBtn = null;
     var _executeBtnEl = null;
     var _modelSelectEl = null;
-    var _currentCommands = [];           // parsed AI commands OR resolved det commands; basis for Steps preview
+    var _currentCommands = [];           // the parsed AI answer's commands
     var _pasteAutoExecTimer = null;      // unified 1.5s grace timer for auto-execute
     var _autoExecHintEl = null;          // DOM ref for "Auto-executing in 1.5s…" hint
+    var _runLineEl = null;               // the run's phases in order, with their state
+    var _reviewEl = null;                // the pause before a phase: what it does, Continue / Stop
+    var _yourPromptBody = null;          // the Your prompt section's body: one field per AI phase
+    var _exchangeHeaderEl = null;        // the AI exchange zone's header, naming the AI phase it serves
 
     // ──────────────────────────── i18n ──────────────────────────────────
 
@@ -203,7 +220,12 @@ window.PreviewAiTools = (function () {
     function enter(opts) {
         opts = opts || {};
         if (!_section) return;
-        _showListView();
+        // A run under way (a review or an AI answer awaited included) is where the panel comes back to.
+        if (_run) {
+            _showRunnerView();
+        } else {
+            _showListView();
+        }
         _renderKept();
         if (_entered && !opts.refresh) return;
         _entered = true;
@@ -499,48 +521,55 @@ window.PreviewAiTools = (function () {
     //                          RUNNER VIEW
     // ════════════════════════════════════════════════════════════════════
 
-    function _onCardClick(workflow) {
+    /**
+     * Open a workflow's runner. opts.restore: {params, requests} put back over the defaults (kept steps
+     * resumed); the promise settles once the runner is drawn and its plan asked for.
+     */
+    function _onCardClick(workflow, opts) {
+        opts = opts || {};
         _activeWorkflowSummary = workflow;
         _activeWorkflowSpec = null;
         _activeTemplate = null;
         _fetchedData = {};
         _paramValues = {};
-        _userPrompt = '';
+        _requests = {};
         _generatedPrompt = '';
-        _promptGenerating = false;
-        _promptGenerated = false;
         _aiResponseText = '';
         _aiResponseStatus = { type: 'idle' };
+        _plan = [];
+        _answerPhase = null;
         _showRunnerView();
         _renderRunnerLoading(workflow);
-        _fetchWorkflowDetail(workflow.id).then(function (detail) {
+        return _fetchWorkflowDetail(workflow.id).then(function (detail) {
             _activeWorkflowSpec = detail.spec || null;
             _activeTemplate = detail.template || '';
             _fetchedData = detail.fetchedData || {};
             _initParamValues();
-            _renderRunner();
-            // Auto-preview for deterministic workflows: resolve commands
-            // server-side and populate Steps preview so the user sees
-            // what would run before clicking the action button.
-            if (!_isAiWorkflow()) {
-                _resolveAndPreviewDeterministic();
+            if (opts.restore) {
+                Object.keys(opts.restore.params || {}).forEach(function (k) { _paramValues[k] = opts.restore.params[k]; });
+                _requests = Object.assign({}, opts.restore.requests || {});
             }
+            _renderRunner();
+            // The plan before Run: every phase with its steps and what they delete or change.
+            return _refreshPlan();
         }).catch(function (err) {
             _renderRunnerError(err && err.message ? err.message : String(err));
         });
     }
 
     function _onBackToList() {
+        if (_run) return;
         _activeWorkflowSummary = null;
         _activeWorkflowSpec = null;
         _activeTemplate = null;
         _fetchedData = {};
         _paramValues = {};
-        _userPrompt = '';
+        _requests = {};
         _generatedPrompt = '';
-        _promptGenerated = false;
         _aiResponseText = '';
         _aiResponseStatus = { type: 'idle' };
+        _plan = [];
+        _answerPhase = null;
         _showListView();
     }
 
@@ -594,9 +623,43 @@ window.PreviewAiTools = (function () {
         }
     }
 
+    /** Whether the workflow itself is an AI one (its main phase sends a prompt). */
     function _isAiWorkflow() {
         if (!_activeWorkflowSpec) return false;
         return !!(_activeWorkflowSpec.promptTemplate || _activeTemplate);
+    }
+
+    /** The AI phases of the run as last planned; before the plan, the workflow itself when it is an AI one. */
+    function _aiPhases() {
+        if (_plan.length > 0) return _plan.filter(function (p) { return p.ai; });
+        return _isAiWorkflow() ? [{ ai: true, index: 0, workflowId: _activeWorkflowSpec.id, title: '' }] : [];
+    }
+
+    /** Whether the run has an AI phase: the AI exchange zone and a Your prompt field are drawn for it. */
+    function _chainHasAi() {
+        return _aiPhases().length > 0;
+    }
+
+    /** Whether the run's first phase is an AI one: an answer can then be pasted before anything runs. */
+    function _firstPhaseIsAi() {
+        return _plan.length > 0 ? !!_plan[0].ai : _isAiWorkflow() && !_hasSubWorkflows(_activeWorkflowSpec);
+    }
+
+    function _hasSubWorkflows(spec) {
+        return !!(spec && ((spec.preWorkflows && spec.preWorkflows.length) || (spec.postWorkflows && spec.postWorkflows.length)));
+    }
+
+    /**
+     * An AI phase's key for its "Your prompt": its workflow, numbered when the run holds it more than
+     * once — stable when a conditional phase before it comes and goes.
+     */
+    function _requestKey(phase, phases) {
+        var list = phases || _plan;
+        var n = 0;
+        for (var i = 0; i < list.length && i < phase.index; i++) {
+            if (list[i].workflowId === phase.workflowId) n++;
+        }
+        return phase.workflowId + (n > 0 ? '#' + (n + 1) : '');
     }
 
     // ──────────────────────────── Condition evaluation ──────────────────
@@ -639,23 +702,13 @@ window.PreviewAiTools = (function () {
     }
 
     var _previewRefreshTimer = null;
+    /** The plan again, a short while after the last parameter change (never during a run: its fields are locked). */
     function _schedulePreviewRefresh() {
         if (_previewRefreshTimer) { clearTimeout(_previewRefreshTimer); _previewRefreshTimer = null; }
-        if (_isAiWorkflow()) {
-            // AI workflows: prompt + Steps preview both depend on params.
-            // The prompt is re-generated lazily on action click; the Steps
-            // preview clears here so the user knows the stale list is gone.
-            _currentCommands = [];
-            _renderStepsPreview();
-            _updateActionStates();
-            return;
-        }
-        // Deterministic: re-resolve after a short debounce so the Steps
-        // preview reflects the new params.
+        if (_run) return;
         _previewRefreshTimer = setTimeout(function () {
             _previewRefreshTimer = null;
-            if (_isAiWorkflow()) return;
-            _resolveAndPreviewDeterministic();
+            if (!_run) _refreshPlan();
         }, 400);
     }
 
@@ -820,8 +873,9 @@ window.PreviewAiTools = (function () {
         if (!_runnerView) return;
         var workflow = _activeWorkflowSummary || {};
         var spec = _activeWorkflowSpec || {};
-        var isAI = _isAiWorkflow();
+        var isAI = _chainHasAi();
         var conn = _getDefaultConnection();
+        _renderedWithAi = isAI;
 
         // Reset live refs
         _generalPromptTextarea = null;
@@ -838,6 +892,10 @@ window.PreviewAiTools = (function () {
         _modelSelectEl = null;
         _currentCommands = [];
         _autoExecHintEl = null;
+        _runLineEl = null;
+        _reviewEl = null;
+        _yourPromptBody = null;
+        _exchangeHeaderEl = null;
         if (_pasteAutoExecTimer) { clearTimeout(_pasteAutoExecTimer); _pasteAutoExecTimer = null; }
 
         _destroyParamPickers();
@@ -916,6 +974,10 @@ window.PreviewAiTools = (function () {
         zone.appendChild(header);
         return { section: zone, body: zone };
     }
+
+    // Whether the runner on screen was drawn with an AI exchange: a plan that adds or drops an AI
+    // phase draws it again (_refreshPlan()).
+    var _renderedWithAi = false;
 
     function _renderInputsZone(spec, isAI) {
         var z = _renderZone('inputs', _t('zoneInputs', 'Inputs'));
@@ -1005,6 +1067,7 @@ window.PreviewAiTools = (function () {
 
     function _renderAiExchangeZone(spec, hasBYOK) {
         var z = _renderZone('exchange', _t('zoneExchange', 'AI exchange'));
+        _exchangeHeaderEl = z.section.querySelector('.preview-contextual-ai-tools__zone-header');
         z.body.appendChild(_renderSectionGeneralPrompt(hasBYOK));
         z.body.appendChild(_renderSectionAiResponseTextarea(hasBYOK));
         return z.section;
@@ -1012,26 +1075,35 @@ window.PreviewAiTools = (function () {
 
     function _renderExecutionZone(spec) {
         var z = _renderZone('execution', _t('zoneExecution', 'Run'));
-        z.body.appendChild(_renderExecuteRow(_isAiWorkflow()));
+        z.body.appendChild(_renderExecuteRow());
+        _runLineEl = document.createElement('p');
+        _runLineEl.className = 'preview-contextual-ai-tools__run-line';
+        _runLineEl.hidden = true;
+        z.body.appendChild(_runLineEl);
+        _reviewEl = document.createElement('div');
+        _reviewEl.className = 'preview-contextual-ai-tools__review';
+        _reviewEl.hidden = true;
+        z.body.appendChild(_reviewEl);
         z.body.appendChild(_renderSectionBatch(spec));
         return z.section;
     }
 
-    function _renderExecuteRow(isAI) {
+    function _renderExecuteRow() {
         var wrap = document.createElement('div');
         wrap.className = 'preview-contextual-ai-tools__execute-row';
 
-        // Auto-execute toggle — AI workflows only (deterministic always runs end-to-end)
-        if (isAI) {
-            var toggles = document.createElement('div');
-            toggles.className = 'preview-contextual-ai-tools__toggles';
-            toggles.appendChild(_renderToggle('aiAutoExecute', _t('autoExecuteLabel', 'Auto-execute')));
-            wrap.appendChild(toggles);
-        }
+        // "Run without stopping", for every workflow: an AI answer runs once it parses, and the run goes
+        // from one phase to the next without a review (a phase that deletes or changes content more
+        // than was confirmed still asks).
+        var toggles = document.createElement('div');
+        toggles.className = 'preview-contextual-ai-tools__toggles';
+        var toggle = _renderToggle('aiAutoExecute', _t('runWithoutStoppingLabel', 'Run without stopping'));
+        toggle.title = _t('runWithoutStoppingHint', "Executes the AI's commands once its answer is parsed, and goes from one part of a workflow to the next without a review. A part that deletes content is still confirmed.");
+        toggles.appendChild(toggle);
+        wrap.appendChild(toggles);
 
-        // Explicit "Execute commands" button — only visible when commands
-        // are ready AND auto-execute is OFF. Visibility set by
-        // _updateActionStates after every relevant state change.
+        // The AI answer's "Execute" — shown while an answer is ready and the switch is off; its label
+        // says what the answer deletes or changes (_updateActionStates()).
         _executeBtnEl = document.createElement('button');
         _executeBtnEl.type = 'button';
         _executeBtnEl.className = 'preview-contextual-ai-tools__action-btn--primary';
@@ -1143,15 +1215,56 @@ window.PreviewAiTools = (function () {
             defaultOpen: true,
             dataKey: 'your-prompt'
         });
+        _yourPromptBody = s.body;
+        _renderYourPromptFields();
+        return s.section;
+    }
+
+    /**
+     * One "Your prompt" field per AI phase of the run, each read when its phase is reached: named by
+     * its workflow when the run holds more than one. A field locks once its phase has started.
+     */
+    function _renderYourPromptFields() {
+        if (!_yourPromptBody) return;
+        _yourPromptBody.replaceChildren();
+        var phases = _aiPhases();
+        for (var i = 0; i < phases.length; i++) {
+            _yourPromptBody.appendChild(_renderRequestField(phases[i], phases.length > 1));
+        }
+    }
+
+    /**
+     * One AI phase's request field (named when several are listed, or when idSuffix marks the review's
+     * copy of it); its text kept in _requests.
+     */
+    function _renderRequestField(phase, named, idSuffix) {
+        var key = _requestKey(phase);
+        var wrap = document.createElement('div');
+        wrap.className = 'preview-contextual-ai-tools__request';
         var ta = document.createElement('textarea');
         ta.className = 'preview-contextual-ai-tools__user-prompt';
+        ta.id = 'ai-tools-request-' + key.replace(/[^\w-]/g, '-') + (idSuffix || '');
+        ta.dataset.requestKey = key;
         ta.placeholder = _t('yourPromptPlaceholder', 'Describe what you want.');
-        ta.value = _userPrompt;
+        ta.value = _requests[key] || '';
+        ta.disabled = !!(_run && _run.started && _run.started[key]);
         ta.addEventListener('input', function () {
-            _userPrompt = ta.value;
+            _requests[key] = ta.value;
+            // The same request may be on screen twice: in the inputs and in the review before its phase.
+            var twins = _runnerView ? _runnerView.querySelectorAll('textarea[data-request-key]') : [];
+            for (var t = 0; t < twins.length; t++) {
+                if (twins[t] !== ta && twins[t].dataset.requestKey === key) twins[t].value = ta.value;
+            }
         });
-        s.body.appendChild(ta);
-        return s.section;
+        if (named) {
+            var label = document.createElement('label');
+            label.className = 'preview-contextual-ai-tools__request-label';
+            label.htmlFor = ta.id;
+            label.textContent = _t('requestFor', 'For {name}').replace('{name}', phase.title || phase.workflowId);
+            wrap.appendChild(label);
+        }
+        wrap.appendChild(ta);
+        return wrap;
     }
 
     function _renderSectionParameters(params) {
@@ -1594,81 +1707,37 @@ window.PreviewAiTools = (function () {
         return wrap;
     }
 
+    /** A switch's stored state: on only once switched on ("Run without stopping" starts off). */
     function _readToggle(storageKeyName) {
         var key = (window.QuickSiteStorageKeys || {})[storageKeyName];
-        if (!key) return true;
-        var raw = localStorage.getItem(key);
-        if (raw === null) return true;
-        return raw !== 'false';
+        if (!key) return false;
+        try {
+            return localStorage.getItem(key) === 'true';
+        } catch (_e) {
+            return false;
+        }
     }
 
     function _writeToggle(storageKeyName, value) {
         var key = (window.QuickSiteStorageKeys || {})[storageKeyName];
         if (!key) return;
-        localStorage.setItem(key, value ? 'true' : 'false');
+        try { localStorage.setItem(key, value ? 'true' : 'false'); } catch (_e) { /* storage unavailable: not kept */ }
     }
 
-    async function _onPrimaryActionClick() {
-        if (_executing) return;
-        if (Object.keys(_paramErrors).length > 0) return;
-        var isAI = _isAiWorkflow();
-        var conn = _getDefaultConnection();
-
-        // User intentionally re-triggered — cancel any pending auto-execute
-        // grace timer so we don't accidentally double-fire.
+    /** The primary action: a run, its AI phases sent with the connection's key when there is one. */
+    function _onPrimaryActionClick() {
+        if (_executing || Object.keys(_paramErrors).length > 0) return;
+        // A pending grace timer must not fire on top of the run this click starts.
         _cancelAutoExecute();
-
-        _executing = true;
-        _updateActionStates();
-
-        try {
-            if (!isAI) {
-                _morphPrimary(_t('runActive', 'Running…'));
-                await _resolveAndPreviewDeterministic();
-                if (_currentCommands && _currentCommands.length > 0) {
-                    await _executeCommands(_currentCommands);
-                }
-                return;
-            }
-            if (!conn) {
-                // No BYOK: generate prompt + auto-focus + auto-copy with toast.
-                _morphPrimary(_t('phaseGenerating', 'Generating prompt…'));
-                await _generatePrompt();
-                _focusGeneralPrompt();
-                _autoCopyPromptWithToast();
-                return;
-            }
-            // BYOK present — generate + send. Auto-execute (if on) fires
-            // via the 1.5s grace timer set up inside _sendToAi.
-            _morphPrimary(_t('phaseGenerating', 'Generating prompt…'));
-            await _generatePrompt();
-            var modelName = conn.defaultModel || conn.model || '';
-            _morphPrimary(_t('sendingToAi', 'Sending to {model}…').replace('{model}', modelName));
-            await _sendToAi(conn);
-        } catch (err) {
-            console.error('[PreviewAiTools] primary action failed:', err);
-        } finally {
-            _executing = false;
-            _updateActionStates();
-        }
+        _startRun({ send: !!_getDefaultConnection() });
     }
 
-    async function _onSecondaryActionClick() {
-        if (_executing) return;
-        if (Object.keys(_paramErrors).length > 0) return;
-        if (!_isAiWorkflow()) return;
-        _executing = true;
-        _updateActionStates();
-        try {
-            await _generatePrompt();
-            _focusGeneralPrompt();
-            _autoCopyPromptWithToast();
-        } catch (err) {
-            console.error('[PreviewAiTools] generate-for-copy failed:', err);
-        } finally {
-            _executing = false;
-            _updateActionStates();
-        }
+    /** "Generate for copy": a run whose AI phases show and copy their prompt instead of sending it. */
+    function _onSecondaryActionClick() {
+        if (_executing || Object.keys(_paramErrors).length > 0) return;
+        if (!_chainHasAi()) return;
+        _cancelAutoExecute();
+        _startRun({ send: false });
     }
 
     // ──────────────────────────── Auto-focus + auto-copy helpers ────────
@@ -1684,14 +1753,15 @@ window.PreviewAiTools = (function () {
         if (_generalPromptTextarea) _generalPromptTextarea.focus();
     }
 
-    function _autoCopyPromptWithToast() {
-        var text = _generatedPrompt || (_generalPromptTextarea && _generalPromptTextarea.value) || '';
+    /** The prompt copied (or the text given), and a toast saying so (okMessage, else "Prompt copied"). */
+    function _autoCopyPromptWithToast(given, okMessage) {
+        var text = given || _generatedPrompt || (_generalPromptTextarea && _generalPromptTextarea.value) || '';
         if (!text) return;
         var toaster = (window.QuickSiteAdmin && typeof window.QuickSiteAdmin.showToast === 'function')
             ? window.QuickSiteAdmin.showToast.bind(window.QuickSiteAdmin)
             : null;
         var ok = function () {
-            if (toaster) toaster(_t('copiedToast', 'Prompt copied to clipboard'), 'success');
+            if (toaster) toaster(okMessage || _t('copiedToast', 'Prompt copied to clipboard'), 'success');
         };
         var fail = function () {
             if (toaster) toaster(_t('copyFailedToast', 'Could not auto-copy — use the Copy button or Ctrl+C'), 'warning');
@@ -1708,28 +1778,35 @@ window.PreviewAiTools = (function () {
         }
     }
 
-    async function _onExecuteClick() {
-        if (_executing) return;
+    /**
+     * The AI answer's Execute: a run waiting for an answer takes these commands; with no run under way,
+     * a run whose first phase is an AI one starts on this answer (it was pasted before anything ran).
+     */
+    function _onExecuteClick() {
         if (Object.keys(_paramErrors).length > 0) return;
-        if (!_currentCommands || _currentCommands.length === 0) return;
-        _executing = true;
-        _updateActionStates();
-        try {
-            await _executeCommands(_currentCommands);
-        } catch (err) {
-            console.error('[PreviewAiTools] execute failed:', err);
-        } finally {
-            _executing = false;
-            _updateActionStates();
+        if (_aiResponseStatus.type !== 'ok' || !_currentCommands || _currentCommands.length === 0) return;
+        _cancelAutoExecute();
+        if (_answerWaiter) {
+            var waiter = _answerWaiter;
+            _answerWaiter = null;
+            waiter.resolve(_currentCommands.slice());
+            return;
         }
+        if (_executing || !_firstPhaseIsAi()) return;
+        _startRun({ send: false, answer: _currentCommands.slice() });
     }
 
     // ──────────────────────────── Send to AI ────────────────────────────
 
-    async function _sendToAi(connection) {
+    /**
+     * Send the generated prompt with the connection's key; the answer streams into AI response.
+     * continuation ({ partial, request }): the request for the rest of a cut answer, sent after the
+     * prompt and the cut answer, which is given as the model's own turn.
+     */
+    async function _sendToAi(connection, continuation) {
         if (!connection) return;
         if (!window.QSAiCall || !window.QSProviderCatalog) {
-            _aiResponseStatus = { type: 'error', message: 'AI caller not loaded.' };
+            _aiResponseStatus = { type: 'error', message: 'AI caller not loaded.', plain: true, cause: 'refused' };
             _updateAiResponseStatusUI();
             _updateActionStates();
             return;
@@ -1740,7 +1817,7 @@ window.PreviewAiTools = (function () {
             || (connection.models && connection.models[0])
             || (connection.model);
         if (!model) {
-            _aiResponseStatus = { type: 'error', message: 'No model configured on the active connection.' };
+            _aiResponseStatus = { type: 'error', message: 'No model configured on the active connection.', plain: true, cause: 'refused' };
             _updateAiResponseStatusUI();
             _updateActionStates();
             return;
@@ -1757,6 +1834,9 @@ window.PreviewAiTools = (function () {
             _aiResponseText = '';
         }
         _cancelAutoExecute();
+        _aiSending = true;
+        _morphPrimary(_t('sendingToAi', 'Sending to {model}…').replace('{model}', model));
+        _updateActionStates();
 
         // Elapsed-time ticker so the user has a "still working" cue during
         // the latency before the first chunk arrives (some providers take a
@@ -1788,13 +1868,16 @@ window.PreviewAiTools = (function () {
             var result = await window.QSAiCall.call({
                 connection: connection,
                 model: model,
-                messages: [{ role: 'user', content: _generatedPrompt }],
-                options: { max_tokens: 16384, temperature: 0.7 },
+                messages: continuation
+                    ? [{ role: 'user', content: _generatedPrompt }, { role: 'assistant', content: continuation.partial },
+                        { role: 'user', content: continuation.request }]
+                    : [{ role: 'user', content: _generatedPrompt }],
+                // The answer may be as long as the connection's output limit (its max_tokens).
+                options: { temperature: 0.7 },
                 onChunk: function (_deltaText, ctx) {
                     // Stream chunks straight into the textarea so the user
-                    // sees progress (mirrors /admin/workflows/{spec} UX).
-                    // We don't fire `input` events here — programmatic value
-                    // sets are silent, so _onAiResponseInput won't trip.
+                    // sees progress. Programmatic value sets fire no `input`
+                    // event, so _onAiResponseInput does not trip.
                     var liveContent = (ctx && ctx.content) || '';
                     lastChars = liveContent.length;
                     if (_aiResponseTextarea) {
@@ -1811,38 +1894,663 @@ window.PreviewAiTools = (function () {
             }
             _aiResponseText = content;
             if (_aiResponseTextarea) _aiResponseTextarea.value = content;
-            _aiResponseStatus = _validateAiResponse(content);
-            // Same pipeline path as user paste so Steps preview + Execute
-            // button + auto-execute timer all wake up correctly.
-            _syncCommandsFromAiResponse();
-            _renderStepsPreview();
-            _updateAiResponseStatusUI();
-            _updateActionStates();
-            _scheduleAutoExecute();
+            // An answer the provider cut at the limit or stopped is never run: it is said so, and the
+            // run waits for an edit of it or another answer.
+            var finish = result && result.finish;
+            if (finish === 'length' || finish === 'other') {
+                _aiResponseStatus = { type: 'error', plain: true, cause: finish === 'length' ? 'cut' : 'stopped', message: finish === 'length'
+                    ? _t('answerCut', "The answer was cut at the connection's output limit ({n} tokens), so none of it runs. Raise the limit in AI connections, or ask for less.")
+                        .replace('{n}', String(window.QSProviderCatalog.maxOutputTokens(connection)))
+                    : _t('answerStopped', 'The AI stopped its answer early ({reason}), so none of it runs.')
+                        .replace('{reason}', String(result.finishReason)) };
+                _currentCommands = [];
+                _answerPhase = null;
+                if (_run) _showPhaseInBatch(_run.index); else _renderBatch();
+                _updateAiResponseStatusUI();
+                _updateActionStates();
+                return;
+            }
+            // The same path as a paste: the answer checked, classified, its Execute or grace timer.
+            _onAnswerChanged();
         } catch (err) {
-            var errTpl = _t('sendFailed', 'Send failed: {error}');
             var msg = err && err.message ? err.message : String(err);
-            _aiResponseStatus = { type: 'error', message: errTpl.replace('{error}', msg) };
+            // An answer that had begun to arrive broke off; else the send itself failed.
+            var partial = err && typeof err.partial === 'string' ? err.partial : '';
+            _aiResponseText = partial;
+            _aiResponseStatus = { type: 'error', plain: true, cause: partial ? 'brokeOff' : 'refused', message: partial
+                ? _t('answerBrokeOff', 'The answer broke off after {chars} characters: {error}')
+                    .replace('{chars}', String(partial.length)).replace('{error}', msg)
+                : _t('sendFailed', 'Send failed: {error}').replace('{error}', msg) };
             _currentCommands = [];
-            _renderStepsPreview();
+            _answerPhase = null;
+            if (_run) _showPhaseInBatch(_run.index); else _renderBatch();
             _updateAiResponseStatusUI();
             _updateActionStates();
         } finally {
             clearInterval(statusTickerId);
+            _aiSending = false;
+            if (_run) _morphPrimary(_t('runActive', 'Running…'));
+            _updateActionStates();
         }
     }
 
-    // ──────────────────────────── Execute batch ─────────────────────────
+    // ──────────────────────────── The run, phase by phase ───────────────
+    //
+    // A run goes through the workflow's phases in order — its pre-workflows, the workflow, its
+    // post-workflows: the server's plan (workflow-generate-steps). Each phase is resolved again when
+    // the run reaches it, so it reads what the earlier ones changed. With "Run without stopping" off,
+    // the run pauses before each phase but the first for a review (Continue / Stop); a review also
+    // stands before a first phase that deletes or changes content. What a phase deletes or changes
+    // (the server's 'effects') is confirmed before it runs: by its review's Continue with the switch
+    // off, by one danger dialog at the start with it on — after which only what that dialog did not
+    // list asks again. An AI phase builds its prompt from the project as it then is, sends it with the
+    // connection's key or shows it to copy, and waits for an answer whatever the switch; with the
+    // switch off its Execute confirms what the answer does. Stop, a failing step marked abortOnFail
+    // and the write rate end the run and keep the rest for later (the kept banner at the top).
+
+    /** Whether "Run without stopping" is on. */
+    function _autoContinue() {
+        return _readToggle('aiAutoExecute');
+    }
+
+    /**
+     * A run of the open workflow. opts.send: an AI phase's prompt is sent with the connection's key
+     * (else shown and copied); opts.answer: the commands of an answer pasted before the run (its first
+     * phase an AI one); opts.resume: kept steps run again (_resumeKept()).
+     */
+    async function _startRun(opts) {
+        opts = opts || {};
+        if (_executing || !_activeWorkflowSummary) return;
+        var toaster = _toaster();
+        // Kept steps come first: a new run would plan over a page they were planned for.
+        if (!opts.resume && _readKept()) {
+            toaster(_t('keptBlocking', 'Run or discard the kept steps first.'), 'warning');
+            _renderKept();
+            return;
+        }
+        var run = {
+            workflowId: _activeWorkflowSummary.id,
+            label: _currentRunLabel(),
+            params: JSON.parse(JSON.stringify(_paramValues)),
+            send: !!opts.send,
+            plan: [],
+            index: 0,
+            first: opts.resume ? opts.resume.phase : 0,
+            confirmed: {},
+            started: {},
+            states: [],
+            ok: 0,
+            fail: 0,
+            ran: false,
+            last: null
+        };
+        _run = run;
+        _executing = true;
+        _setRunLocked(true);
+        _updateActionStates();
+        _morphPrimary(_t('runActive', 'Running…'));
+        try {
+            run.plan = await _fetchPlan(run.params);
+            // Kept steps take the place of their phase's steps: the rest of the phase they stopped in.
+            if (opts.resume && opts.resume.steps && run.plan[run.first]) {
+                run.plan[run.first] = Object.assign({}, run.plan[run.first],
+                    { steps: opts.resume.steps, effects: opts.resume.effects || [], kept: true });
+            }
+            _plan = run.plan.slice();
+            _renderRunLine();
+            _renderBatch();
+            if (run.first >= run.plan.length) return;
+            if (!_rateAllowsStart(run)) return;
+            if (_autoContinue() && !(await _confirmRunStart(run))) return;
+            for (var k = run.first; k < run.plan.length; k++) {
+                run.index = k;
+                var outcome = await _runPhase(run, k, k === run.first && opts.answer ? { answer: opts.answer } : {});
+                if (outcome.stop) {
+                    run.states[k] = 'stopped';
+                    _renderRunLine();
+                    _stopRun(run, k, outcome);
+                    return;
+                }
+                run.states[k] = 'done';
+                _renderRunLine();
+            }
+            if (_stepsHeaderState) {
+                _stepsHeaderState.textContent = run.fail === 0
+                    ? _t('executionDone', 'Done ({ok} succeeded)').replace('{ok}', String(run.ok))
+                    : _t('executionDoneWithErrors', 'Done ({ok}/{total} succeeded, {fail} failed)')
+                        .replace('{ok}', String(run.ok)).replace('{total}', String(run.ok + run.fail)).replace('{fail}', String(run.fail));
+            }
+        } catch (err) {
+            console.error('[PreviewAiTools] run failed:', err);
+            var failMsg = _t('runFailed', 'The run stopped: {error}').replace('{error}', (err && err.message) || String(err));
+            if (_stepsHeaderState) _stepsHeaderState.textContent = failMsg;
+            toaster(failMsg, 'error');
+        } finally {
+            if (_answerWaiter) _answerWaiter = null;
+            _run = null;
+            _continuation = null;
+            _answerParts = 0;
+            _executing = false;
+            _hideReview();
+            _setRunLocked(false);
+            _renderYourPromptFields();
+            _updateActionStates();
+            _renderKept();
+            // Notify the rest of the editor that a workflow ran (the miniplayer and others refresh).
+            if (run.ran) {
+                try {
+                    window.dispatchEvent(new CustomEvent('quicksite:workflow-complete'));
+                } catch (_e) { /* ignore */ }
+            }
+        }
+    }
+
+    /**
+     * One phase of the run, resolved now — the plan's own for the first phase it runs, since nothing
+     * has run since the plan was made — then run.
+     */
+    async function _runPhase(run, k, opts) {
+        var phase = k === run.first ? run.plan[k] : await _fetchPhase(run.params, k);
+        run.plan[k] = phase;
+        _plan[k] = phase;
+        run.states[k] = 'current';
+        _renderRunLine();
+        _showPhaseInBatch(k);
+        return phase.ai ? _runAiPhase(run, k, phase, opts) : _runStepsPhase(run, k, phase);
+    }
+
+    /** A phase of steps: its review or its confirmation, then its steps (kept steps stay kept on a stop). */
+    async function _runStepsPhase(run, k, phase) {
+        var kept = !!phase.kept;
+        var warned = _warnedEffects(phase.effects);
+        if (!_autoContinue()) {
+            if (k > run.first || warned.length > 0) {
+                if (!(await _review(run, k, phase))) return { stop: 'user', phase: phase, from: 0, resolved: kept };
+                _markConfirmed(run, warned);
+            }
+        } else {
+            var fresh = _unconfirmed(run, warned);
+            if (fresh.length > 0) {
+                if (!(await _confirmEffects([{ phase: phase, effects: fresh }], []))) {
+                    return { stop: 'user', phase: phase, from: 0, resolved: kept };
+                }
+                _markConfirmed(run, fresh);
+            }
+        }
+        _hideReview();
+        return _runSteps(run, k, phase);
+    }
+
+    /** An AI phase: its prompt built now and sent or copied, then the answer it waits for, then its commands. */
+    async function _runAiPhase(run, k, phase, opts) {
+        var commands = opts.answer || (phase.kept ? phase.steps : null);
+        if (!commands) {
+            var key = _requestKey(phase, run.plan);
+            if (!_autoContinue() && k > run.first) {
+                if (!(await _review(run, k, phase))) return { stop: 'user', phase: phase, from: 0, resolved: false };
+            }
+            run.started[key] = true;
+            _lockRequest(key);
+            var built = await _fetchPhase(run.params, k, { prompt: true });
+            var request = (_requests[key] || '').trim();
+            _generatedPrompt = String(built.prompt || '') + (request ? '\n\n---\n\n**User Request:**\n' + request : '');
+            if (_generalPromptTextarea) _generalPromptTextarea.value = _generatedPrompt;
+            if (_exchangeHeaderEl) {
+                _exchangeHeaderEl.textContent = _aiPhases().length > 1
+                    ? _t('exchangeFor', 'AI exchange — {name}').replace('{name}', phase.title)
+                    : _t('zoneExchange', 'AI exchange');
+            }
+            _aiResponseText = '';
+            if (_aiResponseTextarea) _aiResponseTextarea.value = '';
+            _aiResponseStatus = { type: 'idle' };
+            _currentCommands = [];
+            _answerPhase = null;
+            _continuation = null;
+            _answerParts = 0;
+            _updateAiResponseStatusUI();
+            var conn = _getDefaultConnection();
+            var waiting = _awaitAnswer();
+            _showAwaitingAnswer(run, k, phase);
+            _updateActionStates();
+            if (run.send && conn) {
+                _morphPrimary(_t('sendingToAi', 'Sending to {model}…').replace('{model}', conn.defaultModel || conn.model || ''));
+                await _sendToAi(conn);
+            } else {
+                _morphPrimary(_t('runActive', 'Running…'));
+                _focusGeneralPrompt();
+                _autoCopyPromptWithToast();
+            }
+            // The answer it waits for: whatever the switch says, without a key this is where the run stops.
+            commands = await waiting;
+            if (commands === null) return { stop: 'user', phase: phase, from: 0, resolved: false };
+        }
+        var answered = await _fetchPhase(run.params, k, { answer: commands });
+        run.plan[k] = answered;
+        _plan[k] = answered;
+        _showPhaseInBatch(k);
+        // The switch on: a deletion in the answer is confirmed (the changes were announced at the start).
+        if (_autoContinue()) {
+            var deletes = _unconfirmed(run, _warnedEffects(answered.effects).filter(function (e) { return e.effect === 'delete'; }));
+            if (deletes.length > 0 && !(await _confirmEffects([{ phase: answered, effects: deletes }], []))) {
+                return { stop: 'user', phase: answered, from: 0, resolved: true };
+            }
+            _markConfirmed(run, deletes);
+        }
+        _hideReview();
+        return _runSteps(run, k, answered);
+    }
+
+    /** A phase's steps, run; the phase's outcome for the run. */
+    async function _runSteps(run, k, phase) {
+        if (!phase.steps || phase.steps.length === 0) return {};
+        var res = await _executeSteps(phase.steps, phase.effects || [], { body: _phaseBodies[k] || _stepsBody, name: phase.title });
+        run.ran = true;
+        run.ok += res.ok;
+        run.fail += res.fail;
+        run.last = { name: phase.title, ok: res.ok, fail: res.fail, total: res.ok + res.fail };
+        // The preview shows what the phase changed before the next one is reviewed.
+        if (res.ok > 0 && window.PreviewManager && typeof window.PreviewManager.reload === 'function') {
+            try { window.PreviewManager.reload(); } catch (_e) { /* ignore */ }
+        }
+        if (res.stoppedAt >= 0) {
+            return { stop: res.reason, phase: phase, from: res.stoppedAt, resolved: true, command: res.command };
+        }
+        return {};
+    }
+
+    /**
+     * The run ends before its last phase: the rest is kept for later (the steps of this phase not run,
+     * when it ran some, and every later phase), and the header and a toast say why.
+     */
+    function _stopRun(run, k, outcome) {
+        var toaster = _toaster();
+        var api = window.QuickSiteAPI;
+        // The steps of this phase not run, when it ran (or was resolved for running); else the run
+        // resumes by resolving this phase again.
+        var steps = outcome.resolved ? (outcome.phase.steps || []).slice(outcome.from) : [];
+        var resumeAt = steps.length > 0 ? k : (outcome.resolved ? k + 1 : k);
+        if (resumeAt < run.plan.length) {
+            _writeKept({
+                workflowId: run.workflowId,
+                label: run.label,
+                params: run.params,
+                requests: Object.assign({}, _requests),
+                phase: resumeAt,
+                phaseTitle: run.plan[resumeAt].title,
+                steps: steps.length > 0 ? steps : null,
+                effects: steps.length > 0 ? (outcome.phase.effects || []).slice(outcome.from) : null,
+                later: run.plan.slice(resumeAt + 1).map(function (p) { return p.title; })
+            });
+        }
+        var msg;
+        if (outcome.stop === 'rate') {
+            var backAt = (api && api.getWriteRate ? api.getWriteRate().windows || [] : []).reduce(function (m, w) {
+                return w.remaining <= 0 ? Math.max(m, w.resetAt) : m;
+            }, 0);
+            msg = _t('rateStopped', 'Stopped: the change allowance is used up until {time}. The {n} steps not run are kept; run them from here once it is back.')
+                .replace('{time}', backAt && api ? api.clockText(backAt) : '')
+                .replace('{n}', String(steps.length));
+        } else if (outcome.stop === 'parts') {
+            msg = _t('rateKeptRest', 'The other {n} steps are kept; run them from here once the allowance is back.')
+                .replace('{n}', String(steps.length));
+        } else if (outcome.stop === 'abort') {
+            msg = _t('stoppedByStep', 'Stopped: {command} failed, and its step stops the run when it fails. The rest is kept: run it from the banner at the top once the cause is fixed.')
+                .replace('{command}', outcome.command || '');
+        } else {
+            msg = _t('stoppedByUser', 'Stopped before {name}. The rest of the run is kept: run it from the banner at the top.')
+                .replace('{name}', outcome.phase.title);
+        }
+        if (_stepsHeaderState) _stepsHeaderState.textContent = msg;
+        toaster(msg, outcome.stop === 'user' || outcome.stop === 'parts' ? 'info' : 'warning');
+    }
+
+    /**
+     * Whether the run may start against the write rate: the steps the plan knows now (an AI phase's
+     * are not known yet) counted as one batch is today. Each phase is counted again when it runs.
+     */
+    function _rateAllowsStart(run) {
+        var api = window.QuickSiteAPI;
+        var rate = (api && typeof api.getWriteRate === 'function') ? api.getWriteRate() : { windows: [], waitSeconds: 0 };
+        var counted = 0;
+        run.plan.slice(run.first).forEach(function (p) { if (!p.ai || p.kept) counted += _countedSteps(p.steps || []); });
+        if (rate.windows.length === 0 || counted === 0) return true;
+        var plan = _planRun(counted, rate);
+        if (plan.start || (plan.reason === 'never' && plan.fitsNow > 0)) return true;
+        var waitMsg = _t('rateRefusedToStart', 'This run needs {needs} changes and {left} are left on this server. Enough is back at {time} (in {wait}).')
+            .replace('{needs}', String(counted))
+            .replace('{left}', String(plan.left))
+            .replace('{time}', api.clockText(plan.backAt))
+            .replace('{wait}', api.waitText((plan.backAt - Date.now()) / 1000));
+        if (_stepsHeaderState) _stepsHeaderState.textContent = waitMsg;
+        _toaster()(waitMsg, 'warning');
+        return false;
+    }
+
+    // ──────────────────────────── What a phase deletes or changes ───────
+
+    /** The warned steps' effects (the server's, null for a step that is neither). */
+    function _warnedEffects(effects) {
+        return (effects || []).filter(function (e) { return e && (e.effect === 'delete' || e.effect === 'change'); });
+    }
+
+    function _effectKey(e) {
+        return e.effect + '|' + e.what + '|' + e.target;
+    }
+
+    function _markConfirmed(run, effects) {
+        effects.forEach(function (e) { run.confirmed[_effectKey(e)] = true; });
+    }
+
+    function _unconfirmed(run, effects) {
+        var seen = {};
+        return effects.filter(function (e) {
+            var key = _effectKey(e);
+            if (run.confirmed[key] || seen[key]) return false;
+            seen[key] = true;
+            return true;
+        });
+    }
+
+    var EFFECT_WHAT = {
+        pages: ['whatPages', 'Pages'],
+        menu: ['whatMenu', 'The menu'],
+        footer: ['whatFooter', 'The footer'],
+        components: ['whatComponents', 'Components'],
+        snippets: ['whatSnippets', 'Snippets'],
+        languages: ['whatLanguages', 'Languages'],
+        defaultLanguage: ['whatDefaultLanguage', 'The default language'],
+        multilingual: ['whatMultilingual', 'Multilingual mode'],
+        texts: ['whatTexts', 'Texts'],
+        translationFiles: ['whatTranslationFiles', 'Translation files of languages the project no longer has'],
+        media: ['whatMedia', 'Media files'],
+        stylesheet: ['whatStylesheet', 'The stylesheet'],
+        interactions: ['whatInteractions', 'Interactions'],
+        privacy: ['whatPrivacy', 'Privacy pages and settings'],
+        other: ['whatOther', 'Other commands']
+    };
+    var EFFECT_LIST_MAX = 8;
+
+    /**
+     * The lines a warning lists: deletions first, then changes, one line per group, its targets named
+     * ("Deletes — Pages: about, services and 3 more").
+     */
+    function _effectLines(effects) {
+        var groups = [];
+        var byKey = {};
+        ['delete', 'change'].forEach(function (kind) {
+            effects.forEach(function (e) {
+                if (e.effect !== kind) return;
+                var key = kind + '|' + e.what;
+                if (!byKey[key]) {
+                    byKey[key] = { effect: kind, what: e.what, targets: [] };
+                    groups.push(byKey[key]);
+                }
+                if (e.target !== '' && byKey[key].targets.indexOf(e.target) === -1) byKey[key].targets.push(e.target);
+            });
+        });
+        return groups.map(function (g) {
+            var what = EFFECT_WHAT[g.what] || EFFECT_WHAT.other;
+            var verb = g.effect === 'delete' ? _t('effectDeletes', 'Deletes') : _t('effectChanges', 'Changes');
+            var line = verb + ' — ' + _t(what[0], what[1]);
+            if (g.targets.length > 0) {
+                var shown = g.targets.slice(0, EFFECT_LIST_MAX).join(', ');
+                if (g.targets.length > EFFECT_LIST_MAX) {
+                    shown = _t('effectMore', '{items} and {n} more').replace('{items}', shown)
+                        .replace('{n}', String(g.targets.length - EFFECT_LIST_MAX));
+                }
+                line += ': ' + shown;
+            }
+            return { effect: g.effect, text: line };
+        });
+    }
+
+    /**
+     * The panel's danger dialog for what is about to be deleted or changed: each phase named with its
+     * lines, then each AI phase announced (its commands are not known yet). True on the confirm.
+     */
+    function _confirmEffects(groups, aiPhases) {
+        var utils = window.QuickSiteUtils;
+        if (!utils || typeof utils.confirm !== 'function') return Promise.resolve(false);
+        var deletes = false;
+        var parts = [];
+        groups.forEach(function (g) {
+            var lines = _effectLines(g.effects);
+            if (lines.length === 0) return;
+            lines.forEach(function (l) { if (l.effect === 'delete') deletes = true; });
+            parts.push(g.phase.title + ':\n' + lines.map(function (l) { return '• ' + l.text; }).join('\n'));
+        });
+        aiPhases.forEach(function (p) {
+            parts.push(_t('confirmAiAnnounce', "{name} (AI): the commands its AI answers change the site; a deletion among them is asked when the answer arrives.")
+                .replace('{name}', p.title));
+        });
+        return utils.confirm(parts.join('\n\n'), {
+            type: 'danger',
+            title: deletes ? _t('confirmTitleDelete', 'Delete content?') : _t('confirmTitleChange', 'Change content?'),
+            confirmText: deletes ? _t('confirmRunDelete', 'Delete and run') : _t('confirmRunChange', 'Change and run')
+        });
+    }
+
+    /**
+     * "Run without stopping": the one dialog before anything runs, listing what every phase the plan
+     * knows deletes and changes; none when nothing is known to. True to go on.
+     */
+    async function _confirmRunStart(run) {
+        var groups = [];
+        var aiPhases = [];
+        for (var k = run.first; k < run.plan.length; k++) {
+            var p = run.plan[k];
+            if (p.ai) {
+                aiPhases.push(p);
+                continue;
+            }
+            var warned = _unconfirmed(run, _warnedEffects(p.effects));
+            if (warned.length > 0) groups.push({ phase: p, effects: warned });
+        }
+        if (groups.length === 0) return true;
+        if (!(await _confirmEffects(groups, aiPhases))) return false;
+        groups.forEach(function (g) { _markConfirmed(run, g.effects); });
+        return true;
+    }
+
+    // ──────────────────────────── The review ────────────────────────────
+
+    /** The pause before phase k: what it does, Continue (its confirmation) or Stop. True on Continue. */
+    function _review(run, k, phase) {
+        return new Promise(function (resolve) {
+            _renderReview(run, k, phase, resolve);
+        });
+    }
+
+    function _renderReview(run, k, phase, resolve) {
+        if (!_reviewEl) {
+            resolve(false);
+            return;
+        }
+        _reviewEl.replaceChildren();
+        _recoveryEls = null;
+        _reviewEl.hidden = false;
+        var warned = _warnedEffects(phase.effects);
+        var lines = _effectLines(warned);
+        var deletes = lines.some(function (l) { return l.effect === 'delete'; });
+        _reviewEl.className = 'preview-contextual-ai-tools__review'
+            + (deletes ? ' preview-contextual-ai-tools__review--delete' : (lines.length ? ' preview-contextual-ai-tools__review--change' : ''));
+
+        var title = document.createElement('p');
+        title.className = 'preview-contextual-ai-tools__review-title';
+        title.textContent = _t('reviewNext', 'Next — {current} of {total}: {name}')
+            .replace('{current}', String(k + 1)).replace('{total}', String(run.plan.length)).replace('{name}', phase.title);
+        _reviewEl.appendChild(title);
+
+        var what = document.createElement('p');
+        what.className = 'preview-contextual-ai-tools__review-what';
+        what.textContent = phase.ai
+            ? _t('reviewAi', 'Its prompt is built from the project as it now is.')
+            : _t('reviewSteps', '{n} steps').replace('{n}', String((phase.steps || []).length));
+        _reviewEl.appendChild(what);
+
+        if (run.last) {
+            var last = document.createElement('p');
+            last.className = 'preview-contextual-ai-tools__review-last';
+            last.textContent = (run.last.fail > 0
+                ? _t('reviewLastFailed', '{name}: {ok} of {total} succeeded, {fail} failed')
+                : _t('reviewLast', '{name}: {ok} of {total} succeeded'))
+                .replace('{name}', run.last.name).replace('{ok}', String(run.last.ok))
+                .replace('{total}', String(run.last.total)).replace('{fail}', String(run.last.fail));
+            _reviewEl.appendChild(last);
+        }
+
+        if (lines.length > 0) _reviewEl.appendChild(_renderEffectList(lines));
+
+        if (phase.ai) {
+            _reviewEl.appendChild(_renderRequestField(phase, true, '-review'));
+        }
+
+        var actions = document.createElement('div');
+        actions.className = 'preview-contextual-ai-tools__review-actions';
+        var go = document.createElement('button');
+        go.type = 'button';
+        go.className = 'admin-btn admin-btn--small ' + (deletes ? 'admin-btn--danger' : 'admin-btn--primary');
+        go.textContent = deletes ? _t('reviewContinueDelete', 'Delete and continue')
+            : (lines.length ? _t('reviewContinueChange', 'Change and continue') : _t('reviewContinue', 'Continue'));
+        var stop = document.createElement('button');
+        stop.type = 'button';
+        stop.className = 'admin-btn admin-btn--secondary admin-btn--small';
+        stop.textContent = _t('reviewStop', 'Stop');
+        go.addEventListener('click', function () { resolve(true); });
+        stop.addEventListener('click', function () { resolve(false); });
+        actions.appendChild(go);
+        actions.appendChild(stop);
+        _reviewEl.appendChild(actions);
+        if (_stepsSetOpen && !phase.ai) _stepsSetOpen(true);
+        if (_stepsHeaderState) {
+            _stepsHeaderState.textContent = _t('stepsReady', '{n} commands ready').replace('{n}', String((phase.steps || []).length));
+        }
+        go.focus();
+    }
+
+    /**
+     * A run waiting for an AI answer: the bar says so, and Stop ends the run there. An answer that
+     * cannot run is recovered from it: Continue the answer, Send again (_refreshRecovery()).
+     */
+    function _showAwaitingAnswer(run, k, phase) {
+        if (!_reviewEl) return;
+        _reviewEl.replaceChildren();
+        _reviewEl.hidden = false;
+        _reviewEl.className = 'preview-contextual-ai-tools__review';
+        var title = document.createElement('p');
+        title.className = 'preview-contextual-ai-tools__review-title';
+        title.textContent = _t('reviewAwaiting', "{current} of {total}: waiting for {name}'s answer — it runs from AI response.")
+            .replace('{current}', String(k + 1)).replace('{total}', String(run.plan.length)).replace('{name}', phase.title);
+        _reviewEl.appendChild(title);
+        var actions = document.createElement('div');
+        actions.className = 'preview-contextual-ai-tools__review-actions';
+        _recoveryEls = {
+            continueBtn: _renderRecoveryButton('continue', 'admin-btn--primary', _t('continueAnswer', 'Continue the answer'),
+                _onContinueAnswerClick),
+            sendAgainBtn: _renderRecoveryButton('send-again', 'admin-btn--secondary', _t('sendAgain', 'Send again'),
+                _onSendAgainClick)
+        };
+        _recoveryEls.sendAgainBtn.title = _t('sendAgainTitle', 'Sends the same prompt again, for a new answer.');
+        actions.appendChild(_recoveryEls.continueBtn);
+        actions.appendChild(_recoveryEls.sendAgainBtn);
+        var stop = document.createElement('button');
+        stop.type = 'button';
+        stop.className = 'admin-btn admin-btn--secondary admin-btn--small';
+        stop.textContent = _t('reviewStop', 'Stop');
+        stop.addEventListener('click', function () {
+            if (!_answerWaiter) return;
+            var waiter = _answerWaiter;
+            _answerWaiter = null;
+            _cancelAutoExecute();
+            waiter.resolve(null);
+        });
+        actions.appendChild(stop);
+        _reviewEl.appendChild(actions);
+        _refreshRecovery();
+    }
+
+    function _hideReview() {
+        if (!_reviewEl) return;
+        _reviewEl.replaceChildren();
+        _reviewEl.hidden = true;
+        _recoveryEls = null;
+    }
+
+    /** A warning's lines, as a list: red for a deletion, amber for a change. */
+    function _renderEffectList(lines) {
+        var list = document.createElement('ul');
+        list.className = 'preview-contextual-ai-tools__effects';
+        lines.forEach(function (l) {
+            var item = document.createElement('li');
+            item.className = 'preview-contextual-ai-tools__effect preview-contextual-ai-tools__effect--' + l.effect;
+            item.textContent = l.text;
+            list.appendChild(item);
+        });
+        return list;
+    }
+
+    /** A promise of the AI answer's commands (null when the run is stopped while it waits). */
+    function _awaitAnswer() {
+        return new Promise(function (resolve) {
+            _answerWaiter = { resolve: resolve };
+        });
+    }
+
+    /** While a run is under way: its parameters, its requests and ← Back locked; the plan's parameters are the run's. */
+    function _setRunLocked(locked) {
+        if (!_runnerView) return;
+        var section = _runnerView.querySelector('[data-section="parameters"]');
+        var fields = section ? section.querySelectorAll('input, select, textarea') : [];
+        for (var i = 0; i < fields.length; i++) fields[i].disabled = locked;
+        _paramPickers.forEach(function (p) { if (typeof p.refresh === 'function') p.refresh(); });
+        var requests = _yourPromptBody ? _yourPromptBody.querySelectorAll('textarea') : [];
+        for (var r = 0; r < requests.length; r++) requests[r].disabled = false;
+        var back = _runnerView.querySelector('.preview-contextual-ai-tools__runner-back');
+        if (back) back.disabled = locked;
+    }
+
+    /** An AI phase's request, read when its phase starts: its fields lock from then on. */
+    function _lockRequest(key) {
+        var fields = _runnerView ? _runnerView.querySelectorAll('textarea[data-request-key]') : [];
+        for (var i = 0; i < fields.length; i++) {
+            if (fields[i].dataset.requestKey === key) fields[i].disabled = true;
+        }
+    }
+
+    /** The run's phases in a line, each with its state; only for a run of more than one phase. */
+    function _renderRunLine() {
+        if (!_runLineEl) return;
+        _runLineEl.replaceChildren();
+        var phases = _run ? _run.plan : _plan;
+        _runLineEl.hidden = phases.length < 2;
+        if (phases.length < 2) return;
+        var marks = { done: '✅', current: '▶', stopped: '⏹' };
+        phases.forEach(function (p, i) {
+            if (i > 0) _runLineEl.appendChild(document.createTextNode(' → '));
+            var item = document.createElement('span');
+            var state = _run ? (_run.states[i] || 'pending') : 'pending';
+            item.className = 'preview-contextual-ai-tools__run-phase preview-contextual-ai-tools__run-phase--' + state;
+            item.textContent = (marks[state] ? marks[state] + ' ' : '') + p.title + (p.ai ? ' (' + _t('kindAi', 'AI') + ')' : '');
+            _runLineEl.appendChild(item);
+        });
+    }
+
+    function _toaster() {
+        return (window.QuickSiteAdmin && typeof window.QuickSiteAdmin.showToast === 'function')
+            ? window.QuickSiteAdmin.showToast.bind(window.QuickSiteAdmin)
+            : function () {};
+    }
+
+    // ──────────────────────────── Execute a phase's steps ───────────────
     //
     // Every command but a read counts against the account's write rate (the
-    // server's own list: QuickSiteAPI.countsAsWrite). Before a run starts its
-    // counted steps are set against what is left of each window
-    // (_planRun): a run that would have to wait longer than the runner's wait
-    // limit does not start, and one that can never fit in one go is offered in
-    // parts. During a run, a refusal whose wait fits the limit is waited out and
-    // the same step sent again; a longer one stops the run and keeps the steps
-    // not run (per account and project), offered again once the allowance is
-    // back — never run on their own.
+    // server's own list: QuickSiteAPI.countsAsWrite). Before a phase runs its counted steps are
+    // set against what is left of each window (_planRun): a phase that would have to wait longer than
+    // the runner's wait limit does not run, and one that can never fit in one go is offered in parts.
+    // During a phase, a refusal whose wait fits the limit is waited out and the same step sent again; a
+    // longer one stops the run. A step's own options: retryOn sends it again on those statuses (up to
+    // maxRetries times, retryDelayMs apart: the schema's defaults when left out), and abortOnFail: true
+    // stops the run when it fails; a step that says nothing carries on after a failure.
 
     /** Commands of a list that count against the write rate. */
     function _countedSteps(commands) {
@@ -1917,26 +2625,21 @@ window.PreviewAiTools = (function () {
         return i;
     }
 
-    async function _executeCommands(commands, opts) {
+    /**
+     * Run one phase's steps into opts.body (its rows drawn there, each with what it deletes or changes),
+     * one at a time. Returns {ok, fail, stoppedAt, reason, command}: stoppedAt is the first step not
+     * done (-1 when every step ran), reason 'rate' (the allowance), 'parts' (a run in parts), 'abort' (a
+     * failing step marked abortOnFail) or 'user' (the parts offer declined).
+     */
+    async function _executeSteps(steps, effects, opts) {
         opts = opts || {};
-        if (!Array.isArray(commands) || commands.length === 0) return;
-        if (!_stepsBody) return;
-
-        var toaster = (window.QuickSiteAdmin && typeof window.QuickSiteAdmin.showToast === 'function')
-            ? window.QuickSiteAdmin.showToast.bind(window.QuickSiteAdmin)
-            : function () {};
+        var toaster = _toaster();
         var api = window.QuickSiteAPI;
-
-        // Kept steps come first: a new run would plan over a page they were planned for.
-        if (!opts.fromKept && _readKept()) {
-            toaster(_t('keptBlocking', 'Run or discard the kept steps first.'), 'warning');
-            _renderKept();
-            return;
-        }
+        var out = { ok: 0, fail: 0, stoppedAt: -1, reason: '', command: '' };
 
         // ── Before starting: the counted steps against what is left ──
         var rate = (api && typeof api.getWriteRate === 'function') ? api.getWriteRate() : { windows: [], waitSeconds: 0 };
-        var counted = _countedSteps(commands);
+        var counted = _countedSteps(steps);
         var keepAfter = null;
         if (rate.windows.length > 0 && counted > 0) {
             var plan = _planRun(counted, rate);
@@ -1948,122 +2651,123 @@ window.PreviewAiTools = (function () {
                     .replace('{wait}', api.waitText((plan.backAt - Date.now()) / 1000));
                 if (_stepsHeaderState) _stepsHeaderState.textContent = waitMsg;
                 toaster(waitMsg, 'warning');
-                return;
+                out.stoppedAt = 0;
+                out.reason = 'rate';
+                return out;
             }
             if (!plan.start) {
                 // More than a whole window: never in one go. Offered in parts.
-                var fits = _firstPart(commands, plan.fitsNow);
+                var fits = _firstPart(steps, plan.fitsNow);
                 var neverMsg = _t('rateNeverOneGo', 'This run needs {needs} changes; this server allows {max} per {period}, so it cannot run in one go.')
                     .replace('{needs}', String(counted))
                     .replace('{max}', String(plan.window.max))
                     .replace('{period}', api.periodText(plan.window.period));
                 var partsMsg = _t('rateRunInParts', 'Run the first {fits} steps now and keep the other {rest} for later?')
                     .replace('{fits}', String(fits))
-                    .replace('{rest}', String(commands.length - fits));
+                    .replace('{rest}', String(steps.length - fits));
                 var go = window.QuickSiteUtils && typeof window.QuickSiteUtils.confirm === 'function'
                     ? await window.QuickSiteUtils.confirm(neverMsg + ' ' + partsMsg, { confirmText: _t('rateRunPart', 'Run the first part') })
                     : false;
                 if (!go) {
                     if (_stepsHeaderState) _stepsHeaderState.textContent = neverMsg;
-                    return;
+                    out.stoppedAt = 0;
+                    out.reason = 'user';
+                    return out;
                 }
                 keepAfter = fits;
             }
         }
 
-        // The run starts: kept steps it runs leave storage (they come back if it stops again).
-        if (opts.fromKept) {
-            _clearKept();
-            _renderKept();
-        }
-
+        var body = opts.body || _stepsBody;
         if (_stepsSetOpen) _stepsSetOpen(true);
-        _stepsBody.replaceChildren();
+        if (body) body.replaceChildren();
         var rows = [];
-        for (var i = 0; i < commands.length; i++) {
-            var row = _renderStepRow(commands[i]);
+        for (var i = 0; i < steps.length; i++) {
+            var row = _renderStepRow(steps[i], effects[i] || null);
             rows.push(row);
-            _stepsBody.appendChild(row.el);
+            if (body) body.appendChild(row.el);
         }
 
-        var ok = 0;
-        var fail = 0;
-        var stoppedAt = -1;
         var runTpl = _t('executionRunning', 'Running {current}/{total}');
-        var last = keepAfter !== null ? keepAfter : commands.length;
-
+        var last = keepAfter !== null ? keepAfter : steps.length;
         for (var j = 0; j < last; j++) {
             if (_stepsHeaderState) {
                 _stepsHeaderState.textContent = runTpl
                     .replace('{current}', String(j + 1))
-                    .replace('{total}', String(commands.length));
+                    .replace('{total}', String(steps.length)) + (opts.name ? ' · ' + opts.name : '');
             }
             _updateStepRow(rows[j], 'running');
+            var result;
             try {
-                var result = await _executeOneCommand(commands[j]);
+                result = await _executeWithRetries(steps[j], rows[j]);
                 // The write rate refused this step: wait it out when the wait fits
                 // the limit (then the same step again), else stop here.
                 while (result.rateLimited && result.retryAfter <= rate.waitSeconds) {
                     await _waitWithCountdown(result.retryAfter);
                     _updateStepRow(rows[j], 'running');
-                    result = await _executeOneCommand(commands[j]);
-                }
-                if (result.rateLimited) {
-                    stoppedAt = j;
-                    _updateStepRow(rows[j], 'error', result.error || '');
-                    break;
-                }
-                if (result.ok) {
-                    ok++;
-                    _updateStepRow(rows[j], 'ok', result.message || '');
-                } else {
-                    fail++;
-                    _updateStepRow(rows[j], 'error', result.error || 'Failed');
+                    result = await _executeWithRetries(steps[j], rows[j]);
                 }
             } catch (e) {
-                fail++;
-                _updateStepRow(rows[j], 'error', (e && e.message) || String(e));
+                result = { ok: false, error: (e && e.message) || String(e) };
+            }
+            if (result.rateLimited) {
+                out.stoppedAt = j;
+                out.reason = 'rate';
+                _updateStepRow(rows[j], 'error', result.error || '');
+                break;
+            }
+            if (result.ok) {
+                out.ok++;
+                _updateStepRow(rows[j], 'ok', result.message || '');
+                continue;
+            }
+            out.fail++;
+            _updateStepRow(rows[j], 'error', result.error || 'Failed');
+            if (steps[j].abortOnFail === true) {
+                out.stoppedAt = j;
+                out.reason = 'abort';
+                out.command = steps[j].command || steps[j].name || '';
+                break;
             }
         }
+        if (out.stoppedAt < 0 && keepAfter !== null && keepAfter < steps.length) {
+            out.stoppedAt = keepAfter;
+            out.reason = 'parts';
+        }
+        return out;
+    }
 
-        // Steps not run: kept for later — after a stop, or the rest of a run in parts.
-        var keepFrom = stoppedAt >= 0 ? stoppedAt : (keepAfter !== null ? keepAfter : -1);
-        if (keepFrom >= 0 && keepFrom < commands.length) {
-            _writeKept(commands.slice(keepFrom), opts.label || _currentRunLabel());
-            var backAt = (api.getWriteRate().windows || []).reduce(function (m, w) {
-                return w.remaining <= 0 ? Math.max(m, w.resetAt) : m;
-            }, 0);
-            var keptMsg = (stoppedAt >= 0
-                ? _t('rateStopped', 'Stopped: the change allowance is used up until {time}. The {n} steps not run are kept; run them from here once it is back.')
-                : _t('rateKeptRest', 'The other {n} steps are kept; run them from here once the allowance is back.'))
-                .replace('{time}', backAt ? api.clockText(backAt) : '')
-                .replace('{n}', String(commands.length - keepFrom));
-            if (_stepsHeaderState) _stepsHeaderState.textContent = keptMsg;
-            toaster(keptMsg, stoppedAt >= 0 ? 'warning' : 'info');
-            _renderKept();
-        } else if (_stepsHeaderState) {
-            if (fail === 0) {
-                _stepsHeaderState.textContent = _t('executionDone', 'Done ({ok} succeeded)')
-                    .replace('{ok}', String(ok));
-            } else {
-                _stepsHeaderState.textContent = _t('executionDoneWithErrors', 'Done ({ok}/{total} succeeded, {fail} failed)')
-                    .replace('{ok}', String(ok))
-                    .replace('{total}', String(commands.length))
-                    .replace('{fail}', String(fail));
-            }
+    /** A whole number of a step's option, kept to the schema's range, its default when absent or out of it. */
+    function _stepOption(value, min, max, fallback) {
+        var n = Number(value);
+        return Number.isInteger(n) && n >= min && n <= max ? n : fallback;
+    }
+
+    /**
+     * One step, sent again while its answer's status is one its retryOn lists: up to maxRetries times
+     * (default 3, at most 10), retryDelayMs apart (default 1000, 100 to 30000) — the row says so.
+     */
+    async function _executeWithRetries(step, row) {
+        var result = await _executeOneCommand(step);
+        var retryOn = Array.isArray(step.retryOn) ? step.retryOn.map(Number) : [];
+        if (retryOn.length === 0) return result;
+        var max = _stepOption(step.maxRetries, 1, 10, 3);
+        var delay = _stepOption(step.retryDelayMs, 100, 30000, 1000);
+        var attempt = 0;
+        while (!result.ok && !result.rateLimited && attempt < max && retryOn.indexOf(result.status) !== -1) {
+            attempt++;
+            _updateStepRow(row, 'retry', _t('stepRetry', 'Retrying ({attempt} of {max}) in {seconds} s — {error}')
+                .replace('{attempt}', String(attempt)).replace('{max}', String(max))
+                .replace('{seconds}', String(delay / 1000)).replace('{error}', result.error || ''));
+            await new Promise(function (resolve) { setTimeout(resolve, delay); });
+            _updateStepRow(row, 'running');
+            result = await _executeOneCommand(step);
         }
-        // Notify the rest of the editor that a workflow batch just ran,
-        // mirroring the existing /admin/workflows/{spec} signal so things
-        // like the miniplayer can refresh.
-        try {
-            window.dispatchEvent(new CustomEvent('quicksite:workflow-complete'));
-        } catch (_e) { /* ignore */ }
-        // Reload the iframe so visual changes appear immediately. Only
-        // when at least one command succeeded — pure-failure runs leave
-        // the iframe alone so the user can investigate.
-        if (ok > 0 && window.PreviewManager && typeof window.PreviewManager.reload === 'function') {
-            try { window.PreviewManager.reload(); } catch (_e) { /* ignore */ }
+        if (!result.ok && !result.rateLimited && attempt > 0) {
+            result.error = _t('stepFailedAfterRetries', '{error} (after {n} retries)')
+                .replace('{n}', String(attempt)).replace('{error}', result.error || '');
         }
+        return result;
     }
 
     /** Wait `seconds`, counting down in the batch's header. */
@@ -2090,17 +2794,19 @@ window.PreviewAiTools = (function () {
     /**
      * One step, through the panel's API client (the project marker, the write
      * allowance kept current). A refusal by the write rate is reported as such,
-     * with the server's wait, so the run can wait it out or stop.
+     * with the server's wait, so the run can wait it out or stop; every answer
+     * carries its HTTP status, which a step's retryOn reads.
      */
     async function _executeOneCommand(cmd) {
         var commandName = cmd.command || cmd.name;
-        if (!commandName) return { ok: false, error: 'Missing command name' };
+        if (!commandName) return { ok: false, status: 0, error: 'Missing command name' };
         var method = String(cmd.method || 'POST').toUpperCase();
         var res = await window.QuickSiteAdmin.apiRequest(commandName, method, method !== 'GET' ? (cmd.params || null) : null);
         var data = res.data || {};
         if (res.status === 429 && data.code === 'quota.rate_limited') {
             return {
                 ok: false,
+                status: res.status,
                 rateLimited: true,
                 retryAfter: Number(data.data && data.data.retry_after) || 0,
                 error: data.message || ('HTTP ' + res.status)
@@ -2108,12 +2814,16 @@ window.PreviewAiTools = (function () {
         }
         var isSuccess = res.ok && ((data.status >= 200 && data.status < 300) || data.success === true);
         if (!isSuccess) {
-            return { ok: false, error: data.error || data.message || ('HTTP ' + res.status) };
+            return { ok: false, status: res.status, error: data.error || data.message || ('HTTP ' + res.status) };
         }
-        return { ok: true, message: data.message || '', data: data };
+        return { ok: true, status: res.status, message: data.message || '', data: data };
     }
 
     // ──────────────────────────── Kept steps ────────────────────────────
+    //
+    // What a stopped run did not reach, kept in the browser per account and project: the steps of
+    // the phase it stopped in that did not run, and its later phases — as references, resolved when
+    // the kept run reaches them, as in a run. Run them reopens the workflow with the run's parameters.
 
     /** Where this account's kept steps for this project live in the browser. */
     function _keptKey() {
@@ -2124,24 +2834,27 @@ window.PreviewAiTools = (function () {
         return base && account && project ? base + ':' + account + ':' + project : null;
     }
 
-    /** The kept steps ({steps, label, savedAt}), or null. */
+    /**
+     * The kept rest ({workflowId, label, params, requests, phase, phaseTitle, steps, effects, later,
+     * savedAt}), or null.
+     */
     function _readKept() {
         var key = _keptKey();
         if (!key) return null;
         try {
             var kept = JSON.parse(localStorage.getItem(key) || 'null');
-            return kept && Array.isArray(kept.steps) && kept.steps.length > 0 ? kept : null;
+            return kept && typeof kept.workflowId === 'string' && typeof kept.phase === 'number' ? kept : null;
         } catch (_e) {
             return null;
         }
     }
 
-    function _writeKept(steps, label) {
+    function _writeKept(kept) {
         var key = _keptKey();
         if (!key) return;
         try {
-            localStorage.setItem(key, JSON.stringify({ steps: steps, label: label || '', savedAt: Date.now() }));
-        } catch (_e) { /* storage unavailable: the steps are not kept */ }
+            localStorage.setItem(key, JSON.stringify(Object.assign({ savedAt: Date.now() }, kept)));
+        } catch (_e) { /* storage unavailable: the rest is not kept */ }
     }
 
     function _clearKept() {
@@ -2159,9 +2872,9 @@ window.PreviewAiTools = (function () {
     var _keptTimer = null;
 
     /**
-     * The kept steps' banner, at the top of the panel: how many, from when, the
-     * warning that the page may have changed, and Run (only once the allowance
-     * covers them) / Discard. Redrawn when the allowance moves.
+     * The kept rest's banner, at the top of the panel: from which run and when, what is kept, the
+     * warning that the page may have changed, and Run them (only once the allowance covers the kept
+     * steps) / Discard. Redrawn when the allowance moves.
      */
     function _renderKept() {
         if (!_section) return;
@@ -2177,18 +2890,30 @@ window.PreviewAiTools = (function () {
         if (!kept) return;
 
         var api = window.QuickSiteAPI;
-        var rate = api.getWriteRate();
-        var plan = _planRun(_countedSteps(kept.steps), rate);
+        var steps = Array.isArray(kept.steps) ? kept.steps : [];
+        var plan = api && typeof api.getWriteRate === 'function'
+            ? _planRun(_countedSteps(steps), api.getWriteRate())
+            : { start: true };
 
         var title = document.createElement('p');
         title.className = 'preview-contextual-ai-tools__kept-title';
-        title.textContent = _t('keptTitle', '{n} steps kept from a stopped run ({label}, planned at {time})')
-            .replace('{n}', String(kept.steps.length))
+        title.textContent = (steps.length > 0
+            ? _t('keptTitle', '{n} steps kept from a stopped run ({label}, planned at {time})').replace('{n}', String(steps.length))
+            : _t('keptBefore', '{label}: stopped before {name} (planned at {time})').replace('{name}', kept.phaseTitle || ''))
             .replace('{label}', kept.label || '—')
-            .replace('{time}', api.clockText(kept.savedAt));
+            .replace('{time}', api ? api.clockText(kept.savedAt) : '');
+        _keptEl.appendChild(title);
+        var later = Array.isArray(kept.later) ? kept.later : [];
+        if (later.length > 0) {
+            var then = document.createElement('p');
+            then.className = 'preview-contextual-ai-tools__kept-then';
+            then.textContent = _t('keptThen', 'Then: {names}').replace('{names}', later.join(', '));
+            _keptEl.appendChild(then);
+        }
         var warn = document.createElement('p');
         warn.className = 'preview-contextual-ai-tools__kept-warning';
         warn.textContent = _t('keptWarning', 'The page may have changed since they were planned: node positions can shift.');
+        _keptEl.appendChild(warn);
 
         var actions = document.createElement('div');
         actions.className = 'preview-contextual-ai-tools__kept-actions';
@@ -2207,12 +2932,10 @@ window.PreviewAiTools = (function () {
         }
         run.addEventListener('click', function () {
             if (!canRun) {
-                if (window.QuickSiteAdmin && typeof window.QuickSiteAdmin.showToast === 'function') {
-                    window.QuickSiteAdmin.showToast(notYetText, 'info');
-                }
+                _toaster()(notYetText, 'info');
                 return;
             }
-            _runKept();
+            _resumeKept();
         });
         var discard = document.createElement('button');
         discard.type = 'button';
@@ -2225,8 +2948,6 @@ window.PreviewAiTools = (function () {
         actions.appendChild(run);
         actions.appendChild(discard);
 
-        _keptEl.appendChild(title);
-        _keptEl.appendChild(warn);
         if (!canRun) {
             var notYet = document.createElement('p');
             notYet.className = 'preview-contextual-ai-tools__kept-wait';
@@ -2237,79 +2958,211 @@ window.PreviewAiTools = (function () {
         _keptEl.appendChild(actions);
     }
 
-    /** Run the kept steps (the user asked). They stay kept until the run starts. */
-    async function _runKept() {
+    /**
+     * Run the kept rest (the user asked): its workflow reopened with the run's parameters and requests,
+     * then a run from the phase it stopped in. The rest stays kept until that run starts.
+     */
+    async function _resumeKept() {
         if (_executing) return;
         var kept = _readKept();
         if (!kept) return;
-        _executing = true;
-        _updateActionStates();
-        try {
-            await _executeCommands(kept.steps, { fromKept: true, label: kept.label });
-        } catch (err) {
-            console.error('[PreviewAiTools] kept steps failed:', err);
-        } finally {
-            _executing = false;
-            _updateActionStates();
-            _renderKept();
+        var workflow = null;
+        for (var i = 0; i < _allWorkflows.length; i++) {
+            if (_allWorkflows[i].id === kept.workflowId) workflow = _allWorkflows[i];
         }
+        if (!workflow) {
+            _toaster()(_t('keptMissing', '{label} is not in the list any more: discard what was kept.').replace('{label}', kept.label || kept.workflowId), 'warning');
+            return;
+        }
+        await _onCardClick(workflow, { restore: { params: kept.params || {}, requests: kept.requests || {} } });
+        if (!_activeWorkflowSpec || _activeWorkflowSummary !== workflow) return;
+        _clearKept();
+        _renderKept();
+        await _startRun({ send: !!_getDefaultConnection(), resume: kept });
     }
 
-    async function _resolveDeterministicCommands() {
-        // Deterministic workflow: POST to /api/workflow-generate-steps with
-        // current params. Returns data.steps as the fully-expanded command
-        // list (forEach loops expanded, conditions evaluated, params
-        // substituted). This is the same endpoint /admin/workflows/{spec}
-        // uses for "Preview Steps" + manual execution.
+    // ──────────────────────────── The plan ──────────────────────────────
+
+    /** The workflow endpoint (workflow-generate-steps): a POST of the request, its data on success. */
+    function _workflowRequest(body) {
         var cfg = window.PreviewConfig || {};
-        var id = _activeWorkflowSummary && _activeWorkflowSummary.id;
-        if (!id) return [];
         var url = (cfg.adminUrl || '') + 'api/' + _helperPath('workflow-generate-steps');
         var headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
         if (cfg.authToken) headers['Authorization'] = 'Bearer ' + cfg.authToken;
-        var res = await fetch(url, {
+        var id = _activeWorkflowSummary && _activeWorkflowSummary.id;
+        return fetch(url, {
             method: 'POST',
             headers: headers,
-            body: JSON.stringify({ workflowId: id, params: _paramValues })
+            body: JSON.stringify(Object.assign({ workflowId: id }, body))
+        }).then(function (res) {
+            return res.json().catch(function () { return null; }).then(function (json) {
+                if (!res.ok || !json || !json.success) {
+                    throw new Error((json && json.error) || ('HTTP ' + res.status));
+                }
+                return json.data || {};
+            });
         });
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        var json = await res.json();
-        if (!json || !json.success) throw new Error((json && json.message) || (json && json.error) || 'Resolution failed');
-        return (json.data && Array.isArray(json.data.steps)) ? json.data.steps : [];
     }
 
-    async function _resolveAndPreviewDeterministic() {
+    /** The run's phases, every one resolved against the project as it is now. */
+    function _fetchPlan(params) {
+        return _workflowRequest({ params: params }).then(function (data) {
+            return Array.isArray(data.phases) ? data.phases : [];
+        });
+    }
+
+    /** Phase k resolved now. extra: {prompt: true} an AI phase's prompt, {answer: [...]} its AI's commands. */
+    function _fetchPhase(params, k, extra) {
+        return _workflowRequest(Object.assign({ params: params, phase: k }, extra || {})).then(function (data) {
+            if (!data.phase) throw new Error('No such phase');
+            return data.phase;
+        });
+    }
+
+    /** The plan again (the preview before a run): the Batch, the run line, the requests and the AI exchange follow it. */
+    async function _refreshPlan() {
+        if (!_activeWorkflowSummary || _run) return;
+        var seq = ++_planSeq;
+        var plan = null;
         try {
-            _currentCommands = await _resolveDeterministicCommands();
+            plan = await _fetchPlan(_paramValues);
         } catch (err) {
-            console.warn('[PreviewAiTools] resolve failed:', err);
-            _currentCommands = [];
+            console.warn('[PreviewAiTools] plan failed:', err);
         }
-        _renderStepsPreview();
+        if (seq !== _planSeq || _run) return;
+        _plan = plan || [];
+        if (_chainHasAi() !== _renderedWithAi) {
+            // An AI phase came or went: the runner is drawn again, with or without its AI exchange.
+            _renderRunner();
+        } else {
+            _renderYourPromptFields();
+        }
+        _renderRunLine();
+        _renderBatch();
+        _updateActionStates();
     }
 
-    // ──────────────────────────── Steps preview ─────────────────────────
+    // ──────────────────────────── The Batch ─────────────────────────────
 
-    function _renderStepsPreview() {
+    var _phaseBodies = [];               // each phase's rows, by index (the Batch's groups)
+    var _phaseGroups = [];               // each phase's group ({el, body}); empty for a run of one phase
+
+    /** A phase's rows: its steps, or for an AI phase its answer's commands once classified. */
+    function _phaseRows(phase) {
+        var steps = phase.steps || [];
+        var effects = phase.effects || [];
+        if (phase.ai && _answerPhase && _answerPhase.index === phase.index && steps.length === 0) {
+            steps = _answerPhase.steps || [];
+            effects = _answerPhase.effects || [];
+        }
+        return { steps: steps, effects: effects };
+    }
+
+    /** A phase's rows drawn into its body (an AI phase with none yet says its commands come with its answer). */
+    function _fillPhaseRows(body, phase, rows) {
+        if (rows.steps.length === 0 && phase.ai) {
+            var pending = document.createElement('p');
+            pending.className = 'preview-contextual-ai-tools__batch-pending';
+            pending.textContent = _t('batchAiPending', 'Its commands appear when the AI answers.');
+            body.appendChild(pending);
+        }
+        for (var s = 0; s < rows.steps.length; s++) {
+            body.appendChild(_renderStepRow(rows.steps[s], rows.effects[s] || null).el);
+        }
+    }
+
+    /**
+     * The Batch: the plan's phases, each a group of its steps with what they delete or change (an AI
+     * phase's commands once its answer is parsed); one phase is its rows alone. `open`: the group shown
+     * open (the phase being reviewed or run).
+     */
+    function _renderBatch(open) {
         if (!_stepsBody) return;
         _stepsBody.replaceChildren();
-        if (!_currentCommands || _currentCommands.length === 0) {
-            if (_stepsHeaderState) _stepsHeaderState.textContent = _t('stateIdle', 'Idle');
+        _phaseBodies = [];
+        _phaseGroups = [];
+        var phases = _run ? _run.plan : _plan;
+        var total = 0;
+        for (var i = 0; i < phases.length; i++) {
+            var rows = _phaseRows(phases[i]);
+            total += rows.steps.length;
+            var body = _stepsBody;
+            if (phases.length > 1) {
+                var group = _renderPhaseGroup(phases[i], rows.steps, rows.effects, open === i);
+                _stepsBody.appendChild(group.el);
+                _phaseGroups[i] = group;
+                body = group.body;
+            }
+            _phaseBodies[i] = body;
+            _fillPhaseRows(body, phases[i], rows);
+        }
+        if (_stepsHeaderState && !_run) {
+            _stepsHeaderState.textContent = total > 0
+                ? _t('stepsReady', '{n} commands ready').replace('{n}', String(total))
+                : _t('stateIdle', 'Idle');
+        }
+    }
+
+    /**
+     * During a run: phase k's group drawn again from the phase as now resolved (or its AI answer) and
+     * opened, the others closed but left as they are — the rows of a phase that ran keep their results.
+     */
+    function _showPhaseInBatch(k) {
+        var phases = _run ? _run.plan : _plan;
+        if (!_stepsBody || !phases[k]) return;
+        if (phases.length > 1 && _phaseGroups.length !== phases.length) {
+            _renderBatch(k);
             return;
         }
-        for (var i = 0; i < _currentCommands.length; i++) {
-            var row = _renderStepRow(_currentCommands[i]);
-            _stepsBody.appendChild(row.el);
+        var rows = _phaseRows(phases[k]);
+        if (phases.length > 1) {
+            var fresh = _renderPhaseGroup(phases[k], rows.steps, rows.effects, true);
+            _phaseGroups[k].el.replaceWith(fresh.el);
+            _phaseGroups[k] = fresh;
+            _phaseBodies[k] = fresh.body;
+            _phaseGroups.forEach(function (g, i) { if (i !== k) g.body.hidden = true; });
+        } else {
+            _stepsBody.replaceChildren();
+            _phaseBodies[k] = _stepsBody;
         }
-        if (_stepsHeaderState) {
-            var tpl = _t('stepsReady', '{n} commands ready');
-            _stepsHeaderState.textContent = tpl.replace('{n}', String(_currentCommands.length));
-        }
+        _fillPhaseRows(_phaseBodies[k], phases[k], rows);
+    }
+    /** One phase's group in the Batch: its name, where it runs and how many steps, then its rows. */
+    function _renderPhaseGroup(phase, steps, effects, open) {
+        var el = document.createElement('div');
+        el.className = 'preview-contextual-ai-tools__phase';
+        var header = document.createElement('button');
+        header.type = 'button';
+        header.className = 'preview-contextual-ai-tools__phase-header';
+        var name = document.createElement('span');
+        name.className = 'preview-contextual-ai-tools__phase-name';
+        name.textContent = (phase.icon ? phase.icon + ' ' : '') + phase.title;
+        header.appendChild(name);
+        var meta = document.createElement('span');
+        meta.className = 'preview-contextual-ai-tools__phase-meta';
+        var kind = phase.kind === 'pre' ? _t('kindBefore', 'before') : (phase.kind === 'post' ? _t('kindAfter', 'after') : '');
+        var parts = [];
+        if (kind) parts.push(kind);
+        if (phase.ai) parts.push(_t('kindAi', 'AI'));
+        parts.push(_t('reviewSteps', '{n} steps').replace('{n}', String(steps.length)));
+        var warned = _warnedEffects(effects);
+        if (warned.some(function (e) { return e.effect === 'delete'; })) parts.push(_t('effectDeletes', 'Deletes'));
+        else if (warned.length > 0) parts.push(_t('effectChanges', 'Changes'));
+        meta.textContent = parts.join(' · ');
+        header.appendChild(meta);
+        var body = document.createElement('div');
+        body.className = 'preview-contextual-ai-tools__phase-body';
+        body.hidden = !open;
+        header.addEventListener('click', function () { body.hidden = !body.hidden; });
+        el.appendChild(header);
+        el.appendChild(body);
+        return { el: el, body: body };
     }
 
     // ──────────────────────────── Step row UI ───────────────────────────
 
-    function _renderStepRow(cmd) {
+    /** A step's row; `effect` (the server's, or null) marks what it deletes or changes. */
+    function _renderStepRow(cmd, effect) {
         var commandName = cmd.command || cmd.name || '(unnamed)';
         var hasParams = cmd.params && typeof cmd.params === 'object' && Object.keys(cmd.params).length > 0;
 
@@ -2327,6 +3180,13 @@ window.PreviewAiTools = (function () {
         name.className = 'preview-contextual-ai-tools__step-name';
         name.textContent = commandName;
         body.appendChild(name);
+
+        if (effect && (effect.effect === 'delete' || effect.effect === 'change')) {
+            var tag = document.createElement('span');
+            tag.className = 'preview-contextual-ai-tools__step-effect preview-contextual-ai-tools__step-effect--' + effect.effect;
+            tag.textContent = effect.effect === 'delete' ? _t('effectDeletes', 'Deletes') : _t('effectChanges', 'Changes');
+            body.appendChild(tag);
+        }
 
         if (hasParams) {
             var summary = document.createElement('span');
@@ -2390,6 +3250,11 @@ window.PreviewAiTools = (function () {
         if (state === 'running') {
             row.icon.textContent = '⏳';
             row.status.textContent = _t('stepRunning', 'Running…');
+            row.el.classList.add('preview-contextual-ai-tools__step--running');
+        } else if (state === 'retry') {
+            // A step sent again (its retryOn): the row says which attempt and when.
+            row.icon.textContent = '⏳';
+            row.status.textContent = message || '';
             row.el.classList.add('preview-contextual-ai-tools__step--running');
         } else if (state === 'ok') {
             row.icon.textContent = '✅';
@@ -2514,8 +3379,6 @@ window.PreviewAiTools = (function () {
 
     function _updateActionStates() {
         var hasParamErrors = Object.keys(_paramErrors).length > 0;
-        var isAI = _isAiWorkflow();
-        var conn = _getDefaultConnection();
 
         if (_primaryActionBtn) {
             if (_executing) {
@@ -2524,33 +3387,58 @@ window.PreviewAiTools = (function () {
             } else if (hasParamErrors) {
                 _primaryActionBtn.disabled = true;
                 _primaryActionBtn.title = _t('runBlockedTooltip', 'Fix the highlighted parameters before running.');
-                _primaryActionBtn.textContent = _computePrimaryLabel(isAI, conn);
+                _primaryActionBtn.textContent = _computePrimaryLabel();
             } else {
                 _primaryActionBtn.disabled = false;
                 _primaryActionBtn.title = '';
-                _primaryActionBtn.textContent = _computePrimaryLabel(isAI, conn);
+                _primaryActionBtn.textContent = _computePrimaryLabel();
             }
         }
         if (_secondaryActionBtn) {
             _secondaryActionBtn.disabled = _executing || hasParamErrors;
         }
+        var target = _answerTargetIndex();
         if (_executeBtnEl) {
-            // Show Execute when commands are queued AND not slated for auto-execution.
-            // Auto-execute fires automatically for BYOK pipeline and on-paste,
-            // so the explicit button is only needed when auto-exec is OFF.
-            var hasCommands = isAI && _currentCommands && _currentCommands.length > 0;
-            var autoExec = _readToggle('aiAutoExecute');
-            var shouldShow = hasCommands && !autoExec && _aiResponseStatus.type === 'ok';
-            _executeBtnEl.style.display = shouldShow ? '' : 'none';
-            _executeBtnEl.disabled = _executing || hasParamErrors;
+            // The answer's Execute: while an answer that parses is ready for a phase that can take it and
+            // the switch is off (on, the grace timer runs it). Its label says what the answer does.
+            var ready = target !== null && _aiResponseStatus.type === 'ok'
+                && _currentCommands && _currentCommands.length > 0;
+            // An answer put together from several waits for its Execute, whatever the switch.
+            _executeBtnEl.style.display = ready && (!_autoContinue() || _answerParts > 1) ? '' : 'none';
+            var warned = _answerPhase ? _warnedEffects(_answerPhase.effects) : [];
+            var deletes = warned.some(function (e) { return e.effect === 'delete'; });
+            _executeBtnEl.textContent = deletes ? _t('confirmRunDelete', 'Delete and run')
+                : (warned.length > 0 ? _t('confirmRunChange', 'Change and run') : _t('actionExecute', 'Execute commands'));
+            _executeBtnEl.className = deletes
+                ? 'preview-contextual-ai-tools__action-btn--primary preview-contextual-ai-tools__action-btn--danger'
+                : 'preview-contextual-ai-tools__action-btn--primary';
+            // Not before the answer is classified: the label must say what it does.
+            _executeBtnEl.disabled = hasParamErrors || !_answerPhase || (_executing && !_answerWaiter);
         }
+        if (_aiResponseTextarea) {
+            // An answer is pasted only when a phase can take it: before the run when its first phase is
+            // the AI one, else once the run reaches that phase.
+            var open = target !== null || (_run === null && !_executing && _firstPhaseIsAi());
+            _aiResponseTextarea.readOnly = !open;
+            _aiResponseTextarea.placeholder = !open
+                ? _t('answerAfterRun', 'Run first: the parts before it prepare the project, then its prompt is built.')
+                : (_continuation
+                    ? _t('continueWaiting', 'The rest of the answer goes here; the commands that arrived whole ({n}) are kept.').replace('{n}', String(_continuation.kept.length))
+                    : _t('aiResponsePlaceholder', '{"commands": [...]}'));
+        }
+        _refreshRecovery();
     }
 
-    function _computePrimaryLabel(isAI, conn) {
-        if (!isAI) return _t('actionRun', 'Run');
-        if (!conn) return _t('actionGeneratePrompt', 'Generate prompt');
-        var autoExec = _readToggle('aiAutoExecute');
-        return autoExec ? _t('actionRunWithAi', 'Run with AI') : _t('actionSendToAi', 'Send to AI');
+    /**
+     * The primary button's label: Run for a run with no AI phase, or one whose AI phase comes after
+     * others (they run first); for a run that starts with its AI phase, Generate prompt with no key, else
+     * Run with AI / Send to AI by the switch.
+     */
+    function _computePrimaryLabel() {
+        if (!_chainHasAi()) return _t('actionRun', 'Run');
+        var conn = _getDefaultConnection();
+        if (!conn) return _firstPhaseIsAi() ? _t('actionGeneratePrompt', 'Generate prompt') : _t('actionRun', 'Run');
+        return _autoContinue() ? _t('actionRunWithAi', 'Run with AI') : _t('actionSendToAi', 'Send to AI');
     }
 
     function _morphPrimary(label) {
@@ -2558,69 +3446,7 @@ window.PreviewAiTools = (function () {
         _primaryActionBtn.textContent = label;
     }
 
-    // ──────────────────────────── Generate / Copy ───────────────────────
-
-    function _generatePrompt() {
-        if (!_isAiWorkflow()) return Promise.resolve();
-        if (_promptGenerating) return Promise.resolve();
-        _promptGenerating = true;
-        var cfg = window.PreviewConfig || {};
-        var id = _activeWorkflowSummary && _activeWorkflowSummary.id;
-        if (!id) {
-            _promptGenerating = false;
-            return Promise.resolve();
-        }
-        var query = _buildParamQueryString();
-        var url = (cfg.adminUrl || '') + 'api/' + _helperPath('ai-spec') + '/' + encodeURIComponent(id) + (query ? '?' + query : '');
-        var headers = { 'Accept': 'application/json' };
-        if (cfg.authToken) headers['Authorization'] = 'Bearer ' + cfg.authToken;
-        return fetch(url, { headers: headers }).then(function (res) {
-            if (!res.ok) throw new Error('HTTP ' + res.status);
-            return res.json();
-        }).then(function (json) {
-            if (!json || !json.success) throw new Error((json && json.error) || 'Unknown error');
-            var prompt = (json.data && json.data.prompt) || '';
-            var assembled = prompt;
-            var trimmedUser = (_userPrompt || '').trim();
-            if (trimmedUser) {
-                assembled += '\n\n---\n\n**User Request:**\n' + trimmedUser;
-            }
-            _generatedPrompt = assembled;
-            _promptGenerated = true;
-            if (_generalPromptTextarea) _generalPromptTextarea.value = assembled;
-        }).catch(function (err) {
-            var tpl = _t('generateError', 'Generate failed: {error}');
-            _generatedPrompt = tpl.replace('{error}', err && err.message ? err.message : String(err));
-            if (_generalPromptTextarea) _generalPromptTextarea.value = _generatedPrompt;
-        }).then(function () {
-            _promptGenerating = false;
-        });
-    }
-
-    function _buildParamQueryString() {
-        var qs = new URLSearchParams();
-        Object.keys(_paramValues).forEach(function (k) {
-            var v = _paramValues[k];
-            if (Array.isArray(v)) {
-                // A list (a tag-select's values) ships as JSON, as a structured value does
-                // below: sent as repeated keys it would reach the server as its last value
-                // only (PHP keeps the last of a repeated key).
-                qs.append(k, JSON.stringify(v));
-            } else if (v !== null && v !== undefined) {
-                if (typeof v === 'object') {
-                    // selector params + any structured value: ship as JSON
-                    // so the server can decode + walk subfields (e.g.
-                    // {{param.element.tag}}). The /api/ai-spec endpoint
-                    // detects `{`-prefixed string values and json_decode()s
-                    // them back into associative arrays.
-                    qs.append(k, JSON.stringify(v));
-                } else {
-                    qs.append(k, typeof v === 'boolean' ? (v ? 'true' : 'false') : String(v));
-                }
-            }
-        });
-        return qs.toString();
-    }
+    // ──────────────────────────── Copy ──────────────────────────────────
 
     function _onCopyPromptClick() {
         var text = _generatedPrompt || (_generalPromptTextarea && _generalPromptTextarea.value) || '';
@@ -2646,16 +3472,261 @@ window.PreviewAiTools = (function () {
         }
     }
 
+    // ──────────────────────────── A cut answer: Continue, Send again ─────
+    //
+    // An answer that cannot run (cut at the output limit, broken off, not whole JSON) may still hold
+    // commands that arrived whole. Continue the answer keeps them and asks the AI only for the rest,
+    // from the command that was cut: sent with the connection's key, after the prompt and the cut
+    // answer given as the model's own turn, or copied to paste to an AI assistant. The reply is its own
+    // JSON, joined to the kept commands; an answer put together so never runs on its own, even with
+    // Run without stopping on. Send again sends the same prompt once more, for a new answer.
+
+    /** One of the waiting bar's ways to recover an answer, drawn hidden until it applies. */
+    function _renderRecoveryButton(name, kind, label, onClick) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'admin-btn ' + kind + ' admin-btn--small';
+        btn.dataset.recovery = name;
+        btn.textContent = label;
+        btn.style.display = 'none';
+        btn.addEventListener('click', onClick);
+        return btn;
+    }
+
+    /** The waiting bar's recovery buttons shown as they apply (never while a send is under way). */
+    function _refreshRecovery() {
+        if (!_recoveryEls) return;
+        var plan = _continuePlan();
+        _recoveryEls.continueBtn.style.display = plan ? '' : 'none';
+        _recoveryEls.continueBtn.title = plan
+            ? _t('continueAnswerTitle', 'Keeps the commands that arrived whole ({n}) and asks the AI only for the rest, from the command that was cut. The answer put together runs only when you click Execute.').replace('{n}', String(plan.kept.length))
+            : '';
+        _recoveryEls.sendAgainBtn.style.display = _canSendAgain() ? '' : 'none';
+    }
+
+    /** Send again applies while the run waits for this answer and sends with a key, no send under way. */
+    function _canSendAgain() {
+        return !!(_answerWaiter && !_aiSending && _run && _run.send && _getDefaultConnection());
+    }
+
+    /**
+     * What Continue the answer would ask for: the commands kept so far (an earlier part's, then the
+     * whole ones of the answer in AI response) and the cut one's text. null while nothing is kept or a
+     * send is under way, for an answer that is ready or whole, and for one the provider stopped itself.
+     */
+    function _continuePlan() {
+        if (!_answerWaiter || _aiSending) return null;
+        if (_aiResponseStatus.type !== 'error' || _aiResponseStatus.empty) return null;
+        if (_aiResponseStatus.cause === 'stopped' || _aiResponseStatus.cause === 'readBack') return null;
+        var got = _salvageAnswer(_aiResponseText) || { whole: [], cut: '' };
+        var kept = _continuation ? _joinCommands(_continuation.kept, got.whole) : got.whole;
+        if (kept.length === 0) return null;
+        var cut = got.whole.length > 0 || got.cut ? got.cut : (_continuation ? _continuation.cut : '');
+        return { kept: kept, cut: cut };
+    }
+
+    /** Continue the answer: the commands that arrived whole kept, the AI asked for the rest (sent with the key, else copied). */
+    function _onContinueAnswerClick() {
+        var plan = _continuePlan();
+        if (!plan) return;
+        var partial = '{"commands": [' + plan.kept.map(function (c) { return JSON.stringify(c); }).join(', ')
+            + (plan.cut ? ', ' + plan.cut : '');
+        var request = _continuationRequest(plan);
+        _continuation = { kept: plan.kept, cut: plan.cut, parts: (_continuation ? _continuation.parts : 1) + 1 };
+        _cancelAutoExecute();
+        _aiResponseText = '';
+        if (_aiResponseTextarea) _aiResponseTextarea.value = '';
+        _aiResponseStatus = { type: 'idle' };
+        _currentCommands = [];
+        _answerPhase = null;
+        _updateAiResponseStatusUI();
+        var conn = _getDefaultConnection();
+        if (_run && _run.send && conn) {
+            _sendToAi(conn, { partial: partial, request: request });
+        } else {
+            if (_generalPromptTextarea) _generalPromptTextarea.value = request;
+            _focusGeneralPrompt();
+            _autoCopyPromptWithToast(request, _t('continueCopied', 'Copied: a request for the rest of the answer. Paste it to your AI assistant, then paste its reply in AI response.'));
+        }
+        if (_run) _showPhaseInBatch(_run.index);
+        _updateActionStates();
+    }
+
+    /** Send again: the same prompt sent for a new answer; whatever was kept of the last one is dropped. */
+    function _onSendAgainClick() {
+        if (!_canSendAgain()) return;
+        _continuation = null;
+        _answerParts = 0;
+        if (_generalPromptTextarea) _generalPromptTextarea.value = _generatedPrompt;
+        _currentCommands = [];
+        _answerPhase = null;
+        _sendToAi(_getDefaultConnection());
+    }
+
+    /** What Continue asks the AI: the commands still missing, from the one that was cut, as one JSON object. */
+    function _continuationRequest(plan) {
+        var n = String(plan.kept.length);
+        if (!plan.cut) {
+            return _t('continueRequestBoundary', 'Your answer above was cut off before it ended, after the commands that arrived whole ({n} of them). Reply with only the commands still missing, as one JSON object {"commands": [...]}, with no text before or after it and none of the commands already given.').split('{n}').join(n);
+        }
+        var cut = plan.cut.length > 240 ? plan.cut.slice(0, 240) + '…' : plan.cut;
+        return _t('continueRequest', 'Your answer above was cut off before it ended. The commands before the cut arrived whole ({n} of them); the command after them was cut, and it began:\n\n{cut}\n\nReply with only the commands still missing, starting again from that cut command, as one JSON object {"commands": [...]}, with no text before or after it and none of the commands that arrived whole.')
+            .split('{n}').join(n).replace('{cut}', function () { return cut; });
+    }
+
+    /** Where an answer's list of commands begins ({"commands": [ … ] or a bare [ … ]), or -1. */
+    function _commandsListStart(text) {
+        var lead = text.search(/\S/);
+        if (lead !== -1 && text.charAt(lead) === '[') return lead;
+        var m = /"commands"\s*:\s*\[/.exec(text);
+        return m ? m.index + m[0].length - 1 : -1;
+    }
+
+    /**
+     * What a cut answer still holds: the commands that arrived whole, in order, and the text of the one
+     * that was cut ('' when the cut fell between two). Brackets inside strings and escaped quotes are
+     * not taken for the list's own. null when no list of commands begins.
+     */
+    function _salvageAnswer(text) {
+        var s = String(text || '');
+        var start = _commandsListStart(s);
+        if (start === -1) return null;
+        var whole = [];
+        var depth = 0;
+        var inString = false;
+        var escaped = false;
+        var from = start + 1;
+        for (var i = from; i < s.length; i++) {
+            var ch = s.charAt(i);
+            if (inString) {
+                if (escaped) escaped = false;
+                else if (ch === '\\') escaped = true;
+                else if (ch === '"') inString = false;
+                continue;
+            }
+            if (ch === '"') {
+                inString = true;
+            } else if (ch === '{' || ch === '[') {
+                depth++;
+            } else if ((ch === '}' || ch === ']') && depth > 0) {
+                depth--;
+            } else if (depth === 0 && (ch === ',' || ch === ']')) {
+                var piece = s.slice(from, i);
+                if (ch === ']' && !piece.trim()) return { whole: whole, cut: '' };
+                var command = _wholeCommand(piece);
+                if (!command) break;
+                whole.push(command);
+                from = i + 1;
+                if (ch === ']') return { whole: whole, cut: '' };
+            }
+        }
+        // The last command may have arrived whole, only the list's end missing.
+        var rest = s.slice(from).trim();
+        var last = rest ? _wholeCommand(rest) : null;
+        if (last) {
+            whole.push(last);
+            rest = '';
+        }
+        return { whole: whole, cut: rest };
+    }
+
+    /** A command that arrived whole: its text parses to an object with a command name; else null. */
+    function _wholeCommand(piece) {
+        try {
+            var c = JSON.parse(piece);
+            return c && typeof c === 'object' && !Array.isArray(c) && typeof c.command === 'string' ? c : null;
+        } catch (_e) {
+            return null;
+        }
+    }
+
+    /** The commands of a reply that parses ({"commands": [...]} or a bare list), even none; else null. */
+    function _replyCommands(text) {
+        try {
+            var parsed = JSON.parse(String(text || '').trim());
+            if (Array.isArray(parsed)) return parsed;
+            return parsed && Array.isArray(parsed.commands) ? parsed.commands : null;
+        } catch (_e) {
+            return null;
+        }
+    }
+
+    /** The kept commands and the rest joined: the rest's first commands that repeat the kept ones' last are dropped. */
+    function _joinCommands(kept, more) {
+        var a = kept.map(function (c) { return JSON.stringify(c); });
+        var b = more.map(function (c) { return JSON.stringify(c); });
+        for (var k = Math.min(a.length, b.length); k > 0; k--) {
+            var same = true;
+            for (var i = 0; i < k && same; i++) same = a[a.length - k + i] === b[i];
+            if (same) return kept.concat(more.slice(k));
+        }
+        return kept.concat(more);
+    }
+
     // ──────────────────────────── AI response parse ─────────────────────
 
     function _onAiResponseInput() {
         _aiResponseText = _aiResponseTextarea ? _aiResponseTextarea.value : '';
+        _onAnswerChanged();
+    }
+
+    /**
+     * An answer changed — pasted, edited, or sent by the AI: checked, its commands read, then
+     * classified by the server (what they delete or change), which wakes its Execute or its grace timer.
+     */
+    function _onAnswerChanged() {
+        // The rest of a cut answer: joined to the commands kept, the whole answer shown in its place.
+        var more = _continuation ? _replyCommands(_aiResponseText) : null;
+        if (more) {
+            _answerParts = _continuation.parts;
+            _aiResponseText = JSON.stringify({ commands: _joinCommands(_continuation.kept, more) }, null, 2);
+            _continuation = null;
+            if (_aiResponseTextarea) _aiResponseTextarea.value = _aiResponseText;
+            if (_generalPromptTextarea) _generalPromptTextarea.value = _generatedPrompt;
+        }
         _aiResponseStatus = _validateAiResponse(_aiResponseText);
         _syncCommandsFromAiResponse();
-        _renderStepsPreview();
+        _answerPhase = null;
+        _answerSeq++;
+        _cancelAutoExecute();
         _updateAiResponseStatusUI();
+        var target = _answerTargetIndex();
+        if (_aiResponseStatus.type === 'ok' && target !== null) _classifyAnswer();
+        if (target !== null) {
+            if (_run) _showPhaseInBatch(target); else _renderBatch(target);
+        }
         _updateActionStates();
-        _scheduleAutoExecute();
+    }
+
+    /**
+     * The phase an answer would run for: the AI phase a run is waiting on, or, with no run under way,
+     * a first phase that is an AI one; null when no phase can take an answer now.
+     */
+    function _answerTargetIndex() {
+        if (_run) return _answerWaiter ? _run.index : null;
+        if (_executing || !_firstPhaseIsAi()) return null;
+        return 0;
+    }
+
+    /** The server says what the answer's commands delete or change (an older answer's reply is dropped). */
+    function _classifyAnswer() {
+        var index = _answerTargetIndex();
+        if (index === null) return;
+        var seq = ++_answerSeq;
+        var params = _run ? _run.params : _paramValues;
+        _fetchPhase(params, index, { answer: _currentCommands.slice() }).then(function (phase) {
+            if (seq !== _answerSeq) return;
+            _answerPhase = phase;
+            if (_run) _showPhaseInBatch(index); else _renderBatch(index);
+            _updateActionStates();
+            _scheduleAutoExecute();
+        }).catch(function (err) {
+            if (seq !== _answerSeq) return;
+            _answerPhase = null;
+            _aiResponseStatus = { type: 'error', message: (err && err.message) || String(err), plain: true, cause: 'readBack' };
+            _updateAiResponseStatusUI();
+            _updateActionStates();
+        });
     }
 
     function _syncCommandsFromAiResponse() {
@@ -2677,21 +3748,18 @@ window.PreviewAiTools = (function () {
         if (_autoExecHintEl) _autoExecHintEl.style.display = 'none';
     }
 
+    /**
+     * "Run without stopping": a 1.5 s grace before an answer runs on its own — a pasted one and one the
+     * AI sent alike — once the server has said what it does. Any edit of the answer cancels it; the
+     * edited answer, once classified, starts it again.
+     */
     function _scheduleAutoExecute() {
-        // Unified 1.5s grace period before auto-execute fires. Applies to
-        // BOTH the BYOK Send pipeline (called from _sendToAi, while the
-        // primary pipeline is still keeping `_executing = true`) AND manual
-        // paste (called from _onAiResponseInput, _executing = false). The
-        // `_executing` check is deferred to the timer's callback rather
-        // than the schedule call, because _sendToAi schedules from INSIDE
-        // _onPrimaryActionClick's try block — at schedule time _executing
-        // is still true; by the time the 1.5s timer fires it has been
-        // released in the finally.
         _cancelAutoExecute();
-        if (!_isAiWorkflow()) return;
+        if (!_autoContinue()) return;
+        if (_answerParts > 1) return;
+        if (_answerTargetIndex() === null || !_answerPhase) return;
         if (_aiResponseStatus.type !== 'ok') return;
         if (!_currentCommands || _currentCommands.length === 0) return;
-        if (!_readToggle('aiAutoExecute')) return;
 
         if (_autoExecHintEl) {
             _autoExecHintEl.textContent = _t('autoExecHint', 'Auto-executing in 1.5s — edit response to cancel');
@@ -2700,8 +3768,7 @@ window.PreviewAiTools = (function () {
         _pasteAutoExecTimer = setTimeout(function () {
             _pasteAutoExecTimer = null;
             if (_autoExecHintEl) _autoExecHintEl.style.display = 'none';
-            if (_executing) return;
-            if (_aiResponseStatus.type !== 'ok') return;
+            if (_aiResponseStatus.type !== 'ok' || !_answerPhase) return;
             _onExecuteClick();
         }, 1500);
     }
@@ -2736,12 +3803,16 @@ window.PreviewAiTools = (function () {
         if (_aiResponseStatus.type === 'idle') {
             _aiResponseStatusEl.textContent = '';
         } else if (_aiResponseStatus.type === 'ok') {
-            var tpl = _t('aiResponseValid', '{n} commands ready');
-            _aiResponseStatusEl.textContent = tpl.replace('{n}', String(_aiResponseStatus.commandCount));
+            var tpl = _answerParts > 1
+                ? _t('assembledReady', '{n} commands ready, put together from {parts} answers: they run only when you click Execute.')
+                : _t('aiResponseValid', '{n} commands ready');
+            _aiResponseStatusEl.textContent = tpl.replace('{n}', String(_aiResponseStatus.commandCount))
+                .replace('{parts}', String(_answerParts));
             _aiResponseStatusEl.classList.add('preview-contextual-ai-tools__ai-response-status--ok');
         } else {
             var errTpl = _t('aiResponseInvalid', 'Invalid JSON: {error}');
-            _aiResponseStatusEl.textContent = _aiResponseStatus.empty
+            // An answer that does not parse says so; a failure to get one (a send, a reading) is said as it is.
+            _aiResponseStatusEl.textContent = _aiResponseStatus.empty || _aiResponseStatus.plain
                 ? _aiResponseStatus.message
                 : errTpl.replace('{error}', _aiResponseStatus.message);
             _aiResponseStatusEl.classList.add('preview-contextual-ai-tools__ai-response-status--error');

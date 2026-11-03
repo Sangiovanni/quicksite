@@ -147,7 +147,7 @@ window.QS_SETTINGS_I18N = <?= json_encode($qsSettingsI18n, JSON_HEX_TAG | JSON_H
             
             <div class="admin-checkbox-group">
                 <input type="checkbox" id="ai-auto-execute" class="admin-checkbox" onchange="updateAiAutomation('autoExecute', this.checked)">
-                <label for="ai-auto-execute" class="admin-checkbox-label"><?= __admin('settings.ai.autoExecuteLabel') ?> <span style="color: var(--admin-warning);"><?= __admin('settings.ai.autoExecuteCaution') ?></span></label>
+                <label for="ai-auto-execute" class="admin-checkbox-label"><?= __admin('settings.ai.runWithoutStoppingLabel') ?> <span style="color: var(--admin-warning);"><?= __admin('settings.ai.autoExecuteCaution') ?></span></label>
             </div>
         </div>
     </div>

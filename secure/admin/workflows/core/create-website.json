@@ -7,7 +7,7 @@
         "titleKey": "ai.specs.createWebsite.title",
         "descriptionKey": "ai.specs.createWebsite.description",
         "category": "creation",
-        "tags": ["create", "website", "multi-page", "from-scratch"],
+        "tags": ["create", "website", "multi-page", "single-page", "landing", "from-scratch"],
         "difficulty": "advanced"
     },
     "parameters": [
@@ -46,6 +46,13 @@
                 "filterFrom": "languages"
             },
             "default": "{{data.langData.default_language}}"
+        },
+        {
+            "id": "onePage",
+            "type": "checkbox",
+            "labelKey": "ai.specs.createWebsite.params.onePage.label",
+            "helpKey": "ai.specs.createWebsite.params.onePage.help",
+            "default": false
         },
         {
             "id": "includeAssets",

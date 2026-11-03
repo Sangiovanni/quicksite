@@ -84,9 +84,9 @@ window.QS_AI_CONNECTIONS_I18N = <?= json_encode($qsAiConnectionsI18n, JSON_HEX_T
             <div class="admin-form-group">
                 <label class="admin-checkbox">
                     <input type="checkbox" id="qsac-auto-execute">
-                    <span class="admin-checkbox__label"><?= __admin('aiConnections.autoExecuteLabel') ?></span>
+                    <span class="admin-checkbox__label"><?= __admin('aiConnections.runWithoutStoppingLabel') ?></span>
                 </label>
-                <p class="admin-hint"><?= str_replace(':caution', '<strong>' . __admin('aiConnections.autoExecuteCaution') . '</strong>', __admin('aiConnections.autoExecuteHint')) ?></p>
+                <p class="admin-hint"><?= str_replace(':caution', '<strong>' . __admin('aiConnections.autoExecuteCaution') . '</strong>', __admin('aiConnections.runWithoutStoppingHint')) ?></p>
             </div>
         </div>
     </div>
@@ -107,7 +107,7 @@ window.QS_AI_CONNECTIONS_I18N = <?= json_encode($qsAiConnectionsI18n, JSON_HEX_T
         <div class="admin-modal__body" id="qsac-modal-body">
             <!-- step content rendered by JS -->
         </div>
-        <div class="admin-modal__footer" id="qsac-modal-footer">
+        <div class="admin-modal__footer qsac-modal__footer" id="qsac-modal-footer">
             <!-- buttons rendered by JS -->
         </div>
     </div>

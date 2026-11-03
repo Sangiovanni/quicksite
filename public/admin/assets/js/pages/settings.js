@@ -148,7 +148,8 @@
         
         // Load automation settings
         const autoExecuteEl = document.getElementById('ai-auto-execute');
-        if (autoExecuteEl) autoExecuteEl.checked = localStorage.getItem(AI_STORAGE_KEYS.autoExecute) !== 'false';
+        // "Run without stopping" is off until switched on (the AI tools runner reads it the same way).
+        if (autoExecuteEl) autoExecuteEl.checked = localStorage.getItem(AI_STORAGE_KEYS.autoExecute) === 'true';
         
         // Check for configured providers
         const storedData = storage.getItem(AI_STORAGE_KEYS.keysV2);
@@ -197,8 +198,8 @@
         if (setting !== 'autoExecute') return;
         localStorage.setItem(AI_STORAGE_KEYS.autoExecute, value);
         QuickSiteAdmin.showToast(t(value
-            ? 'settings.ai.autoExecuteEnabled'
-            : 'settings.ai.autoExecuteDisabled'), 'success');
+            ? 'settings.ai.runWithoutStoppingOn'
+            : 'settings.ai.runWithoutStoppingOff'), 'success');
     };
     
     /**

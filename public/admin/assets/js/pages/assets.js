@@ -751,8 +751,8 @@
      *
      * Deliberately NOT the ⭐ next to it: that star means "include this asset in
      * AI prompts", is multi-select, is capped at 15, and is read by the
-     * create-landing / create-website workflows. The two are unrelated choices
-     * and each keeps its own control.
+     * create-website workflow. The two are unrelated choices and each keeps
+     * its own control.
      *
      * Only rendered for favicon-capable formats — a .bmp or a .mp3 has no
      * favicon affordance at all, rather than a disabled one nobody can explain.

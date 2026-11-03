@@ -50,7 +50,7 @@
     ],
     "steps": [
         {
-            "comment": "=== PHASE 1: DELETE ROUTES (except home and 404) ===",
+            "comment": "=== 1. DELETE ROUTES (except home and 404) ===",
             "forEach": "routes",
             "filter": "{{$value}} !== 'home' && {{$value}} !== '404'",
             "command": "deleteRoute",
@@ -60,7 +60,7 @@
             }
         },
         {
-            "comment": "=== PHASE 2: DELETE ASSETS ===",
+            "comment": "=== 2. DELETE ASSETS ===",
             "condition": "param.keepAssets !== true",
             "forEach": "assetsData.images",
             "command": "deleteAsset",
@@ -94,18 +94,17 @@
         },
 
         {
-            "comment": "=== PHASE 3: DELETE ALL COMPONENTS ===",
+            "comment": "=== 3. DELETE ALL COMPONENTS (an empty structure deletes a component) ===",
             "forEach": "componentsData.components",
             "command": "editStructure",
             "params": {
                 "type": "component",
                 "name": "{{$value.name}}",
-                "action": "delete",
-                "force": true
+                "structure": []
             }
         },
         {
-            "comment": "=== PHASE 4: DELETE NON-DEFAULT LANGUAGES ===",
+            "comment": "=== 4. DELETE NON-DEFAULT LANGUAGES ===",
             "condition": "param.keepLanguages !== true",
             "forEach": "langData.languages",
             "filter": "{{$value}} !== {{langData.default_language}}",
@@ -115,13 +114,13 @@
             }
         },
         {
-            "comment": "=== PHASE 4b: DELETE ORPHAN TRANSLATION FILES (files on disk not in LANGUAGES_SUPPORTED) ===",
+            "comment": "=== 4b. DELETE ORPHAN TRANSLATION FILES (files on disk not in LANGUAGES_SUPPORTED) ===",
             "condition": "param.keepLanguages !== true",
             "command": "cleanOrphanTranslations",
             "params": {}
         },
         {
-            "comment": "=== PHASE 5: RESET STRUCTURES ===",
+            "comment": "=== 5. RESET STRUCTURES ===",
             "command": "editStructure",
             "params": {
                 "type": "page",
@@ -144,7 +143,7 @@
             }
         },
         {
-            "comment": "=== PHASE 5b: MINIMIZE 404 PAGE ===",
+            "comment": "=== 5b. MINIMIZE 404 PAGE ===",
             "command": "editStructure",
             "params": {
                 "type": "page",
@@ -160,7 +159,7 @@
             }
         },
         {
-            "comment": "=== PHASE 6: SET MINIMAL TRANSLATIONS (default language - REPLACE) ===",
+            "comment": "=== 6. SET MINIMAL TRANSLATIONS (default language - REPLACE) ===",
             "command": "setTranslationKeys",
             "params": {
                 "language": "{{langData.default_language}}",
@@ -184,7 +183,7 @@
             }
         },
         {
-            "comment": "=== PHASE 6b: SET MINIMAL TRANSLATIONS (default.json - REPLACE) ===",
+            "comment": "=== 6b. SET MINIMAL TRANSLATIONS (default.json - REPLACE) ===",
             "command": "setTranslationKeys",
             "params": {
                 "language": "default",
@@ -208,15 +207,15 @@
             }
         },
         {
-            "comment": "=== PHASE 7: DISABLE MULTILINGUAL (only if currently multilingual) ===",
-            "condition": "param.keepLanguages !== true && langData.multilingual === true",
+            "comment": "=== 7. DISABLE MULTILINGUAL (only if currently multilingual) ===",
+            "condition": "param.keepLanguages !== true && langData.multilingual_enabled === true",
             "command": "setMultilingual",
             "params": {
                 "enabled": false
             }
         },
         {
-            "comment": "=== PHASE 8: RESET CSS ===",
+            "comment": "=== 8. RESET CSS ===",
             "command": "editStyles",
             "params": {
                 "css": "/* Fresh start - add your styles here */\n\n:root {\n    --color-primary: #3b82f6;\n    --color-text: #1f2937;\n    --color-bg: #ffffff;\n}\n\nbody {\n    font-family: system-ui, -apple-system, sans-serif;\n    color: var(--color-text);\n    background: var(--color-bg);\n    margin: 0;\n    padding: 0;\n}\n\n.container {\n    max-width: 1200px;\n    margin: 0 auto;\n    padding: 2rem;\n}"

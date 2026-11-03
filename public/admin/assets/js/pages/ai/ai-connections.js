@@ -292,7 +292,8 @@
             });
         }
         if (autoExec) {
-            autoExec.checked = localStorage.getItem(STORAGE.aiAutoExecute) !== 'false';
+            // "Run without stopping" is off until switched on (the AI tools runner reads it the same way).
+            autoExec.checked = localStorage.getItem(STORAGE.aiAutoExecute) === 'true';
             autoExec.addEventListener('change', () => {
                 localStorage.setItem(STORAGE.aiAutoExecute, autoExec.checked ? 'true' : 'false');
             });
@@ -542,6 +543,9 @@
                 })
             ])
         ]));
+        // A stored limit the catalog would ignore is shown, and saved, as the default.
+        if (!_outputLimitValid(current.maxOutputTokens)) current.maxOutputTokens = null;
+        body.appendChild(_renderOutputLimitField(current));
 
         body.appendChild(QSDom.el('div', {
             id: 'qsac-probe', class: 'qsac-probe qsac-probe--idle'
@@ -590,6 +594,12 @@
         keyEl.addEventListener('input', () => { current.key = keyEl.value.trim(); scheduleProbe(); refreshSaveBtn(); });
         if (baseEl) baseEl.addEventListener('input', () => { current.baseUrl = baseEl.value.trim(); scheduleProbe(); refreshSaveBtn(); });
         streamEl.addEventListener('change', () => { current.streaming = streamEl.checked; });
+        const limitEl = document.getElementById('qsac-max-output');
+        limitEl.addEventListener('input', () => {
+            const raw = limitEl.value.trim();
+            current.maxOutputTokens = raw === '' ? NaN : Number(raw);
+            refreshSaveBtn();
+        });
 
         // Probe at once whenever the form opens already holding what a probe
         // needs: an edited connection, or a local preset whose base URL is
@@ -636,13 +646,54 @@
         return 'linux';
     }
 
+    /**
+     * The output limit's field: the most the AI may write in one answer, in tokens. It shows the
+     * connection's own limit, or the catalog's default until one is typed.
+     * @returns {HTMLElement}
+     */
+    function _renderOutputLimitField(conn) {
+        const cat = window.QSProviderCatalog;
+        const range = cat.MAX_OUTPUT_TOKENS_RANGE;
+        return QSDom.el('div', { class: 'admin-form-group' }, [
+            QSDom.el('label', {
+                class: 'admin-label', for: 'qsac-max-output', text: t('aiConnections.maxOutputTokensLabel')
+            }),
+            QSDom.el('input', {
+                type: 'number', id: 'qsac-max-output', class: 'admin-input',
+                min: String(range.min), max: String(range.max), step: '1',
+                value: String(cat.maxOutputTokens(conn))
+            }),
+            QSDom.el('p', { class: 'admin-hint', id: 'qsac-max-output-hint', text: _outputLimitHint(true) })
+        ]);
+    }
+
+    /** The limit's hint: what it is, or the range it must be in. @returns {string} */
+    function _outputLimitHint(valid) {
+        const cat = window.QSProviderCatalog;
+        return valid
+            ? t('aiConnections.maxOutputTokensHint', { default: cat.DEFAULT_MAX_OUTPUT_TOKENS })
+            : t('aiConnections.maxOutputTokensInvalid', cat.MAX_OUTPUT_TOKENS_RANGE);
+    }
+
+    /** Whether the limit typed may be saved: none typed (the shown value stays), or a whole number in range. */
+    function _outputLimitValid(n) {
+        if (n === undefined || n === null) return true;
+        const range = window.QSProviderCatalog.MAX_OUTPUT_TOKENS_RANGE;
+        return Number.isInteger(n) && n >= range.min && n <= range.max;
+    }
+
     function refreshSaveBtn() {
         const btn = document.getElementById('qsac-save');
         if (!btn) return;
         const hasName = !!(current.name && current.name.length);
         const hasAuth = current.type === 'local' ? !!(current.baseUrl) : !!(current.key);
+        const limitOk = _outputLimitValid(current.maxOutputTokens);
+        const limitEl = document.getElementById('qsac-max-output');
+        const hintEl = document.getElementById('qsac-max-output-hint');
+        if (limitEl) limitEl.classList.toggle('admin-input--error', !limitOk);
+        if (hintEl) hintEl.textContent = _outputLimitHint(limitOk);
         // Allow save without successful probe — user can save and test later.
-        btn.disabled = !(hasName && hasAuth);
+        btn.disabled = !(hasName && hasAuth && limitOk);
     }
 
     function scheduleProbe(delay) {
@@ -773,6 +824,7 @@
             enabledModels: current.enabledModels || current.models || [],
             defaultModel: current.defaultModel || (current.models && current.models[0]) || null,
             streaming: current.streaming !== false,
+            maxOutputTokens: Number.isInteger(current.maxOutputTokens) ? current.maxOutputTokens : null,
             lastStatus: lastProbe ? { ok: !!lastProbe.ok, at: Date.now(), message: lastProbe.message || null } : null
         };
         if (current._editing) {

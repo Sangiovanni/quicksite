@@ -8,11 +8,13 @@
  *
  *   const result = await QSAiCall.call({
  *     connection, model, messages,
- *     options: { max_tokens, temperature },
+ *     options: { max_tokens, temperature },   // max_tokens: the connection's output limit when omitted
  *     signal,            // AbortSignal for cancellation
  *     onChunk            // called per streamed delta; unused when not streaming
  *   });
- *   // result = { content, usage, viaStream:false, raw, model, providerType }
+ *   // result = { content, usage, finish, finishReason, viaStream, raw, model, providerType }
+ *   // finish: why the answer ended — 'stop', 'length' (cut at the output limit), 'other' (the
+ *   // provider stopped it), or null when it gave no reason; finishReason: the provider's own word.
  *
  * On HTTP error, throws a typed error with .category from
  * QSProviderCatalog.categorizeError plus .status, .body and .message.
@@ -100,9 +102,12 @@
         try { text = await response.text(); parsed = text ? JSON.parse(text) : null; } catch (_e) { parsed = null; }
         const content = cat.parseResponse(parsed, connection.providerType);
         const usage = cat.parseUsage(parsed, connection.providerType);
+        const finishReason = cat.parseFinishReason(parsed, connection.providerType);
         return {
             content,
             usage,
+            finish: cat.finishKind(finishReason),
+            finishReason,
             viaStream: false,
             raw: parsed,
             model,
@@ -121,6 +126,7 @@
         const decoder = new TextDecoder('utf-8');
         let content = '';
         let usage = null;
+        let finishReason = null;
         let aborted = false;
         let streamErr = null;
 
@@ -151,6 +157,7 @@
                         }
                     }
                     if (ev.usage) usage = ev.usage;
+                    if (ev.finish) finishReason = ev.finish;
                 }
             }
             if (aborted) {
@@ -168,17 +175,20 @@
                     }
                 }
                 if (ev.usage) usage = ev.usage;
+                if (ev.finish) finishReason = ev.finish;
             }
             // Flush decoder.
             const finalText = decoder.decode();
             if (finalText) {
                 const more = parser.feed(finalText).concat(parser.flush());
                 more.forEach((ev) => {
+                    if (ev.error) streamErr = ev.error;
                     if (typeof ev.delta === 'string' && ev.delta.length) {
                         content += ev.delta;
                         if (typeof onChunk === 'function') onChunk(ev.delta, { content, model, providerType: connection.providerType });
                     }
                     if (ev.usage) usage = ev.usage;
+                    if (ev.finish) finishReason = ev.finish;
                 });
             }
         } catch (e) {
@@ -198,6 +208,8 @@
         return {
             content,
             usage,
+            finish: window.QSProviderCatalog.finishKind(finishReason),
+            finishReason,
             viaStream: true,
             raw: null,
             model,

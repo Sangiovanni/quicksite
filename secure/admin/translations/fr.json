@@ -1394,10 +1394,6 @@
                     "keepAssets": {
                         "label": "Conserver les assets existants lors du fresh start",
                         "help": "Préserver vos assets téléchargés (images, polices, etc.) lors de la réinitialisation du projet avant la création."
-                    },
-                    "keepLanguages": {
-                        "label": "Conserver les langues existantes lors du fresh start",
-                        "help": "Préserver vos langues supplémentaires lors de la réinitialisation du projet avant la création."
                     }
                 }
             },
@@ -1420,21 +1416,6 @@
                     "spanish": { "title": "Ajouter l'espagnol", "prompt": "Ajouter le support de l'espagnol" },
                     "german": { "title": "Ajouter l'allemand", "prompt": "Ajouter le support de l'allemand" },
                     "japanese": { "title": "Ajouter le japonais", "prompt": "Ajouter le support du japonais" }
-                }
-            },
-            "createLanding": {
-                "title": "Créer une Landing Page",
-                "description": "Générer un site landing page complet à partir de zéro avec sections hero, fonctionnalités, témoignages et contact.",
-                "params": {
-                    "multilingual": {
-                        "label": "Activer le multilingue",
-                        "help": "Créer avec support de plusieurs langues"
-                    }
-                },
-                "examples": {
-                    "coffeeShop": { "title": "Café", "prompt": "Créer une landing page pour un café avec hero, menu en vedette et formulaire de contact" },
-                    "saas": { "title": "Produit SaaS", "prompt": "Créer une landing moderne pour un SaaS de gestion de projet avec fonctionnalités, tarifs, témoignages" },
-                    "portfolio": { "title": "Portfolio", "prompt": "Créer une landing portfolio minimaliste pour un photographe avec galerie et contact" }
                 }
             },
             "createWebsite": {
@@ -1711,7 +1692,6 @@
         "aiToolsStateRunning": "En cours…",
         "aiToolsStateDone": "Terminé",
         "aiToolsAutoPreviewLabel": "Aperçu auto",
-        "aiToolsAutoExecuteLabel": "Exécution auto",
         "aiToolsRunButton": "Exécuter",
         "aiToolsParamOptionsDeferred": "Options chargées lors de l'exécution.",
         "aiToolsRunnerLoading": "Chargement du workflow…",
@@ -1720,7 +1700,6 @@
         "aiToolsGeneralPromptPlaceholder": "Cliquez sur Générer pour assembler l'invite finale.",
         "aiToolsGenerateBtn": "Générer",
         "aiToolsGeneratingPrompt": "Génération…",
-        "aiToolsGenerateError": "Échec de la génération : {error}",
         "aiToolsCopyBtn": "Copier",
         "aiToolsCopied": "Copié !",
         "aiToolsParamOptionsEmpty": "Aucune option disponible.",
@@ -1773,7 +1752,6 @@
         "aiToolsActionExecute": "Exécuter les commandes",
         "aiToolsActionGenerateForCopy": "Générer pour copier",
         "aiToolsModelLabel": "Modèle :",
-        "aiToolsPhaseGenerating": "Génération de l'invite…",
         "aiToolsCopyHint": "Copiez ceci dans votre assistant IA, puis collez la réponse ci-dessous.",
         "aiToolsPasteHint": "Collez la réponse JSON ici.",
         "aiToolsStepsReady": "{n} commandes prêtes",

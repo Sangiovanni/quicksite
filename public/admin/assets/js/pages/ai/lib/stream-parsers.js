@@ -12,6 +12,8 @@
  *   delta : string  — text to append to the textarea
  *   usage : { input_tokens, output_tokens } — final token totals
  *   done  : true    — terminal marker (e.g. data: [DONE])
+ *   finish: string  — why the answer ended, in the provider's own word
+ *                     (finish_reason, stop_reason, finishReason, a blocked prompt's blockReason)
  *   error : string  — provider-emitted error event
  *
  * The OpenAI parser is reused for `openai-compatible` (Ollama / LM Studio /
@@ -113,6 +115,7 @@
             choices.forEach((c) => {
                 const delta = c && c.delta && c.delta.content;
                 if (typeof delta === 'string' && delta.length) out.push({ delta });
+                if (c && c.finish_reason) out.push({ finish: c.finish_reason });
             });
             if (obj && obj.usage) {
                 out.push({
@@ -158,6 +161,8 @@
                         }
                     });
                 }
+                const reason = obj && obj.delta && obj.delta.stop_reason;
+                if (reason) out.push({ finish: reason });
             } else if (ev.event === 'message_stop') {
                 out.push({ done: true });
             } else if (ev.event === 'error') {
@@ -175,6 +180,9 @@
             let obj;
             try { obj = JSON.parse(ev.data); } catch (_e) { return []; }
             const out = [];
+            if (obj && obj.error) {
+                out.push({ error: obj.error.message || obj.error.status || 'error' });
+            }
             const parts = obj && obj.candidates && obj.candidates[0]
                 && obj.candidates[0].content && obj.candidates[0].content.parts;
             if (parts) {
@@ -190,8 +198,9 @@
                     }
                 });
             }
-            const finish = obj && obj.candidates && obj.candidates[0] && obj.candidates[0].finishReason;
-            if (finish) out.push({ done: true });
+            const finish = (obj && obj.candidates && obj.candidates[0] && obj.candidates[0].finishReason)
+                || (obj && obj.promptFeedback && obj.promptFeedback.blockReason);
+            if (finish) out.push({ finish, done: true });
             return out;
         });
     }
@@ -205,13 +214,15 @@
             const delta = obj && obj.message && obj.message.content;
             if (typeof delta === 'string' && delta.length) out.push({ delta });
             if (obj && obj.done) {
-                out.push({
+                const end = {
                     done: true,
                     usage: {
                         input_tokens: obj.prompt_eval_count || 0,
                         output_tokens: obj.eval_count || 0
                     }
-                });
+                };
+                if (obj.done_reason) end.finish = obj.done_reason;
+                out.push(end);
             }
             return out;
         });

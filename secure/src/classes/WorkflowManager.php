@@ -8,11 +8,14 @@
  * - Fetching data requirements via CommandRunner
  * - Rendering prompt templates with variable substitution
  * - Generating steps from forEach definitions
- * 
+ * - The phases a run goes through (its pre-workflows, itself, its post-workflows), each
+ *   resolved when the run reaches it, and what each step deletes or changes
+ *
  * @package QuickSite\Admin
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/CommandRunner.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/languageRegistry.php';
 
 class WorkflowManager {
@@ -34,6 +37,33 @@ class WorkflowManager {
     
     /** Max recursion depth for {{> partial}} resolution (cycle/runaway guard). */
     private const PARTIALS_MAX_DEPTH = 5;
+
+    /** Max nesting of sub-workflows a run follows: a sub-workflow's own pre- and post-workflows, and theirs. */
+    private const PHASES_MAX_DEPTH = 5;
+
+    /** A command whose name begins so deletes what it names: the console's convention (admin.js isDestructiveCommand()). */
+    private const DELETE_NAME = '/^(delete|remove|clear|reset|purge)/i';
+
+    /** A command whose name begins so adds something new: a run is never warned about it. */
+    private const CREATE_NAME = '/^(add|create|upload|insert|duplicate)/';
+
+    /** The categories whose writes change the site's content: such a write that neither deletes nor adds is warned as a change. */
+    private const CONTENT_CATEGORIES = [
+        'content.write', 'translation.write', 'route.write', 'asset.write',
+        'interaction.write', 'privacy.manage', 'style.write',
+    ];
+
+    /**
+     * What a warned step touches, by category: its group in the warning, and the parameters that may
+     * name its target (the first one present). A command of no listed category is its own group.
+     */
+    private const EFFECT_GROUPS = [
+        'route.write'       => ['pages', ['route', 'alias']],
+        'asset.write'       => ['media', ['filename', 'imageName']],
+        'style.write'       => ['stylesheet', ['selector', 'name']],
+        'interaction.write' => ['interactions', ['pageName', 'route']],
+        'privacy.manage'    => ['privacy', ['id', 'route', 'lang']],
+    ];
 
     /**
      * Constructor
@@ -112,6 +142,12 @@ class WorkflowManager {
      * @return array|null Workflow data or null if not found
      */
     public function loadWorkflow(string $workflowId): ?array {
+        // A workflow id names a file of core/: letters, digits, hyphens and underscores only, so an id
+        // taken from a request never reaches a file outside that folder.
+        if (!RegexPatterns::match('identifier_alphanum', $workflowId)) {
+            return null;
+        }
+
         // Check cache
         if (isset($this->workflowsCache[$workflowId])) {
             return $this->workflowsCache[$workflowId];
@@ -307,9 +343,9 @@ class WorkflowManager {
     }
     
     /**
-     * Generate expanded steps from workflow definition
-     * Processes preWorkflows, forEach, conditions, postWorkflows and parameter resolution
-     * 
+     * Generate one workflow's own steps, expanded: forEach, conditions and parameter resolution.
+     * Its pre- and post-workflows are phases of their own (getWorkflowPhases()).
+     *
      * @param array $workflow The workflow definition
      * @param array $userParams User-provided parameters
      * @param array $fetchedData Data from dataRequirements
@@ -318,26 +354,18 @@ class WorkflowManager {
      */
     public function generateSteps(array $workflow, array $userParams = [], array $fetchedData = [], array $configData = []): array {
         $expandedSteps = [];
-        
+
         // Merge static data defined in the workflow itself
         if (!empty($workflow['staticData']) && is_array($workflow['staticData'])) {
             $fetchedData = array_merge($workflow['staticData'], $fetchedData);
         }
-        
+
         $context = [
             'param' => $userParams,
             'data' => $fetchedData,
             'config' => $configData
         ];
-        
-        // Process preWorkflows first
-        if (!empty($workflow['preWorkflows'])) {
-            $preSteps = $this->expandSubWorkflows($workflow['preWorkflows'], $context);
-            foreach ($preSteps as $step) {
-                $expandedSteps[] = $step;
-            }
-        }
-        
+
         // Process main workflow steps
         if (isset($workflow['steps']) && !empty($workflow['steps'])) {
             foreach ($workflow['steps'] as $step) {
@@ -375,189 +403,263 @@ class WorkflowManager {
                 }
             }
         }
-        
-        // Process postWorkflows last
-        if (!empty($workflow['postWorkflows'])) {
-            $postSteps = $this->expandSubWorkflows($workflow['postWorkflows'], $context);
-            foreach ($postSteps as $step) {
-                $expandedSteps[] = $step;
-            }
-        }
-        
+
         return $expandedSteps;
     }
     
     /**
-     * Get the execution phases for a workflow (metadata only, no resolution).
-     * Used by the client to build a phase-by-phase execution plan.
-     * 
+     * The phases a run of this workflow goes through, in order: each pre-workflow, the workflow itself,
+     * then each post-workflow; a sub-workflow's own pre- and post-workflows run around it, depth first.
+     * A sub-workflow's condition is evaluated here, once, when the run is planned: against the
+     * parameters its parent was given, and the parent's data when the condition reads any. Nothing is
+     * resolved: a phase names its workflow and the parameters its parent passes it. A workflow already
+     * on the way to itself (a cycle), or nested deeper than PHASES_MAX_DEPTH, is left out.
+     *
      * @param array $workflow The workflow definition
-     * @param array $userParams User params (for condition evaluation on sub-workflows)
-     * @return array List of phases: [{type, workflowId?}, ...]
+     * @param array $userParams The run's parameters
+     * @return array List of ['kind' => 'pre'|'main'|'post', 'workflowId' => string, 'params' => array]
      */
     public function getWorkflowPhases(array $workflow, array $userParams = []): array {
         $phases = [];
-        $context = ['param' => $userParams];
-        
-        // Pre-workflows
-        if (!empty($workflow['preWorkflows'])) {
-            foreach ($workflow['preWorkflows'] as $sub) {
-                if (is_string($sub)) {
-                    $phases[] = ['type' => 'preWorkflow', 'workflowId' => $sub];
-                } else {
-                    $id = $sub['id'] ?? null;
-                    if (!$id) continue;
-                    
-                    $condition = $sub['condition'] ?? null;
-                    if ($condition !== null && !$this->evaluateStepCondition($condition, $context)) {
-                        continue;
-                    }
-                    
-                    $phases[] = ['type' => 'preWorkflow', 'workflowId' => $id];
-                }
-            }
-        }
-        
-        // Main workflow
-        $phases[] = ['type' => 'main'];
-        
-        // Post-workflows
-        if (!empty($workflow['postWorkflows'])) {
-            foreach ($workflow['postWorkflows'] as $sub) {
-                if (is_string($sub)) {
-                    $phases[] = ['type' => 'postWorkflow', 'workflowId' => $sub];
-                } else {
-                    $id = $sub['id'] ?? null;
-                    if (!$id) continue;
-                    
-                    $condition = $sub['condition'] ?? null;
-                    if ($condition !== null && !$this->evaluateStepCondition($condition, $context)) {
-                        continue;
-                    }
-                    
-                    $phases[] = ['type' => 'postWorkflow', 'workflowId' => $id];
-                }
-            }
-        }
-        
+        $this->collectPhases($workflow, $userParams, 'main', [], $phases);
         return $phases;
     }
-    
-    /**
-     * Resolve a single sub-workflow with fresh data.
-     * Loads the workflow, fetches its dataRequirements, generates expanded steps.
-     * Used by the API for phase-by-phase execution.
-     * 
-     * @param string $workflowId The workflow ID to resolve
-     * @param array $userParams User-provided parameters
-     * @return array {workflowId, steps, count} or {error}
-     */
-    public function resolveSubWorkflow(string $workflowId, array $userParams = []): array {
-        $workflow = $this->loadWorkflow($workflowId);
-        if (!$workflow) {
-            return ['error' => 'Workflow not found: ' . $workflowId];
+
+    /** One workflow's phases, added to $phases: its pre-workflows', its own, its post-workflows'. */
+    private function collectPhases(array $workflow, array $params, string $kind, array $trail, array &$phases): void {
+        $id = (string) ($workflow['id'] ?? '');
+        if (in_array($id, $trail, true) || count($trail) >= self::PHASES_MAX_DEPTH) {
+            error_log("[WorkflowManager] sub-workflow '{$id}' left out of the run: a cycle, or nested too deep");
+            return;
         }
-        
-        // Merge with workflow parameter defaults
-        if (!empty($workflow['parameters'])) {
-            foreach ($workflow['parameters'] as $param) {
-                $paramId = $param['id'];
-                if (!isset($userParams[$paramId]) && isset($param['default'])) {
-                    $userParams[$paramId] = $param['default'];
+        $trail[] = $id;
+        $data = null;
+        // Every phase before the run's own workflow is a pre phase, every phase after it a post phase.
+        $this->collectSubPhases($workflow, $params, 'preWorkflows', $kind === 'main' ? 'pre' : $kind, $trail, $phases, $data);
+        $phases[] = ['kind' => $kind, 'workflowId' => $id, 'params' => $params];
+        $this->collectSubPhases($workflow, $params, 'postWorkflows', $kind === 'main' ? 'post' : $kind, $trail, $phases, $data);
+    }
+
+    /**
+     * The phases of one list of sub-workflows (preWorkflows or postWorkflows): each entry's condition
+     * checked and its parameters resolved against its parent's; the parent's data fetched once, and only
+     * when an entry reads it.
+     */
+    private function collectSubPhases(array $workflow, array $params, string $list, string $kind, array $trail, array &$phases, ?array &$data): void {
+        foreach (($workflow[$list] ?? []) as $entry) {
+            $subId = is_string($entry) ? $entry : (is_array($entry) ? (string) ($entry['id'] ?? '') : '');
+            if ($subId === '') continue;
+            $subParams = is_array($entry) && is_array($entry['params'] ?? null) ? $entry['params'] : [];
+            $condition = is_array($entry) && is_string($entry['condition'] ?? null) ? $entry['condition'] : null;
+            if ($data === null && $this->entryReadsData($condition, $subParams)) {
+                $data = $this->fetchDataRequirements($workflow, $params);
+                if (!empty($workflow['staticData']) && is_array($workflow['staticData'])) {
+                    $data = array_merge($workflow['staticData'], $data);
                 }
             }
+            $context = ['param' => $params, 'data' => $data ?? [], 'config' => []];
+            if ($condition !== null && !$this->evaluateStepCondition($condition, $context)) continue;
+            $sub = $this->loadWorkflow($subId);
+            if (!$sub) continue;
+            $this->collectPhases($sub, $this->resolveStepParams($subParams, $context), $kind, $trail, $phases);
         }
-        
-        // Fetch fresh data requirements
-        $data = $this->fetchDataRequirements($workflow, $userParams);
-        
-        // Generate steps (handles forEach, conditions, nested sub-workflows)
-        $steps = $this->generateSteps($workflow, $userParams, $data, []);
-        
-        return [
-            'workflowId' => $workflowId,
-            'steps' => $steps,
-            'count' => count($steps)
+    }
+
+    /**
+     * Whether a sub-workflow entry reads its parent's data: a path in its condition, or a placeholder in
+     * its parameters, that is not a param.x (a system placeholder {{__x}} and a loop's {{$value}} are not).
+     */
+    private function entryReadsData(?string $condition, array $subParams): bool {
+        $paths = [];
+        if ($condition !== null) {
+            preg_match_all('/[A-Za-z_]\w*(?:\.\w+)*/', (string) preg_replace('/(["\']).*?\1/', '', $condition), $m);
+            $paths = $m[0];
+        }
+        preg_match_all('/\{\{\s*([^{}|\s]+)/', (string) json_encode($subParams), $m);
+        foreach (array_merge($paths, $m[1]) as $path) {
+            if (in_array($path, ['true', 'false', 'null'], true) || str_starts_with($path, '__') || str_starts_with($path, '$')) continue;
+            if (!str_starts_with($path, 'param.')) return true;
+        }
+        return false;
+    }
+
+    /**
+     * The run's plan: every phase, each resolved against the project as it is now (resolvePhase()). A
+     * later phase is resolved again when the run reaches it, since an earlier one can change what it reads.
+     *
+     * @return array The resolved phases, in order
+     */
+    public function planPhases(array $workflow, array $userParams = []): array {
+        $plan = [];
+        foreach ($this->getWorkflowPhases($workflow, $userParams) as $index => $phase) {
+            $plan[] = $this->resolvePhaseEntry($phase, $index, []);
+        }
+        return $plan;
+    }
+
+    /**
+     * One phase of a run, resolved now: called when the run reaches it, so it reads the project as the
+     * earlier phases left it. Its parameters are what its parent passes, then its own defaults (a default
+     * that reads its data, {{data.x}}, resolved against that data). A workflow with steps answers them
+     * expanded. An AI workflow answers its prompt when $options['prompt'] is set (the errors of its spec
+     * instead when it is not valid), and the commands its AI answered as its steps when $options['answer']
+     * holds them. Each step comes with what it deletes or changes, in 'effects' (stepEffect(), null for a
+     * step that is not warned).
+     *
+     * @return array|null ['index', 'kind', 'workflowId', 'title', 'icon', 'ai', 'steps', 'count',
+     *                    'effects', 'prompt'?, 'validationErrors'?], or null when the run has no such phase
+     */
+    public function resolvePhase(array $workflow, array $userParams, int $index, array $options = []): ?array {
+        $phases = $this->getWorkflowPhases($workflow, $userParams);
+        return isset($phases[$index]) ? $this->resolvePhaseEntry($phases[$index], $index, $options) : null;
+    }
+
+    private function resolvePhaseEntry(array $phase, int $index, array $options): array {
+        $workflow = $this->loadWorkflow($phase['workflowId']) ?? [];
+        $ai = $this->isAiWorkflow($workflow);
+        $resolved = [
+            'index' => $index,
+            'kind' => $phase['kind'],
+            'workflowId' => $phase['workflowId'],
+            'title' => $this->workflowTitle($workflow),
+            'icon' => (string) ($workflow['meta']['icon'] ?? ''),
+            'ai' => $ai,
         ];
-    }
-    
-    /**
-     * Expand sub-workflows (preWorkflows or postWorkflows) into steps
-     * 
-     * @param array $subWorkflows Array of workflow IDs or {id, params} objects
-     * @param array $parentContext Parent workflow's context
-     * @return array Expanded steps from all sub-workflows
-     */
-    private function expandSubWorkflows(array $subWorkflows, array $parentContext): array {
-        $allSteps = [];
-        
-        foreach ($subWorkflows as $subWorkflow) {
-            // Parse sub-workflow definition
-            $condition = null;
-            if (is_string($subWorkflow)) {
-                $workflowId = $subWorkflow;
-                $subParams = [];
+        $steps = [];
+        if ($ai && isset($options['answer']) && is_array($options['answer'])) {
+            $steps = $this->answerSteps($options['answer']);
+        }
+        // An AI phase reads its data only for its prompt.
+        if (!$ai || !empty($options['prompt'])) {
+            $params = $phase['params'];
+            $fromDefaults = [];
+            foreach (($workflow['parameters'] ?? []) as $param) {
+                $id = $param['id'] ?? null;
+                if (!is_string($id) || array_key_exists($id, $params) || !array_key_exists('default', $param)) continue;
+                $params[$id] = $param['default'];
+                $fromDefaults[] = $id;
+            }
+            $data = $this->fetchDataRequirements($workflow, $params);
+            // Only the workflow's own defaults are templates: a value its parent passed is a value.
+            $context = ['param' => $params, 'data' => $data, 'config' => []];
+            foreach ($fromDefaults as $id) {
+                if (is_string($params[$id]) && strpos($params[$id], '{{') !== false) {
+                    $params[$id] = $this->resolveStepParamValue($params[$id], $context);
+                }
+            }
+            if (!$ai) {
+                $steps = $this->generateSteps($workflow, $params, $data, []);
             } else {
-                $workflowId = $subWorkflow['id'] ?? null;
-                $subParams = $subWorkflow['params'] ?? [];
-                $condition = $subWorkflow['condition'] ?? null;
-            }
-            
-            if (!$workflowId) {
-                continue;
-            }
-            
-            // Evaluate condition if present (uses parent context)
-            if ($condition !== null) {
-                if (!$this->evaluateStepCondition($condition, $parentContext)) {
-                    continue;
+                $validation = $this->validateWorkflow($workflow);
+                if ($validation['valid']) {
+                    $resolved['prompt'] = $this->renderPrompt($workflow, $params, $data);
+                } else {
+                    $resolved['validationErrors'] = $validation['errors'];
                 }
-            }
-            
-            // Load the sub-workflow
-            $workflow = $this->loadWorkflow($workflowId);
-            if (!$workflow) {
-                continue;
-            }
-            
-            // Resolve sub-workflow params (can use {{param.x}} from parent)
-            $resolvedSubParams = $this->resolveStepParams($subParams, $parentContext);
-            
-            // Merge with workflow defaults
-            $finalParams = $resolvedSubParams;
-            if (!empty($workflow['parameters'])) {
-                foreach ($workflow['parameters'] as $param) {
-                    $paramId = $param['id'];
-                    if (!isset($finalParams[$paramId]) && isset($param['default'])) {
-                        $finalParams[$paramId] = $param['default'];
-                    }
-                }
-            }
-            
-            // Fetch data requirements for sub-workflow
-            $subData = [];
-            try {
-                $subData = $this->fetchDataRequirements($workflow, $finalParams);
-            } catch (Exception $e) {
-                // Continue with empty data
-            }
-            
-            // Generate steps for sub-workflow (recursive - supports nested pre/post)
-            $subSteps = $this->generateSteps($workflow, $finalParams, $subData, $parentContext['config'] ?? []);
-            
-            // Add marker comment for clarity in preview
-            if (!empty($subSteps)) {
-                $subSteps[0]['_subWorkflow'] = $workflowId;
-            }
-            
-            foreach ($subSteps as $step) {
-                $allSteps[] = $step;
             }
         }
-        
-        return $allSteps;
+        $resolved['steps'] = $steps;
+        $resolved['count'] = count($steps);
+        $resolved['effects'] = array_map([$this, 'stepEffect'], $steps);
+        return $resolved;
     }
-    
+
+    /** A workflow's title in the panel's language: its meta name, else its title key's translation, else its id. */
+    private function workflowTitle(array $workflow): string {
+        $labelled = $workflow;
+        self::resolveLabelsInPlace($labelled);
+        return (string) ($labelled['meta']['name'] ?? $labelled['meta']['title'] ?? $workflow['id'] ?? '');
+    }
+
+    /**
+     * The commands an AI answered, as a phase's steps: each entry that names a command, with its method,
+     * its parameters and the execution options the runner honours; anything else is left out.
+     */
+    private function answerSteps(array $answer): array {
+        $steps = [];
+        foreach ($answer as $entry) {
+            if (!is_array($entry)) continue;
+            $command = $entry['command'] ?? $entry['name'] ?? null;
+            if (!is_string($command) || $command === '') continue;
+            $step = [
+                'command' => $command,
+                'method' => is_string($entry['method'] ?? null) ? $entry['method'] : 'POST',
+                'params' => is_array($entry['params'] ?? null) ? $entry['params'] : [],
+            ];
+            foreach (['abortOnFail', 'retryOn', 'maxRetries', 'retryDelayMs'] as $prop) {
+                if (isset($entry[$prop])) {
+                    $step[$prop] = $entry[$prop];
+                }
+            }
+            $steps[] = $step;
+        }
+        return $steps;
+    }
+
+    /**
+     * What one step does to the project, for the run's warning: null when it only reads (a command the
+     * write rate never counts) or adds something new (a name beginning add, create, upload, insert or
+     * duplicate); else ['effect' => 'delete'|'change', 'what' => its group, 'target' => what it names,
+     * 'command' => its command]. A delete: a name beginning delete, remove, clear, reset or purge (the
+     * console's convention), a command whose help says it is destructive, editStructure with action delete
+     * (a node), or editStructure of a component with an empty structure (the component itself). A change:
+     * any other write of a content category (CONTENT_CATEGORIES). A write of another category that does
+     * not delete is not warned.
+     */
+    public function stepEffect(array $step): ?array {
+        $command = (string) ($step['command'] ?? $step['name'] ?? '');
+        if ($command === '') return null;
+        $params = is_array($step['params'] ?? null) ? $step['params'] : [];
+        if (!function_exists('qs_write_rate_counts')) {
+            require_once SECURE_FOLDER_PATH . '/src/functions/quota.php';
+        }
+        if (!function_exists('getCommandCategory')) {
+            require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+        }
+        if (!qs_write_rate_counts($command)) return null;
+        $category = (string) getCommandCategory($command);
+        $deletes = preg_match(self::DELETE_NAME, $command) === 1
+            || ($command === 'editStructure' && ($params['action'] ?? null) === 'delete')
+            || ($command === 'editStructure' && ($params['type'] ?? null) === 'component' && ($params['structure'] ?? null) === [])
+            || !empty($this->resolveHelpForCommand($command)['destructive']);
+        if (!$deletes && (preg_match(self::CREATE_NAME, $command) === 1 || !in_array($category, self::CONTENT_CATEGORIES, true))) {
+            return null;
+        }
+        [$what, $target] = $this->effectTarget($command, $category, $params);
+        return ['effect' => $deletes ? 'delete' : 'change', 'what' => $what, 'target' => $target, 'command' => $command];
+    }
+
+    /** A warned step's group in the warning, and the name of what it touches ('' when it names nothing). */
+    private function effectTarget(string $command, string $category, array $params): array {
+        $text = static function ($v): string {
+            return is_scalar($v) ? (string) $v : '';
+        };
+        if ($category === 'content.write') {
+            if ($command === 'renameComponent') return ['components', $text($params['oldName'] ?? '')];
+            if ($command === 'deleteSnippet') return ['snippets', $text($params['id'] ?? '')];
+            if ($command === 'editTitle') return ['pages', $text($params['route'] ?? '')];
+            $type = $text($params['type'] ?? '');
+            if ($type === 'menu' || $type === 'footer') return [$type, ''];
+            if ($type === 'component') return ['components', $text($params['name'] ?? '')];
+            return ['pages', $text($params['name'] ?? '')];
+        }
+        if ($category === 'translation.write') {
+            if ($command === 'deleteLang') return ['languages', $text($params['code'] ?? '')];
+            if ($command === 'setDefaultLang') return ['defaultLanguage', $text($params['lang'] ?? '')];
+            if ($command === 'setMultilingual') return ['multilingual', ''];
+            if ($command === 'cleanOrphanTranslations') return ['translationFiles', ''];
+            return ['texts', $text($params['language'] ?? '')];
+        }
+        if (isset(self::EFFECT_GROUPS[$category])) {
+            [$what, $names] = self::EFFECT_GROUPS[$category];
+            foreach ($names as $name) {
+                if ($text($params[$name] ?? '') !== '') return [$what, $text($params[$name])];
+            }
+            return [$what, ''];
+        }
+        return ['other', $command];
+    }
+
     /**
      * Expand a forEach step into multiple commands
      * 
@@ -1246,22 +1348,28 @@ class WorkflowManager {
     }
     
     /**
-     * Process {{#if}} conditionals in template
+     * Process {{#if}} conditionals in template: {{#if condition}}...{{/if}}, with an optional
+     * {{else}}. A block may hold another: the innermost blocks are decided first, then the ones
+     * around them, until none is left.
      */
     private function processConditionals(string $template, array $userParams, array $fetchedData): string {
-        // Pattern: {{#if condition}}...content...{{/if}}
-        // Also supports: {{#if condition}}...{{else}}...{{/if}}
-        $pattern = '/\{\{#if\s+(.+?)\}\}(.*?)(?:\{\{else\}\}(.*?))?\{\{\/if\}\}/s';
-        
-        return preg_replace_callback($pattern, function($matches) use ($userParams, $fetchedData) {
-            $condition = trim($matches[1]);
-            $ifContent = $matches[2];
-            $elseContent = $matches[3] ?? '';
-            
-            $conditionMet = $this->evaluateTemplateCondition($condition, $userParams, $fetchedData);
-            
-            return $conditionMet ? $ifContent : $elseContent;
-        }, $template);
+        // A block with no {{#if inside it.
+        $pattern = '/\{\{#if\s+((?:(?!\}\}).)+?)\}\}((?:(?!\{\{#if\s).)*?)(?:\{\{else\}\}((?:(?!\{\{#if\s).)*?))?\{\{\/if\}\}/s';
+
+        do {
+            $before = $template;
+            $template = (string) preg_replace_callback($pattern, function($matches) use ($userParams, $fetchedData) {
+                $condition = trim($matches[1]);
+                $ifContent = $matches[2];
+                $elseContent = $matches[3] ?? '';
+
+                $conditionMet = $this->evaluateTemplateCondition($condition, $userParams, $fetchedData);
+
+                return $conditionMet ? $ifContent : $elseContent;
+            }, $template);
+        } while ($template !== $before);
+
+        return $template;
     }
     
     /**
@@ -1617,16 +1725,6 @@ class WorkflowManager {
             'errors' => $errors,
             'warnings' => $warnings,
         ];
-    }
-    
-    /**
-     * Check if a workflow has manual steps (no AI prompting needed)
-     * 
-     * @param array $workflow The workflow definition
-     * @return bool True if workflow has steps and no promptTemplate
-     */
-    public function isManualWorkflow(array $workflow): bool {
-        return isset($workflow['steps']) && !isset($workflow['promptTemplate']);
     }
     
     /**

@@ -1562,7 +1562,7 @@
             "loadingStatus": "Loading AI status...",
             "automationOptions": "Automation Options",
             "automationHint": "These settings apply when using AI specs.",
-            "autoExecuteLabel": "Auto-execute commands after the AI response is parsed",
+            "runWithoutStoppingLabel": "Run without stopping: an AI answer runs once it is parsed, and a workflow goes from one part to the next without a review",
             "autoExecuteCaution": "(use with caution)",
             "status": "Status",
             "configured": "Configured",
@@ -1575,8 +1575,8 @@
             "storageSession": "Session only (cleared on tab close)",
             "noneConfigured": "No AI providers configured",
             "addApiKey": "Add API Key",
-            "autoExecuteEnabled": "Auto-execute enabled",
-            "autoExecuteDisabled": "Auto-execute disabled"
+            "runWithoutStoppingOn": "Run without stopping: on",
+            "runWithoutStoppingOff": "Run without stopping: off"
         },
         "permissions": {
             "yourRole": "Your Role",
@@ -1885,10 +1885,6 @@
                     "keepAssets": {
                         "label": "Keep existing assets during fresh start",
                         "help": "Preserve your uploaded assets (images, fonts, etc.) when the project is reset before creation."
-                    },
-                    "keepLanguages": {
-                        "label": "Keep existing languages during fresh start",
-                        "help": "Preserve your additional languages when the project is reset before creation."
                     }
                 }
             },
@@ -1913,25 +1909,14 @@
                     "japanese": { "title": "Add Japanese", "prompt": "Add Japanese language support" }
                 }
             },
-            "createLanding": {
-                "title": "Create Landing Page",
-                "description": "Generate a complete single-page landing website from scratch with hero, features, testimonials, and contact sections.",
-                "params": {
-                    "multilingual": {
-                        "label": "Enable multilingual",
-                        "help": "Create with multiple language support"
-                    }
-                },
-                "examples": {
-                    "coffeeShop": { "title": "Coffee Shop", "prompt": "Create a landing page for a coffee shop with hero, menu highlights, and contact form" },
-                    "saas": { "title": "SaaS Product", "prompt": "Create a modern landing for a project management SaaS with features, pricing, testimonials" },
-                    "portfolio": { "title": "Portfolio", "prompt": "Create a minimalist portfolio landing for a photographer with gallery and contact" }
-                }
-            },
             "createWebsite": {
-                "title": "Create Multi-Page Website",
-                "description": "Generate a complete multi-page website with navigation, multiple pages, shared header/footer, and consistent styling.",
+                "title": "Create Website",
+                "description": "Generate a complete website: several pages with navigation, or one page whose menu links to its sections, with a shared header and footer and consistent styling.",
                 "params": {
+                    "onePage": {
+                        "label": "One page only",
+                        "help": "Builds the home page only, its menu linking to the page's sections: a landing page."
+                    },
                     "multilingual": {
                         "label": "Enable multilingual",
                         "help": "Create with multiple language support"
@@ -2217,7 +2202,6 @@
         "aiToolsStateRunning": "Running…",
         "aiToolsStateDone": "Done",
         "aiToolsAutoPreviewLabel": "Auto-preview",
-        "aiToolsAutoExecuteLabel": "Auto-execute",
         "aiToolsRunButton": "Run",
         "aiToolsParamOptionsDeferred": "Options loaded when you run the workflow.",
         "aiToolsRunnerLoading": "Loading workflow…",
@@ -2226,7 +2210,6 @@
         "aiToolsGeneralPromptPlaceholder": "Click Generate to assemble the final prompt.",
         "aiToolsGenerateBtn": "Generate",
         "aiToolsGeneratingPrompt": "Generating…",
-        "aiToolsGenerateError": "Generate failed: {error}",
         "aiToolsCopyBtn": "Copy",
         "aiToolsCopied": "Copied!",
         "aiToolsParamOptionsEmpty": "No options available.",
@@ -2268,6 +2251,68 @@
         "aiToolsKeptDiscard": "Discard",
         "aiToolsKeptNotYet": "Enough is back at {time}.",
         "aiToolsKeptBlocking": "Run or discard the kept steps first.",
+        "aiToolsRunWithoutStoppingLabel": "Run without stopping",
+        "aiToolsRunWithoutStoppingHint": "Executes the AI's commands once its answer is parsed, and goes from one part of a workflow to the next without a review. What a part deletes or changes is still confirmed first.",
+        "aiToolsAnswerAfterRun": "Run first: the parts before it prepare the project, then its prompt is built.",
+        "aiToolsBatchAiPending": "Its commands appear when the AI answers.",
+        "aiToolsConfirmAiAnnounce": "{name} (AI): the commands its AI answers change the site; a deletion among them is asked when the answer arrives.",
+        "aiToolsConfirmRunChange": "Change and run",
+        "aiToolsConfirmRunDelete": "Delete and run",
+        "aiToolsConfirmTitleChange": "Change content?",
+        "aiToolsConfirmTitleDelete": "Delete content?",
+        "aiToolsEffectChanges": "Changes",
+        "aiToolsEffectDeletes": "Deletes",
+        "aiToolsEffectMore": "{items} and {n} more",
+        "aiToolsExchangeFor": "AI exchange — {name}",
+        "aiToolsKeptBefore": "{label}: stopped before {name} (planned at {time})",
+        "aiToolsKeptMissing": "{label} is not in the list any more: discard what was kept.",
+        "aiToolsKeptThen": "Then: {names}",
+        "aiToolsKindAfter": "after",
+        "aiToolsKindAi": "AI",
+        "aiToolsKindBefore": "before",
+        "aiToolsRequestFor": "For {name}",
+        "aiToolsReviewAi": "Its prompt is built from the project as it now is.",
+        "aiToolsReviewAwaiting": "{current} of {total}: {name} waits for its AI answer, in AI response below.",
+        "aiToolsReviewContinue": "Continue",
+        "aiToolsReviewContinueChange": "Change and continue",
+        "aiToolsReviewContinueDelete": "Delete and continue",
+        "aiToolsReviewLast": "{name}: {ok} of {total} succeeded",
+        "aiToolsReviewLastFailed": "{name}: {ok} of {total} succeeded, {fail} failed",
+        "aiToolsReviewNext": "Next — {current} of {total}: {name}",
+        "aiToolsReviewSteps": "{n} steps",
+        "aiToolsReviewStop": "Stop",
+        "aiToolsRunFailed": "The run stopped: {error}",
+        "aiToolsStepFailedAfterRetries": "{error} (after {n} retries)",
+        "aiToolsStepRetry": "Retrying ({attempt} of {max}) in {seconds} s — {error}",
+        "aiToolsStoppedByStep": "Stopped: {command} failed, and its step stops the run when it fails. The rest is kept: run it from the banner at the top once the cause is fixed.",
+        "aiToolsStoppedByUser": "Stopped before {name}. The rest of the run is kept: run it from the banner at the top.",
+        "aiToolsWhatComponents": "Components",
+        "aiToolsWhatDefaultLanguage": "The default language",
+        "aiToolsWhatFooter": "The footer",
+        "aiToolsWhatInteractions": "Interactions",
+        "aiToolsWhatLanguages": "Languages",
+        "aiToolsWhatMedia": "Media files",
+        "aiToolsWhatMenu": "The menu",
+        "aiToolsWhatMultilingual": "Multilingual mode",
+        "aiToolsWhatOther": "Other commands",
+        "aiToolsWhatPages": "Pages",
+        "aiToolsWhatPrivacy": "Privacy pages and settings",
+        "aiToolsWhatSnippets": "Snippets",
+        "aiToolsWhatStylesheet": "The stylesheet",
+        "aiToolsWhatTexts": "Texts",
+        "aiToolsWhatTranslationFiles": "Translation files of languages the project no longer has",
+        "aiToolsAnswerCut": "The answer was cut at the connection's output limit ({n} tokens), so none of it runs. Raise the limit in AI connections, or ask for less.",
+        "aiToolsAnswerStopped": "The AI stopped its answer early ({reason}), so none of it runs.",
+        "aiToolsAnswerBrokeOff": "The answer broke off after {chars} characters: {error}",
+        "aiToolsContinueAnswer": "Continue the answer",
+        "aiToolsContinueAnswerTitle": "Keeps the commands that arrived whole ({n}) and asks the AI only for the rest, from the command that was cut. The answer put together runs only when you click Execute.",
+        "aiToolsSendAgain": "Send again",
+        "aiToolsSendAgainTitle": "Sends the same prompt again, for a new answer.",
+        "aiToolsContinueRequest": "Your answer above was cut off before it ended. The commands before the cut arrived whole ({n} of them); the command after them was cut, and it began:\n\n{cut}\n\nReply with only the commands still missing, starting again from that cut command, as one JSON object {\"commands\": [...]}, with no text before or after it and none of the commands that arrived whole.",
+        "aiToolsContinueRequestBoundary": "Your answer above was cut off before it ended, after the commands that arrived whole ({n} of them). Reply with only the commands still missing, as one JSON object {\"commands\": [...]}, with no text before or after it and none of the commands already given.",
+        "aiToolsContinueCopied": "Copied: a request for the rest of the answer. Paste it to your AI assistant, then paste its reply in AI response.",
+        "aiToolsContinueWaiting": "The rest of the answer goes here; the commands that arrived whole ({n}) are kept.",
+        "aiToolsAssembledReady": "{n} commands ready, put together from {parts} answers: they run only when you click Execute.",
         "aiToolsStepPending": "Pending",
         "aiToolsStepRunning": "Running…",
         "aiToolsStepError": "Failed: {error}",
@@ -2279,7 +2324,6 @@
         "aiToolsActionExecute": "Execute commands",
         "aiToolsActionGenerateForCopy": "Generate for copy",
         "aiToolsModelLabel": "Model:",
-        "aiToolsPhaseGenerating": "Generating prompt…",
         "aiToolsCopyHint": "Copy this to your AI assistant, then paste the reply below.",
         "aiToolsPasteHint": "Paste the JSON reply here.",
         "aiToolsStepsReady": "{n} commands ready",
@@ -3656,9 +3700,9 @@
         "defaultsTitle": "Defaults & automation",
         "persistLabel": "Keep cloud keys after closing the browser (localStorage)",
         "persistHint": "Off = cleared on tab close (sessionStorage). Local connections always persist (URLs aren't sensitive).",
-        "autoExecuteLabel": "Auto-execute commands after the AI response is parsed",
+        "runWithoutStoppingLabel": "Run without stopping",
         "autoExecuteCaution": "Use with caution.",
-        "autoExecuteHint": ":caution Applies in the AI tools panel (Preview → AI tools) and the workflow runner.",
+        "runWithoutStoppingHint": ":caution An AI answer runs once it is parsed, and a workflow goes from one part to the next without a review, in the AI tools panel (Preview → AI tools). What a part deletes or changes is still confirmed first.",
         "modalTitle": "Add a connection",
         "empty": "No AI connection yet.",
         "emptyAdd": "+ Add your first connection",
@@ -3699,6 +3743,9 @@
         "keyToggleTitle": "Show / hide",
         "getKeyPrefix": "Get a key →",
         "streamingLabel": "Streaming (recommended)",
+        "maxOutputTokensLabel": "Output limit (tokens)",
+        "maxOutputTokensHint": "The most the AI may write in one answer (default :default). A workflow that builds a whole site needs a long answer; a model refuses a limit above its own.",
+        "maxOutputTokensInvalid": "A whole number from :min to :max.",
         "probeIdleLocal": "Enter a base URL to test the connection.",
         "probeIdleCloud": "Enter an API key to test the connection.",
         "back": "← Back",

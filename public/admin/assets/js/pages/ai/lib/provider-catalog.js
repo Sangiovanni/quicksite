@@ -227,11 +227,25 @@
         return headers;
     }
 
+    // ---------- output limit ----------
+
+    /** The most an answer may be, in tokens, when its connection sets no limit of its own. */
+    const DEFAULT_MAX_OUTPUT_TOKENS = 16384;
+    /** What a connection's own limit may be. */
+    const MAX_OUTPUT_TOKENS_RANGE = Object.freeze({ min: 256, max: 1000000 });
+
+    /** A connection's output limit: its own `maxOutputTokens` when set and in range, else the default. */
+    function maxOutputTokens(connection) {
+        const n = connection && connection.maxOutputTokens;
+        return Number.isInteger(n) && n >= MAX_OUTPUT_TOKENS_RANGE.min && n <= MAX_OUTPUT_TOKENS_RANGE.max
+            ? n : DEFAULT_MAX_OUTPUT_TOKENS;
+    }
+
     // ---------- request body ----------
 
     function buildBody(connection, model, messages, options, opts) {
         const p = get(connection.providerType);
-        const maxTokens = (options && options.max_tokens) || 8192;
+        const maxTokens = (options && options.max_tokens) || maxOutputTokens(connection);
         const temperature = options && options.temperature !== undefined ? options.temperature : 0.7;
         const stream = !!(opts && opts.stream);
 
@@ -322,6 +336,43 @@
         }
     }
 
+    // ---------- why an answer ended ----------
+
+    /** The providers' words for an answer cut because it reached the output limit. */
+    const FINISH_LENGTH = ['length', 'max_tokens', 'MAX_TOKENS', 'model_length'];
+    /** Their words for an answer that ended because the model was done. */
+    const FINISH_STOP = ['stop', 'end_turn', 'stop_sequence', 'STOP', 'tool_calls', 'tool_use', 'function_call'];
+
+    /**
+     * Why an answer ended, from the provider's own word for it: 'length' (cut at the output limit),
+     * 'stop' (the model was done), 'other' (the provider stopped it: a safety filter, a recitation…),
+     * or null when the provider gave none.
+     */
+    function finishKind(reason) {
+        if (!reason) return null;
+        if (FINISH_LENGTH.indexOf(reason) !== -1) return 'length';
+        if (FINISH_STOP.indexOf(reason) !== -1) return 'stop';
+        return 'other';
+    }
+
+    /** The provider's word for why a whole (not streamed) answer ended, or null. */
+    function parseFinishReason(body, providerType) {
+        const p = get(providerType);
+        if (!p || !body) return null;
+        switch (p.requestFormat) {
+            case 'anthropic':
+                return body.stop_reason || null;
+            case 'google': {
+                const c = body.candidates && body.candidates[0];
+                return (c && c.finishReason) || (body.promptFeedback && body.promptFeedback.blockReason) || null;
+            }
+            default: {
+                const c = body.choices && body.choices[0];
+                return (c && c.finish_reason) || null;
+            }
+        }
+    }
+
     function parseModels(body, providerType) {
         const out = [];
         const p = get(providerType);
@@ -406,8 +457,13 @@
         buildModelsUrl,
         buildHeaders,
         buildBody,
+        DEFAULT_MAX_OUTPUT_TOKENS,
+        MAX_OUTPUT_TOKENS_RANGE,
+        maxOutputTokens,
         parseResponse,
         parseUsage,
+        finishKind,
+        parseFinishReason,
         parseModels,
         categorizeError
     });

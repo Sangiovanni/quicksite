@@ -90,7 +90,7 @@ $params = $parts;
 // the same command would be through /management/p/<id>/<cmd>.
 //
 // QS_API_ARM_COMMANDS maps arm => the management command(s) it executes. The
-// AI-spec arms run their workflow's declared dataRequirements through
+// workflow arms run their workflow's declared dataRequirements through
 // CommandRunner (a documented hasPermission bypass, contained by its own
 // read-only allowlist); every command the shipped core specs pull is in
 // content.read, so gating those arms on the same category is coherent.
@@ -114,7 +114,6 @@ const QS_API_ARM_COMMANDS = [
     'style-rules'              => ['listStyleRules'],
     // Workflow arms — shipped core specs only; they pull project data via
     // CommandRunner, so they are gated like any other project read.
-    'ai-spec'                  => ['getStructure'],
     'ai-spec-raw'              => ['getStructure'],
     'workflow-generate-steps'  => ['getStructure'],
 ];
@@ -739,86 +738,9 @@ switch ($action) {
         break;
     
     // ========================================================================
-    // AI Spec System Endpoints
+    // Workflow Endpoints
     // ========================================================================
-    
-    case 'ai-spec':
-        // Get a specific AI spec (rendered with data)
-        if (empty($params[0])) {
-            http_response_code(400);
-            echo json_encode(['error' => 'Missing spec ID']);
-            break;
-        }
-        
-        require_once SECURE_FOLDER_PATH . '/src/classes/WorkflowManager.php';
-        $manager = new WorkflowManager();
-        // Arm the per-command re-gate. fetchDataRequirements()
-        // re-checks every data command with hasPermission ONLY when tokenInfo is
-        // set; without this the CommandRunner allowlist would run unchecked.
-        $manager->setTokenInfo($tokenInfo);
-        $specId = $params[0];
-        
-        // Load the spec
-        $spec = $manager->loadWorkflow($specId);
-        if (!$spec) {
-            http_response_code(404);
-            echo json_encode(['error' => 'Spec not found: ' . $specId]);
-            break;
-        }
-        
-        // Validate the spec
-        $validation = $manager->validateWorkflow($spec);
-        if (!$validation['valid']) {
-            http_response_code(500);
-            echo json_encode([
-                'error' => 'Invalid spec',
-                'validationErrors' => $validation['errors']
-            ]);
-            break;
-        }
-        
-        // Get user parameters from query string. Selector-type params (and
-        // any other structured value) ship as a JSON-stringified blob from
-        // the frontend so the workflow can access subfields via
-        // {{param.X.tag}}. Detect `{`/`[`-prefixed strings and decode them
-        // back into PHP arrays before passing into the workflow context.
-        $userParams = [];
-        foreach ($_GET as $key => $value) {
-            if (in_array($key, ['action'])) continue;
-            if (is_string($value) && strlen($value) > 0
-                && ($value[0] === '{' || $value[0] === '[')) {
-                $decoded = json_decode($value, true);
-                if ($decoded !== null) {
-                    $userParams[$key] = $decoded;
-                    continue;
-                }
-            }
-            $userParams[$key] = $value;
-        }
-        
-        // Fetch data requirements (pass userParams for condition evaluation)
-        $data = $manager->fetchDataRequirements($spec, $userParams);
-        
-        // Render the prompt (signature: workflow, userParams, fetchedData)
-        $prompt = $manager->renderPrompt($spec, $userParams, $data);
-        
-        // Get execution phases for phase-based execution
-        $phases = $manager->getWorkflowPhases($spec, $userParams);
-        
-        echo json_encode([
-            'success' => true,
-            'data' => [
-                'id' => $spec['id'],
-                'version' => $spec['version'],
-                'meta' => $spec['meta'],
-                'prompt' => $prompt,
-                'phases' => $phases,
-                'dataFetched' => array_keys($data),
-                'userParams' => $userParams
-            ]
-        ]);
-        break;
-    
+
     case 'ai-spec-raw':
         // Get raw spec JSON (for debugging/editing)
         if (empty($params[0])) {
@@ -857,8 +779,8 @@ switch ($action) {
         // ?withData=1 — also fetch unconditional dataRequirements so JS
         // can populate optionsFrom selects without an extra round-trip.
         // Conditional dataRequirements (those with a `condition` referencing
-        // user params) are still evaluated against empty params here; the
-        // runner re-fetches via /api/ai-spec on user action.
+        // user params) are still evaluated against empty params here; a run's
+        // phases read them with the user's (workflow-generate-steps).
         if (!empty($_GET['withData'])) {
             $response['fetchedData'] = $manager->fetchDataRequirements($spec, []);
             // Resolve any `default: "{{data.X}}"` template references so the
@@ -885,20 +807,36 @@ switch ($action) {
     // custom-workflow feature is absent for the same reason. No client calls it.
 
     case 'workflow-generate-steps':
-        // Generate steps for a manual workflow
+        // A workflow's run, phase by phase: its pre-workflows, itself, its post-workflows
+        // (WorkflowManager::getWorkflowPhases()). {workflowId, params} answers the plan, every phase
+        // resolved against the project as it is now. {workflowId, params, phase} answers that one phase
+        // resolved now: the runner asks when it reaches it, so the phase reads what the earlier ones
+        // changed. For an AI phase, "prompt": true adds its prompt and "answer": [...] gives the
+        // commands its AI answered back as its steps. Every step comes with what it deletes or changes.
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             http_response_code(405);
             echo json_encode(['error' => 'Method not allowed']);
             break;
         }
-        
+
         $input = json_decode(file_get_contents('php://input'), true);
-        if (!$input || !isset($input['workflowId'])) {
+        if (!is_array($input) || !is_string($input['workflowId'] ?? null)) {
             http_response_code(400);
             echo json_encode(['error' => 'Missing workflowId']);
             break;
         }
-        
+        $userParams = is_array($input['params'] ?? null) ? $input['params'] : [];
+        if (array_key_exists('phase', $input) && !is_int($input['phase'])) {
+            http_response_code(400);
+            echo json_encode(['error' => 'phase must be a number']);
+            break;
+        }
+        if (array_key_exists('answer', $input) && !is_array($input['answer'])) {
+            http_response_code(400);
+            echo json_encode(['error' => 'answer must be a list of commands']);
+            break;
+        }
+
         require_once SECURE_FOLDER_PATH . '/src/classes/WorkflowManager.php';
         $manager = new WorkflowManager();
         $manager->setTokenInfo($tokenInfo); // arm the per-command re-gate
@@ -909,56 +847,37 @@ switch ($action) {
             echo json_encode(['error' => 'Workflow not found']);
             break;
         }
-        
-        // Get user params
-        $userParams = $input['params'] ?? [];
-        
-        // Fetch data requirements
-        $data = [];
-        $dataError = null;
+
         try {
-            $data = $manager->fetchDataRequirements($workflow, $userParams);
+            if (!array_key_exists('phase', $input)) {
+                echo json_encode(['success' => true, 'data' => ['phases' => $manager->planPhases($workflow, $userParams)]]);
+                break;
+            }
+            $options = ['prompt' => !empty($input['prompt'])];
+            if (array_key_exists('answer', $input)) {
+                $options['answer'] = $input['answer'];
+            }
+            $phase = $manager->resolvePhase($workflow, $userParams, $input['phase'], $options);
+            if ($phase === null) {
+                http_response_code(404);
+                echo json_encode(['error' => 'No such phase']);
+                break;
+            }
+            // An AI phase's spec is checked when its prompt is asked for: an invalid one is refused
+            // whole rather than rendered half.
+            if (isset($phase['validationErrors'])) {
+                http_response_code(500);
+                echo json_encode(['error' => 'Invalid spec', 'validationErrors' => $phase['validationErrors']]);
+                break;
+            }
+            echo json_encode(['success' => true, 'data' => ['phase' => $phase]]);
         } catch (\Throwable $e) {
-            $dataError = $e->getMessage();
-            $data = ['_error' => $e->getMessage()];
+            error_log('[workflow-generate-steps] ' . $input['workflowId'] . ': ' . $e->getMessage());
+            http_response_code(500);
+            echo json_encode(['error' => 'The workflow could not be resolved']);
         }
-        
-        // Generate expanded steps
-        $stepsError = null;
-        try {
-            $steps = $manager->generateSteps($workflow, $userParams, $data, []);
-        } catch (\Throwable $e) {
-            $stepsError = $e->getMessage();
-            $steps = [];
-        }
-        
-        $response = [
-            'success' => true,
-            'data' => [
-                'steps' => $steps,
-                'count' => count($steps)
-            ]
-        ];
-        
-        // Add debug info when step count is unexpectedly low
-        if (count($steps) === 0 || $dataError || $stepsError) {
-            $response['data']['_debug'] = [
-                'dataKeys' => array_keys($data),
-                'dataSummary' => array_map(function($v) {
-                    if ($v === null) return 'null';
-                    if (is_array($v)) return 'array(' . count($v) . ')';
-                    return gettype($v) . ':' . substr(json_encode($v), 0, 100);
-                }, $data),
-                'dataError' => $dataError,
-                'stepsError' => $stepsError,
-                'workflowHasSteps' => isset($workflow['steps']) && count($workflow['steps']) > 0,
-                'workflowStepCount' => count($workflow['steps'] ?? []),
-            ];
-        }
-        
-        echo json_encode($response);
         break;
-    
+
 default:
         http_response_code(404);
         echo json_encode(['error' => 'Unknown action: ' . $action]);

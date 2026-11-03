@@ -1202,3 +1202,152 @@
     opacity: 0.5;
     cursor: not-allowed;
 }
+
+/* The AI answer's Execute when the answer deletes something: red. */
+.preview-contextual-ai-tools__action-btn--danger {
+    background: #dc2626;
+    border-color: #dc2626;
+}
+
+/* A run's phases in one line, each with its state. */
+.preview-contextual-ai-tools__run-line {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--admin-text-muted);
+}
+.preview-contextual-ai-tools__run-phase--current {
+    color: var(--admin-accent);
+    font-weight: 600;
+}
+.preview-contextual-ai-tools__run-phase--done {
+    color: var(--admin-text);
+}
+.preview-contextual-ai-tools__run-phase--stopped {
+    color: #ef4444;
+}
+
+/* The pause before a phase (and the wait for an AI answer): what comes next, what it deletes or
+   changes, Continue / Stop. Outside the collapsible Batch, so it is always seen. */
+.preview-contextual-ai-tools__review {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 10px;
+    border: 1px solid var(--admin-border);
+    border-radius: 6px;
+    background: var(--admin-bg);
+}
+.preview-contextual-ai-tools__review[hidden] {
+    display: none;
+}
+.preview-contextual-ai-tools__review--change {
+    border-color: var(--admin-warning, #d4a84b);
+}
+.preview-contextual-ai-tools__review--delete {
+    border-color: #ef4444;
+}
+.preview-contextual-ai-tools__review-title {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--admin-text);
+}
+.preview-contextual-ai-tools__review-what,
+.preview-contextual-ai-tools__review-last {
+    margin: 0;
+    font-size: 12px;
+    color: var(--admin-text-muted);
+}
+.preview-contextual-ai-tools__review-actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* What a phase deletes (red) and changes (amber), one line per kind of thing. */
+.preview-contextual-ai-tools__effects {
+    margin: 0;
+    padding: 0 0 0 16px;
+    font-size: 12px;
+    line-height: 1.4;
+}
+.preview-contextual-ai-tools__effect--delete {
+    color: #ef4444;
+}
+.preview-contextual-ai-tools__effect--change {
+    color: var(--admin-warning, #d4a84b);
+}
+
+/* A step's mark in the Batch: it deletes or changes content. */
+.preview-contextual-ai-tools__step-effect {
+    align-self: flex-start;
+    padding: 0 5px;
+    border-radius: 3px;
+    font-size: 10px;
+    line-height: 1.5;
+}
+.preview-contextual-ai-tools__step-effect--delete {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+}
+.preview-contextual-ai-tools__step-effect--change {
+    background: rgba(212, 168, 75, 0.15);
+    color: var(--admin-warning, #d4a84b);
+}
+
+/* The Batch by phase: a group per phase, its header opening its rows. */
+.preview-contextual-ai-tools__phase + .preview-contextual-ai-tools__phase {
+    margin-top: 6px;
+}
+.preview-contextual-ai-tools__phase-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    width: 100%;
+    padding: 4px 6px;
+    background: transparent;
+    border: 1px solid var(--admin-border);
+    border-radius: 4px;
+    color: var(--admin-text);
+    font-size: 12px;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+.preview-contextual-ai-tools__phase-name {
+    font-weight: 600;
+}
+.preview-contextual-ai-tools__phase-meta {
+    color: var(--admin-text-muted);
+    white-space: nowrap;
+}
+.preview-contextual-ai-tools__phase-body {
+    padding: 2px 0 0 8px;
+}
+.preview-contextual-ai-tools__batch-pending {
+    margin: 4px 0;
+    font-size: 12px;
+    font-style: italic;
+    color: var(--admin-text-muted);
+}
+
+/* One "Your prompt" per AI phase, named when there are several. */
+.preview-contextual-ai-tools__request {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.preview-contextual-ai-tools__request + .preview-contextual-ai-tools__request {
+    margin-top: 8px;
+}
+.preview-contextual-ai-tools__request-label {
+    font-size: 12px;
+    color: var(--admin-text-muted);
+}
+
+/* The kept rest's later phases. */
+.preview-contextual-ai-tools__kept-then {
+    margin: 0 0 6px;
+    font-size: 12px;
+    line-height: 1.4;
+}

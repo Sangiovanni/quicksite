@@ -43,8 +43,10 @@ User fills parameters in the AI tools panel
 │     → CommandRunner executes        │
 │       read-only API commands        │
 │       (re-gated per command)        │
-│  3a. generateSteps()    [manual]    │
-│  3b. renderPrompt()     [AI]        │
+│  3. getWorkflowPhases()             │
+│     each phase, when reached:       │
+│     generateSteps()  [its steps]    │
+│     renderPrompt()   [an AI phase]  │
 └─────────────────────────────────────┘
         │                    │
     [manual]              [AI]
@@ -104,7 +106,7 @@ See [ADMIN_PANEL.md §8.12](ADMIN_PANEL.md) for the runner UX.
 
 ### API Endpoints (via admin router)
 
-The helper endpoints live in `public/admin/api/index.php`. All three are
+The helper endpoints live in `public/admin/api/index.php`. Both are
 project-scoped, so the project marker is **required**, not optional — a call
 without it is refused with `400`:
 
@@ -115,9 +117,8 @@ without it is refused with `400`:
 
 | Action | Method | Purpose |
 |----------|--------|---------|
-| `ai-spec/<id>` | GET | Load a spec with its data requirements fetched and its prompt rendered |
 | `ai-spec-raw/<id>` | GET | Load the spec definition itself (parameter schema, metadata) |
-| `workflow-generate-steps` | POST | Resolve steps for deterministic workflow execution |
+| `workflow-generate-steps` | POST | A workflow's phases, each with its steps resolved: the whole run (the plan), or one phase when the run reaches it — an AI phase's prompt (`prompt: true`), an AI answer's commands read back with what they delete or change (`answer`) |
 
 Resolved commands are **not** executed through a batch endpoint. The client runs
 them one at a time against the Management API — `POST
@@ -165,7 +166,7 @@ Workflows can reference other workflows via `preWorkflows` and `postWorkflows`:
 ]
 ```
 
-Sub-workflows are fully resolved (their own data requirements fetched, steps generated) and injected before/after the main steps.
+Every workflow runs in phases: each pre-workflow, then the workflow itself, then each post-workflow, in order — manual and AI workflows alike, and any of them may be an AI workflow. A sub-workflow's condition is evaluated once, when the run is planned; a phase is resolved when the run reaches it, its own data requirements fetched against the project as the earlier phases left it, so it sees what they changed. An AI phase builds its prompt when it is reached: an AI workflow's pre-workflows run before its prompt is built, its post-workflows after its commands. A sub-workflow takes the parameters its parent passes it and its own defaults for the rest. A sub-workflow's own pre- and post-workflows are phases of their own; a cycle is left out where it closes. Between two phases the runner pauses for a review unless *Run without stopping* is on, and what a phase deletes or changes is confirmed before it runs ([ADMIN_PANEL.md §8.12](ADMIN_PANEL.md), *A run, phase by phase*).
 
 ---
 
@@ -496,6 +497,10 @@ For manual workflows. Each step:
 }
 ```
 
+A step that fails is counted and the run carries on, unless it sets `abortOnFail: true`: the run then stops at that step — the later steps and phases do not run, and the rest is kept for later. `retryOn` lists the HTTP statuses that send the step again, up to `maxRetries` times (default 3), `retryDelayMs` apart (default 1000).
+
+**What a run warns about.** Before a step runs, the panel says what it deletes or changes, read from the step itself (`WorkflowManager::stepEffect()`): a read and a command that adds something are never warned; a step deletes when its command's name begins with delete, remove, clear, reset or purge, when its help marks it destructive, when it deletes a node, or when it gives a component an empty structure; any other write to the site's content changes it. There is nothing to declare: a new deleting step is warned as one.
+
 **Filter operators**:
 - `===`, `!==`, `==`, `!=` — equality comparison on the forEach `$value` / `$value.field` / `$key`. Right side accepts literals, `{{$value}}` placeholders, or `{{path}}` references resolved against the context.
 - `in`, `not_in` — membership check against an array. Left is a value, right is an array reference (typically `{{data.X}}` or `{{param.X}}`). The right side must resolve to an array; otherwise `in` returns false and `not_in` returns true (matches the intuitive read of an empty list).
@@ -515,7 +520,7 @@ The `in` / `not_in` operators are the foundation of diff-style workflows. For ex
 Paired with the symmetric `not_in` step against `param.languages` filtered by `data.langData.languages`, this lets a workflow synchronise the project state with the user's selection — only adding new items and only deleting absent ones, leaving the rest untouched.
 
 #### `preWorkflows` / `postWorkflows` (array)
-Sub-workflows to run before/after. Can be a simple string ID or an object with `id`, `params`, and `condition`.
+Sub-workflows to run before/after. Can be a simple string ID or an object with `id`, `params`, and `condition`. Each one runs as a phase of its own, and may be an AI workflow (see *Sub-Workflows*).
 
 ---
 
@@ -679,48 +684,50 @@ Fallback: checks `$fetchedData[key]`. Unknown placeholders are left as-is.
 ### AI Workflow Execution (in `preview/preview-ai-tools.js`)
 
 ```
-1. User fills parameter form
+1. User fills the parameter form, and a Your prompt per AI phase
 2. Click the primary action button
-3. GET /admin/api/ai-spec/{id}?<params>
-   → WorkflowManager.renderPrompt() → returns markdown
-4. Prompt goes to the AI — browser-direct via QSAiCall when a BYOK
+3. POST /admin/api/p/<projectId>/workflow-generate-steps  { workflowId, params }
+   → the run's phases (getWorkflowPhases()), each resolved against the project as it is
+4. Each pre-workflow phase runs, resolved again when reached, a review between
+5. The same request with { phase, prompt: true } for the AI phase
+   → WorkflowManager.renderPrompt(): the markdown, built from the project as the
+     pre-workflows left it
+6. Prompt goes to the AI — browser-direct via QSAiCall when a BYOK
    connection is configured, otherwise copied out and pasted back
-5. Client validates the JSON response structure
-6. Client normalizes commands (ensures correct format)
-7. Each command is POSTed to /management/p/<projectId>/{command} in turn,
+7. Client validates the JSON response structure
+8. The same request with { phase, answer } reads the commands back, with what each
+   deletes or changes; each is POSTed to /management/p/<projectId>/{command} in turn,
    results shown per-row in the Batch panel
+9. Each post-workflow phase runs
 ```
 
 ### Manual Workflow Execution
 
 ```
 1. User fills parameter form
-2. POST /admin/api/workflow-generate-steps  { workflowId, params }
-   → WorkflowManager resolves phases:
-     a. getWorkflowPhases() → [{type: preWorkflow, id}, {type: main}, ...]
-     b. For each phase: resolveSubWorkflow() 
-        → fetchDataRequirements + generateSteps
-   → Returns all expanded steps
-3. Steps shown in the Batch panel
-4. User clicks "Execute"
-5. Same per-command execution against the Management API
+2. POST /admin/api/p/<projectId>/workflow-generate-steps  { workflowId, params }
+   → the phases (getWorkflowPhases()), each with its steps resolved against the
+     project as it is now
+3. The phases and their steps shown in the Batch panel
+4. User clicks "Run"
+5. Each phase is resolved again when the run reaches it
+   ({ workflowId, params, phase }), then its steps are POSTed one by one to the
+   Management API; between two phases, a review (unless Run without stopping)
 ```
 
-### Step Generation Pipeline (manual workflows)
+### Step Generation Pipeline (one phase)
 
 ```
 1. Merge staticData into fetchedData
 2. Build context: { param, data, config }
-3. Expand preWorkflows (recursive — sub-workflows can have their own pre/post)
-4. For each main step:
+3. For each main step:
    a. Evaluate condition → skip if false
    b. If forEach: expand into N steps (one per item)
       - Apply filter if present
       - Create item context with $key, $value, $item
    c. Resolve params: {{param.x}}, {{data.x}}, {{$value}}, etc.
    d. Resolve $each loops in params (for generating arrays)
-5. Expand postWorkflows (same as pre)
-6. Return flat array of resolved commands
+4. Return the phase's resolved commands
 ```
 
 ---

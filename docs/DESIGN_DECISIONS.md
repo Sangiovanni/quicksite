@@ -14517,3 +14517,174 @@ answers among English ones); the wait in seconds.
 `public/admin/assets/admin.js`, `public/admin/assets/js/pages/account.js`, `secure/admin/templates/layout.php`,
 `secure/admin/templates/pages/account.php`, `setup.php`, `secure/admin/functions/accountSelf.php`,
 `secure/src/functions/AuthManagement.php`, `secure/admin/AdminRouter.php`, `secure/admin/translations/en.json`.
+
+### A workflow runs in phases, each resolved when the run reaches it (locked 2026-11-01)
+
+**Decision**: Every workflow runs as phases: each pre-workflow, the workflow itself, then each post-workflow — manual
+and AI workflows alike, through the one runner; a sub-workflow's own pre- and post-workflows are phases of their own,
+and a cycle is left out where it closes. The phases are the server's: `WorkflowManager::getWorkflowPhases()` is the one
+rule, and the workflow arm (`workflow-generate-steps`) answers the plan — every phase resolved against the project as it
+is when the run starts — and, when the run reaches it, one phase resolved again: its steps, or for an AI phase its
+prompt, and an AI answer's commands read back as that phase's steps. Any phase may be an AI one. An AI workflow's
+pre-workflows run before its prompt is built, so the prompt describes the project as they left it: `create-website`'s
+languages are set by its `setup-languages` pre-workflow, and its prompt only names them, read from the project.
+`generateSteps()` expands one workflow's own steps; the flattened list, the `ai-spec` arm and the runner's query-string
+parameters are gone (a run's parameters travel as JSON). A workflow id is a name of `core/`, nothing that climbs out.
+
+**Reasoning**: An AI workflow's pre- and post-workflows never ran, though its prompt said the languages were
+configured; a manual one ran them flattened into one list resolved before anything ran. Resolved that early, two
+shipped chains go wrong: `setup-languages` compares the languages picked with languages `fresh-start` is about to
+delete, and a post-workflow's language switch lists the languages the project had before the main phase added its own.
+A phase resolved when it is reached reads what the earlier ones changed. One rule on the server keeps the runner a
+client of it.
+
+**Alternatives considered**: phases for AI workflows only, manual ones flattened as before; every phase resolved when
+the run starts; the prompt kept on its own arm (`ai-spec`, a query string); a form for each sub-workflow's own
+parameters (the parent already passes what the user chooses and fixes the rest on purpose).
+
+**Source**: design round 2026-11-01 (Sangio: the phases, the pre-workflows before the prompt, the server's phases, and
+any phase an AI one); beta.12. `secure/src/classes/WorkflowManager.php`, `public/admin/api/index.php`,
+`public/admin/assets/js/pages/preview/preview-ai-tools.js`, `secure/admin/workflows/core/create-website.md`.
+
+### Between two phases a review; Run without stopping is off until switched on (locked 2026-11-01)
+
+**Decision**: Between two phases the run pauses for a review: the next phase's name, its steps and what they delete
+or change, the last phase's result, **Continue** and **Stop**. Stop keeps the rest of the run for later: the steps of
+the phase it stopped in that did not run and its later phases, by name, resolved when the kept run reaches them; the
+panel's banner reopens that workflow with the run's parameters to run them. The Auto-execute switch, renamed **Run
+without stopping**, is offered for every workflow and also means "run every phase without the review"; it is off until
+switched on, in all three places it is read. An AI phase always waits for an answer it has not got: without an API key
+the run stops there whatever the switch says.
+
+**Reasoning**: The pause between each part is what was asked for; a switch that skips it, on by default, would make it
+unseen, and a switch labelled "use with caution" should not start on. Keeping later phases by name rather than by steps
+keeps the rule that a phase is resolved when it is reached, a kept run included.
+
+**Alternatives considered**: a short automatic delay, or a plain confirmation with no list; a second switch for the
+phases; the switch on by default; at Stop, every later phase resolved and kept as steps (stale when run, and an AI
+phase cannot be kept so).
+
+**Source**: design round 2026-11-01 (Sangio: the review with an auto-continue option, the switch off by default, the
+forced pause for an AI phase's input); beta.12. `public/admin/assets/js/pages/preview/preview-ai-tools.js`,
+`public/admin/assets/js/pages/settings.js`, `public/admin/assets/js/pages/ai/ai-connections.js`.
+
+### What a run deletes or changes is read from its commands and confirmed before it runs (locked 2026-11-01)
+
+**Decision**: The server reads each step (`WorkflowManager::stepEffect()`): a read (a command the write rate never
+counts) or an addition (a name beginning `add`, `create`, `upload`, `insert`, `duplicate`) is not warned; a step
+**deletes** when its name begins `delete`, `remove`, `clear`, `reset` or `purge` (the console's convention), when its
+help marks it destructive, when it deletes a node or gives a component an empty structure; any other write to the
+site's content **changes** it; a write outside the content (a build, a deploy) is warned only when it deletes. Each
+warning names its target. With Run without stopping off, the review is the confirmation — red, **Delete and continue**,
+for a phase that deletes; **Change and continue** for one that changes — and a review stands before a first phase that
+warns; an AI answer's Execute reads the same way. With it on, one danger dialog before anything runs lists what every
+known phase deletes and changes and announces the AI phases; afterwards only what it did not list asks again — a phase
+that, resolved when reached, does more, and an AI answer that deletes. **The behaviour change:** *Create website* on a
+project with content now asks, then deletes: its `fresh-start` runs, and its keep options take effect; `fresh-start`
+run on its own asks first too.
+
+**Reasoning**: Every deletion and every change of content is worth a warning, a creation or a read is not. Read from
+the commands, the warning cannot drift from what the steps do, and it names what they touch; a keep option shows by its
+absence. Almost every workflow changes content, so a dialog after each Continue would double every confirmation: the
+review itself confirms, and the dialog is kept for the runs that do not stop.
+
+**Alternatives considered**: a flag declared on `fresh-start` (`deletesContent`), the dialog only for it; only the
+deleting commands warned; a dialog after every Continue.
+
+**Source**: design round 2026-11-01 (Sangio: "every command that will delete should be warned … Same for command that
+edit content"); beta.12. `secure/src/classes/WorkflowManager.php`,
+`public/admin/assets/js/pages/preview/preview-ai-tools.js`.
+
+### The runner honours a step's abortOnFail and its retries (locked 2026-11-01)
+
+**Decision**: A failing step marked `abortOnFail: true` stops the run at that step: its later phases do not run, and
+the rest is kept for later from the failed step. `retryOn` sends a step again while its answer's status is one it
+lists, up to `maxRetries` times (default 3, at most 10), `retryDelayMs` apart (default 1000, 100 to 30000), its row
+saying so. A step that says nothing is counted and the run carries on, as before, so no shipped workflow changes but
+`build-and-deploy`, which sets them: a failed build no longer goes on to the deploy, and a deploy refused with 409 is
+tried again. No command answers before its work is done, so no step needs to wait for one.
+
+**Reasoning**: The options were documented and passed through by the server, and no runner read them. The default of a
+step that says nothing keeps every run as it was.
+
+**Alternatives considered**: stop by default; a whole sub-workflow marked as required (`required: true` on its entry),
+not built while `abortOnFail` on its steps covers it.
+
+**Source**: design round 2026-11-01 (Sangio); beta.12. `public/admin/assets/js/pages/preview/preview-ai-tools.js`,
+`secure/admin/workflows/schema.json` (the defaults).
+
+### Create landing is folded into Create website's "One page only" (locked 2026-11-01)
+
+**Decision**: *Create website* (titled "Create Website") gains a **One page only** checkbox, unticked by default: its
+prompt then builds the home page only, its menu linking to the page's sections, with a one-page example in place of the
+multi-page one. *Create landing* is removed with its translations. Its own *keep languages* option is not carried:
+*Create website* sets the languages in its pre-workflow.
+
+**Reasoning**: The two had the same parameters, and most of the landing prompt was, line for line, the website
+prompt; the rest said "one page, home only, no `addRoute`". One workflow with a choice costs no more prompt.
+
+**Alternatives considered**: keeping both, *Create landing* given `setup-languages` as *Create website* has it.
+
+**Source**: design round 2026-11-01 (Sangio: "maybe we should just get rid of it?"); beta.12.
+`secure/admin/workflows/core/create-website.json`, `create-website.md`, `secure/admin/translations/en.json`.
+
+### An AI answer is as long as its connection allows, and says why it ended (locked 2026-11-03)
+
+**Decision**: Every AI request asks for its connection's output limit. That is a whole number from 256 to 1000000
+tokens, set on the connection in *AI connections*, and 16384 until one is set; a caller's explicit `max_tokens` still
+wins (the connection test asks for 1). The AI caller says why an answer ended: every stream parser keeps the provider's
+reason, a whole answer's reason is read too, and each comes out as `length` (cut at the limit), `stop` or `other`
+(stopped for another reason: a safety filter, a blocked prompt). The Google parser also reads an error sent mid-stream.
+The workflow runner never runs an answer cut at the limit or stopped: it says so, naming the limit or the reason, and
+waits for the answer edited whole, another one, or Stop. An answer whose connection breaks while it arrives says after
+how many characters.
+
+**Reasoning**: The runner asked every provider for 16384 tokens, a number written in its own code. That is too many for
+a model whose limit is lower, which refuses the request, and it can be too few for a whole site in one answer. A cut
+answer then read as invalid JSON, so neither the user nor the panel could tell a limit from a broken connection. The
+limit belongs to the connection because it is the model's; why an answer ended is the provider's to tell, and every
+provider tells it.
+
+**Alternatives considered**: a higher number for every provider (refused by the models below it); each model's maximum
+kept in the provider catalog (a list that goes stale as models ship); a limit per model on a connection (more than a
+connection's one default model needs); the runner repairing a cut answer.
+
+**Source**: Sangio's run of the workflow runner with his own key, 2026-11-03 (a Gemini answer stopped part-way, twice:
+"that is a problem if the api didn't answer the full message properly"); beta.12.
+`public/admin/assets/js/pages/ai/lib/provider-catalog.js`, `stream-parsers.js`, `ai-call.js`, `connections-store.js`,
+`public/admin/assets/js/pages/ai/ai-connections.js`, `public/admin/assets/js/pages/preview/preview-ai-tools.js`.
+
+### A cut AI answer is continued from its last whole command, and never runs on its own (locked 2026-11-03)
+
+**Decision**: When the workflow runner waits for an AI answer that cannot run, it offers a way on, chosen by why the
+answer ended.
+- **Continue the answer** is offered when the answer still holds commands that arrived whole: it was cut at the output
+  limit, broke off, or is not whole JSON. Those commands are kept, and the AI is asked only for the commands still
+  missing, from the one that was cut, as a JSON answer of its own.
+  - With the connection's key, the request goes after the prompt and the cut answer, which is given as the model's own
+    turn.
+  - Without a key, the request is copied for the user's AI assistant.
+- **The reply** is joined to the kept commands; its first commands are dropped when they repeat the last kept ones
+  word for word.
+  - An answer put together this way waits for Execute even with *Run without stopping* on.
+  - A reply that is cut again can be continued again.
+- **Send again** sends the same prompt for a new answer.
+- **An answer the provider stopped** (a safety filter) is not continued.
+
+**Reasoning**: The cut usually falls inside a long string, such as a stylesheet. Asked to go on "from the exact point",
+a model often repeats a line, restarts the command, or wraps its reply, so two texts glued together rarely parse.
+Cutting at a command boundary gives every part a JSON answer of its own, checked as any answer is. It works with every
+provider and for both causes, the limit (the rest gets a fresh output budget) and a broken stream. Since the caller now
+says why an answer ended, no guess from its length is needed. An answer assembled from several replies is the one most
+worth reading before it runs.
+
+**Alternatives considered**: continuing the text from the cut character and gluing the two (fragile at the seam);
+prefilling the model's turn so it simply goes on (exact, but only some providers offer it); offering it only when the
+answer stopped well before the limit (a guess the finish reason makes unnecessary); retrying automatically after a
+provider's "high demand" error (it spends a free tier's quota unasked); splitting long workflows into shorter AI
+phases (still worth doing, but not a recovery).
+
+**Source**: Sangio's run of the workflow runner with his own key, 2026-11-03: his question "what happen if we have a
+continue where it stopped … do you think it could work?", and his "Yes, build here"; beta.12.
+`public/admin/assets/js/pages/preview/preview-ai-tools.js`, `secure/admin/templates/pages/preview-config.php`,
+`secure/admin/translations/en.json`.

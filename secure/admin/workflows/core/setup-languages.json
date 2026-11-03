@@ -65,7 +65,7 @@
     "relatedCommands": ["addLang", "deleteLang", "setDefaultLang", "setMultilingual"],
     "steps": [
         {
-            "comment": "=== MULTI-LANG PHASE 1: Enable multilingual support ===",
+            "comment": "=== MULTI-LANG 1. Enable multilingual support ===",
             "condition": "param.multilingual === true",
             "command": "setMultilingual",
             "params": {
@@ -73,7 +73,7 @@
             }
         },
         {
-            "comment": "=== MULTI-LANG PHASE 2: Add only the languages the user picked that aren't already present ===",
+            "comment": "=== MULTI-LANG 2. Add only the languages the user picked that aren't already present ===",
             "condition": "param.multilingual === true",
             "forEach": "param.languages",
             "filter": "{{$value}} not_in {{data.langData.languages}}",
@@ -83,7 +83,7 @@
             }
         },
         {
-            "comment": "=== MULTI-LANG PHASE 3: Remove only the languages currently present that the user un-picked ===",
+            "comment": "=== MULTI-LANG 3. Remove only the languages currently present that the user un-picked ===",
             "condition": "param.multilingual === true",
             "forEach": "data.langData.languages",
             "filter": "{{$value}} not_in {{param.languages}}",
@@ -93,7 +93,7 @@
             }
         },
         {
-            "comment": "=== SINGLE-LANG PHASE 1: Add the chosen base language (no-op if already present) ===",
+            "comment": "=== SINGLE-LANG 1. Add the chosen base language (no-op if already present) ===",
             "condition": "param.multilingual !== true",
             "command": "addLang",
             "params": {
@@ -101,7 +101,7 @@
             }
         },
         {
-            "comment": "=== SINGLE-LANG PHASE 2: Temporarily enable multilingual so we can change the default + delete extras ===",
+            "comment": "=== SINGLE-LANG 2. Temporarily enable multilingual so we can change the default + delete extras ===",
             "condition": "param.multilingual !== true && param.defaultLanguage !== langData.default_language",
             "command": "setMultilingual",
             "params": {
@@ -109,7 +109,7 @@
             }
         },
         {
-            "comment": "=== SHARED PHASE 4: Set default language (only when different from current) ===",
+            "comment": "=== SHARED 4. Set default language (only when different from current) ===",
             "condition": "param.defaultLanguage !== langData.default_language",
             "command": "setDefaultLang",
             "params": {
@@ -117,7 +117,7 @@
             }
         },
         {
-            "comment": "=== SINGLE-LANG PHASE 5: Delete every existing language except the chosen default ===",
+            "comment": "=== SINGLE-LANG 5. Delete every existing language except the chosen default ===",
             "condition": "param.multilingual !== true",
             "forEach": "data.langData.languages",
             "filter": "{{$value}} !== {{param.defaultLanguage}}",
@@ -127,7 +127,7 @@
             }
         },
         {
-            "comment": "=== SINGLE-LANG PHASE 6: Disable multilingual now that only one language remains ===",
+            "comment": "=== SINGLE-LANG 6. Disable multilingual now that only one language remains ===",
             "condition": "param.multilingual !== true",
             "command": "setMultilingual",
             "params": {

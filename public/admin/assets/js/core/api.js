@@ -723,7 +723,7 @@ window.QuickSiteAPI = (function() {
      * project data ignore it, which keeps the scope decision on the server
      * instead of duplicating the arm list on the client.
      *
-     * @param {string} action - helper action, e.g. 'pages' or 'ai-spec'
+     * @param {string} action - helper action, e.g. 'pages' or 'ai-spec-raw'
      * @returns {string} e.g. 'p/my-project/pages' or 'pages'
      */
     function helperPath(action) {

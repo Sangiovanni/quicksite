@@ -14564,6 +14564,15 @@ code.preview-contextual-info__value {
 .qsac-kind__label { font-weight: 600; font-size: 0.9rem; }
 .qsac-kind__sub { font-size: 0.72rem; color: var(--color-text-muted, #6b7280); }
 
+/* The form's Save is off until the connection can be saved: a name, its key or base URL, a limit in range. */
+.qsac-modal__footer .admin-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+.qsac-modal__footer .admin-btn--primary:disabled:hover {
+    background: var(--admin-accent);
+}
+
 .qsac-probe {
     border-radius: var(--radius-md, 6px);
     padding: var(--space-sm) var(--space-md);

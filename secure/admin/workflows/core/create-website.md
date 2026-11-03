@@ -1,6 +1,10 @@
-# QuickSite Create Multi-Page Website Specification
+# QuickSite Create Website Specification
 
+{{#if param.onePage === true}}
+You are creating a complete one-page website (a landing page) from a blank QuickSite project.
+{{else}}
 You are creating a complete multi-page website from a blank QuickSite project.
+{{/if}}
 
 {{> output-json-only}}
 
@@ -11,50 +15,52 @@ You are creating a complete multi-page website from a blank QuickSite project.
 **⚠️ MANDATORY ORDER:**
 
 {{#if param.multilingual === true}}
-**Note: Languages are already configured.** The project has multilingual mode enabled with these languages: {{param.languages}} (default: {{param.defaultLanguage}}).
+**Note: Languages are already configured.** The project has multilingual mode enabled with these languages: {{data.langData.languages}} (default: {{data.langData.default_language}}).
+{{else}}
+**Note: The language is already configured:** {{data.langData.default_language}}.
+{{/if}}
 
-1. **Routes**:
-   - `addRoute` → creates new pages (home exists by default)
-   - Note: "home" route exists by default (accessible as "/" or "/home")
-
-2. **Structures** (in this order):
-   - `editStructure` type="menu" → navigation (shared across all pages)
-   - `editStructure` type="footer" → footer (shared across all pages) **⚠️ MUST include `{ "component": "lang-switch", "data": {} }`**
-   - `editStructure` type="page", name="$routeName" → each page content
-
-3. **Translations**:
-   - `setTranslationKeys` → MUST cover ALL textKeys used in structures
-   - **Repeat for each language:** {{param.languages}}
-   - Note: `addRoute` auto-creates `page.titles.$routeName` - set this too!
-
-   {{> per-language-404-keys}}
-
-   {{> warning.no-extra-keys}}
-
-4. **Styles LAST** (order matters!):
-   - `editStyles` → MUST come BEFORE setRootVariables
-   - `setRootVariables` → AFTER editStyles (optional)
+{{#if param.onePage === true}}
+1. **One page only**:
+   - Build the home page only: do NOT call `addRoute`
+   - The menu links to the home page's sections with `#section-id` anchors; give each section that `id`
 {{else}}
 1. **Routes**:
    - `addRoute` → creates new pages (home exists by default)
    - Note: "home" route exists by default (accessible as "/" or "/home")
+{{/if}}
 
 2. **Structures** (in this order):
    - `editStructure` type="menu" → navigation (shared across all pages)
-   - `editStructure` type="footer" → footer (shared across all pages)
+   - `editStructure` type="footer" → footer (shared across all pages){{#if param.multilingual === true}} **⚠️ MUST include `{ "component": "lang-switch", "data": {} }`**{{/if}}
+{{#if param.onePage === true}}
+   - `editStructure` type="page", name="home" → the page, its sections in order
+{{else}}
    - `editStructure` type="page", name="$routeName" → each page content
+{{/if}}
 
 3. **Translations**:
    - `setTranslationKeys` → MUST cover ALL textKeys used in structures
-   - Language: {{param.defaultLanguage}}
+{{#if param.multilingual === true}}
+   - **Repeat for each language:** {{data.langData.languages}}
+{{else}}
+   - Language: {{data.langData.default_language}}
+{{/if}}
+{{#if param.onePage === true}}
+   - Set `page.titles.home` too
+{{else}}
    - Note: `addRoute` auto-creates `page.titles.$routeName` - set this too!
+{{/if}}
+{{#if param.multilingual === true}}
+
+   {{> per-language-404-keys}}
+{{/if}}
 
    {{> warning.no-extra-keys}}
 
 4. **Styles LAST** (order matters!):
    - `editStyles` → MUST come BEFORE setRootVariables
    - `setRootVariables` → AFTER editStyles (optional)
-{{/if}}
 
 ---
 
@@ -154,6 +160,103 @@ When using a component, the `data` object maps variable names to their values:
 
 ---
 
+{{#if param.onePage === true}}
+## One-Page Website Example
+
+```json
+[
+  {
+    "command": "editStructure",
+    "params": {
+      "type": "menu",
+      "structure": [
+        {
+          "tag": "nav",
+          "children": [
+            { "tag": "a", "params": { "href": "/" }, "children": [{ "textKey": "menu.logo" }] },
+            { "tag": "a", "params": { "href": "#features" }, "children": [{ "textKey": "menu.features" }] },
+            { "tag": "a", "params": { "href": "#contact" }, "children": [{ "textKey": "menu.contact" }] }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "command": "editStructure",
+    "params": {
+      "type": "footer",
+      "structure": [
+        {
+          "tag": "footer",
+          "children": [
+            { "tag": "p", "children": [{ "textKey": "footer.copyright" }] },
+            { "component": "lang-switch", "data": {} }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "command": "editStructure",
+    "params": {
+      "type": "page",
+      "name": "home",
+      "structure": [
+        {
+          "tag": "section",
+          "params": { "id": "hero" },
+          "children": [
+            { "tag": "h1", "children": [{ "textKey": "home.hero.title" }] },
+            { "tag": "p", "children": [{ "textKey": "home.hero.subtitle" }] },
+            { "tag": "a", "params": { "href": "#contact", "class": "btn" }, "children": [{ "textKey": "home.hero.cta" }] }
+          ]
+        },
+        {
+          "tag": "section",
+          "params": { "id": "features" },
+          "children": [
+            { "tag": "h2", "children": [{ "textKey": "home.features.title" }] },
+            {
+              "tag": "div",
+              "params": { "class": "grid" },
+              "children": [
+                { "tag": "div", "children": [{ "tag": "h3", "children": [{ "textKey": "home.features.item1.title" }] }, { "tag": "p", "children": [{ "textKey": "home.features.item1.desc" }] }] },
+                { "tag": "div", "children": [{ "tag": "h3", "children": [{ "textKey": "home.features.item2.title" }] }, { "tag": "p", "children": [{ "textKey": "home.features.item2.desc" }] }] }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "command": "setTranslationKeys",
+    "params": {
+      "language": "en",
+      "translations": {
+        "page": { "titles": { "home": "My Landing Page" } },
+        "menu": { "logo": "Brand", "features": "Features", "contact": "Contact" },
+        "home": {
+          "hero": { "title": "Welcome", "subtitle": "Your tagline here", "cta": "Get Started" },
+          "features": {
+            "title": "Features",
+            "item1": { "title": "Feature 1", "desc": "Description..." },
+            "item2": { "title": "Feature 2", "desc": "Description..." }
+          }
+        },
+        "footer": { "copyright": "© 2025 Brand" }
+      }
+    }
+  },
+  {
+    "command": "editStyles",
+    "params": {
+      "css": ":root { --color-primary: #6366f1; --color-text: #333; }\nbody { font-family: sans-serif; color: var(--color-text); }\nnav { display: flex; gap: 1rem; padding: 1rem; }\nsection { padding: 3rem 2rem; }\n.btn { display: inline-block; padding: 0.75rem 1.5rem; background: var(--color-primary); color: white; text-decoration: none; border-radius: 4px; }\n.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }\nfooter { text-align: center; padding: 2rem; }"
+    }
+  }
+]
+```
+{{else}}
 ## Multi-Page Website Example
 
 ```json
@@ -311,6 +414,7 @@ When using a component, the `data` object maps variable names to their values:
   }
 ]
 ```
+{{/if}}
 
 ---
 
@@ -318,10 +422,10 @@ When using a component, the `data` object maps variable names to their values:
 ## ✅ FINAL CHECKLIST (Verify before outputting)
 
 - [ ] Footer contains `{ "component": "lang-switch", "data": {} }` ← **REQUIRED!**
-- [ ] All links use `/route-name` format (no `?`, `&`, `=`)
+- [ ] Links follow the link rules above: `/route-name` to a page, `#section-id` to a section of the same page
 - [ ] External links have `target="_blank"`
 - [ ] All text uses `textKey`, never hardcoded strings
-- [ ] Translations provided for ALL languages: {{param.languages}} (default: {{param.defaultLanguage}})
+- [ ] Translations provided for ALL languages: {{data.langData.languages}} (default: {{data.langData.default_language}})
 {{/if}}
 
 ---
@@ -347,7 +451,11 @@ Path format: `/assets/{category}/{filename}` (leading slash required).
 
 ## 🚀 NOW GENERATE
 
+{{#if param.onePage === true}}
+Create a complete one-page website (a landing page) based on the user's requirements.
+{{else}}
 Create a complete multi-page website based on the user's requirements.
+{{/if}}
 - If information is missing, **assume reasonable defaults** (don't ask)
 - **Output ONLY the JSON array** - no explanations before or after
 - Ensure ALL textKeys have matching translations
