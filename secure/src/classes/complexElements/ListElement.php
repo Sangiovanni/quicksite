@@ -102,16 +102,4 @@ class ListElementBuilder extends ComplexElementBuilder {
         }
         return $listNode;
     }
-
-    public function declaredTextKeys(array $config): array {
-        $keys = [];
-        if (isset($config['items']) && is_array($config['items'])) {
-            foreach ($config['items'] as $item) {
-                if (is_array($item) && isset($item['labelKey']) && $item['labelKey'] !== '') {
-                    $keys[] = (string)$item['labelKey'];
-                }
-            }
-        }
-        return $keys;
-    }
 }

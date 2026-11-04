@@ -11,7 +11,9 @@
  *   2. addRoute   /auth/oauth/<provider>/callback (skip-if-exists)
  *   3. setRouteResolver on start    (oauth-start kind)
  *   4. setRouteResolver on callback (oauth-callback kind)
- *   5. addComplexElement (host handles step 5 after preSubmit resolves)
+ *   5. addComplexElement (host handles step 5 after preSubmit resolves),
+ *      which also writes the label's starting text where its key has none
+ *      (OAuthButtonBuilder::startingTexts()).
  *
  * Steps 1-4 fire in preSubmit (new optional wizard hook in preview.js
  * addComplexNode). When routes already exist the UX warns the author
@@ -237,10 +239,9 @@
         labelGroup.appendChild(_renderLabel('Button label key', true));
         const labelMount = document.createElement('div');
         labelGroup.appendChild(labelMount);
-        labelGroup.appendChild(_renderHint(
-            'Translation key for the button label. Defaults to '
-            + '"form.signin.<provider>" when you pick a provider.'
-        ));
+        labelGroup.appendChild(QSDom.el('p', { class: 'admin-hint' },
+            window.QSComplexWizard.codeText(window.QSComplexWizard.t('oauthButton.labelKeyHint'),
+                { key: 'form.signin.<provider>' })));
         wrap.appendChild(labelGroup);
 
         // ---- optional icon class --------------------------------------

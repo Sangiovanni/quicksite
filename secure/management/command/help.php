@@ -3202,7 +3202,9 @@ $GLOBALS['__help_commands'] = [
                 'targetNodeId' => '0',
                 'position' => 'inside',
                 'structType' => 'page',
-                'pageName' => 'home'
+                'pageName' => 'home',
+                'startingTexts' => '{"en": ["form.signin.github"], "fr": ["form.signin.github"], "default": ["form.signin.github"]} (the keys given a starting text, per translation file; {} when none)',
+                'startingTextsFailed' => '["fr"] (present only when a translation file could not be written; the element was inserted)'
             ]
         ],
         'error_responses' => [
@@ -3213,7 +3215,7 @@ $GLOBALS['__help_commands'] = [
             '404.complex_element.unknown_kind' => 'No builder registered for the requested kind (response includes availableKinds list)',
             '404.route.not_found' => 'The page is neither a route of the project nor a special page; data.available_routes and data.special_pages list both, or its route has no structure file.',
             '404.node.not_found' => 'Target node not found at the given dot path',
-            '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
+            '413.validation.size_limit_exceeded' => 'A file this command writes - the structure, or a translation file a starting text goes into - would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
             '500.complex_element.build_failed' => 'Builder threw unexpectedly or returned a malformed node',
             '400.operation.failed' => 'Failed to insert subtree: inside (or at "root") a target that cannot hold children — a component call, a text node, or a void element such as img, input or br: "The target node is an img element, which cannot hold children" (at "root": "The structure root is …").',
             '400.validation.blocked_tag' => 'Builder emitted tag, which is not allowed (security restriction).',
@@ -3226,7 +3228,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_length' => 'A page name longer than 200 bytes.',
             '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
-        'notes' => 'After save, the emitted subtree is INDISTINGUISHABLE from a hand-built one — same JSON shape, same renderer, editable with the regular visual-editor tools. Wizard is build-time only; nothing at render time knows the element came from here. Builders live in <secure>/src/classes/complexElements/*.php as ComplexElementBuilder subclasses and are auto-discovered by the dispatcher. Drop a new builder file + a matching <public>/admin/.../contextual-complex/complex-<kind>.js wizard to add a kind — zero registration. Before, after and inside a node follow the rule addNode follows, the one every positional insert shares. targetNodeId "root" inserts at the structure\'s root, by the one rule every command that inserts there shares: a structure whose root is a list of nodes (every page, menu and footer) takes the new node as its first entry; one whose root is a single node (a component) takes it as its first child; either way its id is "0". A root that cannot hold children (a component call, a text node, a void element such as img) is refused with 400 operation.failed.'
+        'notes' => 'After save, the emitted subtree is INDISTINGUISHABLE from a hand-built one — same JSON shape, same renderer, editable with the regular visual-editor tools. Wizard is build-time only; nothing at render time knows the element came from here. Builders live in <secure>/src/classes/complexElements/*.php as ComplexElementBuilder subclasses and are auto-discovered by the dispatcher. Drop a new builder file + a matching <public>/admin/.../contextual-complex/complex-<kind>.js wizard to add a kind — zero registration. Before, after and inside a node follow the rule addNode follows, the one every positional insert shares. targetNodeId "root" inserts at the structure\'s root, by the one rule every command that inserts there shares: a structure whose root is a list of nodes (every page, menu and footer) takes the new node as its first entry; one whose root is a single node (a component) takes it as its first child; either way its id is "0". A root that cannot hold children (a component call, a text node, a void element such as img) is refused with 400 operation.failed. STARTING TEXTS: a translation key the element names that has no text gets a starting text, written into every translation file the project\'s pages read - on a multilingual project each listed language\'s file that exists and default.json, on a monolingual one default.json - only where the key is absent or empty there: a text is never replaced, no language file is created, and the texts are checked with the structure, so a refused command writes neither. oauth-button: its label key gets the word complexElements.oauthButton.label of <secure>/src/translations/<lang>.json ("Sign in with {{provider}}" in en.json) around the provider\'s name from the provider list, in the file\'s language (default.json in the default language); a language with no word file takes its base language\'s, else English. form-scaffold: each field\'s label key gets the field\'s name, _ and - read as spaces, its first letter capitalised, the same in every language. The other kinds name only keys the author picked, and write none.'
     ],
 
     'duplicateNode' => [
@@ -4441,7 +4443,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.move_failed' => 'save=true, but the archive could not be written into the exports folder',
             '507.quota.storage_exceeded' => 'save=true and a storage quota is configured: keeping the archive would put the project owner over it, counting the archive less the oldest one the five-export limit drops for it. The archive was not kept. A streamed export (save=false) is never charged: it lives in the system\'s temporary folder for the download only.'
         ],
-        'notes' => 'Project-scoped: the exported project is the one in the URL marker; a name/project in the request is optional and must match. Export format v2.0-secure - PHP files are NOT included, they are rebuilt from JSON on import. The archive carries the project\'s settings (languages, multilingual mode, theme mode, favicon and build size limit) and the routes as config.json and routes.json, config/*.json except members.json (its name file, config/project.json, among them), its page, component, menu and footer structures, its own snippets, its translations and data, and - unless include_public=false - public/assets and public/style. Its data never includes the project\'s OAuth key file as it is: without include_oauth_secrets no key travels, and with it data/oauth-secrets.json holds the build keys alone (an import writes them into the new project as they are). It never carries builds, backups or earlier exports. Its config.json always names the project\'s languages: its list, or, when its configuration lists none, its default language (en when it has none either), because an import refuses an archive that names no language. Saved exports live in that project\'s own folder (<secure>/projects/<id>/exports/), are auto-cleaned (keeps the last 5), and are reachable only through their own project\'s marker via downloadExport.'
+        'notes' => 'Project-scoped: the exported project is the one in the URL marker; a name/project in the request is optional and must match. Export format v2.0-secure - PHP files are NOT included, they are rebuilt from JSON on import. The archive carries the project\'s settings (languages, multilingual mode, theme mode, favicon and build size limit) and the routes as config.json and routes.json, config/*.json except members.json (its name file, config/project.json, among them), its page, component, menu and footer structures, its own snippets, its translations and data, and - unless include_public=false - public/assets and public/style. Its data never includes the project\'s OAuth key file as it is: without include_oauth_secrets no key travels, and with it data/oauth-secrets.json holds the build keys alone (an import writes them into the new project as they are). It never carries builds, backups or earlier exports. Its config.json always names the project\'s languages: its list, or, when its configuration lists none, its default language (en when it has none either), because an import refuses an archive that names no language. Every archive is built in the system\'s temporary folder, in a file of its own that only the server\'s account can read, removed once streamed or saved. Saved exports live in that project\'s own folder (<secure>/projects/<id>/exports/), are named <id>_export_<date>_<time>.zip - a second archive saved in the same second takes _2, then _3 and so on, so one never replaces another (the name is claimed before the archive is moved into the folder) -, are auto-cleaned (keeps the last 5: the oldest by modification time, then by name within one second), and are reachable only through their own project\'s marker via downloadExport.'
     ],
     
     'importProject' => [
@@ -4552,7 +4554,7 @@ $GLOBALS['__help_commands'] = [
             '400.project.required' => 'No project marker on the request. This command is project-scoped: target a project with /management/p/<projectId>/.',
             '400.validation.invalid_type' => 'Only ZIP files can be downloaded.'
         ],
-        'notes' => 'Export files expire after 24 hours. This command only serves archives that exportProject was asked to SAVE (save=true); for an immediate download call exportProject with no options - streaming is its default and stores nothing. A browser cannot fetch this with a plain link: the surface requires an Authorization header as well as the session cookie, so the archive has to be fetched with the header and handed to the user as a blob (the admin panel does this through QuickSiteAdmin.downloadFile).'
+        'notes' => 'A saved archive stays until five newer ones of its project push it out (exportProject keeps the last 5) or clearExports removes it; one saved in the same second as another is named with _2, _3 and so on (exportProject), which this command takes like any other name. This command only serves archives that exportProject was asked to SAVE (save=true); for an immediate download call exportProject with no options - streaming is its default and stores nothing. A browser cannot fetch this with a plain link: the surface requires an Authorization header as well as the session cookie, so the archive has to be fetched with the header and handed to the user as a blob (the admin panel does this through QuickSiteAdmin.downloadFile).'
     ],
     
     // =========================================================================
@@ -5864,19 +5866,28 @@ $GLOBALS['__help_commands'] = [
     'generateConsentLayer' => [
         'description' => 'Generate (or re-generate) the consent banner + popup structures from the registry and enable the consent layer (data/consent.json enabled=true). Writes templates/model/json/consent-banner.json + consent-popup.json — one popup toggle row per DECLARED non-essential category — and seeds default-language copy for the textKeys (NEW keys only, never clobbering edited copy; other languages are translated via the Translation Manager). The banner links to the cookie-policy route recorded in consent.json (owned by generateCookiePolicy). The structures render globally like menu/footer and are styleable/editable in the visual editor.',
         'method' => 'POST',
-        'parameters' => [],
-        'example_post' => 'POST /management/p/<projectId>/generateConsentLayer',
+        'parameters' => [
+            'askAgain' => [
+                'required' => false,
+                'type' => 'boolean',
+                'description' => 'Ask every visitor again: the consent version in data/consent.json goes up by one, so no recorded choice counts any more (the banner shows again and, until the visitor chooses, every non-essential category is refused). A change to a category\'s declared keys already asks again for that category by itself; this is for a change the keys do not show (a retention, a purpose, the policy).',
+                'example' => 'true',
+                'default' => false
+            ],
+        ],
+        'example_post' => 'POST /management/p/<projectId>/generateConsentLayer or POST /management/p/<projectId>/generateConsentLayer {"askAgain": true}',
         'success_response' => [
             'status' => 200,
             'code' => 'success',
-            'data' => ['categories' => '[declared non-essential categories]', 'languagesSeeded' => '{lang: keysAdded}', 'policyRoute' => 'string|null', 'enabled' => true]
+            'data' => ['categories' => '[declared non-essential categories]', 'languagesSeeded' => '{lang: keysAdded}', 'policyRoute' => 'string|null', 'enabled' => true, 'version' => 'int (the consent version now)', 'askedAgain' => 'bool']
         ],
         'error_responses' => [
+            '400.validation.invalid_type' => 'askAgain is not a boolean. Nothing was written.',
             '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
             '500.server.operation_failed' => 'Failed to write the consent layer structure files.',
             '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
-        'notes' => 'Idempotent. Runtime write-gating only activates once this enables the layer. Drives the /admin/storage "Generate consent layer" button.'
+        'notes' => 'Idempotent. The consent rule only applies once this enables the layer: then a value the site\'s storage verbs store is written, read and kept only while the visitor consents to its key\'s category (an essential key always, an undeclared one never), and a refused category\'s declared keys are deleted from the browser when the choice refuses it and at every page load. A consent counts only while its category\'s fingerprint - the consent version and the category\'s declared keys - is the one recorded with the choice, so a key added to, moved into or out of, or removed from a category asks the visitor again for that category. The page carries the fingerprints (a build precomputes them: rebuild after a registry change). Drives the /admin/storage "Generate consent layer" button and its "Ask visitors again" box.'
     ],
 
     'generateCookiePolicy' => [

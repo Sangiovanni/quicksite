@@ -145,7 +145,8 @@
     margin-top: 8px;
     padding-top: 10px;
 }
-.storage-cookie-secure { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: var(--admin-text); }
+.storage-cookie-secure,
+.storage-consent-ask-again { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: var(--admin-text); }
 
 .storage-modal-actions {
     display: flex;

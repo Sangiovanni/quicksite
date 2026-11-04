@@ -167,19 +167,4 @@ class CheckboxGroupBuilder extends ComplexElementBuilder {
             'children' => $children
         ];
     }
-
-    public function declaredTextKeys(array $config): array {
-        $keys = [];
-        if (isset($config['legendKey']) && $config['legendKey'] !== '') {
-            $keys[] = (string)$config['legendKey'];
-        }
-        if (isset($config['options']) && is_array($config['options'])) {
-            foreach ($config['options'] as $opt) {
-                if (is_array($opt) && isset($opt['labelKey']) && $opt['labelKey'] !== '') {
-                    $keys[] = (string)$opt['labelKey'];
-                }
-            }
-        }
-        return $keys;
-    }
 }

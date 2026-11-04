@@ -123,12 +123,4 @@ class PagedNavigatorBuilder extends ComplexElementBuilder {
             'children' => [],
         ];
     }
-
-    public function declaredTextKeys(array $config): array {
-        // No translatable strings — Prev/Next labels are emitted as
-        // raw chevrons by the runtime (purely visual). If we later
-        // want translatable labels we'd add prevLabelKey / nextLabelKey
-        // config + read them in the runtime via store-bound attrs.
-        return [];
-    }
 }

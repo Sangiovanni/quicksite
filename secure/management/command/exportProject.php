@@ -97,16 +97,24 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
     // styles and assets. A pull from a shared live copy would also let exporting any
     // project pick up another project's assets.
 
-    // Create temp directory for export
-    $tempDir = sys_get_temp_dir();
-    $zipFileName = $projectName . '_export_' . date('Ymd_His') . '.zip';
-    $zipPath = $tempDir . '/' . $zipFileName;
-    
+    // The archive is built in the system's temporary folder, in a file no other request
+    // shares (tempnam() creates it, readable by its owner only): it holds the project's data,
+    // and its OAuth build keys when asked. Its name in a download is the export's name.
+    $exportStamp = date('Ymd_His');
+    $zipFileName = $projectName . '_export_' . $exportStamp . '.zip';
+    $zipPath = @tempnam(sys_get_temp_dir(), 'qs-export-');
+    if ($zipPath === false) {
+        return ApiResponse::create(500, 'server.zip_create_failed')
+            ->withMessage('Failed to create ZIP archive');
+    }
+    @chmod($zipPath, 0600);
+
     // Create ZIP archive
     $zip = new ZipArchive();
     $result = $zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE);
-    
+
     if ($result !== true) {
+        @unlink($zipPath);
         return ApiResponse::create(500, 'server.zip_create_failed')
             ->withMessage('Failed to create ZIP archive')
             ->withData(['error_code' => $result]);
@@ -178,8 +186,10 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
         $metadata = createExportMetadata($projectName, $projectPath, $stats);
         $zip->addFromString($projectName . '/export_info.json', json_encode($metadata, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
         $stats['files']++;
-        
+
         $zip->close();
+        // The ZIP library writes the archive anew on close: it stays readable by its owner only.
+        @chmod($zipPath, 0600);
     } catch (Throwable $e) {
         // `Throwable`, not `Exception`: an `Error` (TypeError from a malformed
         // routes.php, the max_execution_time timeout, any other engine-level
@@ -239,6 +249,15 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
             }
         }
 
+        // A saved archive never replaces another: its name is claimed first (a second
+        // archive saved in the same second takes `_2`, then `_3`…), and the archive is
+        // moved over the claim.
+        $zipFileName = exportClaimName($exportDir, $projectName, $exportStamp);
+        if ($zipFileName === null) {
+            unlink($zipPath);
+            return ApiResponse::create(500, 'server.move_failed')
+                ->withMessage('Failed to save export file');
+        }
         $finalPath = $exportDir . '/' . $zipFileName;
 
         // Move ZIP to exports folder
@@ -246,6 +265,7 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
             // Try copy+delete if rename fails
             if (!copy($zipPath, $finalPath)) {
                 unlink($zipPath);
+                @unlink($finalPath);
                 return ApiResponse::create(500, 'server.move_failed')
                     ->withMessage('Failed to save export file');
             }
@@ -584,7 +604,8 @@ function cleanupOldExports(string $exportDir, string $projectName): void {
 
 /**
  * The saved archives past the last 5 once $adding more are saved: the oldest, by
- * modification time. The quota check asks with 1 before an archive is kept.
+ * modification time, then by name (exportNameOrder()). The quota check asks with 1
+ * before an archive is kept.
  *
  * @return string[] paths, oldest first
  */
@@ -594,8 +615,47 @@ function exportsBeyondLimit(string $exportDir, string $projectName, int $adding)
     if ($excess <= 0) {
         return [];
     }
-    usort($files, fn($a, $b) => filemtime($a) - filemtime($b));
+    usort($files, static function (string $a, string $b): int {
+        return [filemtime($a), ...exportNameOrder($a)] <=> [filemtime($b), ...exportNameOrder($b)];
+    });
     return array_slice($files, 0, $excess);
+}
+
+/**
+ * Where a saved archive's name puts it among archives of the same second: its date and
+ * time, then its number (none is 1, `_2` is 2…). A modification time counts in whole
+ * seconds, so archives saved in one second tie on it; their names order them, `_10`
+ * after `_2`. A name of another shape comes first, by name.
+ *
+ * @return array{0: string, 1: int, 2: string}
+ */
+function exportNameOrder(string $path): array {
+    $name = basename($path);
+    if (preg_match('/_export_(\d{8}_\d{6})(?:_(\d+))?\.zip$/D', $name, $m) === 1) {
+        return [$m[1], isset($m[2]) ? (int) $m[2] : 1, $name];
+    }
+    return ['', 0, $name];
+}
+
+/**
+ * Claim a saved archive's name: `<id>_export_<date>_<time>.zip`, else the first of
+ * `_2`, `_3`… not taken. Each is created empty with an exclusive create, so two
+ * requests never claim one name; the archive is then moved over the claim. null when
+ * no name could be created.
+ */
+function exportClaimName(string $exportDir, string $projectName, string $stamp): ?string {
+    for ($n = 1; $n <= 100; $n++) {
+        $name = $projectName . '_export_' . $stamp . ($n === 1 ? '' : '_' . $n) . '.zip';
+        $handle = @fopen($exportDir . '/' . $name, 'x');
+        if ($handle !== false) {
+            fclose($handle);
+            return $name;
+        }
+        if (!file_exists($exportDir . '/' . $name)) {
+            return null;   // not taken, yet not creatable: the folder refuses the write
+        }
+    }
+    return null;
 }
 
 /**

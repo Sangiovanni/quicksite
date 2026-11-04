@@ -8,13 +8,17 @@
  *
  *   { "enabled": false, "policyRoute": null, "version": 1 }
  *
- *   enabled      — is runtime write-gating + the banner active for this project
+ *   enabled      — is the consent rule + the banner active for this project
  *   policyRoute  — route the generated cookie-policy page lives at
- *   version      — bump (or a registry category change) re-prompts the visitor
+ *   version      — a bump asks every visitor again (generateConsentLayer's
+ *                  askAgain); a change to a category's declared keys asks again
+ *                  for that category by itself (qs_consent_fingerprints())
  *
  * When enabled, the page emits window.QS_CONSENT carrying the key→category map
- * so qs.js can gate non-essential storage writes against the consent_prefs
- * cookie.
+ * and one fingerprint per non-essential category, so qs.js reads, writes and
+ * keeps a non-essential key only while the visitor consents to its category
+ * under that category's fingerprint now (the consent cookie records the
+ * fingerprints a choice was made under).
  */
 
 if (!defined('SECURE_FOLDER_PATH')) {
@@ -86,7 +90,7 @@ function consentCategoryMap(): array {
  * author edits the consent config or the registry, so the build computes it
  * once and ships the result as data.
  *
- * @return array{enabled: bool, version: int, categories: array<string,string>}|null
+ * @return array{enabled: bool, version: int, categories: array<string,string>, fingerprints: array<string,string>}|null
  */
 function qs_consent_payload(): ?array
 {
@@ -94,9 +98,44 @@ function qs_consent_payload(): ?array
     if (empty($cfg['enabled'])) {
         return null;
     }
+    $version = (int) ($cfg['version'] ?? 1);
+    $categories = consentCategoryMap();
     return [
-        'enabled'    => true,
-        'version'    => (int) ($cfg['version'] ?? 1),
-        'categories' => consentCategoryMap(),
+        'enabled'      => true,
+        'version'      => $version,
+        'categories'   => $categories,
+        'fingerprints' => qs_consent_fingerprints($version, $categories),
     ];
+}
+
+/**
+ * One fingerprint per category a visitor chooses (every category but essential): the stored
+ * version and the category's declared keys, sorted. A consent counts only while the fingerprint
+ * recorded with it is the category's fingerprint now, so a key added to, moved into or out of,
+ * or removed from a category asks the visitor again for that category alone; a version bump
+ * asks again for all of them; an essential key asks nothing. A key's retention, scope and
+ * description are not part of it: the version is bumped when one of them must ask again.
+ *
+ * @param array<string,string> $categories key → category (consentCategoryMap())
+ * @return array<string,string> category → 16 hex characters
+ */
+function qs_consent_fingerprints(int $version, array $categories): array
+{
+    $out = [];
+    foreach (STORAGE_CATEGORIES as $category) {
+        if ($category === 'essential') {
+            continue;
+        }
+        $keys = [];
+        foreach ($categories as $key => $keyCategory) {
+            if ($keyCategory === $category) {
+                $keys[] = (string) $key;
+            }
+        }
+        sort($keys, SORT_STRING);
+        // A declared key holds no whitespace (validateStorageItem()), so the line break
+        // separates the keys without ambiguity.
+        $out[$category] = substr(hash('sha256', $version . "\n" . $category . "\n" . implode("\n", $keys)), 0, 16);
+    }
+    return $out;
 }

@@ -104,8 +104,24 @@ class OAuthButtonBuilder extends ComplexElementBuilder {
         ];
     }
 
-    public function declaredTextKeys(array $config): array {
-        $key = isset($config['labelKey']) ? trim((string) $config['labelKey']) : '';
-        return $key !== '' ? [$key] : [];
+    /**
+     * The label's starting text, where its key has none: the word
+     * complexElements.oauthButton.label of <secure>/src/translations/<lang>.json,
+     * around the provider's name as the installation's provider list gives it
+     * (qs_oauth_provider_name(): its `name`, else the id with a capital first
+     * letter).
+     */
+    public function startingTexts(array $config): array {
+        $provider = isset($config['provider']) ? (string) $config['provider'] : '';
+        $labelKey = isset($config['labelKey']) ? trim((string) $config['labelKey']) : '';
+        if ($labelKey === '' || !preg_match('/^[a-z][a-z0-9-]*$/D', $provider)) {
+            return [];
+        }
+        require_once SECURE_FOLDER_PATH . '/src/functions/oauthProviderHelpers.php';
+        return [[
+            'key'    => $labelKey,
+            'word'   => 'complexElements.oauthButton.label',
+            'params' => ['provider' => qs_oauth_provider_name($provider, qs_oauth_provider($provider) ?? [])],
+        ]];
     }
 }

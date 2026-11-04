@@ -1,0 +1,7 @@
+{
+    "complexElements": {
+        "oauthButton": {
+            "label": "Sign in with {{provider}}"
+        }
+    }
+}

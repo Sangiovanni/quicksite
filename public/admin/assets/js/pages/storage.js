@@ -890,6 +890,17 @@
                     : 'Optional. Generates a deterministic cookie-policy page at this route (the banner links to it).')));
         }
 
+        // Asking every visitor again (the stored version bumped) is offered once the layer is on;
+        // a change to a category's keys asks again for that category by itself.
+        var askAgainCb = null;
+        if (status && status.enabled) {
+            askAgainCb = QSDom.el('input', { type: 'checkbox' });
+            var askAgainLabel = QSDom.el('label', { class: 'storage-consent-ask-again' });
+            askAgainLabel.appendChild(askAgainCb);
+            askAgainLabel.appendChild(document.createTextNode(' ' + t('storage.consent.askAgain')));
+            content.appendChild(_renderGroup(null, askAgainLabel, _renderHint(t('storage.consent.askAgainHint'))));
+        }
+
         var resultBox = QSDom.el('div', { class: 'storage-modal-actions__error' });
         resultBox.style.color = 'var(--admin-success)';
         if (message) { resultBox.textContent = message; } else { resultBox.hidden = true; }
@@ -934,6 +945,7 @@
                 : (routeInput ? routeInput.value.trim().replace(/^\/+|\/+$/g, '') : '');
             _runConsentGenerate({
                 policyRoute: policyRoute, isUpdate: hasPage,
+                askAgain: !!(askAgainCb && askAgainCb.checked),
                 content: content, genBtn: genBtn, resultBox: resultBox, errBox: errBox,
             });
         });
@@ -970,7 +982,7 @@
             }
 
             // 2. Consent layer — banner reads the (now-updated) policy route.
-            var r = await api('generateConsentLayer', 'POST', {});
+            var r = await api('generateConsentLayer', 'POST', opts.askAgain ? { askAgain: true } : {});
             if (!r || !r.ok) {
                 errBox.hidden = false;
                 errBox.textContent = (r && r.data && r.data.message) || 'Generation failed';
@@ -982,6 +994,7 @@
 
             var msg = 'Consent layer ' + (opts.isUpdate ? 'updated' : 'generated and enabled') + '.' +
                 (langs.length ? ' Seeded copy: ' + langs.join(', ') + '.' : '') +
+                (d.askedAgain ? ' ' + t('storage.consent.askedAgain') : '') +
                 policyMsg +
                 ' Preview a page to see the banner.';
             // Re-render from fresh status — flips to the locked route + Update/

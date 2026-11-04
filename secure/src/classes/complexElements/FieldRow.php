@@ -140,15 +140,4 @@ class FieldRowBuilder extends ComplexElementBuilder {
             ]
         ];
     }
-
-    public function declaredTextKeys(array $config): array {
-        $keys = [];
-        if (isset($config['labelKey']) && $config['labelKey'] !== '') {
-            $keys[] = (string)$config['labelKey'];
-        }
-        if (isset($config['placeholder']) && $config['placeholder'] !== '') {
-            $keys[] = (string)$config['placeholder'];
-        }
-        return $keys;
-    }
 }

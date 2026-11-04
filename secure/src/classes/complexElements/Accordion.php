@@ -91,16 +91,4 @@ class AccordionBuilder extends ComplexElementBuilder {
             'children' => $detailsNodes
         ];
     }
-
-    public function declaredTextKeys(array $config): array {
-        $keys = [];
-        if (isset($config['items']) && is_array($config['items'])) {
-            foreach ($config['items'] as $item) {
-                if (!is_array($item)) continue;
-                if (isset($item['summaryKey']) && $item['summaryKey'] !== '') $keys[] = (string)$item['summaryKey'];
-                if (isset($item['contentKey']) && $item['contentKey'] !== '') $keys[] = (string)$item['contentKey'];
-            }
-        }
-        return $keys;
-    }
 }

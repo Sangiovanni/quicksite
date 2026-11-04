@@ -502,13 +502,33 @@ tools.
 ```php
 abstract public function kind(): string;              // 'list', 'select', etc.
 abstract public function build(array $config): array; // → single root node spec
-public function declaredTextKeys(array $config): array; // → string[] (optional)
+public function startingTexts(array $config): array;  // → starting texts of the keys it names (optional)
 ```
 
 Helpers exposed to subclasses: `stripWizardKeys`, `requireField`,
 `validateHtmlId`. The dispatcher (`addComplexElement` command)
 auto-discovers builders by globbing `complexElements/*.php` — drop a
 new file, no registration.
+
+**Starting texts.** A translation key an element names that has no text
+yet would show the missing-translation marker. `startingTexts()` answers
+a text for it, and `addComplexElement` writes that text into every
+translation file the project's pages read — each listed language's file
+that exists and `default.json` on a multilingual project, `default.json`
+alone on a monolingual one — **only where the key has none** (absent or
+empty): a text is never replaced, no language file is created, and the
+texts are checked against the size limits together with the structure, so
+a refused insert writes nothing. A starting text is either a **word**,
+read by key from `<secure>/src/translations/<lang>.json` — one file per
+language, English and French shipped; a language without a file takes its
+base language's (`pt` for `pt-br`), else English; its `{{name}}` markers
+filled — or a **text** the same in every language. No word is written in
+code: a new language is a new file. Today the **Sign in with OAuth**
+button's label gets the word `complexElements.oauthButton.label`
+(*Sign in with GitHub*, *Se connecter avec GitHub*) and each **Form
+Scaffold** field's label gets the field's name (`first_name` → *First
+name*). Edit either like any translation; the answer's `startingTexts`
+lists what was written.
 
 **Wizard contract** (JS)
 
@@ -543,7 +563,7 @@ Same auto-discovery pattern client-side — `preview-config.php` globs
 | Kind | Emits | Notes |
 |---|---|---|
 | `field-row` | `<div class="field"><label/><input/><span data-error-for/></div>` | Single form field, ready for `QS.validate` per-field error wiring. Building block for Form Scaffold. |
-| `form-scaffold` | `<form>` + N field rows + submit button, with `onsubmit` chain pre-wired (validate + fetch + optional post-submit actions) | Headline API-objective integration. Reuses `FieldRow` internally for each field. **Auto-seed from request schema**: when the picked API endpoint declares a `requestSchema.properties`, a `⤓ Pre-fill from request schema` button appears in the API group — click to populate every field row with `{name, type, required, labelKey}` inferred from the schema. Type inference: standard JSON Schema (`boolean` → checkbox; `number` / `integer` → number); QuickSite-permissive aliasing — any HTML5 input name typed directly into `type` (`password` / `email` / `tel` / `url` / `date` / `color` / …) maps to that input type; `format` on a `string` (email / tel / url / date / time / date-time / color / **password**) → matching HTML5 type; `writeOnly: true` → password; property name matches `/password/i` → password (last-resort); else `text`. **Reset behaviour**: with fields already populated, the button label flips to `⤴ Reset to schema fields (clears N)` and asks in the panel's own confirmation dialog (**Replace** / **Cancel**) before replacing them — useful after picking the wrong endpoint or to recover from typos. |
+| `form-scaffold` | `<form>` + N field rows + submit button, with `onsubmit` chain pre-wired (validate + fetch + optional post-submit actions) | Headline API-objective integration. Reuses `FieldRow` internally for each field. Each field's label key gets the field's name as its starting text where it has none (*Starting texts* above); the submit button's key is yours to pick and gets none. **Auto-seed from request schema**: when the picked API endpoint declares a `requestSchema.properties`, a `⤓ Pre-fill from request schema` button appears in the API group — click to populate every field row with `{name, type, required, labelKey}` inferred from the schema. Type inference: standard JSON Schema (`boolean` → checkbox; `number` / `integer` → number); QuickSite-permissive aliasing — any HTML5 input name typed directly into `type` (`password` / `email` / `tel` / `url` / `date` / `color` / …) maps to that input type; `format` on a `string` (email / tel / url / date / time / date-time / color / **password**) → matching HTML5 type; `writeOnly: true` → password; property name matches `/password/i` → password (last-resort); else `text`. **Reset behaviour**: with fields already populated, the button label flips to `⤴ Reset to schema fields (clears N)` and asks in the panel's own confirmation dialog (**Replace** / **Cancel**) before replacing them — useful after picking the wrong endpoint or to recover from typos. |
 | `select` | `<div class="field"><label/><select/><span data-error-for/></div>` with N `<option>` children | Same outer shape as field-row so a select sits alongside text inputs in a form-scaffold and picks up the same QS.validate hook. Optional placeholder option + required + multiple. |
 | `list` | `<ul>` or `<ol>` with N `<li><textKey/></li>` children | Simple flat list. `<ol>` supports `start` and `reversed`. |
 | `radio-group` | `<fieldset class="field">` + `<legend>` + N (`<label><input type="radio">`) + `<span data-error-for>` | All radios share one `name`. Layout `inline` / `stacked` (adds `field--inline` class). Optional default-selected value (a `<select>` rebuilt from the live option values). |
@@ -2014,7 +2034,12 @@ registered for them.
    wizard. The wizard creates the start + callback routes
    (`/auth/oauth/<provider>/start` + `/callback`), attaches the
    `oauth-start` + `oauth-callback` resolvers, and emits the button
-   in one pass. Re-running the wizard for the same provider on
+   in one pass. Its label key (`form.signin.<provider>` unless you
+   pick another) gets a starting text in each of the site's languages
+   where it has none — the provider's name as the provider list gives
+   it, in built-in words (*Sign in with GitHub*; see *Starting texts*
+   in §8.7) — so the button never shows the missing-translation marker.
+   Re-running the wizard for the same provider on
    another page reuses the existing routes (with an explicit
    warning) and just adds the button.
 
@@ -3022,7 +3047,7 @@ registry into four buckets:
 runs `generateConsentLayer`, which seeds two global structures —
 `consent-banner.json` + `consent-popup.json` — from the registry (one popup
 toggle row per *declared* non-essential category; Essential is always-on, locked)
-and enables runtime gating. They render on every page via `renderConsentLayer()`
+and turns the consent rule on (below). They render on every page via `renderConsentLayer()`
 (the menu/footer pattern), are styleable in the stylesheet editor and editable in
 the visual editor, and `qs.js` wires the **Accept all / Refuse all / Customize**
 actions, through one listener on the page. Inside the banner and the popup every
@@ -3035,12 +3060,51 @@ does nothing, and a link keeps its own address. The visual editor toolbar gains 
 **Cookie popup** toggles beside Menu/Footer (they reveal the layers in the canvas
 for styling; they don't persist).
 
-**Runtime gating.** Once enabled, a non-essential storage write is **skipped**
-unless the visitor consented to that key's category — just that write, not the
-surrounding chain. Undeclared keys are fail-closed (blocked). Consent lives in a
-`consent_prefs` cookie; the `data-consent-show="granted|denied:<category>"`
-binding shows/hides elements on consent state. The layer is dormant until
-generated, so existing projects are unaffected until they opt in.
+**The consent rule.** Once the layer is on, a value QuickSite stores is written,
+read and kept only while the visitor consents to its key's category:
+
+| The key | Write | Read | Kept |
+|---|---|---|---|
+| declared **essential** | always | always | always |
+| declared in another category, **consented** | yes | yes | yes |
+| declared in another category, **not consented** | skipped | answers nothing | deleted |
+| **undeclared** | skipped | answers nothing | left where it is |
+
+- **A refused write** is just that write, not the surrounding chain (`qs:consent:blocked`
+  fires). **A refused read** answers as if nothing were stored, for every reader: the
+  `data-storage-value` / `data-storage-show` / `data-auth-show` bindings, `QS.isAuthed()`,
+  the sign-in token an API request sends, and a state store's `localStorage:` /
+  `sessionStorage:` seed. It fires no event; the browser console's debug level gets one
+  line per key and page.
+- **What a refused category stored is deleted** from local *and* session storage, under
+  the project's prefix: when the visitor's choice refuses it (the banner, the popup, the
+  policy page's button), and at every page load, before anything shows a stored value.
+  Page load covers a consent cookie that expired, a choice made in another tab, and a
+  category asked again (below). Accepting again restores nothing: the site stores the
+  value again the next time it writes it. A **sign-in token declared under a non-essential
+  category** is no exception: refusing the category signs the visitor out.
+- **What stays yours.** QuickSite deletes only what its own verbs store (local and
+  session storage under `qsp_<projectId>_`), and only declared keys — an undeclared one
+  is refused, never deleted. A cookie you declare is written by your own code, and so is
+  anything your scripts or third-party tags store: clear it yourself on
+  `qs:consent:changed`, which fires on every choice (`detail` is the choice).
+
+**Asked again, per category.** A consent counts only while its category's
+*fingerprint* — the category's declared keys and the consent version — is the one
+recorded with the choice. Adding a key to a category, moving one in or out, or removing
+one asks the visitor again for that category alone: the banner shows again, the
+preferences reopen with that category unticked, and until the visitor chooses, its values
+are refused and deleted; the other categories keep their consent and their values. An
+essential key asks nothing. A change the keys do not show (a retention, a purpose, the
+policy itself) asks again through the modal's **Ask visitors again** box, shown once the
+layer is on: it raises the consent version, so every visitor is asked again for every
+category (`generateConsentLayer` with `askAgain`). A build carries the fingerprints it
+was built with: rebuild after a registry change.
+
+The consent record is the cookie `qsp_<projectId>_consent_prefs` (an essential item), and
+the `data-consent-show="granted|denied:<category>"` binding shows/hides elements on
+consent state. The layer is dormant until generated, so existing projects are unaffected
+until they opt in: with it off, nothing is refused and nothing deleted.
 
 **Cookie-policy page.** In the same modal, an optional route field generates a
 deterministic policy page (`generateCookiePolicy`) — a **Change my cookie

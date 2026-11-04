@@ -175,23 +175,26 @@ class FormScaffoldBuilder extends ComplexElementBuilder {
         ];
     }
 
-    public function declaredTextKeys(array $config): array {
-        $keys = [];
-        if (isset($config['submitLabelKey']) && $config['submitLabelKey'] !== '') {
-            $keys[] = (string)$config['submitLabelKey'];
-        }
-        // Collect keys from each field via FieldRowBuilder so we never
-        // miss one — single source of truth for what a row produces.
-        if (isset($config['fields']) && is_array($config['fields'])) {
-            $fieldRowBuilder = new FieldRowBuilder();
-            foreach ($config['fields'] as $fc) {
-                if (is_array($fc)) {
-                    foreach ($fieldRowBuilder->declaredTextKeys($fc) as $k) {
-                        $keys[] = $k;
-                    }
-                }
+    /**
+     * Each field's label, where its key has none: the field's name as a text,
+     * the same in every language — `_` and `-` read as spaces, the first
+     * letter capitalised (`first_name` → "First name"). The wizard names a
+     * field's label key after its name, so without it the form shows the
+     * missing-translation marker beside every field.
+     */
+    public function startingTexts(array $config): array {
+        $out = [];
+        $fields = (isset($config['fields']) && is_array($config['fields'])) ? $config['fields'] : [];
+        foreach ($fields as $fc) {
+            if (!is_array($fc)) continue;
+            $name = isset($fc['name']) ? (string) $fc['name'] : '';
+            $labelKey = isset($fc['labelKey']) ? trim((string) $fc['labelKey']) : '';
+            if ($labelKey === '' || !preg_match('/^[a-zA-Z][a-zA-Z0-9_-]*$/D', $name)) continue;
+            $text = ucfirst(trim((string) preg_replace('/[_-]+/', ' ', $name)));
+            if ($text !== '') {
+                $out[] = ['key' => $labelKey, 'text' => $text];
             }
         }
-        return $keys;
+        return $out;
     }
 }

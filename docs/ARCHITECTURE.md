@@ -198,7 +198,7 @@ ApiResponse::create(201, 'route.created')
     ->send();
 ```
 
-**One command extends without new commands.** `addComplexElement` dispatches to a registry of **builders** auto-discovered from `secure/src/classes/complexElements/*.php` — each a `ComplexElementBuilder` subclass that turns a wizard config into a node spec (pure: config in, node out, no I/O), which the command splices into the structure under one lock using `addNode`'s insertion helper. A new wizard kind is therefore one PHP file drop: no `routes.php` / `roles.php` / `help.php` edit, no new command, because the dispatcher globs the directory at request time and registers each subclass by its declared `kind()`. What it emits is indistinguishable from a hand-built subtree, so nothing at render time knows the element came from a wizard. See [ADMIN_PANEL.md §8.7](ADMIN_PANEL.md#87-complex-element-wizard) for the per-kind catalogue and the client-side half.
+**One command extends without new commands.** `addComplexElement` dispatches to a registry of **builders** auto-discovered from `secure/src/classes/complexElements/*.php` — each a `ComplexElementBuilder` subclass that turns a wizard config into a node spec (pure: config in, node out, no I/O), which the command splices into the structure under one lock using `addNode`'s insertion helper. A new wizard kind is therefore one PHP file drop: no `routes.php` / `roles.php` / `help.php` edit, no new command, because the dispatcher globs the directory at request time and registers each subclass by its declared `kind()`. What it emits is indistinguishable from a hand-built subtree, so nothing at render time knows the element came from a wizard. A translation key the element names that has no text yet gets the builder's starting text, written where the key has none, its words read by key from `secure/src/translations/<lang>.json`. See [ADMIN_PANEL.md §8.7](ADMIN_PANEL.md#87-complex-element-wizard) for the per-kind catalogue and the client-side half.
 
 The full list of 150 commands is registered in `secure/management/routes.php`. See [COMMAND_API.md](COMMAND_API.md) for the catalogue and a per-command reference (also obtainable at runtime via `GET /management/help`).
 
@@ -1239,7 +1239,7 @@ PHP and the browser runtime:
 | `qs-route-schema.js` | `window.QS_ROUTES` — the project's route table: every pattern and its params |
 | `window.QS_PROJECT`, `window.QS_ROUTE` | the project id every browser-storage key is prefixed with; the route the server resolved for this request (pattern, captured values, found) and the base the page is served under, which `qs.js` exposes as `QS.routePath` / `QS.routeParams` / `QS.routeFound` / `QS.basePath` (§6.3) |
 | `qs.js` | the runtime itself |
-| `window.QS_CONSENT` | the key→category map that gates storage writes |
+| `window.QS_CONSENT` | the key→category map and one fingerprint per category a visitor chooses: what `qs.js` writes, reads and keeps only while its category is consented |
 | theme wiring | `[data-theme-toggle]` behaviour, keyed per project |
 | `qs-api-config.js` | `window.QS_API_ENDPOINTS` |
 | `qs-enums.js` | `window.QS_ENUMS` |
@@ -1274,11 +1274,13 @@ remains the only translation engine either way.
 
 `window.QS_CONSENT` is the block where absence is meaningful rather than
 neutral: `qs.js` reads a missing value as "this project has no consent layer"
-and lets every storage write through. That is correct for a project that never
+and refuses nothing: every storage write and read goes through, and nothing is
+deleted. That is correct for a project that never
 configured one, and it is why a surface that fails to emit the payload does not
 look broken: the gate simply fails open, silently. A build therefore precomputes
 the payload (the live derivation walks the storage registry through authoring
-helpers that do not belong in a deployed site) and ships it as data.
+helpers that do not belong in a deployed site) and ships it as data, its
+fingerprints with it: a build asks a visitor again only once it is rebuilt.
 
 ## 10. Style management
 

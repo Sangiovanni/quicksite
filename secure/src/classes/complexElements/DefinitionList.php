@@ -65,16 +65,4 @@ class DefinitionListBuilder extends ComplexElementBuilder {
             'children' => $children
         ];
     }
-
-    public function declaredTextKeys(array $config): array {
-        $keys = [];
-        if (isset($config['items']) && is_array($config['items'])) {
-            foreach ($config['items'] as $item) {
-                if (!is_array($item)) continue;
-                if (isset($item['termKey']) && $item['termKey'] !== '') $keys[] = (string)$item['termKey'];
-                if (isset($item['descKey']) && $item['descKey'] !== '') $keys[] = (string)$item['descKey'];
-            }
-        }
-        return $keys;
-    }
 }

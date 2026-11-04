@@ -60,6 +60,8 @@ quicksite/
 │   │   ├── classes/              # Core classes (ApiResponse, JsonToHtmlRenderer,
 │   │   │                         #   JsonToPhpCompiler, CssParser, Translator, etc.)
 │   │   ├── functions/            # Utility functions (auth, paths, logging, etc.)
+│   │   ├── translations/         # The words QuickSite writes into a site as starting texts,
+│   │   │                         #   read by key: one file per language (en.json, fr.json)
 │   │   └── runtime/              # What ships to a SITE rather than running the engine
 │   │       ├── qs.js             #   the browser runtime, copied into every build
 │   │       └── site/index.php    #   a built site's front controller, copied verbatim

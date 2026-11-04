@@ -155,22 +155,4 @@ class SelectBuilder extends ComplexElementBuilder {
             ]
         ];
     }
-
-    public function declaredTextKeys(array $config): array {
-        $keys = [];
-        if (isset($config['labelKey']) && $config['labelKey'] !== '') {
-            $keys[] = (string)$config['labelKey'];
-        }
-        if (isset($config['placeholderKey']) && $config['placeholderKey'] !== '') {
-            $keys[] = (string)$config['placeholderKey'];
-        }
-        if (isset($config['options']) && is_array($config['options'])) {
-            foreach ($config['options'] as $opt) {
-                if (is_array($opt) && isset($opt['labelKey']) && $opt['labelKey'] !== '') {
-                    $keys[] = (string)$opt['labelKey'];
-                }
-            }
-        }
-        return $keys;
-    }
 }

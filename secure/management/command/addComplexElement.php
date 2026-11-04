@@ -25,6 +25,12 @@
  * After save, the emitted subtree is indistinguishable from a
  * hand-built one. The wizard is build-time only; nothing at render
  * time knows or cares an element came from here.
+ *
+ * A key the element names that has no text gets its builder's starting
+ * text (ComplexElementBuilder::startingTexts(), startingTexts.php), in
+ * every translation file the project's pages read and only where the key
+ * has none: a text is never replaced. The answer's `startingTexts` lists
+ * the keys written per file.
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
@@ -40,6 +46,7 @@ require_once SECURE_FOLDER_PATH . '/src/classes/IframeSandbox.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/JsonToHtmlRenderer.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
+require_once SECURE_FOLDER_PATH . '/src/functions/startingTexts.php';
 
 /**
  * Lazy-load all builders under secure/src/classes/complexElements/ and
@@ -314,13 +321,30 @@ function __command_addComplexElement(array $params = [], array $urlParams = []):
         return qs_unsafe_structure_param_response($unsafeStructureParam);
     }
 
-    // ----- Write back, unless the structure would pass its size cap or grow
-    // while the owner is over quota (qs_small_write_refusal) -----
+    // ----- The starting texts of the keys the element names, in every translation
+    // file the project's pages read, where a key has none (startingTexts.php) -----
+    try {
+        $startingEntries = $builder->startingTexts($config);
+    } catch (\Throwable $e) {
+        error_log("[addComplexElement] Builder '$kind' failed to answer its starting texts: " . $e->getMessage());
+        $startingEntries = [];
+    }
+    $startingPlan = qs_starting_texts_plan(is_array($startingEntries) ? $startingEntries : []);
+
+    // ----- Write back, unless a file would pass its size cap or grow while the
+    // owner is over quota (qs_small_write_refusal): the structure and every
+    // translation file the starting texts touch, checked together, so a refused
+    // command writes nothing -----
     $jsonFlags = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
-    $refusal = qs_small_write_refusal([$json_file => qs_json_size($insertResult['structure'], $jsonFlags)]);
+    $sizes = [$json_file => qs_json_size($insertResult['structure'], $jsonFlags)];
+    foreach ($startingPlan as $item) {
+        $sizes[$item['file']] = $item['bytes'];
+    }
+    $refusal = qs_small_write_refusal($sizes);
     if ($refusal !== null) {
         return $refusal;
     }
+    $startingWritten = qs_starting_texts_write($startingPlan);
     if (!qs_json_write(
         $json_file,
         $insertResult['structure'],
@@ -331,17 +355,23 @@ function __command_addComplexElement(array $params = [], array $urlParams = []):
             ->withMessage('Failed to write structure file');
     }
 
+    $data = [
+        'kind' => $kind,
+        'newNodeId' => $insertResult['newNodeId'],
+        'newNode' => $newNode,
+        'targetNodeId' => $targetNodeId,
+        'position' => $position,
+        'structType' => $structType,
+        'pageName' => $pageName,
+        // The keys given a starting text, per translation file ('default' for default.json).
+        'startingTexts' => (object) $startingWritten['written'],
+    ];
+    if ($startingWritten['failed'] !== []) {
+        $data['startingTextsFailed'] = $startingWritten['failed'];
+    }
     return ApiResponse::create(201, 'operation.success')
         ->withMessage("Complex element '$kind' inserted")
-        ->withData([
-            'kind' => $kind,
-            'newNodeId' => $insertResult['newNodeId'],
-            'newNode' => $newNode,
-            'targetNodeId' => $targetNodeId,
-            'position' => $position,
-            'structType' => $structType,
-            'pageName' => $pageName,
-        ]);
+        ->withData($data);
 }
 
 // Direct HTTP dispatch.

@@ -1239,13 +1239,14 @@
     /**
      * The name Import suggests when the archive carries none: its file name
      * without `.zip`, a browser's duplicate-download marker (` (1)`), and the
-     * `_export_<date>_<time>` suffix exportProject names every archive with.
+     * `_export_<date>_<time>` suffix exportProject names every archive with
+     * (with its `_<n>` when several were saved in one second).
      */
     function importNameFromFile(fileName) {
         const base = String(fileName || '')
             .replace(/\.zip$/i, '')
             .replace(/\s*\(\d+\)$/, '')
-            .replace(/_export_\d{8}_\d{6}$/, '')
+            .replace(/_export_\d{8}_\d{6}(?:_\d+)?$/, '')
             .trim();
         return Array.from(base).slice(0, 60).join('');
     }

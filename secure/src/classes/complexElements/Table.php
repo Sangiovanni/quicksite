@@ -179,27 +179,4 @@ class TableBuilder extends ComplexElementBuilder {
         }
         return $tableNode;
     }
-
-    public function declaredTextKeys(array $config): array {
-        $keys = [];
-        if (isset($config['captionKey']) && $config['captionKey'] !== '') {
-            $keys[] = (string)$config['captionKey'];
-        }
-        if (!empty($config['hasHead']) && isset($config['headerCells']) && is_array($config['headerCells'])) {
-            foreach ($config['headerCells'] as $cell) {
-                $s = trim((string)$cell);
-                if ($s !== '') $keys[] = $s;
-            }
-        }
-        if (isset($config['bodyRows']) && is_array($config['bodyRows'])) {
-            foreach ($config['bodyRows'] as $row) {
-                if (!is_array($row)) continue;
-                foreach ($row as $cell) {
-                    $s = trim((string)$cell);
-                    if ($s !== '') $keys[] = $s;
-                }
-            }
-        }
-        return $keys;
-    }
 }

@@ -1185,8 +1185,17 @@
         return null;
     }
 
-    /** Read an author key from `storage`. null when absent or unreadable. */
+    /**
+     * Read an author key from `storage`. null when absent, unreadable, or refused by the consent
+     * rule (_consentRefusal()): every reader of a stored value comes through here, so a key the
+     * visitor has not consented to reads as absent everywhere.
+     */
     function _storageGet(storage, key) {
+        var refusal = _consentRefusal(key);
+        if (refusal !== null) {
+            _consentReadRefused(key, refusal.category);
+            return null;
+        }
         try {
             return window[storage].getItem(_storageKey(key));
         } catch (e) {
@@ -1220,16 +1229,12 @@
      * @returns {string|null}
      */
     function getTokenValue(source) {
-        if (!source || !source.includes(':')) {
-            return null;
+        // Parsed as every writer parses a reference (parseStorageRef(): the key is everything after
+        // the first ':'), so a key holding a ':' is read where it was written.
+        const ref = typeof source === 'string' ? parseStorageRef(source) : null;
+        if (ref && (ref.storage === 'localStorage' || ref.storage === 'sessionStorage')) {
+            return _storageGet(ref.storage, ref.key);
         }
-
-        const [storageType, key] = source.split(':');
-
-        if (storageType === 'localStorage' || storageType === 'sessionStorage') {
-            return _storageGet(storageType, key);
-        }
-
         return null;
     }
 
@@ -1245,15 +1250,34 @@
     }
 
     // =========================================================================
-    // CONSENT — GDPR write-gating
+    // CONSENT — one rule for what QuickSite stores
     //
-    // Reads the `consent_prefs` cookie + window.QS_CONSENT (the key→category map,
-    // emitted server-side ONLY when the project enabled the consent layer). When
-    // the layer is off, gating is fully dormant. When on, non-essential storage
-    // writes are skipped unless the visitor consented to that key's category.
+    // Reads the consent cookie (`qsp_<projectId>_consent_prefs`) and window.QS_CONSENT,
+    // emitted server-side ONLY when the project enabled the consent layer: the
+    // key→category map and one fingerprint per non-essential category. When the
+    // layer is off, all of it is dormant. When on, a value QuickSite stores is
+    // written, read and kept only while its category is consented: an essential
+    // key always; a declared non-essential key while the visitor consents to its
+    // category; an undeclared key never (_consentRefusal(), for a read as for a
+    // write). A refused read answers null. A refused category's declared keys are
+    // deleted from local and session storage when a choice refuses it and at
+    // every page load (_consentRemoveRefused()). A consent counts only while its
+    // category's fingerprint is the one recorded with the choice: a change to the
+    // category's declared keys, or a version bump, asks the visitor again.
+    // Cookies, and storage QuickSite did not write, stay the author's;
+    // `qs:consent:changed` is the hook for their own clean-up.
     // =========================================================================
 
-    /** Parse the consent_prefs cookie → object, or null. */
+    /** The categories a visitor chooses; essential is always granted. */
+    var CONSENT_TOGGLE_CATS = ['functional', 'analytics', 'marketing'];
+
+    /** window.QS_CONSENT when the project enabled the consent layer, else null (dormant). */
+    function _consentConfig() {
+        var cfg = window.QS_CONSENT;
+        return (cfg && cfg.enabled) ? cfg : null;
+    }
+
+    /** Parse the consent cookie → object, or null. */
     function _readConsentCookie() {
         try {
             var raw = _readCookie(_cookieName(QS_CONSENT_COOKIE));
@@ -1265,59 +1289,142 @@
         }
     }
 
-    /** Current consent choices (empty object when none set). */
-    QS.getConsent = function() {
-        return _readConsentCookie() || {};
-    };
+    /**
+     * Whether a recorded choice still holds for `category`: the fingerprint recorded with it is
+     * the category's fingerprint now (window.QS_CONSENT.fingerprints). With the layer off there
+     * is nothing to compare, and the record is read as it is.
+     */
+    function _consentCurrent(prefs, category) {
+        var cfg = _consentConfig();
+        if (!cfg) return true;
+        var now = cfg.fingerprints && typeof cfg.fingerprints === 'object' ? cfg.fingerprints[category] : undefined;
+        var then = prefs && prefs.f && typeof prefs.f === 'object' ? prefs.f[category] : undefined;
+        return typeof now === 'string' && now !== '' && then === now;
+    }
 
-    /** essential is always granted; every other category needs an explicit true. */
-    QS.hasConsent = function(category) {
-        if (category === 'essential') return true;
+    /**
+     * Current consent choices (empty object when none set): the recorded choice, each category
+     * whose consent no longer holds (its fingerprint changed) read as refused.
+     */
+    QS.getConsent = function() {
         var prefs = _readConsentCookie();
-        return !!(prefs && prefs[category] === true);
+        if (!prefs) return {};
+        var out = {};
+        for (var k in prefs) {
+            if (Object.prototype.hasOwnProperty.call(prefs, k)) out[k] = prefs[k];
+        }
+        CONSENT_TOGGLE_CATS.forEach(function (c) { out[c] = QS.hasConsent(c); });
+        return out;
     };
 
     /**
+     * essential is always granted; every other category needs an explicit true, recorded under
+     * the category's fingerprint now (a consent given before its keys changed no longer counts).
+     */
+    QS.hasConsent = function(category) {
+        if (category === 'essential') return true;
+        var prefs = _readConsentCookie();
+        return !!(prefs && prefs[category] === true && _consentCurrent(prefs, category));
+    };
+
+    /**
+     * Whether the visitor has a choice to make: the layer is on, and no choice is recorded or a
+     * category's consent no longer holds. The banner shows while this is true.
+     */
+    function _consentNeedsChoice() {
+        if (!_consentConfig()) return false;
+        var prefs = _readConsentCookie();
+        if (!prefs) return true;
+        for (var i = 0; i < CONSENT_TOGGLE_CATS.length; i++) {
+            if (!_consentCurrent(prefs, CONSENT_TOGGLE_CATS[i])) return true;
+        }
+        return false;
+    }
+
+    /**
      * Persist the visitor's consent choice (used by the banner).
-     * 180-day life, Path=/, SameSite=Lax, Secure on https. Fires
-     * `qs:consent:changed` so the banner/gated UI can react.
+     * 180-day life, Path=/, SameSite=Lax, Secure on https. Records each
+     * category's fingerprint with it, deletes what a refused category stored,
+     * then fires `qs:consent:changed` so the banner/gated UI can react.
      * @param {{functional?:boolean, analytics?:boolean, marketing?:boolean}} prefs
      */
     QS.setConsent = function(prefs) {
-        var cfg = (window.QS_CONSENT && window.QS_CONSENT.enabled) ? window.QS_CONSENT : null;
+        var cfg = _consentConfig();
         var payload = {
             v: cfg ? (cfg.version || 1) : 1,
             functional: !!(prefs && prefs.functional),
             analytics: !!(prefs && prefs.analytics),
             marketing: !!(prefs && prefs.marketing)
         };
+        if (cfg && cfg.fingerprints && typeof cfg.fingerprints === 'object') {
+            payload.f = {};
+            CONSENT_TOGGLE_CATS.forEach(function (c) {
+                if (typeof cfg.fingerprints[c] === 'string') payload.f[c] = cfg.fingerprints[c];
+            });
+        }
         var maxAge = 180 * 24 * 60 * 60; // 180 days
         var secure = (location.protocol === 'https:') ? '; Secure' : '';
         document.cookie = _cookieName(QS_CONSENT_COOKIE) + '=' + encodeURIComponent(JSON.stringify(payload)) +
             '; Max-Age=' + maxAge + '; Path=/; SameSite=Lax' + secure;
+        _consentRemoveRefused();
         document.dispatchEvent(new CustomEvent('qs:consent:changed', { detail: payload }));
         return payload;
     };
 
     /**
-     * Gate a storage WRITE by key. Returns true when the write may proceed.
-     * Dormant (always true) unless the project enabled the consent layer
-     * (window.QS_CONSENT). Then: essential always passes; a declared non-
-     * essential key needs consent; an UNDECLARED key is fail-closed (blocked) —
-     * GDPR-safe by design.
+     * The one consent rule, for a read as for a write: null when QuickSite may store or read
+     * `key` now, else `{category}` (null for an undeclared key). Dormant (always null) unless the
+     * project enabled the consent layer. Then: essential always passes; a declared non-essential
+     * key needs its category's consent; an UNDECLARED key is fail-closed (refused).
      */
+    function _consentRefusal(key) {
+        var cfg = _consentConfig();
+        if (!cfg) return null;                           // layer off → nothing refused
+        var cats = cfg.categories;
+        var category = (cats && typeof cats === 'object' && Object.prototype.hasOwnProperty.call(cats, key)
+            && typeof cats[key] === 'string') ? cats[key] : null;
+        if (category === 'essential') return null;
+        if (category !== null && QS.hasConsent(category)) return null;
+        return { category: category };
+    }
+
+    /** Gate a storage WRITE by key (the consent rule). true when the write may proceed. */
     function _consentAllowsWrite(key) {
-        var cfg = window.QS_CONSENT;
-        if (!cfg || !cfg.enabled) return true;          // layer off → no gating
-        var category = (cfg.categories && cfg.categories[key]) || null;
-        if (category === 'essential') return true;
-        if (category === null) {                         // undeclared → fail-closed
-            _consentBlocked(key, null);
-            return false;
-        }
-        if (QS.hasConsent(category)) return true;
-        _consentBlocked(key, category);
+        var refusal = _consentRefusal(key);
+        if (refusal === null) return true;
+        _consentBlocked(key, refusal.category);
         return false;
+    }
+
+    // A refused READ fires no event (a read happens on every render): one debug line per key and page.
+    var _consentReadNoted = {};
+    function _consentReadRefused(key, category) {
+        if (Object.prototype.hasOwnProperty.call(_consentReadNoted, key)) return;
+        _consentReadNoted[key] = true;
+        if (window.console && console.debug) {
+            console.debug('[QS] consent: read of "' + key + '" refused (category=' + (category || 'undeclared') + ')');
+        }
+    }
+
+    /**
+     * Delete every declared key whose category the visitor does not consent to now, from local
+     * AND session storage, under the project's prefix (_storageKey()). Runs when a choice is
+     * recorded (QS.setConsent()) and at every page load, before anything renders a stored value
+     * (_qsAuthAndConsentInit()): a consent cookie that expired, a choice made in another tab and a
+     * category whose keys changed are covered there. Essential keys are never touched, and
+     * neither is a key the registry does not declare: the clean-up deletes by name and never
+     * lists the visitor's storage. Dormant while the layer is off.
+     */
+    function _consentRemoveRefused() {
+        var cfg = _consentConfig();
+        var cats = cfg ? cfg.categories : null;
+        if (!cats || typeof cats !== 'object') return;
+        Object.keys(cats).forEach(function (key) {
+            var category = cats[key];
+            if (typeof category !== 'string' || category === 'essential' || QS.hasConsent(category)) return;
+            _storageRemove('localStorage', key);
+            _storageRemove('sessionStorage', key);
+        });
     }
 
     function _consentBlocked(key, category) {
@@ -1336,8 +1443,6 @@
     // ids + data-consent-toggle) and every data-consent-action control on the
     // page. The structures carry the markup (styleable/editable); this drives
     // behaviour.
-
-    var CONSENT_TOGGLE_CATS = ['functional', 'analytics', 'marketing'];
 
     function _consentShow(el) { if (el) el.hidden = false; }
     function _consentHide(el) { if (el) el.hidden = true; }
@@ -1456,9 +1561,11 @@
         if (!banner && !popup) return;
         _consentInjectStyles();
         // Auto-show the banner when the layer is enabled (live site) and the
-        // visitor hasn't chosen yet. QS_CONSENT is emitted live-only, so the
-        // banner never auto-pops in the editor (the toolbar toggle shows it).
-        if (window.QS_CONSENT && window.QS_CONSENT.enabled && !_readConsentCookie()) {
+        // visitor has a choice to make: none recorded yet, or a category's
+        // consent no longer holds (its keys changed, or the version was bumped).
+        // QS_CONSENT is emitted live-only, so the banner never auto-pops in the
+        // editor (the toolbar toggle shows it).
+        if (_consentNeedsChoice()) {
             _consentShow(banner);
         }
     }
@@ -2850,8 +2957,10 @@
     document.addEventListener('qs:storage:changed', function () {
         applyAuthState();
     });
-    // qs:consent:changed → the visitor updated consent; re-scan data-consent-show
-    // bindings so gated placeholders reflect the new choice.
+    // qs:consent:changed → the visitor updated consent; re-scan every binding:
+    // gated placeholders reflect the new choice, and a refused category's values
+    // (deleted, and refused to every reader) show as absent — a sign-in token
+    // declared under it signs the visitor out.
     document.addEventListener('qs:consent:changed', function () {
         applyAuthState();
     });
@@ -2867,7 +2976,12 @@
         _exchangeState = 'failed';
         applyAuthState();
     });
+    // The page-load clean-up comes first: it is registered before _initStores()
+    // and the page events' load handlers (the same DOMContentLoaded, later), so
+    // nothing renders a value the visitor refuses. It cannot run earlier:
+    // window.QS_CONSENT is written after this file.
     function _qsAuthAndConsentInit() {
+        _consentRemoveRefused();
         applyAuthState();
         _initConsentBanner();
     }

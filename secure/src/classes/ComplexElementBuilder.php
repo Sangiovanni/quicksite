@@ -43,18 +43,26 @@ abstract class ComplexElementBuilder {
     abstract public function build(array $config): array;
 
     /**
-     * Optional: declare which textKeys this builder will reference, so
-     * the command can pre-allocate them in the translation files. Each
-     * entry is a string key path; the command creates empty entries
-     * for every active language (idempotent — won't overwrite existing).
+     * Optional: the starting texts of the translation keys this element
+     * names, which addComplexElement writes into every translation file the
+     * project's pages read, only where a key has no text there
+     * (startingTexts.php): a text is never replaced. Without one, a key the
+     * author has not translated shows the missing-translation marker.
      *
-     * Default: no textKeys. Builders that emit translatable strings
-     * (Field Row label, Form Scaffold submit label, etc.) override.
+     * Each entry is either
+     *   ['key' => <translation key>, 'word' => <key in <secure>/src/translations/<lang>.json>, 'params' => [<name> => <value>]]
+     * — a word, in each file's language, its {{name}} markers filled — or
+     *   ['key' => <translation key>, 'text' => <text>]
+     * — a text the same in every language. A word is never written in code:
+     * it lives in the word files, one per language.
+     *
+     * May read the installation's own lists (the OAuth providers); never
+     * writes. Default: none.
      *
      * @param array $config Same config passed to build().
-     * @return string[]
+     * @return array<int, array<string, mixed>>
      */
-    public function declaredTextKeys(array $config): array {
+    public function startingTexts(array $config): array {
         return [];
     }
 

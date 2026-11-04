@@ -8,7 +8,10 @@
  * @auth   required (write permission)
  *
  * Body (all optional):
- *   { "policyRoute": "/cookies" }   // route the cookie-policy page lives at
+ *   { "askAgain": true }   // ask every visitor again: the stored version goes up by one
+ *
+ * The banner links to the cookie-policy route consent.json records (owned by
+ * generateCookiePolicy / deleteCookiePolicy); a body cannot set it.
  *
  * Writes templates/model/json/consent-banner.json + consent-popup.json (one
  * popup toggle row per DECLARED non-essential category), seeds EN/FR default
@@ -16,7 +19,7 @@
  * data/consent.json enabled=true. Idempotent: re-running refreshes the
  * structures + re-enables, preserving existing translations.
  *
- * @return ApiResponse 200 { categories, languagesSeeded, policyRoute }
+ * @return ApiResponse 200 { categories, languagesSeeded, policyRoute, enabled, version, askedAgain }
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
@@ -27,6 +30,22 @@ require_once SECURE_FOLDER_PATH . '/src/functions/consentLayerHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/translationHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
+
+// askAgain: every visitor is asked again. The stored version goes up by one, so
+// every category's fingerprint changes and no recorded choice holds
+// (qs_consent_fingerprints()). Read before any write: a value that is not a
+// boolean writes nothing.
+$params = $trimParametersManagement->params();
+$askAgain = false;
+if (array_key_exists('askAgain', $params)) {
+    $askAgain = filter_var($params['askAgain'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+    if ($askAgain === null) {
+        ApiResponse::create(400, 'validation.invalid_type')
+            ->withMessage('askAgain must be a boolean')
+            ->withErrors([['field' => 'askAgain', 'reason' => 'invalid_type', 'expected' => 'boolean']])
+            ->send();
+    }
+}
 
 // The policy route is owned by generateCookiePolicy / deleteCookiePolicy (set
 // only when a page actually exists). Here we just read it for the banner link
@@ -90,16 +109,25 @@ if (!empty($newOnly)) {
     }
 }
 
-// 3. Enable the layer (policyRoute is left untouched — owned elsewhere).
-saveConsentConfig(array_merge($config, ['enabled' => true]));
+// 3. Enable the layer (policyRoute is left untouched — owned elsewhere), the
+//    version one higher when every visitor is asked again.
+$version = max(1, (int) ($config['version'] ?? 1));
+$update = ['enabled' => true];
+if ($askAgain) {
+    $version++;
+    $update['version'] = $version;
+}
+saveConsentConfig(array_merge($config, $update));
 qs_small_write_send_refusal();
 
 ApiResponse::create(200, 'success')
-    ->withMessage('Consent layer generated and enabled')
+    ->withMessage($askAgain ? 'Consent layer generated and enabled; every visitor is asked again' : 'Consent layer generated and enabled')
     ->withData([
         'categories'      => $categories,
         'languagesSeeded' => $languagesSeeded,
         'policyRoute'     => $policyRoute,
         'enabled'         => true,
+        'version'         => $version,
+        'askedAgain'      => $askAgain,
     ])
     ->send();

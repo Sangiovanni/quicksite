@@ -14968,3 +14968,75 @@ the person has not answered).
 **Source**: the kickoff design sweep, its shape ruled 2026-11-04; beta.12. `secure/src/functions/AuthManagement.php`
 (`qs_membership_approved_entry()`, `qs_membership_reconciled_entry()`), `secure/admin/functions/membershipSelf.php`,
 `secure/management/command/approveJoinRequest.php`.
+
+### Consent governs reading and keeping what QuickSite stores, and is asked again per category when its keys change (locked 2026-11-04)
+
+**Amends**: *Consent gating skips the individual write, fail-closed, at two choke points* (locked 2026-06-27). That
+entry gates writes only; reads now follow the same rule, and a refusal deletes what the refused category stored.
+
+**Decision**: While the consent layer is on, one rule decides, for a write and for a read alike, whether QuickSite may
+store or read a key: an essential key always; a key declared in another category only while the visitor consents to
+that category; an undeclared key never. A refused write is skipped as before. A refused read answers as if nothing
+were stored, for every reader (the storage and sign-in bindings, the sign-in token a request sends, a state store's
+seed); it fires no event and logs one debug line per key and page. What a refused category stored is deleted from
+local and session storage under the project's prefix, when a choice refuses it and at every page load before anything
+shows a stored value. Essential keys are never touched; an undeclared key is refused, not deleted; cookies, and
+storage the author's own code writes, stay the author's, with `qs:consent:changed` as the hook for their clean-up. A
+sign-in token declared under a non-essential category is treated like any key: refusing the category signs the
+visitor out. A consent counts only while its category's fingerprint, made of the consent version and the category's
+declared keys, is the one recorded with the choice: a key added to, moved into or out of, or removed from a category
+asks the visitor again for that category alone; a version bump (the Storage page's *Ask visitors again*, the `askAgain`
+of `generateConsentLayer`) asks again for all; an essential key asks nothing. A choice recorded before fingerprints
+existed counts for nothing. The page carries the fingerprints and a build precomputes them. All of it is dormant
+while the layer is off.
+
+**Reasoning**: The EU rule the write gate exists for (ePrivacy article 5(3)) covers reading what is stored on the
+visitor's device as well as storing it, and withdrawing consent must be as easy as giving it: a withdrawal that left
+the values stored and readable changed nothing. One function serves both sides, so a read is never allowed where the
+write would be refused. The clean-up runs at page load as well as on the choice because a choice is not the only way a
+consent ends: the cookie expires, another tab refuses, a category's keys change. It deletes by declared name and never
+lists the visitor's storage: on a host that serves several projects one project's prefix can begin another's keys, and
+QuickSite cannot tell what an undeclared value is. A fingerprint per category asks again only about what changed, so
+adding an analytics key does not delete a visitor's functional cart; the version stays the lever for a change the keys
+do not show (a retention, a purpose, the policy).
+
+**Alternatives considered**: gate reads but delete nothing (a withdrawal that keeps the data); delete every key under
+the project's prefix (it can reach another project's keys, and the author's own); one version for the whole layer from
+a digest of every category (any change would delete every non-essential value of every visitor until they choose
+again); compare the stored version only (no registry change would ever ask again, and nothing bumped the version); an
+event for a refused read (a read happens on every render).
+
+**Source**: design round 2026-11-04, from a question in the UX run of the cookie preferences; beta.12.
+`secure/src/runtime/qs.js` (`_consentRefusal()`, `_storageGet()`, `_consentRemoveRefused()`,
+`_qsAuthAndConsentInit()`), `secure/src/functions/consentHelpers.php` (`qs_consent_fingerprints()`,
+`qs_consent_payload()`), `secure/management/command/generateConsentLayer.php` (`askAgain`).
+
+### A key a complex element names gets a starting text where it has none, its words read by key (locked 2026-11-04)
+
+**Decision**: When a complex element names a translation key, its builder may answer a starting text for it
+(`startingTexts()`), and `addComplexElement` writes that text into every translation file the project's pages read
+(each listed language's file that exists and `default.json` on a multilingual project, `default.json` alone on a
+monolingual one), only where the key has no text: absent or empty. A text is never replaced, no language file is
+created, and the texts are checked against the size limits with the structure, so a refused insert writes nothing. A
+starting text is a word, read by key from `<secure>/src/translations/<lang>.json` (one file per language; a language
+without one takes its base language's, else English) with its markers filled, or a text the same in every language.
+The OAuth button's label gets the word *Sign in with {{provider}}* around the provider's name from the provider list;
+a Form Scaffold field's label gets the field's name. The builders' unread `declaredTextKeys()` is gone.
+
+**Reasoning**: A wizard that names a key and writes no text for it leaves the missing-translation marker on the page
+until the author translates it, and the OAuth wizard names its key itself. Writing the text in the command rather than
+in the wizard gives an API caller the same result as the panel, and every builder one place to use. Every file the
+pages read, because the translator has no fallback between languages: a text in the default language alone would
+leave the marker in the others. No language file is created, because a language without one reads `default.json`,
+and a file holding a single key would cut it off from every other text. The words live in files read by key, never in
+code, so a new language is a new file.
+
+**Alternatives considered**: the wizard writes the text through `setTranslationKeys` (the panel only, and a copy per
+wizard); the default language only, as the policy generators seed (the marker in the other languages); the words in
+PHP beside the builder (a new language would be a code change); empty entries, as `declaredTextKeys()` once promised
+(an empty text shows the marker too).
+
+**Source**: design round 2026-11-04, from the UX run of the OAuth button; beta.12.
+`secure/src/functions/startingTexts.php`, `secure/src/translations/en.json` and `fr.json`,
+`secure/src/classes/ComplexElementBuilder.php`, `secure/src/classes/complexElements/OAuthButton.php` and
+`FormScaffold.php`, `secure/management/command/addComplexElement.php`.

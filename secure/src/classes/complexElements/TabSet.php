@@ -177,16 +177,4 @@ class TabSetBuilder extends ComplexElementBuilder {
             'children' => $outerChildren
         ];
     }
-
-    public function declaredTextKeys(array $config): array {
-        $keys = [];
-        if (isset($config['items']) && is_array($config['items'])) {
-            foreach ($config['items'] as $item) {
-                if (!is_array($item)) continue;
-                if (isset($item['labelKey'])   && $item['labelKey']   !== '') $keys[] = (string)$item['labelKey'];
-                if (isset($item['contentKey']) && $item['contentKey'] !== '') $keys[] = (string)$item['contentKey'];
-            }
-        }
-        return $keys;
-    }
 }
