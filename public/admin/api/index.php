@@ -31,11 +31,9 @@ $__qsApiProject = null;
     for ($__i = 0, $__n = count($__segs); $__i < $__n - 2; $__i++) {
         if ($__segs[$__i] === 'admin' && $__segs[$__i + 1] === 'api' && $__segs[$__i + 2] === 'p'
             && isset($__segs[$__i + 3])) {
-            $__cand = rawurldecode($__segs[$__i + 3]);
-            // The project-name shape only — membership is checked after auth, below.
-            if (preg_match('/^[A-Za-z0-9_-]{1,64}$/D', $__cand)) {
-                $__qsApiProject = $__cand;
-            }
+            // The segment as sent. Its shape is the one id rule's question
+            // (is_valid_project_name()), asked below with the membership check.
+            $__qsApiProject = rawurldecode($__segs[$__i + 3]);
             break;
         }
     }

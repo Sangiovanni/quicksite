@@ -87,6 +87,12 @@ function qs_backup_copy_item(string $fromRoot, string $toRoot, string $item): ar
         return ['ok' => $ok, 'files' => $ok ? 1 : 0, 'failed' => $ok ? [] : [$item]];
     }
     $copy = qs_copy_tree($from, $to, $item === 'config' ? QS_BACKUP_CONFIG_KEPT : []);
+    if ($item === 'data') {
+        // The OAuth key file a copy wrote is readable by the server's own user only, as
+        // its writer leaves it: a backup, the copy kept before a restore and a restore.
+        require_once __DIR__ . '/oauthProviderHelpers.php';
+        qs_oauth_keys_protect($toRoot);
+    }
     return [
         'ok' => $copy['ok'],
         'files' => $copy['files'],

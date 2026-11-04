@@ -76,7 +76,7 @@ class Page {
         if ($themeEnabled && ($toggleEnabled || $themeDefault === 'system')) {
             $js = '(function(){try{';
             if ($toggleEnabled) {
-                $js .= 'var s=localStorage.getItem(' . qs_inline_script_json('qs-theme-' . $projectKey) . ');';
+                $js .= 'var s=localStorage.getItem(' . qs_inline_script_json(qs_theme_storage_key((string) $projectKey)) . ');';
                 $js .= 'if(s==="dark"||s==="light"){document.documentElement.setAttribute("data-theme",s);return;}';
             }
             if ($themeDefault === 'system') {
@@ -127,7 +127,7 @@ class Page {
     <?php
     // ── The runtime handoff ───────────────────────────────────────────────
     // Every <script> the server hands the browser runtime — route schema,
-    // storage namespace, qs.js, consent map, theme wiring, API config, enums,
+    // storage namespace, consent map, qs.js, theme wiring, API config, enums,
     // this route's state stores, and what the server-side resolver already
     // fetched — in the one order they have to be in.
     //

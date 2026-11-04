@@ -240,11 +240,16 @@ function validateStorageItem(string $id, array $input): array {
     $errors = [];
     $item = [];
 
-    // id — non-empty, no whitespace (storage keys / CSS selectors).
+    // id — non-empty, no whitespace (storage keys / CSS selectors), and never `__proto__`:
+    // the page's consent map is written as an object literal, where that name sets the
+    // object's prototype instead of making a key, so the key could be neither read under
+    // its category nor removed when the category is refused.
     if ($id === '') {
         $errors[] = ['field' => 'id', 'reason' => 'missing'];
     } elseif (preg_match('/\s/', $id)) {
         $errors[] = ['field' => 'id', 'reason' => 'invalid_format', 'hint' => 'A storage key cannot contain whitespace.'];
+    } elseif ($id === '__proto__') {
+        $errors[] = ['field' => 'id', 'reason' => 'reserved', 'hint' => 'A storage key cannot be __proto__: a page could not read it or remove it under its category.'];
     }
 
     // scope — required enum.

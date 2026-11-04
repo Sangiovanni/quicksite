@@ -15040,3 +15040,98 @@ PHP beside the builder (a new language would be a code change); empty entries, a
 `secure/src/functions/startingTexts.php`, `secure/src/translations/en.json` and `fr.json`,
 `secure/src/classes/ComplexElementBuilder.php`, `secure/src/classes/complexElements/OAuthButton.php` and
 `FormScaffold.php`, `secure/management/command/addComplexElement.php`.
+
+### A build that carries the OAuth secrets goes only through who may set the keys (locked 2026-11-04)
+
+**Amends**: *A build carries a project's OAuth secret only when asked; an export follows it, a backup keeps it, a clone
+never copies it* (locked 2026-10-10). Its decision stands. Its reasoning said the role check closed what the opt-in
+would leave open: "a developer who may build but never sees the build keys could have ticked the box and downloaded
+them". The check stopped such a role from asking for the secret, not from taking it: a build the owner or an admin
+made with the box stayed on disk, and `downloadBuild` handed it whole to every role that may build. The export's box
+asked no permission of its own either; it held only because the shipped roles that may export are the ones that may
+set the keys.
+
+**Decision**: `downloadBuild` hands a build that carries the OAuth secrets only to a role that may set the project's
+keys — the permission the box itself asks — and refuses every other role with 403 before any archive is made.
+`deleteBuild` refuses that role the same build, and until an owner or admin deletes it that role cannot build either:
+`build` refuses while one exists, and says who to ask. A build whose manifest does not say it carries none is treated
+as carrying them. The Builds page and the dashboard's Manage Space hide both buttons from such a role, and the Builds
+page says why. A build made without the box downloads and deletes for every role that may build, and one that did not
+finish deletes for every role that may build. `exportProject` asks the same permission before it carries the keys.
+
+**Reasoning**: The secret leaves only through someone who could have entered it, and a download is as much a way out
+as the box. A delete lets nothing out, but a role that can neither fetch the build nor make it again should not destroy
+the only copy of what someone else made. A build that did not finish is nobody's deliverable, and the project could not
+build again without clearing it. Answering from the build's manifest keeps one build on disk, the same for everyone who
+may fetch it. Asking the permission rather than relying on the roles that hold it today keeps every door on one rule
+when an operator edits `roles.php`.
+
+**Alternatives considered**: handing such a role a copy with the secret left out (a download that differs from the
+build on disk, and a site that does not sign in); refusing every download of a secrets build (the owner and admin who
+made it could not fetch it either); leaving the export's box to whichever roles may export (true only while the
+shipped roles say so); leaving the delete open to every role that may build (it keeps a developer able to build, at the
+price of the owner's build going at the hand of someone who cannot make it again).
+
+**Source**: security review 2026-11-04, ruled by Sangio the same day; the delete from Sangio's UX run the same day;
+beta.12. `secure/management/command/downloadBuild.php`, `deleteBuild.php`, `build.php`, `exportProject.php`,
+`secure/src/functions/utilsManagement.php`, `public/admin/assets/js/pages/builds.js`, `dashboard.js`,
+`secure/admin/templates/pages/builds.php`.
+
+### A project id holds no `_` (locked 2026-11-04)
+
+**Decision**: A project id is a letter, then letters, digits and `-`, at most 50 characters (`is_valid_project_name()`),
+and every place that takes an id from a request applies that one rule: the management and panel endpoints, every
+command, the `/p/` surface and first run. An id holding `_` is accepted nowhere. A browser-storage slot keeps its
+shape, `qsp_<projectId>_<key>`, and so do the cookies and the panel's prefix.
+
+**Reasoning**: A slot joins the id and the key with `_`, so project `x`'s key `y_k` and project `x_y`'s key `k` are one
+slot on one origin — two projects served under `/p/` on one host, or two built sites deployed under one origin. Reading
+one project's key reads the other's value, and since the consent rule deletes a refused category's declared keys at
+every page load, a page of `x` deletes `x_y`'s value for every visitor who refused the category, merely because `x`
+declares the key. The collision always needs an id holding `_`, and a drawn id never holds one; the rule makes it
+impossible rather than unlikely. The `/p/` surface, the panel's endpoint and first run each had a looser shape of their
+own (a digit first, up to 64 characters); they take the one rule, so an id is read one way everywhere.
+
+**Alternatives considered**: a new delimiter for every project (every site's stored values and cookies move once, and
+an author's script that reads `qsp_<id>_<key>` breaks, to fix what only an id holding `_` can meet); a second slot form
+for an id holding `_`, each value moved on its first read (a migration for ids that exist only as test data: there is
+no data to keep before 1.0).
+
+**Source**: security review 2026-11-04, ruled by Sangio the same day; beta.12.
+`secure/src/functions/PathManagement.php`, `surfaceB.php`, `firstRun.php`, `projectIdentity.php`,
+`public/admin/api/index.php`.
+
+### A generated consent layer stays on (locked 2026-11-04)
+
+**Decision**: Once `generateConsentLayer` has turned a project's consent layer on, nothing turns it off: no command
+writes `enabled: false`, and running it again refreshes the banner and the popup and leaves the layer on. A site that
+declares a functional, analytics or marketing key keeps asking its visitors.
+
+**Reasoning**: An off switch would let an author stop asking visitors while the site still stores what needs their
+consent — the one state the consent layer exists to prevent. A layer with nothing to ask is the lesser cost: a site
+whose registry declares only essential keys keeps a banner that offers the locked *Essential* row.
+
+**Alternatives considered**: a command that turns the layer off and on again, keeping everything but the switch (it
+allows exactly the state above); the same command refused while a non-essential key is declared (easy to get around:
+remove the keys, turn the layer off, declare them again); a parameter on `generateConsentLayer` (a "generate" that
+switches off).
+
+**Source**: Sangio, 2026-11-04, answering the off switch the consent work's review left open; beta.12.
+`secure/management/command/generateConsentLayer.php`.
+
+### Accepting an invitation opens the project (locked 2026-11-04)
+
+**Decision**: Accepting an invitation on **My Memberships** also makes that project the edited one: the selected-project
+write and a reload, with a message naming the project now being edited. Should the write fail, the membership stands and
+the page stays where it is, its new row offering *Edit this project*.
+
+**Reasoning**: Whoever accepts expects to be on the project they just said yes to. Every page acts on the edited project
+and looks the same on any of them, so staying on the previous one reads as working on the new one: in the run that found
+this, a second account accepted, stayed on a project of its own, and its build and its download went there. The selection
+stays a preference, never an authorization input, and switching back is one click in the header's picker.
+
+**Alternatives considered**: an *Open it* button beside the message (a step nearly everyone would take, and one more to
+miss); leaving it to the header's picker (the state that misled the run); the server switching on accept (an account's
+selection would then move for an API caller too: the switch is the panel's, as it is for *Edit this project*).
+
+**Source**: Sangio, UX run, 2026-11-04; beta.12. `public/admin/assets/js/pages/memberships.js`.

@@ -77,6 +77,7 @@ window.QS_MEMBERSHIPS_I18N = <?= json_encode([
     'accept'             => __admin('memberships.inbox.accept', 'Accept'),
     'decline'            => __admin('memberships.inbox.decline', 'Decline'),
     'acceptedMsg'        => __admin('memberships.inbox.acceptedMsg', 'Invitation accepted — welcome aboard'),
+    'acceptedOpenedMsg'  => __admin('memberships.inbox.acceptedOpenedMsg'),
     'declinedMsg'        => __admin('memberships.inbox.declinedMsg', 'Invitation declined'),
     'requestsEmpty'      => __admin('memberships.requests.empty', 'No pending join requests.'),
     'withdraw'           => __admin('memberships.requests.withdraw', 'Withdraw'),

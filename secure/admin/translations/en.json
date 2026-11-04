@@ -239,6 +239,7 @@
             "accept": "Accept",
             "decline": "Decline",
             "acceptedMsg": "Invitation accepted — welcome aboard",
+            "acceptedOpenedMsg": "Invitation accepted — welcome aboard. You are now editing {project}.",
             "declinedMsg": "Invitation declined"
         },
         "requests": {
@@ -1086,6 +1087,7 @@
         "fieldSpace": "URL space",
         "spaceRoot": "(served from the root)",
         "oauthWarn": "This build carries OAuth client secrets. Treat the archive as a credential, not just a website.",
+        "secretsRoleOnly": "This build carries the OAuth secrets: only a role that may set the project's keys can download or delete it. To build again, ask the project's owner or an admin.",
         "oauthMissingTitle": "The deployed site's sign-in is not ready",
         "oauthMissingBody": "This build carries no build keys for: {providers}. On the deployed site, sign-in with them fails until the server sets QS_OAUTH_<PROVIDER>_CLIENT_ID and _CLIENT_SECRET, or until you enter the build keys and build again.",
         "oauthNotOffered": "This project's sign-in routes name providers the installation does not offer: {providers}.",

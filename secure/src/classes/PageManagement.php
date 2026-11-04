@@ -29,7 +29,7 @@ class PageManagement {
         // handoff (the end of the body) both live here.
         require_once SECURE_FOLDER_PATH . '/src/functions/runtimeHandoff.php';
 
-        // ── Theme resolution (Step 3) ─────────────────────────────────────
+        // ── Theme resolution ──────────────────────────────────────────────
         // Compute server-side initial data-theme value. Client-side script
         // overrides it from localStorage before first paint when needed.
         $themeEnabled   = defined('THEME_MODE_ENABLED') && THEME_MODE_ENABLED;
@@ -51,7 +51,7 @@ class PageManagement {
         if ($themeEnabled && ($toggleEnabled || $themeDefault === 'system')) {
             $js = '(function(){try{';
             if ($toggleEnabled) {
-                $js .= 'var s=localStorage.getItem(' . qs_inline_script_json('qs-theme-' . $projectKey) . ');';
+                $js .= 'var s=localStorage.getItem(' . qs_inline_script_json(qs_theme_storage_key((string) $projectKey)) . ');';
                 $js .= 'if(s==="dark"||s==="light"){document.documentElement.setAttribute("data-theme",s);return;}';
             }
             if ($themeDefault === 'system') {

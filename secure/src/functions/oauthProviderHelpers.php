@@ -284,9 +284,10 @@ function qs_oauth_secret_placeholder(string $provider): string
  * The project's key file, provider => set => {client_id, client_secret}, keeping only well-formed
  * sets. [] when absent or unreadable.
  *
- * A set with no secret is a public client (client_secret null). A secret that no project stores and
- * no provider issues — the placeholder a copy writes when it leaves the secret out, or anything else
- * holding a space or a character outside printable ASCII — is read as not set: the set answers
+ * Only a set whose secret is absent or null is a public client (client_secret null). Any other
+ * secret that no project stores and no provider issues — the placeholder a copy writes when it
+ * leaves the secret out, a string holding a space or a character outside printable ASCII, an empty
+ * string, or a value that is not a string at all — is read as not set: the set answers
  * client_secret null with secret_left_out true, so it is never sent to a provider and never taken for
  * a public client. Every writer of a key file writes a set through qs_oauth_stored_set(), so the
  * flag never reaches a file.
@@ -313,9 +314,9 @@ function qs_oauth_keys_read(): array
         foreach (QS_OAUTH_KEY_SETS as $set) {
             $s = $sets[$set] ?? null;
             if (is_array($s) && isset($s['client_id']) && is_string($s['client_id']) && $s['client_id'] !== '') {
-                $secret = isset($s['client_secret']) && is_string($s['client_secret']) && $s['client_secret'] !== ''
-                    ? $s['client_secret'] : null;
-                $out[$provider][$set] = $secret === null || qs_oauth_key_value_ok($secret, QS_OAUTH_CLIENT_SECRET_MAX)
+                $secret = $s['client_secret'] ?? null;
+                $out[$provider][$set] = $secret === null
+                    || (is_string($secret) && qs_oauth_key_value_ok($secret, QS_OAUTH_CLIENT_SECRET_MAX))
                     ? ['client_id' => $s['client_id'], 'client_secret' => $secret]
                     : ['client_id' => $s['client_id'], 'client_secret' => null, 'secret_left_out' => true];
             }
@@ -398,6 +399,21 @@ function qs_oauth_keys_write(array $keys): bool
     }
     @chmod($path, 0600);
     return true;
+}
+
+/**
+ * Make the key file of a project-shaped folder ($root: a project, a backup) readable by the
+ * server's own user only, on systems that honour file modes, as qs_oauth_keys_write() leaves it.
+ * Every copy that writes a key file calls it once the file is written — a backup, the copy kept
+ * before a restore, a restore (qs_backup_copy_item()), and an import — since a copy is made at the
+ * default mode. A link is left alone: its mode is its target's.
+ */
+function qs_oauth_keys_protect(string $root): void
+{
+    $path = $root . '/data/oauth-secrets.json';
+    if (is_file($path) && !is_link($path)) {
+        @chmod($path, 0600);
+    }
 }
 
 /**

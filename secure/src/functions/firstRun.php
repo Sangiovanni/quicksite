@@ -198,9 +198,9 @@ function qs_first_run_unowned_projects(): array {
     $ids = [];
     foreach ($dirs as $dir) {
         $id = basename($dir);
-        // Same id shape the /p/ surface enforces — a directory it could never
-        // serve is not a project, whatever else it may be.
-        if (preg_match('/^[A-Za-z0-9_-]{1,64}$/D', $id) !== 1) {
+        // The one id rule, which the /p/ surface enforces too — a directory it
+        // could never serve is not a project, whatever else it may be.
+        if (!is_valid_project_name($id)) {
             continue;
         }
         if (is_file($dir . '/config/members.json')) {

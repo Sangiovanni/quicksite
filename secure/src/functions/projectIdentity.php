@@ -9,7 +9,9 @@
  * length, it is hard to guess — a project can be public for a client without its address being
  * found by trying names — and it holds no `_`, so two projects can never build the same storage
  * name. Every drawn id passes is_valid_project_name() (PathManagement.php), which stays the rule
- * for READING an id: a project made before ids were drawn keeps the one it has.
+ * for READING an id: a letter first, then letters, digits and `-`, never `_`. A project made before
+ * ids were drawn keeps the one it has while it passes that rule; one whose id holds `_` is not
+ * accepted anywhere.
  *
  * THE NAME is free text the owner chooses, shown wherever the project is listed ("Name #id"). It
  * lives in the project, in config/project.json — per-project data, so JSON — and is read when it

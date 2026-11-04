@@ -3106,6 +3106,11 @@ the `data-consent-show="granted|denied:<category>"` binding shows/hides elements
 consent state. The layer is dormant until generated, so existing projects are unaffected
 until they opt in: with it off, nothing is refused and nothing deleted.
 
+**Once generated, the layer stays on.** Nothing turns it off: **Generate** again
+refreshes the banner and the popup from the registry and leaves the layer on. A site
+that declares a functional, analytics or marketing key keeps asking its visitors — an
+off switch would let it stop asking while it still stores what needs their consent.
+
 **Cookie-policy page.** In the same modal, an optional route field generates a
 deterministic policy page (`generateCookiePolicy`) — a **Change my cookie
 preferences** button right under its intro (withdrawing consent must be as easy as
@@ -3120,6 +3125,15 @@ exists the modal locks the route and offers **Update** + **Delete page**
 (`getConsentStatus` / `deleteCookiePolicy` drive this), so there is exactly one
 policy page and no accidental duplicates. Overwriting an existing route asks for
 confirmation.
+
+**The theme switch's key in the policy.** When the project's theme mode and its
+visitor toggle are both on (`setThemeMode`), the table also lists the key the theme
+switch keeps a visitor's choice under, `qs-theme-<projectId>`: local storage,
+essential, needing no consent, kept until the visitor clears it, set only by a click
+on the switch. It is outside the registry and the consent rule — the click is the
+visitor's own request to keep that choice — but a visitor checking their storage finds
+it in the table. Like every row, it is the setting when the page is generated: after
+turning the switch on or off, **Update** the page.
 
 **Languages.** Structural banner / popup / policy copy is seeded in the site's
 **default language** only (built-in en/fr wording, or English text when the
@@ -3210,7 +3224,9 @@ the others by name, each row starting with its ☆ / ★ toggle (§8.0); role ch
 OWNED badge, *editing* chip on the current edit target, per-row *Edit this
 project* = the selected-project write + reload, *Leave* with confirm — hidden on
 owned rows), **Invitation inbox** (accept / decline, inviter + note + `sponsored_by`
-shown; a voided invitation surfaces the server's 409 message), **My join
+shown; accepting opens the project: the selected-project write + reload, the message
+naming it carried across, and should that write fail you are a member and the page
+stays; a voided invitation surfaces the server's 409 message), **My join
 requests** (withdraw), **My proposals** (`GET /admin/self/proposals` — pending validation
 vs. awaiting the person's answer; withdraw while pending), **Notices**
 (refused / removed / deleted with the recorded reason → dismiss, which also
@@ -3429,7 +3445,7 @@ Where a project becomes a site you can put on a server: build it, download the a
 | No build | An explanation of what a build is, a **Build now** button, and the folder-name / URL-space options behind a closed disclosure. |
 | A build | Its name, when it was made, its size, how many files and pages it carries, its languages, and the public / secure folder names and URL space it was built for. |
 | A build that did not finish | The same, marked **incomplete**, with a note saying it carries no manifest and can only be deleted. |
-| A build carrying OAuth client secrets | A warning that the archive is a credential, not just a website. |
+| A build carrying OAuth client secrets | A warning that the archive is a credential, not just a website. To a role that may not set the project's OAuth keys (a developer, say), no **Download** and no **Delete** — here or in the dashboard's Manage Space — but a line saying that only a role that may set the keys can download or delete this build, and to ask the project's owner or an admin to build again. |
 | A build whose sign-in is not ready | A warning naming the providers it carries without build keys (their sign-in fails on the deployed site until the server sets the keys or the project's build keys are entered and the project built again), the providers whose client secret it left out (their sign-in fails until the secret is written into its `<secure>/data/oauth-secrets.json` on the server, `QS_OAUTH_<PROVIDER>_CLIENT_SECRET` is set there, or the project is built again with the secrets included), any provider a sign-in route names that the installation no longer offers, and a route that takes its provider from the address when no provider has build keys — with a link to the OAuth providers page for a role that can open it. |
 
 #### Choosing the folder names and the URL space
@@ -3459,9 +3475,11 @@ Beside **Build now**, the project's owner and admin — the roles that may set i
 
 A provider without a secret (a public client) carries none either way. The explanation names the build's own secure folder, as the folder-name field holds it. Another role does not see the box, and the server refuses the parameter from it.
 
+**A build made with the box downloads and deletes only for the roles that may tick it.** The secret leaves the installation only through someone who could have entered it, and a download is as much a way out as the box: `downloadBuild` refuses such a build to every other role that may build. `deleteBuild` refuses it too, because that role could neither fetch the build nor make it again and this is the only copy; until an owner or admin deletes it, that role cannot build either. The page shows that role the line above instead of the two buttons. A build whose manifest does not say it carries no secret is treated the same way. A build made without the box downloads and deletes for every role that may build, and one that did not finish deletes for every role that may build.
+
 #### The second build is refused, and the page says what to do
 
-Building while a build exists does not overwrite it — the command answers 409 and nothing on disk changes. The page states that **before** you press anything: while a build is present it explains that a new one will be refused, and offers download and delete beside the explanation. If the refusal arrives anyway, the panel re-reads the build and shows the same two buttons rather than an error you cannot act on.
+Building while a build exists does not overwrite it — the command answers 409 and nothing on disk changes. The page states that **before** you press anything: while a build is present it explains that a new one will be refused, and offers download and delete beside the explanation. If the refusal arrives anyway, the panel re-reads the build and shows the same two buttons rather than an error you cannot act on. A role that may use neither button on a build carrying the secrets is told who to ask instead, on the page and in the refusal.
 
 The reason it works this way: the build on disk is the only copy. Overwriting one silently would destroy something nobody asked to lose.
 

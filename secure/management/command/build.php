@@ -55,15 +55,11 @@ $buildCustomName = $params['name'] ?? '';
 // Only a role that may set the project's keys may ask, so a secret leaves the installation only
 // through someone who could have entered it.
 $buildIncludesOAuthSecrets = filter_var($params['include_oauth_secrets'] ?? false, FILTER_VALIDATE_BOOLEAN);
-if ($buildIncludesOAuthSecrets) {
-    require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
-    $oauthCaller = getCurrentUser();
-    if (!is_array($oauthCaller) || !hasPermission($oauthCaller, 'setOAuthCredentials', (string) PROJECT_NAME)) {
-        ApiResponse::create(403, 'auth.forbidden')
-            ->withMessage('Only a role that may set the project\'s OAuth keys (its owner or admin) may include the OAuth secrets in a build')
-            ->withData(['command' => 'build', 'parameter' => 'include_oauth_secrets'])
-            ->send();
-    }
+if ($buildIncludesOAuthSecrets && !qs_caller_may_set_oauth_keys()) {
+    ApiResponse::create(403, 'auth.forbidden')
+        ->withMessage('Only a role that may set the project\'s OAuth keys (its owner or admin) may include the OAuth secrets in a build')
+        ->withData(['command' => 'build', 'parameter' => 'include_oauth_secrets'])
+        ->send();
 }
 
 // Validate optional custom build name
@@ -244,12 +240,20 @@ if (!is_dir(SECURE_FOLDER_PATH)) {
 // qs_build_root() — secure/projects/<id>/qs_build/, OUTSIDE the served public/.
 $buildPath = qs_build_root();
 $timestamp = date('Ymd_His');
-// Retention is N = 1: a project holds ONE build, and a second build is REFUSED
-// rather than overwriting it. Refused HERE — before the lock, before any
-// directory is created — so a build that was never going to be allowed to
-// replace the existing one never touches it.
-$existingBuild = qs_build_current();
-if ($existingBuild !== null) {
+/** The answer to a build asked for while the project has one. Ends the request. */
+function refuse_existing_build(string $existingBuild): void {
+    // A finished build that carries the OAuth secrets is not this caller's to clear when
+    // its role may not set the keys: the way forward below would only be refused.
+    if (qs_build_is_complete($existingBuild) && qs_build_holds_secrets($existingBuild) && !qs_caller_may_set_oauth_keys()) {
+        ApiResponse::create(409, 'conflict.already_exists')
+            ->withMessage('This project already has a build that carries its OAuth secrets. Only its owner or an admin can delete it: ask one of them before building again.')
+            ->withData([
+                'existing_build' => $existingBuild,
+                'complete'       => true,
+                'hint'           => 'Only a role that may set the project\'s OAuth keys may download or delete this build.',
+            ])
+            ->send();
+    }
     ApiResponse::create(409, 'conflict.already_exists')
         ->withMessage('This project already has a build. Delete it before building again.')
         ->withData([
@@ -259,6 +263,14 @@ if ($existingBuild !== null) {
             'next_steps'     => ['download' => 'downloadBuild', 'delete' => 'deleteBuild']
         ])
         ->send();
+}
+// Retention is N = 1: a project holds ONE build, and a second build is REFUSED
+// rather than overwriting it. Refused HERE — before the lock, before any
+// directory is created — so a build that was never going to be allowed to
+// replace the existing one never touches it.
+$existingBuild = qs_build_current();
+if ($existingBuild !== null) {
+    refuse_existing_build($existingBuild);
 }
 // The auto name is second-resolution: mkdir'd with no existence check, two
 // builds inside the same second would make the second one answer 500
@@ -276,18 +288,26 @@ if ($buildCustomName !== '') {
 }
 $buildFullPath = $buildPath . '/' . $buildFolderName;
 
-// Sanitize folder name for lock file (replace / with _ to make it filename-safe)
-$lockId = 'build_' . str_replace('/', '_', $buildFolderName);
-
 // === CRITICAL SECTION: Use file lock to prevent concurrent builds ===
-// Lock is scoped per build name — different builds can run in parallel
+// The lock is the project's, because a project holds one build: scoped to the build's
+// name, two requests under two names could both pass the refusal above before either
+// made its folder, and both land. Another project builds at the same time.
+$lockId = 'build_' . PROJECT_NAME;
 $lock = acquireLock($lockId);
 
 if (!$lock) {
     ApiResponse::create(409, 'conflict.operation_in_progress')
-        ->withMessage('Another build with this name is already in progress. Please wait and try again.')
+        ->withMessage('Another build of this project is already in progress. Please wait and try again.')
         ->withData(['buildName' => $buildFolderName])
         ->send();
+}
+
+// Asked again under the lock: a request that passed the refusal above just before
+// another one finished would otherwise land a second build beside it.
+$existingBuild = qs_build_current();
+if ($existingBuild !== null) {
+    release_build_lock();
+    refuse_existing_build($existingBuild);
 }
 
 // Release the lock. SUCCESS PATH ONLY — a failed build must call
@@ -321,6 +341,8 @@ function release_build_lock() {
 function abort_build(ApiResponse $response) {
     global $buildFullPath;
 
+    // This removal is the one that answers: the shutdown hook armed below stands down.
+    $GLOBALS['__qs_build_partial'] = null;
     release_build_lock();
 
     $removed = null;
@@ -355,12 +377,11 @@ if (!file_exists($buildPath)) {
     }
 }
 
-// The per-name "already exists" 409 that used to sit here is GONE, and its
-// removal is deliberate rather than an oversight. At N = 1 the retention
+// There is no per-name "already exists" check here. At N = 1 the retention
 // refusal above has already established that qs_build/ holds no build at all,
-// so this branch was unreachable — and it was the single call site where the
-// cleanup below would have deleted a GOOD build rather than a partial. One
-// refusal, raised before anything is created, replaces it.
+// and a refusal here would be the one call site where the cleanup below could
+// delete a GOOD build rather than a partial. The one refusal, asked twice, is
+// raised before anything is created.
 
 // Create build folder
 if (!mkdir($buildFullPath, 0755, true)) {
@@ -369,6 +390,26 @@ if (!mkdir($buildFullPath, 0755, true)) {
             ->withMessage("Failed to create timestamped build folder")
     );
 }
+
+// From here until the build passes its last check, a request that ends any other
+// way than through abort_build() — a fatal error, the time or the memory limit —
+// still releases the lock and removes what it built, as abort_build() does. A
+// partial would otherwise stay in qs_build/: holding the OAuth secret when the
+// build was asked to carry it, and, once its manifest is written, reading as a
+// complete build that downloadBuild hands out. Disarmed just before the success
+// answer.
+$GLOBALS['__qs_build_partial'] = $buildFullPath;
+register_shutdown_function(static function (): void {
+    $partial = $GLOBALS['__qs_build_partial'] ?? null;
+    if (!is_string($partial) || $partial === '') {
+        return;
+    }
+    release_build_lock();
+    if (is_dir($partial)) {
+        deleteDirectory($partial);
+    }
+    qs_invalidate_space_cache((string) PROJECT_NAME);
+});
 
 // Create build directory structure using configured names
 // If space parameter is provided, public files go inside space subdirectory (like movePublicRoot)
@@ -1393,14 +1434,14 @@ if (!empty($servabilityProblems)) {
     );
 }
 
-// NO ZIP IS WRITTEN HERE, and that is the point.
-//
-// The build used to emit BOTH an expanded folder and a zip of that same folder,
-// paying disk for the deliverable twice and leaving the archive to go stale
-// against the folder beside it. The folder is the build; downloadBuild zips it
-// on demand and streams the bytes without storing them, so there is exactly one
-// copy on disk and the download can never be out of date. deployBuild copies
-// the expanded folder, so it never wanted the archive either.
+// NO ZIP IS WRITTEN HERE, and that is the point. The folder is the build:
+// downloadBuild zips it on demand and streams the bytes without storing them, so
+// there is exactly one copy on disk and the download can never be out of date
+// against it, and deployBuild copies the expanded folder. A zip beside the folder
+// would pay disk for the deliverable twice and could go stale.
+
+// The build passed its last check: it stays, and the shutdown hook stands down.
+$GLOBALS['__qs_build_partial'] = null;
 
 // Release lock before sending response
 release_build_lock();

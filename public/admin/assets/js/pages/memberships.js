@@ -366,14 +366,39 @@
     function onAccept(inv) {
         account('accept-invitation', 'POST', { project: inv.project }).then(function (res) {
             if (res && res.ok) {
-                toast(T.acceptedMsg || 'Invitation accepted', 'success');
-            } else {
-                // 409 invitation.void and friends: surface the server's own words.
-                toast(serverMessage(res), res && res.status === 409 ? 'warning' : 'error');
+                openAcceptedProject(inv);
+                return;
             }
+            // 409 invitation.void and friends: surface the server's own words.
+            toast(serverMessage(res), res && res.status === 409 ? 'warning' : 'error');
             refreshAll();
             notifyMembershipChange();
         });
+    }
+
+    /**
+     * An accepted invitation opens its project: whoever just said yes to a project expects
+     * to be on it, and every page acts on the edited project, so staying on the previous one
+     * reads as working on the new one. The same selected-project write and cache-busted
+     * navigation as Edit this project, with the message carried across the reload. Should
+     * the write fail the membership still stands: the page stays where it is, and the new
+     * row offers Edit this project.
+     */
+    function openAcceptedProject(inv) {
+        function stayHere() {
+            toast(T.acceptedMsg || 'Invitation accepted', 'success');
+            refreshAll();
+            notifyMembershipChange();
+        }
+        selectProject(inv.project).then(function (res) {
+            if (!res || !res.ok) {
+                stayHere();
+                return;
+            }
+            var words = T.acceptedOpenedMsg || T.acceptedMsg || 'Invitation accepted';
+            window.QuickSiteAdmin.setPendingMessage(words.replace('{project}', projectLabel(inv.project, inv.project_name)), 'success');
+            window.location.href = window.location.pathname + '?t=' + Date.now();
+        }, stayHere);
     }
 
     function onDecline(inv) {

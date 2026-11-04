@@ -90,7 +90,7 @@ secure/projects/<projectId>/
 
 Interaction behaviour is not a folder: it is declared inline in the page JSON (§9).
 
-**A project has an id and a name.** The **id** is drawn by the engine when the project is made (`createProject`, `cloneProject`, `importProject`, and first run's copy of the starter): nine characters, a lowercase letter first, then lowercase letters and digits, leaving out the ones easily misread when typed (`0`, `o`, `1`, `l`, `i`), drawn again while it is taken. It is the project's folder, its `/p/<projectId>/` address, every project-scoped command's marker, its log bucket and its browser-storage prefix, and it never changes. Random and of fixed length, it cannot be found by trying names, and it holds no `_`, so two projects never build the same storage key (§9). A project made before ids were drawn keeps the one it has: every id is read against one shape rule, a letter first, then letters, digits, `-` and `_`. The **name** is free text — 1 to 60 characters, no control character — that the owner gives and can change (`renameProject`). It lives in `config/project.json` and is read wherever the project is shown, as "Name #id"; nothing else keeps a copy, and two projects may share a name. It is the panel's label only: what a visitor reads as the site's name is the site's own `site.name` text, which a rename never touches.
+**A project has an id and a name.** The **id** is drawn by the engine when the project is made (`createProject`, `cloneProject`, `importProject`, and first run's copy of the starter): nine characters, a lowercase letter first, then lowercase letters and digits, leaving out the ones easily misread when typed (`0`, `o`, `1`, `l`, `i`), drawn again while it is taken. It is the project's folder, its `/p/<projectId>/` address, every project-scoped command's marker, its log bucket and its browser-storage prefix, and it never changes. Random and of fixed length, it cannot be found by trying names, and it holds no `_`, so two projects never build the same storage key (§9). A project made before ids were drawn keeps the one it has while it passes the one shape rule every id is read against: a letter first, then letters, digits and `-`, at most 50 characters — never `_`. The **name** is free text — 1 to 60 characters, no control character — that the owner gives and can change (`renameProject`). It lives in `config/project.json` and is read wherever the project is shown, as "Name #id"; nothing else keeps a copy, and two projects may share a name. It is the panel's label only: what a visitor reads as the site's name is the site's own `site.name` text, which a rename never touches.
 
 ### JSON structure format
 
@@ -1238,8 +1238,8 @@ PHP and the browser runtime:
 |---|---|
 | `qs-route-schema.js` | `window.QS_ROUTES` — the project's route table: every pattern and its params |
 | `window.QS_PROJECT`, `window.QS_ROUTE` | the project id every browser-storage key is prefixed with; the route the server resolved for this request (pattern, captured values, found) and the base the page is served under, which `qs.js` exposes as `QS.routePath` / `QS.routeParams` / `QS.routeFound` / `QS.basePath` (§6.3) |
-| `qs.js` | the runtime itself |
 | `window.QS_CONSENT` | the key→category map and one fingerprint per category a visitor chooses: what `qs.js` writes, reads and keeps only while its category is consented |
+| `qs.js` | the runtime itself |
 | theme wiring | `[data-theme-toggle]` behaviour, keyed per project |
 | `qs-api-config.js` | `window.QS_API_ENDPOINTS` |
 | `qs-enums.js` | `window.QS_ENUMS` |
@@ -1281,6 +1281,8 @@ look broken: the gate simply fails open, silently. A build therefore precomputes
 the payload (the live derivation walks the storage registry through authoring
 helpers that do not belong in a deployed site) and ships it as data, its
 fingerprints with it: a build asks a visitor again only once it is rebuilt.
+The payload is therefore written before `qs.js`: a script between the two would
+find no map and read a refused value.
 
 ## 10. Style management
 
@@ -1428,7 +1430,7 @@ client id as it is, each secret only when the build was asked to include it
 client secret is read from the server first (`QS_OAUTH_<PROVIDER>_CLIENT_ID` /
 `_CLIENT_SECRET`; `_CLIENT_SECRET` alone fills a secret the build left out) and
 from the shipped `data/oauth-secrets.json` second, so a deployer can keep the
-credential out of a build folder that `downloadBuild` hands over whole. The installation itself never reads those variables: a server that
+credential out of a build folder that `downloadBuild` hands over whole — and a build that carries it, only to a role that may set the project's keys. The installation itself never reads those variables: a server that
 hosts many projects would sign every one of them in with one registration.
 
 Every redirect the sign-in routes make from a `?return=` value lands on the site:
@@ -1455,7 +1457,9 @@ Before the lock:
 3. Confirm the source public and secure folders exist.
 4. Refuse when the project already has a build; otherwise settle the build
    folder name.
-5. Acquire the build lock, scoped to that name.
+5. Acquire the build lock, scoped to the project, and refuse again when the
+   project already has a build: a request that passed step 4 while another was
+   finishing lands no second build.
 
 Then:
 
@@ -1530,6 +1534,7 @@ stale against the build it claims to be.
 **One build per project.** A project holds at most one build. `build` refuses
 while one exists rather than overwriting it (`409 conflict.already_exists`),
 so replacing a build is a deliberate `deleteBuild` first. A build that FAILS
+— a fatal error such as the time limit included, until it passes its last check —
 removes its own partial directory; if that removal also fails, the leftover
 carries no `build_manifest.json` — written last, precisely so its absence marks
 an unfinished build — and `getBuild` reports it as incomplete.

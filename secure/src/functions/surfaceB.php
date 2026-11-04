@@ -42,6 +42,7 @@
 
 require_once __DIR__ . '/projectPublicArtifacts.php'; // QS_RESERVED_BASE + regen helpers
 require_once __DIR__ . '/projectContext.php';         // qs_request_origin — pre-init-safe
+require_once __DIR__ . '/PathManagement.php';         // is_valid_project_name — pre-init-safe (functions only)
 
 /**
  * How big a file may be before its ETag stops being a content hash.
@@ -63,11 +64,6 @@ const QS_SB_ETAG_CONTENT_MAX = 1048576; // 1 MiB
 /** Read size for a range body — big enough not to syscall per packet, small
  *  enough that a 200 MB file never sits in memory. */
 const QS_SB_STREAM_CHUNK = 262144; // 256 KiB
-
-/** Project id shape (replicated so this can run pre-init without PathManagement). */
-function qs_sb_valid_id(string $id): bool {
-    return $id !== '' && preg_match('/^[A-Za-z0-9_-]{1,64}$/D', $id) === 1;
-}
 
 /**
  * The surface-B visibility + membership gate. PRE-INIT-safe: only needs
@@ -127,11 +123,12 @@ function qs_surface_b_gate(string $id, string $secure): ?int {
     require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
 
     // The shape rule is this function's own precondition now that it is handed
-    // raw URL segments. A malformed id takes the empty shape — the same shape an
-    // id naming no project takes, and the same shape a private project with no
-    // members takes — so all three walk the identity check below together.
-    // (loadProjectMembers is independently F1-guarded; this is not its defence.)
-    $members    = qs_sb_valid_id($id) ? loadProjectMembers($id) : ['members' => []];
+    // raw URL segments: the one id rule, is_valid_project_name(). A malformed id —
+    // one holding `_` included — takes the empty shape: the same shape an id
+    // naming no project takes, and the same shape a private project with no
+    // members takes, so all three walk the identity check below together.
+    // (loadProjectMembers refuses a separator or `..` itself; this is not its defence.)
+    $members    = is_valid_project_name($id) ? loadProjectMembers($id) : ['members' => []];
     $visibility = $members['visibility'] ?? 'private';   // secure default: private
     // Stashed for qs_sb_send_file(), which has to choose `Cache-Control: public`
     // or `private` and must not re-derive the answer — two readings of the same
@@ -149,7 +146,10 @@ function qs_surface_b_gate(string $id, string $secure): ?int {
         return 404; // no identity — indistinguishable from "no such project"
     }
     $userId = $auth['user']['id'] ?? '';
-    if ($userId === '' || getUserRoleForProject($userId, $id) === null) {
+    // The role is read from the roster itself, which knows nothing of the id rule: a
+    // malformed id is refused here too, after the same identity check, so a folder on
+    // disk under an id the rule refuses is served to nobody, its own members included.
+    if ($userId === '' || !is_valid_project_name($id) || getUserRoleForProject($userId, $id) === null) {
         return 404; // identity, but not a member — same answer, no oracle
     }
     return null;

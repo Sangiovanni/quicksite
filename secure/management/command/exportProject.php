@@ -39,6 +39,8 @@ require_once SECURE_FOLDER_PATH . '/src/functions/projectLanguage.php'; // qs_pr
 require_once SECURE_FOLDER_PATH . '/src/functions/quota.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/spaceUsage.php'; // qs_invalidate_space_cache
 require_once SECURE_FOLDER_PATH . '/src/functions/projectIdentity.php'; // qs_project_name_in
+require_once SECURE_FOLDER_PATH . '/src/functions/ZipUtilities.php';    // qs_temp_archive_arm / _send
+require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php';      // qs_delete_tree_leads_elsewhere
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -71,8 +73,19 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
 
     // Options
     $includePublic = filter_var($params['include_public'] ?? true, FILTER_VALIDATE_BOOLEAN);
-    // The project's OAuth keys are credentials: an archive carries them only when asked.
+    // The project's OAuth keys are credentials: an archive carries them only when asked, and only
+    // a role that may set them may ask — the rule the build's own box follows (build.php), whatever
+    // roles may export.
     $includeOAuthSecrets = filter_var($params['include_oauth_secrets'] ?? false, FILTER_VALIDATE_BOOLEAN);
+    if ($includeOAuthSecrets) {
+        require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+        $oauthCaller = getCurrentUser();
+        if (!is_array($oauthCaller) || !hasPermission($oauthCaller, 'setOAuthCredentials', $projectName)) {
+            return ApiResponse::create(403, 'auth.forbidden')
+                ->withMessage('Only a role that may set the project\'s OAuth keys (its owner or admin) may include the OAuth keys in an export')
+                ->withData(['command' => 'exportProject', 'parameter' => 'include_oauth_secrets']);
+        }
+    }
     // Default: stream directly. Use save=true to store in exports folder
     $save = filter_var($params['save'] ?? false, FILTER_VALIDATE_BOOLEAN);
     
@@ -99,7 +112,10 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
 
     // The archive is built in the system's temporary folder, in a file no other request
     // shares (tempnam() creates it, readable by its owner only): it holds the project's data,
-    // and its OAuth build keys when asked. Its name in a download is the export's name.
+    // and its OAuth build keys when asked. Its name in a download is the export's name. It is
+    // armed at once, so it is removed however the request ends — a stream the client cuts
+    // and a fatal error while it is built included (qs_temp_archive_arm()); a saved archive
+    // is moved out of the way first.
     $exportStamp = date('Ymd_His');
     $zipFileName = $projectName . '_export_' . $exportStamp . '.zip';
     $zipPath = @tempnam(sys_get_temp_dir(), 'qs-export-');
@@ -107,6 +123,7 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
         return ApiResponse::create(500, 'server.zip_create_failed')
             ->withMessage('Failed to create ZIP archive');
     }
+    qs_temp_archive_arm($zipPath);
     @chmod($zipPath, 0600);
 
     // Create ZIP archive
@@ -130,54 +147,59 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
         // 2. Export routes.php as routes.json
         exportRoutesAsJson($zip, $projectPath, $projectName, $stats);
         
+        // A link is never followed, as no copier of the engine follows one: a folder this
+        // export reads is left out when it, or a folder on the way to it, is a link
+        // (exportPathLeadsElsewhere()), and every walker below leaves out a link inside it.
+        // An archive carries the project's own files, nothing a link reaches elsewhere.
+
         // 3. Export config/*.json (project settings) — but NEVER members.json
         // (privacy): it holds the membership graph + owner id + private
         // invitation notes. Import discards any archived members.json and
         // birth-writes the importer as sole owner, so shipping it would be a pure
         // leak. (The members.json.lock sidecar is not .json — already skipped.)
         $configDir = $projectPath . '/config';
-        if (is_dir($configDir)) {
+        if (is_dir($configDir) && !exportPathLeadsElsewhere($projectPath, 'config')) {
             addJsonFilesOnly($zip, $configDir, $projectName . '/config', $stats, ['members.json']);
         }
-        
+
         // 4. Export templates/model/json/ (JSON structures only - no PHP!)
         $jsonModelPath = $projectPath . '/templates/model/json';
-        if (is_dir($jsonModelPath)) {
-            addDirectoryToZip($zip, $jsonModelPath, $projectName . '/templates/model/json', $stats);
+        if (is_dir($jsonModelPath) && !exportPathLeadsElsewhere($projectPath, 'templates/model/json')) {
+            addAllFilesToZip($zip, $jsonModelPath, $projectName . '/templates/model/json', $stats);
         }
-        
+
         // 5. Export snippets/ — the project's own snippets, the tier the editor's
         // Save as Snippet writes to by default. Without them an export → import
         // round trip loses them. (A personal snippet belongs to its author, not
         // to the project, and never travels.)
         $snippetsPath = $projectPath . '/snippets';
-        if (is_dir($snippetsPath)) {
+        if (is_dir($snippetsPath) && !exportPathLeadsElsewhere($projectPath, 'snippets')) {
             addJsonFilesOnly($zip, $snippetsPath, $projectName . '/snippets', $stats);
         }
-        
+
         // 6. Export translate/*.json
         $translatePath = $projectPath . '/translate';
-        if (is_dir($translatePath)) {
+        if (is_dir($translatePath) && !exportPathLeadsElsewhere($projectPath, 'translate')) {
             addJsonFilesOnly($zip, $translatePath, $projectName . '/translate', $stats);
         }
-        
+
         // 7. Export data/*.json — but never the OAuth key file as it is. Its keys travel only when
         // the caller asks (include_oauth_secrets), and then only the build set: the deployed site's
         // keys keep working wherever the project is imported, while the preview keys name this
         // installation's address of the project (/p/<projectId>/, and an import draws a new id), so
-        // they never leave it.
+        // they never leave it. A data/ that is a link carries nothing, its keys included.
         $dataPath = $projectPath . '/data';
-        if (is_dir($dataPath)) {
+        if (is_dir($dataPath) && !exportPathLeadsElsewhere($projectPath, 'data')) {
             addJsonFilesOnly($zip, $dataPath, $projectName . '/data', $stats, ['oauth-secrets.json']);
             if ($includeOAuthSecrets) {
                 addOAuthBuildKeysToZip($zip, $projectName, $stats);
             }
         }
-        
+
         // 8. Export public/ (assets only, no PHP)
         if ($includePublic) {
             $publicPath = $projectPath . '/public';
-            if (is_dir($publicPath)) {
+            if (is_dir($publicPath) && !exportPathLeadsElsewhere($projectPath, 'public')) {
                 addPublicAssetsToZip($zip, $publicPath, $projectName . '/public', $stats);
             }
         }
@@ -262,13 +284,15 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
 
         // Move ZIP to exports folder
         if (!rename($zipPath, $finalPath)) {
-            // Try copy+delete if rename fails
+            // Try copy+delete if rename fails. A copy writes into the claim, so the
+            // archive is made readable by its owner only again afterwards.
             if (!copy($zipPath, $finalPath)) {
                 unlink($zipPath);
                 @unlink($finalPath);
                 return ApiResponse::create(500, 'server.move_failed')
                     ->withMessage('Failed to save export file');
             }
+            @chmod($finalPath, 0600);
             unlink($zipPath);
         }
         
@@ -295,9 +319,12 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
             ]);
     }
     
-    // Default: Stream ZIP directly to browser (no file saved)
-    streamZipDownload($zipPath, $zipFileName);
-    // streamZipDownload exits, so we never reach here
+    // Default: stream the archive to the browser and remove it (no file saved). The send ends
+    // the request; the armed removal covers a stream the client cuts.
+    if (!qs_temp_archive_send($zipPath, $zipFileName)) {
+        return ApiResponse::create(500, 'server.file_read_failed')
+            ->withMessage('Failed to read the export archive');
+    }
 }
 
 /**
@@ -354,11 +381,29 @@ function exportRoutesAsJson(ZipArchive $zip, string $projectPath, string $projec
 }
 
 /**
+ * Whether the folder $rel ('/'-separated, under $root) is a link, or is reached through one:
+ * the export leaves such a folder out, as it leaves out a link inside the folders it reads.
+ */
+function exportPathLeadsElsewhere(string $root, string $rel): bool {
+    $dir = $root;
+    foreach (explode('/', $rel) as $segment) {
+        $path = $dir . '/' . $segment;
+        if (qs_delete_tree_leads_elsewhere($dir, $segment, $path)) {
+            return true;
+        }
+        $dir = $path;
+    }
+    return false;
+}
+
+/**
  * Add only JSON files from a directory (no PHP). $excludeNames = basenames to
- * skip at THIS level (members.json is excluded from the config export).
+ * skip at THIS level (members.json is excluded from the config export). A link
+ * — to a file or a folder, a Windows junction included — is left out.
  */
 function addJsonFilesOnly(ZipArchive $zip, string $dir, string $zipBase, array &$stats, array $excludeNames = []): void {
     $items = scandir($dir);
+    $realDir = realpath($dir);
 
     foreach ($items as $item) {
         if ($item === '.' || $item === '..') {
@@ -371,6 +416,9 @@ function addJsonFilesOnly(ZipArchive $zip, string $dir, string $zipBase, array &
         $path = $dir . '/' . $item;
         $zipPath = $zipBase . '/' . $item;
 
+        if (qs_delete_tree_leads_elsewhere($dir, $item, $path, $realDir)) {
+            continue;
+        }
         if (is_dir($path)) {
             $zip->addEmptyDir($zipPath);
             $stats['directories']++;
@@ -415,39 +463,39 @@ function addOAuthBuildKeysToZip(ZipArchive $zip, string $projectName, array &$st
  * Add public assets to ZIP (images, CSS, JS - no PHP)
  */
 function addPublicAssetsToZip(ZipArchive $zip, string $dir, string $zipBase, array &$stats): void {
-    // Allowed folders in public/.
-    //
-    // 'build' is GONE from this list, and its removal is the point rather than an
-    // omission: builds no longer live under public/ at all, and while they did,
-    // every export carried every build. Exports are dramatically smaller now and
-    // carry only what an export is for — the project's own content.
+    // Allowed folders in public/. No 'build': builds live outside public/, and an
+    // export carries only what an export is for — the project's own content.
     $allowedFolders = ['assets', 'style'];
-    
+
     foreach ($allowedFolders as $folder) {
         $folderPath = $dir . '/' . $folder;
-        if (is_dir($folderPath)) {
+        if (is_dir($folderPath) && !qs_delete_tree_leads_elsewhere($dir, $folder, $folderPath)) {
             addSafeFilesToZip($zip, $folderPath, $zipBase . '/' . $folder, $stats);
         }
     }
 }
 
 /**
- * Add files to ZIP excluding dangerous extensions
+ * Add files to ZIP excluding dangerous extensions. A link is left out.
  */
 function addSafeFilesToZip(ZipArchive $zip, string $dir, string $zipBase, array &$stats): void {
     // Dangerous extensions that could execute code
     $dangerousExtensions = ['php', 'phtml', 'php3', 'php4', 'php5', 'php7', 'phps', 'phar', 'htaccess'];
-    
+
     $items = scandir($dir);
-    
+    $realDir = realpath($dir);
+
     foreach ($items as $item) {
         if ($item === '.' || $item === '..') {
             continue;
         }
-        
+
         $path = $dir . '/' . $item;
         $zipPath = $zipBase . '/' . $item;
-        
+
+        if (qs_delete_tree_leads_elsewhere($dir, $item, $path, $realDir)) {
+            continue;
+        }
         if (is_dir($path)) {
             $zip->addEmptyDir($zipPath);
             $stats['directories']++;
@@ -473,28 +521,33 @@ function addSafeFilesToZip(ZipArchive $zip, string $dir, string $zipBase, array 
 }
 
 /**
- * Recursively add directory contents to ZIP (used for templates/model/json)
- * 
+ * Recursively add directory contents to ZIP (used for templates/model/json). A link is
+ * left out.
+ *
  * @param ZipArchive $zip ZIP archive instance
  * @param string $dir Directory to add
  * @param string $zipBase Base path in ZIP
  * @param array &$stats Stats counter
  */
-function addDirectoryToZip(ZipArchive $zip, string $dir, string $zipBase, array &$stats): void {
+function addAllFilesToZip(ZipArchive $zip, string $dir, string $zipBase, array &$stats): void {
     $items = scandir($dir);
-    
+    $realDir = realpath($dir);
+
     foreach ($items as $item) {
         if ($item === '.' || $item === '..') {
             continue;
         }
-        
+
         $path = $dir . '/' . $item;
         $zipPath = $zipBase . '/' . $item;
-        
+
+        if (qs_delete_tree_leads_elsewhere($dir, $item, $path, $realDir)) {
+            continue;
+        }
         if (is_dir($path)) {
             $zip->addEmptyDir($zipPath);
             $stats['directories']++;
-            addDirectoryToZip($zip, $path, $zipPath, $stats);
+            addAllFilesToZip($zip, $path, $zipPath, $stats);
         } else {
             $zip->addFile($path, $zipPath);
             $stats['files']++;
@@ -579,21 +632,6 @@ function countRoutesRecursive(array $routes): int {
 }
 
 /**
- * Stream ZIP file as download
- */
-function streamZipDownload(string $zipPath, string $filename): void {
-    header('Content-Type: application/zip');
-    header('Content-Disposition: attachment; filename="' . $filename . '"');
-    header('Content-Length: ' . filesize($zipPath));
-    header('Cache-Control: no-cache');
-    header('Pragma: no-cache');
-    
-    readfile($zipPath);
-    unlink($zipPath);
-    exit;
-}
-
-/**
  * Clean up old exports
  */
 function cleanupOldExports(string $exportDir, string $projectName): void {
@@ -640,8 +678,9 @@ function exportNameOrder(string $path): array {
 /**
  * Claim a saved archive's name: `<id>_export_<date>_<time>.zip`, else the first of
  * `_2`, `_3`… not taken. Each is created empty with an exclusive create, so two
- * requests never claim one name; the archive is then moved over the claim. null when
- * no name could be created.
+ * requests never claim one name; the archive is then moved over the claim. The claim is
+ * readable by its owner only from the start, as the archive is: a move that copies into
+ * it keeps that mode. null when no name could be created.
  */
 function exportClaimName(string $exportDir, string $projectName, string $stamp): ?string {
     for ($n = 1; $n <= 100; $n++) {
@@ -649,6 +688,7 @@ function exportClaimName(string $exportDir, string $projectName, string $stamp):
         $handle = @fopen($exportDir . '/' . $name, 'x');
         if ($handle !== false) {
             fclose($handle);
+            @chmod($exportDir . '/' . $name, 0600);
             return $name;
         }
         if (!file_exists($exportDir . '/' . $name)) {

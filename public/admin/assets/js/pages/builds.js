@@ -383,32 +383,58 @@
 
         nodes.push(_renderFacts(b));
 
+        // A build that may carry the OAuth secrets is out of reach of a role that may
+        // build but not set the project's keys: say so where the buttons would be, and
+        // who to ask, since that role cannot make room for a build of its own either.
+        var outOfReach = _outOfReach(b) && (canRun('downloadBuild') || canRun('deleteBuild'));
+
         // A build already exists, so `build` will refuse. Say so HERE rather than
         // letting the user find out from a 409 — and say what to do about it.
-        if (canRun('build')) {
+        if (canRun('build') && !outOfReach) {
             nodes.push(_renderAlert('info', T.oneAtATime || '', T.oneAtATimeBody || ''));
         }
 
+        if (outOfReach) {
+            nodes.push(_renderAlert('info', null, T.secretsRoleOnly || ''));
+        }
+
         var actions = [];
-        // An incomplete build has no archive worth handing over: downloadBuild
-        // refuses it, so the button would only ever produce an error.
-        if (b.complete !== false && canRun('downloadBuild')) {
+        if (_mayDownload(b)) {
             actions.push(_renderButton(T.downloadBtn || 'Download', ICON_DOWNLOAD, 'outline', function () {
                 onDownload(this);
             }));
         }
-        if (canRun('deleteBuild')) {
+        if (_mayDelete(b)) {
             actions.push(_renderButton(T.deleteBtn || 'Delete', ICON_TRASH, 'danger', function () {
                 onDeleteConfirm(b);
             }));
         }
         if (actions.length) {
             nodes.push(el('div', { class: 'builds-actions' }, actions));
-        } else {
+        } else if (!outOfReach) {
             nodes.push(_renderAlert('info', null, T.noControls || ''));
         }
 
         return nodes;
+    }
+
+    /**
+     * A finished build only a role that may set the project's keys can touch, and this
+     * caller's role may not: the rule downloadBuild and deleteBuild answer by. A manifest
+     * that does not say the build carries no OAuth secrets is read as carrying them.
+     */
+    function _outOfReach(b) {
+        return b.complete !== false && b.oauth_secrets_included !== false && !canRun('setOAuthCredentials');
+    }
+
+    /** Whether this caller may download the build: an incomplete one is refused to everyone. */
+    function _mayDownload(b) {
+        return b.complete !== false && canRun('downloadBuild') && !_outOfReach(b);
+    }
+
+    /** Whether this caller may delete the build: an incomplete one goes for every role that may build. */
+    function _mayDelete(b) {
+        return canRun('deleteBuild') && !_outOfReach(b);
     }
 
     function _renderFacts(b) {
@@ -519,7 +545,7 @@
 
         _renderModal(T.deleteTitle || 'Delete this build?', body, function (close) {
             var footer = [];
-            if (b.complete !== false && canRun('downloadBuild')) {
+            if (_mayDownload(b)) {
                 footer.push(_renderButton(T.deleteDownloadFirst || 'Download it first', ICON_DOWNLOAD, 'outline', async function () {
                     var ok = await onDownload(this);
                     if (ok) toast(T.deleteDownloaded || 'Downloaded', 'success');

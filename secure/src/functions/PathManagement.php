@@ -66,23 +66,26 @@ function is_valid_relative_path(string $path, int $max_length = 255, int $max_de
 
 
 /**
- * Validate a PROJECT name — a single directory segment under secure/projects/.
+ * Validate a PROJECT ID — the project's folder under secure/projects/, its `/p/<id>/`
+ * segment and its command marker. (The free-text name a project is shown by has its
+ * own rule, qs_project_name_problem().)
  *
- * Mirrors the createProject format that is already treated as correct:
- * must start with a letter, then alphanumerics / dash / underscore,
- * max 50 chars. This rejects '', '.', '..', '/', '\', ':' (NTFS ADS), and any
- * other separator or device-name character, so the value can never traverse out
- * of the projects/ jail when concatenated into a path.
+ * A letter first, then letters, digits and hyphens, at most 50 characters. Every id
+ * the engine draws passes (projectIdentity.php). No `_`: a project's browser-storage
+ * names are `qsp_<id>_<key>`, so an id holding `_` could build another project's
+ * name — project `x`'s key `y_k` and project `x_y`'s key `k` would be one slot. This
+ * also rejects '', '.', '..', '/', '\', ':' (NTFS ADS), and any other separator or
+ * device-name character, so the value can never traverse out of the projects/ jail
+ * when concatenated into a path.
  *
- * Use this for every request-supplied project name/source before it is used to
- * build a filesystem path (deleteProject, cloneProject source, backupProject,
- * restoreBackup, exportProject, clearExports filter, and the snippet family's
- * `project` param). Every project name now reaches a command through the URL marker,
- * so this is the single shape gate for all of them.
+ * Use this for every request-supplied project id before it is used to build a
+ * filesystem path — the management and admin-API markers, the `/p/` surface, the
+ * panel's own endpoints and every command that takes one. It is the single shape
+ * gate for all of them. It holds no deployment state, so it runs before init.
  */
 function is_valid_project_name(string $name): bool
 {
-    return (bool) preg_match('/^[a-zA-Z][a-zA-Z0-9_-]{0,49}$/D', $name);
+    return (bool) preg_match('/^[a-zA-Z][a-zA-Z0-9-]{0,49}$/D', $name);
 }
 
 /**

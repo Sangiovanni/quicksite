@@ -67,13 +67,21 @@ function __command_downloadExport(array $params = [], array $urlParams = []): Ap
     $exportDir = qs_project_exports_dir($projectName);
     $filePath = $exportDir . '/' . $filename;
     
-    if (!file_exists($filePath)) {
+    if (!is_file($filePath)) {
         return ApiResponse::create(404, 'resource.not_found')
             ->withMessage('Export file not found')
             ->withData([
                 'filename' => $filename,
                 'hint' => 'Export may have expired or been deleted'
             ]);
+    }
+
+    // An empty file is a name exportProject has claimed and not yet filled: the
+    // archive is moved over the claim once it is whole. Nothing to download yet.
+    if ((int) @filesize($filePath) === 0) {
+        return ApiResponse::create(409, 'export.not_ready')
+            ->withMessage('This export is still being saved. Try again in a moment.')
+            ->withData(['filename' => $filename]);
     }
     
     // Stream the file

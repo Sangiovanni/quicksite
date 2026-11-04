@@ -3,7 +3,7 @@
  * The runtime handoff — everything the server tells qs.js about this page.
  *
  * A rendered page ends with a run of `<script>` tags: the route schema, the
- * storage namespace, the library itself, the consent map, the theme wiring, the
+ * storage namespace, the consent map, the library itself, the theme wiring, the
  * API config, the enum tables, this page's count-sentence strings, this route's
  * state stores, and what the server-side resolver already fetched. Together they
  * are the contract between PHP and the browser runtime.
@@ -26,6 +26,9 @@
  *   - the storage namespace and the served route go BEFORE qs.js, because its
  *     IIFE reads window.QS_PROJECT and window.QS_ROUTE synchronously at load;
  *     after it, QS.routeParams has already been set from undefined
+ *   - the consent map goes BEFORE qs.js too: the gate reads an absent map as a
+ *     layer that is off, so from the library's first line every read and write
+ *     is judged against the map the page carries
  *   - the state stores go AFTER qs-api-config, because a store's endpoint
  *     resolves against QS_API_ENDPOINTS
  *   - the page-events script goes LAST, because an onload chain can call
@@ -338,16 +341,19 @@ if (!function_exists('qs_runtime_handoff')) {
         $out .= '<script>window.QS_PROJECT=' . qs_inline_script_json($projectKey)
               . ';window.QS_ROUTE=' . qs_inline_script_json($route) . ';</script>';
 
-        // 3. The library.
-        $runtimeFile = is_string($ctx['runtimeFile'] ?? null) ? $ctx['runtimeFile'] : $contentPath . '/scripts/qs.js';
-        $out .= '<script src="' . $base . 'scripts/qs.js' . $v($runtimeFile) . '"></script>';
-
-        // 4. Consent map — drives qs.js write-gating. Emitting nothing means
-        //    "no layer configured", which is why the payload must be passed in
-        //    rather than assumed absent.
+        // 3. Consent map — drives qs.js's read and write gating. Emitting nothing
+        //    means "no layer configured", which is why the payload must be passed
+        //    in rather than assumed absent. It is plain data, written BEFORE the
+        //    library: the gate reads an absent map as a layer that is off, so a
+        //    reader running between the library and a map written after it would
+        //    read a refused value.
         if (!empty($ctx['consentPayload']) && is_array($ctx['consentPayload'])) {
             $out .= qs_consent_hydration_script($ctx['consentPayload']);
         }
+
+        // 4. The library.
+        $runtimeFile = is_string($ctx['runtimeFile'] ?? null) ? $ctx['runtimeFile'] : $contentPath . '/scripts/qs.js';
+        $out .= '<script src="' . $base . 'scripts/qs.js' . $v($runtimeFile) . '"></script>';
 
         // 5. Theme toggle wiring.
         if (!empty($ctx['themeEnabled']) && !empty($ctx['themeToggleEnabled'])) {
@@ -488,18 +494,33 @@ if (!function_exists('qs_resolved_hydration_scripts')) {
     }
 }
 
+if (!function_exists('qs_theme_storage_key')) {
+    /**
+     * The local-storage key the theme switch keeps a visitor's choice under —
+     * the one spelling of it: both page shells read it at load, the toggle
+     * script writes it on a click, and the generated cookie policy lists it.
+     *
+     * The key is namespaced by project for the same reason QS_PROJECT is: two
+     * built sites deployed under one origin must not share a theme setting. It
+     * stays outside the consent rule: only the visitor's own click on the
+     * switch sets it, to keep the choice they just made.
+     */
+    function qs_theme_storage_key(string $projectKey): string
+    {
+        return 'qs-theme-' . $projectKey;
+    }
+}
+
 if (!function_exists('qs_theme_toggle_script')) {
     /**
      * The `[data-theme-toggle]` wiring: set the icon and label on load and on
-     * click, and persist the choice under this project's own key.
-     *
-     * The key is namespaced by project for the same reason QS_PROJECT is: two
-     * built sites deployed under one origin must not share a theme setting.
+     * click, and persist the choice under this project's own key
+     * (qs_theme_storage_key()).
      */
     function qs_theme_toggle_script(string $projectKey): string
     {
         $js  = '(function(){';
-        $js .= 'var key=' . qs_inline_script_json('qs-theme-' . $projectKey) . ';';
+        $js .= 'var key=' . qs_inline_script_json(qs_theme_storage_key($projectKey)) . ';';
         $js .= 'function apply(t){document.documentElement.setAttribute("data-theme",t);try{localStorage.setItem(key,t);}catch(e){}}';
         $js .= 'function sync(t){document.querySelectorAll("[data-theme-toggle]").forEach(function(b){';
         $js .= 'var icon=b.querySelector(".theme-switch-icon");';

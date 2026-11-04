@@ -186,11 +186,12 @@ function consentOAuthLinks(): array {
 
 /**
  * Cookie-policy page structure (array of nodes) — a button that reopens the
- * cookie preferences, a deterministic table built from the registry, an
- * OAuth-provider privacy-link section and a legal note. Structural copy +
- * per-key descriptions use textKeys (translatable);
- * name/scope/retention are baked from the registry at generation time
- * (re-generate to refresh). $oauthLinks = [['name'=>..,'url'=>..|null], ...].
+ * cookie preferences, a deterministic table built from the registry (and the
+ * theme switch's key when the switch is on), an OAuth-provider privacy-link
+ * section and a legal note. Structural copy + per-key descriptions use textKeys
+ * (translatable); name/scope/retention are baked from the registry and the
+ * project's settings at generation time (re-generate to refresh).
+ * $oauthLinks = [['name'=>..,'url'=>..|null], ...].
  */
 function buildCookiePolicyStructure(array $items, array $oauthLinks): array {
     // Table header row.
@@ -237,6 +238,25 @@ function buildCookiePolicyStructure(array $items, array $oauthLinks): array {
             _cNode('td', [], [_cRaw($retention !== '' ? (string) $retention : '—')]),
             _cNode('td', [], [_cText($consentKey)]),
             _cNode('td', [], $hasDesc ? [_cText(storageDescKey((string) $id))] : []),
+        ]);
+    }
+
+    // The theme switch's key, when the switch is on (theme mode and the visitor's own
+    // toggle, the one case where a page reads or writes it). QuickSite itself keeps the
+    // visitor's choice under it, outside the registry and the consent rule: only a click
+    // on the switch sets it, to keep the choice that click made, so it needs no consent —
+    // but a visitor checking their storage must find it here. Like every row, it is the
+    // setting at generation: the page is generated again after the switch changes.
+    if (defined('PROJECT_NAME') && defined('THEME_MODE_ENABLED') && THEME_MODE_ENABLED
+        && defined('THEME_USER_TOGGLE_ENABLED') && THEME_USER_TOGGLE_ENABLED) {
+        require_once SECURE_FOLDER_PATH . '/src/functions/runtimeHandoff.php'; // qs_theme_storage_key
+        $bodyRows[] = _cNode('tr', [], [
+            _cNode('td', ['class' => 'qs-cookie-policy__key'], [_cRaw(qs_theme_storage_key((string) PROJECT_NAME))]),
+            _cNode('td', [], [_cRaw('localStorage')]),
+            _cNode('td', [], [_cText('consent.category.essential')]),
+            _cNode('td', [], [_cText('consent.policy.theme_retention')]),
+            _cNode('td', [], [_cText('consent.policy.no')]),
+            _cNode('td', [], [_cText('consent.policy.theme_description')]),
         ]);
     }
     $table = _cNode('table', ['class' => 'qs-cookie-policy'], [$thead, _cNode('tbody', [], $bodyRows)]);
@@ -312,6 +332,8 @@ function cookiePolicyTranslationSeed(): array {
             'consent.policy.oauth_intro' => 'This site offers sign-in via the following providers. See each provider\'s own privacy policy for what they collect.',
             'consent.policy.provider_link' => 'Privacy policy',
             'consent.policy.prefix_note' => 'Names in the first column include a short site prefix, because several sites can share one browser storage area — this is how each site keeps its own entries separate. It is the exact name you will find in your browser.',
+            'consent.policy.theme_retention' => 'Until you clear it',
+            'consent.policy.theme_description' => 'Remembers the light or dark theme you chose. It is set only when you click the theme switch.',
             'consent.policy.disclaimer' => 'This summary is generated from the site\'s storage registry and is provided for transparency. It is not legal advice — obtain your own legal review.',
         ],
         'fr' => [
@@ -330,6 +352,8 @@ function cookiePolicyTranslationSeed(): array {
             'consent.policy.oauth_intro' => 'Ce site propose la connexion via les fournisseurs suivants. Consultez la politique de confidentialité de chaque fournisseur pour savoir ce qu\'il collecte.',
             'consent.policy.provider_link' => 'Politique de confidentialité',
             'consent.policy.prefix_note' => 'Les noms de la première colonne comportent un court préfixe propre au site, car plusieurs sites peuvent partager un même espace de stockage du navigateur — c\'est ainsi que chaque site garde ses entrées séparées. C\'est exactement le nom que vous trouverez dans votre navigateur.',
+            'consent.policy.theme_retention' => 'Jusqu\'à ce que vous l\'effaciez',
+            'consent.policy.theme_description' => 'Mémorise le thème clair ou sombre que vous avez choisi. Il n\'est enregistré que lorsque vous cliquez sur le sélecteur de thème.',
             'consent.policy.disclaimer' => 'Ce résumé est généré à partir du registre de stockage du site et fourni à titre de transparence. Il ne constitue pas un avis juridique — faites réaliser votre propre vérification juridique.',
         ],
     ];

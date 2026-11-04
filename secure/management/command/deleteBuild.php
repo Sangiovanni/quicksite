@@ -12,6 +12,10 @@
  * build exists rather than overwriting one. An INCOMPLETE build (a partial
  * whose own cleanup failed) is removed by this command too — that is how the
  * user recovers without touching the filesystem.
+ *
+ * A finished build that carries the OAuth secrets is removed only by a role that
+ * may set the project's keys: any other role could neither fetch it nor make it
+ * again, so it does not destroy the only copy. It asks one who can.
  */
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php';
@@ -28,6 +32,13 @@ if ($buildName === null) {
 
 $buildFolder = qs_build_path($buildName);
 $wasComplete = qs_build_is_complete($buildName);
+
+if ($wasComplete && qs_build_holds_secrets($buildName) && !qs_caller_may_set_oauth_keys()) {
+    ApiResponse::create(403, 'auth.forbidden')
+        ->withMessage('This build carries the project\'s OAuth secrets: only a role that may set the project\'s OAuth keys (its owner or admin) may delete it. Ask one of them.')
+        ->withData(['command' => 'deleteBuild', 'build' => $buildName])
+        ->send();
+}
 
 // Size before deletion, for the freed-space report.
 $folderSize = 0;

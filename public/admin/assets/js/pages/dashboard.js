@@ -985,15 +985,20 @@
             }));
         }
 
+        // A finished build that may carry the OAuth secrets is only for a role that may set
+        // the project's keys: downloadBuild and deleteBuild refuse any other, so neither
+        // button is offered. The builds page, linked above this list, says why.
+        const outOfReach = build.complete !== false && build.oauth_secrets_included !== false && !canRun('setOAuthCredentials');
+
         // An incomplete build cannot be downloaded - the command refuses it, so
         // the button would only ever produce an error toast.
-        const dlBtn = build.complete === false ? null : QSDom.el('button', {
+        const dlBtn = (build.complete === false || outOfReach) ? null : QSDom.el('button', {
             type: 'button',
             class: 'manage-space__delete-btn',
             title: t('dashboard.storage.download', 'Download')
         }, [QSDom.svgIcon('M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2', 14)]);
 
-        const delBtn = QSDom.el('button', {
+        const delBtn = outOfReach ? null : QSDom.el('button', {
             type: 'button',
             class: 'manage-space__delete-btn',
             title: t('common.delete', 'Delete')
@@ -1026,26 +1031,28 @@
             });
         }
 
-        delBtn.addEventListener('click', async function () {
-            if (!(await QuickSiteUtils.confirm(t('dashboard.storage.confirmDelete', 'Delete this item?') + '\n' + build.name, { type: 'danger' }))) return;
-            this.disabled = true;
-            try {
-                const res = await QuickSiteAdmin.apiRequest('deleteBuild', 'POST', {});
-                if (res.ok) {
-                    item.remove();
-                    count.textContent = '0';
-                    list.appendChild(emptyRow());
-                    loadStorageOverview();
-                    QuickSiteAdmin.showToast(t('dashboard.storage.deleted', 'Deleted') + ': ' + build.name, 'success');
-                } else {
-                    QuickSiteAdmin.showToast(res.data?.message || 'Delete failed', 'error');
+        if (delBtn) {
+            delBtn.addEventListener('click', async function () {
+                if (!(await QuickSiteUtils.confirm(t('dashboard.storage.confirmDelete', 'Delete this item?') + '\n' + build.name, { type: 'danger' }))) return;
+                this.disabled = true;
+                try {
+                    const res = await QuickSiteAdmin.apiRequest('deleteBuild', 'POST', {});
+                    if (res.ok) {
+                        item.remove();
+                        count.textContent = '0';
+                        list.appendChild(emptyRow());
+                        loadStorageOverview();
+                        QuickSiteAdmin.showToast(t('dashboard.storage.deleted', 'Deleted') + ': ' + build.name, 'success');
+                    } else {
+                        QuickSiteAdmin.showToast(res.data?.message || 'Delete failed', 'error');
+                        this.disabled = false;
+                    }
+                } catch (e) {
+                    QuickSiteAdmin.showToast('Delete failed', 'error');
                     this.disabled = false;
                 }
-            } catch (e) {
-                QuickSiteAdmin.showToast('Delete failed', 'error');
-                this.disabled = false;
-            }
-        });
+            });
+        }
 
         return item;
     }

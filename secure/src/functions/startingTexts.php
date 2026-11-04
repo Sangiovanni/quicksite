@@ -25,18 +25,23 @@ if (!defined('SECURE_FOLDER_PATH')) {
 require_once SECURE_FOLDER_PATH . '/src/functions/jsonIo.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectLanguage.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/translationHelpers.php';
+require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 
 /** How a translation file is written (writeTranslationsToFile() writes the same bytes). */
 const QS_STARTING_TEXTS_JSON_FLAGS = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
 
-/** The words <secure>/src/translations/<lang>.json holds; [] when there is no such file. */
+/**
+ * The words <secure>/src/translations/<lang>.json holds; [] when there is no such file. A code
+ * names a file only once it passes the language rule (RegexPatterns `language_code`), the one a
+ * project's languages follow.
+ */
 function qs_starting_words_file(string $lang): array
 {
     static $cache = [];
     if (array_key_exists($lang, $cache)) {
         return $cache[$lang];
     }
-    if (preg_match('/^[a-z]{2,3}(?:-[a-z0-9]{2,8})*$/D', $lang) !== 1) {
+    if (!RegexPatterns::match('language_code', $lang)) {
         return $cache[$lang] = [];
     }
     $path = SECURE_FOLDER_PATH . '/src/translations/' . $lang . '.json';
@@ -120,7 +125,10 @@ function qs_starting_text_set(array &$tree, string $dotKey, string $text): void
  * on a multilingual project each listed language's file that exists, then default.json (what a
  * listed language with no file of its own reads), in the default language; on a monolingual one
  * default.json alone, in the default language. A file that does not exist is never created: a
- * language file that appeared would stop its language reading default.json.
+ * language file that appeared would stop its language reading default.json. A code names a file
+ * only once it passes the language rule (RegexPatterns `language_code`) every writer of the list
+ * applies: a list edited by hand can hold anything, and a code shaped like a path would name a
+ * file outside translate/.
  *
  * @return array<string, array{file: string, lang: string}> keyed by the file's name ('default' for default.json)
  */
@@ -131,7 +139,7 @@ function qs_starting_text_targets(): array
     $out = [];
     if (qs_project_is_multilingual()) {
         foreach (qs_project_language_codes() as $code) {
-            if ($code !== 'default' && is_file("$dir/$code.json")) {
+            if (RegexPatterns::match('language_code', $code) && is_file("$dir/$code.json")) {
                 $out[$code] = ['file' => "$dir/$code.json", 'lang' => $code];
             }
         }

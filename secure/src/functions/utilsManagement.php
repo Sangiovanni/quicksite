@@ -119,6 +119,35 @@ function qs_build_is_complete(string $buildName): bool
 }
 
 /**
+ * Does this build count as carrying the project's OAuth secrets?
+ *
+ * A build made with include_oauth_secrets holds the real client secrets. A
+ * manifest that does not say false is read as holding them: a build is treated
+ * as a credential until it says otherwise. Asked of a complete build; one with
+ * no manifest has nothing to say, and is decided by its caller.
+ */
+function qs_build_holds_secrets(string $buildName): bool
+{
+    $manifest = json_decode((string) @file_get_contents(qs_build_path($buildName) . DIRECTORY_SEPARATOR . 'build_manifest.json'), true);
+    return !is_array($manifest) || ($manifest['oauth_secrets_included'] ?? null) !== false;
+}
+
+/**
+ * May this request's caller set the project's OAuth keys?
+ *
+ * The one rule for a build that carries the secrets, so the secret moves only
+ * through someone who could have entered it: `build` asks it before it takes
+ * include_oauth_secrets, `downloadBuild` before it hands such a build over,
+ * `deleteBuild` before it removes one.
+ */
+function qs_caller_may_set_oauth_keys(): bool
+{
+    require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+    $caller = getCurrentUser();
+    return is_array($caller) && hasPermission($caller, 'setOAuthCredentials', (string) PROJECT_NAME);
+}
+
+/**
  * Export array with proper formatting for nested routes.
  * Forces all keys to strings — PHP auto-casts numeric string keys to int.
  */

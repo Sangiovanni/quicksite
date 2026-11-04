@@ -255,7 +255,12 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
             ->withMessage('Failed to extract project files')
             ->withData(['error' => $extractResult['error']]);
     }
-    
+
+    // An OAuth key file the archive carried is written at the default mode: it is made
+    // readable by the server's own user only, as its writer leaves it.
+    require_once SECURE_FOLDER_PATH . '/src/functions/oauthProviderHelpers.php';
+    qs_oauth_keys_protect($projectPath);
+
     // Rebuild PHP files from JSON (secure approach)
     $rebuildResult = rebuildPhpFromJson($projectPath);
     
@@ -842,6 +847,37 @@ function importFirstInvalidComponentReference(string $relativePath, string $cont
 }
 
 /**
+ * The first item of an archive's storage registry (data/storage.json) that no command
+ * could have written, or null when every one is valid: each item is checked by
+ * validateStorageItem(), the rule addStorageItem and editStorageItem apply — its key
+ * included, never `__proto__`. A description written into an item is not part of its
+ * shape (descriptions live in the translation files) and is not checked here.
+ *
+ * @return array|null ['key' => the item's key, 'message' => the rule it breaks]
+ */
+function importFirstInvalidStorageItem(array $registry): ?array {
+    $items = $registry['items'] ?? [];
+    if (!is_array($items)) {
+        return ['key' => 'items', 'message' => 'The storage registry\'s items must be a JSON object.'];
+    }
+    require_once SECURE_FOLDER_PATH . '/src/functions/storageHelpers.php';
+    foreach ($items as $id => $item) {
+        $id = (string) $id;
+        if (!is_array($item)) {
+            return ['key' => $id, 'message' => "Storage item '{$id}' must be a JSON object."];
+        }
+        unset($item['description']);
+        $errors = validateStorageItem($id, $item)['errors'];
+        if ($errors !== []) {
+            $first = $errors[0];
+            return ['key' => $id, 'message' => "Storage item '{$id}': "
+                . ($first['hint'] ?? "its {$first['field']} is {$first['reason']}" . (isset($first['expected']) ? " (expected {$first['expected']})" : '') . '.')];
+        }
+    }
+    return null;
+}
+
+/**
  * The first setting in an archive's config.json that this installation would
  * refuse, or null when every one is valid. config.php is rebuilt from these values
  * and the router, the translator and every language command read them — a
@@ -1008,6 +1044,13 @@ function importFirstStructureFailure(ZipArchive $zip, string $prefix): ?array {
             if ($badSetting !== null) {
                 return ['file' => $relativePath, 'reason' => 'invalid_setting', 'value' => $badSetting['key'],
                         'message' => $badSetting['message']];
+            }
+        }
+        if (strtolower($relativePath) === 'data/storage.json') {
+            $badItem = importFirstInvalidStorageItem($data);
+            if ($badItem !== null) {
+                return ['file' => $relativePath, 'reason' => 'invalid_storage_item', 'value' => $badItem['key'],
+                        'message' => $badItem['message']];
             }
         }
         if ($kind === null) {

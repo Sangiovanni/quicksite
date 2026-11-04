@@ -32,40 +32,48 @@ function addDirectoryToZip(ZipArchive $zip, string $dir, string $baseDir = ''): 
 }
 
 /**
- * Create a ZIP archive from a directory
- * 
- * @param string $sourceDir Source directory to compress
- * @param string $zipFilePath Destination ZIP file path
- * @param string|null $internalBaseName Optional base name for files inside ZIP
- * @return array Result with 'success' (bool), 'zip_path' (string), 'size_bytes' (int), 'error' (string|null)
+ * A temporary archive a request builds, streams and removes (an export streamed without
+ * saving, a build's download). Arm it as soon as its file exists: however the request
+ * ends from then on — the archive sent whole, the client gone mid-transfer (the web
+ * server stops the script inside the send), a fatal error while the archive is built,
+ * or a refusal before a byte is sent — the file is removed. qs_temp_archive_send()
+ * streams through a handle it registers here, and the removal closes that handle
+ * first: Windows refuses to remove a file that is still open.
  */
-function createZipFromDirectory(string $sourceDir, string $zipFilePath, ?string $internalBaseName = null): array {
-    if (!is_dir($sourceDir)) {
-        return [
-            'success' => false,
-            'error' => 'Source directory does not exist'
-        ];
+function qs_temp_archive_arm(string $path): void {
+    $GLOBALS['__qs_temp_archives'][$path] = null;
+    register_shutdown_function(static function () use ($path): void {
+        $handle = $GLOBALS['__qs_temp_archives'][$path] ?? null;
+        if (is_resource($handle)) {
+            @fclose($handle);
+        }
+        if (is_file($path)) {
+            @unlink($path);
+        }
+    });
+}
+
+/**
+ * Stream an armed temporary archive as the download $filename, remove it and end the
+ * request. Returns false, having sent nothing, when the archive cannot be opened; the
+ * caller answers that, and the armed removal still runs.
+ */
+function qs_temp_archive_send(string $path, string $filename): bool {
+    $handle = @fopen($path, 'rb');
+    if ($handle === false) {
+        return false;
     }
-    
-    $zip = new ZipArchive();
-    if ($zip->open($zipFilePath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
-        return [
-            'success' => false,
-            'error' => 'Failed to create ZIP archive'
-        ];
-    }
-    
-    $baseName = $internalBaseName ?? basename($sourceDir);
-    addDirectoryToZip($zip, $sourceDir, $baseName);
-    $zip->close();
-    
-    $zipSize = file_exists($zipFilePath) ? filesize($zipFilePath) : 0;
-    
-    return [
-        'success' => true,
-        'zip_path' => $zipFilePath,
-        'size_bytes' => $zipSize,
-        'size_mb' => round($zipSize / 1024 / 1024, 2),
-        'error' => null
-    ];
+    $GLOBALS['__qs_temp_archives'][$path] = $handle;
+    $stat = fstat($handle);
+    header('Content-Type: application/zip');
+    header('Content-Disposition: attachment; filename="' . $filename . '"');
+    header('Content-Length: ' . (is_array($stat) ? (int) $stat['size'] : (int) @filesize($path)));
+    header('Cache-Control: no-cache');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+    fpassthru($handle);
+    fclose($handle);
+    $GLOBALS['__qs_temp_archives'][$path] = null;
+    @unlink($path);
+    exit;
 }

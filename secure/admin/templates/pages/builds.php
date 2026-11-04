@@ -116,6 +116,7 @@ window.QS_BUILDS_I18N = <?= json_encode([
     'fieldSpace'       => __admin('builds.fieldSpace', 'URL space'),
     'spaceRoot'        => __admin('builds.spaceRoot', '(served from the root)'),
     'oauthWarn'        => __admin('builds.oauthWarn', 'This build carries OAuth client secrets. Treat the archive as a credential, not just a website.'),
+    'secretsRoleOnly'  => __admin('builds.secretsRoleOnly'),
     'oauthMissingTitle'  => __admin('builds.oauthMissingTitle'),
     'oauthMissingBody'   => __admin('builds.oauthMissingBody'),
     'oauthLeftOutBody'   => __admin('builds.oauthLeftOutBody'),
