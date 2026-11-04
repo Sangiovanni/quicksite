@@ -16,11 +16,17 @@
             "id": "langData",
             "command": "getLangList",
             "extract": "data"
+        },
+        {
+            "id": "switchNow",
+            "command": "getStructure",
+            "urlParams": ["component", "lang-switch"],
+            "extract": "data.structure"
         }
     ],
     "steps": [
         {
-            "condition": "data.langData.languages",
+            "condition": "data.langData.languages && data.langData.languages !== {{switchNow.children.*.params.data-lang}}",
             "command": "editStructure",
             "params": {
                 "type": "component",

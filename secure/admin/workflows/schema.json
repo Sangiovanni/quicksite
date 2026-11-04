@@ -77,64 +77,12 @@
     "preWorkflows": {
       "type": "array",
       "description": "Workflows to run BEFORE this workflow's steps. Each can optionally specify params and a condition.",
-      "items": {
-        "oneOf": [
-          {
-            "type": "string",
-            "description": "Workflow ID to run with default params"
-          },
-          {
-            "type": "object",
-            "required": ["id"],
-            "properties": {
-              "id": {
-                "type": "string",
-                "description": "Workflow ID to run"
-              },
-              "params": {
-                "type": "object",
-                "description": "Parameters to pass to the sub-workflow. Can use {{param.x}} to forward values.",
-                "additionalProperties": true
-              },
-              "condition": {
-                "type": "string",
-                "description": "Condition to evaluate. Sub-workflow is skipped if false. Supports param.x, data.x, operators."
-              }
-            }
-          }
-        ]
-      }
+      "items": { "$ref": "#/definitions/subWorkflowEntry" }
     },
     "postWorkflows": {
       "type": "array",
       "description": "Workflows to run AFTER this workflow's steps complete. Same format as preWorkflows.",
-      "items": {
-        "oneOf": [
-          {
-            "type": "string",
-            "description": "Workflow ID to run with default params"
-          },
-          {
-            "type": "object",
-            "required": ["id"],
-            "properties": {
-              "id": {
-                "type": "string",
-                "description": "Workflow ID to run"
-              },
-              "params": {
-                "type": "object",
-                "description": "Parameters to pass to the sub-workflow. Can use {{param.x}} to forward values.",
-                "additionalProperties": true
-              },
-              "condition": {
-                "type": "string",
-                "description": "Condition to evaluate. Sub-workflow is skipped if false. Supports param.x, data.x, operators."
-              }
-            }
-          }
-        ]
-      }
+      "items": { "$ref": "#/definitions/subWorkflowEntry" }
     },
     "parameters": {
       "type": "array",
@@ -333,6 +281,51 @@
     }
   },
   "definitions": {
+    "subWorkflowEntry": {
+      "description": "One entry of preWorkflows or postWorkflows: a workflow ID, or an object. Each entry runs as a phase of its own (one per item with forEach).",
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "Workflow ID to run with default params"
+        },
+        {
+          "type": "object",
+          "required": ["id"],
+          "properties": {
+            "id": {
+              "type": "string",
+              "description": "Workflow ID to run"
+            },
+            "params": {
+              "type": "object",
+              "description": "Parameters to pass to the sub-workflow. Can use {{param.x}} to forward values, and {{$value}} with forEach.",
+              "additionalProperties": true
+            },
+            "condition": {
+              "type": "string",
+              "description": "Condition to evaluate. Sub-workflow is skipped if false. Supports param.x, data.x, operators; the right side of a comparison is a literal or a {{path}}."
+            },
+            "forEach": {
+              "type": "string",
+              "description": "Run the sub-workflow once per item, read as a step's forEach when the run is planned (e.g. param.languages): one phase per item."
+            },
+            "filter": {
+              "type": "string",
+              "description": "With forEach: which items run, read as a step's filter (e.g. {{$value}} !== {{param.defaultLanguage}})."
+            },
+            "label": {
+              "type": "string",
+              "description": "With forEach: what names each phase after its workflow's title, e.g. {{$value | langname}}."
+            },
+            "request": {
+              "type": "string",
+              "enum": ["parent"],
+              "description": "An AI sub-workflow takes its parent's Your prompt instead of a field of its own (the parent must be an AI workflow)."
+            }
+          }
+        }
+      ]
+    },
     "specCommand": {
       "type": "object",
       "description": "A command or template to execute automatically",

@@ -1,0 +1,63 @@
+{
+    "$schema": "../schema.json",
+    "id": "translate-site",
+    "version": "1.0.0",
+    "meta": {
+        "icon": "🌍",
+        "titleKey": "ai.specs.translateSite.title",
+        "descriptionKey": "ai.specs.translateSite.description",
+        "category": "content",
+        "tags": ["translate", "translation", "language", "multilingual", "i18n"],
+        "difficulty": "beginner"
+    },
+    "parameters": [
+        {
+            "id": "language",
+            "type": "select",
+            "searchable": true,
+            "labelKey": "ai.specs.translateSite.params.language.label",
+            "helpKey": "ai.specs.translateSite.params.language.help",
+            "optionsFrom": {
+                "data": "projectLanguages"
+            }
+        },
+        {
+            "id": "from",
+            "type": "select",
+            "searchable": true,
+            "labelKey": "ai.specs.translateSite.params.from.label",
+            "helpKey": "ai.specs.translateSite.params.from.help",
+            "optionsFrom": {
+                "data": "projectLanguages"
+            },
+            "default": "{{data.langData.default_language}}"
+        }
+    ],
+    "dataRequirements": [
+        {
+            "id": "langData",
+            "command": "getLangList",
+            "extract": "data"
+        },
+        {
+            "id": "projectLanguages",
+            "command": "getLangList",
+            "extract": "data.languages"
+        },
+        {
+            "id": "sourceTexts",
+            "command": "getTranslation",
+            "urlParams": ["{{from}}"],
+            "extract": "data.translations",
+            "condition": "from"
+        },
+        {
+            "id": "helpSetTranslationKeys",
+            "command": "help",
+            "urlParams": ["setTranslationKeys"],
+            "extract": "data"
+        }
+    ],
+    "relatedCommands": ["setTranslationKeys"],
+    "promptTemplate": "translate-site.md"
+}

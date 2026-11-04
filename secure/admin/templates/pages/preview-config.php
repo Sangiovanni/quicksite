@@ -28,8 +28,9 @@ if (!isset($editConfig)) {
     $editConfig = defined('CONFIG') ? CONFIG : [];
 }
 
-// AI tools mode workflow metadata. Loaded server-side (mirrors
-// /admin/workflows pattern) with the same role-based filter applied.
+// AI tools mode workflow metadata, loaded server-side. A workflow is listed only when the
+// role may send every command a run of it may send, its sub-workflows' included
+// (WorkflowManager::runCommands()).
 require_once SECURE_FOLDER_PATH . '/src/classes/WorkflowManager.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
 $__previewAiToolsWorkflows = [];
@@ -47,16 +48,8 @@ try {
     $__aiToolsCategoryIndex = array_flip($__aiToolsCategoryOrder);
     foreach ($__aiToolsSpecs as $__aiToolsSpec) {
         if ($__aiToolsAllowed !== null) {
-            $__aiToolsRequired = $__aiToolsSpec['relatedCommands'] ?? [];
-            if (!empty($__aiToolsSpec['steps'])) {
-                foreach ($__aiToolsSpec['steps'] as $__aiToolsStep) {
-                    if (!empty($__aiToolsStep['command'])) {
-                        $__aiToolsRequired[] = $__aiToolsStep['command'];
-                    }
-                }
-            }
             $__aiToolsSkip = false;
-            foreach (array_unique($__aiToolsRequired) as $__aiToolsCmd) {
+            foreach ($__aiToolsManager->runCommands($__aiToolsSpec) as $__aiToolsCmd) {
                 if (!in_array($__aiToolsCmd, $__aiToolsAllowed, true)) {
                     $__aiToolsSkip = true;
                     break;
@@ -750,6 +743,8 @@ window.PreviewConfig = {
             kindAi: <?= qs_inline_script_json(__admin('preview.aiToolsKindAi')) ?>,
             kindBefore: <?= qs_inline_script_json(__admin('preview.aiToolsKindBefore')) ?>,
             requestFor: <?= qs_inline_script_json(__admin('preview.aiToolsRequestFor')) ?>,
+            requestShared: <?= qs_inline_script_json(__admin('preview.aiToolsRequestShared')) ?>,
+            noChanges: <?= qs_inline_script_json(__admin('preview.aiToolsNoChanges')) ?>,
             reviewAi: <?= qs_inline_script_json(__admin('preview.aiToolsReviewAi')) ?>,
             reviewAwaiting: <?= qs_inline_script_json(__admin('preview.aiToolsReviewAwaiting')) ?>,
             reviewContinue: <?= qs_inline_script_json(__admin('preview.aiToolsReviewContinue')) ?>,

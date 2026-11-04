@@ -41,6 +41,9 @@ class WorkflowManager {
     /** Max nesting of sub-workflows a run follows: a sub-workflow's own pre- and post-workflows, and theirs. */
     private const PHASES_MAX_DEPTH = 5;
 
+    /** The last reference collectPhases() gave a phase: how a sub-workflow's phase finds its parent's. */
+    private int $phaseRefs = 0;
+
     /** A command whose name begins so deletes what it names: the console's convention (admin.js isDestructiveCommand()). */
     private const DELETE_NAME = '/^(delete|remove|clear|reset|purge)/i';
 
@@ -411,22 +414,66 @@ class WorkflowManager {
      * The phases a run of this workflow goes through, in order: each pre-workflow, the workflow itself,
      * then each post-workflow; a sub-workflow's own pre- and post-workflows run around it, depth first.
      * A sub-workflow's condition is evaluated here, once, when the run is planned: against the
-     * parameters its parent was given, and the parent's data when the condition reads any. Nothing is
-     * resolved: a phase names its workflow and the parameters its parent passes it. A workflow already
-     * on the way to itself (a cycle), or nested deeper than PHASES_MAX_DEPTH, is left out.
+     * parameters its parent was given, and the parent's data when the condition reads any. An entry
+     * with a forEach (and its filter, read as a step's) is one phase per item, {{$value}} in its params
+     * and its label. Nothing else is resolved: a phase names its workflow and the parameters its parent
+     * passes it. A workflow already on the way to itself (a cycle), or nested deeper than
+     * PHASES_MAX_DEPTH, is left out.
      *
      * @param array $workflow The workflow definition
      * @param array $userParams The run's parameters
-     * @return array List of ['kind' => 'pre'|'main'|'post', 'workflowId' => string, 'params' => array]
+     * @return array List of ['kind' => 'pre'|'main'|'post', 'workflowId' => string, 'params' => array,
+     *               'requestFrom' => int|null (settleRequests()), 'label'? => string (a repeated entry's item)]
      */
     public function getWorkflowPhases(array $workflow, array $userParams = []): array {
         $phases = [];
-        $this->collectPhases($workflow, $userParams, 'main', [], $phases);
-        return $phases;
+        $this->collectPhases($workflow, $userParams, 'main', [], $phases, []);
+        return $this->settleRequests($phases);
     }
 
-    /** One workflow's phases, added to $phases: its pre-workflows', its own, its post-workflows'. */
-    private function collectPhases(array $workflow, array $params, string $kind, array $trail, array &$phases): void {
+    /**
+     * Every workflow a run of this one may reach — itself, then each sub-workflow at any depth, each
+     * once — through getWorkflowPhases()' walk taking every entry: no condition decided (a conditional
+     * sub-workflow may run), no entry repeated, nothing fetched.
+     *
+     * @return array The workflow definitions, the given one first
+     */
+    public function reachableWorkflows(array $workflow): array {
+        $phases = [];
+        $this->collectPhases($workflow, [], 'main', [], $phases, ['every' => true]);
+        $out = [];
+        foreach ($phases as $phase) {
+            $id = $phase['workflowId'];
+            if (isset($out[$id])) continue;
+            $loaded = $id === (string) ($workflow['id'] ?? '') ? $workflow : $this->loadWorkflow($id);
+            if ($loaded) $out[$id] = $loaded;
+        }
+        return array_values($out);
+    }
+
+    /**
+     * The commands a run of this workflow may send, for a role check: the related commands and the
+     * steps' commands of every workflow it may reach (reachableWorkflows()).
+     */
+    public function runCommands(array $workflow): array {
+        $commands = [];
+        foreach ($this->reachableWorkflows($workflow) as $reached) {
+            foreach (($reached['relatedCommands'] ?? []) as $command) {
+                if (is_string($command) && $command !== '') $commands[] = $command;
+            }
+            foreach (($reached['steps'] ?? []) as $step) {
+                if (is_array($step) && is_string($step['command'] ?? null) && $step['command'] !== '') $commands[] = $step['command'];
+            }
+        }
+        return array_values(array_unique($commands));
+    }
+
+    /**
+     * One workflow's phases, added to $phases: its pre-workflows', its own, its post-workflows'. $from:
+     * 'every' (reachableWorkflows()' mode), and from the entry that named it 'parentRef' (its parent's
+     * phase), 'requestParent' (the entry's "request": "parent") and 'label'.
+     */
+    private function collectPhases(array $workflow, array $params, string $kind, array $trail, array &$phases, array $from): void {
         $id = (string) ($workflow['id'] ?? '');
         if (in_array($id, $trail, true) || count($trail) >= self::PHASES_MAX_DEPTH) {
             error_log("[WorkflowManager] sub-workflow '{$id}' left out of the run: a cycle, or nested too deep");
@@ -434,24 +481,38 @@ class WorkflowManager {
         }
         $trail[] = $id;
         $data = null;
+        $ref = ++$this->phaseRefs;
+        $own = ['kind' => $kind, 'workflowId' => $id, 'params' => $params, 'ref' => $ref]
+            + array_intersect_key($from, ['parentRef' => true, 'requestParent' => true, 'label' => true]);
         // Every phase before the run's own workflow is a pre phase, every phase after it a post phase.
-        $this->collectSubPhases($workflow, $params, 'preWorkflows', $kind === 'main' ? 'pre' : $kind, $trail, $phases, $data);
-        $phases[] = ['kind' => $kind, 'workflowId' => $id, 'params' => $params];
-        $this->collectSubPhases($workflow, $params, 'postWorkflows', $kind === 'main' ? 'post' : $kind, $trail, $phases, $data);
+        $this->collectSubPhases($workflow, $params, 'preWorkflows', $kind === 'main' ? 'pre' : $kind, $trail, $phases, $data, $from, $ref);
+        $phases[] = $own;
+        $this->collectSubPhases($workflow, $params, 'postWorkflows', $kind === 'main' ? 'post' : $kind, $trail, $phases, $data, $from, $ref);
     }
 
     /**
      * The phases of one list of sub-workflows (preWorkflows or postWorkflows): each entry's condition
-     * checked and its parameters resolved against its parent's; the parent's data fetched once, and only
-     * when an entry reads it.
+     * checked and its parameters resolved against its parent's — once per item of its forEach, when it
+     * has one; the parent's data fetched once, and only when an entry reads it.
      */
-    private function collectSubPhases(array $workflow, array $params, string $list, string $kind, array $trail, array &$phases, ?array &$data): void {
+    private function collectSubPhases(array $workflow, array $params, string $list, string $kind, array $trail, array &$phases, ?array &$data, array $from, int $parentRef): void {
+        $every = !empty($from['every']);
         foreach (($workflow[$list] ?? []) as $entry) {
             $subId = is_string($entry) ? $entry : (is_array($entry) ? (string) ($entry['id'] ?? '') : '');
             if ($subId === '') continue;
+            $link = ['every' => $every, 'parentRef' => $parentRef,
+                'requestParent' => is_array($entry) && ($entry['request'] ?? null) === 'parent'];
+            if ($every) {
+                $sub = $this->loadWorkflow($subId);
+                if ($sub) $this->collectPhases($sub, [], $kind, $trail, $phases, $link);
+                continue;
+            }
             $subParams = is_array($entry) && is_array($entry['params'] ?? null) ? $entry['params'] : [];
             $condition = is_array($entry) && is_string($entry['condition'] ?? null) ? $entry['condition'] : null;
-            if ($data === null && $this->entryReadsData($condition, $subParams)) {
+            $forEach = is_array($entry) && is_string($entry['forEach'] ?? null) ? $entry['forEach'] : null;
+            $filter = is_array($entry) && is_string($entry['filter'] ?? null) ? $entry['filter'] : null;
+            $label = is_array($entry) && is_string($entry['label'] ?? null) ? $entry['label'] : null;
+            if ($data === null && $this->entryReadsData($condition, $subParams, $forEach, $filter)) {
                 $data = $this->fetchDataRequirements($workflow, $params);
                 if (!empty($workflow['staticData']) && is_array($workflow['staticData'])) {
                     $data = array_merge($workflow['staticData'], $data);
@@ -461,26 +522,67 @@ class WorkflowManager {
             if ($condition !== null && !$this->evaluateStepCondition($condition, $context)) continue;
             $sub = $this->loadWorkflow($subId);
             if (!$sub) continue;
-            $this->collectPhases($sub, $this->resolveStepParams($subParams, $context), $kind, $trail, $phases);
+            if ($forEach === null) {
+                $this->collectPhases($sub, $this->resolveStepParams($subParams, $context), $kind, $trail, $phases, $link);
+                continue;
+            }
+            foreach ($this->forEachItems($forEach, $filter, $context) as $key => $value) {
+                $itemContext = array_merge($context, ['$key' => $key, '$value' => $value, '$item' => $value]);
+                $itemLink = $link;
+                if ($label !== null) {
+                    $itemLink['label'] = (string) $this->resolveStepParamValue($label, $itemContext);
+                }
+                $this->collectPhases($sub, $this->resolveStepParams($subParams, $itemContext), $kind, $trail, $phases, $itemLink);
+            }
         }
     }
 
     /**
-     * Whether a sub-workflow entry reads its parent's data: a path in its condition, or a placeholder in
-     * its parameters, that is not a param.x (a system placeholder {{__x}} and a loop's {{$value}} are not).
+     * Whether a sub-workflow entry reads its parent's data: a path in its condition, its forEach or its
+     * filter, or a placeholder in its parameters, that is not a param.x (a system placeholder {{__x}} and
+     * a loop's {{$value}} are not).
      */
-    private function entryReadsData(?string $condition, array $subParams): bool {
-        $paths = [];
-        if ($condition !== null) {
-            preg_match_all('/[A-Za-z_]\w*(?:\.\w+)*/', (string) preg_replace('/(["\']).*?\1/', '', $condition), $m);
-            $paths = $m[0];
+    private function entryReadsData(?string $condition, array $subParams, ?string $forEach = null, ?string $filter = null): bool {
+        $paths = $forEach !== null ? [$forEach] : [];
+        foreach ([$condition, $filter] as $expression) {
+            if ($expression === null) continue;
+            preg_match_all('/(?<![\w$])[A-Za-z_]\w*(?:\.\w+)*/', (string) preg_replace('/(["\']).*?\1/', '', $expression), $m);
+            $paths = array_merge($paths, $m[0]);
         }
         preg_match_all('/\{\{\s*([^{}|\s]+)/', (string) json_encode($subParams), $m);
         foreach (array_merge($paths, $m[1]) as $path) {
-            if (in_array($path, ['true', 'false', 'null'], true) || str_starts_with($path, '__') || str_starts_with($path, '$')) continue;
+            if (in_array($path, ['true', 'false', 'null', 'in', 'not_in'], true) || str_starts_with($path, '__') || str_starts_with($path, '$')) continue;
             if (!str_starts_with($path, 'param.')) return true;
         }
         return false;
+    }
+
+    /**
+     * Whose "Your prompt" each phase takes, as 'requestFrom': an AI phase whose entry says
+     * "request": "parent" takes its parent's phase's when that is an AI one (and the one that phase
+     * takes, when it takes its own parent's); every other phase null — an AI phase its own, a phase of
+     * steps none. The walk's working keys are dropped.
+     */
+    private function settleRequests(array $phases): array {
+        $index = [];
+        foreach ($phases as $i => $phase) $index[$phase['ref']] = $i;
+        $isAi = function (int $i) use ($phases): bool {
+            return $this->isAiWorkflow($this->loadWorkflow($phases[$i]['workflowId']) ?? []);
+        };
+        $owner = function (int $i) use (&$owner, $phases, $index, $isAi): ?int {
+            $phase = $phases[$i];
+            if (empty($phase['requestParent']) || !isset($phase['parentRef'], $index[$phase['parentRef']])) return null;
+            $parent = $index[$phase['parentRef']];
+            if (!$isAi($parent)) return null;
+            return $owner($parent) ?? $parent;
+        };
+        $settled = [];
+        foreach ($phases as $i => $phase) {
+            $phase['requestFrom'] = $isAi($i) ? $owner($i) : null;
+            unset($phase['ref'], $phase['parentRef'], $phase['requestParent']);
+            $settled[] = $phase;
+        }
+        return $settled;
     }
 
     /**
@@ -506,7 +608,7 @@ class WorkflowManager {
      * holds them. Each step comes with what it deletes or changes, in 'effects' (stepEffect(), null for a
      * step that is not warned).
      *
-     * @return array|null ['index', 'kind', 'workflowId', 'title', 'icon', 'ai', 'steps', 'count',
+     * @return array|null ['index', 'kind', 'workflowId', 'title', 'icon', 'ai', 'requestFrom', 'steps', 'count',
      *                    'effects', 'prompt'?, 'validationErrors'?], or null when the run has no such phase
      */
     public function resolvePhase(array $workflow, array $userParams, int $index, array $options = []): ?array {
@@ -517,13 +619,16 @@ class WorkflowManager {
     private function resolvePhaseEntry(array $phase, int $index, array $options): array {
         $workflow = $this->loadWorkflow($phase['workflowId']) ?? [];
         $ai = $this->isAiWorkflow($workflow);
+        $title = $this->workflowTitle($workflow);
         $resolved = [
             'index' => $index,
             'kind' => $phase['kind'],
             'workflowId' => $phase['workflowId'],
-            'title' => $this->workflowTitle($workflow),
+            // A repeated entry's phase is named by its item: "Translate Site — Français".
+            'title' => ($phase['label'] ?? '') !== '' ? $title . ' — ' . $phase['label'] : $title,
             'icon' => (string) ($workflow['meta']['icon'] ?? ''),
             'ai' => $ai,
+            'requestFrom' => $phase['requestFrom'] ?? null,
         ];
         $steps = [];
         if ($ai && isset($options['answer']) && is_array($options['answer'])) {
@@ -669,25 +774,8 @@ class WorkflowManager {
      */
     private function expandForEach(array $step, array $context): array {
         $expanded = [];
-        $forEachPath = $step['forEach'];
-        
-        // Get the data to iterate over
-        $items = $this->resolveDataPath($forEachPath, $context);
-        
-        // Support comma-separated strings (e.g., from user params like "en,fr,es")
-        if (is_string($items) && !empty($items)) {
-            $items = array_map('trim', explode(',', $items));
-        }
-        
-        if (!is_array($items)) {
-            return [];
-        }
-        
-        // Apply filter if present
-        if (isset($step['filter'])) {
-            $items = $this->evaluateStepFilter($step['filter'], $items, $context);
-        }
-        
+        $items = $this->forEachItems($step['forEach'], $step['filter'] ?? null, $context);
+
         // Expand each item
         foreach ($items as $key => $value) {
             // Create item context for parameter resolution
@@ -717,7 +805,22 @@ class WorkflowManager {
         
         return $expanded;
     }
-    
+
+    /**
+     * The items a forEach goes through — a step's, or a sub-workflow entry's: its path read from the
+     * context (a comma-separated string, as a form's "en,fr,es", split), then its filter applied.
+     */
+    private function forEachItems(string $path, ?string $filter, array $context): array {
+        $items = $this->resolveDataPath($path, $context);
+        if (is_string($items) && !empty($items)) {
+            $items = array_map('trim', explode(',', $items));
+        }
+        if (!is_array($items)) {
+            return [];
+        }
+        return $filter !== null ? $this->evaluateStepFilter($filter, $items, $context) : $items;
+    }
+
     /**
      * Resolve a data path like "routes", "langData.languages", "param.keepAssets"
      * 
@@ -726,39 +829,41 @@ class WorkflowManager {
      * - Nested paths: "langData.languages" → $context['data']['langData']['languages']
      * - Param paths: "param.keepAssets" → $context['param']['keepAssets']
      * - Config paths: "config.x" → $context['config']['x']
-     * 
+     * - Every item of a list: "switchNow.children.*.params.data-lang" → each child's data-lang, as a list
+     *
      * @param string $path Dot-notation path
      * @param array $context Full context
      * @return mixed Resolved value
      */
     private function resolveDataPath(string $path, array $context) {
         $parts = explode('.', $path);
-        $firstPart = $parts[0];
-        
-        // Check if first part is a known context key
-        if (in_array($firstPart, ['param', 'data', 'config', '$key', '$value', '$item'])) {
-            // Standard path resolution
-            $current = $context;
-            foreach ($parts as $part) {
-                if (is_array($current) && isset($current[$part])) {
-                    $current = $current[$part];
-                } else {
-                    return null;
+        // A known context key starts at the context; anything else is a data requirement's id.
+        $start = in_array($parts[0], ['param', 'data', 'config', '$key', '$value', '$item']) ? $context : ($context['data'] ?? []);
+        return $this->walkPath($start, $parts);
+    }
+
+    /**
+     * A path's value from $current, null when a part is missing. A '*' part reads the rest of the path
+     * on every item of the array it stands at: their values, as a list (an item without one is left out).
+     */
+    private function walkPath($current, array $parts) {
+        foreach ($parts as $i => $part) {
+            if ($part === '*') {
+                if (!is_array($current)) return null;
+                $rest = array_slice($parts, $i + 1);
+                $values = [];
+                foreach ($current as $item) {
+                    $value = $this->walkPath($item, $rest);
+                    if ($value !== null) $values[] = $value;
                 }
+                return $values;
             }
-            return $current;
-        }
-        
-        // Otherwise, assume it's a dataRequirement ID - look in 'data' context
-        $current = $context['data'] ?? [];
-        foreach ($parts as $part) {
             if (is_array($current) && isset($current[$part])) {
                 $current = $current[$part];
             } else {
                 return null;
             }
         }
-        
         return $current;
     }
     
@@ -768,6 +873,7 @@ class WorkflowManager {
      * Supports:
      * - Simple path checks: "param.keepAssets"
      * - Comparisons: "param.keepAssets !== true"
+     * - Two values compared: "param.defaultLanguage !== {{langData.default_language}}"
      * - AND conditions: "param.keepLanguages !== true && langData.multilingual === true"
      * 
      * @param string $condition Condition string
@@ -801,7 +907,9 @@ class WorkflowManager {
     }
     
     /**
-     * Evaluate a single condition (no && or ||)
+     * Evaluate a single condition (no && or ||). The left side is a path; the right side of a
+     * comparison is a literal or a {{path}} (comparisonValue()). A value read from the context is
+     * normalised on either side (booleanLike()): a form sends "true" / "false" as strings.
      */
     private function evaluateSingleCondition(string $condition, array $context): bool {
         // Handle negation at start
@@ -810,25 +918,16 @@ class WorkflowManager {
             $negate = true;
             $condition = ltrim(substr($condition, 1));
         }
-        
-        // Check for comparison operators
-        if (preg_match('/^([\w.]+)\s*(===?|!==?|>=?|<=?)\s*(.+)$/', $condition, $matches)) {
+
+        // Check for comparison operators (a path may read every item of a list, '*', and a key with a hyphen)
+        if (preg_match('/^([\w.*-]+)\s*(===?|!==?|>=?|<=?)\s*(.+)$/', $condition, $matches)) {
             $leftPath = $matches[1];
             $operator = $matches[2];
             $rightValue = trim($matches[3]);
-            
-            // Resolve left side
-            $leftValue = $this->resolveDataPath($leftPath, $context);
-            
-            // Normalize left value for boolean comparisons (form sends "true"/"false" as strings)
-            if ($leftValue === 'true') $leftValue = true;
-            if ($leftValue === 'false') $leftValue = false;
-            if ($leftValue === '1') $leftValue = true;
-            if ($leftValue === '0') $leftValue = false;
-            
-            // Parse right side
-            $rightParsed = $this->parseFilterValue($rightValue);
-            
+
+            $leftValue = $this->booleanLike($this->resolveDataPath($leftPath, $context));
+            $rightParsed = $this->comparisonValue($rightValue, $context, true);
+
             $result = match($operator) {
                 '=', '==' => $leftValue == $rightParsed,
                 '===' => $leftValue === $rightParsed,
@@ -844,15 +943,32 @@ class WorkflowManager {
         }
         
         // Simple truthy check on path
-        $value = $this->resolveDataPath($condition, $context);
-        
-        // Normalize for truthy check
-        if ($value === 'true' || $value === '1') $value = true;
-        if ($value === 'false' || $value === '0') $value = false;
-        
+        $value = $this->booleanLike($this->resolveDataPath($condition, $context));
+
         $result = !empty($value);
-        
+
         return $negate ? !$result : $result;
+    }
+
+    /**
+     * The right side of a comparison — in a step's condition, a sub-workflow's condition and a forEach
+     * filter: a {{path}} is read from the context (normalised when $normalize, as a condition's left
+     * side is), anything else is a literal (parseFilterValue()).
+     */
+    private function comparisonValue(string $raw, array $context, bool $normalize = false) {
+        $raw = trim($raw);
+        if (preg_match('/^\{\{(.+)\}\}$/D', $raw, $m)) {
+            $value = $this->resolveDataPath(trim($m[1]), $context);
+            return $normalize ? $this->booleanLike($value) : $value;
+        }
+        return $this->parseFilterValue($raw);
+    }
+
+    /** A value read from the context, its boolean-like strings as booleans: "true" / "1", "false" / "0". */
+    private function booleanLike($value) {
+        if ($value === 'true' || $value === '1') return true;
+        if ($value === 'false' || $value === '0') return false;
+        return $value;
     }
     
     /**
@@ -916,12 +1032,8 @@ class WorkflowManager {
                 $leftResolved = $this->resolveDataPath(ltrim($leftPath, '$'), $itemContext);
             }
 
-            // Parse right value - also handle {{dataPath}} references
-            if (preg_match('/^\{\{(.+)\}\}$/', $rightValue, $dataMatch)) {
-                $rightParsed = $this->resolveDataPath($dataMatch[1], $itemContext);
-            } else {
-                $rightParsed = $this->parseFilterValue($rightValue);
-            }
+            // The right side: a literal or a {{path}}, read as a condition reads it.
+            $rightParsed = $this->comparisonValue($rightValue, $itemContext);
 
             return match($operator) {
                 '=', '==' => $leftResolved == $rightParsed,
@@ -1387,7 +1499,7 @@ class WorkflowManager {
         if (preg_match('/^([\w.]+)\s*(===?|!==?|>=?|<=?)\s*(.+)$/', $condition, $matches)) {
             $left = $this->resolveTemplateValue($matches[1], $userParams, $fetchedData);
             $operator = $matches[2];
-            $right = $this->parseConditionValue($matches[3]);
+            $right = $this->parseFilterValue(trim($matches[3]));
             
             $result = match($operator) {
                 '=', '==' => $left == $right,
@@ -1455,30 +1567,6 @@ class WorkflowManager {
         
         // Direct param check (for backward compatibility)
         return $userParams[$ref] ?? null;
-    }
-    
-    /**
-     * Parse a condition value (handle quotes, numbers, booleans)
-     */
-    private function parseConditionValue(string $value) {
-        $value = trim($value);
-        
-        // Quoted string
-        if (preg_match('/^["\'](.*)["\']\s*$/', $value, $matches)) {
-            return $matches[1];
-        }
-        
-        // Boolean
-        if ($value === 'true') return true;
-        if ($value === 'false') return false;
-        if ($value === 'null') return null;
-        
-        // Number
-        if (is_numeric($value)) {
-            return strpos($value, '.') !== false ? (float)$value : (int)$value;
-        }
-        
-        return $value;
     }
     
     /**
@@ -1624,9 +1712,10 @@ class WorkflowManager {
             }
         }
         
-        // Must have either promptTemplate OR steps (or both)
+        // Must have a promptTemplate or steps. With both it is an AI workflow (isAiWorkflow()): its steps
+        // are not run, which is said as a warning so a workflow that loads today keeps loading.
         if (!isset($workflow['promptTemplate']) && !isset($workflow['steps'])) {
-            $errors[] = "Workflow must have either 'promptTemplate' or 'steps' (or both)";
+            $errors[] = "Workflow must have either 'promptTemplate' or 'steps'";
         }
         
         // Validate meta
@@ -1683,6 +1772,9 @@ class WorkflowManager {
         
         // Validate pins / warnings — must be string arrays whose IDs map to existing files.
         $warnings = [];
+        if (isset($workflow['promptTemplate'], $workflow['steps'])) {
+            $warnings[] = "Workflow has both 'promptTemplate' and 'steps': it runs as an AI workflow and its steps are not run (put them in a pre- or post-workflow)";
+        }
         foreach (['pins' => 'pins', 'warnings' => 'warnings'] as $field => $folder) {
             if (!isset($workflow[$field])) continue;
             if (!is_array($workflow[$field])) {

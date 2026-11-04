@@ -48,6 +48,13 @@
                 "filterFrom": "languages"
             },
             "default": "{{data.langData.default_language}}"
+        },
+        {
+            "id": "updateLangSwitch",
+            "type": "checkbox",
+            "labelKey": "workflows.specs.setupLanguages.params.updateLangSwitch.label",
+            "helpKey": "workflows.specs.setupLanguages.params.updateLangSwitch.help",
+            "default": true
         }
     ],
     "dataRequirements": [
@@ -65,8 +72,8 @@
     "relatedCommands": ["addLang", "deleteLang", "setDefaultLang", "setMultilingual"],
     "steps": [
         {
-            "comment": "=== MULTI-LANG 1. Enable multilingual support ===",
-            "condition": "param.multilingual === true",
+            "comment": "=== MULTI-LANG 1. Enable multilingual support (only when it is off) ===",
+            "condition": "param.multilingual === true && langData.multilingual_enabled !== true",
             "command": "setMultilingual",
             "params": {
                 "enabled": true
@@ -83,7 +90,33 @@
             }
         },
         {
-            "comment": "=== MULTI-LANG 3. Remove only the languages currently present that the user un-picked ===",
+            "comment": "=== SINGLE-LANG 3. Add the chosen base language (only when it is not present) ===",
+            "condition": "param.multilingual !== true",
+            "forEach": "param.defaultLanguage",
+            "filter": "{{$value}} not_in {{data.langData.languages}}",
+            "command": "addLang",
+            "params": {
+                "code": "{{$value}}"
+            }
+        },
+        {
+            "comment": "=== SINGLE-LANG 4. Enable multilingual for a moment, so the default can change (only when it is off) ===",
+            "condition": "param.multilingual !== true && langData.multilingual_enabled !== true && param.defaultLanguage !== {{langData.default_language}}",
+            "command": "setMultilingual",
+            "params": {
+                "enabled": true
+            }
+        },
+        {
+            "comment": "=== SHARED 5. Set default language (only when different from current), before any language is removed: the default cannot be ===",
+            "condition": "param.defaultLanguage !== {{langData.default_language}}",
+            "command": "setDefaultLang",
+            "params": {
+                "lang": "{{param.defaultLanguage}}"
+            }
+        },
+        {
+            "comment": "=== MULTI-LANG 6. Remove only the languages currently present that the user un-picked ===",
             "condition": "param.multilingual === true",
             "forEach": "data.langData.languages",
             "filter": "{{$value}} not_in {{param.languages}}",
@@ -93,31 +126,7 @@
             }
         },
         {
-            "comment": "=== SINGLE-LANG 1. Add the chosen base language (no-op if already present) ===",
-            "condition": "param.multilingual !== true",
-            "command": "addLang",
-            "params": {
-                "code": "{{param.defaultLanguage}}"
-            }
-        },
-        {
-            "comment": "=== SINGLE-LANG 2. Temporarily enable multilingual so we can change the default + delete extras ===",
-            "condition": "param.multilingual !== true && param.defaultLanguage !== langData.default_language",
-            "command": "setMultilingual",
-            "params": {
-                "enabled": true
-            }
-        },
-        {
-            "comment": "=== SHARED 4. Set default language (only when different from current) ===",
-            "condition": "param.defaultLanguage !== langData.default_language",
-            "command": "setDefaultLang",
-            "params": {
-                "lang": "{{param.defaultLanguage}}"
-            }
-        },
-        {
-            "comment": "=== SINGLE-LANG 5. Delete every existing language except the chosen default ===",
+            "comment": "=== SINGLE-LANG 7. Delete every existing language except the chosen default ===",
             "condition": "param.multilingual !== true",
             "forEach": "data.langData.languages",
             "filter": "{{$value}} !== {{param.defaultLanguage}}",
@@ -127,12 +136,26 @@
             }
         },
         {
-            "comment": "=== SINGLE-LANG 6. Disable multilingual now that only one language remains ===",
-            "condition": "param.multilingual !== true",
+            "comment": "=== SINGLE-LANG 8. Disable multilingual now that only one language remains (it was on) ===",
+            "condition": "param.multilingual !== true && langData.multilingual_enabled === true",
             "command": "setMultilingual",
             "params": {
                 "enabled": false
             }
+        },
+        {
+            "comment": "=== SINGLE-LANG 9. Disable multilingual again (SINGLE-LANG 4 enabled it) ===",
+            "condition": "param.multilingual !== true && langData.multilingual_enabled !== true && param.defaultLanguage !== {{langData.default_language}}",
+            "command": "setMultilingual",
+            "params": {
+                "enabled": false
+            }
+        }
+    ],
+    "postWorkflows": [
+        {
+            "id": "update-lang-switch",
+            "condition": "param.updateLangSwitch === true"
         }
     ]
 }

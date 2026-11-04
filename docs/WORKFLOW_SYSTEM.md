@@ -149,7 +149,7 @@ Have `promptTemplate` pointing to a `.md` file. The markdown is rendered with li
 
 ### Hybrid Workflows
 
-Have both `steps` AND `promptTemplate`. The steps provide a fallback or complementary manual flow.
+A workflow with both `steps` and a `promptTemplate` runs as an AI workflow: its prompt is built and its AI's answer runs; its `steps` are not run. To run steps before or after an AI prompt, put them in a workflow of their own and name it in `preWorkflows` or `postWorkflows` (see *Sub-Workflows*).
 
 ### Sub-Workflows
 
@@ -166,7 +166,7 @@ Workflows can reference other workflows via `preWorkflows` and `postWorkflows`:
 ]
 ```
 
-Every workflow runs in phases: each pre-workflow, then the workflow itself, then each post-workflow, in order — manual and AI workflows alike, and any of them may be an AI workflow. A sub-workflow's condition is evaluated once, when the run is planned; a phase is resolved when the run reaches it, its own data requirements fetched against the project as the earlier phases left it, so it sees what they changed. An AI phase builds its prompt when it is reached: an AI workflow's pre-workflows run before its prompt is built, its post-workflows after its commands. A sub-workflow takes the parameters its parent passes it and its own defaults for the rest. A sub-workflow's own pre- and post-workflows are phases of their own; a cycle is left out where it closes. Between two phases the runner pauses for a review unless *Run without stopping* is on, and what a phase deletes or changes is confirmed before it runs ([ADMIN_PANEL.md §8.12](ADMIN_PANEL.md), *A run, phase by phase*).
+Every workflow runs in phases: each pre-workflow, then the workflow itself, then each post-workflow, in order — manual and AI workflows alike, and any of them may be an AI workflow. A sub-workflow's condition is evaluated once, when the run is planned; a phase is resolved when the run reaches it, its own data requirements fetched against the project as the earlier phases left it, so it sees what they changed. An AI phase builds its prompt when it is reached: an AI workflow's pre-workflows run before its prompt is built, its post-workflows after its commands. A sub-workflow takes the parameters its parent passes it and its own defaults for the rest. An entry with `forEach` runs its sub-workflow once per item, read like a step's `forEach` and `filter` when the run is planned, `{{$value}}` in its `params`. An AI sub-workflow whose entry says `"request": "parent"` takes its parent's *Your prompt* instead of a field of its own; each review before it shows that request, editable for the phases still to run. A sub-workflow's own pre- and post-workflows are phases of their own; a cycle is left out where it closes. Between two phases the runner pauses for a review unless *Run without stopping* is on, and what a phase deletes or changes is confirmed before it runs ([ADMIN_PANEL.md §8.12](ADMIN_PANEL.md), *A run, phase by phase*).
 
 ---
 
@@ -520,7 +520,7 @@ The `in` / `not_in` operators are the foundation of diff-style workflows. For ex
 Paired with the symmetric `not_in` step against `param.languages` filtered by `data.langData.languages`, this lets a workflow synchronise the project state with the user's selection — only adding new items and only deleting absent ones, leaving the rest untouched.
 
 #### `preWorkflows` / `postWorkflows` (array)
-Sub-workflows to run before/after. Can be a simple string ID or an object with `id`, `params`, and `condition`. Each one runs as a phase of its own, and may be an AI workflow (see *Sub-Workflows*).
+Sub-workflows to run before/after. Can be a simple string ID or an object with `id`, `params`, `condition`, `forEach` with its `filter` and `label`, and `request`. Each one runs as a phase of its own (one per item with `forEach`), and may be an AI workflow (see *Sub-Workflows*).
 
 ---
 
@@ -684,7 +684,7 @@ Fallback: checks `$fetchedData[key]`. Unknown placeholders are left as-is.
 ### AI Workflow Execution (in `preview/preview-ai-tools.js`)
 
 ```
-1. User fills the parameter form, and a Your prompt per AI phase
+1. User fills the parameter form, and a Your prompt per AI phase (one for every phase that takes its parent's)
 2. Click the primary action button
 3. POST /admin/api/p/<projectId>/workflow-generate-steps  { workflowId, params }
    → the run's phases (getWorkflowPhases()), each resolved against the project as it is
@@ -744,11 +744,17 @@ Conditions are used in multiple places with slightly different capabilities:
 | Parameter visibility | ❌ | ❌ | ❌ | `=== !==` | Direct param IDs |
 | forEach filter | ✅ | ❌ | ❌ | `=== == !== !=` | `$key`, `$value`, `$value.field` |
 
+In a step condition and a sub-workflow's condition, the right side of a comparison is a literal (a quoted string, a number, `true`, `false`, `null`) or a `{{path}}`, read from the context as the left side is: `param.defaultLanguage !== {{langData.default_language}}` compares two values. A right side without braces is a literal. A forEach filter reads its right side the same way.
+
+A `*` in a path reads every item of a list: `switchNow.children.*.params.data-lang` is each child's `data-lang`, as a list.
+
 ### Value Normalization
 
 Boolean-like strings are automatically normalized:
 - `"true"`, `"on"`, `"1"` → `true`
 - `"false"`, `"off"`, `"0"` → `false`
+
+In a step condition this applies to a value read from the context on either side.
 
 ### Filter Syntax (step params)
 

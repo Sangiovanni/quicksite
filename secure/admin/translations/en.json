@@ -1938,6 +1938,24 @@
                     "agency": { "title": "Creative Agency", "prompt": "Create a creative agency website with home, work, services, team, blog, contact" }
                 }
             },
+            "createWebsiteV2": {
+                "title": "Create Website v2",
+                "description": "Builds the site in several shorter AI answers: the pages and their texts in the default language, then each other language, then the look. A shorter answer is less likely to be cut, and a cut one costs one part."
+            },
+            "translateSite": {
+                "title": "Translate Site",
+                "description": "Translates every text of the site from one of its languages into another: for a language just added, whose texts are still a copy of the default language's.",
+                "params": {
+                    "language": {
+                        "label": "Language to write",
+                        "help": "The project's language whose texts are written."
+                    },
+                    "from": {
+                        "label": "Translate from",
+                        "help": "The language the texts are read from: the project's default language unless you choose another."
+                    }
+                }
+            },
             "addPage": {
                 "title": "Add New Page",
                 "description": "Add a new page to an existing website with proper navigation links and translations for all languages.",
@@ -2100,6 +2118,10 @@
                     "defaultLanguage": {
                         "label": "Default language",
                         "help": "The primary language of your website"
+                    },
+                    "updateLangSwitch": {
+                        "label": "Update the language switch",
+                        "help": "Rebuilds the site's language switch when it no longer lists the project's languages. Untick it to leave the switch as it is."
                     }
                 }
             },
@@ -2271,6 +2293,8 @@
         "aiToolsKindAi": "AI",
         "aiToolsKindBefore": "before",
         "aiToolsRequestFor": "For {name}",
+        "aiToolsRequestShared": "Your prompt — shared by this run's AI phases",
+        "aiToolsNoChanges": "No changes were needed here.",
         "aiToolsReviewAi": "Its prompt is built from the project as it now is.",
         "aiToolsReviewAwaiting": "{current} of {total}: {name} waits for its AI answer, in AI response below.",
         "aiToolsReviewContinue": "Continue",

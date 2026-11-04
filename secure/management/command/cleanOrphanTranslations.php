@@ -127,7 +127,7 @@ function __command_cleanOrphanTranslations(array $params = [], array $urlParams 
     ];
 
     // Partial failure: some files we couldn't unlink. Return 207-ish via 200 + errors so
-    // the caller (typically fresh-start) keeps running other phases, but the failure is visible.
+    // the caller (typically fresh-start) keeps running its other steps, but the failure is visible.
     if (!empty($errors)) {
         return ApiResponse::create(200, 'operation.partial_success')
             ->withMessage(sprintf(

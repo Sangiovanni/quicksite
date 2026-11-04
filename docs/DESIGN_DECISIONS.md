@@ -14688,3 +14688,97 @@ phases (still worth doing, but not a recovery).
 continue where it stopped … do you think it could work?", and his "Yes, build here"; beta.12.
 `public/admin/assets/js/pages/preview/preview-ai-tools.js`, `secure/admin/templates/pages/preview-config.php`,
 `secure/admin/translations/en.json`.
+
+### A condition compares two values, read as a filter reads them (locked 2026-11-03)
+
+**Decision**: In a step's condition and a sub-workflow's condition, the right side of a comparison is a literal or a
+`{{path}}`, read from the run's context as the left side is: `param.defaultLanguage !== {{langData.default_language}}`
+compares the parameter with the project's value. A right side written without braces stays a literal, as before. A
+value read on either side is normalised the same way ("true" and "1" as true). The reading is one function, which a
+forEach filter also uses: the filter always took a `{{path}}` there, and now accepts spaces inside the braces.
+`setup-languages` is written that way: a project already set as asked gets no step, and the default language is set
+before any language is removed.
+
+**Reasoning**: A condition read its right side as text, so `setup-languages`' "only when the default changes" was
+always true. Once a run listed what each phase changes, every Create Website run warned of changes that did not
+happen, and a single-language run failed a step (`addLang` of a language the project has). The filter already compared
+two paths; giving conditions the same reading, through the same code, makes one syntax for both rather than a second
+dialect.
+
+**Alternatives considered**: rewriting the two steps as `forEach` + `filter` (it works, but leaves every other
+workflow's conditions unable to compare two values); reading a bare dotted word on the right as a path (it would change
+what an existing literal means).
+
+**Source**: design round 2026-11-03; beta.12. `secure/src/classes/WorkflowManager.php`,
+`secure/admin/workflows/core/setup-languages.json`.
+
+### Create Website v2 builds the site in shorter AI phases, beside Create Website (locked 2026-11-03)
+
+**Decision**: A new AI workflow, *Create Website v2*, takes Create Website's parameters and runs `fresh-start`,
+`setup-languages` and, when multilingual, the language switch. Then its own phase writes the routes, the menu, the
+footer, every page's structure, the texts of the default language, and a base stylesheet of the layout: a rule for each
+class used, colours and fonts through variables. Then one *Translate Site* phase per other language, then *Restyle*.
+*Translate Site* is a new AI workflow, also listed on its own: it reads one language's texts from the project and
+answers one `setTranslationKeys` per group for another. To repeat it, a sub-workflow entry may run once per item
+(`forEach` and `filter`, read as a step's; `label` names each phase). *Create Website* stays as it was, its own prompt
+unchanged.
+
+**Reasoning**: Create Website asks for the whole site in one answer, and the texts of every language are most of a
+multilingual answer: answers were cut. One language per phase keeps each answer short, and a cut one costs one language,
+not the site. The look is Restyle's, so the product has one style prompt. Restyle reads the stylesheet, never the pages,
+so the main phase writes the stylesheet's layout, which names every class the pages use, and Restyle gives it its look.
+The languages to translate come from the run's parameters: the phases are planned before `setup-languages` adds them.
+The language switch is made before the first AI phase writes the footer that uses it. A v2 beside the original lets the
+two be compared on the same request before one is kept.
+
+**Alternatives considered**: reworking Create Website itself (no comparison); two phases only, the site then its style
+(the languages stay in the long answer); a main phase with no CSS and a Restyle that reads the pages' classes (no
+command reads them); a full stylesheet in the main phase that Restyle then refines (the stylesheet written twice); a
+scope of pages for Translate Site (a cut answer is already recovered from its last whole group).
+
+**Source**: design round 2026-11-03 (Sangio: "make a v2 don't rework it entirely. i want to compare"); beta.12.
+`secure/admin/workflows/core/create-website-v2.json`, `create-website-v2.md`, `translate-site.json`,
+`translate-site.md`, `secure/admin/workflows/schema.json`, `secure/src/classes/WorkflowManager.php`.
+
+### A sub-workflow may take its parent's request (locked 2026-11-03)
+
+**Decision**: An AI sub-workflow whose entry says `"request": "parent"` takes its parent's *Your prompt* instead of a
+field of its own, through AI parents up to the one that owns it; under a parent of steps it keeps its own. The server
+says which phase owns each phase's request (`requestFrom`), and a run shows one field per request: v2's AI phases share
+one. The review before each phase that takes it shows it, editable for the phases still to run. It is locked while one
+of its phases runs, and for good once its last one has started. Without the declaration, each AI phase keeps its own
+field.
+
+**Reasoning**: Three request fields for one website ask the user the same thing three times. One request, handed down,
+tells every phase what the site is, and a review lets the user add what a later phase needs (a tone for a translation,
+a mood for the look) before it runs. A request locked for good when first read would be locked in those reviews.
+
+**Alternatives considered**: one field per AI phase, as before (three for v2); a copy per phase seeded from the
+parent's (an edit then reaches one phase only); every AI sub-workflow taking its parent's request without a declaration
+(a workflow of unrelated AI phases needs its own fields).
+
+**Source**: design round 2026-11-03; beta.12. `secure/src/classes/WorkflowManager.php` (`settleRequests()`),
+`public/admin/assets/js/pages/preview/preview-ai-tools.js`, `secure/admin/workflows/schema.json`.
+
+### The language switch is rebuilt only when it is out of date (locked 2026-11-03)
+
+**Decision**: *Update Language Switch* reads the switch it would replace and rebuilds it only when the languages the
+switch lists, in order, are not the project's. *Setup Languages* runs it after itself while its box **Update the
+language switch** is ticked (by default). A step condition reads every item of a list through a `*` in a path, which is
+how the switch's languages are read. A later phase of steps with none passes without a review, and a run that had no
+step to run ends with a toast saying that no changes were needed.
+
+**Reasoning**: Setup Languages changed the languages without the switch, so a language added on its own was missing
+from the site's switch. Rebuilding the switch on every run would make a Setup Languages run that changes nothing list a
+change and ask to confirm it. Comparing the switch itself serves every caller the same way: a first switch is built, a
+stale one repaired, an up-to-date one, or one changed by hand that still lists the languages, left alone. The box stays
+because a rebuild drops a switch changed by hand.
+
+**Alternatives considered**: rewriting the switch on every run (simplest, but a run with nothing to change is never a
+no-op again); handing the switch update the language list from before the run and comparing it with the list after
+(the server plans the run again at each phase, so that list would be read after the change and always match); updating
+the switch at the end of *Translate Site* (it never changes which languages the project has).
+
+**Source**: the UX run of 2026-11-03; beta.12. `secure/admin/workflows/core/update-lang-switch.json`,
+`secure/admin/workflows/core/setup-languages.json`, `secure/src/classes/WorkflowManager.php` (`walkPath()`),
+`public/admin/assets/js/pages/preview/preview-ai-tools.js`.

@@ -651,15 +651,25 @@ window.PreviewAiTools = (function () {
 
     /**
      * An AI phase's key for its "Your prompt": its workflow, numbered when the run holds it more than
-     * once — stable when a conditional phase before it comes and goes.
+     * once — stable when a conditional phase before it comes and goes. A phase that takes its parent's
+     * request (the server's requestFrom, from "request": "parent") has that phase's key.
      */
     function _requestKey(phase, phases) {
         var list = phases || _plan;
+        if (typeof phase.requestFrom === 'number' && list[phase.requestFrom]) {
+            return _requestKey(list[phase.requestFrom], list);
+        }
         var n = 0;
         for (var i = 0; i < list.length && i < phase.index; i++) {
             if (list[i].workflowId === phase.workflowId) n++;
         }
         return phase.workflowId + (n > 0 ? '#' + (n + 1) : '');
+    }
+
+    /** The AI phases whose prompt carries this request, in order (more than one: a request handed down). */
+    function _requestPhases(key, phases) {
+        var list = phases || _plan;
+        return list.filter(function (p) { return p.ai && _requestKey(p, list) === key; });
     }
 
     // ──────────────────────────── Condition evaluation ──────────────────
@@ -1221,24 +1231,34 @@ window.PreviewAiTools = (function () {
     }
 
     /**
-     * One "Your prompt" field per AI phase of the run, each read when its phase is reached: named by
-     * its workflow when the run holds more than one. A field locks once its phase has started.
+     * One "Your prompt" field per request of the run — an AI phase's own, or one its sub-workflows take
+     * from it — each read when a phase that takes it starts: named by its workflow when the run has more
+     * than one. A field locks while a phase that takes it runs, and for good once the last one starts.
      */
     function _renderYourPromptFields() {
         if (!_yourPromptBody) return;
         _yourPromptBody.replaceChildren();
         var phases = _aiPhases();
+        var owners = [];
+        var seen = {};
         for (var i = 0; i < phases.length; i++) {
-            _yourPromptBody.appendChild(_renderRequestField(phases[i], phases.length > 1));
+            var key = _requestKey(phases[i]);
+            if (seen[key]) continue;
+            seen[key] = true;
+            owners.push(phases[i]);
+        }
+        for (var o = 0; o < owners.length; o++) {
+            _yourPromptBody.appendChild(_renderRequestField(owners[o], owners.length > 1));
         }
     }
 
     /**
-     * One AI phase's request field (named when several are listed, or when idSuffix marks the review's
-     * copy of it); its text kept in _requests.
+     * One request's field (named when several are listed, or when idSuffix marks the review's copy of
+     * it); its text kept in _requests. A request several phases take is named as shared in a review.
      */
     function _renderRequestField(phase, named, idSuffix) {
         var key = _requestKey(phase);
+        var shared = _requestPhases(key).length > 1;
         var wrap = document.createElement('div');
         wrap.className = 'preview-contextual-ai-tools__request';
         var ta = document.createElement('textarea');
@@ -1247,7 +1267,7 @@ window.PreviewAiTools = (function () {
         ta.dataset.requestKey = key;
         ta.placeholder = _t('yourPromptPlaceholder', 'Describe what you want.');
         ta.value = _requests[key] || '';
-        ta.disabled = !!(_run && _run.started && _run.started[key]);
+        ta.disabled = !!(_run && ((_run.started && _run.started[key]) || _run.activeRequest === key));
         ta.addEventListener('input', function () {
             _requests[key] = ta.value;
             // The same request may be on screen twice: in the inputs and in the review before its phase.
@@ -1260,7 +1280,9 @@ window.PreviewAiTools = (function () {
             var label = document.createElement('label');
             label.className = 'preview-contextual-ai-tools__request-label';
             label.htmlFor = ta.id;
-            label.textContent = _t('requestFor', 'For {name}').replace('{name}', phase.title || phase.workflowId);
+            label.textContent = shared && idSuffix
+                ? _t('requestShared', "Your prompt — shared by this run's AI phases")
+                : _t('requestFor', 'For {name}').replace('{name}', phase.title || phase.workflowId);
             wrap.appendChild(label);
         }
         wrap.appendChild(ta);
@@ -1978,6 +2000,7 @@ window.PreviewAiTools = (function () {
             first: opts.resume ? opts.resume.phase : 0,
             confirmed: {},
             started: {},
+            activeRequest: null,
             states: [],
             ok: 0,
             fail: 0,
@@ -2020,6 +2043,8 @@ window.PreviewAiTools = (function () {
                     : _t('executionDoneWithErrors', 'Done ({ok}/{total} succeeded, {fail} failed)')
                         .replace('{ok}', String(run.ok)).replace('{total}', String(run.ok + run.fail)).replace('{fail}', String(run.fail));
             }
+            // A run that had no step to run says so: the project was already as asked.
+            if (!run.ran) toaster(_t('noChanges', 'No changes were needed here.'), 'success');
         } catch (err) {
             console.error('[PreviewAiTools] run failed:', err);
             var failMsg = _t('runFailed', 'The run stopped: {error}').replace('{error}', (err && err.message) || String(err));
@@ -2056,15 +2081,32 @@ window.PreviewAiTools = (function () {
         run.states[k] = 'current';
         _renderRunLine();
         _showPhaseInBatch(k);
-        return phase.ai ? _runAiPhase(run, k, phase, opts) : _runStepsPhase(run, k, phase);
+        if (!phase.ai) return _runStepsPhase(run, k, phase);
+        var outcome = await _runAiPhase(run, k, phase, opts);
+        _releaseRequest(run);
+        return outcome;
     }
 
-    /** A phase of steps: its review or its confirmation, then its steps (kept steps stay kept on a stop). */
+    /** An AI phase is over: a request a later phase still takes opens again for the review before it. */
+    function _releaseRequest(run) {
+        var key = run.activeRequest;
+        run.activeRequest = null;
+        if (!key || run.started[key] || !_runnerView) return;
+        var fields = _runnerView.querySelectorAll('textarea[data-request-key]');
+        for (var i = 0; i < fields.length; i++) {
+            if (fields[i].dataset.requestKey === key) fields[i].disabled = false;
+        }
+    }
+
+    /**
+     * A phase of steps: its review or its confirmation, then its steps (kept steps stay kept on a stop).
+     * A later phase with no step passes without a review: there is nothing in it to stop before.
+     */
     async function _runStepsPhase(run, k, phase) {
         var kept = !!phase.kept;
         var warned = _warnedEffects(phase.effects);
         if (!_autoContinue()) {
-            if (k > run.first || warned.length > 0) {
+            if ((k > run.first && (phase.steps || []).length > 0) || warned.length > 0) {
                 if (!(await _review(run, k, phase))) return { stop: 'user', phase: phase, from: 0, resolved: kept };
                 _markConfirmed(run, warned);
             }
@@ -2089,7 +2131,10 @@ window.PreviewAiTools = (function () {
             if (!_autoContinue() && k > run.first) {
                 if (!(await _review(run, k, phase))) return { stop: 'user', phase: phase, from: 0, resolved: false };
             }
-            run.started[key] = true;
+            // The request is read now: locked while this phase runs, and for good once its last phase starts.
+            var takers = _requestPhases(key, run.plan);
+            if (takers.length === 0 || takers[takers.length - 1].index <= k) run.started[key] = true;
+            run.activeRequest = key;
             _lockRequest(key);
             var built = await _fetchPhase(run.params, k, { prompt: true });
             var request = (_requests[key] || '').trim();
@@ -2509,7 +2554,7 @@ window.PreviewAiTools = (function () {
         if (back) back.disabled = locked;
     }
 
-    /** An AI phase's request, read when its phase starts: its fields lock from then on. */
+    /** A request, read when a phase that takes it starts: its fields lock (until _releaseRequest(), unless it was the last). */
     function _lockRequest(key) {
         var fields = _runnerView ? _runnerView.querySelectorAll('textarea[data-request-key]') : [];
         for (var i = 0; i < fields.length; i++) {

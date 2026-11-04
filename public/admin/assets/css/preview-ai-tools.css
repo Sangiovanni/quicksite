@@ -1196,13 +1196,6 @@
     display: flex;
     gap: var(--space-sm, 8px);
 }
-/* Run before the allowance is back: it looks unavailable, and a click says when. */
-.preview-contextual-ai-tools__kept-actions .admin-btn[aria-disabled="true"],
-.preview-contextual-ai-tools__kept-actions .admin-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
 /* The AI answer's Execute when the answer deletes something: red. */
 .preview-contextual-ai-tools__action-btn--danger {
     background: #dc2626;
