@@ -413,17 +413,21 @@ class WorkflowManager {
     /**
      * The phases a run of this workflow goes through, in order: each pre-workflow, the workflow itself,
      * then each post-workflow; a sub-workflow's own pre- and post-workflows run around it, depth first.
-     * A sub-workflow's condition is evaluated here, once, when the run is planned: against the
-     * parameters its parent was given, and the parent's data when the condition reads any. An entry
-     * with a forEach (and its filter, read as a step's) is one phase per item, {{$value}} in its params
-     * and its label. Nothing else is resolved: a phase names its workflow and the parameters its parent
-     * passes it. A workflow already on the way to itself (a cycle), or nested deeper than
-     * PHASES_MAX_DEPTH, is left out.
+     * A sub-workflow's condition is evaluated at every walk — when the run is planned, and again for
+     * each phase the run reaches (resolvePhase()) — against the parameters its parent was given, and
+     * the parent's data when the condition reads any. An entry with a forEach (and its filter, read as
+     * a step's) is one phase per item, {{$value}} in its params and its label. Each phase carries its
+     * key (the entries that lead to it, and a repeated entry's item), so a phase that is no longer the
+     * one the plan named at its place is refused rather than run (the workflow-generate-steps arm).
+     * Nothing else is resolved: a phase names its workflow and the parameters its parent passes it. A
+     * workflow already on the way to itself (a cycle), or nested deeper than PHASES_MAX_DEPTH, is left
+     * out.
      *
      * @param array $workflow The workflow definition
      * @param array $userParams The run's parameters
-     * @return array List of ['kind' => 'pre'|'main'|'post', 'workflowId' => string, 'params' => array,
-     *               'requestFrom' => int|null (settleRequests()), 'label'? => string (a repeated entry's item)]
+     * @return array List of ['kind' => 'pre'|'main'|'post', 'workflowId' => string, 'key' => string,
+     *               'params' => array, 'requestFrom' => int|null (settleRequests()),
+     *               'label'? => string (a repeated entry's item)]
      */
     public function getWorkflowPhases(array $workflow, array $userParams = []): array {
         $phases = [];
@@ -471,7 +475,8 @@ class WorkflowManager {
     /**
      * One workflow's phases, added to $phases: its pre-workflows', its own, its post-workflows'. $from:
      * 'every' (reachableWorkflows()' mode), and from the entry that named it 'parentRef' (its parent's
-     * phase), 'requestParent' (the entry's "request": "parent") and 'label'.
+     * phase), 'requestParent' (the entry's "request": "parent"), 'label' and 'key' (the phase's key;
+     * the run's own workflow is keyed by its id).
      */
     private function collectPhases(array $workflow, array $params, string $kind, array $trail, array &$phases, array $from): void {
         $id = (string) ($workflow['id'] ?? '');
@@ -482,25 +487,29 @@ class WorkflowManager {
         $trail[] = $id;
         $data = null;
         $ref = ++$this->phaseRefs;
-        $own = ['kind' => $kind, 'workflowId' => $id, 'params' => $params, 'ref' => $ref]
+        $key = (string) ($from['key'] ?? $id);
+        $own = ['kind' => $kind, 'workflowId' => $id, 'key' => $key, 'params' => $params, 'ref' => $ref]
             + array_intersect_key($from, ['parentRef' => true, 'requestParent' => true, 'label' => true]);
         // Every phase before the run's own workflow is a pre phase, every phase after it a post phase.
-        $this->collectSubPhases($workflow, $params, 'preWorkflows', $kind === 'main' ? 'pre' : $kind, $trail, $phases, $data, $from, $ref);
+        $this->collectSubPhases($workflow, $params, 'preWorkflows', $kind === 'main' ? 'pre' : $kind, $trail, $phases, $data, $from, $ref, $key);
         $phases[] = $own;
-        $this->collectSubPhases($workflow, $params, 'postWorkflows', $kind === 'main' ? 'post' : $kind, $trail, $phases, $data, $from, $ref);
+        $this->collectSubPhases($workflow, $params, 'postWorkflows', $kind === 'main' ? 'post' : $kind, $trail, $phases, $data, $from, $ref, $key);
     }
 
     /**
      * The phases of one list of sub-workflows (preWorkflows or postWorkflows): each entry's condition
      * checked and its parameters resolved against its parent's — once per item of its forEach, when it
-     * has one; the parent's data fetched once, and only when an entry reads it.
+     * has one; the parent's data fetched once, and only when an entry reads it. A phase's key is its
+     * parent's, then "/pre<position>:<id>" or "/post<position>:<id>" (the entry's position in its list,
+     * so a sibling left out changes no other key), then "=<item>" for each item of a forEach.
      */
-    private function collectSubPhases(array $workflow, array $params, string $list, string $kind, array $trail, array &$phases, ?array &$data, array $from, int $parentRef): void {
+    private function collectSubPhases(array $workflow, array $params, string $list, string $kind, array $trail, array &$phases, ?array &$data, array $from, int $parentRef, string $parentKey): void {
         $every = !empty($from['every']);
-        foreach (($workflow[$list] ?? []) as $entry) {
+        foreach (array_values($workflow[$list] ?? []) as $position => $entry) {
             $subId = is_string($entry) ? $entry : (is_array($entry) ? (string) ($entry['id'] ?? '') : '');
             if ($subId === '') continue;
-            $link = ['every' => $every, 'parentRef' => $parentRef,
+            $entryKey = $parentKey . '/' . ($list === 'preWorkflows' ? 'pre' : 'post') . $position . ':' . $subId;
+            $link = ['every' => $every, 'parentRef' => $parentRef, 'key' => $entryKey,
                 'requestParent' => is_array($entry) && ($entry['request'] ?? null) === 'parent'];
             if ($every) {
                 $sub = $this->loadWorkflow($subId);
@@ -529,6 +538,8 @@ class WorkflowManager {
             foreach ($this->forEachItems($forEach, $filter, $context) as $key => $value) {
                 $itemContext = array_merge($context, ['$key' => $key, '$value' => $value, '$item' => $value]);
                 $itemLink = $link;
+                $itemLink['key'] = $entryKey . '=' . (is_string($value) ? $value
+                    : (string) json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
                 if ($label !== null) {
                     $itemLink['label'] = (string) $this->resolveStepParamValue($label, $itemContext);
                 }
@@ -606,13 +617,19 @@ class WorkflowManager {
      * expanded. An AI workflow answers its prompt when $options['prompt'] is set (the errors of its spec
      * instead when it is not valid), and the commands its AI answered as its steps when $options['answer']
      * holds them. Each step comes with what it deletes or changes, in 'effects' (stepEffect(), null for a
-     * step that is not warned).
+     * step that is not warned). $options['key'], the phase's key as the runner's plan has it, is checked
+     * first: when the walk now puts another phase at $index, or none, the answer is ['planChanged' => true]
+     * and nothing is resolved — a condition or a forEach that reads the project's data planned another run.
      *
-     * @return array|null ['index', 'kind', 'workflowId', 'title', 'icon', 'ai', 'requestFrom', 'steps', 'count',
-     *                    'effects', 'prompt'?, 'validationErrors'?], or null when the run has no such phase
+     * @return array|null ['index', 'kind', 'workflowId', 'key', 'title', 'icon', 'ai', 'requestFrom', 'steps',
+     *                    'count', 'effects', 'prompt'?, 'validationErrors'?], ['planChanged' => true], or null
+     *                    when the run has no such phase (and no key was given)
      */
     public function resolvePhase(array $workflow, array $userParams, int $index, array $options = []): ?array {
         $phases = $this->getWorkflowPhases($workflow, $userParams);
+        if (array_key_exists('key', $options) && ($phases[$index]['key'] ?? null) !== $options['key']) {
+            return ['planChanged' => true];
+        }
         return isset($phases[$index]) ? $this->resolvePhaseEntry($phases[$index], $index, $options) : null;
     }
 
@@ -624,6 +641,7 @@ class WorkflowManager {
             'index' => $index,
             'kind' => $phase['kind'],
             'workflowId' => $phase['workflowId'],
+            'key' => (string) ($phase['key'] ?? ''),
             // A repeated entry's phase is named by its item: "Translate Site — Français".
             'title' => ($phase['label'] ?? '') !== '' ? $title . ' — ' . $phase['label'] : $title,
             'icon' => (string) ($workflow['meta']['icon'] ?? ''),

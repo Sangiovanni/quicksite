@@ -152,14 +152,13 @@
                     });
                 }
             } else if (ev.event === 'message_delta') {
+                // The answer's end: its output count, and an input count only when the event carries one
+                // (the input count came with message_start).
                 const u = obj && obj.usage;
                 if (u) {
-                    out.push({
-                        usage: {
-                            input_tokens: 0,
-                            output_tokens: u.output_tokens || 0
-                        }
-                    });
+                    const counts = { output_tokens: u.output_tokens || 0 };
+                    if (typeof u.input_tokens === 'number') counts.input_tokens = u.input_tokens;
+                    out.push({ usage: counts });
                 }
                 const reason = obj && obj.delta && obj.delta.stop_reason;
                 if (reason) out.push({ finish: reason });

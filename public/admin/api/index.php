@@ -813,6 +813,10 @@ switch ($action) {
         // resolved now: the runner asks when it reaches it, so the phase reads what the earlier ones
         // changed. For an AI phase, "prompt": true adds its prompt and "answer": [...] gives the
         // commands its AI answered back as its steps. Every step comes with what it deletes or changes.
+        // A run's "key" is the phase's key as its plan has it: when the walk now puts another phase at
+        // that place (a condition or a forEach that reads the project's data, flipped by an earlier
+        // phase), or none, the answer is 409 with "planChanged" and nothing is resolved. The plan itself
+        // is never taken from the request: every phase is resolved here.
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             http_response_code(405);
             echo json_encode(['error' => 'Method not allowed']);
@@ -836,6 +840,11 @@ switch ($action) {
             echo json_encode(['error' => 'answer must be a list of commands']);
             break;
         }
+        if (array_key_exists('key', $input) && !is_string($input['key'])) {
+            http_response_code(400);
+            echo json_encode(['error' => 'key must be a string']);
+            break;
+        }
 
         require_once SECURE_FOLDER_PATH . '/src/classes/WorkflowManager.php';
         $manager = new WorkflowManager();
@@ -857,7 +866,15 @@ switch ($action) {
             if (array_key_exists('answer', $input)) {
                 $options['answer'] = $input['answer'];
             }
+            if (array_key_exists('key', $input)) {
+                $options['key'] = $input['key'];
+            }
             $phase = $manager->resolvePhase($workflow, $userParams, $input['phase'], $options);
+            if (isset($phase['planChanged'])) {
+                http_response_code(409);
+                echo json_encode(['error' => "The run's plan changed", 'planChanged' => true]);
+                break;
+            }
             if ($phase === null) {
                 http_response_code(404);
                 echo json_encode(['error' => 'No such phase']);

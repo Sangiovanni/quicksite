@@ -14782,3 +14782,63 @@ the switch at the end of *Translate Site* (it never changes which languages the 
 **Source**: the UX run of 2026-11-03; beta.12. `secure/admin/workflows/core/update-lang-switch.json`,
 `secure/admin/workflows/core/setup-languages.json`, `secure/src/classes/WorkflowManager.php` (`walkPath()`),
 `public/admin/assets/js/pages/preview/preview-ai-tools.js`.
+
+### A run's AI cost is shown and never stored (locked 2026-11-04)
+
+**Decision**: The AI tools runner shows what a run's AI phases cost: the AI exchange shows the phase it serves, and a
+block above the Batch shows the run's total and each AI phase. With the connection's key it counts, for each call, the
+characters of the messages sent and of the answer received, and the tokens the provider reports; a provider that sends
+no counts is said to send none, and a call that failed (a send refused, an answer broken off) to have failed. Pasted, it counts the characters of each prompt shown to copy and of each answer taken.
+Characters are never turned into tokens. One function (`_costRecord()`) builds the run's record from what was counted,
+and the display reads only that record: per AI phase its workflow and key, how its prompt went, each call's provider,
+model, characters, tokens (null when none were reported) and how its answer ended, then their sums, and the run's
+totals kept apart by how the prompts went. The record holds ids and numbers, no word of the panel: the phase's title is
+there for the display only. It stays on screen until that workflow runs again, in the page's memory; nothing is
+written. A streamed answer's counts are its events' put together: Anthropic sends the input count when the answer
+starts and the output count when it ends, and the caller kept the last event's alone, which lost the input count.
+
+**Reasoning**: Two ways to build a site are compared by what a run costs. Tokens are what a provider bills and limits,
+but only a provider can count them, with its own tokenizer, and a guess at 3 or 4 characters a token moves by model,
+by language and by how much of a prompt is JSON. Two runs pasted the same way compare exactly in characters; a ratio
+applied to both changes neither the order nor the gap. Counting characters with the key too gives every run one
+measure, and, beside the reported tokens, the real ratio for each model. One record that holds only data is the piece
+a statistics engine can store unchanged later, and grouped by workflow and key rather than by a title that changes
+with the panel's language. Storing it is new data per installation, with its own questions (where, how much, who
+reads it, whether a deployment turns it on), so it waits for its own release.
+
+**Alternatives considered**: tokens estimated from characters for a pasted run, shown beside them (a guessed number
+next to measured ones); characters only for a pasted run and tokens only with the key (no one measure across the
+two); the totals put on the Batch's *Done* line (the first parameter change after a run rewrites it); each phase's
+figures only in the AI exchange (one zone serves every AI phase in turn); storing the record now.
+
+**Source**: a UX run's remarks, ruled 2026-11-04; beta.12. `public/admin/assets/js/pages/preview/preview-ai-tools.js`
+(`_costRecord()`, `_renderCost()`), `public/admin/assets/js/pages/ai/lib/ai-call.js` (`mergeUsage()`),
+`public/admin/assets/js/pages/ai/lib/stream-parsers.js`.
+
+### A phase is asked for by its key, and one no longer planned there is refused (locked 2026-11-04)
+
+**Decision**: Every phase of a run has a key: the run's workflow, then each sub-workflow entry on the way to the phase,
+by its list and its position in that list (`pre1:setup-languages`, `post0:translate-site`), and a repeated entry's
+item (`=fr`). The plan and every phase the server answers carry it, and the runner sends it with every phase request
+of a run. The server still walks the run's phases and resolves every phase itself; when the walk now puts another
+phase at that place, or none, it refuses with 409 `planChanged` and resolves nothing. The runner then stops with *The
+run's plan changed: start the run again*: what ran stays done and nothing is kept. A kept rest carries its phase's key
+and resumes only where that phase still is.
+
+**Reasoning**: A sub-workflow's condition, or its `forEach`, may read the project's data, and the server decides it
+again at every phase, against the project as the earlier phases left it. If it flips, a phase number points at another
+phase, or past the end, and that phase would run with another entry's parameters. No shipped workflow does this, so
+the case is refused loudly rather than designed around. A key of the workflow alone would not tell two entries of the
+same workflow apart, and the position in the list, not in the plan, keeps every other key when a sibling is left out.
+The rest of a run planned against a plan that no longer holds is not kept: no shipped workflow reaches it, and running
+its phases by their old places is the fault being refused.
+
+**Alternatives considered**: the runner sending its plan for the server to run (the server would trust a client's
+plan, and stop resolving each phase when it is reached); refusing a data-reading entry condition outright (closes a
+door a workflow may need); deciding sub-workflow conditions once and pinning the plan on the server (a run would need
+state the server does not keep); keeping the rest after the refusal and resuming it by key (more code for a case no
+shipped workflow reaches).
+
+**Source**: a UX run's remarks, ruled 2026-11-04; beta.12. `secure/src/classes/WorkflowManager.php`
+(`collectPhases()`, `collectSubPhases()`, `resolvePhase()`), `public/admin/api/index.php` (`workflow-generate-steps`),
+`public/admin/assets/js/pages/preview/preview-ai-tools.js`.

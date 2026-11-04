@@ -151,19 +151,19 @@
             }
           },
           "optionsFrom": {
-            "description": "Dynamic options populated from dataRequirements at render time.",
+            "description": "Dynamic options populated from dataRequirements at render time. The data is a list (each item its value and label, or the fields `value` / `label` name) or a map (each key a value, its value the label).",
             "oneOf": [
               {
                 "type": "string",
-                "description": "dataRequirements ID — simple array items become both value and label"
+                "description": "dataRequirements ID — simple array items become both value and label; a map's keys are the values, its values the labels"
               },
               {
                 "type": "object",
                 "required": ["data"],
                 "properties": {
                   "data": { "type": "string", "description": "dataRequirements ID to pull options from" },
-                  "value": { "type": "string", "description": "Field name to use as option value" },
-                  "label": { "type": "string", "description": "Field name to use as option label" },
+                  "value": { "type": "string", "description": "Field name to use as option value (a list of objects; not read for a map)" },
+                  "label": { "type": "string", "description": "Field name to use as option label (a list of objects; not read for a map)" },
                   "prepend": {
                     "type": "array",
                     "description": "Options to add before dynamic ones (e.g., a 'None' option)",
@@ -178,6 +178,10 @@
                   "filterFrom": {
                     "type": "string",
                     "description": "Another parameter ID whose current value(s) restrict the available options. The filter only applies when the referenced param is currently visible (its own `condition` evaluates truthy) AND its value is non-empty. Otherwise the full optionsFrom list is used. Useful for cascading selects (e.g. 'defaultLanguage' restricted to languages picked in the multi-select 'languages')."
+                  },
+                  "excludeFrom": {
+                    "type": "string",
+                    "description": "Another parameter ID whose current value(s) are left out of the available options — a list parameter's every value. Read as filterFrom reads its parameter: only while the referenced param is currently visible AND its value is non-empty; otherwise nothing is left out. The field is drawn again on the same changes as filterFrom's, and a value no longer offered moves to the first option left (e.g. Translate Site's 'language' never offers the 'from' language)."
                   }
                 }
               }

@@ -166,7 +166,7 @@ Workflows can reference other workflows via `preWorkflows` and `postWorkflows`:
 ]
 ```
 
-Every workflow runs in phases: each pre-workflow, then the workflow itself, then each post-workflow, in order — manual and AI workflows alike, and any of them may be an AI workflow. A sub-workflow's condition is evaluated once, when the run is planned; a phase is resolved when the run reaches it, its own data requirements fetched against the project as the earlier phases left it, so it sees what they changed. An AI phase builds its prompt when it is reached: an AI workflow's pre-workflows run before its prompt is built, its post-workflows after its commands. A sub-workflow takes the parameters its parent passes it and its own defaults for the rest. An entry with `forEach` runs its sub-workflow once per item, read like a step's `forEach` and `filter` when the run is planned, `{{$value}}` in its `params`. An AI sub-workflow whose entry says `"request": "parent"` takes its parent's *Your prompt* instead of a field of its own; each review before it shows that request, editable for the phases still to run. A sub-workflow's own pre- and post-workflows are phases of their own; a cycle is left out where it closes. Between two phases the runner pauses for a review unless *Run without stopping* is on, and what a phase deletes or changes is confirmed before it runs ([ADMIN_PANEL.md §8.12](ADMIN_PANEL.md), *A run, phase by phase*).
+Every workflow runs in phases: each pre-workflow, then the workflow itself, then each post-workflow, in order — manual and AI workflows alike, and any of them may be an AI workflow. A sub-workflow's condition is decided when the run is planned, and again each time the run reaches a phase; a phase is resolved when the run reaches it, its own data requirements fetched against the project as the earlier phases left it, so it sees what they changed. Each phase has a key — the entries that lead to it and, for a repeated entry, its item — and the run asks for a phase by its key: when a condition or a `forEach` that reads the project's data now plans another phase in its place, the run stops there with *The run's plan changed: start the run again*. An AI phase builds its prompt when it is reached: an AI workflow's pre-workflows run before its prompt is built, its post-workflows after its commands. A sub-workflow takes the parameters its parent passes it and its own defaults for the rest. An entry with `forEach` runs its sub-workflow once per item, read like a step's `forEach` and `filter`, whenever the condition is, `{{$value}}` in its `params`. An AI sub-workflow whose entry says `"request": "parent"` takes its parent's *Your prompt* instead of a field of its own; each review before it shows that request, editable for the phases still to run. A sub-workflow's own pre- and post-workflows are phases of their own; a cycle is left out where it closes. Between two phases the runner pauses for a review unless *Run without stopping* is on, and what a phase deletes or changes is confirmed before it runs ([ADMIN_PANEL.md §8.12](ADMIN_PANEL.md), *A run, phase by phase*).
 
 ---
 
@@ -426,9 +426,13 @@ Shorthand — uses the data array directly as values.
 ```
 Full form — `data` references a `dataRequirements` ID, `value`/`label` pick fields from each item, `prepend` adds fixed options at the top.
 
+Data that is a map rather than a list gives one option per entry, its key the value and its value the label (`value` / `label` are not read): Translate Site's two fields read `getLangList`'s `language_names` so, showing each language's name and sending its code.
+
 `filterFrom` cascades the resolved options from another parameter's value: the option list is restricted to entries whose `value` appears in the referenced parameter's current selection. The cascade only applies when the referenced parameter is currently visible (its own `condition` is truthy) AND has a non-empty value — otherwise the full list is used. The auto-correct rule: when the cascade narrows the option set and the dependent's current value is no longer valid, the dependent flips to the first available option.
 
 Example: setup-languages's `defaultLanguage` uses `filterFrom: "languages"`. With Multilingual unchecked, Languages is hidden, so the cascade is skipped and Default language shows all 230 languages. Check Multilingual and pick `[en, fr]` in Languages, and Default language re-renders with just English + Français.
+
+`excludeFrom` names another parameter whose current value — or values, for a list — is left out of the options, read as `filterFrom` reads its parameter (only while that one is visible and has a value), drawn again on the same changes and with the same auto-correct. Translate Site's *Language to write* has `"excludeFrom": "from"`, so it never offers the *Translate from* language.
 
 `"searchable": true` beside the `type` of a `select` or a `tag-select` gives its list a search that matches an option's name and its value: the `select` becomes a dropdown you type in, the `tag-select` gets a search field above its checkboxes that hides the options that do not match but never one already ticked. On any other type it is ignored.
 
@@ -754,7 +758,7 @@ Boolean-like strings are automatically normalized:
 - `"true"`, `"on"`, `"1"` → `true`
 - `"false"`, `"off"`, `"0"` → `false`
 
-In a step condition this applies to a value read from the context on either side.
+That is how the prompt's `{{#if}}` reads a `param.` value and how a data requirement's `condition` reads its parameter. A step condition and a sub-workflow's condition normalize a value read from the context, on either side, from `"true"` / `"1"` and `"false"` / `"0"` only: `"on"` and `"off"` stay text.
 
 ### Filter Syntax (step params)
 

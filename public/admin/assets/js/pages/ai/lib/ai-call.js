@@ -116,6 +116,19 @@
     }
 
     /**
+     * A stream's token counts so far, with one more event's. A count never goes down within one
+     * answer, so each keeps its largest; a count an event leaves out stays as it was. Anthropic sends
+     * the input count when the answer starts and the output count when it ends.
+     */
+    function mergeUsage(usage, more) {
+        const out = Object.assign({}, usage || {});
+        ['input_tokens', 'output_tokens'].forEach((k) => {
+            if (typeof more[k] === 'number') out[k] = Math.max(typeof out[k] === 'number' ? out[k] : 0, more[k]);
+        });
+        return out;
+    }
+
+    /**
      * Consume an SSE/streaming response, calling onChunk(deltaText) per
      * delta and accumulating the full content. Returns the same shape as
      * the non-streaming branch.
@@ -156,7 +169,7 @@
                             catch (_e) { /* swallow caller errors */ }
                         }
                     }
-                    if (ev.usage) usage = ev.usage;
+                    if (ev.usage) usage = mergeUsage(usage, ev.usage);
                     if (ev.finish) finishReason = ev.finish;
                 }
             }
@@ -174,7 +187,7 @@
                         catch (_e) { /* noop */ }
                     }
                 }
-                if (ev.usage) usage = ev.usage;
+                if (ev.usage) usage = mergeUsage(usage, ev.usage);
                 if (ev.finish) finishReason = ev.finish;
             }
             // Flush decoder.
@@ -187,7 +200,7 @@
                         content += ev.delta;
                         if (typeof onChunk === 'function') onChunk(ev.delta, { content, model, providerType: connection.providerType });
                     }
-                    if (ev.usage) usage = ev.usage;
+                    if (ev.usage) usage = mergeUsage(usage, ev.usage);
                     if (ev.finish) finishReason = ev.finish;
                 });
             }

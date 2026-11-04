@@ -1344,3 +1344,47 @@
     font-size: 12px;
     line-height: 1.4;
 }
+
+/* A run's AI cost: the Run zone's block (the run's total, then each AI phase when there are several),
+   above the Batch, and the AI exchange's line for the AI phase it serves. */
+.preview-contextual-ai-tools__cost {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px 10px;
+    border: 1px solid var(--admin-border);
+    border-radius: 6px;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--admin-text-muted);
+}
+.preview-contextual-ai-tools__cost[hidden],
+.preview-contextual-ai-tools__phase-cost[hidden] {
+    display: none;
+}
+.preview-contextual-ai-tools__cost-title,
+.preview-contextual-ai-tools__cost-line,
+.preview-contextual-ai-tools__cost-note,
+.preview-contextual-ai-tools__cost-phase-name {
+    margin: 0;
+}
+.preview-contextual-ai-tools__cost-title,
+.preview-contextual-ai-tools__cost-phase-name {
+    color: var(--admin-text);
+    font-weight: 600;
+}
+.preview-contextual-ai-tools__cost-note {
+    font-style: italic;
+}
+.preview-contextual-ai-tools__cost-phases {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 4px;
+}
+.preview-contextual-ai-tools__phase-cost {
+    padding: 2px 0;
+    font-size: 11px;
+    line-height: 1.4;
+    color: var(--admin-text-muted);
+}

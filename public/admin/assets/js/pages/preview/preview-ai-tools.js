@@ -63,6 +63,10 @@ window.PreviewAiTools = (function () {
     var _answerParts = 0;                    // the answer ready was put together from this many answers (0: one); it waits for Execute
     var _aiSending = false;                  // a send to the AI is under way
     var _recoveryEls = null;                 // the waiting bar's Continue the answer and Send again ({ continueBtn, sendAgainBtn })
+    // A run's cost: the last run's tally of each workflow (_costRecord() builds the record the display
+    // reads), in memory only — nothing is written; a new run of the workflow starts it again.
+    var _lastCost = {};
+    var _exchangePhase = null;               // the AI phase the AI exchange last served, in the last run
 
     // DOM refs — bound on init().
 
@@ -111,6 +115,8 @@ window.PreviewAiTools = (function () {
     var _reviewEl = null;                // the pause before a phase: what it does, Continue / Stop
     var _yourPromptBody = null;          // the Your prompt section's body: one field per AI phase
     var _exchangeHeaderEl = null;        // the AI exchange zone's header, naming the AI phase it serves
+    var _phaseCostEl = null;             // the AI exchange's cost: the AI phase it serves
+    var _costEl = null;                  // the Run zone's cost block: the run's total and each AI phase
 
     // ──────────────────────────── i18n ──────────────────────────────────
 
@@ -538,6 +544,7 @@ window.PreviewAiTools = (function () {
         _aiResponseStatus = { type: 'idle' };
         _plan = [];
         _answerPhase = null;
+        _exchangePhase = null;
         _showRunnerView();
         _renderRunnerLoading(workflow);
         return _fetchWorkflowDetail(workflow.id).then(function (detail) {
@@ -570,6 +577,7 @@ window.PreviewAiTools = (function () {
         _aiResponseStatus = { type: 'idle' };
         _plan = [];
         _answerPhase = null;
+        _exchangePhase = null;
         _showListView();
     }
 
@@ -722,50 +730,64 @@ window.PreviewAiTools = (function () {
         }, 400);
     }
 
-    // ──────────────────────────── optionsFrom (incl. filterFrom) ────────
+    // ──────────────────────────── optionsFrom (incl. filterFrom, excludeFrom) ──
 
+    /**
+     * A field's options from its data requirement: a list (each item its value and label, or the
+     * item's `value` / `label` fields) or a map (each key a value, its value the label: Translate
+     * Site's language names). filterFrom keeps only the values another parameter holds, excludeFrom
+     * leaves them out (e.g. defaultLanguage restricted to the languages picked; Translate Site's
+     * language to write never the one translated from).
+     */
     function _resolveOptionsFromData(param) {
         var of = param.optionsFrom;
         if (!of) return null;
         var dataKey = typeof of === 'string' ? of : of.data;
         if (!dataKey) return null;
         var fetched = _fetchedData ? _fetchedData[dataKey] : null;
-        if (!Array.isArray(fetched)) return null;
+        var isMap = fetched !== null && typeof fetched === 'object' && !Array.isArray(fetched);
+        if (!Array.isArray(fetched) && !isMap) return null;
         var valueField = (typeof of === 'object') ? of.value : null;
         var labelField = (typeof of === 'object') ? of.label : null;
         var prepend = (typeof of === 'object' && Array.isArray(of.prepend)) ? of.prepend : [];
         var options = prepend.slice();
-        for (var i = 0; i < fetched.length; i++) {
-            var item = fetched[i];
-            if (valueField) {
-                options.push({
-                    value: item[valueField],
-                    label: item[labelField] != null ? String(item[labelField]) : String(item[valueField])
-                });
-            } else {
-                options.push({ value: item, label: String(item) });
-            }
-        }
-
-        // filterFrom: cascade from another param's value (e.g. defaultLanguage
-        // restricted to whatever's in the languages array). Only applies when
-        // the referenced param is visible AND has a non-empty value.
-        if (typeof of === 'object' && of.filterFrom) {
-            var refParam = _findParam(of.filterFrom);
-            if (refParam && _isParamVisible(refParam)) {
-                var refVal = _paramValues[of.filterFrom];
-                var refList = Array.isArray(refVal)
-                    ? refVal
-                    : (refVal != null && refVal !== '' ? [refVal] : []);
-                if (refList.length > 0) {
-                    options = options.filter(function (o) {
-                        return refList.indexOf(o.value) !== -1;
+        if (isMap) {
+            Object.keys(fetched).forEach(function (key) {
+                options.push({ value: key, label: fetched[key] != null ? String(fetched[key]) : key });
+            });
+        } else {
+            for (var i = 0; i < fetched.length; i++) {
+                var item = fetched[i];
+                if (valueField) {
+                    options.push({
+                        value: item[valueField],
+                        label: item[labelField] != null ? String(item[labelField]) : String(item[valueField])
                     });
+                } else {
+                    options.push({ value: item, label: String(item) });
                 }
             }
         }
 
+        if (typeof of === 'object') {
+            var keep = of.filterFrom ? _refValues(of.filterFrom) : null;
+            if (keep) options = options.filter(function (o) { return keep.indexOf(o.value) !== -1; });
+            var drop = of.excludeFrom ? _refValues(of.excludeFrom) : null;
+            if (drop) options = options.filter(function (o) { return drop.indexOf(o.value) === -1; });
+        }
         return options;
+    }
+
+    /**
+     * The value(s) another parameter holds, as a list, for filterFrom and excludeFrom: null while that
+     * parameter is hidden or empty, which then filters nothing.
+     */
+    function _refValues(id) {
+        var refParam = _findParam(id);
+        if (!refParam || !_isParamVisible(refParam)) return null;
+        var refVal = _paramValues[id];
+        var list = Array.isArray(refVal) ? refVal : (refVal != null && refVal !== '' ? [refVal] : []);
+        return list.length > 0 ? list : null;
     }
 
     function _findParam(id) {
@@ -777,23 +799,23 @@ window.PreviewAiTools = (function () {
     }
 
     function _updateDependentSelects(changedParamId) {
-        // Rebuild ALL filterFrom-having selects on any param change but their own.
-        // Why not restrict to selects whose filterFrom === changedParamId?
+        // Rebuild ALL selects with a filterFrom or an excludeFrom on any param change but their own.
+        // Why not restrict to selects that name changedParamId?
         // Because the dependency can be transitive: defaultLanguage filters
         // from `languages`, but `languages` becomes hidden when multilingual
         // changes — so defaultLanguage's filter outcome can shift without
-        // languages itself being the immediate trigger. Rebuilding all
-        // filterFrom selects on any change is cheap (typically 0–2 per
-        // workflow) and side-steps cascade tracking. A field's own change
-        // never rebuilds it: its options never depend on its own value
-        // (filterFrom names another parameter), and a searchable one would
-        // be destroyed under the pick that changed it.
+        // languages itself being the immediate trigger. Rebuilding them all
+        // on any change is cheap (typically 0–2 per workflow) and side-steps
+        // cascade tracking. A field's own change never rebuilds it: its options
+        // never depend on its own value (filterFrom and excludeFrom name another
+        // parameter), and a searchable one would be destroyed under the pick
+        // that changed it.
         if (!_runnerView) return;
         var params = (_activeWorkflowSpec && _activeWorkflowSpec.parameters) || [];
         for (var i = 0; i < params.length; i++) {
             var p = params[i];
             var of = p.optionsFrom;
-            if (!of || typeof of !== 'object' || !of.filterFrom || p.id === changedParamId) continue;
+            if (!of || typeof of !== 'object' || !(of.filterFrom || of.excludeFrom) || p.id === changedParamId) continue;
             var wrap = _runnerView.querySelector('[data-param-id="' + p.id + '"]');
             if (!wrap) continue;
             // The field's control as a whole: a searchable one holds more than one input.
@@ -906,6 +928,8 @@ window.PreviewAiTools = (function () {
         _reviewEl = null;
         _yourPromptBody = null;
         _exchangeHeaderEl = null;
+        _phaseCostEl = null;
+        _costEl = null;
         if (_pasteAutoExecTimer) { clearTimeout(_pasteAutoExecTimer); _pasteAutoExecTimer = null; }
 
         _destroyParamPickers();
@@ -936,6 +960,7 @@ window.PreviewAiTools = (function () {
             _updateParamVisibility();
         }
         _renderParamErrors();
+        _renderCost();
     }
 
     function _renderRunnerHeader(workflow) {
@@ -1094,6 +1119,10 @@ window.PreviewAiTools = (function () {
         _reviewEl.className = 'preview-contextual-ai-tools__review';
         _reviewEl.hidden = true;
         z.body.appendChild(_reviewEl);
+        _costEl = document.createElement('div');
+        _costEl.className = 'preview-contextual-ai-tools__cost';
+        _costEl.hidden = true;
+        z.body.appendChild(_costEl);
         z.body.appendChild(_renderSectionBatch(spec));
         return z.section;
     }
@@ -1673,6 +1702,12 @@ window.PreviewAiTools = (function () {
         _updateAiResponseStatusUI();
         s.body.appendChild(_aiResponseStatusEl);
 
+        // What the AI phase this exchange serves has cost so far (_renderCost()).
+        _phaseCostEl = document.createElement('div');
+        _phaseCostEl.className = 'preview-contextual-ai-tools__phase-cost';
+        _phaseCostEl.hidden = true;
+        s.body.appendChild(_phaseCostEl);
+
         // 1.5s auto-execute grace hint — shows under the status line when a
         // timer is scheduled, hides when fired or cancelled.
         _autoExecHintEl = document.createElement('p');
@@ -1809,13 +1844,15 @@ window.PreviewAiTools = (function () {
         if (_aiResponseStatus.type !== 'ok' || !_currentCommands || _currentCommands.length === 0) return;
         _cancelAutoExecute();
         if (_answerWaiter) {
+            // An answer put together from several was counted part by part.
+            if (_run && _answerParts <= 1) _tallyAnswer(_run, _run.index, _aiResponseText.length);
             var waiter = _answerWaiter;
             _answerWaiter = null;
             waiter.resolve(_currentCommands.slice());
             return;
         }
         if (_executing || !_firstPhaseIsAi()) return;
-        _startRun({ send: false, answer: _currentCommands.slice() });
+        _startRun({ send: false, answer: _currentCommands.slice(), answerChars: _aiResponseText.length });
     }
 
     // ──────────────────────────── Send to AI ────────────────────────────
@@ -1886,14 +1923,20 @@ window.PreviewAiTools = (function () {
         refreshSendStatus();
         var statusTickerId = setInterval(refreshSendStatus, 300);
 
+        var messages = continuation
+            ? [{ role: 'user', content: _generatedPrompt }, { role: 'assistant', content: continuation.partial },
+                { role: 'user', content: continuation.request }]
+            : [{ role: 'user', content: _generatedPrompt }];
+        // The call's cost: the characters of every message sent, whatever comes back.
+        var call = { via: 'key', provider: String(connection.providerType || '') || null, model: String(model),
+            sentChars: messages.reduce(function (n, m) { return n + m.content.length; }, 0),
+            receivedChars: 0, sentTokens: null, receivedTokens: null, finish: null, failed: false };
+
         try {
             var result = await window.QSAiCall.call({
                 connection: connection,
                 model: model,
-                messages: continuation
-                    ? [{ role: 'user', content: _generatedPrompt }, { role: 'assistant', content: continuation.partial },
-                        { role: 'user', content: continuation.request }]
-                    : [{ role: 'user', content: _generatedPrompt }],
+                messages: messages,
                 // The answer may be as long as the connection's output limit (its max_tokens).
                 options: { temperature: 0.7 },
                 onChunk: function (_deltaText, ctx) {
@@ -1909,6 +1952,12 @@ window.PreviewAiTools = (function () {
                     refreshSendStatus();
                 }
             });
+            var usage = result && result.usage;
+            call.receivedChars = String((result && result.content) || '').length;
+            call.sentTokens = usage && typeof usage.input_tokens === 'number' ? usage.input_tokens : null;
+            call.receivedTokens = usage && typeof usage.output_tokens === 'number' ? usage.output_tokens : null;
+            call.finish = (result && result.finish) || null;
+            _tallyCall(call);
             var content = String((result && result.content) || '').trim();
             // Strip Markdown code fences the AI commonly wraps JSON in.
             if (content.indexOf('```') === 0) {
@@ -1938,6 +1987,9 @@ window.PreviewAiTools = (function () {
             var msg = err && err.message ? err.message : String(err);
             // An answer that had begun to arrive broke off; else the send itself failed.
             var partial = err && typeof err.partial === 'string' ? err.partial : '';
+            call.receivedChars = partial.length;
+            call.failed = true;
+            _tallyCall(call);
             _aiResponseText = partial;
             _aiResponseStatus = { type: 'error', plain: true, cause: partial ? 'brokeOff' : 'refused', message: partial
                 ? _t('answerBrokeOff', 'The answer broke off after {chars} characters: {error}')
@@ -1953,6 +2005,231 @@ window.PreviewAiTools = (function () {
             _aiSending = false;
             if (_run) _morphPrimary(_t('runActive', 'Running…'));
             _updateActionStates();
+        }
+    }
+
+    // ──────────────────────────── A run's cost ──────────────────────────
+    //
+    // What a run's AI phases cost, shown and never stored. With the connection's key, each call: the
+    // characters of the messages sent and of the answer received, and the tokens the provider reports
+    // (none is guessed: a provider that sends no counts is said to send none). Pasted, each exchange:
+    // the characters of the prompt shown to copy (a Continue's request is one more) and of the answer
+    // taken (Execute, Continue, or a continuation's reply joined) — characters, never turned into
+    // tokens. The tally is the last run's of each workflow, in memory; _costRecord() builds the one
+    // record the display reads.
+
+    function _newCostTally(workflowId) {
+        return { workflowId: workflowId, phases: {}, order: [] };
+    }
+
+    /** The tally's entry for phase k of the run, made at its first call. */
+    function _costPhase(run, k) {
+        var tally = _lastCost[run.workflowId];
+        if (!tally || !run.plan[k]) return null;
+        if (!tally.phases[k]) {
+            var p = run.plan[k];
+            tally.phases[k] = { index: k, key: p.key || '', workflowId: p.workflowId, title: p.title || '', calls: [] };
+            tally.order.push(k);
+        }
+        return tally.phases[k];
+    }
+
+    /** One call with the connection's key, in the phase the run is at. */
+    function _tallyCall(call) {
+        if (!_run) return;
+        var phase = _costPhase(_run, _run.index);
+        if (!phase) return;
+        phase.calls.push(call);
+        _renderCost();
+    }
+
+    /** A prompt shown to copy (a pasted exchange starts), in phase k. */
+    function _tallyPrompt(run, k, chars) {
+        var phase = _costPhase(run, k);
+        if (!phase) return;
+        phase.calls.push({ via: 'paste', provider: null, model: null, sentChars: chars, receivedChars: null,
+            sentTokens: null, receivedTokens: null, finish: null, failed: false });
+        _renderCost();
+    }
+
+    /**
+     * A pasted answer taken in phase k: the characters of the exchange its prompt opened, or an exchange
+     * of its own when no prompt is waiting (an answer pasted before the run). A phase whose prompt was
+     * sent with the key counts what its calls received, so an answer pasted there adds nothing.
+     */
+    function _tallyAnswer(run, k, chars) {
+        var phase = _costPhase(run, k);
+        if (!phase) return;
+        if (phase.calls.some(function (c) { return c.via === 'key'; })) return;
+        var open = null;
+        for (var i = phase.calls.length - 1; i >= 0 && !open; i--) {
+            if (phase.calls[i].receivedChars === null) open = phase.calls[i];
+        }
+        if (open) open.receivedChars = chars || 0;
+        else phase.calls.push({ via: 'paste', provider: null, model: null, sentChars: null, receivedChars: chars || 0,
+            sentTokens: null, receivedTokens: null, finish: null, failed: false });
+        _renderCost();
+    }
+
+    /**
+     * The run's cost record, from its tally: what the display reads, and what a statistics engine would
+     * store unchanged — ids, numbers and the provider's own names, no word of the panel (a phase's title
+     * is there for the display only; its identity is its workflow and its key). Per AI phase: how its
+     * prompt went ('key' or 'paste'), its calls (each its provider and model, null pasted; the
+     * characters sent and received; the tokens reported, null when none were; how its answer ended;
+     * whether the call failed), their sums, and how its last answer ended. The run's totals are kept by
+     * how the prompts went, never added across.
+     */
+    function _costRecord(tally) {
+        if (!tally || tally.order.length === 0) return null;
+        var phases = tally.order.map(function (k) {
+            var p = tally.phases[k];
+            var calls = p.calls.map(function (c) { return Object.assign({}, c); });
+            var unit = calls.length > 0 && calls[0].via === 'key' ? 'key' : 'paste';
+            return Object.assign({ index: p.index, key: p.key, workflowId: p.workflowId, title: p.title, unit: unit,
+                calls: calls, finish: calls.length > 0 ? calls[calls.length - 1].finish : null }, _costSums(calls));
+        });
+        var totals = { key: null, paste: null };
+        ['key', 'paste'].forEach(function (unit) {
+            var calls = [];
+            phases.forEach(function (p) { if (p.unit === unit) calls = calls.concat(p.calls); });
+            if (calls.length > 0) totals[unit] = _costSums(calls);
+        });
+        return { workflowId: tally.workflowId, phases: phases, totals: totals };
+    }
+
+    /**
+     * Calls summed: how many (a pasted exchange counts once its prompt was shown), how many failed (a
+     * send refused, an answer broken off), the characters sent and received, and the tokens of the calls
+     * the provider gave both counts for (null when none did).
+     */
+    function _costSums(calls) {
+        var sums = { callCount: 0, failedCalls: 0, sentChars: 0, receivedChars: 0, countedCalls: 0, sentTokens: null, receivedTokens: null };
+        calls.forEach(function (c) {
+            if (c.sentChars !== null) sums.callCount++;
+            if (c.failed) sums.failedCalls++;
+            sums.sentChars += c.sentChars || 0;
+            sums.receivedChars += c.receivedChars || 0;
+            if (typeof c.sentTokens === 'number' && typeof c.receivedTokens === 'number') {
+                sums.countedCalls++;
+                sums.sentTokens = (sums.sentTokens || 0) + c.sentTokens;
+                sums.receivedTokens = (sums.receivedTokens || 0) + c.receivedTokens;
+            }
+        });
+        return sums;
+    }
+
+    /** A count as the viewer's locale writes it. */
+    function _costNumber(n) {
+        return Number(n || 0).toLocaleString();
+    }
+
+    /**
+     * One cost's lines: with the key its tokens, then its characters; pasted its characters. A call that
+     * failed is said to have failed, never to have answered without counts: the calls are followed by
+     * what they hold besides counted ones ("4 (1 without counts, 1 failed)"), a cost of failed calls
+     * alone says so, and one whose answered calls sent no counts says that.
+     */
+    function _costLines(sums, unit) {
+        var lines = [];
+        if (unit === 'key') {
+            var failed = sums.failedCalls;
+            var missing = sums.callCount - sums.countedCalls - failed;
+            var parts = [];
+            if (missing > 0 && sums.countedCalls > 0) {
+                parts.push(_t('costWithoutCounts', '{n} without counts').replace('{n}', _costNumber(missing)));
+            }
+            if (failed > 0 && missing + sums.countedCalls > 0) {
+                parts.push(_t('costFailed', '{n} failed').replace('{n}', _costNumber(failed)));
+            }
+            var calls = _costNumber(sums.callCount) + (parts.length > 0 ? ' (' + parts.join(', ') + ')' : '');
+            if (sums.countedCalls > 0) {
+                lines.push(_t('costTokens', 'Tokens — sent: {sent} · received: {received} · calls: {calls}')
+                    .replace('{sent}', _costNumber(sums.sentTokens)).replace('{received}', _costNumber(sums.receivedTokens))
+                    .replace('{calls}', calls));
+            } else if (missing > 0) {
+                lines.push(_t('costTokensNone', 'Tokens — calls: {calls}; the provider sent no counts').replace('{calls}', calls));
+            } else {
+                lines.push(_t('costTokensFailed', 'Tokens — calls: {calls}; failed, no counts').replace('{calls}', calls));
+            }
+            lines.push(_t('costCharsKey', 'Characters — sent: {sent} · received: {received}')
+                .replace('{sent}', _costNumber(sums.sentChars)).replace('{received}', _costNumber(sums.receivedChars)));
+        } else {
+            lines.push(_t('costCharsPaste', 'Characters — copied: {sent} · pasted: {received} · prompts: {calls}')
+                .replace('{sent}', _costNumber(sums.sentChars)).replace('{received}', _costNumber(sums.receivedChars))
+                .replace('{calls}', _costNumber(sums.callCount)));
+        }
+        return lines;
+    }
+
+    /** A phase's provider and models, as its calls name them ("anthropic · model-a, model-b"), or ''. */
+    function _costSource(phase) {
+        var providers = [];
+        var models = [];
+        phase.calls.forEach(function (c) {
+            if (c.provider && providers.indexOf(c.provider) === -1) providers.push(c.provider);
+            if (c.model && models.indexOf(c.model) === -1) models.push(c.model);
+        });
+        return providers.concat(models.length ? [models.join(', ')] : []).join(' · ');
+    }
+
+    /** How a phase's last answer ended, when not as asked ('' otherwise). */
+    function _costFinish(phase) {
+        if (phase.finish === 'length') return _t('costCut', 'its last answer was cut at the output limit');
+        if (phase.finish === 'other') return _t('costStopped', 'its last answer was stopped by the AI');
+        return '';
+    }
+
+    function _renderCostLine(text, className) {
+        var line = document.createElement('p');
+        line.className = 'preview-contextual-ai-tools__' + (className || 'cost-line');
+        line.textContent = text;
+        return line;
+    }
+
+    /** A phase's cost: its lines, where its calls came from, and how its answer ended. */
+    function _renderCostPhase(phase, named) {
+        var item = document.createElement('div');
+        item.className = 'preview-contextual-ai-tools__cost-phase';
+        if (named) item.appendChild(_renderCostLine(phase.title, 'cost-phase-name'));
+        _costLines(phase, phase.unit).forEach(function (text) { item.appendChild(_renderCostLine(text)); });
+        var source = _costSource(phase);
+        var finish = _costFinish(phase);
+        if (source || finish) item.appendChild(_renderCostLine([source, finish].filter(Boolean).join(' · '), 'cost-note'));
+        return item;
+    }
+
+    /**
+     * The cost shown, from the record alone: the AI exchange's for the AI phase it serves, and the Run
+     * zone's block — the run's total, then each AI phase when there are several. Both stay after the
+     * run, until the workflow runs again.
+     */
+    function _renderCost() {
+        var record = _activeWorkflowSummary ? _costRecord(_lastCost[_activeWorkflowSummary.id]) : null;
+        if (_phaseCostEl) {
+            _phaseCostEl.replaceChildren();
+            var served = null;
+            (record ? record.phases : []).forEach(function (p) { if (p.index === _exchangePhase) served = p; });
+            _phaseCostEl.hidden = !served;
+            if (served) _phaseCostEl.appendChild(_renderCostPhase(served, false));
+        }
+        if (!_costEl) return;
+        _costEl.replaceChildren();
+        _costEl.hidden = !record;
+        if (!record) return;
+        _costEl.appendChild(_renderCostLine(_t('costTitle', "This run's AI cost"), 'cost-title'));
+        ['key', 'paste'].forEach(function (unit) {
+            if (!record.totals[unit]) return;
+            _costLines(record.totals[unit], unit).forEach(function (text) { _costEl.appendChild(_renderCostLine(text)); });
+        });
+        if (record.phases.length > 1) {
+            var list = document.createElement('div');
+            list.className = 'preview-contextual-ai-tools__cost-phases';
+            record.phases.forEach(function (p) { list.appendChild(_renderCostPhase(p, true)); });
+            _costEl.appendChild(list);
+        } else {
+            var note = [_costSource(record.phases[0]), _costFinish(record.phases[0])].filter(Boolean).join(' · ');
+            if (note) _costEl.appendChild(_renderCostLine(note, 'cost-note'));
         }
     }
 
@@ -2008,12 +2285,22 @@ window.PreviewAiTools = (function () {
             last: null
         };
         _run = run;
+        _lastCost[run.workflowId] = _newCostTally(run.workflowId);
+        _exchangePhase = null;
+        _renderCost();
         _executing = true;
         _setRunLocked(true);
         _updateActionStates();
         _morphPrimary(_t('runActive', 'Running…'));
         try {
             run.plan = await _fetchPlan(run.params);
+            run.index = run.first;
+            // A kept rest resumes only where its phase still is: a fresh plan with another phase there
+            // (or none) is the plan changed. A rest kept without its phase's key resumes as it was.
+            if (opts.resume && typeof opts.resume.phaseKey === 'string'
+                    && (!run.plan[run.first] || run.plan[run.first].key !== opts.resume.phaseKey)) {
+                throw _planChangedError();
+            }
             // Kept steps take the place of their phase's steps: the rest of the phase they stopped in.
             if (opts.resume && opts.resume.steps && run.plan[run.first]) {
                 run.plan[run.first] = Object.assign({}, run.plan[run.first],
@@ -2027,7 +2314,8 @@ window.PreviewAiTools = (function () {
             if (_autoContinue() && !(await _confirmRunStart(run))) return;
             for (var k = run.first; k < run.plan.length; k++) {
                 run.index = k;
-                var outcome = await _runPhase(run, k, k === run.first && opts.answer ? { answer: opts.answer } : {});
+                var outcome = await _runPhase(run, k, k === run.first && opts.answer
+                    ? { answer: opts.answer, answerChars: opts.answerChars || 0 } : {});
                 if (outcome.stop) {
                     run.states[k] = 'stopped';
                     _renderRunLine();
@@ -2046,10 +2334,18 @@ window.PreviewAiTools = (function () {
             // A run that had no step to run says so: the project was already as asked.
             if (!run.ran) toaster(_t('noChanges', 'No changes were needed here.'), 'success');
         } catch (err) {
-            console.error('[PreviewAiTools] run failed:', err);
-            var failMsg = _t('runFailed', 'The run stopped: {error}').replace('{error}', (err && err.message) || String(err));
-            if (_stepsHeaderState) _stepsHeaderState.textContent = failMsg;
-            toaster(failMsg, 'error');
+            if (err && err.planChanged) {
+                // What ran stays done; nothing is kept: the rest was planned against a plan that no longer holds.
+                if (run.plan[run.index]) run.states[run.index] = 'stopped';
+                _renderRunLine();
+                if (_stepsHeaderState) _stepsHeaderState.textContent = err.message;
+                toaster(err.message, 'warning');
+            } else {
+                console.error('[PreviewAiTools] run failed:', err);
+                var failMsg = _t('runFailed', 'The run stopped: {error}').replace('{error}', (err && err.message) || String(err));
+                if (_stepsHeaderState) _stepsHeaderState.textContent = failMsg;
+                toaster(failMsg, 'error');
+            }
         } finally {
             if (_answerWaiter) _answerWaiter = null;
             _run = null;
@@ -2075,7 +2371,7 @@ window.PreviewAiTools = (function () {
      * has run since the plan was made — then run.
      */
     async function _runPhase(run, k, opts) {
-        var phase = k === run.first ? run.plan[k] : await _fetchPhase(run.params, k);
+        var phase = k === run.first ? run.plan[k] : await _fetchPhase(run.params, k, { key: run.plan[k].key });
         run.plan[k] = phase;
         _plan[k] = phase;
         run.states[k] = 'current';
@@ -2126,6 +2422,8 @@ window.PreviewAiTools = (function () {
     /** An AI phase: its prompt built now and sent or copied, then the answer it waits for, then its commands. */
     async function _runAiPhase(run, k, phase, opts) {
         var commands = opts.answer || (phase.kept ? phase.steps : null);
+        // An answer pasted before the run is taken now, with no prompt shown in it.
+        if (opts.answer) _tallyAnswer(run, k, opts.answerChars);
         if (!commands) {
             var key = _requestKey(phase, run.plan);
             if (!_autoContinue() && k > run.first) {
@@ -2136,9 +2434,10 @@ window.PreviewAiTools = (function () {
             if (takers.length === 0 || takers[takers.length - 1].index <= k) run.started[key] = true;
             run.activeRequest = key;
             _lockRequest(key);
-            var built = await _fetchPhase(run.params, k, { prompt: true });
+            var built = await _fetchPhase(run.params, k, { prompt: true, key: phase.key });
             var request = (_requests[key] || '').trim();
             _generatedPrompt = String(built.prompt || '') + (request ? '\n\n---\n\n**User Request:**\n' + request : '');
+            _exchangePhase = k;
             if (_generalPromptTextarea) _generalPromptTextarea.value = _generatedPrompt;
             if (_exchangeHeaderEl) {
                 _exchangeHeaderEl.textContent = _aiPhases().length > 1
@@ -2164,12 +2463,14 @@ window.PreviewAiTools = (function () {
                 _morphPrimary(_t('runActive', 'Running…'));
                 _focusGeneralPrompt();
                 _autoCopyPromptWithToast();
+                _tallyPrompt(run, k, _generatedPrompt.length);
             }
             // The answer it waits for: whatever the switch says, without a key this is where the run stops.
             commands = await waiting;
             if (commands === null) return { stop: 'user', phase: phase, from: 0, resolved: false };
+            if (commands.planChanged) throw _planChangedError();
         }
-        var answered = await _fetchPhase(run.params, k, { answer: commands });
+        var answered = await _fetchPhase(run.params, k, { answer: commands, key: phase.key });
         run.plan[k] = answered;
         _plan[k] = answered;
         _showPhaseInBatch(k);
@@ -2221,6 +2522,7 @@ window.PreviewAiTools = (function () {
                 params: run.params,
                 requests: Object.assign({}, _requests),
                 phase: resumeAt,
+                phaseKey: run.plan[resumeAt].key,
                 phaseTitle: run.plan[resumeAt].title,
                 steps: steps.length > 0 ? steps : null,
                 effects: steps.length > 0 ? (outcome.phase.effects || []).slice(outcome.from) : null,
@@ -3041,6 +3343,7 @@ window.PreviewAiTools = (function () {
             body: JSON.stringify(Object.assign({ workflowId: id }, body))
         }).then(function (res) {
             return res.json().catch(function () { return null; }).then(function (json) {
+                if (json && json.planChanged === true) throw _planChangedError();
                 if (!res.ok || !json || !json.success) {
                     throw new Error((json && json.error) || ('HTTP ' + res.status));
                 }
@@ -3056,12 +3359,24 @@ window.PreviewAiTools = (function () {
         });
     }
 
-    /** Phase k resolved now. extra: {prompt: true} an AI phase's prompt, {answer: [...]} its AI's commands. */
+    /**
+     * Phase k resolved now. extra: {prompt: true} an AI phase's prompt, {answer: [...]} its AI's commands,
+     * and in a run {key} the phase's key as the run's plan has it: the server refuses the request when
+     * it now plans another phase there (_planChangedError()). The plan is never sent: the server
+     * resolves every phase itself.
+     */
     function _fetchPhase(params, k, extra) {
         return _workflowRequest(Object.assign({ params: params, phase: k }, extra || {})).then(function (data) {
             if (!data.phase) throw new Error('No such phase');
             return data.phase;
         });
+    }
+
+    /** The run's plan changed under it (the server's 409, or a kept rest whose phase moved): the run stops there. */
+    function _planChangedError() {
+        var err = new Error(_t('planChanged', "The run's plan changed: start the run again."));
+        err.planChanged = true;
+        return err;
     }
 
     /** The plan again (the preview before a run): the Batch, the run line, the requests and the AI exchange follow it. */
@@ -3577,6 +3892,7 @@ window.PreviewAiTools = (function () {
         var partial = '{"commands": [' + plan.kept.map(function (c) { return JSON.stringify(c); }).join(', ')
             + (plan.cut ? ', ' + plan.cut : '');
         var request = _continuationRequest(plan);
+        if (_run) _tallyAnswer(_run, _run.index, _aiResponseText.length);
         _continuation = { kept: plan.kept, cut: plan.cut, parts: (_continuation ? _continuation.parts : 1) + 1 };
         _cancelAutoExecute();
         _aiResponseText = '';
@@ -3592,6 +3908,7 @@ window.PreviewAiTools = (function () {
             if (_generalPromptTextarea) _generalPromptTextarea.value = request;
             _focusGeneralPrompt();
             _autoCopyPromptWithToast(request, _t('continueCopied', 'Copied: a request for the rest of the answer. Paste it to your AI assistant, then paste its reply in AI response.'));
+            if (_run) _tallyPrompt(_run, _run.index, request.length);
         }
         if (_run) _showPhaseInBatch(_run.index);
         _updateActionStates();
@@ -3723,6 +4040,7 @@ window.PreviewAiTools = (function () {
         // The rest of a cut answer: joined to the commands kept, the whole answer shown in its place.
         var more = _continuation ? _replyCommands(_aiResponseText) : null;
         if (more) {
+            if (_run) _tallyAnswer(_run, _run.index, _aiResponseText.length);
             _answerParts = _continuation.parts;
             _aiResponseText = JSON.stringify({ commands: _joinCommands(_continuation.kept, more) }, null, 2);
             _continuation = null;
@@ -3759,7 +4077,9 @@ window.PreviewAiTools = (function () {
         if (index === null) return;
         var seq = ++_answerSeq;
         var params = _run ? _run.params : _paramValues;
-        _fetchPhase(params, index, { answer: _currentCommands.slice() }).then(function (phase) {
+        var extra = { answer: _currentCommands.slice() };
+        if (_run && _run.plan[index]) extra.key = _run.plan[index].key;
+        _fetchPhase(params, index, extra).then(function (phase) {
             if (seq !== _answerSeq) return;
             _answerPhase = phase;
             if (_run) _showPhaseInBatch(index); else _renderBatch(index);
@@ -3768,6 +4088,14 @@ window.PreviewAiTools = (function () {
         }).catch(function (err) {
             if (seq !== _answerSeq) return;
             _answerPhase = null;
+            // The run's plan changed while it waited for this answer: the run ends there.
+            if (err && err.planChanged && _answerWaiter) {
+                var waiter = _answerWaiter;
+                _answerWaiter = null;
+                _cancelAutoExecute();
+                waiter.resolve({ planChanged: true });
+                return;
+            }
             _aiResponseStatus = { type: 'error', message: (err && err.message) || String(err), plain: true, cause: 'readBack' };
             _updateAiResponseStatusUI();
             _updateActionStates();

@@ -15,10 +15,12 @@
             "id": "language",
             "type": "select",
             "searchable": true,
+            "required": true,
             "labelKey": "ai.specs.translateSite.params.language.label",
             "helpKey": "ai.specs.translateSite.params.language.help",
             "optionsFrom": {
-                "data": "projectLanguages"
+                "data": "projectLanguageNames",
+                "excludeFrom": "from"
             }
         },
         {
@@ -28,7 +30,7 @@
             "labelKey": "ai.specs.translateSite.params.from.label",
             "helpKey": "ai.specs.translateSite.params.from.help",
             "optionsFrom": {
-                "data": "projectLanguages"
+                "data": "projectLanguageNames"
             },
             "default": "{{data.langData.default_language}}"
         }
@@ -40,9 +42,9 @@
             "extract": "data"
         },
         {
-            "id": "projectLanguages",
+            "id": "projectLanguageNames",
             "command": "getLangList",
-            "extract": "data.languages"
+            "extract": "data.language_names"
         },
         {
             "id": "sourceTexts",
