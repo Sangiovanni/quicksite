@@ -20,10 +20,12 @@
  *
  * A BUILT SITE carries copies of both, written by build.php: the entries of the providers its
  * project uses at `<secure>/data/oauth-providers.json`, and only the `build` keys at
- * `<secure>/data/oauth-secrets.json`. On the deployed server, `QS_OAUTH_<PROVIDER>_CLIENT_ID` /
- * `_CLIENT_SECRET` come first, so a deployer can keep the secret out of the build folder. The
- * installation never reads those variables: on a server that hosts many projects they would sign
- * every project in with one registration.
+ * `<secure>/data/oauth-secrets.json` — each client id as it is, each secret only when the build was
+ * asked to include it, else a placeholder the site reads as not set (qs_oauth_secret_placeholder()).
+ * On the deployed server, `QS_OAUTH_<PROVIDER>_CLIENT_ID` / `_CLIENT_SECRET` come first, and
+ * `_CLIENT_SECRET` alone fills a secret the build left out. The installation never reads those
+ * variables: on a server that hosts many projects they would sign every project in with one
+ * registration.
  *
  * Installation or build is decided by the folders on disk, as IframeSandbox decides it: an
  * installation carries `<secure>/management/config`, a build does not. Never a request-scoped
@@ -138,8 +140,8 @@ function qs_oauth_provider_id_ok(string $id): bool
  *
  * Every address is absolute, with a host and no user name, password or fragment, and uses https.
  * Plain http is accepted only in development, the same switch that lets the server reach a local
- * address. Unknown fields are refused, so a misspelt optional field is reported rather than
- * silently ignored.
+ * address. The privacy link is checked as a link instead (qs_oauth_link_problem()). Unknown fields
+ * are refused, so a misspelt optional field is reported rather than silently ignored.
  */
 function qs_oauth_provider_problem(string $id, $entry): ?string
 {
@@ -149,7 +151,7 @@ function qs_oauth_provider_problem(string $id, $entry): ?string
     if (!is_array($entry) || ($entry !== [] && array_keys($entry) === range(0, count($entry) - 1))) {
         return 'the entry is not an object';
     }
-    $known = ['name', 'console_url', 'authorize_url', 'token_url', 'userinfo_url', 'revoke_url', 'scope',
+    $known = ['name', 'console_url', 'privacy_url', 'authorize_url', 'token_url', 'userinfo_url', 'revoke_url', 'scope',
         'userinfo_sub_path', 'userinfo_email_path', 'userinfo_name_path', 'extra_authorize_params',
         'refresh_token_supported'];
     foreach (array_keys($entry) as $field) {
@@ -170,6 +172,9 @@ function qs_oauth_provider_problem(string $id, $entry): ?string
         if (array_key_exists($field, $entry) && ($why = qs_oauth_address_problem($entry[$field])) !== null) {
             return "'$field' $why";
         }
+    }
+    if (array_key_exists('privacy_url', $entry) && ($why = qs_oauth_link_problem($entry['privacy_url'])) !== null) {
+        return "'privacy_url' $why";
     }
     foreach (['scope', 'userinfo_sub_path', 'userinfo_email_path'] as $field) {
         if (!isset($entry[$field]) || !is_string($entry[$field]) || trim($entry[$field]) === '') {
@@ -221,6 +226,28 @@ function qs_oauth_address_problem($url): ?string
     return $scheme === 'http' ? 'must use https (http is accepted only in development)' : 'must use https';
 }
 
+/**
+ * Why a provider's privacy link cannot be used, or null when it can. A generated cookie or privacy
+ * policy writes it into a public page, where a visitor's browser opens it and the server never
+ * calls it: so it may end in a fragment, and it is https even in development (the exception for
+ * reaching a local test server does not apply to a link). Absolute, with a host, and no user name,
+ * password, space or control character, like every address of the list.
+ */
+function qs_oauth_link_problem($url): ?string
+{
+    if (!is_string($url) || $url === '' || preg_match('/[\x00-\x20\x7F]/', $url) === 1) {
+        return 'must be an address with no spaces or control characters';
+    }
+    $parts = parse_url($url);
+    if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host']) || filter_var($url, FILTER_VALIDATE_URL) === false) {
+        return 'must be an absolute address';
+    }
+    if (isset($parts['user']) || isset($parts['pass'])) {
+        return 'may not hold a user name or a password';
+    }
+    return strtolower($parts['scheme']) === 'https' ? null : 'must use https';
+}
+
 /** The provider's display name: its `name`, else its id with the first letter capitalised. */
 function qs_oauth_provider_name(string $id, array $entry): string
 {
@@ -235,11 +262,36 @@ function qs_oauth_keys_path(): ?string
     return defined('PROJECT_PATH') ? PROJECT_PATH . '/data/oauth-secrets.json' : null;
 }
 
+/** The key file's name as an operator reads it in a log line: the placeholder, never the real path. */
+function qs_oauth_keys_label(): string
+{
+    return qs_oauth_on_installation() ? "this project's data/oauth-secrets.json" : '<secure>/data/oauth-secrets.json';
+}
+
+/**
+ * What a copy carried out of the project — a build, an export — writes for a client secret it
+ * leaves out: words for the deployer who opens the file. They hold spaces, so they can never be a
+ * secret a project stores (qs_oauth_key_value_ok()) nor one a provider issues, and every reader takes
+ * them as "not set" (qs_oauth_keys_read()).
+ */
+function qs_oauth_secret_placeholder(string $provider): string
+{
+    return 'REPLACE THIS VALUE with the client secret, or set ' . qs_oauth_server_variable($provider)
+        . '_CLIENT_SECRET on the server';
+}
+
 /**
  * The project's key file, provider => set => {client_id, client_secret}, keeping only well-formed
  * sets. [] when absent or unreadable.
  *
- * @return array<string, array<string, array{client_id: string, client_secret: ?string}>>
+ * A set with no secret is a public client (client_secret null). A secret that no project stores and
+ * no provider issues — the placeholder a copy writes when it leaves the secret out, or anything else
+ * holding a space or a character outside printable ASCII — is read as not set: the set answers
+ * client_secret null with secret_left_out true, so it is never sent to a provider and never taken for
+ * a public client. Every writer of a key file writes a set through qs_oauth_stored_set(), so the
+ * flag never reaches a file.
+ *
+ * @return array<string, array<string, array{client_id: string, client_secret: ?string, secret_left_out?: bool}>>
  */
 function qs_oauth_keys_read(): array
 {
@@ -261,15 +313,47 @@ function qs_oauth_keys_read(): array
         foreach (QS_OAUTH_KEY_SETS as $set) {
             $s = $sets[$set] ?? null;
             if (is_array($s) && isset($s['client_id']) && is_string($s['client_id']) && $s['client_id'] !== '') {
-                $out[$provider][$set] = [
-                    'client_id'     => $s['client_id'],
-                    'client_secret' => isset($s['client_secret']) && is_string($s['client_secret']) && $s['client_secret'] !== ''
-                        ? $s['client_secret'] : null,
-                ];
+                $secret = isset($s['client_secret']) && is_string($s['client_secret']) && $s['client_secret'] !== ''
+                    ? $s['client_secret'] : null;
+                $out[$provider][$set] = $secret === null || qs_oauth_key_value_ok($secret, QS_OAUTH_CLIENT_SECRET_MAX)
+                    ? ['client_id' => $s['client_id'], 'client_secret' => $secret]
+                    : ['client_id' => $s['client_id'], 'client_secret' => null, 'secret_left_out' => true];
             }
         }
     }
     return $out;
+}
+
+/**
+ * A set as a key file holds it: its client id, and its secret, or the placeholder for one the read
+ * found left out. What every writer of a key file writes, so a left-out secret stays left out.
+ */
+function qs_oauth_stored_set(string $provider, array $set): array
+{
+    return [
+        'client_id'     => (string) ($set['client_id'] ?? ''),
+        'client_secret' => !empty($set['secret_left_out']) ? qs_oauth_secret_placeholder($provider) : ($set['client_secret'] ?? null),
+    ];
+}
+
+/**
+ * The build set as a copy carried out of the project writes it — a build, an export: the client id
+ * as it is (it is public: every sign-in shows it to the browser), and the secret only when
+ * $withSecret, else the placeholder. A public client carries no secret either way.
+ *
+ * @return array{0: array{client_id: string, client_secret: ?string}, 1: bool} the set, and whether
+ *         its secret was left out
+ */
+function qs_oauth_carried_set(string $provider, array $set, bool $withSecret): array
+{
+    $leftOut = !empty($set['secret_left_out']);
+    if (($set['client_secret'] ?? null) === null && !$leftOut) {
+        return [qs_oauth_stored_set($provider, $set), false];
+    }
+    if ($withSecret && !$leftOut) {
+        return [qs_oauth_stored_set($provider, $set), false];
+    }
+    return [['client_id' => (string) ($set['client_id'] ?? ''), 'client_secret' => qs_oauth_secret_placeholder($provider)], true];
 }
 
 /**
@@ -282,8 +366,8 @@ function qs_oauth_key_value_ok(string $value, int $max): bool
 }
 
 /**
- * Write the project's key file. Readable by the server's own user only, on systems that honour
- * file modes.
+ * Write the project's key file, every set as a key file holds it (qs_oauth_stored_set()). Readable by
+ * the server's own user only, on systems that honour file modes.
  */
 function qs_oauth_keys_write(array $keys): bool
 {
@@ -291,17 +375,25 @@ function qs_oauth_keys_write(array $keys): bool
     if ($path === null) {
         return false;
     }
+    $stored = [];
+    foreach ($keys as $provider => $sets) {
+        foreach (is_array($sets) ? $sets : [] as $set => $value) {
+            if (is_array($value)) {
+                $stored[(string) $provider][(string) $set] = qs_oauth_stored_set((string) $provider, $value);
+            }
+        }
+    }
     // The size check (qs_small_write_guard): false when refused, and the command
     // answers qs_small_write_refused().
     $flags = JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE;
     require_once __DIR__ . '/quota.php';
-    if (!qs_small_write_guard($path, qs_json_size((object) $keys, $flags, "\n"))) {
+    if (!qs_small_write_guard($path, qs_json_size((object) $stored, $flags, "\n"))) {
         return false;
     }
     if (!is_dir(dirname($path)) && !@mkdir(dirname($path), 0755, true)) {
         return false;
     }
-    if (!qs_json_write($path, (object) $keys, $flags, LOCK_EX, "\n")) {
+    if (!qs_json_write($path, (object) $stored, $flags, LOCK_EX, "\n")) {
         return false;
     }
     @chmod($path, 0600);
@@ -313,42 +405,77 @@ function qs_oauth_keys_write(array $keys): bool
  *
  *   installation  the project's `preview` set;
  *   built site    the server's QS_OAUTH_<PROVIDER>_CLIENT_ID / _CLIENT_SECRET when set, else the
- *                 `build` set the build carried.
+ *                 `build` set the build carried; when the build left its secret out, the server's
+ *                 _CLIENT_SECRET alone fills it.
+ *
+ * A set whose secret was left out and is filled from nowhere is no keys at all: the sign-in answers
+ * that it is not configured, nothing is sent to the provider, and the log names the file and the
+ * variable.
  *
  * @return array{client_id: string, client_secret: ?string}|null
  */
 function qs_oauth_sign_in_keys(string $provider): ?array
 {
-    if (!qs_oauth_on_installation()) {
+    $installation = qs_oauth_on_installation();
+    if (!$installation) {
         $server = qs_oauth_server_keys($provider);
         if ($server !== null) {
             return $server;
         }
     }
-    return qs_oauth_keys_read()[$provider][qs_oauth_on_installation() ? 'preview' : 'build'] ?? null;
+    $set = qs_oauth_keys_read()[$provider][$installation ? 'preview' : 'build'] ?? null;
+    if ($set === null || empty($set['secret_left_out'])) {
+        return $set;
+    }
+    $variable = qs_oauth_server_variable($provider) . '_CLIENT_SECRET';
+    if (!$installation) {
+        $secret = qs_oauth_server_value($variable);
+        if ($secret !== null) {
+            return ['client_id' => $set['client_id'], 'client_secret' => $secret];
+        }
+    }
+    error_log("QuickSite: OAuth provider '" . substr((string) preg_replace('/[^a-z0-9-]/', '?', $provider), 0, 64)
+        . "' has no client secret in " . qs_oauth_keys_label()
+        . ($installation ? '' : ": write it there, or set $variable on the server")
+        . ' — its sign-in is not configured.');
+    return null;
 }
 
 /**
- * The deployed server's keys for a provider: QS_OAUTH_<PROVIDER>_CLIENT_ID and _CLIENT_SECRET,
+ * The name of a provider's server variables, before `_CLIENT_ID` / `_CLIENT_SECRET`: QS_OAUTH_ and
  * the provider id upper-cased with every run of other characters folded to `_` (`my-sso` reads
- * QS_OAUTH_MY_SSO_CLIENT_ID). `REDIRECT_` is checked too: Apache prefixes environment variables
- * with it once a request has been through an internal redirect, which a build's FallbackResource
- * does to every page request.
+ * QS_OAUTH_MY_SSO_CLIENT_ID).
+ */
+function qs_oauth_server_variable(string $provider): string
+{
+    return 'QS_OAUTH_' . strtoupper((string) preg_replace('/[^A-Za-z0-9]+/', '_', $provider));
+}
+
+/**
+ * One server variable, or null when it is not set or empty. `REDIRECT_` is checked too: Apache
+ * prefixes environment variables with it once a request has been through an internal redirect,
+ * which a build's FallbackResource does to every page request.
+ */
+function qs_oauth_server_value(string $key): ?string
+{
+    $raw = $_SERVER[$key] ?? $_SERVER['REDIRECT_' . $key] ?? getenv($key);
+    return is_string($raw) && $raw !== '' ? $raw : null;
+}
+
+/**
+ * The deployed server's keys for a provider: QS_OAUTH_<PROVIDER>_CLIENT_ID and _CLIENT_SECRET
+ * (qs_oauth_server_variable()), or null when the client id is not set.
  *
  * @return array{client_id: string, client_secret: ?string}|null
  */
 function qs_oauth_server_keys(string $provider): ?array
 {
-    $name = 'QS_OAUTH_' . strtoupper((string) preg_replace('/[^A-Za-z0-9]+/', '_', $provider));
-    $read = static function (string $key): ?string {
-        $raw = $_SERVER[$key] ?? $_SERVER['REDIRECT_' . $key] ?? getenv($key);
-        return is_string($raw) && $raw !== '' ? $raw : null;
-    };
-    $id = $read($name . '_CLIENT_ID');
+    $name = qs_oauth_server_variable($provider);
+    $id = qs_oauth_server_value($name . '_CLIENT_ID');
     if ($id === null) {
         return null;
     }
-    return ['client_id' => $id, 'client_secret' => $read($name . '_CLIENT_SECRET')];
+    return ['client_id' => $id, 'client_secret' => qs_oauth_server_value($name . '_CLIENT_SECRET')];
 }
 
 // ── what a project's routes use ────────────────────────────────────────────────────────────

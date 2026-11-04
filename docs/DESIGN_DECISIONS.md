@@ -14842,3 +14842,129 @@ shipped workflow reaches).
 **Source**: a UX run's remarks, ruled 2026-11-04; beta.12. `secure/src/classes/WorkflowManager.php`
 (`collectPhases()`, `collectSubPhases()`, `resolvePhase()`), `public/admin/api/index.php` (`workflow-generate-steps`),
 `public/admin/assets/js/pages/preview/preview-ai-tools.js`.
+
+### A build carries a project's OAuth secret only when asked; an export follows it, a backup keeps it, a clone never copies it (locked 2026-10-10)
+
+**Amends**: *A built site's environment comes from the server, and its OAuth secret can too* (locked 2026-08-23). A
+build no longer copies the secret whenever the project has one: it carries it only when asked. *OAuth: the
+installation offers the providers, each project brings its keys in two sets, and every `?return=` stays on the site*
+(locked 2026-10-09). A build still carries the build keys only, and of them the client id always and the secret only
+when asked.
+
+**Decision**: `build` carries each provider's build client id as it is, and its client secret only with
+`include_oauth_secrets`, which the Builds page offers as a box, off by default and in the warning style, to the
+project's owner and admin only — the roles that may set the keys; the server refuses it from another role. Without it
+the build's `<secure>/data/oauth-secrets.json` keeps its shape and the secret is a placeholder: words telling the
+deployer to replace it or to set the server variable. Every reader of a key file takes as not set any secret no
+project stores and no provider issues — the placeholder, or anything else with a space or a character outside
+printable ASCII. A built site then sends nothing to the provider and answers that its sign-in is not configured, the
+log naming the file and the variable; the server's `QS_OAUTH_<PROVIDER>_CLIENT_SECRET` alone fills the secret. The
+build's `oauth` report names the secrets it left out, the Builds page warns of them and the build's README says how to
+put them in. `exportProject` takes the same parameter: without it an archive carries no key; with it, the build keys
+alone. A backup keeps both sets, and a restore puts them back. A clone copies no key file, no build and no saved
+export, and answers which providers' keys must be created again.
+
+**Reasoning**: A build folder is handed whole to anyone with build permission and downloaded as an archive, so a
+secret inside it travels with every copy; most deployers set it once on the server and never need it in the archive,
+and the one who deploys from this installation ticks the box. The client id is public — every sign-in shows it to the
+browser — so keeping it real leaves the deployer one value to fill. A placeholder recognised by its shape rather than
+by its words can never be mistaken for a secret, and a placeholder edited and broken by hand is never sent either. The
+role check closes what the opt-in would otherwise leave open: a developer who may build but never sees the build keys
+could have ticked the box and downloaded them. An export moves a project to another installation, where an import
+gives it a new id: the preview keys' callback names this installation's address of the project and stops matching,
+while the deployed site's does not, so only the build keys are worth carrying, and only on request. A backup is the
+project's own copy for a restore, which needs the keys. A clone is a new project with addresses of its own, so its
+sign-in needs keys registered for them; its source's build and saved exports hold the keys too, and belong to the
+source, as first run already treats them.
+
+**Alternatives considered**: shipping the secret by default with a box to leave it out (the safe choice would be the
+one a user must remember); leaving the whole key file out of a build (the deployer types the public client id again
+too); a fixed placeholder compared word for word (one edited by hand would reach the provider); a placeholder
+structure in an export instead of no key file (an import would plant secrets that read as not set, beside client ids
+that may belong to another installation's app); letting any role that may build tick the box (the secret would leave
+through a role that cannot see it); a clone that keeps the source's build and exports (each carries the keys);
+refusing a deploy whose secrets are placeholders (the deploy runs in the installation's environment and cannot see the
+target server's variables).
+
+**Source**: Sangio's design, ruled 2026-10-10, its details ruled 2026-11-04; beta.12.
+`secure/management/command/build.php`, `exportProject.php` and `cloneProject.php`,
+`secure/src/functions/oauthProviderHelpers.php` (`qs_oauth_keys_read()`, `qs_oauth_carried_set()`,
+`qs_oauth_sign_in_keys()`), `public/admin/assets/js/pages/builds.js`, `dashboard.js`.
+
+### Only `customize` works outside the cookie banner, and the cookie policy carries it (locked 2026-09-26)
+
+**Decision**: One listener on the document answers every `data-consent-action` click. Inside the banner and the popup
+each action works as before — accept-all, refuse-all, save, customize, close — and is handled once. Anywhere else on a
+page only `customize` works: it reopens the preferences, their toggles set from the visitor's recorded choice, and
+stops the element's own default; the other actions do nothing there. On a page without the popup it does nothing at
+all, and a link keeps its address. `generateCookiePolicy` always puts a *Change my cookie preferences* button, marked
+`customize`, right under the policy's intro, its words seeded with the policy's other texts.
+
+**Reasoning**: Withdrawing consent must be as easy as giving it, and once the banner was gone a visitor could withdraw
+only by deleting a cookie by hand. QuickSite generates both the banner and the policy, so it can put the way back on
+the page a visitor reads to change their mind. Opening the preferences records nothing, so it is safe from any
+element; accepting or refusing from outside the banner would let any element on any page record a choice the visitor
+never made. One listener on the document reaches the elements a page adds after it loads, and keeps a click inside the
+banner to one handling.
+
+**Alternatives considered**: a listener per marked element (misses elements rendered later, and two listeners could
+answer one click); every action working anywhere (a stray element could record consent); a parameter to leave the
+policy's button out (the policy is where the way back belongs; the button can be restyled or removed in the editor,
+and a regeneration puts it back).
+
+**Source**: a UX run's finding, ruled 2026-09-26; beta.12. `secure/src/runtime/qs.js` (`_onConsentActionClick()`,
+`QS.openConsent()`), `secure/src/functions/consentLayerHelpers.php` (`buildCookiePolicyStructure()`),
+`secure/src/functions/qsDataAttributeCatalog.php`.
+
+### A provider's name and privacy link come from the provider list (locked 2026-10-10)
+
+**Decision**: A provider entry may carry a `privacy_url`. The sign-in section of a generated cookie or privacy policy
+lists the providers the project's sign-in routes use, from the one scan of those routes (`qs_oauth_project_routes()`);
+a route that takes its provider from the address lists every offered provider the project has keys for, in either set;
+a provider the list does not offer is not listed. Each is named as the list names it and linked to its `privacy_url`,
+or listed by name without one. The link is checked as a link: absolute https even in development, no user name or
+password, a fragment allowed; a malformed one leaves its entry out of the list, like any malformed field. The four
+shipped providers carry theirs, and the engine keeps no list of its own.
+
+**Reasoning**: The policy kept its own scan of the routes and its own map of five links, so a provider the operator
+added got no link and its name was guessed from its id. The operator's list already says which providers exist and
+what they are called; one more field there reaches every policy, and the privacy policy reads the same function. A
+preview served at `/p/` signs real visitors in, so a provider with preview keys only is listed too. The development
+exception for http lets the server reach a local test provider; a visitor's browser opens a privacy link and the
+server never calls it, so the exception does not apply. A malformed link leaves the whole entry out because every
+field of the list is treated that way: one rule is easier to keep than a field that half-works.
+
+**Alternatives considered**: keeping a shipped map beside the list (a second source to keep in step); listing only the
+providers with build keys for an address route, as a build does (a public preview's visitors would not be told);
+dropping only a malformed link and keeping the provider (a misspelt field would pass unreported).
+
+**Source**: a finding while building OAuth, ruled 2026-10-10, its details ruled 2026-11-04; beta.12.
+`secure/src/functions/consentLayerHelpers.php` (`consentOAuthLinks()`),
+`secure/src/functions/oauthProviderHelpers.php` (`qs_oauth_link_problem()`),
+`secure/management/config/oauth-providers.json.example`.
+
+### An accepted join request leaves a notice, and dismissing it ends nothing (locked 2026-11-04)
+
+**Amends**: *Self-initiated exits leave no trace; other-initiated terminations leave a dismissable notice* (locked
+2026-07-17). A decision made about you is told even when it is good news.
+
+**Decision**: When a self-request is approved, the requester's member entry in their own `users.php` copy carries
+`notice: "approved"`, and their inbox lists *Join request accepted* until they dismiss it; the header's badge and the
+dashboard count it. Dismissing it takes the mark off and leaves the membership, and every live state is still refused
+(`notice.not_dismissable`). The shared repair keeps the mark while the roster lists the person as a member and never
+writes one; a removal or a deletion writes its own notice over it, and leaving takes it away with the membership. A
+proposal approved into an invitation writes no notice: the invitation is the news.
+
+**Reasoning**: Approving a request changes someone's access while they are away, and they learned it only by spotting
+a new project in their list. A mark on the member entry leaves every reader of `status: "member"` right, and every
+exit already replaces or removes the entry, so no exit needs to know about the mark. The repair rebuilds a member
+entry from the roster, which keeps no record of the approval, so it keeps a mark it finds rather than inventing one it
+cannot know about; a lost mirror write loses the notice, never the membership.
+
+**Alternatives considered**: a status of its own (every reader of `member` would have to learn it); a separate map of
+notices (every exit would have to clear it); a notice for an approved proposal too (it would announce an invitation
+the person has not answered).
+
+**Source**: the kickoff design sweep, its shape ruled 2026-11-04; beta.12. `secure/src/functions/AuthManagement.php`
+(`qs_membership_approved_entry()`, `qs_membership_reconciled_entry()`), `secure/admin/functions/membershipSelf.php`,
+`secure/management/command/approveJoinRequest.php`.

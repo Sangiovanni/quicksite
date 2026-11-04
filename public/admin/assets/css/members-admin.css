@@ -85,6 +85,7 @@
 .members-chip--refused  { background: var(--admin-error-bg); color: var(--admin-error); }
 .members-chip--removed  { background: var(--admin-error-bg); color: var(--admin-error); }
 .members-chip--deleted  { background: var(--admin-surface); color: var(--admin-text-light); }
+.members-chip--approved { background: var(--admin-success-bg); color: var(--admin-success); }
 .members-chip--picked   { background: var(--admin-success-bg); color: var(--admin-success); margin-left: 0; margin-right: 8px; }
 .members-chip--status   { background: var(--admin-surface); color: var(--admin-text-muted); }
 

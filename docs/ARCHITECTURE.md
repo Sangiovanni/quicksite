@@ -918,7 +918,7 @@ The core registry exposes 26 built-ins, grouped by what they act on: element vis
 
 Use the live `listJsFunctions` command for the authoritative list. The catalog itself is declared **once** in `secure/src/functions/qsVerbCatalog.php` (the single source of truth) and is read by three consumers: the `listJsFunctions` command (picker payload), `JsonToHtmlRenderer` (runtime `{{call:fn:...}}` allowlist), and `JsonToPhpCompiler` (build-time allowlist). Add a new QS.* verb by adding an entry to that catalog file — the picker, the renderer, and the compiler all pick it up automatically; an unknown verb wired anyway is dropped with a `console.warn('[QS] unknown verb …')` in the rendered page. (The renderer allowlist also accepts `applyAuthState` for hand-authored manual re-scans; it is intentionally not surfaced in the picker.)
 
-Beyond the `{{call:…}}` verbs, the auth-flows runtime adds **declarative bindings** read by `qs.js` on load + on `qs:auth:*` events — `data-auth-show` (with four modes: `in` / `out` for token presence, `connecting` / `failed` for the Tier 3 magic-link exchange lifecycle) / `data-auth-source` and the generic `data-storage-show` / `data-storage-value` (any storage key) and `data-consent-show="granted|denied:<category>"` (visibility gated on cookie-consent state) — plus the `QS.isAuthed(source)` query. The Tier 3 magic-link verbs (`exchangeMagicLink`, `requestMagicLink`, `logoutServer`) dispatch `qs:auth:exchange-started` / `qs:auth:exchange-failed` to drive the connecting/failed modes. All documented in `ADMIN_PANEL.md §9.5`.
+Beyond the `{{call:…}}` verbs, the auth-flows runtime adds **declarative bindings** read by `qs.js` on load + on `qs:auth:*` events — `data-auth-show` (with four modes: `in` / `out` for token presence, `connecting` / `failed` for the Tier 3 magic-link exchange lifecycle) / `data-auth-source` and the generic `data-storage-show` / `data-storage-value` (any storage key) and `data-consent-show="granted|denied:<category>"` (visibility gated on cookie-consent state) and `data-consent-action` (the consent controls: every action inside the banner and the popup, only `customize` — which reopens the preferences — anywhere else) — plus the `QS.isAuthed(source)` query. The Tier 3 magic-link verbs (`exchangeMagicLink`, `requestMagicLink`, `logoutServer`) dispatch `qs:auth:exchange-started` / `qs:auth:exchange-failed` to drive the connecting/failed modes. All documented in `ADMIN_PANEL.md §9.5`.
 
 **An API's `auth` block travels into the client config, so it may hold no secret.** `auth.type` is one of `none` / `bearer` / `basic` / `cookie` / `apiKey`; `apiKey` is the shape whose credential belongs server-side, and endpoints deriving it are filtered out of `qs-api-config.js` entirely (see *callableFrom*, §9.4). `cookie` accepts one optional extra: `csrf: {from: "cookie:NAME", to: "header:NAME"}`, which makes `QS.fetch` echo the named cookie into the named request header — the double-submit token most session-cookie APIs require. A cookie name and a header name are not secrets; the token itself is read from the browser at call time and never stored in the config. This is the **author's API's** auth, never QuickSite's own session. Details in `ADMIN_PANEL.md §9.5`.
 
@@ -1420,11 +1420,13 @@ needs PHP sessions, an outbound HTTPS call and a route to return to, and a built
 site has all three; it needs nothing from the management API or the admin panel,
 neither of which exists in a build. The build carries the entries of the
 providers the project's sign-in routes use, copied from the installation's
-provider list, and the project's **build** keys — never its preview keys. The
+provider list, and the project's **build** keys — never its preview keys: each
+client id as it is, each secret only when the build was asked to include it
+(`include_oauth_secrets`), else a placeholder the site reads as not set. The
 client secret is read from the server first (`QS_OAUTH_<PROVIDER>_CLIENT_ID` /
-`_CLIENT_SECRET`) and from the shipped `data/oauth-secrets.json` second, so a
-deployer can keep the credential out of a build folder that `downloadBuild` hands
-over whole. The installation itself never reads those variables: a server that
+`_CLIENT_SECRET`; `_CLIENT_SECRET` alone fills a secret the build left out) and
+from the shipped `data/oauth-secrets.json` second, so a deployer can keep the
+credential out of a build folder that `downloadBuild` hands over whole. The installation itself never reads those variables: a server that
 hosts many projects would sign every one of them in with one registration.
 
 Every redirect the sign-in routes make from a `?return=` value lands on the site:

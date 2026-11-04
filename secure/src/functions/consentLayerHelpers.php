@@ -9,6 +9,11 @@
  *
  *   #qs-consent-banner / #qs-consent-popup  — reserved container ids
  *   [data-consent-action="accept-all|refuse-all|customize|save|close"]
+ *                                            — every action inside the banner and
+ *                                              the popup; anywhere else only
+ *                                              customize, which reopens the
+ *                                              preferences (the cookie-policy
+ *                                              page carries one)
  *   [data-consent-toggle="<category>"]       — per-category checkbox in the popup
  *
  * Visible copy uses translation keys (textKey) so the layer shows in the
@@ -143,59 +148,47 @@ function buildConsentPopupStructure(array $categories): array {
     ];
 }
 
-// Privacy-policy URLs for the common OAuth presets. Custom providers list
-// without a link (a per-provider override field is a possible later addition).
-const CONSENT_OAUTH_PRIVACY_URLS = [
-    'google'    => 'https://policies.google.com/privacy',
-    'github'    => 'https://docs.github.com/site-policy/privacy-policies/github-privacy-statement',
-    'meta'      => 'https://www.facebook.com/privacy/policy',
-    'facebook'  => 'https://www.facebook.com/privacy/policy',
-    'amazon'    => 'https://www.amazon.com/gp/help/customer/display.html?nodeId=GX7NJQ4ZB8MHFRNJ',
-    'microsoft' => 'https://privacy.microsoft.com/privacystatement',
-];
-
 /**
- * OAuth providers THIS project actually offers sign-in with, as
- * [['name','url'|null]]. The signal is the project's route-resolvers wiring an
- * oauth-start/callback/logout flow to a literal provider id — NOT the presence
- * of (possibly global/admin) credentials. So a project that hasn't wired any
- * OAuth login returns [] (no third-party section). Mirrors the in-use scan in
- * listOAuthProviders.
+ * The OAuth providers THIS project signs visitors in with, as [['name', 'url'|null]], for the
+ * sign-in section of a generated cookie or privacy policy. The routes come from the one scan of the
+ * project's sign-in routes (qs_oauth_project_routes()); a route that takes its provider from the
+ * address names none, so for it every offered provider the project has keys for, in either set,
+ * is listed. Only a provider the installation's list offers is listed: a route naming another
+ * signs nobody in. The name and the privacy link are the list's (qs_oauth_provider_name(),
+ * `privacy_url`); a provider without a link is listed by name. A project that wires no sign-in
+ * returns [] (no third-party section).
  */
 function consentOAuthLinks(): array {
     if (!defined('PROJECT_PATH')) return [];
-    $sidecar = PROJECT_PATH . '/data/route-resolvers.json';
-    if (!file_exists($sidecar)) return [];
-    $all = json_decode((string) @file_get_contents($sidecar), true);
-    if (!is_array($all)) return [];
-
-    $providers = [];
-    foreach ($all as $entry) {
-        // Single resolver = scalar config; multi = array of configs.
-        $configs = (isset($entry['kind']) && is_string($entry['kind'])) ? [$entry] : $entry;
-        if (!is_array($configs)) continue;
-        foreach ($configs as $config) {
-            if (!is_array($config)) continue;
-            $kind = $config['kind'] ?? null;
-            if ($kind !== 'oauth-start' && $kind !== 'oauth-callback' && $kind !== 'oauth-logout') continue;
-            $provider = $config['provider'] ?? null;
-            // Skip empty + param-placeholder providers ('{:provider}').
-            if (!is_string($provider) || $provider === '' || preg_match('/^\{:\w+\}$/', $provider)) continue;
-            $providers[$provider] = true;
+    require_once SECURE_FOLDER_PATH . '/src/functions/oauthProviderHelpers.php';
+    $offered = qs_oauth_providers();
+    $keys = null;
+    $ids = [];
+    foreach (qs_oauth_project_routes() as $route) {
+        $id = $route['provider'];
+        if ($id === null) {
+            $keys = $keys ?? qs_oauth_keys_read();
+            foreach (array_keys($offered) as $offeredId) {
+                if (isset($keys[$offeredId])) $ids[$offeredId] = true;
+            }
+        } elseif (isset($offered[$id])) {
+            $ids[$id] = true;
         }
     }
 
     $out = [];
-    foreach (array_keys($providers) as $pid) {
-        $out[] = ['name' => ucfirst($pid), 'url' => CONSENT_OAUTH_PRIVACY_URLS[strtolower($pid)] ?? null];
+    foreach (array_keys($ids) as $id) {
+        $entry = $offered[$id];
+        $out[] = ['name' => qs_oauth_provider_name((string) $id, $entry), 'url' => $entry['privacy_url'] ?? null];
     }
     return $out;
 }
 
 /**
- * Cookie-policy page structure (array of nodes) — a deterministic table built
- * from the registry, plus an OAuth-provider privacy-link section and a legal
- * note. Structural copy + per-key descriptions use textKeys (translatable);
+ * Cookie-policy page structure (array of nodes) — a button that reopens the
+ * cookie preferences, a deterministic table built from the registry, an
+ * OAuth-provider privacy-link section and a legal note. Structural copy +
+ * per-key descriptions use textKeys (translatable);
  * name/scope/retention are baked from the registry at generation time
  * (re-generate to refresh). $oauthLinks = [['name'=>..,'url'=>..|null], ...].
  */
@@ -248,9 +241,21 @@ function buildCookiePolicyStructure(array $items, array $oauthLinks): array {
     }
     $table = _cNode('table', ['class' => 'qs-cookie-policy'], [$thead, _cNode('tbody', [], $bodyRows)]);
 
+    // The way back to the cookie preferences, right under the intro: withdrawing consent must be
+    // as easy as giving it, and a visitor reading the policy has often come to change their choice.
+    // qs.js opens the preferences from any element marked customize.
+    $preferences = _cNode('p', ['class' => 'qs-cookie-policy__preferences'], [
+        _cNode('button', [
+            'type' => 'button',
+            'class' => 'qs-consent-btn qs-consent-btn--primary',
+            'data-consent-action' => 'customize',
+        ], [_cText('consent.policy.change_preferences')]),
+    ]);
+
     $children = [
         _cNode('h1', [], [_cText('consent.policy.title')]),
         _cNode('p', ['class' => 'qs-cookie-policy__intro'], [_cText('consent.policy.intro')]),
+        $preferences,
         $table,
     ];
 
@@ -294,6 +299,7 @@ function cookiePolicyTranslationSeed(): array {
         'en' => [
             'consent.policy.title' => 'Cookie policy',
             'consent.policy.intro' => 'This page lists the browser storage this site uses, generated from the site\'s storage registry.',
+            'consent.policy.change_preferences' => 'Change my cookie preferences',
             'consent.policy.col_key' => 'Name in your browser',
             'consent.policy.col_scope' => 'Storage',
             'consent.policy.col_category' => 'Category',
@@ -311,6 +317,7 @@ function cookiePolicyTranslationSeed(): array {
         'fr' => [
             'consent.policy.title' => 'Politique des cookies',
             'consent.policy.intro' => 'Cette page liste les données de stockage que ce site utilise, générée à partir du registre de stockage du site.',
+            'consent.policy.change_preferences' => 'Modifier mes préférences de cookies',
             'consent.policy.col_key' => 'Nom dans votre navigateur',
             'consent.policy.col_scope' => 'Stockage',
             'consent.policy.col_category' => 'Catégorie',

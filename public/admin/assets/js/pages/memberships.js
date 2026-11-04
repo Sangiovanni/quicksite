@@ -480,10 +480,17 @@
     // Notices
     // ============================================================
 
+    // A notice's chip: its words by status. `approved` (your own join request, accepted) is
+    // the one that is good news; dismissing it leaves the membership as it is.
+    var NOTICE_LABEL_KEYS = {
+        refused: 'statusRefused',
+        removed: 'statusRemoved',
+        deleted: 'statusDeleted',
+        approved: 'statusApproved',
+    };
+
     function _renderNoticeRow(n) {
-        var statusLabel = n.status === 'refused' ? (T.statusRefused || 'Refused')
-            : n.status === 'removed' ? (T.statusRemoved || 'Removed')
-            : (T.statusDeleted || 'Deleted');
+        var statusLabel = T[NOTICE_LABEL_KEYS[n.status] || 'statusDeleted'];
         var main = [
             el('span', { class: 'members-row__title' }, [
                 el('span', { class: 'members-chip members-chip--' + n.status, text: statusLabel }),

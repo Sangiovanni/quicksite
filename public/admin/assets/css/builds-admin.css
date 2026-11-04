@@ -103,6 +103,25 @@
     margin: 0;
 }
 
+/* The way to the OAuth providers page, inside a warning: a chip of its own, light on the dark
+   surface, so it reads on the warning's tint whatever the browser does with a visited link. */
+.builds-alert__link,
+.builds-alert__link:visited {
+    display: inline-block;
+    margin-top: 6px;
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+    background: var(--admin-surface);
+    color: var(--admin-text);
+    text-decoration: none;
+}
+
+.builds-alert__link:hover,
+.builds-alert__link:focus-visible {
+    background: var(--admin-bg-secondary);
+    text-decoration: underline;
+}
+
 /* The base .admin-modal__content is 90% wide with no ceiling, which is right for
    the editor's big panels and far too wide for a confirmation. */
 .admin-modal--builds .admin-modal__content {

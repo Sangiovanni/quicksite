@@ -9,7 +9,10 @@
  * - space (optional): URL path prefix - creates subdirectory inside public folder (max 5 levels, e.g., '' or 'space')
  *                     When set, all public files are placed in: {public}/{space}/
  *                     This allows multiple sub-websites on the same domain (e.g., http://site.com/space/en/)
- * 
+ * - include_oauth_secrets (optional, default false): carry the project's real OAuth client secrets
+ *                     (its owner and admin only). Without it each provider's build keys keep their
+ *                     client id and the secret is a placeholder the built site reads as not set.
+ *
  * Output: secure/projects/<id>/qs_build/<name>/ — outside the project's public/,
  * so no URL reaches it. Retention is N = 1: a project holds one build, a second
  * build is refused, and a FAILED build removes its own partial directory.
@@ -46,6 +49,22 @@ $buildPublicName = $params['public'] ?? 'public';
 $buildSecureName = $params['secure'] ?? 'secure';
 $buildPublicSpace = $params['space'] ?? '';
 $buildCustomName = $params['name'] ?? '';
+
+// Whether the build carries the project's real OAuth client secrets (see the OAuth step). Off by
+// default: the build then keeps each provider's client id and writes a placeholder for its secret.
+// Only a role that may set the project's keys may ask, so a secret leaves the installation only
+// through someone who could have entered it.
+$buildIncludesOAuthSecrets = filter_var($params['include_oauth_secrets'] ?? false, FILTER_VALIDATE_BOOLEAN);
+if ($buildIncludesOAuthSecrets) {
+    require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+    $oauthCaller = getCurrentUser();
+    if (!is_array($oauthCaller) || !hasPermission($oauthCaller, 'setOAuthCredentials', (string) PROJECT_NAME)) {
+        ApiResponse::create(403, 'auth.forbidden')
+            ->withMessage('Only a role that may set the project\'s OAuth keys (its owner or admin) may include the OAuth secrets in a build')
+            ->withData(['command' => 'build', 'parameter' => 'include_oauth_secrets'])
+            ->send();
+    }
+}
 
 // Validate optional custom build name
 if (!empty($buildCustomName)) {
@@ -760,15 +779,16 @@ if (($copyError = qs_safe_copy($embedPolicySource, $dataDir . '/embed-policy.jso
 // project has build keys for. The entries hold public addresses only.
 //
 // The keys are the project's BUILD set — never its preview set, so a key made for testing on this
-// installation never leaves it. Copying a credential into a distributable artifact is its own
-// decision: a build folder is handed whole to anyone with build permission, so the secret travels
-// with the deliverable. It has to reach the deployer's server either way, which is what makes
-// shipping it defensible; a deployer who would rather not carry it sets QS_OAUTH_<PROVIDER>_CLIENT_ID
-// / _CLIENT_SECRET on the server and deletes the file, and the sign-in prefers the server's value.
+// installation never leaves it. Each client id is written as it is: it is public, every sign-in
+// shows it to the browser. A secret is a credential, and a build folder is handed whole to anyone
+// with build permission, so it goes in only when the caller asks (`include_oauth_secrets`, owner and
+// admin); otherwise the file keeps its shape and the secret is a placeholder the built site reads as
+// not set (qs_oauth_carried_set()). The deployer then writes the secret into the file on the server,
+// or sets QS_OAUTH_<PROVIDER>_CLIENT_SECRET there, which the sign-in reads first.
 //
-// What is missing is reported, never guessed: a provider carried without build keys, a provider a
-// route names that the installation does not offer, and an address route with no keys at all. The
-// builds page shows it, with the way to the OAuth providers page.
+// What is missing is reported, never guessed: a provider carried without build keys, a secret left
+// out, a provider a route names that the installation does not offer, and an address route with no
+// keys at all. The builds page shows it, with the way to the OAuth providers page.
 require_once SECURE_FOLDER_PATH . '/src/functions/oauthProviderHelpers.php';
 $oauthOffered = qs_oauth_providers();
 $oauthKeys = qs_oauth_keys_read();
@@ -792,18 +812,26 @@ if ($oauthFromAddress) {
     $oauthAddressWithoutKeys = $oauthKeyed === [];
 }
 $oauthBuildKeys = [];
+$oauthSecretsLeftOut = [];
+$buildCarriesOAuthSecrets = false;
 foreach (array_keys($oauthCarried) as $oauthId) {
     if (isset($oauthKeys[$oauthId]['build'])) {
-        $oauthBuildKeys[$oauthId] = ['build' => $oauthKeys[$oauthId]['build']];
+        [$oauthSet, $oauthLeftOut] = qs_oauth_carried_set((string) $oauthId, $oauthKeys[$oauthId]['build'], $buildIncludesOAuthSecrets);
+        $oauthBuildKeys[$oauthId] = ['build' => $oauthSet];
+        if ($oauthLeftOut) {
+            $oauthSecretsLeftOut[] = (string) $oauthId;
+        } elseif ($oauthSet['client_secret'] !== null) {
+            $buildCarriesOAuthSecrets = true;
+        }
     }
 }
 $oauthReport = [
     'providers'                   => array_keys($oauthCarried),
     'missing_build_keys'          => array_values(array_diff(array_keys($oauthCarried), array_keys($oauthBuildKeys))),
+    'secrets_left_out'            => $oauthSecretsLeftOut,
     'not_offered'                 => array_keys($oauthNotOffered),
     'address_routes_without_keys' => $oauthAddressWithoutKeys,
 ];
-$buildCarriesOAuthSecrets = false;
 if ($oauthCarried !== []) {
     if (!is_dir($dataDir) && !mkdir($dataDir, 0755, true)) {
         abort_build(
@@ -825,7 +853,6 @@ if ($oauthCarried !== []) {
             );
         }
         @chmod($dataDir . '/oauth-secrets.json', 0600);
-        $buildCarriesOAuthSecrets = true;
     }
 }
 
@@ -1123,6 +1150,19 @@ $spaceNote = $buildPublicSpace !== ''
 $readmeSpacePrefix = $buildPublicSpace !== '' ? '/' . $buildPublicSpace : '';
 $readmeHome        = $readmeSpacePrefix . '/';
 
+// A secret the build left out is the deployer's to put in: the README says how, beside the steps.
+$oauthReadmeNote = '';
+if ($oauthSecretsLeftOut !== []) {
+    $oauthVariables = array_map(fn($id) => qs_oauth_server_variable($id) . '_CLIENT_SECRET', $oauthSecretsLeftOut);
+    $oauthReadmeNote = "\nOAUTH SIGN-IN:\n\n"
+        . '  The client secret of ' . implode(', ', $oauthSecretsLeftOut) . " was left out of this build:\n"
+        . "  sign-in with it is not configured until, on the server, you either\n"
+        . "    - write the secret into {$buildSecureName}/data/oauth-secrets.json, in place of\n"
+        . "      the value that starts with \"REPLACE THIS VALUE\", or\n"
+        . '    - set ' . implode(', ', $oauthVariables) . " in the server's environment,\n"
+        . "      which the sign-in reads first.\n";
+}
+
 $readme = <<<README
 =======================================================
 PRODUCTION BUILD - DEPLOYMENT INSTRUCTIONS
@@ -1213,7 +1253,7 @@ DEPLOYMENT STEPS:
    reaching the site. (a) and (b) can both pass while it is not.
 
    Then check that styling loads, and language switching if multilingual.
-
+{$oauthReadmeNote}
 REQUIREMENTS:
 - PHP 8.3 or newer, with mod_php / php-fpm serving the document root
 - No PHP extensions beyond the defaults, no Composer, no database
@@ -1399,7 +1439,7 @@ ApiResponse::create(201, 'operation.success')
         // config keys was weighed and declined, because today's schema holds only
         // benign settings and a list that must be updated for every new key fails
         // closed in the silent direction.
-// The site's own front controller, its parameters and its request
+        // The site's own front controller, its parameters and its request
         // funnel — all three verified present and consistent before this
         // response was allowed to be a success.
         'entry_point_written' => true,

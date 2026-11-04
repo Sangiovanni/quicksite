@@ -324,9 +324,17 @@ $GLOBALS['__help_commands'] = [
                 'description' => 'PUBLIC_FOLDER_SPACE - subdirectory inside public folder for all public files (default: empty string)',
                 'example' => 'web or space/v1',
                 'validation' => 'Max 255 chars, max 5 levels deep, alphanumeric/dots/hyphens/underscores/forward-slash only, empty allowed'
+            ],
+            'include_oauth_secrets' => [
+                'required' => false,
+                'type' => 'boolean',
+                'description' => 'Carry the project\'s real OAuth client secrets in the build. Without it each provider\'s build keys keep their client id, and the secret is a placeholder the built site reads as not set: the deployer writes the secret into <secure>/data/oauth-secrets.json on the server, or sets QS_OAUTH_<PROVIDER>_CLIENT_SECRET there. Only a role that may set the project\'s keys (its owner and admin) may ask for it.',
+                'example' => true,
+                'default' => false,
+                'validation' => 'Read with a boolean filter, so true/false, 1/0 and the strings "true"/"false"/"on"/"yes" are all accepted; anything else reads as false.'
             ]
         ],
-        'example_post' => 'POST /management/p/<projectId>/build with body: {"public": "www/public", "secure": "app", "space": "web"}',
+        'example_post' => 'POST /management/p/<projectId>/build with body: {"public": "www/public", "secure": "app", "space": "web"} or {"include_oauth_secrets": true}',
         'success_response' => [
             'status' => 201,
             'code' => 'operation.success',
@@ -339,6 +347,14 @@ $GLOBALS['__help_commands'] = [
                 'entry_point_written' => true,
                 'entry_point_verified' => true,
                 'project_name' => 'myproject',
+                'oauth_secrets_included' => false,
+                'oauth' => [
+                    'providers' => ['github'],
+                    'missing_build_keys' => [],
+                    'secrets_left_out' => ['github'],
+                    'not_offered' => [],
+                    'address_routes_without_keys' => false
+                ],
                 'download_with' => 'downloadBuild'
             ]
         ],
@@ -346,6 +362,7 @@ $GLOBALS['__help_commands'] = [
             '400.validation.invalid_type' => 'Parameter must be a string',
             '400.validation.invalid_format' => 'Invalid path format (check max depth and allowed characters)',
             '400.validation.shared_parent_folder' => 'The public and secure folders would overlap: one contains the other, they are the same folder, or they share a root directory. data.conflict names which (identical, secure_inside_public, public_inside_secure, shared_root).',
+            '403.auth.forbidden' => 'include_oauth_secrets was asked for by a role that may not set the project\'s OAuth keys (only its owner and admin may); nothing was built',
 '409.conflict.already_exists' => 'This project already has a build - delete it first with deleteBuild',
             '409.conflict.operation_in_progress' => 'Another build is already running',
             '413.validation.size_limit_exceeded' => 'Build exceeds MAX_BUILD_SIZE_MB',
@@ -355,7 +372,7 @@ $GLOBALS['__help_commands'] = [
             '404.file.not_found' => 'The project is mono-language and its default.json translation file is missing, so the build cannot resolve any text. The build is aborted and rolled back.',
             '500.server.directory_create_failed' => 'Failed to create build directory. Failed to create timestamped build folder. Failed to create directory. Failed to create the build\'s data directory.'
         ],
-        'notes' => 'Compiles JSON templates to PHP using JsonToPhpCompiler and emits a self-contained single-project site: a front controller, the parameters it reads, an .htaccess that funnels requests into it, and the small runtime the compiled pages need. Before answering success the command checks that the finished build can actually serve - funnel target, parameters, project data, runtime, menu/footer, every route reachable at the path routing will compute, and the 404 - and DISCARDS the build with a 500 if any of that is missing. Output goes to qs_build/<name>/ inside the project - OUTSIDE its public/, so no URL reaches a build; downloadBuild is the only way to fetch one. RETENTION IS ONE BUILD PER PROJECT: a second build is refused rather than overwriting the first, so use deleteBuild between builds. A build that FAILS removes its own partial directory; if that removal also fails the leftover carries no build_manifest.json and getBuild reports it as incomplete. No ZIP is stored - downloadBuild archives the folder on demand. The "space" parameter controls PUBLIC_FOLDER_SPACE - when set (e.g., "web"), all public files go inside {public}/{space}/ creating access URL like http://site.com/web/, and the document root gets its own non-browsable .htaccess since the site is not there. Public and secure folders MUST NOT overlap: neither may contain the other, be the other, or share a root directory - otherwise a deployed build would serve its own secure folder over the web. The built site stores visitor state under the REAL project id, so it shares a browser-storage namespace with the same project served at /p/<projectId>/. Uses file locking to prevent concurrent builds.'
+        'notes' => 'Compiles JSON templates to PHP using JsonToPhpCompiler and emits a self-contained single-project site: a front controller, the parameters it reads, an .htaccess that funnels requests into it, and the small runtime the compiled pages need. Before answering success the command checks that the finished build can actually serve - funnel target, parameters, project data, runtime, menu/footer, every route reachable at the path routing will compute, and the 404 - and DISCARDS the build with a 500 if any of that is missing. Output goes to qs_build/<name>/ inside the project - OUTSIDE its public/, so no URL reaches a build; downloadBuild is the only way to fetch one. RETENTION IS ONE BUILD PER PROJECT: a second build is refused rather than overwriting the first, so use deleteBuild between builds. A build that FAILS removes its own partial directory; if that removal also fails the leftover carries no build_manifest.json and getBuild reports it as incomplete. No ZIP is stored - downloadBuild archives the folder on demand. The "space" parameter controls PUBLIC_FOLDER_SPACE - when set (e.g., "web"), all public files go inside {public}/{space}/ creating access URL like http://site.com/web/, and the document root gets its own non-browsable .htaccess since the site is not there. Public and secure folders MUST NOT overlap: neither may contain the other, be the other, or share a root directory - otherwise a deployed build would serve its own secure folder over the web. The built site stores visitor state under the REAL project id, so it shares a browser-storage namespace with the same project served at /p/<projectId>/. Uses file locking to prevent concurrent builds. OAUTH: a build carries the installation\'s entries of the providers the project\'s sign-in routes use (for a route that takes its provider from the address, every offered provider the project has build keys for) at <secure>/data/oauth-providers.json, and the project\'s BUILD keys at <secure>/data/oauth-secrets.json, never its preview keys. Each client id is written as it is; each secret only with include_oauth_secrets, else a placeholder: a string with spaces, which no stored secret and no provider\'s secret can be, so the built site reads it as not set - it sends nothing to the provider, answers that the sign-in is not configured and logs the file and the variable to set - while QS_OAUTH_<PROVIDER>_CLIENT_ID and _CLIENT_SECRET on the server come first, and _CLIENT_SECRET alone fills a secret the build left out. A provider without a secret (a public client) carries none either way. The answer and build_manifest.json say what the deployed site\'s sign-in has and lacks: oauth_secrets_included (true only when a real secret went in), and oauth - providers (carried), missing_build_keys (carried with no build keys), secrets_left_out (whose secret is the placeholder), not_offered (named by a route, not offered by the installation) and address_routes_without_keys. When a secret was left out, the build\'s README.txt says how to put it in.'
     ],
     
     'getBuild' => [
@@ -3732,7 +3749,7 @@ $GLOBALS['__help_commands'] = [
     ],
 
     'cloneProject' => [
-        'description' => 'Duplicates a project as a new one: a new id, always drawn by the installation, and the name the caller gives. Every file is copied as it is except the backups folder; the clone gets a fresh membership file with the caller as its sole owner.',
+        'description' => 'Duplicates a project as a new one: a new id, always drawn by the installation, and the name the caller gives. Every file is copied as it is except what belongs to the source - its backups, its build, its saved exports and its OAuth keys; the clone gets a fresh membership file with the caller as its sole owner.',
         'method' => 'POST',
         'url_structure' => '/management/p/<projectId>/cloneProject',
         'parameters' => [
@@ -3772,7 +3789,8 @@ $GLOBALS['__help_commands'] = [
                 'files_copied' => 25,
                 'cloned' => true,
                 'owner_user_id' => 'usr_0123456789abcdef0123456789abcdef',
-                'switched_to' => false
+                'switched_to' => false,
+                'oauth_keys_not_copied' => ['github']
             ]
         ],
         'error_responses' => [
@@ -3788,7 +3806,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.file_write_failed' => 'The clone\'s name file or membership file could not be created. The whole clone is deleted rather than left half-made.',
             '507.quota.storage_exceeded' => 'A storage quota is configured and the clone would put the caller over it. A clone is a new project owned by the caller, so it is charged to the caller - as an import is - for everything it copies (the source without its backups). Checked before the clone exists; nothing was written.'
         ],
-        'notes' => 'The clone does NOT inherit the source\'s roster: its membership file is written fresh with the caller as sole owner, no members, no pending invitations, visibility private and joining closed. A clone is an independent project — re-invite collaborators explicitly. The backups folder is skipped, so a clone starts with no backup history; everything else, including config, templates, translations, data and public assets, is copied. A link inside the project is not followed: what it points to is not copied. The clone always gets a new id, drawn like createProject\'s (data.project); its name is stored in its config/project.json. The site itself is copied as it is: its translations, site.name included, are the source\'s. data.files_copied counts the files present in the clone after the copy.'
+        'notes' => 'The clone does NOT inherit the source\'s roster: its membership file is written fresh with the caller as sole owner, no members, no pending invitations, visibility private and joining closed. A clone is an independent project — re-invite collaborators explicitly. The backups folder, the build (qs_build/) and the saved exports (exports/) are skipped: they belong to the source, so a clone starts with no backup history, no build and no saved export. The project\'s OAuth keys (data/oauth-secrets.json, both sets) are never copied either: the clone\'s callback addresses differ from the source\'s, so its sign-in needs keys registered for them, entered on its OAuth providers page; data.oauth_keys_not_copied lists the providers the source had keys for ([] when none), and the message says so when there are any. Everything else, including config, templates, translations, the rest of data and public assets, is copied. A link inside the project is not followed: what it points to is not copied. The clone always gets a new id, drawn like createProject\'s (data.project); its name is stored in its config/project.json. The site itself is copied as it is: its translations, site.name included, are the source\'s. data.files_copied counts the files present in the clone after the copy.'
     ],
     
     'renameProject' => [
@@ -4176,7 +4194,7 @@ $GLOBALS['__help_commands'] = [
     ],
 
     'approveJoinRequest' => [
-        'description' => 'Authority\'s "yes" on a pending join request or proposal. Consent rule: membership materializes exactly when BOTH consents exist. A SELF-REQUEST (the person asked) joins immediately at the granted role. A SPONSORED PROPOSAL converts into a normal invitation (by = the approver, sponsor kept, note kept) - the person is engaged for the first time and still answers it themselves from their membership inbox. The approver may name the role to grant (optional; defaults to the stored role).',
+        'description' => 'Authority\'s "yes" on a pending join request or proposal. Consent rule: membership materializes exactly when BOTH consents exist. A SELF-REQUEST (the person asked) joins immediately at the granted role, and the person is told: their membership inbox shows an "approved" notice until they dismiss it, which leaves the membership as it is. A SPONSORED PROPOSAL converts into a normal invitation (by = the approver, sponsor kept, note kept) - the person is engaged for the first time and still answers it themselves from their membership inbox. The approver may name the role to grant (optional; defaults to the stored role).',
         'method' => 'POST',
         'parameters' => [
             'user_id' => [
@@ -4210,7 +4228,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.file_write_failed' => 'Could not persist the approval',
             '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.'
         ],
-        'notes' => 'Approve-time re-validation mirrors the invitee\'s own accept step: approver rank in-lock (against the GRANTED role); target account must still exist; a sponsored entry\'s sponsor must still be a MEMBER (any rank - a demoted sponsor stays valid, a removed one voids the proposal). The optional role is the authority changeMemberRole already carries, folded into the approval as one atomic step (supersedes the earlier "no role override at approve" rule). For a converted proposal the response carries converted_to_invitation=true and joined=false.'
+        'notes' => 'Approve-time re-validation mirrors the invitee\'s own accept step: approver rank in-lock (against the GRANTED role); target account must still exist; a sponsored entry\'s sponsor must still be a MEMBER (any rank - a demoted sponsor stays valid, a removed one voids the proposal). The optional role is the authority changeMemberRole already carries, folded into the approval as one atomic step (supersedes the earlier "no role override at approve" rule). For a converted proposal the response carries converted_to_invitation=true and joined=false, and no approved notice is written: the invitation it became is the person\'s news. The approved notice is a mark on the person\'s member entry in their own users.php cache (notice: "approved"); the mirror write is secondary, so a lost write loses the notice, and no repair writes one back.'
     ],
 
     'denyJoinRequest' => [
@@ -4334,7 +4352,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.file_write_failed' => 'Could not persist the reconciled cache',
             '401.auth.required' => 'The command could not resolve the caller to a user. Over HTTP the dispatcher refuses an unauthenticated request first with 401 auth.unauthorized, so this is reached when the session stops resolving between those two checks (revoked, disabled, expired), or when the command is executed in-process with no authenticated caller.'
         ],
-        'notes' => 'MERGE-PRESERVE rule (the point of the command): member/pending_invite/pending_request are DERIVABLE from members.json and rebuilt from it; but refused/removed/deleted are TOMBSTONES that live ONLY in the user cache (members.json keeps no record of a refusal, kick, or dead project). Reconcile PRESERVES any tombstone for a user the authority no longer lists, and prunes only STALE POSITIVES (a cache claiming member/pending the authority contradicts). A rebuilt entry carries no project name (a name is read from the project when it is shown), so a name an older entry kept is dropped; a tombstone keeps the name it was written with. Aborts on an unreadable authority rather than wipe real memberships.'
+        'notes' => 'MERGE-PRESERVE rule (the point of the command): member/pending_invite/pending_request are DERIVABLE from members.json and rebuilt from it; but refused/removed/deleted are TOMBSTONES that live ONLY in the user cache (members.json keeps no record of a refusal, kick, or dead project). Reconcile PRESERVES any tombstone for a user the authority no longer lists, and prunes only STALE POSITIVES (a cache claiming member/pending the authority contradicts). The approved notice on a member entry (an accepted join request, notice: "approved") is kept while the authority lists the user as a member, never added to an entry that lacks it, and pruned with an entry the authority contradicts; it is not counted apart. A rebuilt entry carries no project name (a name is read from the project when it is shown), so a name an older entry kept is dropped; a tombstone keeps the name it was written with. Aborts on an unreadable authority rather than wipe real memberships.'
     ],
 
     'getProjectRoster' => [
@@ -4383,6 +4401,12 @@ $GLOBALS['__help_commands'] = [
                 'type' => 'boolean',
                 'description' => 'false (default): stream the ZIP bytes straight back as the response body - no JSON envelope, nothing stored. true: write the archive into <secure>/projects/<id>/exports/ and return the JSON envelope below with a download_url.',
                 'default' => false
+            ],
+            'include_oauth_secrets' => [
+                'required' => false,
+                'type' => 'boolean',
+                'description' => 'Carry the project\'s OAuth build keys, secrets included, as data/oauth-secrets.json. Without it the archive carries no OAuth key at all. The preview keys never travel: an import draws a new id, so the preview callback address changes.',
+                'default' => false
             ]
         ],
         'example_get' => 'GET /management/p/quicksite/exportProject (streams the ZIP) or GET /management/p/quicksite/exportProject?save=true&include_public=false (stores it, returns JSON)',
@@ -4417,7 +4441,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.move_failed' => 'save=true, but the archive could not be written into the exports folder',
             '507.quota.storage_exceeded' => 'save=true and a storage quota is configured: keeping the archive would put the project owner over it, counting the archive less the oldest one the five-export limit drops for it. The archive was not kept. A streamed export (save=false) is never charged: it lives in the system\'s temporary folder for the download only.'
         ],
-        'notes' => 'Project-scoped: the exported project is the one in the URL marker; a name/project in the request is optional and must match. Export format v2.0-secure - PHP files are NOT included, they are rebuilt from JSON on import. The archive carries the project\'s settings (languages, multilingual mode, theme mode, favicon and build size limit) and the routes as config.json and routes.json, config/*.json except members.json (its name file, config/project.json, among them), its page, component, menu and footer structures, its own snippets, its translations and data, and - unless include_public=false - public/assets and public/style. It never carries builds, backups or earlier exports. Its config.json always names the project\'s languages: its list, or, when its configuration lists none, its default language (en when it has none either), because an import refuses an archive that names no language. Saved exports live in that project\'s own folder (<secure>/projects/<id>/exports/), are auto-cleaned (keeps the last 5), and are reachable only through their own project\'s marker via downloadExport.'
+        'notes' => 'Project-scoped: the exported project is the one in the URL marker; a name/project in the request is optional and must match. Export format v2.0-secure - PHP files are NOT included, they are rebuilt from JSON on import. The archive carries the project\'s settings (languages, multilingual mode, theme mode, favicon and build size limit) and the routes as config.json and routes.json, config/*.json except members.json (its name file, config/project.json, among them), its page, component, menu and footer structures, its own snippets, its translations and data, and - unless include_public=false - public/assets and public/style. Its data never includes the project\'s OAuth key file as it is: without include_oauth_secrets no key travels, and with it data/oauth-secrets.json holds the build keys alone (an import writes them into the new project as they are). It never carries builds, backups or earlier exports. Its config.json always names the project\'s languages: its list, or, when its configuration lists none, its default language (en when it has none either), because an import refuses an archive that names no language. Saved exports live in that project\'s own folder (<secure>/projects/<id>/exports/), are auto-cleaned (keeps the last 5), and are reachable only through their own project\'s marker via downloadExport.'
     ],
     
     'importProject' => [
@@ -4854,7 +4878,7 @@ $GLOBALS['__help_commands'] = [
     ],
 
     'listDataBindings' => [
-        'description' => 'Lists the QuickSite-runtime `data-*` attribute catalog — what each attribute does, what value shape it expects, which attrs it pairs with. Consumed by the in-editor autocomplete in the Add Element wizard so users can discover which data-* attributes the runtime recognises (data-state-*, data-auth-*, data-storage-*, data-bind, data-error-for, data-qs-complex, …). Single source of truth lives in <secure>/src/functions/qsDataAttributeCatalog.php.',
+        'description' => 'Lists the QuickSite-runtime `data-*` attribute catalog — what each attribute does, what value shape it expects, which attrs it pairs with. Consumed by the in-editor autocomplete in the Add Element wizard so users can discover which data-* attributes the runtime recognises (data-state-*, data-auth-*, data-storage-*, data-consent-*, data-bind, data-error-for, data-qs-complex, …). Single source of truth lives in <secure>/src/functions/qsDataAttributeCatalog.php.',
         'method' => 'GET',
         'parameters' => [],
         'url_segments' => [
@@ -5679,7 +5703,7 @@ $GLOBALS['__help_commands'] = [
             ]
         ],
         'error_responses' => [],
-        'notes' => 'The providers belong to the installation: <secure>/management/config/oauth-providers.json when its operator has made that file, else the shipped oauth-providers.json.example beside it. No command writes either; the operator adds a provider by editing the file. An entry is offered only when its addresses are absolute https (http is accepted only in development) and its fields are well formed; a malformed entry is left out and the reason written to the PHP error log. The keys belong to the project, in two sets per provider (see setOAuthCredentials): "preview", which the sign-in uses on this installation, and "build", which a build carries to the deployed site. credentials.build is answered only to whoever may call setOAuthCredentials (the project\'s owner and admin); can_manage says which. credentials_status is "set" when the preview set holds a client id and a secret. callback.preview_url is the address to register in the provider\'s console for the preview; callback.path is the one to register on the deployed site\'s domain. resolver_count counts the routes whose OAuth resolver names this provider.'
+        'notes' => 'The providers belong to the installation: <secure>/management/config/oauth-providers.json when its operator has made that file, else the shipped oauth-providers.json.example beside it. No command writes either; the operator adds a provider by editing the file. An entry is offered only when its addresses are absolute https (http is accepted only in development) and its fields are well formed; a malformed entry is left out and the reason written to the PHP error log. An entry may carry a privacy_url: the provider\'s privacy policy, which a generated cookie or privacy policy links from its sign-in section; it is https even in development and may end in a fragment. preset is the entry as the list holds it. The keys belong to the project, in two sets per provider (see setOAuthCredentials): "preview", which the sign-in uses on this installation, and "build", which a build carries to the deployed site. credentials.build is answered only to whoever may call setOAuthCredentials (the project\'s owner and admin); can_manage says which. credentials_status is "set" when the preview set holds a client id and a secret. callback.preview_url is the address to register in the provider\'s console for the preview; callback.path is the one to register on the deployed site\'s domain. resolver_count counts the routes whose OAuth resolver names this provider.'
     ],
     'setOAuthCredentials' => [
         'description' => 'Sets or clears one of this project\'s two key sets for an OAuth provider the installation offers: "preview" (the sign-in on this installation) or "build" (carried by a build to the deployed site). Writes only the project\'s data/oauth-secrets.json. The answer never contains the secret.',
@@ -5856,7 +5880,7 @@ $GLOBALS['__help_commands'] = [
     ],
 
     'generateCookiePolicy' => [
-        'description' => 'Generate (or overwrite) the cookie-policy page at an author-chosen route — a deterministic table built from the registry (one row per declared key) plus an OAuth-provider privacy-link section and a legal-review note. Seeds default-language structural copy (new keys only; other languages translate via the Translation Manager) and records the route in data/consent.json so the banner links to it. Per-item descriptions are not seeded here — they live in translate/ under storage.desc.<id>, authored via the storage registry and resolved live.',
+        'description' => 'Generate (or overwrite) the cookie-policy page at an author-chosen route — a "Change my cookie preferences" button that reopens the consent popup, a deterministic table built from the registry (one row per declared key), an OAuth-provider privacy-link section and a legal-review note. Seeds default-language structural copy (new keys only; other languages translate via the Translation Manager) and records the route in data/consent.json so the banner links to it. Per-item descriptions are not seeded here — they live in translate/ under storage.desc.<id>, authored via the storage registry and resolved live.',
         'method' => 'POST',
         'parameters' => [
             'route' => [
@@ -5886,7 +5910,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.operation_failed' => 'Failed to write the cookie-policy page structure.',
             '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
-        'notes' => 'Creates the route (cascading parents) when missing; overwrites the structure when it exists (warned). Pairs with generateConsentLayer (which links the banner to this route).'
+        'notes' => 'Creates the route (cascading parents) when missing; overwrites the structure when it exists (warned). Pairs with generateConsentLayer (which links the banner to this route). The button is always on the page, right under the intro: withdrawing consent must be as easy as giving it. It is an ordinary node marked data-consent-action="customize", which qs.js answers on any page by reopening the consent popup (nothing happens on a page without one); a regeneration puts it back. The privacy-link section lists the OAuth providers the project\'s sign-in routes use - for a route that takes its provider from the address, every provider the installation offers that the project has keys for, in either set - each named as the installation\'s provider list names it and linked to its privacy_url (listed by name when it has none); a provider the list does not offer is not listed.'
     ],
 
     'getConsentStatus' => [
@@ -6080,7 +6104,7 @@ $GLOBALS['__help_commands'] = [
             '500.server.operation_failed' => 'Failed to write the privacy-policy page structure.',
             '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
-        'notes' => 'Descriptions resolve live (textKeys); regenerate only for data changes (new mappings, host re-classification). Drives the /admin/privacy Generate/Update flow.'
+        'notes' => 'Descriptions resolve live (textKeys); regenerate only for data changes (new mappings, host re-classification). Drives the /admin/privacy Generate/Update flow. The OAuth sign-in section lists the providers as generateCookiePolicy\'s does: the providers the project\'s sign-in routes use, named and linked to their privacy_url from the installation\'s provider list.'
     ],
     'deletePrivacyPolicy' => [
         'description' => 'Delete the generated privacy-policy page (the route recorded in data/privacy.json) and clear the recorded route. No body — the route is read from privacy.json so an unrelated route cannot be deleted by accident. Deletes the leaf route + its page files; parent routes stay.',

@@ -520,7 +520,8 @@ if (isset($_GET['denied'])): ?>
 </div>
 
 <!-- Clone Project Modal -->
-<div id="modal-clone-project" class="admin-modal" style="display: none;">
+<div id="modal-clone-project" class="admin-modal" style="display: none;"
+     data-oauth-keys-text="<?= htmlspecialchars(__admin('dashboard.projects.cloneOAuthKeys'), ENT_QUOTES) ?>">
     <div class="admin-modal__backdrop"></div>
     <div class="admin-modal__content">
         <div class="admin-modal__header">
@@ -551,6 +552,45 @@ if (isset($_GET['denied'])): ?>
                     <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
                 </svg>
                 <?= __admin('dashboard.projects.cloneBtn') ?>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Export Project Modal: the archive carries the project's OAuth keys only when its box is
+     ticked, and then the build keys alone. -->
+<div id="modal-export-project" class="admin-modal" style="display: none;">
+    <div class="admin-modal__backdrop"></div>
+    <div class="admin-modal__content">
+        <div class="admin-modal__header">
+            <h3 class="admin-modal__title"><?= __admin('dashboard.projects.exportTitle') ?></h3>
+            <button type="button" class="admin-modal__close" data-close-modal>×</button>
+        </div>
+        <div class="admin-modal__body">
+            <div class="admin-form-group">
+                <?= __admin('dashboard.projects.exportFrom') ?>: <strong id="export-source-name"></strong>
+            </div>
+            <div class="admin-alert admin-alert--warning">
+                <label class="admin-checkbox">
+                    <input type="checkbox" id="export-include-secrets" />
+                    <strong>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01"/>
+                        </svg>
+                        <?= __admin('dashboard.projects.exportSecretsLabel') ?>
+                    </strong>
+                </label>
+                <p class="admin-hint"><?= __admin('dashboard.projects.exportSecretsHint') ?></p>
+            </div>
+        </div>
+        <div class="admin-modal__footer">
+            <button type="button" class="admin-btn admin-btn--ghost" data-close-modal><?= __admin('common.cancel') ?></button>
+            <button type="button" id="btn-confirm-export" class="admin-btn admin-btn--primary">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                <?= __admin('dashboard.projects.export') ?>
             </button>
         </div>
     </div>

@@ -502,6 +502,23 @@ function qs_membership_mirror_entry(string $status, string $date): array {
 }
 
 /**
+ * The notice a member entry carries when the person's own join request was approved: the one
+ * notice that is good news. It is not terminal: dismissing it takes the mark off and leaves the
+ * membership as it is.
+ */
+const QS_MEMBERSHIP_APPROVED = 'approved';
+
+/** The member entry an approved join request writes: a member entry with the approved notice on it. */
+function qs_membership_approved_entry(string $date): array {
+    return qs_membership_mirror_entry('member', $date) + ['notice' => QS_MEMBERSHIP_APPROVED];
+}
+
+/** Does this cache entry carry the approved notice (a member entry marked by approveJoinRequest)? */
+function qs_membership_has_approved_notice($entry): bool {
+    return is_array($entry) && qs_cache_entry_is_member($entry) && ($entry['notice'] ?? null) === QS_MEMBERSHIP_APPROVED;
+}
+
+/**
  * Write ONE entry of a user's `projects` cache (the status mirror) through the
  * users.php writer — the single mirror-write path for the membership commands
  * $entry null = remove the entry. Mirror writes are SECONDARY: the failure
@@ -528,7 +545,8 @@ function qs_membership_cache_set(string $userId, string $project, ?array $entry)
 
 /**
  * The statuses of a terminal notice in a user's `projects` cache: a refusal, a removal, a deleted
- * project. members.json keeps no record of them, so no repair rebuilds or prunes one.
+ * project. members.json keeps no record of them, so no repair rebuilds or prunes one. The approved
+ * notice is not among them: it is a mark on a live member entry (QS_MEMBERSHIP_APPROVED).
  */
 const QS_MEMBERSHIP_NOTICES = ['refused', 'removed', 'deleted'];
 
@@ -575,10 +593,12 @@ function qs_membership_desired_statuses(array $members): array {
  * The cache entry a user holds for one project once repaired, from the entry they hold ($current,
  * null when none) and the status their roster gives them ($status, null when it lists them in no
  * engaged state). An engaged status gets its mirror entry, keeping the date the current entry
- * carries (`created` on a member entry, `at` on a pending one); with no status a notice is kept, and
- * anything else, a member or pending entry the roster contradicts, is dropped (null). The one rule
- * of reconcileMemberships (per project), qs_membership_sync_account() (per account) and a switch of
- * the edited project (qs_admin_set_selected_project()).
+ * carries (`created` on a member entry, `at` on a pending one); a member keeps the approved notice
+ * the entry carries, and no repair ever adds one (members.json keeps no record of it); with no
+ * status a terminal notice is kept, and anything else, a member or pending entry the roster
+ * contradicts, is dropped (null), the approved notice with it. The one rule of
+ * reconcileMemberships (per project), qs_membership_sync_account() (per account), a switch of the
+ * edited project (qs_admin_set_selected_project()) and the inbox (qs_membership_list_invitations()).
  */
 function qs_membership_reconciled_entry($current, ?string $status, string $today): ?array {
     if ($status !== null) {
@@ -586,6 +606,9 @@ function qs_membership_reconciled_entry($current, ?string $status, string $today
         $dateKey = $status === 'member' ? 'created' : 'at';
         if (is_array($current) && isset($current[$dateKey]) && is_string($current[$dateKey])) {
             $want[$dateKey] = $current[$dateKey];
+        }
+        if ($status === 'member' && qs_membership_has_approved_notice($current)) {
+            $want['notice'] = QS_MEMBERSHIP_APPROVED;
         }
         return $want;
     }

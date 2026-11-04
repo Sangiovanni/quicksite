@@ -1004,7 +1004,7 @@ The AI call is browser-direct via `QSAiCall.call(...)` (see `public/admin/assets
 
 | Page | What it does |
 |---|---|
-| **Dashboard** (`dashboard.js`) | Stats cards (route count, language count, recent build), command activity feed, recent history. Calls `help`, `getRoutes`, `getCommandHistory`. The **Project Manager** names every project as "Name #id" — the edited project's chip, the project selector (with your role on each), the delete selector, the backups label, the storage rows — reading names from `listProjects` and `/admin/self/space-usage`. The project selector and the **Delete** dialog's list are the panel's searchable dropdown (§9.9.2), your starred projects first; the ☆ beside the selector stars the project chosen in it (§8.0). The Delete list holds only the projects you **own** (the selector keeps every project you work on); it opens with nothing chosen and **Delete Project** off until you pick one, and **Delete** itself is off when you own none. ***My total space*** lists the **five largest** projects you own; **Show all (N)** lists them all (then reads **Show the 5 largest**), and the search above the rows, shown when you own more than five, finds any of them by name or id (a leading `#` allowed) — the total, the bar and the legend always count every project you own. Loading the dashboard repairs the header menu's copy of your memberships (§8.0). The **New Project** dialog asks for the project's name (free text, up to 60 characters) and its first language: a searchable list of the installation's languages with the installation's default language preselected, both read from `getLanguageList`. It creates the project with `createProject`; its id is drawn by the server. **Clone** opens prefilled with the source's name; **Import** reads the chosen archive's own name in the browser (its `config/project.json`, from the ZIP's directory, inflated with the browser's `DecompressionStream` — no library) and opens prefilled with it, or with the file name when the archive carries none. Each copy always gets a new id. **Rename** (`renameProject`) opens prefilled with the current name; it is enabled only when your role on the project chosen in the selector is owner, read from `listProjects` — the panel-wide permission set answers for the edited project only. **New Project**, **Clone** and **Import** each offer to switch to the new project, ticked by default. Deleting a project asks a second confirmation that names it. When an action reloads the page, its success message is shown after the reload. |
+| **Dashboard** (`dashboard.js`) | Stats cards (route count, language count, recent build), command activity feed, recent history. Calls `help`, `getRoutes`, `getCommandHistory`. The **Project Manager** names every project as "Name #id" — the edited project's chip, the project selector (with your role on each), the delete selector, the backups label, the storage rows — reading names from `listProjects` and `/admin/self/space-usage`. The project selector and the **Delete** dialog's list are the panel's searchable dropdown (§9.9.2), your starred projects first; the ☆ beside the selector stars the project chosen in it (§8.0). The Delete list holds only the projects you **own** (the selector keeps every project you work on); it opens with nothing chosen and **Delete Project** off until you pick one, and **Delete** itself is off when you own none. ***My total space*** lists the **five largest** projects you own; **Show all (N)** lists them all (then reads **Show the 5 largest**), and the search above the rows, shown when you own more than five, finds any of them by name or id (a leading `#` allowed) — the total, the bar and the legend always count every project you own. Loading the dashboard repairs the header menu's copy of your memberships (§8.0). The **New Project** dialog asks for the project's name (free text, up to 60 characters) and its first language: a searchable list of the installation's languages with the installation's default language preselected, both read from `getLanguageList`. It creates the project with `createProject`; its id is drawn by the server. **Clone** opens prefilled with the source's name; **Import** reads the chosen archive's own name in the browser (its `config/project.json`, from the ZIP's directory, inflated with the browser's `DecompressionStream` — no library) and opens prefilled with it, or with the file name when the archive carries none. Each copy always gets a new id. **Export** opens a dialog first: its box *Include the OAuth build keys*, in the warning style and unticked each time the dialog opens, decides whether the archive carries the project's OAuth build keys, secrets included; unticked, the archive carries no key at all, and the preview keys never travel (an imported project gets a new id, so its preview addresses change). A clone never carries the source's OAuth keys, its build or its saved exports: when the source had keys, a warning that stays until it is closed — after the reload too, when the clone is switched to — names the providers whose keys must be created on the clone's OAuth providers page, for the clone's own addresses. **Rename** (`renameProject`) opens prefilled with the current name; it is enabled only when your role on the project chosen in the selector is owner, read from `listProjects` — the panel-wide permission set answers for the edited project only. **New Project**, **Clone** and **Import** each offer to switch to the new project, ticked by default. Deleting a project asks a second confirmation that names it. When an action reloads the page, its success message is shown after the reload. |
 | **Command** (`command.js`) | Permission-filtered command index. An installation can decline to offer the console at all — see §9.17. |
 | **Command form** (`command-form.js`) | Renders a dynamic form for any command from `help` metadata, then executes it. The escape hatch into raw API. Withheld with the rest of the console when the installation turns it off (§9.17). |
 | **History** (`history.js`) | Its own page at `/admin/history` — see §9.18. Browses `getCommandHistory` for the **currently edited project**, exports what is on screen as CSV, and clears the stored trail. The command history is per-project, so switching projects switches the trail. Actions that belong to no project (creating a project, signing out) are recorded server-side but are not shown here; see *Command history storage* in `COMMAND_API.md`. Admin and owner only. |
@@ -1960,9 +1960,13 @@ providers page. There are no installation-wide keys.
 dot-paths to the user's id and email in the user-information answer
 (`userinfo_sub_path`, `userinfo_email_path`, optionally `userinfo_name_path`),
 and optionally a display `name`, the `console_url` where an owner registers an
-app, `extra_authorize_params` and `refresh_token_supported`. The `.example`'s
-`_fields` entry documents each. Every address must be an absolute https address;
-plain http is accepted only when the installation runs in development. An entry
+app, a `privacy_url` — the provider's privacy policy, which the sign-in section of
+a generated cookie or privacy policy links (§9.10), and which may end in a
+`#fragment` — `extra_authorize_params` and `refresh_token_supported`. The
+`.example`'s `_fields` entry documents each, and the four shipped providers carry
+their `privacy_url`. Every address must be an absolute https address; plain http
+is accepted only when the installation runs in development, and never for
+`privacy_url`: a visitor's browser opens that one, the server never calls it. An entry
 that is malformed — a missing address, an unknown field, an extra parameter that
 would replace one the engine writes — is left out of the list, and the reason is
 written to the PHP error log. A file that is not JSON offers no provider at all;
@@ -1981,11 +1985,18 @@ hand.
   know the deployed site's callback, `https://<your-site>/auth/oauth/<provider>/callback`.
   Often a second app: GitHub, for one, holds a single callback address per app.
 
-A build carries the build keys only; the preview keys never leave the
-installation. On the deployed server, `QS_OAUTH_<PROVIDER>_CLIENT_ID` and
-`QS_OAUTH_<PROVIDER>_CLIENT_SECRET` come first (the provider id upper-cased,
-every other character folded to `_`), so a deployer can keep the secret out of
-the build folder. The installation itself never reads those variables.
+A build carries the build keys only, and of them each client id as it is and
+each secret only when the Builds page's **Include the OAuth secrets** box was
+ticked (§9.16); otherwise the secret is a placeholder the deployed site reads as
+not set. The preview keys never leave the installation. On the deployed server,
+`QS_OAUTH_<PROVIDER>_CLIENT_ID` and `QS_OAUTH_<PROVIDER>_CLIENT_SECRET` come first
+(the provider id upper-cased, every other character folded to `_`), and
+`_CLIENT_SECRET` alone fills a secret the build left out, so a deployer can keep
+the secret out of the build folder. The installation itself never reads those
+variables. An export carries the build keys only when its dialog's box is ticked
+(the Dashboard row in §9); a backup always keeps both sets, which a restore puts
+back; a clone never copies them — its addresses differ, so its sign-in needs keys
+registered for them.
 
 **Setting up a provider — 3 steps**:
 
@@ -3014,7 +3025,13 @@ toggle row per *declared* non-essential category; Essential is always-on, locked
 and enables runtime gating. They render on every page via `renderConsentLayer()`
 (the menu/footer pattern), are styleable in the stylesheet editor and editable in
 the visual editor, and `qs.js` wires the **Accept all / Refuse all / Customize**
-actions. The visual editor toolbar gains two preview-only **Cookie banner** /
+actions, through one listener on the page. Inside the banner and the popup every
+`data-consent-action` works; anywhere else on a page, an element marked
+`data-consent-action="customize"` — a footer's *Cookie settings* link, the policy
+page's button — reopens the preferences, its toggles set from the visitor's
+recorded choice, and only that action works there: no element outside the banner
+and the popup can record a choice for the visitor. On a page without the popup it
+does nothing, and a link keeps its own address. The visual editor toolbar gains two preview-only **Cookie banner** /
 **Cookie popup** toggles beside Menu/Footer (they reveal the layers in the canvas
 for styling; they don't persist).
 
@@ -3026,10 +3043,15 @@ binding shows/hides elements on consent state. The layer is dormant until
 generated, so existing projects are unaffected until they opt in.
 
 **Cookie-policy page.** In the same modal, an optional route field generates a
-deterministic policy page (`generateCookiePolicy`) — a table of every declared
-key (name / scope / category / retention / needs-consent / purpose), an OAuth
-provider privacy-link section (sourced from the project's wired OAuth resolvers),
-and a legal-review note. The route is recorded in `consent.json`; once a page
+deterministic policy page (`generateCookiePolicy`) — a **Change my cookie
+preferences** button right under its intro (withdrawing consent must be as easy as
+giving it; the button is a node marked `customize`, which a regeneration puts back),
+a table of every declared key (name / scope / category / retention / needs-consent
+/ purpose), a sign-in section listing the OAuth providers the project's sign-in
+routes use — named as the installation's provider list names them and linked to
+their `privacy_url` (§9.5), a provider without one listed by name; a route that takes
+its provider from the address lists every provider the project has keys for, in
+either set — and a legal-review note. The route is recorded in `consent.json`; once a page
 exists the modal locks the route and offers **Update** + **Delete page**
 (`getConsentStatus` / `deleteCookiePolicy` drive this), so there is exactly one
 policy page and no accidental duplicates. Overwriting an existing route asks for
@@ -3079,7 +3101,9 @@ derive this, so it is author-declared (`setPrivacyHost`). A datum's recipient is
 **Coverage.** A summary reports mapped atoms, unverifiable endpoints, and
 unclassified hosts, and reads **Complete** only when none remain. OAuth and
 magic-link sign-in are auto-detected and surfaced as known data-collection sources
-(each collects a fixed field set) plus their third-party links.
+(each collects a fixed field set) plus their third-party links, the OAuth
+providers named and linked from the installation's provider list as on the cookie
+policy (§9.10).
 
 **Generate the page.** `generatePrivacyPolicy` writes a deterministic page at an
 author-chosen route: a **data-we-collect** table (label / purpose), a per-third-
@@ -3126,12 +3150,18 @@ shown; a voided invitation surfaces the server's 409 message), **My join
 requests** (withdraw), **My proposals** (`GET /admin/self/proposals` — pending validation
 vs. awaiting the person's answer; withdraw while pending), **Notices**
 (refused / removed / deleted with the recorded reason → dismiss, which also
-unblocks re-requesting), and a **Request to join** form (project id, with or
+unblocks re-requesting; and **Join request accepted**, in green, when a request
+of yours was approved — dismissing it takes the notice away and leaves you a
+member), and a **Request to join** form (project id, with or
 without the `#` it is shown with, + mandatory note; every error code mapped to a
 human message). Reading the inbox repairs your own copy of each pending entry from
 its project's roster, by the rule the header's menu is repaired with (§8.0): an
 entry the roster contradicts takes the roster's side and keeps its own date, one it
-no longer lists goes, and a roster that cannot be read is left alone.
+no longer lists goes, and a roster that cannot be read is left alone. An accepted
+request's notice is listed only while the roster lists you as a member; a later
+removal or deletion replaces it with its own notice, and leaving the project takes
+it away with the membership. No repair writes one: it exists only when the approval
+wrote it.
 
 **Project members** (`/admin/members`) manages the **edited** project — a banner
 re-states the project ("Name #id") + the caller's role, and the page follows the header
@@ -3336,7 +3366,7 @@ Where a project becomes a site you can put on a server: build it, download the a
 | A build | Its name, when it was made, its size, how many files and pages it carries, its languages, and the public / secure folder names and URL space it was built for. |
 | A build that did not finish | The same, marked **incomplete**, with a note saying it carries no manifest and can only be deleted. |
 | A build carrying OAuth client secrets | A warning that the archive is a credential, not just a website. |
-| A build whose sign-in is not ready | A warning naming the providers it carries without build keys (their sign-in fails on the deployed site until the server sets the keys or the project's build keys are entered and the project built again), any provider a sign-in route names that the installation no longer offers, and a route that takes its provider from the address when no provider has build keys — with a link to the OAuth providers page for a role that can open it. |
+| A build whose sign-in is not ready | A warning naming the providers it carries without build keys (their sign-in fails on the deployed site until the server sets the keys or the project's build keys are entered and the project built again), the providers whose client secret it left out (their sign-in fails until the secret is written into its `<secure>/data/oauth-secrets.json` on the server, `QS_OAUTH_<PROVIDER>_CLIENT_SECRET` is set there, or the project is built again with the secrets included), any provider a sign-in route names that the installation no longer offers, and a route that takes its provider from the address when no provider has build keys — with a link to the OAuth providers page for a role that can open it. |
 
 #### Choosing the folder names and the URL space
 
@@ -3355,6 +3385,15 @@ The **public folder name is read-only until you unlock it**, behind an explicit 
 A rejected name comes back **into the form** with what was typed still in it and the disclosure opened, since the reason is almost certainly one of the three fields. Names are validated before the one-build-at-a-time refusal, so a bad name is answered as a bad name rather than sending you off to delete a build first.
 
 These names are what the deploy panel compares against the installation's own, so a build made with the defaults and deployed into the install root is the case it flags in red.
+
+#### Including the OAuth secrets
+
+Beside **Build now**, the project's owner and admin — the roles that may set its OAuth keys — see a box **Include the OAuth secrets**, in the warning style, unticked each time the page loads and again after a build. Its explanation says what each choice means:
+
+- **Unticked** (the default): better not to share real secrets. The build keeps each provider's **client id** as it is — it is public, every sign-in shows it to the browser — and writes a placeholder for its **secret** in its `<secure>/data/oauth-secrets.json`. The placeholder reads *REPLACE THIS VALUE with the client secret, or set QS_OAUTH_<PROVIDER>_CLIENT_SECRET on the server*; the deployed site reads it as not set, so its sign-in answers that it is not configured until the deployer writes the secret into that file on the server, or sets `QS_OAUTH_<PROVIDER>_CLIENT_SECRET` there (the sign-in reads the server first). The build's `README.txt` says the same, provider by provider.
+- **Ticked**: the real secrets go in, and the build is a credential (the warning above says so). A build you deploy from this page needs it for its sign-in to work.
+
+A provider without a secret (a public client) carries none either way. The explanation names the build's own secure folder, as the folder-name field holds it. Another role does not see the box, and the server refuses the parameter from it.
 
 #### The second build is refused, and the page says what to do
 
@@ -3574,8 +3613,8 @@ Clearing is available here whether or not the command console is switched on. Th
 
 QuickSite's runtime understands a small set of `data-*` attributes that
 turn plain HTML elements into bindings (state-store readers, auth-state
-toggles, storage value displays, complex-element markers, …). Nearly every
-attribute on this page is **catalogued in
+toggles, storage value displays, cookie-consent controls, complex-element
+markers, …). Every attribute on this page is **catalogued in
 `secure/src/functions/qsDataAttributeCatalog.php`** — the single source
 of truth read by `GET /management/p/<projectId>/listDataBindings` and by the in-editor
 autocomplete + smart widgets, available on **both** the Add Element
@@ -3585,10 +3624,6 @@ autocomplete dropdown, per-attribute description box, smart widgets
 (store/field cascader, enum select, storage-spec composer), reserved-
 storage-key blocking — applies whether you're authoring a new element OR
 editing an existing one's bindings.
-
-The consent bindings are the exception: `data-consent-show` and its siblings are
-read by the runtime but carry no catalogue entry, so the picker does not offer
-them and they have to be typed by hand. They are documented in §9.10.
 
 This section is the task-oriented index for those attributes. For
 per-feature deep-dives (semantics, edge cases, full examples), see the
@@ -3610,6 +3645,8 @@ deep-dive.
 | `data-storage-show` | storage | `has:loc:key` / `missing:loc:key` | Generic show/hide on any storage key presence | §9.5 |
 | `data-storage-value` | storage | `localStorage:key` | Element text = the stored value | §9.5 |
 | `data-consent-show` | consent | `granted:<cat>` / `denied:<cat>` | Show/hide on cookie-consent state for a category (e.g. `granted:analytics`) | §9.10 |
+| `data-consent-action` | consent | `customize` / `accept-all` / `refuse-all` / `save` / `close` | A consent control: every action inside the banner and the popup; anywhere else only `customize`, which reopens the cookie preferences | §9.10 |
+| `data-consent-toggle` | consent | `functional` / `analytics` / `marketing` | The checkbox of one cookie category in the popup, ticked from the visitor's choice when the preferences open | §9.10 |
 | `data-bind` | template | field name | Per-item template field (inside `data-state-list` OR componentList) | §9.2 |
 | `data-bind-attr` | template | attribute name | Variant of `data-bind` — sets the named attribute instead of textContent | §9.2 |
 | `data-list-template` | template | `true` | Marks a hidden element as the per-item template for componentList | §9.2 |

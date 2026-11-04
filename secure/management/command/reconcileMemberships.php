@@ -18,7 +18,10 @@
  * cache (members.json keeps no record of a refusal, a kick, or a dead project).
  * A naive rebuild would erase them — reconcile PRESERVES any tombstone for a user
  * the authority no longer lists, and prunes only STALE POSITIVES (a cache claiming
- * member/pending that the authority contradicts).
+ * member/pending that the authority contradicts). The approved notice on a member
+ * entry is the same kind of record: kept while the authority lists the user as a
+ * member, never added to an entry that lacks it, and pruned with an entry the
+ * authority contradicts.
  *
  * @method POST
  * @route /management/p/<projectId>/reconcileMemberships

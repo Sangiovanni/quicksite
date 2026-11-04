@@ -45,7 +45,7 @@ if (!defined('SECURE_FOLDER_PATH')) {
  * Entry shape:
  *   name             string  the attribute name (e.g. 'data-state-show')
  *   description      string  one-sentence English description (picker tooltip)
- *   category         string  state | auth | storage | template | form | complex | internal
+ *   category         string  state | auth | storage | consent | template | form | complex | internal
  *   valueShape       string  what the value field expects — drives the
  *                            autocomplete widget:
  *                              store-field-ref  → "storeId.fieldName"
@@ -241,6 +241,44 @@ function qsDataAttributeCatalog(): array {
             'docAnchor' => 'ADMIN_PANEL.md#95-auth-flows',
             'examplePayload' => '<span data-storage-value="localStorage:userEmail"></span>',
             'since' => 'v1.0.0-beta.7'
+        ],
+
+        // ─── COOKIE CONSENT ───
+        [
+            'name' => 'data-consent-show',
+            'description' => 'Show this element only when the visitor has (granted:<category>) or has not (denied:<category>) accepted a cookie category: functional, analytics or marketing. It reads the visitor\'s recorded choice, so until they choose, every category counts as not accepted; re-applied when they change it.',
+            'category' => 'consent',
+            'valueShape' => 'enum',
+            'valueOptions' => ['granted:functional', 'granted:analytics', 'granted:marketing', 'denied:functional', 'denied:analytics', 'denied:marketing'],
+            'valuePlaceholder' => 'granted:analytics',
+            'tagsAllowed' => ['*'],
+            'docAnchor' => 'ADMIN_PANEL.md#910-storage-registry--cookie-consent-adminstorage',
+            'examplePayload' => '<p data-consent-show="denied:analytics">Accept analytics cookies to see this chart.</p>',
+            'since' => 'v1.0.0-beta.9'
+        ],
+        [
+            'name' => 'data-consent-action',
+            'description' => 'A cookie-consent control. Inside the cookie banner or the cookie popup: accept-all, refuse-all, save (the popup\'s choices), customize (open the preferences) and close (hide the popup). Anywhere else on a page only customize works: it reopens the cookie preferences, so a visitor can change or withdraw their consent; the other values do nothing there. On a page without the consent layer it does nothing.',
+            'category' => 'consent',
+            'valueShape' => 'enum',
+            'valueOptions' => ['customize', 'accept-all', 'refuse-all', 'save', 'close'],
+            'valuePlaceholder' => 'customize',
+            'tagsAllowed' => ['button', 'a'],
+            'docAnchor' => 'ADMIN_PANEL.md#910-storage-registry--cookie-consent-adminstorage',
+            'examplePayload' => '<button type="button" data-consent-action="customize">Cookie settings</button>',
+            'since' => 'v1.0.0-beta.9'
+        ],
+        [
+            'name' => 'data-consent-toggle',
+            'description' => 'The checkbox of one cookie category in the cookie popup: functional, analytics or marketing. Opening the preferences ticks it from the visitor\'s current choice; Save records every toggle. Read inside the cookie popup only.',
+            'category' => 'consent',
+            'valueShape' => 'enum',
+            'valueOptions' => ['functional', 'analytics', 'marketing'],
+            'valuePlaceholder' => 'analytics',
+            'tagsAllowed' => ['input'],
+            'docAnchor' => 'ADMIN_PANEL.md#910-storage-registry--cookie-consent-adminstorage',
+            'examplePayload' => '<input type="checkbox" data-consent-toggle="analytics">',
+            'since' => 'v1.0.0-beta.9'
         ],
 
         // ─── TEMPLATE / BINDING PRIMITIVES ───

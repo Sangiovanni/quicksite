@@ -1487,11 +1487,20 @@
                     const filesCopied = d.files_copied || '';
                     const msg = (proj.cloned || 'Project cloned') + ': ' + QuickSiteAdmin.projectLabel(d.project, d.name || name)
                         + (filesCopied ? ' (' + filesCopied + ' files)' : '');
+                    // A clone never carries the source's OAuth keys: say which to create again.
+                    // The warning stays until closed, and survives the reload. Its words come
+                    // with the clone dialog (dashboard.php), as the template hands its others.
+                    const keysLeft = Array.isArray(d.oauth_keys_not_copied) ? d.oauth_keys_not_copied : [];
+                    const keysWords = document.getElementById('modal-clone-project')?.dataset.oauthKeysText || '';
+                    const keysMsg = keysLeft.length
+                        ? keysWords.split('{providers}').join(keysLeft.join(', ')) : '';
                     closeAllModals();
                     if (activateCheckbox.checked) {
-                        reloadWithMessage(msg);
+                        if (keysMsg) reloadWithMessage(msg + '. ' + keysMsg, 'warning', 0);
+                        else reloadWithMessage(msg);
                     } else {
                         QuickSiteAdmin.showToast(msg, 'success');
+                        if (keysMsg) QuickSiteAdmin.showToast(keysMsg, 'warning', 0);
                         loadProjectManager();
                         this.disabled = false;
                         this.textContent = proj.cloneBtn || 'Clone Project';
@@ -1552,9 +1561,18 @@
             }
         });
         
-        // Export project
-        document.getElementById('btn-export-project').addEventListener('click', async function() {
-            const originalText = QSDom.setButtonBusy(this, proj.exporting || 'Exporting...');
+        // Export project: its dialog first, which asks whether the archive carries the
+        // project's OAuth build keys (unticked each time it opens).
+        document.getElementById('btn-export-project').addEventListener('click', function() {
+            document.getElementById('export-source-name').textContent = labelOf(getTargetProject());
+            document.getElementById('export-include-secrets').checked = false;
+            document.getElementById('modal-export-project').style.display = 'flex';
+        });
+
+        document.getElementById('btn-confirm-export').addEventListener('click', async function() {
+            // The button's icon and words, put back as they were once the export is done.
+            const restore = Array.from(this.childNodes);
+            QSDom.setButtonBusy(this, proj.exporting || 'Exporting...');
 
             try {
                 // exportProject streams a binary ZIP: the client's download path
@@ -1562,10 +1580,13 @@
                 // as the target, so no ?name is needed), reads a refusal as an
                 // envelope, and keeps the write allowance current like every call.
                 const target = getTargetProject();
-                const res = await QuickSiteAdmin.downloadFile('exportProject', [], {},
+                const withKeys = document.getElementById('export-include-secrets').checked;
+                const res = await QuickSiteAdmin.downloadFile('exportProject', [],
+                    withKeys ? { include_oauth_secrets: 'true' } : {},
                     { project: target, filename: target + '_export.zip' });
 
                 if (res.ok) {
+                    closeAllModals();
                     QuickSiteAdmin.showToast(proj.exported || 'Project exported', 'success');
                 } else {
                     QuickSiteAdmin.showToast((res.data && res.data.message) || 'Failed to export project', 'error');
@@ -1576,7 +1597,7 @@
             }
             
             this.disabled = false;
-            this.textContent = originalText;
+            this.replaceChildren(...restore);
         });
         
         // Import project: choose the archive, then name the project it becomes.

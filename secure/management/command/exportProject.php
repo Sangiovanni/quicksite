@@ -13,15 +13,16 @@
  * - templates/model/json/ (JSON structures only)
  * - snippets/ (the project's own snippets)
  * - translate/*.json
- * - data/*.json
+ * - data/*.json, but the project's OAuth keys only when asked, and then the build set alone
  * - public/assets/, public/style/
- * 
+ *
  * @method GET
  * @route /management/exportProject
  * @auth required (admin permission)
- * 
+ *
  * @param string $name Project name (optional, defaults to active project)
  * @param bool $include_public Include public files (optional, default: true)
+ * @param bool $include_oauth_secrets Carry the project's OAuth build keys, secrets included (optional, default: false)
  * @param bool $save Save to exports folder instead of streaming (optional, default: false)
  * 
  * @return ApiResponse|void Streams ZIP file or returns download URL if save=true
@@ -70,6 +71,8 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
 
     // Options
     $includePublic = filter_var($params['include_public'] ?? true, FILTER_VALIDATE_BOOLEAN);
+    // The project's OAuth keys are credentials: an archive carries them only when asked.
+    $includeOAuthSecrets = filter_var($params['include_oauth_secrets'] ?? false, FILTER_VALIDATE_BOOLEAN);
     // Default: stream directly. Use save=true to store in exports folder
     $save = filter_var($params['save'] ?? false, FILTER_VALIDATE_BOOLEAN);
     
@@ -150,10 +153,17 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
             addJsonFilesOnly($zip, $translatePath, $projectName . '/translate', $stats);
         }
         
-        // 7. Export data/*.json
+        // 7. Export data/*.json — but never the OAuth key file as it is. Its keys travel only when
+        // the caller asks (include_oauth_secrets), and then only the build set: the deployed site's
+        // keys keep working wherever the project is imported, while the preview keys name this
+        // installation's address of the project (/p/<projectId>/, and an import draws a new id), so
+        // they never leave it.
         $dataPath = $projectPath . '/data';
         if (is_dir($dataPath)) {
-            addJsonFilesOnly($zip, $dataPath, $projectName . '/data', $stats);
+            addJsonFilesOnly($zip, $dataPath, $projectName . '/data', $stats, ['oauth-secrets.json']);
+            if ($includeOAuthSecrets) {
+                addOAuthBuildKeysToZip($zip, $projectName, $stats);
+            }
         }
         
         // 8. Export public/ (assets only, no PHP)
@@ -353,6 +363,32 @@ function addJsonFilesOnly(ZipArchive $zip, string $dir, string $zipBase, array &
         }
         // Skip non-JSON files (especially .php)
     }
+}
+
+/**
+ * Add the project's OAuth build keys to the archive as data/oauth-secrets.json: each provider's
+ * build set with its secret (qs_oauth_carried_set()), and nothing of its preview set. Nothing is
+ * added when the project has no build keys.
+ */
+function addOAuthBuildKeysToZip(ZipArchive $zip, string $projectName, array &$stats): void {
+    require_once SECURE_FOLDER_PATH . '/src/functions/oauthProviderHelpers.php';
+    $carried = [];
+    foreach (qs_oauth_keys_read() as $provider => $sets) {
+        if (isset($sets['build'])) {
+            [$set] = qs_oauth_carried_set((string) $provider, $sets['build'], true);
+            $carried[(string) $provider] = ['build' => $set];
+        }
+    }
+    if ($carried === []) {
+        return;
+    }
+    $json = json_encode((object) $carried, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    if ($json === false) {
+        return;
+    }
+    $zip->addFromString($projectName . '/data/oauth-secrets.json', $json . "\n");
+    $stats['files']++;
+    $stats['total_size'] += strlen($json) + 1;
 }
 
 /**

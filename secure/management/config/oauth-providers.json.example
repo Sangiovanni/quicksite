@@ -1,9 +1,10 @@
 {
-    "_about": "The OAuth providers this installation offers to every project. While oauth-providers.json does not exist beside this file, this shipped list is the list; to change it, copy this file to oauth-providers.json and edit the copy (add an entry, change one, or remove one). No command writes either file. Each project enters its own keys for a provider on the panel's OAuth providers page. Every address must be an absolute https address (plain http is accepted only when the installation runs in development). An entry that is malformed is left out of the list and the reason is written to the PHP error log. A key starting with an underscore, like this one, is documentation.",
+    "_about": "The OAuth providers this installation offers to every project. While oauth-providers.json does not exist beside this file, this shipped list is the list; to change it, copy this file to oauth-providers.json and edit the copy (add an entry, change one, or remove one). No command writes either file. Each project enters its own keys for a provider on the panel's OAuth providers page. Every address must be an absolute https address (plain http is accepted only when the installation runs in development, and never for privacy_url). An entry that is malformed is left out of the list and the reason is written to the PHP error log. A key starting with an underscore, like this one, is documentation.",
 
     "_fields": {
         "name": "Optional. The name the panel shows (else the id with a capital first letter).",
         "console_url": "Optional. Where a project's owner registers an app with the provider; the panel links it.",
+        "privacy_url": "Optional. The provider's privacy policy, linked from the sign-in section of a generated cookie or privacy policy page (a provider without one is listed by name). An absolute https address even in development; it may end in a #fragment.",
         "authorize_url": "Required. The provider's authorization endpoint (the browser is sent there).",
         "token_url": "Required. The provider's token endpoint (the server calls it).",
         "userinfo_url": "Required. The provider's user-information endpoint (the server calls it).",
@@ -19,6 +20,7 @@
     "google": {
         "name": "Google",
         "console_url": "https://console.cloud.google.com/apis/credentials",
+        "privacy_url": "https://policies.google.com/privacy",
         "authorize_url": "https://accounts.google.com/o/oauth2/v2/auth",
         "token_url": "https://oauth2.googleapis.com/token",
         "userinfo_url": "https://www.googleapis.com/oauth2/v2/userinfo",
@@ -37,6 +39,7 @@
     "github": {
         "name": "GitHub",
         "console_url": "https://github.com/settings/developers",
+        "privacy_url": "https://docs.github.com/site-policy/privacy-policies/github-privacy-statement",
         "authorize_url": "https://github.com/login/oauth/authorize",
         "token_url": "https://github.com/login/oauth/access_token",
         "userinfo_url": "https://api.github.com/user",
@@ -51,6 +54,7 @@
     "amazon": {
         "name": "Amazon",
         "console_url": "https://developer.amazon.com/loginwithamazon/console/site/lwa/overview.html",
+        "privacy_url": "https://www.amazon.com/gp/help/customer/display.html?nodeId=GX7NJQ4ZB8MHFRNJ",
         "authorize_url": "https://www.amazon.com/ap/oa",
         "token_url": "https://api.amazon.com/auth/o2/token",
         "userinfo_url": "https://api.amazon.com/user/profile",
@@ -66,6 +70,7 @@
     "meta": {
         "name": "Meta",
         "console_url": "https://developers.facebook.com/apps/",
+        "privacy_url": "https://www.facebook.com/privacy/policy",
         "authorize_url": "https://www.facebook.com/v26.0/dialog/oauth",
         "token_url": "https://graph.facebook.com/v26.0/oauth/access_token",
         "userinfo_url": "https://graph.facebook.com/v26.0/me?fields=id,name,email",

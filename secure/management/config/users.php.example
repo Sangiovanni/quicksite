@@ -54,9 +54,13 @@
  *                    'pending_request' (awaiting consent — never grants
  *                    access), or a terminal notice 'refused' / 'removed' /
  *                    'deleted' (dismissable from the memberships page).
- *                    'member' entries are rebuildable from members.json;
- *                    pending/terminal statuses are NOT — a cache repair
- *                    (reconcileMemberships) must merge-preserve them.
+ *                    A member entry whose own join request was approved
+ *                    also carries `notice: 'approved'` until the person
+ *                    dismisses it; the membership stays.
+ *                    'member' and pending entries are rebuilt from
+ *                    members.json; a terminal notice and the approved
+ *                    notice are NOT — a cache repair (reconcileMemberships)
+ *                    keeps them.
  */
 
 // QuickSite ships NO working credential — this file is a SHAPE REFERENCE, not a

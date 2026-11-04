@@ -1332,9 +1332,10 @@
     }
 
     // ---- Banner + popup controller ----------------------------------------
-    // Wires the generated consent-banner / consent-popup structures (reserved
-    // ids + data-consent-action / data-consent-toggle). The structures carry
-    // the markup (styleable/editable); this drives behaviour.
+    // Drives the generated consent-banner / consent-popup structures (reserved
+    // ids + data-consent-toggle) and every data-consent-action control on the
+    // page. The structures carry the markup (styleable/editable); this drives
+    // behaviour.
 
     var CONSENT_TOGGLE_CATS = ['functional', 'analytics', 'marketing'];
 
@@ -1397,6 +1398,7 @@
             '.qs-cookie-policy th{background:#f9fafb;font-weight:600}' +
             '.qs-cookie-policy__key{font-family:ui-monospace,Menlo,Consolas,monospace}' +
             '.qs-cookie-policy__providers{line-height:1.7}' +
+            '.qs-cookie-policy__preferences{margin:12px 0 16px}' +
             '.qs-cookie-policy__disclaimer{margin-top:20px;font-size:12px;color:#6b7280;font-style:italic}';
         var style = document.createElement('style');
         style.id = 'qs-consent-styles';
@@ -1404,33 +1406,48 @@
         (document.head || document.documentElement).appendChild(style);
     }
 
-    function _wireConsentActions(scope, banner, popup) {
-        if (!scope) return;
-        scope.querySelectorAll('[data-consent-action]').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                switch (btn.getAttribute('data-consent-action')) {
-                    case 'accept-all':
-                        QS.setConsent({ functional: true, analytics: true, marketing: true });
-                        _consentHide(banner); _consentHide(popup);
-                        break;
-                    case 'refuse-all':
-                        QS.setConsent({ functional: false, analytics: false, marketing: false });
-                        _consentHide(banner); _consentHide(popup);
-                        break;
-                    case 'customize':
-                        _consentSyncToggles(popup, QS.getConsent());
-                        _consentShow(popup);
-                        break;
-                    case 'save':
-                        QS.setConsent(_consentReadToggles(popup));
-                        _consentHide(popup); _consentHide(banner);
-                        break;
-                    case 'close':
-                        _consentHide(popup);
-                        break;
-                }
-            });
-        });
+    /**
+     * Every consent control on the page, through one listener on the document. Inside the banner
+     * and the popup each action works; anywhere else only `customize`, which reopens the
+     * preferences: a visitor can change or withdraw their consent from any page that offers it, and
+     * no element outside the banner and the popup can record a choice on the visitor's behalf.
+     * Outside them, on a page with no popup, the click is left alone (a link follows its address).
+     */
+    function _onConsentActionClick(e) {
+        var target = e.target;
+        var control = (target && typeof target.closest === 'function') ? target.closest('[data-consent-action]') : null;
+        if (!control) return;
+        var banner = document.getElementById('qs-consent-banner');
+        var popup = document.getElementById('qs-consent-popup');
+        var action = control.getAttribute('data-consent-action');
+        var inLayer = !!((banner && banner.contains(control)) || (popup && popup.contains(control)));
+        if (!inLayer) {
+            if (action === 'customize' && popup) {
+                e.preventDefault();
+                QS.openConsent();
+            }
+            return;
+        }
+        switch (action) {
+            case 'accept-all':
+                QS.setConsent({ functional: true, analytics: true, marketing: true });
+                _consentHide(banner); _consentHide(popup);
+                break;
+            case 'refuse-all':
+                QS.setConsent({ functional: false, analytics: false, marketing: false });
+                _consentHide(banner); _consentHide(popup);
+                break;
+            case 'customize':
+                QS.openConsent();
+                break;
+            case 'save':
+                QS.setConsent(_consentReadToggles(popup));
+                _consentHide(popup); _consentHide(banner);
+                break;
+            case 'close':
+                _consentHide(popup);
+                break;
+        }
     }
 
     function _initConsentBanner() {
@@ -1438,8 +1455,6 @@
         var popup = document.getElementById('qs-consent-popup');
         if (!banner && !popup) return;
         _consentInjectStyles();
-        _wireConsentActions(banner, banner, popup);
-        _wireConsentActions(popup, banner, popup);
         // Auto-show the banner when the layer is enabled (live site) and the
         // visitor hasn't chosen yet. QS_CONSENT is emitted live-only, so the
         // banner never auto-pops in the editor (the toolbar toggle shows it).
@@ -1448,12 +1463,19 @@
         }
     }
 
-    /** Re-open the preferences popup (e.g. a footer "Cookie settings" link). */
+    /**
+     * Re-open the preferences popup, its toggles set from the visitor's recorded choice: what an
+     * element marked data-consent-action="customize" does, anywhere on the page. Nothing happens on
+     * a page that has no popup.
+     */
     QS.openConsent = function () {
         var popup = document.getElementById('qs-consent-popup');
+        if (!popup) return;
         _consentSyncToggles(popup, QS.getConsent());
         _consentShow(popup);
     };
+
+    document.addEventListener('click', _onConsentActionClick);
 
     /**
      * Write a token value to browser storage and fire qs:auth:saved.

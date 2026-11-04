@@ -71,17 +71,21 @@ function qs_membership_resolve(array $params, ?string &$project, ?string &$userI
 
 /**
  * The caller's membership INBOX: pending invitations, their own join requests,
- * and terminal project notices (refused / removed / deleted).
+ * and project notices — the terminal ones (refused / removed / deleted) and the
+ * approved one (their own join request accepted).
  *
  * Reads the caller's OWN users.php cache (cheap — no all-projects scan), then
- * hydrates each pending entry from that project's AUTHORITATIVE members.json: a
- * stale mirror can never misrepresent an offer, and drift self-corrects TOWARD
+ * hydrates each pending entry, and each member entry carrying the approved
+ * notice, from that project's AUTHORITATIVE members.json: a stale mirror can
+ * never misrepresent an offer or a membership, and drift self-corrects TOWARD
  * AUTHORITY by the shared repair rule (qs_membership_reconciled_entry(), as
  * reconcileMemberships and the dashboard's repair apply it) — a dangling pending
  * entry is pruned; a pending mirror whose authority already shows MEMBERSHIP is
  * upgraded to a member entry (restores picker visibility when an approve/accept
  * mirror write was lost); a mirror whose pending KIND disagrees with the
- * authority's direction is healed to the authority's side, keeping its own date.
+ * authority's direction is healed to the authority's side, keeping its own date;
+ * an approved notice is listed only while the roster lists the caller as a
+ * member, and goes with an entry the roster contradicts.
  * Sponsored proposals (`by` != me) are never mine to see: a drifted mirror
  * pointing at one is pruned, and the row is not listed. The heal writes the copy
  * only, never members.json, so it is no membership change (no token bump).
@@ -194,8 +198,41 @@ function qs_membership_list_invitations(): ApiResponse {
                 $row['note'] = $entry['note'];
             }
             $notices[] = $row;
+        } elseif (qs_membership_has_approved_notice($entry)) {
+            // The caller's own join request, accepted. Listed only while the
+            // roster lists them as a member: then the project's name is theirs
+            // to read, so it is read now, as for any membership.
+            if ($projectId === '' || strpbrk($projectId, "/\\") !== false || strpos($projectId, '..') !== false) {
+                continue;
+            }
+            if (!is_dir(SECURE_FOLDER_PATH . '/projects/' . $projectId)) {
+                $prune[] = $projectId;
+                continue;
+            }
+            $authority = loadProjectMembers($projectId);
+            if (!qs_membership_roster_readable($authority)) {
+                continue;
+            }
+            $desired = qs_membership_desired_statuses($authority)[$userId] ?? null;
+            $want = qs_membership_reconciled_entry($entry, $desired, $today);
+            if ($want === null) {
+                $prune[] = $projectId; // the roster no longer lists them
+                continue;
+            }
+            if ($want !== $entry) {
+                $heal[$projectId] = $want;
+            }
+            if (!qs_membership_has_approved_notice($want)) {
+                continue;
+            }
+            $notices[] = [
+                'project'      => $projectId,
+                'project_name' => qs_project_display_name($projectId),
+                'status'       => QS_MEMBERSHIP_APPROVED,
+                'at'           => $entry['created'] ?? null,
+            ];
         }
-        // 'member' entries are not inbox items.
+        // Any other member entry is not an inbox item.
     }
 
     // Self-heal: prunes + drift-heals in ONE cache write. Secondary write —
@@ -450,11 +487,14 @@ function qs_membership_leave(array $params): ApiResponse {
 }
 
 /**
- * Clear ONE terminal notice (refused | removed | deleted) from the CALLER's own
- * users.php cache — the "OK, seen it" for the notices the inbox surfaces.
+ * Clear ONE notice from the CALLER's own users.php cache — the "OK, seen it" for
+ * the notices the inbox surfaces. A terminal notice (refused | removed |
+ * deleted) is the whole entry, and goes. The approved notice is a mark on a live
+ * member entry: the mark goes and the membership stays exactly as it was.
  *
  * LIVE states are never dismissable: a membership is ended by leaving the
- * project, a pending invitation by declining it.
+ * project, a pending invitation by declining it. So a member entry without the
+ * mark, and every pending entry, is refused, and no dismissal can end one.
  *
  * Pure cache operation: no members.json involved (for a 'deleted' notice the
  * project — and its members.json — no longer exists; that is the point). The
@@ -478,12 +518,16 @@ function qs_membership_dismiss_notice(array $params): ApiResponse {
             return false;
         }
         $status = $entry['status'] ?? 'member';
-        if (!in_array($status, QS_MEMBERSHIP_NOTICES, true)) {
-            $error = 'notice.not_dismissable';
-            return false;
+        if (in_array($status, QS_MEMBERSHIP_NOTICES, true)) {
+            unset($cfg['users'][$userId]['projects'][$project]);
+            return true;
         }
-        unset($cfg['users'][$userId]['projects'][$project]);
-        return true;
+        if (qs_membership_has_approved_notice($entry)) {
+            unset($cfg['users'][$userId]['projects'][$project]['notice']);
+            return true;
+        }
+        $error = 'notice.not_dismissable';
+        return false;
     });
 
     if ($error === 'notice.not_found') {
@@ -492,7 +536,7 @@ function qs_membership_dismiss_notice(array $params): ApiResponse {
     }
     if ($error === 'notice.not_dismissable') {
         return ApiResponse::create(400, 'notice.not_dismissable')
-            ->withMessage('Only terminal notices can be dismissed — end a membership by leaving the project, and a pending invitation by declining it')
+            ->withMessage('Only a notice can be dismissed — end a membership by leaving the project, and a pending invitation by declining it')
             ->withData(['status' => $status]);
     }
     if ($written !== true) {

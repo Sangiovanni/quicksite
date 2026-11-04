@@ -10,11 +10,13 @@
  * Body:
  *   { "route": "cookies" }   required — the route to host the policy page
  *
- * Builds a page structure (one table row per declared key + an OAuth-provider
- * privacy-link section + a legal-review note) and writes it at the route. If
- * the route already exists, its structure is OVERWRITTEN (warned). Seeds EN/FR
- * copy (new keys only) and records the route in data/consent.json so the banner
- * links to it.
+ * Builds a page structure (a "Change my cookie preferences" button that reopens
+ * the consent popup + one table row per declared key + a privacy-link section
+ * for the OAuth providers the project's sign-in routes use, named and linked
+ * from the installation's provider list + a legal-review note) and writes it at
+ * the route. If the route already exists, its structure is OVERWRITTEN (warned).
+ * Seeds EN/FR copy (new keys only) and records the route in data/consent.json so
+ * the banner links to it.
  *
  * @return ApiResponse 200 { route, overwritten, rows, languagesSeeded }
  */

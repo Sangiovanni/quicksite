@@ -42,6 +42,7 @@
     var ICON_BUILD = 'M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z';
     var ICON_REFRESH = 'M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15';
     var ICON_DEPLOY = 'M12 19V5m0 0l-7 7m7-7l7 7M4 21h16';
+    var ICON_WARNING = 'M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01';
 
     // Last successful getBuild payload — the delete modal's download-first button
     // and the space panel both read it rather than re-fetching.
@@ -58,6 +59,15 @@
      * instead of throwing it away.
      */
     var buildOptions = { public: 'public', secure: 'secure', space: '' };
+
+    /**
+     * Whether the next build carries the project's real OAuth secrets (`include_oauth_secrets`).
+     * Off until the box is ticked, and off again on every page load: the default is the safe one.
+     */
+    var includeOAuthSecrets = false;
+
+    /** The box's explanation, which names the build's secure folder: rewritten when that name changes. */
+    var secretsHint = null;
 
     function api(cmd, method, body) {
         return window.QuickSiteAdmin.apiRequest(cmd, method, body);
@@ -107,12 +117,17 @@
      * providers page where the build keys are entered. Null when nothing is missing — and for a
      * build made before the report existed, which has none.
      */
-    function _renderOAuthGaps(report) {
+    function _renderOAuthGaps(report, secureName) {
         if (!report || typeof report !== 'object') return null;
         var missing = Array.isArray(report.missing_build_keys) ? report.missing_build_keys : [];
+        var leftOut = Array.isArray(report.secrets_left_out) ? report.secrets_left_out : [];
         var notOffered = Array.isArray(report.not_offered) ? report.not_offered : [];
         var lines = [];
         if (missing.length) lines.push(String(T.oauthMissingBody || '').split('{providers}').join(missing.join(', ')));
+        if (leftOut.length) {
+            lines.push(String(T.oauthLeftOutBody || '').split('{providers}').join(leftOut.join(', '))
+                .split('{secure}').join(String(secureName || 'secure')));
+        }
         if (notOffered.length) lines.push(String(T.oauthNotOffered || '').split('{providers}').join(notOffered.join(', ')));
         if (report.address_routes_without_keys === true) lines.push(T.oauthAddressNoKeys || '');
         if (!lines.length) return null;
@@ -220,6 +235,9 @@
             // one of these three fields, and it is already filled in with what
             // was typed.
             nodes.push(_renderBuildOptions(!!errorText));
+            // The secrets box only for a role that may set the project's keys: the server
+            // refuses the parameter from any other.
+            if (canRun('setOAuthCredentials')) nodes.push(_renderSecretsBox());
             nodes.push(el('div', { class: 'builds-actions' }, [
                 _renderButton(T.buildBtn || 'Build now', ICON_BUILD, 'primary', onBuild),
             ]));
@@ -301,6 +319,7 @@
                 preview.appendChild(_renderPathLine(pub + '/' + space + '/', (T.optSpaceServes || '').replace('{space}', space)));
             }
             preview.appendChild(_renderPathLine(sec + '/', T.deployOutside || '', true));
+            _refreshSecretsHint();
         }
         refresh();
 
@@ -318,6 +337,32 @@
         return details;
     }
 
+    /**
+     * "Include the OAuth secrets", beside Build now: off by default, in the warning style, with
+     * what each choice means. Unticked, the build keeps each provider's client id and writes a
+     * placeholder for its secret, which the deployer replaces on the server.
+     */
+    function _renderSecretsBox() {
+        var box = el('input', { type: 'checkbox', id: 'builds-opt-oauth-secrets' });
+        box.checked = includeOAuthSecrets;
+        box.addEventListener('change', function () { includeOAuthSecrets = box.checked; });
+        secretsHint = el('p', { class: 'builds-alert__body' });
+        _refreshSecretsHint();
+        return el('div', { class: 'admin-alert admin-alert--warning builds-secrets' }, [
+            el('label', { class: 'admin-checkbox', for: 'builds-opt-oauth-secrets' }, [
+                box,
+                el('strong', { class: 'builds-alert__title' }, [svgIcon(ICON_WARNING, 16), ' ' + (T.secretsLabel || '')]),
+            ]),
+            secretsHint,
+        ]);
+    }
+
+    /** The box's explanation, with the secure folder the next build is given. */
+    function _refreshSecretsHint() {
+        if (!secretsHint) return;
+        secretsHint.textContent = String(T.secretsHint || '').split('{secure}').join(buildOptions.secure || 'secure');
+    }
+
     function _renderBuild(b) {
         var nodes = [];
 
@@ -333,7 +378,7 @@
         if (b.oauth_secrets_included) {
             nodes.push(_renderAlert('warning', null, T.oauthWarn || ''));
         }
-        var oauthGaps = _renderOAuthGaps(b.oauth);
+        var oauthGaps = _renderOAuthGaps(b.oauth, b.secure);
         if (oauthGaps) nodes.push(oauthGaps);
 
         nodes.push(_renderFacts(b));
@@ -400,6 +445,7 @@
         if (buildOptions.public) body.public = buildOptions.public;
         if (buildOptions.secure) body.secure = buildOptions.secure;
         if (buildOptions.space) body.space = buildOptions.space;
+        if (includeOAuthSecrets) body.include_oauth_secrets = true;
 
         var res;
         try {
@@ -411,6 +457,8 @@
 
         if (res && res.ok) {
             toast(T.builtMsg || 'Build completed', 'success');
+            // The next build starts from the safe default again.
+            includeOAuthSecrets = false;
             await loadBuild();
             await loadSpace(true);
             return;

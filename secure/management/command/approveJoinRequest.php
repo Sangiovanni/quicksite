@@ -5,7 +5,8 @@
  * Authority's "yes" on a `direction:'request'` entry — with the CONSENT
  * LEDGER rule: membership materializes exactly when BOTH consents exist.
  *   - SELF-REQUEST (by == target): the requester consented by asking, the
- *     approver consents now → membership materializes immediately.
+ *     approver consents now → membership materializes immediately, and the
+ *     requester's mirror entry carries the approved notice until they dismiss it.
  *   - SPONSORED PROPOSAL (by == a sponsor): the approver consents now but the
  *     TARGET never asked → the entry CONVERTS into a normal invitation
  *     (`direction:'invite'`, `by` = the APPROVER whose rank now backs it,
@@ -175,8 +176,12 @@ function __command_approveJoinRequest(array $params = [], array $urlParams = [])
 
     // Status mirror (secondary write, silent-failure by ruling). No name: a
     // member — or an authority-engaged invitee — reads the project's name when
-    // it is shown.
-    $mirror = qs_membership_mirror_entry($converted ? 'pending_invite' : 'member', $today);
+    // it is shown. A self-request's approval carries the approved notice, so the
+    // requester is told; a converted proposal carries none: the invitation it
+    // became is the news.
+    $mirror = $converted
+        ? qs_membership_mirror_entry('pending_invite', $today)
+        : qs_membership_approved_entry($today);
     if (!qs_membership_cache_set($targetId, $project, $mirror)) {
         error_log("approveJoinRequest: cache mirror write failed for '{$targetId}' on '{$project}'");
     }

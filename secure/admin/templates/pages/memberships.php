@@ -92,6 +92,7 @@ window.QS_MEMBERSHIPS_I18N = <?= json_encode([
     'statusRefused'      => __admin('memberships.notices.statusRefused', 'Join request refused'),
     'statusRemoved'      => __admin('memberships.notices.statusRemoved', 'Removed from project'),
     'statusDeleted'      => __admin('memberships.notices.statusDeleted', 'Project deleted'),
+    'statusApproved'     => __admin('memberships.notices.statusApproved'),
     'reason'             => __admin('memberships.notices.reason', 'Reason'),
     'requestSentMsg'     => __admin('memberships.request.sentMsg', 'Join request sent'),
     'noteRequired'       => __admin('memberships.request.noteRequired', 'The note is required — say why you want to join.'),
