@@ -1152,8 +1152,9 @@ crawlers are even more conservative about running JS).
 |---|---|
 | Storage (per project) | `secure/projects/<projectId>/data/route-resolvers.json` |
 | Server-side execution | `secure/src/classes/DataResolver.php` → `resolveMany()` (handles single- and multi-resolver routes uniformly) |
-| Server-side fetch | `secure/src/functions/serverFetch.php` → `serverFetch()` (single) / `serverFetchMulti()` (parallel via `curl_multi_*`). Endpoint lookup goes through `secure/src/functions/apiRegistry.php`, the read half of the API registry. |
+| Server-side fetch | `secure/src/functions/serverFetch.php` → `serverFetchMulti()` (parallel via `curl_multi_*`). Endpoint lookup goes through `secure/src/functions/apiRegistry.php`, the read half of the API registry. |
 | Outbound SSRF guard | `secure/src/classes/OutboundUrlPolicy.php` — every server-side fetch is restricted to `http`/`https`, and in `production` the target is refused if it resolves to a loopback, private, or cloud-metadata address; the validated IP is pinned so DNS cannot rebind between check and connect. `development` (see `secure/management/config/environment.php`) lifts the internal-address block so a local/LAN API can be reached while building. Resolver fetches do **not** follow HTTP redirects. |
+| What a `cookie` API forwards | `qs_api_forwarded_cookies()` (`secure/src/functions/apiRegistry.php`), called from `serverFetch.php`: never the engine's own cookies, nothing over plain `http` from a page served over `https`, and on `/p/<projectId>/` only to the host of the page being served. `ADMIN_PANEL.md` §9.5. |
 | Storage + validation helpers | `secure/src/functions/resolverHelpers.php` (authoring) — the READ half a served page needs is `secure/src/functions/resolverRegistry.php`, which a build carries instead |
 | File-based cache + observability | `secure/src/functions/resolverCache.php` + `X-QS-Resolver-Cache` header |
 | Commands | `setRouteResolver` (set / clear / patch / append / remove), `cleanResolverCache` |

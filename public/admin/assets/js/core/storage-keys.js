@@ -19,7 +19,8 @@ window.QuickSiteStorageKeys = Object.freeze({
     adminPrefs:          'quicksite_admin_prefs',
     pendingMessage:      'quicksite_pending_message',
 
-    // External API registry. Per project: apis.js puts `qsp_<project>_` before it.
+    // The tokens typed for the API page's Test panel, per project (the key gets
+    // ':<project>' appended). A panel key: every name a page uses starts `qsp_`.
     apiAuthTokens:       'qs_api_auth_tokens',
 
     // AI provider settings

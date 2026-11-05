@@ -62,92 +62,6 @@ require_once __DIR__ . '/../functions/serverFetch.php';
 class DataResolver {
 
     /**
-     * Resolve a route's resolver config against the current request
-     * context. Returns the exposed template variables on success, or an
-     * error breakdown when the fetch / config failed.
-     *
-     * @param array $config  The route's `resolver` block from routes.php.
-     *                       Required keys: 'endpoint', 'expose'.
-     *                       Optional keys: 'inputs', 'cacheTTL', 'onMiss'.
-     * @param array $context Request-time context:
-     *                         'routeParams' => array  URL path params from
-     *                                          TrimParameters (e.g. ['slug' => 'red-vase'])
-     *                         'query'       => array  $_GET equivalent
-     *                         'session'     => array  ['token' => ..., 'userId' => ..., ...]
-     *                         'cookieHeader'=> string raw Cookie header for cookie-auth APIs
-     *                         'apiSecrets'  => array  test injection (default: read from disk)
-     *
-     * @return array {
-     *   'ok'      => bool,
-     *   'exposed' => array<string, mixed>  // template-scope variables
-     *                                      // empty array on failure
-     *   'status'  => int,                  // HTTP status from upstream
-     *   'error'   => string,               // present only on ok=false
-     * }
-     */
-    public function resolve(array $config, array $context = []): array {
-        // Validate config minimally — the routes.php schema validator
-        // is the canonical check; this is defence in depth.
-        if (!isset($config['endpoint']) || $config['endpoint'] === '') {
-            return [
-                'ok' => false,
-                'exposed' => [],
-                'status' => 0,
-                'error' => 'Resolver config missing required field: endpoint',
-            ];
-        }
-        $endpointRef = (string) $config['endpoint'];
-
-        // 1. Resolve each input's source spec into a concrete value.
-        $resolvedInputs = [];
-        foreach (($config['inputs'] ?? []) as $inputName => $sourceSpec) {
-            $value = $this->resolveSource((string) $sourceSpec, $context);
-            // null values are dropped from the resolved set so they don't
-            // override the upstream's defaults. The path-placeholder case
-            // still surfaces a 404 / 400 from the API (serverFetch leaves
-            // the literal :name in the URL) — that's the right signal for
-            // a misconfigured input source.
-            if ($value !== null) {
-                $resolvedInputs[$inputName] = $value;
-            }
-        }
-
-        // 2. Call serverFetch with the resolved inputs. Forward the
-        //    resolver's cacheTTL (if any) via the fetch
-        //    context so serverFetch can cache before / after curl.
-        //    Default 0 = no caching (per-request fetch every time).
-        $fetchContext = $context;
-        if (isset($config['cacheTTL']) && is_int($config['cacheTTL']) && $config['cacheTTL'] > 0) {
-            $fetchContext['cacheTTL'] = $config['cacheTTL'];
-        }
-        $result = serverFetch($endpointRef, $resolvedInputs, $fetchContext);
-        if (!$result['ok']) {
-            return [
-                'ok' => false,
-                'exposed' => [],
-                'status' => $result['status'] ?? 0,
-                'error' => $result['error'] ?? 'fetch failed',
-            ];
-        }
-
-        // 3. Apply expose mapping — read dot-paths from the response into
-        //    a flat name → value dict for the renderer.
-        $exposed = [];
-        foreach (($config['expose'] ?? []) as $varName => $responsePath) {
-            $exposed[(string) $varName] = $this->readDotPath(
-                $result['data'],
-                (string) $responsePath
-            );
-        }
-
-        return [
-            'ok' => true,
-            'exposed' => $exposed,
-            'status' => $result['status'],
-        ];
-    }
-
-    /**
      * Resolve a single input source spec. Mirrors the client-side
      * state-store init conventions:
      *
@@ -218,15 +132,10 @@ class DataResolver {
     }
 
     /**
-     * Resolve an array of resolver configs
-     * concurrently via serverFetchMulti. Replaces the per-resolver
-     * loop the single-config caller would otherwise need to roll, and
-     * preserves per-resolver `onMiss` semantics.
-     *
-     * Single-resolver routes pass a 1-element array — execution path
-     * is identical to resolve() but with multi-handle plumbing. The
-     * latency cost of curl_multi_init for a single fetch is negligible
-     * (<1ms); the consistency win of one code path is worth it.
+     * Resolve an array of resolver configs concurrently via
+     * serverFetchMulti, with per-resolver `onMiss` semantics. A route's
+     * resolvers go through here however many it has: a single resolver
+     * is a 1-element array.
      *
      * Return shape:
      *   [
@@ -244,7 +153,7 @@ class DataResolver {
      *                                     // if author skipped flat exposure.
      *       'firstError'      => array|null, // when ok=false, the FIRST
      *                                     // resolver failure that wasn't
-     *                                     // covered by onMiss. Caller (index.php)
+     *                                     // covered by onMiss. qs_resolve_route_data()
      *                                     // uses this to drive the 404/500 path.
      *                                     // {error, status, resolverIndex}
      *   ]
@@ -259,7 +168,16 @@ class DataResolver {
      *
      * @param array $configs Array of resolver config blocks (from
      *                       getResolversForRoute, normalised — always array).
-     * @param array $context Request-time context (same shape as resolve()).
+     *                       Required keys: 'endpoint', 'expose'.
+     *                       Optional keys: 'inputs', 'cacheTTL', 'onMiss'.
+     * @param array $context Request-time context:
+     *                         'routeParams' => array  URL path params from
+     *                                          TrimParameters (e.g. ['slug' => 'red-vase'])
+     *                         'query'       => array  $_GET equivalent
+     *                         'session'     => array  ['token' => ..., 'userId' => ..., ...]
+     *                         'cookieHeader'=> string the request's Cookie header
+     *                                          (serverFetch decides what of it leaves)
+     *                         'apiSecrets'  => array  test injection (default: read from disk)
      * @return array         See "Return shape" above.
      */
     public function resolveMany(array $configs, array $context = []): array {

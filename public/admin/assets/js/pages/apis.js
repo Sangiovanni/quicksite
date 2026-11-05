@@ -1600,14 +1600,14 @@
     }
     
     /**
-     * Where the tokens typed for the Test panel are kept: under the edited project's prefix, like every
-     * key a project stores, so one project's test never sends a token typed for another's API of the
-     * same id. No project, no key: nothing is kept outside a project's namespace.
+     * Where the tokens typed for the Test panel are kept: the panel's own key, one per project. One
+     * project's test never sends a token typed for another's API of the same id, and no page reaches them:
+     * every name a page uses starts `qsp_`. No project, no key.
      * @returns {?string}
      */
     function _authTokensKey() {
         const project = window.QUICKSITE_CONFIG && window.QUICKSITE_CONFIG.currentProject;
-        return project ? QuickSiteUtils.storageKeyPrefix() + QuickSiteStorageKeys.apiAuthTokens : null;
+        return project ? QuickSiteStorageKeys.apiAuthTokens + ':' + project : null;
     }
 
     /**

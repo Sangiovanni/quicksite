@@ -189,6 +189,103 @@ if (!function_exists('qs_http_header_value_is_safe')) {
     }
 }
 
+if (!defined('QS_ENGINE_COOKIES')) {
+    /**
+     * The cookies the engine sets under a fixed name, lower case: the panel's session, the panel's form
+     * token and the OAuth state store's session. They are spelled here and not read from where each is
+     * set, because a build carries this file and not those.
+     */
+    define('QS_ENGINE_COOKIES', ['qssessid', 'qs_form_token', 'qs_oauth_session']);
+    /** What every cookie the engine names per project starts with: qs_project_cookie_name(), and _cookieName() in qs.js. */
+    define('QS_ENGINE_COOKIE_PREFIX', 'qsp_');
+}
+
+if (!function_exists('qs_cookie_name_is_engine')) {
+    /**
+     * Is this cookie name one of the engine's? A cookie's name is case-sensitive, and this compares without
+     * case on purpose: a cookie an author named like one of these is one cookie that author does not get
+     * forwarded, and one of the engine's under a spelling another reader folds would be the credential.
+     */
+    function qs_cookie_name_is_engine(string $name): bool
+    {
+        $name = strtolower($name);
+        return in_array($name, QS_ENGINE_COOKIES, true) || strpos($name, QS_ENGINE_COOKIE_PREFIX) === 0;
+    }
+}
+
+if (!function_exists('qs_api_jar_may_reach')) {
+    /**
+     * May a visitor's cookies go to this URL? Never over plain http from a page served over https, on any
+     * surface: a browser would hold a `Secure` cookie back from that call, and a server cannot tell which ones are.
+     *
+     * Beyond that, a build's cookies are its own site's, and its API is usually a sibling of it (`www.` calling
+     * `api.`), which nothing can tell from a stranger without a public suffix list, so there the registry decides.
+     * Anywhere else they are the installation's and not the project's: the panel, every project at `/p/<id>/`
+     * and whatever else lives on that host share them. So there they go only to the host of the page being
+     * served. The port does not count, as it does not for a cookie.
+     */
+    function qs_api_jar_may_reach(string $apiHost, string $apiScheme): bool
+    {
+        if (strtolower($apiScheme) !== 'https') {
+            require_once __DIR__ . '/oauthStateStore.php'; // _oauthIsHttps, which also hears a proxy
+            if (_oauthIsHttps()) {
+                return false;
+            }
+        }
+        if (defined('QS_BUILD_VERSION')) {
+            return true;
+        }
+        require_once __DIR__ . '/requestRuntime.php';
+        $spelled = static fn(string $host): string => rtrim(strtolower(trim($host, '[]')), '.');
+        $apiHost = $spelled($apiHost);
+        return $apiHost !== '' && $apiHost === $spelled((string) preg_replace('/:\d+$/D', '', qs_request_host()));
+    }
+}
+
+if (!function_exists('qs_api_forwarded_cookies')) {
+    /**
+     * The Cookie header a server call under `auth.type = cookie` sends, or null for none: the one place a
+     * visitor's cookies leave the server. The engine's own never do, whatever a registry says, and
+     * qs_api_jar_may_reach() decides whether the rest may go to this URL at all.
+     *
+     * The header is read as pairs: split at `;`, the spaces and tabs around a pair dropped, name and value
+     * split at the first `=`. What cannot be read as one pair does not go out: no `=`, an empty name, a name
+     * holding white space, a control character or a comma, and a line break or a NUL anywhere. A pair that
+     * goes out goes as it came, a repeated name included: a browser sends one per path.
+     *
+     * @param mixed  $jar       The request's Cookie header.
+     * @param string $apiHost   The host the call goes to.
+     * @param string $apiScheme The scheme it goes over.
+     */
+    function qs_api_forwarded_cookies($jar, string $apiHost, string $apiScheme): ?string
+    {
+        if (!is_string($jar) || !qs_api_jar_may_reach($apiHost, $apiScheme)) {
+            return null;
+        }
+        $kept = [];
+        foreach (explode(';', $jar) as $piece) {
+            $piece = trim($piece, " \t");
+            $at = strpos($piece, '=');
+            if (!$at || !qs_http_header_value_is_safe($piece)) {
+                continue;
+            }
+            $name = substr($piece, 0, $at);
+            if (preg_match('/[\x00-\x20\x7F,]/', $name) === 1 || qs_cookie_name_is_engine($name)) {
+                continue;
+            }
+            // A server that receives two Cookie lines merges them with a comma, so what reads as one value
+            // here can hold a second pair for a reader that also splits at commas.
+            foreach (array_slice(explode(',', $piece), 1) as $part) {
+                if (qs_cookie_name_is_engine(trim(explode('=', $part, 2)[0], " \t"))) {
+                    continue 2;
+                }
+            }
+            $kept[] = $piece;
+        }
+        return $kept === [] ? null : implode('; ', $kept);
+    }
+}
+
 if (!function_exists('qs_api_effective_auth')) {
     /**
      * The one reading of an endpoint's `auth`: what a call to it carries, whichever runtime makes the

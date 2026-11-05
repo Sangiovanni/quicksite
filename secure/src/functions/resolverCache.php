@@ -38,13 +38,13 @@ require_once __DIR__ . '/jsonIo.php'; // qs_json_write — NOT the whole utility
  * Broader invalidation hooks (mutation broadcast, related-data
  * triggers, etc.) are not implemented.
  *
- * Per-call observability seam (by design): writes
- * $GLOBALS['__qs_resolver_cache_status'] to one of:
+ * Per-call observability (by design): a call's cache status is one of:
  *   'hit'       — cache satisfied the request
  *   'miss'      — eligible to cache but no entry; will fetch + write
  *   'skip'      — TTL=0 (resolver config didn't opt in)
  *   'disabled'  — TTL>0 but auth-type forbids caching (per-user)
- * public/index.php picks this up and emits as X-QS-Resolver-Cache header
+ * serverFetchMulti() collects them in $GLOBALS['__qs_resolver_cache_statuses'],
+ * and qs_resolve_route_data() sends them as the X-QS-Resolver-Cache header
  * so the user can watch cache behaviour in DevTools.
  */
 

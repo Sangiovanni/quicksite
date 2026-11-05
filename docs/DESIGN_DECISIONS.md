@@ -15298,7 +15298,7 @@ they are undeclared once opened; which key an import should name is a question o
 
 **Source**: Sangio, 2026-11-05, on the flags raised by the storage-key picker's build and the OpenAPI converter; beta.12. `secure/src/functions/apiRegistry.php`, `secure/src/classes/ApiEndpointManager.php`.
 
-### A token comes from the project's own namespace and nowhere else (locked 2026-11-05)
+### A token comes from the project's own namespace and nowhere else (locked 2026-11-05) (superseded 2026-11-05)
 
 **Decision**: On this mechanism a token only ever comes from, and goes to, a slot under `qsp_<projectId>_`. `QS.fetch` reads a source's key through the one storage boundary, so a key written with no prefix and another project's slot named whole are not read. A page that does not know its project sends no token and stores none. A credential is never a literal in the registry. The token typed for the Test panel is kept under the edited project's prefix, so one project's test never sends a token typed for another project's API of the same id. A CSRF cookie named `qsp_…` is refused at save and ignored at a call: that namespace is the engine's.
 
@@ -15317,3 +15317,25 @@ they are undeclared once opened; which key an import should name is a question o
 **Alternatives considered**: declaring the keys with a default category (a choice nobody made, in a consent register); changing the import's fixed keys (any fixed name is equally undeclared); restoring the old API after a refused add (not atomic, and the old API may no longer pass).
 
 **Source**: Sangio, 2026-11-05; beta.12. `public/admin/assets/js/pages/apis.js`, `secure/src/classes/ApiEndpointManager.php`.
+
+### The engine's own cookies never leave a server call, and on `/p/` a visitor's cookies go only to the page's own host (locked 2026-11-05)
+
+**Decision**: A server call under `auth.type = cookie` forwards the visitor's cookies through one function, `qs_api_forwarded_cookies()`. Whatever a registry says, it removes the panel's session, the panel's form token, the OAuth state store's session and every name starting `qsp_`, each compared without case. On an installation it sends nothing to any host but the page's own, compared without the port; in a build it sends the rest to the API's host. From a page served over `https` it sends nothing over plain `http`, on any surface. What cannot be read as one `name=value` pair does not go out, a pair that goes out goes as it came, and with nothing left the call has no `Cookie` header. The browser's `credentials: 'include'` and the Test panel, which sends no cookie, are as they were.
+
+**Reasoning**: The panel's session cookie is scoped to the whole origin because `/p/<id>/` needs it, so a `/p/` request carries it, with the OAuth store's session and each project's cookies, and the engine alone reads any of them. What a visitor's browser holds must not depend on what a registry says, since the people who write a registry and the people who visit a page are different people. The names are listed, because a build carries this file and not the files that set them. The rule about the host does the work the list cannot: on an installation the cookies are the installation's, a browser would not send them to another host either, and a cookie the list has forgotten still goes nowhere. In a build they are the site's own, and the API is usually a sibling host. Over plain `http` from a page served over `https`, a browser would hold a `Secure` cookie back and block the call besides, and a server cannot tell which cookies are `Secure`, so none goes. The one shape the host rule changes keeps working in a build and from the browser: a resolver in a preview, calling a sibling host for a cookie set on a parent domain.
+
+**Alternatives considered**: an allow list in the registry instead of the list of the engine's names (the registry's author writes it, so it cannot keep anything from that author, and the engine's names would have to be refused anyway; a list that narrows what goes out can be added later and breaks nobody); a registrable-domain test (without a public suffix list two strangers under one public suffix pass, and a suffix list is a data file that goes stale); the host rule in a build too (it refuses `www.` calling `api.`, the one reason a build forwards a cookie at all); a host named in the API's config (the only host a config names is the one it sends to); refusing the call when no cookie may go (an API that also answers anonymous visitors would stop answering, where a call with no `Cookie` header is what a visitor with no cookies makes); reserving every name starting `qs_` (it would take away an author's own cookies for a convention the list states exactly); an exception to the `https` rule for a loopback API (a production server may not call one anyway, and one rule is easier to state).
+
+**Source**: Sangio, 2026-11-05: the engine's own cookies never leave; "Deny list + same host"; on plain `http`, "Close it here"; beta.12. `secure/src/functions/apiRegistry.php`, `secure/src/functions/serverFetch.php`.
+
+### The Test panel's tokens live in the panel's own namespace, per project (locked 2026-11-05)
+
+**Supersedes** (in part): *A token comes from the project's own namespace and nowhere else* (locked 2026-11-05), whose sentence on the token typed for the Test panel this replaces. The rest of it stands: a page's token only ever comes from, and goes to, a slot under `qsp_<projectId>_`.
+
+**Decision**: The tokens typed in an API card for the Test panel are kept under `qs_api_auth_tokens:<projectId>`, the panel's own key with the project appended. No project sees another's, and no page sees any, because every name a page uses starts `qsp_`. No panel code reads a name under `qsp_`, so what a page keeps under the bare name `qs_api_auth_tokens` is the page's own.
+
+**Reasoning**: Per project was right, since two projects can each have an API of the same id. But `qsp_<projectId>_` is the namespace a page of that project reads and writes, and roles separate who writes a page from who types a token. A token kept there sat within a page's reach, and that made false the statement that a project page cannot address panel state whatever a key is called. The prefix was a means to keep a token inside its project, and the panel's own key does that and keeps it out of every page.
+
+**Alternatives considered**: refusing the bare name on a page (no name is refused: the prefix is the boundary); a key per account as well as per project (asked for per project; it stays in that browser like the panel's other keys); `_` before the project id (safe too, since the name before it is fixed; `:` is what the registry's other per-project key uses).
+
+**Source**: Sangio, 2026-11-05, told it departs from the words of his addition to keep what they were for: "Yes, as recommended"; beta.12. `public/admin/assets/js/pages/apis.js`, `public/admin/assets/js/core/storage-keys.js`.

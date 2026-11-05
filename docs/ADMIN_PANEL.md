@@ -272,7 +272,7 @@ Two other cookies exist, both HttpOnly and neither readable by page scripts. `QS
 |---|---|---|
 | `adminPrefs` | localStorage | `utils.js`, `admin.js`, `settings.js`, `preview-sidebar-resize.js` |
 | `pendingMessage` | sessionStorage | `utils.js`, `admin.js` |
-| `apiAuthTokens` | localStorage, per project: under `qsp_<project>_` | `apis.js` |
+| `apiAuthTokens` | localStorage, per project (the key gets `:<project>` appended): a panel key, which no page of any project reaches. The panel reads nothing under `qsp_`, so what a page keeps under the bare name `qs_api_auth_tokens` is the page's own | `apis.js` |
 | `aiConnectionsV3` | localStorage | `connections-store.js` (canonical), `ai-connections.js` |
 | `aiKeysV2` | localStorage / sessionStorage | `connections-store.js`, `settings.js` — read-only, for the v2 → v3 migration |
 | `aiDefaultProvider` | localStorage / sessionStorage | `connections-store.js`, `settings.js` |
@@ -1062,7 +1062,7 @@ The location list offers each auth type what reads it, and the server refuses an
 |---|---|---|
 | `bearer`, `basic` | `localStorage`, `sessionStorage` | `QS.fetch` in the browser. The server's own call does not read a location: it sends the session's token, and a served page passes none. |
 | `apiKey` | `header` | The server, which sends the key from the secrets file in the named request header (`header:X-API-Key`). The browser sends no API key. |
-| `cookie`, `none` | none | Nothing to read: the browser owns a cookie. |
+| `cookie`, `none` | none | Nothing to read: the browser owns a cookie. What a server call forwards is in §9.5. |
 
 For **localStorage** and **sessionStorage** the name is a storage key, taken from the storage-key picker (§9.10) with the location
 as its scope; the refresh token's source is always one of these two. For **header** the name is typed. Switching the location away
@@ -1232,7 +1232,7 @@ that need authoring on top:
 
 - **Response bindings** (which fields feed which DOM selectors / state stores) are project-specific and authored in the visual editor — the imported schemas drive the binding picker, but no bindings are emitted.
 - **OAuth handler config** — when a security scheme is `oauth2` or `openIdConnect`, the converter sets the API auth to `bearer` (oauth2 yields a bearer token at runtime). Configure the OAuth handler details via the API edit form.
-- **Auth token storage** — the converter sets sensible `tokenSource` defaults (`localStorage:token` for bearer, `localStorage:basicAuth` for basic, `header:<name>` for apiKey). The token the Test panel sends is entered per-API in the registry card's Auth Token field, and kept in the browser under `qsp_<project>_`, for that project alone. A storage key an import names is not declared by it: declaring one needs a category only the author can choose, so the preview's notes name each API whose source is an undeclared key, in every format, and say what to do, and the storage-key picker says so when the API is opened.
+- **Auth token storage** — the converter sets sensible `tokenSource` defaults (`localStorage:token` for bearer, `localStorage:basicAuth` for basic, `header:<name>` for apiKey). The token the Test panel sends is entered per-API in the registry card's Auth Token field, and kept in the browser under the panel's own key, one per project (§6), where no page of any project reaches it. A storage key an import names is not declared by it: declaring one needs a category only the author can choose, so the preview's notes name each API whose source is an undeclared key, in every format, and say what to do, and the storage-key picker says so when the API is opened.
 - **Alternate security schemes** — endpoints flagged `auth: 'required'` (different scheme from the API default) carry the API's credential until refined, and nothing while the API has no auth. The preview's notes name which schemes were seen.
 - **What the server refuses** — a refused endpoint stays out of its API, and a toast names the API, the endpoint and why. An API that already exists is replaced in one `editApi` call, which the server takes whole or not at all: a refused import leaves the API as it was, and only what referred to an endpoint it leaves out goes with it.
 
@@ -1730,6 +1730,36 @@ self-contained.
 `credentials: 'include'` also works cross-origin if the server sets
 the right CORS headers (`Access-Control-Allow-Credentials: true`
 plus a concrete `Access-Control-Allow-Origin` — not `*`).
+
+**A server call — what a route's resolver forwards**
+
+A resolver's call under `cookie` carries the visitor's cookies as the request
+brought them, within three limits. The Test panel's call carries none.
+
+- **The engine's own cookies never leave**, on any surface and whatever the
+  registry says: the panel's session (`QSSESSID`), its form token
+  (`qs_form_token`), the OAuth state store's session (`qs_oauth_session`) and
+  every name starting `qsp_`, which is each project's own. A name is compared
+  without case. No API has a use for one of these: the engine alone reads them.
+- **From a page served over `https` none goes over plain `http`**, on any
+  surface: a browser would hold a `Secure` cookie back from that call, and a
+  server cannot tell which ones are. A proxy's `X-Forwarded-Proto` counts. The
+  call goes with no `Cookie` header.
+- **On `/p/<projectId>/` the cookies go only to the host of the page being
+  served.** There they belong to the installation and not to the project: the
+  panel, every project and whatever else lives on that host share them. The port
+  does not count, as it does not for a cookie. An API on another host is called
+  with no `Cookie` header, as a visitor with no cookies would be. In a build they
+  are the site's own, so they go to the API's host wherever it is.
+
+So an API on `api.example.com` whose cookie is set on `.example.com` gets it from
+a site built for `www.example.com`, and not from a preview on another host of
+that domain. `QS.fetch` in that preview still sends it: the browser decides that.
+
+What cannot be read as one `name=value` pair does not go out: no `=`, an empty
+name, a name holding white space, a control character or a comma, and a line
+break or a NUL anywhere. A pair that goes out goes as it came, a repeated name
+included. With nothing left the call has no `Cookie` header.
 
 **CSRF — the double-submit token**
 
@@ -2391,7 +2421,7 @@ splits).
 |---|---|
 | Storage (per project, keyed by route) | `secure/projects/<project>/data/route-resolvers.json` |
 | Server-side execution | `secure/src/classes/DataResolver.php` → `resolveMany()` |
-| Server-side fetch (single + parallel) | `secure/src/functions/serverFetch.php` → `serverFetch()` / `serverFetchMulti()` |
+| Server-side fetch (parallel) | `secure/src/functions/serverFetch.php` → `serverFetchMulti()` |
 | Outbound SSRF guard | `secure/src/classes/OutboundUrlPolicy.php` — a resolver endpoint must be a public `http`/`https` URL. In `production` a target resolving to a loopback / private / cloud-metadata address is refused (the fetch returns an error and the resolver's `onMiss` applies); set the environment to `development` (`secure/management/config/environment.php`) to reach `localhost` / a LAN API while building. |
 | Storage + validation helpers | `secure/src/functions/resolverHelpers.php` |
 | Cache layer | `secure/src/functions/resolverCache.php` + `cleanResolverCache` command |

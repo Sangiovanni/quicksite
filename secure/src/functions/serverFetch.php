@@ -1,25 +1,22 @@
 <?php
 /**
- * serverFetch — Server-side equivalent of QS.fetch.
+ * Server-side equivalent of QS.fetch: serverFetchMulti().
  *
- * Resolves an endpoint reference against the project's API registry
+ * Resolves each endpoint reference against the project's API registry
  * (the same `api-endpoints.json` that drives the client-side QS.fetch),
  * substitutes path placeholders + body / query inputs, attaches auth
  * for server-callable endpoints (apiKey / bearer-with-session / cookie),
  * fires curl, and returns a normalised response shape.
  *
- * Used by:
- *   - secure/src/classes/DataResolver.php — per-route resolvers that
- *     populate template variables before render (the headline use).
- *   - Future: OAuth callback handlers, webhook responders,
- *     any server-side code that needs to call a registered API.
+ * Used by secure/src/classes/DataResolver.php: per-route resolvers that
+ * populate template variables before render.
  *
  *
  * Refusing client-only endpoints:
  *
  *   Endpoints carry a `callableFrom` marker (see
  *   qs_api_effective_callable_from). Endpoints whose effective
- *   value is `client` cannot be invoked here — serverFetch returns
+ *   value is `client` cannot be invoked here — the call answers
  *   ok=false with a clear error. This is the server-side mirror of the
  *   client-side guard in QS.fetch + the qs-api-config.js filtering that
  *   keeps server-only endpoints out of the public bundle. Defence in
@@ -40,10 +37,11 @@
  *                ['token']. Without that, the call goes auth-less and
  *                will likely 401 — Tier 3 server-side session wiring
  *                populates this.
- *   - `cookie` → passes through the user's Cookie header (from
- *                $context['cookieHeader'] or $_SERVER['HTTP_COOKIE']).
- *                The auth API and the user's site must share an origin
- *                or have explicit cross-origin cookie config.
+ *   - `cookie` → passes through the visitor's cookies (from
+ *                $context['cookieHeader'] or $_SERVER['HTTP_COOKIE']), as
+ *                qs_api_forwarded_cookies() leaves them: never the engine's
+ *                own, never over plain http from a page served over https,
+ *                and on an installation only to the page's own host.
  *
  *   An endpoint's own `auth` decides which of these applies:
  *   qs_api_effective_auth(). An endpoint's `headers` are checked before
@@ -59,7 +57,7 @@
  *   POST/PUT/PATCH (as JSON) or to the query string for GET/HEAD.
  *
  *   The DataResolver is responsible for source resolution
- *   ('param:slug' → routeParams['slug']); serverFetch just consumes the
+ *   ('param:slug' → routeParams['slug']); this file just consumes the
  *   already-resolved flat values.
  *
  *
@@ -73,18 +71,20 @@
  *   ]
  *
  *
- * @param string $endpointRef Endpoint reference, '@apiId/endpointId' or
- *                            'apiId/endpointId' or just 'endpointId'
- *                            (searches all APIs in that case).
- * @param array  $inputs      Map of input name → already-resolved value.
- * @param array  $context     Optional execution context:
- *                              'session'      => ['token' => string, ...]
- *                                                bearer token for the user
- *                              'cookieHeader' => string  raw Cookie header
- *                              'apiSecrets'   => array  inject for testing
- *                                                (default: require the
- *                                                gitignored file).
- * @return array              Normalised response (see above).
+ * What a call takes:
+ *
+ *   endpointRef  Endpoint reference, '@apiId/endpointId' or
+ *                'apiId/endpointId' or just 'endpointId'
+ *                (searches all APIs in that case).
+ *   inputs       Map of input name → already-resolved value.
+ *   context      Optional execution context:
+ *                  'session'      => ['token' => string, ...]
+ *                                    bearer token for the user
+ *                  'cookieHeader' => string  the request's Cookie
+ *                                    header, read as above
+ *                  'apiSecrets'   => array  inject for testing
+ *                                    (default: require the
+ *                                    gitignored file).
  */
 
 // The API registry READ half only — this file runs on every served page,
@@ -94,14 +94,14 @@ require_once __DIR__ . '/apiRegistry.php';
 require_once __DIR__ . '/../classes/OutboundUrlPolicy.php';
 
 /**
- * Internal — build a curl handle + bookkeeping for serverFetch /
- * serverFetchMulti. Holds all the deterministic work (registry
- * lookup, callableFrom gate, URL/body/headers construction, auth
- * resolution, cache eligibility + read) so the caller does ONLY the
- * actual transport (curl_exec single vs curl_multi_exec parallel).
+ * Internal — build a curl handle + bookkeeping for one call. Holds all
+ * the deterministic work (registry lookup, callableFrom gate,
+ * URL/body/headers construction, auth resolution, cache eligibility +
+ * read) so serverFetchMulti does ONLY the actual transport, and only
+ * for the genuine cache misses.
  *
  * Return shape:
- *   ['state' => 'error',    'result' => <serverFetch envelope, ok:false>]
+ *   ['state' => 'error',    'result' => <response envelope, ok:false>]
  *   ['state' => 'hit',      'result' => <cached envelope, ok:true>,
  *                            'cacheStatus' => 'hit']
  *   ['state' => 'prepared', 'handle' => <curl handle>,
@@ -110,11 +110,6 @@ require_once __DIR__ . '/../classes/OutboundUrlPolicy.php';
  *                            'cacheable' => <bool>,
  *                            'cacheTTL' => <int>,
  *                            'cacheStatus' => 'miss'|'skip'|'disabled']
- *
- * Extracted from serverFetch's single-curl
- * implementation so serverFetchMulti can prepare N requests, hit the
- * cache for the ones with usable entries, and only fire curl_multi_*
- * for genuine misses.
  */
 function _serverFetchPrepare(string $endpointRef, array $inputs, array $context): array {
     // Strip leading '@' if present (registry-mode convention from QS.fetch).
@@ -313,13 +308,14 @@ function _serverFetchPrepare(string $endpointRef, array $inputs, array $context)
             $headers[] = 'Authorization: Bearer ' . $token;
         }
     } elseif ($authType === 'cookie') {
-        // Pass the user's Cookie header straight
-        // through. Same as the client's `credentials: 'include'`. The
-        // auth API and the QuickSite site need a shared origin (or
-        // explicit cross-origin cookie config on both ends).
-        $cookieHeader = $context['cookieHeader']
-            ?? ($_SERVER['HTTP_COOKIE'] ?? null);
-        if ($cookieHeader !== null && $cookieHeader !== '') {
+        // The server side of the browser's `credentials: 'include'`: the visitor's
+        // cookies, as the one function leaves them. Nothing left, no header.
+        $cookieHeader = qs_api_forwarded_cookies(
+            $context['cookieHeader'] ?? ($_SERVER['HTTP_COOKIE'] ?? null),
+            (string) ($ssrf['host'] ?? ''),
+            (string) ($ssrf['scheme'] ?? '')
+        );
+        if ($cookieHeader !== null) {
             $headers[] = 'Cookie: ' . $cookieHeader;
         }
     } elseif ($authType === 'basic') {
@@ -352,9 +348,8 @@ function _serverFetchPrepare(string $endpointRef, array $inputs, array $context)
     // The right place for a per-call observe(start, endpoint, callableFrom)
     // before curl_exec + observe(end, status, durationMs, cacheHit) after.
 
-    // Cache read attempt (cacheStatus reporting is the caller's, so
-    // multi-resolver callers get a per-resolver status array instead of a
-    // single $GLOBALS value clobbered by whichever call ran last).
+    // Cache read attempt (cacheStatus reporting is the caller's, so a route
+    // with several resolvers gets a status for each).
     //
     // Eligibility: cacheTTL>0 + auth type doesn't carry per-user identity.
     // The auth-cacheable rule (LOCKED): only `none` and `apiKey` —
@@ -381,8 +376,7 @@ function _serverFetchPrepare(string $endpointRef, array $inputs, array $context)
     }
 
     // Prepare the curl handle. CURLOPT_RETURNTRANSFER is on so we can
-    // recover the body via curl_multi_getcontent (curl_multi path) or
-    // the return of curl_exec (single path).
+    // recover the body via curl_multi_getcontent.
     $ch = curl_init();
     curl_setopt_array($ch, [
         CURLOPT_URL            => $url,
@@ -413,8 +407,7 @@ function _serverFetchPrepare(string $endpointRef, array $inputs, array $context)
 }
 
 /**
- * Decode a response body. Shared post-curl logic used by both single
- * (serverFetch) and multi (serverFetchMulti) paths.
+ * Decode a response body.
  */
 function _serverFetchParseResponse(string $responseBody, int $httpCode): array {
     // JSON when it parses; raw string otherwise (the resolver's expose
@@ -433,54 +426,6 @@ function _serverFetchParseResponse(string $responseBody, int $httpCode): array {
 }
 
 /**
- * Single-endpoint synchronous fetch. Thin wrapper around the prepare /
- * curl_exec / parse trio; keeps the single-endpoint contract for callers
- * (signature unchanged, `$GLOBALS['__qs_resolver_cache_status']` still
- * set for back-compat with public/index.php's single-resolver path).
- */
-function serverFetch(string $endpointRef, array $inputs = [], array $context = []): array {
-    $prep = _serverFetchPrepare($endpointRef, $inputs, $context);
-
-    if ($prep['state'] === 'error') {
-        // Skip/disabled wasn't set; surface a neutral status for the header.
-        $GLOBALS['__qs_resolver_cache_status'] = 'skip';
-        return $prep['result'];
-    }
-    if ($prep['state'] === 'hit') {
-        $GLOBALS['__qs_resolver_cache_status'] = 'hit';
-        return $prep['result'];
-    }
-
-    // state === 'prepared'
-    $GLOBALS['__qs_resolver_cache_status'] = $prep['cacheStatus'];
-    $ch = $prep['handle'];
-
-    $responseBody = curl_exec($ch);
-    if ($responseBody === false) {
-        $curlError = curl_error($ch);
-        curl_close($ch);
-        return [
-            'ok'     => false,
-            'status' => 0,
-            'data'   => null,
-            'error'  => "curl failed for @{$prep['endpointRef']}: {$curlError}",
-        ];
-    }
-    $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-
-    $result = _serverFetchParseResponse($responseBody, $httpCode);
-
-    // Cache write on success only — failures aren't cached so re-trying
-    // soon is the right behaviour.
-    if ($prep['cacheable'] && $result['ok']) {
-        writeResolverCache('@' . $prep['endpointRef'], $prep['inputs'], $result, $prep['cacheTTL']);
-    }
-
-    return $result;
-}
-
-/**
  * Parallel multi-endpoint fetch.
  *
  * Accepts an array of fetch specs and fires them concurrently via
@@ -490,11 +435,11 @@ function serverFetch(string $endpointRef, array $inputs = [], array $context = [
  * the multi-handle.
  *
  * Returns results in the SAME order as the input specs (a results array
- * indexed 0..N-1). Each result has the serverFetch envelope shape.
+ * indexed 0..N-1). Each result has the return shape at the top of this file.
  *
  * Per-resolver cache statuses are collected into
- * $GLOBALS['__qs_resolver_cache_statuses'] (array, in spec order). The
- * caller (public/index.php) emits the X-QS-Resolver-Cache header as a
+ * $GLOBALS['__qs_resolver_cache_statuses'] (array, in spec order).
+ * qs_resolve_route_data() sends the X-QS-Resolver-Cache header as a
  * comma-separated list of these per-call statuses.
  *
  * @param array $specs Array of `['endpointRef' => ..., 'inputs' => [...],
@@ -582,8 +527,8 @@ function serverFetchMulti(array $specs, array $context = []): array {
         curl_multi_close($multi);
     }
 
-    // Per-resolver cache status array for observability. public/index.php
-    // emits this as a comma-separated X-QS-Resolver-Cache header so
+    // Per-resolver cache status array for observability. qs_resolve_route_data()
+    // sends this as a comma-separated X-QS-Resolver-Cache header so
     // DevTools shows "hit,miss,disabled" for a 3-resolver route.
     $GLOBALS['__qs_resolver_cache_statuses'] = $statuses;
 
