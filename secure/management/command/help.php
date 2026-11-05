@@ -6226,7 +6226,7 @@ $GLOBALS['__help_commands'] = [
             'auth' => [
                 'required' => false,
                 'type' => 'object',
-                'description' => 'Authentication configuration: {type: "none"|"bearer"|"apiKey"|"basic", tokenSource: "localStorage:key"|"sessionStorage:key"|"config:key"|"header:Header-Name"}. A header name is an RFC 7230 token: letters, digits and ! # $ % & \' * + - . ^ _ ` | ~',
+                'description' => 'Authentication configuration: {type: "none"|"bearer"|"apiKey"|"basic"|"cookie", tokenSource}. A bearer or basic token is read in the browser from a storage key: tokenSource "localStorage:key" or "sessionStorage:key". An API key is sent by the server in a request header: tokenSource "header:Header-Name", where the name is an RFC 7230 token: letters, digits and ! # $ % & \' * + - . ^ _ ` | ~. Types none and cookie take no tokenSource. Any other pair is refused: nothing reads it.',
                 'example' => '{"type": "bearer", "tokenSource": "localStorage:apiToken"}'
             ]
         ],
@@ -6247,7 +6247,7 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '400.api.error.missing_parameter' => 'Missing required parameter (apiId, name, or baseUrl)',
-            '400.api.error.invalid_parameter' => 'API with this ID already exists, or an invalid apiId, baseUrl or auth (a tokenSource header name that is not an RFC 7230 token included); the message says which',
+            '400.api.error.invalid_parameter' => 'API with this ID already exists, or an invalid apiId, baseUrl or auth (a tokenSource its auth type does not read and a header name that is not an RFC 7230 token included); the message says which',
             '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
             '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
@@ -6285,19 +6285,19 @@ $GLOBALS['__help_commands'] = [
             'auth' => [
                 'required' => false,
                 'type' => 'object',
-                'description' => 'New authentication config, in the shape addApi takes. A header:Header-Name tokenSource names an RFC 7230 token: letters, digits and ! # $ % & \' * + - . ^ _ ` | ~',
+                'description' => 'New authentication config, in the shape addApi takes. A bearer or basic token is read in the browser from a storage key: tokenSource "localStorage:key" or "sessionStorage:key". An API key is sent by the server in a request header: tokenSource "header:Header-Name", where the name is an RFC 7230 token: letters, digits and ! # $ % & \' * + - . ^ _ ` | ~. Types none and cookie take no tokenSource. Any other pair is refused: nothing reads it.',
                 'example' => '{"type": "apiKey", "tokenSource": "header:X-API-Key"}'
             ],
             'endpoints' => [
                 'required' => false,
                 'type' => 'array',
-                'description' => 'Full replacement of all endpoints (use with caution)',
+                'description' => 'Full replacement of all endpoints (use with caution). Each is checked as addEndpoint checks it, and one refused changes nothing. An endpoint the list leaves out goes as deleteEndpoint removes one, with what refers to it.',
                 'example' => '[{"id": "ep1", "name": "Endpoint 1", "path": "/ep1", "method": "GET"}]'
             ],
             'addEndpoint' => [
                 'required' => false,
                 'type' => 'object',
-                'description' => 'Add a single endpoint: {id, name, path, method, description?, requestSchema?, responseSchema?, headers?, queryParams?, responseBindings?, callableFrom?}. path starts with / and holds only letters, digits, - . _ ~ ! $ & \' ( ) * + , ; = : @ / ? and %XX escapes (":name" segments are placeholders). callableFrom: "client" | "server" | "both". Absent = auto-derived from auth type (apiKey → server; others → both). Server-only endpoints are filtered out of qs-api-config.js.',
+                'description' => 'Add a single endpoint: {id, name, path, method, description?, auth?, requestSchema?, responseSchema?, headers?, queryParams?, responseBindings?, callableFrom?}. path starts with / and holds only letters, digits, - . _ ~ ! $ & \' ( ) * + , ; = : @ / ? and %XX escapes (":name" segments are placeholders). auth: what a call carries, in the browser and on the server alike: absent, "inherit" or "required" the API\'s auth, "none" nothing, or an auth object in the shape addApi takes. Anything else is refused. headers: a map of header name (an RFC 7230 token) to text with no CR, LF or NUL, sent by the server on a call and on a test; it may not name Host, Content-Length, Transfer-Encoding, Connection, Authorization, Cookie or the header that carries the API\'s key, and is checked again before any request, because a registry can arrive by import or by hand. callableFrom: "client" | "server" | "both". Absent = auto-derived from auth type (apiKey → server; others → both). Server-only endpoints are filtered out of qs-api-config.js.',
                 'example' => '{"id": "contact", "name": "Contact Form", "path": "/contact", "method": "POST"}'
             ],
             'editEndpoint' => [
@@ -6336,7 +6336,7 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '400.api.error.missing_parameter' => 'Missing apiId or no updates provided',
-            '400.api.error.invalid_parameter' => 'Endpoint already exists (when adding), invalid update operation, invalid callableFrom value (must be client/server/both or omitted for auto-derive), an endpoint path outside its character set, or a tokenSource header name that is not an RFC 7230 token',
+            '400.api.error.invalid_parameter' => 'Endpoint already exists (when adding), invalid update operation, invalid callableFrom value (must be client/server/both or omitted for auto-derive), an endpoint path outside its character set, an invalid endpoint auth or headers map, a tokenSource its auth type does not read, or a tokenSource header name that is not an RFC 7230 token',
             '404.api.error.not_found' => 'API or endpoint not found',
             '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
             '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
@@ -6403,13 +6403,13 @@ $GLOBALS['__help_commands'] = [
             'headers' => [
                 'required' => false,
                 'type' => 'object',
-                'description' => 'Additional headers to include',
+                'description' => 'Additional headers to include. Held to the rule of an endpoint\'s headers (see editApi addEndpoint).',
                 'example' => '{"X-Custom-Header": "value"}'
             ],
             'authToken' => [
                 'required' => false,
                 'type' => 'string',
-                'description' => 'Override auth token for testing',
+                'description' => 'Override auth token for testing: text with no CR, LF or NUL. Sent only when a call to this endpoint carries a credential (see editApi addEndpoint, auth).',
                 'example' => 'test-token-123'
             ],
             'timeout' => [
@@ -6453,7 +6453,7 @@ $GLOBALS['__help_commands'] = [
         ],
         'error_responses' => [
             '400.api.error.missing_parameter' => 'Missing endpointId',
-            '400.api.error.invalid_parameter' => 'Duplicate endpoint IDs - specify apiId',
+            '400.api.error.invalid_parameter' => 'Duplicate endpoint IDs - specify apiId; or the endpoint\'s auth or headers, the headers parameter or authToken break the rule a real call is held to, in which case nothing is sent',
             '404.api.error.not_found' => 'Endpoint not found',
             '500.api.error.request_failed' => 'HTTP request failed (timeout, connection error)',
             '400.api.error.blocked_url' => 'Endpoint URL blocked by SSRF policy.',

@@ -138,17 +138,21 @@ function __command_editApi(array $params = [], array $urlParams = []): ApiRespon
     require_once SECURE_FOLDER_PATH . '/src/functions/resolverCache.php';
     $resolverCacheCleared = clearResolverCacheForApi($apiId);
 
-    // Cascade cleanup when an endpoint was deleted
+    // Cascade cleanup when an endpoint was deleted, by name or by a full
+    // replacement that left it out
     $cascadeCleanup = null;
+    $deletedEndpoints = $result['removedEndpoints'] ?? [];
     if (isset($updates['deleteEndpoint'])) {
-        $deletedEndpointId = $updates['deleteEndpoint'];
+        $deletedEndpoints[] = $updates['deleteEndpoint'];
+    }
+    foreach ($deletedEndpoints as $deletedEndpointId) {
         $pageEventsCleanup = cleanPageEventsForApiEndpoint($apiId, $deletedEndpointId);
         $interactionsCleanup = cleanInteractionsForApiEndpoint($apiId, $deletedEndpointId);
         $cascadeCleanup = [
-            'pageEventsRemoved' => count($pageEventsCleanup['removedCalls']),
-            'interactionsRemoved' => count($interactionsCleanup['removedInteractions']),
-            'modifiedFiles' => $interactionsCleanup['modifiedFiles'],
-            'refusedFiles' => $interactionsCleanup['refusedFiles']
+            'pageEventsRemoved' => ($cascadeCleanup['pageEventsRemoved'] ?? 0) + count($pageEventsCleanup['removedCalls']),
+            'interactionsRemoved' => ($cascadeCleanup['interactionsRemoved'] ?? 0) + count($interactionsCleanup['removedInteractions']),
+            'modifiedFiles' => array_values(array_unique(array_merge($cascadeCleanup['modifiedFiles'] ?? [], $interactionsCleanup['modifiedFiles']))),
+            'refusedFiles' => array_values(array_unique(array_merge($cascadeCleanup['refusedFiles'] ?? [], $interactionsCleanup['refusedFiles'])))
         ];
     }
 

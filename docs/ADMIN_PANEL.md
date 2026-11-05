@@ -272,7 +272,7 @@ Two other cookies exist, both HttpOnly and neither readable by page scripts. `QS
 |---|---|---|
 | `adminPrefs` | localStorage | `utils.js`, `admin.js`, `settings.js`, `preview-sidebar-resize.js` |
 | `pendingMessage` | sessionStorage | `utils.js`, `admin.js` |
-| `apiAuthTokens` | localStorage | `apis.js` |
+| `apiAuthTokens` | localStorage, per project: under `qsp_<project>_` | `apis.js` |
 | `aiConnectionsV3` | localStorage | `connections-store.js` (canonical), `ai-connections.js` |
 | `aiKeysV2` | localStorage / sessionStorage | `connections-store.js`, `settings.js` — read-only, for the v2 → v3 migration |
 | `aiDefaultProvider` | localStorage / sessionStorage | `connections-store.js`, `settings.js` |
@@ -1056,12 +1056,23 @@ Pages get this script included automatically when at least one API
 is registered (see `PageManagement::render()`).
 
 **The token source** of an API with a bearer, API-key or basic auth type says where the token comes from, as `<location>:<name>`.
+The location list offers each auth type what reads it, and the server refuses any other pair:
+
+| Auth type | Locations | Who reads it |
+|---|---|---|
+| `bearer`, `basic` | `localStorage`, `sessionStorage` | `QS.fetch` in the browser. The server's own call does not read a location: it sends the session's token, and a served page passes none. |
+| `apiKey` | `header` | The server, which sends the key from the secrets file in the named request header (`header:X-API-Key`). The browser sends no API key. |
+| `cookie`, `none` | none | Nothing to read: the browser owns a cookie. |
+
 For **localStorage** and **sessionStorage** the name is a storage key, taken from the storage-key picker (§9.10) with the location
-as its scope; the refresh token's source is always one of these two. **config** and **header** name something else and are typed:
-a public key in the page's config, and the request header the server sends the API's key in (`header:X-API-Key`). Switching the
-location away and back finds what it held, and nothing is carried over to another location, except a storage key between the two
-that name one. An API saved untouched keeps its source as it was; one with no name is not
-saved, and a toast says why.
+as its scope; the refresh token's source is always one of these two. For **header** the name is typed. Switching the location away
+and back finds what it held, and nothing is carried over to another location, except a storage key between the two that name one.
+An API saved untouched keeps its source as it was. A saved source its auth type does not read opens on the first location with no
+name, and an API with no name is not saved, and a toast says why.
+
+**A token only ever comes from the project's own namespace.** `QS.fetch` reads a token's key under `qsp_<projectId>_`, whatever the
+source names, so a key written with no prefix or another project's slot named whole is never read, and a page that does not know its
+project sends no token and stores none.
 
 **Endpoint schema** (fields the modal exposes):
 
@@ -1072,10 +1083,23 @@ saved, and a toast says why.
 | `method` | `GET / POST / PUT / PATCH / DELETE`. |
 | `path` | Relative to API `baseUrl`. May contain `:placeholders` (see below). |
 | `parameters` | Optional array of `{ name, type, required, description }`. Type ∈ `string / number / integer / boolean`. |
-| `auth` | Per-endpoint override: `none / inherit / required`. Inherits from API-level auth by default. |
+| `auth` | What a call to this endpoint carries (below): `none / inherit / required`, or an auth object. Inherits from API-level auth by default. |
 | `callableFrom` | `client` / `server` / `both`, or absent for auto-derive. Server-only endpoints are **filtered out of `qs-api-config.js`** at build emit time (clients literally can't call them). Auto-derive rule: `apiKey → server`; everything else → `both`. Set explicitly in the form via the "Callable from" select; "Auto" shows a live preview of the derived value. |
 | `requestSchema` | Optional JSON Schema for POST/PUT/PATCH bodies. Drives the test modal's dynamic form. |
-| `responseSchema` | Optional JSON Schema. Drives the response-bindings picker (componentList / count / etc.). |
+| `responseSchema` | Optional JSON Schema. Drives the response-bindings picker (componentList / count / etc.). A test can draft one (below). It is public: it travels in the client's config. |
+
+**What a call carries.** An endpoint's `auth` means one thing to the server's call, to `QS.fetch` and to the Test panel:
+
+| `auth` | A call carries | The endpoint's row shows |
+|---|---|---|
+| absent, `inherit` | The API's auth | The API's auth type |
+| `required` | The API's auth (nothing, on an API with none) | The API's auth type, or `required` on an API with none |
+| `none` | Nothing | Nothing |
+| an auth object (`{type, tokenSource}`) | Itself | Its type |
+
+Anything else is refused when saved, and a call under it does not go out. The form offers the three words and shows an auth object as
+an option of its own, which Save keeps; an object is set through `editApi`. An endpoint's own `auth` reaches the browser in
+`qs-api-config.js` when it differs from its API's. `none` under an API-key API stays server-only unless `callableFrom` says otherwise.
 
 **Path templating** — `:name` placeholders in the `path` are
 substituted at fetch time. Example:
@@ -1091,6 +1115,36 @@ Validation rules (`ApiEndpointManager::validateEndpoint`):
 - Every `:name` in `path` must appear in `parameters`.
 - Parameter names start with a letter, then letters, digits or underscores; no duplicates.
 - Unknown types or shapes are rejected with a clear message.
+- `auth` is one of the values above.
+- `headers`, a map set through `editApi` that the form does not show, sent by the server on a call and on a test: each name is an
+  RFC 7230 token, each value text with no CR, LF or NUL, and no name may be `Host`, `Content-Length`, `Transfer-Encoding`,
+  `Connection`, `Authorization`, `Cookie` or the header that carries the API's key. The same check runs before any request is built,
+  because a registry can arrive by import or by hand, and a request that fails it is not sent.
+
+**A test response becomes a draft response schema.** Response Mapping needs a schema, so a test that answered 2xx with a JSON body
+offers **Draft a response schema from this** under the response. A failed call, an error's body and a non-JSON body offer nothing:
+an error's shape is not the response's. A JSON answer with no field to draft from (a single value, null, empty) says so instead.
+
+The offer closes the test and opens the endpoint's form with the draft in its **Response Schema** field, not saved; **Save** is the
+form's own, with its own checks, and **Cancel** leaves everything as it was. Where a schema is already saved the panel asks first,
+and on a no the test stays as it is. The draft is what one response can show, and the words beside the field name what it cannot:
+
+- Nothing is marked `required`, and a field absent from this response looks as if it does not exist.
+- An empty list or object has no item shape, and the two read the same here: the test's answer comes through PHP.
+- A null has no type: written as `null`, for the author to change. Beside another type a null stays out of `type`, and is named.
+- A field in some of a list's elements, and a field whose type differs between them, are kept and named. A list's item shape is the
+  union of the elements read.
+- A saved schema is public, so the draft holds types and names and **never a value**: no `example`, `default`, `enum` or `format`.
+- A name can be data too. An object keyed by what look like ids, addresses, dates or tokens, or with more than 100 names, is written
+  with `additionalProperties` describing its values and none of those names. Every other name stays, so the words ask the author to
+  read them before saving.
+- A name that is part of a JavaScript object (`__proto__`, `constructor`, `prototype`) cannot be read back by the page: it is left out
+  and named.
+- A body read past 16 levels or 100 list elements stops there, and says where. A deeper body than PHP can decode (512 levels) arrives
+  as text, and offers nothing.
+
+A list, or an object keyed by data, at the top of a response is a valid schema, but Response Mapping binds a named field, so it has
+nothing to offer such an endpoint, and says so.
 
 **What an omitted parameter leaves behind**
 
@@ -1154,7 +1208,7 @@ document to one QuickSite API + one endpoint per `paths.<path>.<method>`:
 |---|---|---|
 | `info.title` | API `name` | Slugified into the `apiId`. |
 | `servers[0].url` | API `baseUrl` | Relative URLs surface a dedicated input in the preview (must be made absolute before Import). |
-| `components.securitySchemes` | API `auth` | Most-used scheme wins; first-mappable becomes the API auth. apiKey-in-header → `apiKey` + `tokenSource: 'header:<name>'`. http-bearer / oauth2 / openIdConnect → `bearer`. http-basic → `basic`. apiKey-in-cookie → `cookie` (with a "verify Pattern X" warning). |
+| `components.securitySchemes` | API `auth` | Most-used scheme wins; first-mappable becomes the API auth. apiKey-in-header → `apiKey` + `tokenSource: 'header:<name>'`. http-bearer / oauth2 / openIdConnect → `bearer`. http-basic → `basic`. apiKey-in-cookie → `cookie` (with a "verify Pattern X" warning). apiKey-in-query maps to nothing: QuickSite does not send a key in a URL, where it lands in every log on the way. The API imports without that auth, and a note says what the author can do. |
 | `paths.<p>.<method>.operationId` | Endpoint `id` | Slugified to dash-case. Falls back to `<method>-<slugified-path>` if absent. Collisions append `-2`, `-3`, ... and are noted in the preview. |
 | `paths.<p>.<method>.summary` | Endpoint `name` | Falls back to `operationId`, then to `<METHOD> <path>`. |
 | `paths.<p>.<method>.description` | Endpoint `description` | |
@@ -1168,7 +1222,7 @@ document to one QuickSite API + one endpoint per `paths.<path>.<method>`:
 
 **Preview screen** (after the converter runs):
 
-1. **Summary line** — detected format, API count, endpoint count, and notes (alternate auth schemes, dropped header params, schema-example counts, slug collisions, etc.).
+1. **Summary line** — detected format, API count, endpoint count, and notes (alternate auth schemes, dropped header params, schema-example counts, slug collisions, a token source whose key is not declared, etc.).
 2. **Base URL fixer** — appears when any API has a relative `baseUrl`. One labeled input per affected API; edits mirror live into the JSON dump; Import is blocked until every baseUrl matches `http(s)://`.
 3. **Tree view** — one section per API. The header has a select-all checkbox, the API name + ID, and a count badge that reads `19 endpoints` when all are selected and `15 / 19 endpoints` when partial. Each endpoint row shows: a checkbox (default checked), method badge, endpoint ID, path, auth indicator (`public` / `🔐 inherit (bearer)` / `🔐 required`), and `req` / `resp` chips when the endpoint has schemas attached. Unchecked endpoints are dropped at Import.
 4. **Advanced: raw JSON** — collapsed by default. The full converted JSON, editable. Edits here take effect on Import alongside the tree-selection state.
@@ -1178,8 +1232,9 @@ that need authoring on top:
 
 - **Response bindings** (which fields feed which DOM selectors / state stores) are project-specific and authored in the visual editor — the imported schemas drive the binding picker, but no bindings are emitted.
 - **OAuth handler config** — when a security scheme is `oauth2` or `openIdConnect`, the converter sets the API auth to `bearer` (oauth2 yields a bearer token at runtime). Configure the OAuth handler details via the API edit form.
-- **Auth token storage** — the converter sets sensible `tokenSource` defaults (`localStorage:token` for bearer, `localStorage:basicAuth` for basic, `header:<name>` for apiKey). The actual token value is entered per-API in the registry card's Auth Token field. A storage key the converter names is not declared by the import: the storage-key picker says so when the API is opened.
-- **Alternate security schemes** — endpoints flagged `auth: 'required'` (different scheme from the API default) need manual refinement. The preview's notes name which schemes were seen.
+- **Auth token storage** — the converter sets sensible `tokenSource` defaults (`localStorage:token` for bearer, `localStorage:basicAuth` for basic, `header:<name>` for apiKey). The token the Test panel sends is entered per-API in the registry card's Auth Token field, and kept in the browser under `qsp_<project>_`, for that project alone. A storage key an import names is not declared by it: declaring one needs a category only the author can choose, so the preview's notes name each API whose source is an undeclared key, in every format, and say what to do, and the storage-key picker says so when the API is opened.
+- **Alternate security schemes** — endpoints flagged `auth: 'required'` (different scheme from the API default) carry the API's credential until refined, and nothing while the API has no auth. The preview's notes name which schemes were seen.
+- **What the server refuses** — a refused endpoint stays out of its API, and a toast names the API, the endpoint and why. An API that already exists is replaced in one `editApi` call, which the server takes whole or not at all: a refused import leaves the API as it was, and only what referred to an endpoint it leaves out goes with it.
 
 ### 9.2 Component list binding
 
@@ -1694,7 +1749,9 @@ Declare the pair on the API's `auth` block, alongside `type: "cookie"`:
 
 `QS.fetch` reads the named cookie, URL-decodes it, and sets the named header.
 The `prefix:name` form matches `tokenSource` elsewhere in the auth config;
-only `cookie:` reads and only `header:` writes. The block is optional and
+only `cookie:` reads and only `header:` writes. It reads the cookie by the name
+the author's server set it under; a name starting `qsp_` is the engine's, and is
+refused when saved and ignored at a call. The block is optional and
 accepted on `type: "cookie"` only — every other auth shape puts its credential
 in a header the caller already controls, which is not forgeable cross-site in
 the first place.
@@ -1755,8 +1812,7 @@ Notes:
   `QS.saveToken`, so a refresh also fires `qs:auth:saved`.
 - Validation (`ApiEndpointManager::validateAuth`) enforces bearer-only,
   the all-or-nothing rule for the first four fields, and restricts the
-  refresh-token store to `localStorage` / `sessionStorage` (never
-  `config`, which would publish the refresh token to every visitor).
+  refresh-token store to `localStorage` / `sessionStorage`.
 
 #### Auth-state UI primitives
 
@@ -2575,7 +2631,7 @@ without `render-empty` short-circuits the whole page.
 | Resolver fails + `onMiss: render-empty` + upstream 4xx/5xx | At least one resolver fails this way; all other failures are also `render-empty` | **200** — template renders with null vars for the failed resolver(s); template's `data-state-show-empty` (§10) drives the "no data" UI |
 | Resolver fails + no `onMiss` + upstream **4xx** | Any resolver fails this way | **404** — render the project's `templates/pages/404.php` (the slug doesn't exist; matches the `/products/red-vase` not-found pattern) |
 | Resolver fails + no `onMiss` + upstream **5xx or curl error** | Any resolver fails this way | **500** — render the project's `templates/pages/500.php` (the upstream is down; the page can't render meaningfully) |
-| Resolver fails + **config bug** (endpoint missing from registry, `apiKey` not set, `callableFrom: client` server-side call, etc.) | Any resolver fails this way | **500** — verbose inline page surfacing the misconfig (route, error message, fix hint). |
+| Resolver fails + **config bug** (endpoint missing from registry, `apiKey` not set, a refused `auth`, `headers` or token source, `callableFrom: client` server-side call, etc.) | Any resolver fails this way | **500** — verbose inline page surfacing the misconfig (route, error message, fix hint). |
 
 `$GLOBALS['__qs_resolver_failure']` is populated for `404` / `500`
 template branches with `{ route, status, error }` so the template can

@@ -157,6 +157,109 @@ if (!function_exists('qs_http_header_name_is_token')) {
     }
 }
 
+if (!defined('QS_API_AUTH_TYPES')) {
+    /** An auth object's `type`. */
+    define('QS_API_AUTH_TYPES', ['none', 'bearer', 'apiKey', 'basic', 'cookie']);
+    /**
+     * Where each auth type takes its token from, and so the locations the API page offers it. A
+     * type absent here takes no token source. Bearer and basic are read from the browser's storage;
+     * an API key is sent by the server in a request header. Nothing reads any other pair.
+     */
+    define('QS_API_TOKEN_LOCATIONS', [
+        'bearer' => ['localStorage', 'sessionStorage'],
+        'basic'  => ['localStorage', 'sessionStorage'],
+        'apiKey' => ['header'],
+    ]);
+    /** The words an endpoint's `auth` may be, beside an auth object (qs_api_effective_auth()). */
+    define('QS_API_ENDPOINT_AUTH_WORDS', ['inherit', 'none', 'required']);
+    /**
+     * The headers an endpoint's `headers` map may not name, lower case. The first four frame the
+     * request: a map that sets one changes where it goes or how it is read. The last two carry a
+     * credential: a credential belongs in the API's auth and the secrets file, while the registry
+     * travels in every export.
+     */
+    define('QS_API_RESERVED_HEADERS', ['host', 'content-length', 'transfer-encoding', 'connection', 'authorization', 'cookie']);
+}
+
+if (!function_exists('qs_http_header_value_is_safe')) {
+    /** May a header carry this value? A CR or an LF would end its line and start another, a NUL cuts it short. */
+    function qs_http_header_value_is_safe(string $value): bool
+    {
+        return strpbrk($value, "\r\n\0") === false;
+    }
+}
+
+if (!function_exists('qs_api_effective_auth')) {
+    /**
+     * The one reading of an endpoint's `auth`: what a call to it carries, whichever runtime makes the
+     * call. Absent (or an empty value, the storage convention's absent), `inherit` and `required`
+     * carry the API's auth; `none` carries nothing; an auth object carries itself.
+     *
+     * @param mixed $apiAuth      The API's auth as stored: an object, or by import or by hand anything
+     *                            else, which means nothing either.
+     * @param mixed $endpointAuth The endpoint's `auth` as stored.
+     * @return array|null The auth to apply; null for anything else, which no call goes out under.
+     */
+    function qs_api_effective_auth($apiAuth, $endpointAuth): ?array
+    {
+        if ($endpointAuth === null || $endpointAuth === '' || $endpointAuth === []
+            || $endpointAuth === 'inherit' || $endpointAuth === 'required') {
+            return is_array($apiAuth) ? $apiAuth : null;
+        }
+        if ($endpointAuth === 'none') {
+            return ['type' => 'none'];
+        }
+        if (is_array($endpointAuth) && in_array($endpointAuth['type'] ?? null, QS_API_AUTH_TYPES, true)) {
+            return $endpointAuth;
+        }
+        return null;
+    }
+}
+
+if (!function_exists('qs_api_header_map_problem')) {
+    /**
+     * What is wrong with an endpoint's `headers` map, or null. Checked where a registry is saved and
+     * again where a request is built, because a registry also arrives by import or by hand. The words
+     * never repeat a value, and repeat a name only once it is known to be a token.
+     *
+     * @param mixed $headers The map as stored.
+     * @param array $auth    The auth the call goes out under (qs_api_effective_auth()): a map may not
+     *                       set the header that carries its API key either.
+     */
+    function qs_api_header_map_problem($headers, array $auth): ?string
+    {
+        if ($headers === null || $headers === []) {
+            return null;
+        }
+        if (!is_array($headers) || array_is_list($headers)) {
+            return "An endpoint's headers are a map of header name to text value.";
+        }
+        $source = $auth['tokenSource'] ?? null;
+        $keyHeader = ($auth['type'] ?? null) === 'apiKey' && is_string($source) && strpos($source, 'header:') === 0
+            ? strtolower(substr($source, 7))
+            : null;
+        foreach ($headers as $name => $value) {
+            $name = (string) $name;
+            if (!qs_http_header_name_is_token($name)) {
+                return "An endpoint's header name is letters, digits and ! # $ % & ' * + - . ^ _ ` | ~ (RFC 7230).";
+            }
+            if (!is_string($value)) {
+                return "The value of the header '$name' must be text.";
+            }
+            if (!qs_http_header_value_is_safe($value)) {
+                return "The value of the header '$name' holds a line break or a NUL.";
+            }
+            if (in_array(strtolower($name), QS_API_RESERVED_HEADERS, true)) {
+                return "An endpoint may not set the header '$name': the request sets it, or it carries a credential, which belongs in the API's auth.";
+            }
+            if (strtolower($name) === $keyHeader) {
+                return "An endpoint may not set the header '$name': it carries this API's key.";
+            }
+        }
+        return null;
+    }
+}
+
 if (!function_exists('qs_api_count_strings')) {
     /**
      * The count-sentence strings this project's bindings need, in THIS

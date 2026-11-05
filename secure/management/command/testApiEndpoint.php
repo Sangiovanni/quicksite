@@ -5,7 +5,7 @@
  * @method POST
  * @url /management/testApiEndpoint
  * @auth required
- * @permission editor
+ * @permission admin (api.manage)
  * 
  * Body (JSON): {
  *     "endpointId": "contact-submit",    // Required: Endpoint to test
@@ -117,35 +117,53 @@ function __command_testApiEndpoint(array $params = [], array $urlParams = []): A
         $headers['Content-Type'] = 'application/json';
     }
     
+    // What this endpoint's own `auth` means, as a real call reads it.
+    $auth = qs_api_effective_auth(($endpoint['apiAuth'] ?? []) ?: ['type' => 'none'], $endpoint['auth'] ?? null);
+    if ($auth === null) {
+        return ApiResponse::create(400, 'api.error.invalid_parameter')
+            ->withMessage("Invalid auth on endpoint '$endpointId': it is inherit, none, required or an auth object.");
+    }
+
     // Add auth header
-    $auth = $endpoint['apiAuth'] ?? ['type' => 'none'];
-    if ($auth['type'] !== 'none') {
-        if ($authToken) {
-            // Use provided test token
-            if ($auth['type'] === 'bearer') {
-                $headers['Authorization'] = 'Bearer ' . $authToken;
-            } elseif ($auth['type'] === 'apiKey') {
-                // Extract header name from tokenSource (format: header:X-API-Key)
-                $tokenSource = $auth['tokenSource'] ?? '';
-                if (strpos($tokenSource, 'header:') === 0) {
-                    $headerName = substr($tokenSource, 7);
-                    $headers[$headerName] = $authToken;
-                }
-            } elseif ($auth['type'] === 'basic') {
-                $headers['Authorization'] = 'Basic ' . base64_encode($authToken);
-            }
+    $authType = $auth['type'] ?? 'none';
+    if ($authType !== 'none' && $authToken) {
+        // Every value below is sent verbatim, so it is checked as a real call checks it.
+        if (!is_string($authToken) || !qs_http_header_value_is_safe($authToken)) {
+            return ApiResponse::create(400, 'api.error.invalid_parameter')
+                ->withMessage('authToken must be text with no line break or NUL.');
         }
-        // If no authToken provided, we skip auth - the test will likely fail but that's informative
+        // Use provided test token
+        if ($authType === 'bearer') {
+            $headers['Authorization'] = 'Bearer ' . $authToken;
+        } elseif ($authType === 'apiKey') {
+            // Extract header name from tokenSource (format: header:X-API-Key)
+            $tokenSource = $auth['tokenSource'] ?? '';
+            if (is_string($tokenSource) && strpos($tokenSource, 'header:') === 0) {
+                $headerName = substr($tokenSource, 7);
+                if (!qs_http_header_name_is_token($headerName)) {
+                    return ApiResponse::create(400, 'api.error.invalid_parameter')
+                        ->withMessage("Invalid header name in the tokenSource of API '{$endpoint['apiId']}'.");
+                }
+                $headers[$headerName] = $authToken;
+            }
+        } elseif ($authType === 'basic') {
+            $headers['Authorization'] = 'Basic ' . base64_encode($authToken);
+        }
     }
-    
-    // Add endpoint-specific headers
-    if (!empty($endpoint['headers'])) {
-        $headers = array_merge($headers, $endpoint['headers']);
+    // If no authToken provided, we skip auth - the test will likely fail but that's informative
+
+    // Add the endpoint's own headers and the request's, each held to the rule a real call is held to.
+    foreach ([$endpoint['headers'] ?? null, $extraHeaders] as $map) {
+        $headerProblem = qs_api_header_map_problem($map, $auth);
+        if ($headerProblem !== null) {
+            return ApiResponse::create(400, 'api.error.invalid_parameter')
+                ->withMessage($headerProblem);
+        }
+        foreach ($map ?? [] as $key => $value) {
+            $headers[$key] = $value;
+        }
     }
-    
-    // Add extra headers from request
-    $headers = array_merge($headers, $extraHeaders);
-    
+
     // Make the request
     $startTime = microtime(true);
     

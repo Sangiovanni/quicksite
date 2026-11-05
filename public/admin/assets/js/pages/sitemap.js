@@ -1577,7 +1577,8 @@
      * and show "disabled for bearer" in the cache badge.
      */
     function _normalizeAuthValue(authValue) {
-        if (typeof authValue === 'string' && authValue !== '' && authValue !== 'inherit') {
+        // `required` carries the API's auth, as `inherit` does: neither names a type.
+        if (typeof authValue === 'string' && authValue !== '' && authValue !== 'inherit' && authValue !== 'required') {
             return authValue;
         }
         if (authValue && typeof authValue === 'object' && typeof authValue.type === 'string' && authValue.type !== '') {

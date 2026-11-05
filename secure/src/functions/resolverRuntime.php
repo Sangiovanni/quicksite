@@ -47,6 +47,10 @@ if (!function_exists('qs_resolver_error_is_config_bug')) {
             || stripos($errMsg, 'API not found')         !== false
             || stripos($errMsg, 'callableFrom')          !== false
             || stripos($errMsg, 'apiKey not configured') !== false
+            || stripos($errMsg, 'apiKey of API') !== false
+            || stripos($errMsg, 'tokenSource of API') !== false
+            || stripos($errMsg, 'Invalid auth on endpoint') !== false
+            || stripos($errMsg, 'not called:') !== false
             || stripos($errMsg, 'missing endpoint')      !== false
             || stripos($errMsg, 'missing required field') !== false;
     }

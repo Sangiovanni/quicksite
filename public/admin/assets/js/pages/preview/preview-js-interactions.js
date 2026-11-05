@@ -5551,14 +5551,21 @@
         var note = document.createElement('p');
         note.className = 'preview-contextual-js-response-bindings__notice';
         var strong = document.createElement('strong');
-        strong.textContent = PreviewConfig.i18n?.noResponseSchema
-            || 'No response schema defined for this endpoint';
+        strong.textContent = PreviewConfig.i18n?.noResponseSchema;
         note.appendChild(strong);
         note.appendChild(document.createTextNode(' '));
-        note.appendChild(document.createTextNode(
-            PreviewConfig.i18n?.noResponseSchemaHint
-            || 'Response Mapping needs one. Add it on /admin/apis — open this endpoint and paste a JSON schema describing the response.'
-        ));
+        note.appendChild(document.createTextNode(PreviewConfig.i18n?.noResponseSchemaHint));
+        return note;
+    }
+
+    /**
+     * A schema is saved, but it names no field at the top of the response: a list, a single value or
+     * an object keyed by data. Response Mapping binds a named field, so it has nothing to offer.
+     */
+    function _renderNoFieldsNotice() {
+        var note = document.createElement('p');
+        note.className = 'preview-contextual-js-response-bindings__notice';
+        note.textContent = PreviewConfig.i18n?.responseSchemaNoFields;
         return note;
     }
 
@@ -5582,7 +5589,7 @@
             // from the schema, so there is nothing to choose from.
             container.style.display = epData ? '' : 'none';
             rowsEl.replaceChildren();
-            if (epData) rowsEl.appendChild(_renderNoSchemaNotice());
+            if (epData) rowsEl.appendChild(epData.responseSchema ? _renderNoFieldsNotice() : _renderNoSchemaNotice());
             if (addBtn) addBtn.style.display = 'none';
             return;
         }

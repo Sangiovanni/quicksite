@@ -19,7 +19,7 @@ window.QuickSiteStorageKeys = Object.freeze({
     adminPrefs:          'quicksite_admin_prefs',
     pendingMessage:      'quicksite_pending_message',
 
-    // External API registry
+    // External API registry. Per project: apis.js puts `qsp_<project>_` before it.
     apiAuthTokens:       'qs_api_auth_tokens',
 
     // AI provider settings

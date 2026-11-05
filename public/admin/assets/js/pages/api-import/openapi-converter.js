@@ -11,10 +11,17 @@
  *   http-basic / oauth2 / openIdConnect / cookie); per-endpoint
  *   inherit/none/required derived from op.security vs global.
  *
- * Exposes window.QSApiImport.{detectOpenApi, convertOpenApi}.
+ * An apiKey in the query maps to nothing: QuickSite does not send a key in a URL, where it would land
+ * in every log on the way. The scheme's note says so and what the author can do.
+ *
+ * Exposes window.QSApiImport.{detectOpenApi, convertOpenApi}. convertOpenApi takes the page's t(),
+ * which holds the notes' words.
  */
 (function () {
     'use strict';
+
+    // The page's translator, for the notes. Set by convertOpenApi().
+    let _t = (path) => path;
 
     const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options', 'trace'];
     const QS_PARAM_TYPES = ['string', 'number', 'integer', 'boolean'];
@@ -126,7 +133,7 @@
             }
             taken[id] = true;
             if (n > 1) {
-                notes.push('Endpoint id auto-suffixed to avoid collision: ' + baseId + ' → ' + id);
+                notes.push(_t('apis.importModal.converter.idSuffixed', { base: baseId, id: id }));
             }
             return id;
         };
@@ -147,49 +154,50 @@
             refParamsUnresolved: 0,
             // {schemeName: opCount} — operations whose security references
             // a scheme other than the one we picked as API-level auth.
-            altSchemeUsage: Object.create(null)
+            altSchemeUsage: Object.create(null),
+            // Whether a scheme became the API's auth: what `required` sends depends on it.
+            apiHasAuth: false
         };
     }
 
     function _summariseStats(stats, notes) {
         if (stats.headerParamsDropped > 0) {
-            notes.push(stats.headerParamsDropped + ' header parameter(s) dropped — QuickSite configures headers at the API level (auth.tokenSource: "header:X-Key").');
+            notes.push(_t('apis.importModal.converter.headerParamsDropped', { count: stats.headerParamsDropped }));
         }
         if (stats.refParamsResolved > 0) {
-            notes.push(stats.refParamsResolved + ' $ref parameter(s) resolved from components.parameters.');
+            notes.push(_t('apis.importModal.converter.refParamsResolved', { count: stats.refParamsResolved }));
         }
         if (stats.refParamsUnresolved > 0) {
-            notes.push(stats.refParamsUnresolved + ' $ref parameter(s) skipped (unresolved or external).');
+            notes.push(_t('apis.importModal.converter.refParamsUnresolved', { count: stats.refParamsUnresolved }));
         }
         if (stats.examplesKept || stats.examplesStripped) {
             const parts = [];
-            if (stats.examplesKept) parts.push(stats.examplesKept + ' copied');
-            if (stats.examplesStripped) parts.push(stats.examplesStripped + ' stripped as credential-like');
-            notes.push('Schema examples: ' + parts.join(', ') + '.');
+            if (stats.examplesKept) parts.push(_t('apis.importModal.converter.examplesCopied', { count: stats.examplesKept }));
+            if (stats.examplesStripped) parts.push(_t('apis.importModal.converter.examplesStripped', { count: stats.examplesStripped }));
+            notes.push(_t('apis.importModal.converter.examples', { list: parts.join(', ') }));
         }
         if (stats.compositionsSkipped > 0) {
-            notes.push(stats.compositionsSkipped + ' schema composition(s) (oneOf/anyOf) skipped — refine manually after import.');
+            notes.push(_t('apis.importModal.converter.compositionsSkipped', { count: stats.compositionsSkipped }));
         }
         if (stats.refsExternal > 0) {
-            notes.push(stats.refsExternal + ' external $ref(s) skipped (only same-document refs resolved).');
+            notes.push(_t('apis.importModal.converter.refsExternal', { count: stats.refsExternal }));
         }
         if (stats.refsCycle > 0) {
-            notes.push(stats.refsCycle + ' $ref cycle(s) broken with empty-object placeholder.');
+            notes.push(_t('apis.importModal.converter.refsCycle', { count: stats.refsCycle }));
         }
         if (stats.refsUnresolved > 0) {
-            notes.push(stats.refsUnresolved + ' $ref(s) could not be resolved (missing target).');
+            notes.push(_t('apis.importModal.converter.refsUnresolved', { count: stats.refsUnresolved }));
         }
         if (stats.depthExceeded > 0) {
-            notes.push(stats.depthExceeded + ' schema branch(es) hit max depth (' + MAX_REF_DEPTH + ').');
+            notes.push(_t('apis.importModal.converter.depthExceeded', { count: stats.depthExceeded, max: MAX_REF_DEPTH }));
         }
         if (stats.schemasDropped > 0) {
-            notes.push(stats.schemasDropped + ' schema(s) dropped — failed shape validation (set them manually after import).');
+            notes.push(_t('apis.importModal.converter.schemasDropped', { count: stats.schemasDropped }));
         }
         const altNames = Object.keys(stats.altSchemeUsage);
         if (altNames.length > 0) {
             const parts = altNames.map(n => n + ' (' + stats.altSchemeUsage[n] + ')');
-            notes.push('Alternate security schemes used by some endpoints: ' + parts.join(', ') +
-                '. Those endpoints set to auth:"required" — refine per-endpoint or switch the API auth in preview.');
+            notes.push(_t(stats.apiHasAuth ? 'apis.importModal.converter.altSchemes' : 'apis.importModal.converter.altSchemesNoAuth', { list: parts.join(', ') }));
         }
     }
 
@@ -366,9 +374,10 @@
 
     /**
      * Translate one OpenAPI securityScheme entry into a QuickSite auth
-     * object. Returns null when the scheme isn't mappable. Side-effect:
-     * pushes a clarifying note for cookie/oauth2/openIdConnect/query
-     * variants (the runtime + editor have known nuances for each).
+     * object. Returns null when the scheme isn't mappable, a key in the
+     * query among them. Side-effect: pushes a clarifying note for
+     * cookie/oauth2/openIdConnect/query variants (the runtime + editor
+     * have known nuances for each).
      */
     function _mapSecurityScheme(scheme, schemeName, notes) {
         if (!scheme || typeof scheme !== 'object') return null;
@@ -381,14 +390,12 @@
                 // By design: best-effort map + warning. QuickSite's cookie
                 // auth assumes Pattern X (same-origin session cookie owned
                 // by the browser); not all "cookie security" specs match.
-                notes.push('Security: scheme "' + schemeName + '" is apiKey-in-cookie (cookie: "' + keyName +
-                    '") — mapped to QuickSite cookie auth. Verify your server session cookie matches Pattern X before going live.');
+                notes.push(_t('apis.importModal.converter.apiKeyInCookie', { scheme: schemeName, cookie: keyName }));
                 return { type: 'cookie' };
             }
             if (where === 'query') {
-                notes.push('Security: scheme "' + schemeName + '" is apiKey-in-query (param: "' + keyName +
-                    '"). Verify QuickSite query-string token delivery after import.');
-                return { type: 'apiKey', tokenSource: 'query:' + keyName };
+                notes.push(_t('apis.importModal.converter.apiKeyInQuery', { scheme: schemeName, param: keyName }));
+                return null;
             }
             return { type: 'apiKey', tokenSource: 'header:' + keyName };
         }
@@ -401,12 +408,12 @@
         }
 
         if (t === 'oauth2') {
-            notes.push('Security: scheme "' + schemeName + '" is oauth2 — mapped to bearer (oauth2 yields a bearer token at runtime). Configure the OAuth handler separately on the API.');
+            notes.push(_t('apis.importModal.converter.oauth2', { scheme: schemeName }));
             return { type: 'bearer', tokenSource: 'localStorage:token' };
         }
 
         if (t === 'openIdConnect') {
-            notes.push('Security: scheme "' + schemeName + '" is openIdConnect — mapped to bearer auth. Verify token source after import.');
+            notes.push(_t('apis.importModal.converter.openIdConnect', { scheme: schemeName }));
             return { type: 'bearer', tokenSource: 'localStorage:token' };
         }
 
@@ -459,14 +466,13 @@
             const mapped = _mapSecurityScheme(securitySchemes[name], name, notes);
             if (mapped) {
                 if (schemeNames.length > 1) {
-                    notes.push('Security: API declares ' + schemeNames.length + ' schemes (' +
-                        schemeNames.join(', ') + '); using "' + name + '". Edit auth in preview to switch.');
+                    notes.push(_t('apis.importModal.converter.severalSchemes', { count: schemeNames.length, list: schemeNames.join(', '), name: name }));
                 }
                 return { auth: mapped, pickedName: name };
             }
         }
 
-        notes.push('Security: no scheme could be mapped. API set to public — configure auth manually after import.');
+        notes.push(_t('apis.importModal.converter.noScheme'));
         return { auth: { type: 'none' }, pickedName: null };
     }
 
@@ -511,7 +517,8 @@
      * the native import shape ({ apis: { <apiId>: {...} } }) and `notes`
      * is a list of human-readable strings the preview can surface.
      */
-    function convertOpenApi(spec) {
+    function convertOpenApi(spec, t) {
+        if (typeof t === 'function') _t = t;
         const notes = [];
         const stats = _makeStats();
 
@@ -522,16 +529,17 @@
         const servers = Array.isArray(spec && spec.servers) ? spec.servers : [];
         const baseUrl = (servers[0] && typeof servers[0].url === 'string') ? servers[0].url : '/';
         if (servers.length > 1) {
-            notes.push(servers.length + ' server URLs declared; using first ("' + baseUrl + '"). Edit in preview to switch.');
+            notes.push(_t('apis.importModal.converter.severalServers', { count: servers.length, url: baseUrl }));
         }
         if (baseUrl && baseUrl.charAt(0) === '/') {
-            notes.push('Base URL is relative ("' + baseUrl + '"). Set an absolute URL in the "Base URL" field above the JSON preview before importing.');
+            notes.push(_t('apis.importModal.converter.relativeBase', { url: baseUrl }));
         }
 
         const allocateId = _makeSlugAllocator(notes);
         const endpoints = [];
 
         const { auth: apiAuth, pickedName: pickedSchemeName } = _pickApiAuth(spec, notes);
+        stats.apiHasAuth = !!pickedSchemeName;
 
         const paths = (spec && spec.paths && typeof spec.paths === 'object') ? spec.paths : {};
         for (const rawPath of Object.keys(paths)) {

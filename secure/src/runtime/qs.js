@@ -877,7 +877,8 @@
             url: url,
             baseUrl: api.baseUrl || '',
             method: endpoint.method || 'GET',
-            auth: api.auth,
+            // The compiled config gives an endpoint an `auth` when it differs from its API's.
+            auth: endpoint.auth || api.auth,
             endpoint: endpoint
         };
     }
@@ -975,7 +976,7 @@
     /**
      * Apply auth configuration to fetch options
      * @param {object} fetchOpts - Fetch options object
-     * @param {object} auth - Auth config {type, tokenSource, apiKey, headerName}
+     * @param {object} auth - Auth config {type, tokenSource, csrf}
      */
     function applyAuth(fetchOpts, auth) {
         if (!auth || !auth.type || auth.type === 'none') {
@@ -986,13 +987,6 @@
             const token = getTokenValue(auth.tokenSource);
             if (token) {
                 fetchOpts.headers['Authorization'] = 'Bearer ' + token;
-            }
-        } else if (auth.type === 'api-key' && auth.apiKey) {
-            const headerName = auth.headerName || 'X-API-Key';
-            // apiKey could be a tokenSource reference or literal value
-            const keyValue = auth.apiKey.includes(':') ? getTokenValue(auth.apiKey) : auth.apiKey;
-            if (keyValue) {
-                fetchOpts.headers[headerName] = keyValue;
             }
         } else if (auth.type === 'basic' && auth.tokenSource) {
             const token = getTokenValue(auth.tokenSource);
@@ -1058,6 +1052,12 @@
         var headerName = to.slice(7);
         if (!cookieName || !headerName) {
             console.warn('[QS] auth.csrf ignored: cookie name or header name is empty');
+            return;
+        }
+        // The author's server's cookie, read by the name it was set under. The qsp_ names are the
+        // engine's, one project's or another's, and none of them goes out in a header.
+        if (cookieName.indexOf(QS_STORAGE_PREFIX) === 0) {
+            console.warn('[QS] auth.csrf ignored: a cookie named ' + QS_STORAGE_PREFIX + '… belongs to the engine');
             return;
         }
 
@@ -1226,11 +1226,15 @@
     }
 
     /**
-     * Get token value from storage
+     * Get token value from storage. A token only ever comes from the project's own slots, `qsp_<project>_<key>`
+     * (_storageGet() → _storageKey()), whatever the source names: a key written whole, another project's
+     * included, is a key inside this project's namespace. A page that does not know its project has
+     * no namespace, and so no token.
      * @param {string} source - "localStorage:key" or "sessionStorage:key"
      * @returns {string|null}
      */
     function getTokenValue(source) {
+        if (!_qsProjectId()) return null;
         // Parsed as every writer parses a reference (parseStorageRef(): the key is everything after
         // the first ':'), so a key holding a ':' is read where it was written.
         const ref = typeof source === 'string' ? parseStorageRef(source) : null;
@@ -1593,6 +1597,8 @@
      */
     function setStoredToken(storage, key, value) {
         if (storage !== 'localStorage' && storage !== 'sessionStorage') return false;
+        // No project, no namespace: a token is never written under the unnamed one.
+        if (!_qsProjectId()) return false;
         // Consent is checked on the AUTHOR key: window.QS_CONSENT.categories is
         // keyed by what the storage registry declares, so the classification and
         // the gate have to speak the same names. The prefix is applied one line

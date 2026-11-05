@@ -15257,3 +15257,63 @@ they are undeclared once opened; which key an import should name is a question o
 
 **Source**: Sangio, 2026-11-05, on the flags raised by the storage-key picker's build; beta.12.
 `public/admin/assets/js/pages/apis.js`, `public/admin/assets/js/pages/preview/preview-js-interactions.js`.
+
+### A test response gives a draft, never a schema (locked 2026-11-05)
+
+**Decision**: A test that answers 2xx with a JSON body offers an editable draft response schema, which opens in the endpoint's form, not saved, with the words that say what one response cannot tell, each path named. Saving is the author's own act, through the form's own Save. A schema already saved is replaced in the field only on the author's yes. The draft holds types and names, never a value, marks nothing required, writes a list's item shape as the union of the elements it read, keeps a null out of `type` beside a known type, leaves out and names a name that is part of a JavaScript object, and describes an object keyed by what look like ids, addresses, dates or tokens, or by more than 100 names, with `additionalProperties` and none of those names. It reads 16 levels and 100 list elements, and says where it stopped. A failed call, an error's body and a non-JSON body offer nothing; a single value, null or an empty body says there is nothing to draft from.
+
+**Reasoning**: With no schema Response Mapping offers no binding, and an author looking at a good response had to write out what the screen already showed. But a schema is public and authoritative, and a test response is neither: one response cannot say what is required, what an empty list holds or what a null's type is, and it may hold values and keys nobody should publish. So the machine fills in what it can see, and the author decides. A value is never written, because it would reach every visitor; a name can be data as well, so the obvious shapes stay out and the words ask the author to read the rest. A key naming a prototype compiles into the client's config as an object literal, where it sets the prototype instead of a field, so it cannot be kept. A body is untrusted, so each walk has a stated limit. An empty object and an empty list are not told apart, because the test's answer comes through PHP arrays; the words say so rather than guess. A list at the top of a response is a valid schema that nothing can bind, because Response Mapping binds a named field; the form and the editor both say so.
+
+**Alternatives considered**: saving the schema with the test (silently authoritative, and public before anyone read it); a schema from several calls (a better union, and a second test harness for a case one reviewed draft already covers); listing every key with a warning (publishes them for anyone who presses Save); asking per object which keys are data (a question nobody can answer before reading the draft); keeping `{}` apart from `[]` by decoding the test's body to objects (it would leave the body outside the answer's path scrub, which walks arrays); a whole-response binding, so a list at the top can be bound (a new runtime feature, not the draft's to add).
+
+**Source**: Sangio, 2026-09-27 and 2026-11-05, on the API authoring slice; beta.12. `public/admin/assets/js/pages/api-import/response-draft.js`, `public/admin/assets/js/pages/apis.js`.
+
+### An endpoint's headers are checked where they are saved and where they are sent (locked 2026-11-05)
+
+**Decision**: An endpoint's `headers` map is held to one rule, when saved through any write path of `editApi` and again before `serverFetch` or `testApiEndpoint` builds a request, with nothing sent on a refusal: each name an RFC 7230 token, each value text with no CR, LF or NUL. A map may not name `Host`, `Content-Length`, `Transfer-Encoding`, `Connection`, `Authorization`, `Cookie` or the header that carries the API's key. The Test command's own `headers` parameter and its `authToken` are held to the same rule.
+
+**Reasoning**: Each name and value is written verbatim into a request, so an unchecked one splits it. It is checked twice because a registry also arrives by import, by restore and by hand. The names are refused because measured at a listener they break what the fetch relies on: `Host` replaced the request's host on the pinned address, `Content-Length` hung the call to its timeout and a page render with it, and a credential header merged with the real one. A static credential belongs in the secrets file: the registry travels in every export. `Accept` and the rest merge harmlessly and stay allowed. The list is a fixed constant, a convention rather than a setting: nothing an author legitimately does needs one of these names on an endpoint.
+
+**Alternatives considered**: checking at use only (saves what can never be sent, and says so far from where it was typed); checking at save only (a registry by import or by hand reaches the wire); refusing only `Host` and the framing names (a credential in the registry, sent beside the real one); a configurable list (a setting nobody needs, for a rule about how HTTP works).
+
+**Source**: Sangio, 2026-11-05, on the input-check flags of the outbound fetch work; beta.12. `secure/src/functions/apiRegistry.php`.
+
+### An endpoint's auth means one thing on every path (locked 2026-11-05)
+
+**Decision**: An endpoint's `auth` is read one way by the server's call, `QS.fetch` and the Test panel: absent, `inherit` and `required` carry the API's auth, `none` carries nothing, an auth object carries itself. Anything else is refused at save, and no call goes out under it. The compiled config gives an endpoint its `auth` when it differs from its API's. The form shows an auth object as an option of its own, which Save keeps. `none` under an API-key API stays server-only.
+
+**Reasoning**: The readers disagreed on which calls carried a credential. `required` sent nothing on the server and the API's credential in the browser, `none` sent the API's credential in the browser, an absent `auth` read as public on the card and in the Test panel and as inherit everywhere else, a string naming an auth type sent the API's secret under a header of its own, and the form silently dropped an auth object on Save. One function now answers, and a refresh endpoint set to `none` no longer sends the expired token, which the runtime's own comment and the docs already said. `callableFrom` stays derived from the API's type under `none`, because publishing an endpoint's path should take an explicit act; it fails closed.
+
+**Alternatives considered**: removing `required`, which now behaves as `inherit` on every call (the import uses it to mark an operation that names another scheme, and the card shows it where an API has none); leaving objects server-only (`{type: "none"}` would still send a credential from the browser); deriving `callableFrom` from `none` (publishes a path nobody asked to publish).
+
+**Source**: Sangio, 2026-11-05, on the table of what each value did at each reader; beta.12. `secure/src/functions/apiRegistry.php` `qs_api_effective_auth()`.
+
+### A token source's location is what reads it (locked 2026-11-05)
+
+**Decision**: Bearer and basic are offered and saved with `localStorage` or `sessionStorage`, an API key with `header`, and `none` and `cookie` take no source; any other pair is refused, the empty name included. The `config` location, its warning and its words are gone. `serverFetch` refuses an API key whose source is not a header rather than call bare. The OpenAPI import maps an API key in the query to nothing, and its note says QuickSite does not send a key in a URL and what the author can do. `qs.js` no longer has the `api-key` branch.
+
+**Reasoning**: Every location was offered under every type, and each runtime reads only some, so a pair nothing reads saved and sent nothing, silently; under API Key the first location offered was one that never sends the key. `config` was read by nothing, in either runtime, while its warning described a behaviour that did not exist. A key in a URL lands in every log on the way, and supporting it would mean a new prefix read in two runtimes. The `api-key` branch answered to a spelling no validated writer can produce, and could send a literal key from a public file. The one list lives in `apiRegistry.php`, and the page reads it, so the page and the validator cannot differ.
+
+**Alternatives considered**: keeping `config` and wiring it (a key in a public file, for a need nobody has); supporting the query scheme (widens a surface kept narrow on purpose); a note that says only "set it by hand" (nothing could be set: no location sends a key in a URL); warning on a pair instead of refusing it (it still does nothing).
+
+**Source**: Sangio, 2026-11-05, on the flags raised by the storage-key picker's build and the OpenAPI converter; beta.12. `secure/src/functions/apiRegistry.php`, `secure/src/classes/ApiEndpointManager.php`.
+
+### A token comes from the project's own namespace and nowhere else (locked 2026-11-05)
+
+**Decision**: On this mechanism a token only ever comes from, and goes to, a slot under `qsp_<projectId>_`. `QS.fetch` reads a source's key through the one storage boundary, so a key written with no prefix and another project's slot named whole are not read. A page that does not know its project sends no token and stores none. A credential is never a literal in the registry. The token typed for the Test panel is kept under the edited project's prefix, so one project's test never sends a token typed for another project's API of the same id. A CSRF cookie named `qsp_…` is refused at save and ignored at a call: that namespace is the engine's.
+
+**Reasoning**: With an endpoint's own auth object honoured in the browser, a source can be written per endpoint, so what it can reach has to be proven and not assumed. Projects at `/p/<id>/` share one origin and one storage. The Test panel's tokens were keyed by API id alone, under no prefix at all. A CSRF cookie is the one credential read by a name the engine does not prefix, because the author's server sets it: that exception stays, and the engine's own names are excluded from it.
+
+**Alternatives considered**: refusing a source whose key starts `qsp_` (it already reads inside this project's namespace, and the registry's own rule was dropped for the same reason); clearing the old unprefixed test tokens (no legacy data exists to clear); prefixing the CSRF cookie's name (the author's server chooses it).
+
+**Source**: Sangio, 2026-11-05: "I need to ensure it's not possible to insert a token without the prefix qsp_<project_id>_ through this mechanism."; beta.12. `secure/src/runtime/qs.js`, `public/admin/assets/js/pages/apis.js`.
+
+### An import says what it cannot do, and a replacement is whole (locked 2026-11-05)
+
+**Decision**: The import's preview names each API whose token source is an undeclared key, in every format, and says what to do. A refused endpoint stays out of its API, and a toast names the API, the endpoint and why. An API that exists is replaced in one `editApi` call, which validates everything before it saves; what the replacement leaves out goes as a deleted endpoint does.
+
+**Reasoning**: Declaring a key needs a category only the author can choose, so the import cannot do it, and under a consent layer an undeclared key is never stored. The import reported success over an endpoint the server had refused, and it deleted the API before finding out that its replacement would be refused, which also removed everything that referred to it. The new checks on headers, auth and locations make a refusal likelier, so it had to be safe and said.
+
+**Alternatives considered**: declaring the keys with a default category (a choice nobody made, in a consent register); changing the import's fixed keys (any fixed name is equally undeclared); restoring the old API after a refused add (not atomic, and the old API may no longer pass).
+
+**Source**: Sangio, 2026-11-05; beta.12. `public/admin/assets/js/pages/apis.js`, `secure/src/classes/ApiEndpointManager.php`.

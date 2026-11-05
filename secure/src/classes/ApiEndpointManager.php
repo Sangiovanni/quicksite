@@ -37,11 +37,11 @@ class ApiEndpointManager {
     /** @var array Valid HTTP methods */
     private array $validMethods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
     
-    /** @var array Valid auth types */
+    /** @var array Valid auth types (one list, QS_API_AUTH_TYPES) */
     // 'cookie' = browser-managed session cookie (Pattern X). The
     // server's Set-Cookie does everything; runtime just adds
     // `credentials: 'include'` to fetch options. No tokenSource needed.
-    private array $validAuthTypes = ['none', 'bearer', 'apiKey', 'basic', 'cookie'];
+    private array $validAuthTypes = QS_API_AUTH_TYPES;
 
     /** @var array Valid `callableFrom` values. */
     // The marker declares whether an endpoint can be invoked from
@@ -301,6 +301,8 @@ class ApiEndpointManager {
         // can run the reference cascade (interactions + page events). null
         // when no rename happened this call.
         $renamed = null;
+        // The endpoints a full replacement left out, for the same cascade.
+        $removedEndpoints = [];
 
         // Update allowed fields
         if (isset($updates['name'])) {
@@ -336,23 +338,39 @@ class ApiEndpointManager {
         
         // Handle endpoints updates (full replacement or individual operations)
         if (isset($updates['endpoints'])) {
-            // Full replacement - validate all endpoints
+            // Full replacement - validate all endpoints, and change nothing unless all pass
+            if (!is_array($updates['endpoints'])) {
+                return ['success' => false, 'error' => 'endpoints must be a list of endpoints'];
+            }
+            $replacement = [];
             foreach ($updates['endpoints'] as $endpoint) {
-                $validation = $this->validateEndpoint($endpoint);
+                if (!is_array($endpoint)) {
+                    return ['success' => false, 'error' => 'endpoints must be a list of endpoints'];
+                }
+                $endpoint = $this->normalizeEndpointOptionalFields($endpoint);
+                $validation = $this->validateEndpoint($endpoint, $api['auth'] ?? []);
                 if (!$validation['valid']) {
                     return [
                         'success' => false,
-                        'error' => "Invalid endpoint: " . $validation['error']
+                        'error' => "Invalid endpoint '" . (is_string($endpoint['id'] ?? null) ? $endpoint['id'] : '') . "': " . $validation['error']
                     ];
                 }
+                if (isset($replacement[$endpoint['id']])) {
+                    return ['success' => false, 'error' => "Endpoint ID '{$endpoint['id']}' appears twice"];
+                }
+                $endpoint['created'] = $endpoint['created'] ?? date('Y-m-d H:i:s');
+                $replacement[$endpoint['id']] = $endpoint;
             }
-            $api['endpoints'] = $updates['endpoints'];
+            // Whatever the replacement leaves out goes as a deleted endpoint does: the
+            // command clears what referred to it.
+            $removedEndpoints = array_values(array_diff(array_column($api['endpoints'] ?? [], 'id'), array_map('strval', array_keys($replacement))));
+            $api['endpoints'] = array_values($replacement);
         }
-        
+
         // Handle single endpoint add
         if (isset($updates['addEndpoint'])) {
             $endpoint = $this->normalizeEndpointOptionalFields($updates['addEndpoint']);
-            $validation = $this->validateEndpoint($endpoint);
+            $validation = $this->validateEndpoint($endpoint, $api['auth'] ?? []);
             if (!$validation['valid']) {
                 return [
                     'success' => false,
@@ -398,7 +416,7 @@ class ApiEndpointManager {
                     $merged['updated'] = date('Y-m-d H:i:s');
 
                     // Validate the result
-                    $validation = $this->validateEndpoint($merged);
+                    $validation = $this->validateEndpoint($merged, $api['auth'] ?? []);
                     if (!$validation['valid']) {
                         return [
                             'success' => false,
@@ -474,7 +492,7 @@ class ApiEndpointManager {
                     $merged = $this->normalizeEndpointOptionalFields($merged);
                     $merged['updated'] = date('Y-m-d H:i:s');
 
-                    $validation = $this->validateEndpoint($merged);
+                    $validation = $this->validateEndpoint($merged, $api['auth'] ?? []);
                     if (!$validation['valid']) {
                         return ['success' => false, 'error' => "Invalid endpoint after rename: " . $validation['error']];
                     }
@@ -516,7 +534,8 @@ class ApiEndpointManager {
             'success' => true,
             'apiId' => $apiId,
             'api' => $api,
-            'renamed' => $renamed
+            'renamed' => $renamed,
+            'removedEndpoints' => $removedEndpoints
         ];
     }
     
@@ -633,33 +652,42 @@ class ApiEndpointManager {
      */
     private function validateAuth(array $auth): array {
         $type = $auth['type'] ?? null;
-        
-        if (!$type || !in_array($type, $this->validAuthTypes)) {
+
+        if (!is_string($type) || !in_array($type, $this->validAuthTypes, true)) {
             return [
                 'valid' => false,
                 'error' => 'Invalid auth type. Must be one of: ' . implode(', ', $this->validAuthTypes)
             ];
         }
-        
-        // tokenSource is required for everything that reads a stored
-        // value (bearer, apiKey, basic). 'cookie' delegates to the
-        // browser (no tokenSource). 'none' is obvious.
-        if ($type !== 'none' && $type !== 'cookie' && empty($auth['tokenSource'])) {
+
+        // Where a type takes its token from (QS_API_TOKEN_LOCATIONS): a pair nothing
+        // reads is refused, or it would save and send nothing, silently. 'cookie'
+        // delegates to the browser and 'none' is obvious: neither takes a source.
+        $locations = QS_API_TOKEN_LOCATIONS[$type] ?? [];
+        if ($locations === [] && !empty($auth['tokenSource'])) {
+            return [
+                'valid' => false,
+                'error' => "Auth type '$type' takes no tokenSource"
+            ];
+        }
+        if ($locations !== [] && empty($auth['tokenSource'])) {
             return [
                 'valid' => false,
                 'error' => "Auth type '$type' requires tokenSource"
             ];
         }
-        
+
         // Validate tokenSource format (prefix:key)
-        if (!empty($auth['tokenSource'])) {
-            $validPrefixes = ['localStorage', 'sessionStorage', 'config', 'header'];
+        if ($locations !== []) {
             $parts = is_string($auth['tokenSource']) ? explode(':', $auth['tokenSource'], 2) : [];
 
-            if (count($parts) !== 2 || !in_array($parts[0], $validPrefixes)) {
+            if (count($parts) !== 2 || !in_array($parts[0], $locations, true) || $parts[1] === '') {
                 return [
                     'valid' => false,
-                    'error' => 'Invalid tokenSource format. Use: localStorage:key, sessionStorage:key, config:key, or header:headerName'
+                    'error' => "Invalid tokenSource for auth type '$type'. Use: " . implode(' or ', array_map(
+                        static fn(string $l): string => $l === 'header' ? 'header:headerName' : "$l:key",
+                        $locations
+                    ))
                 ];
             }
             // A header name is sent verbatim in a request header, so it is held to
@@ -703,6 +731,14 @@ class ApiEndpointManager {
                     'error' => 'Invalid csrf config. Use: {"from": "cookie:XSRF-TOKEN", "to": "header:X-XSRF-TOKEN"}'
                 ];
             }
+            // This is the author's server's cookie, read by the name it was set under. The
+            // qsp_ names are the engine's, one project's or another's, and none is a CSRF token.
+            if (strpos($from, 'cookie:qsp_') === 0) {
+                return [
+                    'valid' => false,
+                    'error' => 'Invalid csrf config: a cookie whose name starts with qsp_ belongs to the engine.'
+                ];
+            }
         }
 
         // Refresh-token config (Tier 2). All four primary fields move
@@ -725,18 +761,17 @@ class ApiEndpointManager {
                     'error' => 'Refresh config requires all of: ' . implode(', ', $refreshKeys) . '. Missing: ' . implode(', ', $missing)
                 ];
             }
-            if (!preg_match('/^@[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+$/D', $auth['refreshEndpoint'])) {
+            if (!is_string($auth['refreshEndpoint']) || !preg_match('/^@[a-zA-Z0-9_-]+\/[a-zA-Z0-9_-]+$/D', $auth['refreshEndpoint'])) {
                 return [
                     'valid' => false,
                     'error' => "Invalid refreshEndpoint format. Use: @apiId/endpointId"
                 ];
             }
-            // Refresh token storage: restricted to browser stores. 'config'
-            // would publish the refresh token to every visitor; 'header'
+            // Refresh token storage: restricted to browser stores. 'header'
             // is for sent-on-every-request keys, not stored values.
             $refreshStoragePrefixes = ['localStorage', 'sessionStorage'];
-            $rParts = explode(':', $auth['refreshTokenSource'], 2);
-            if (count($rParts) !== 2 || !in_array($rParts[0], $refreshStoragePrefixes)) {
+            $rParts = is_string($auth['refreshTokenSource']) ? explode(':', $auth['refreshTokenSource'], 2) : [];
+            if (count($rParts) !== 2 || !in_array($rParts[0], $refreshStoragePrefixes, true) || $rParts[1] === '') {
                 return [
                     'valid' => false,
                     'error' => 'Invalid refreshTokenSource format. Use: localStorage:key or sessionStorage:key'
@@ -793,9 +828,10 @@ class ApiEndpointManager {
     /**
      * Validate endpoint definition
      * @param array $endpoint
+     * @param mixed $apiAuth The auth of the API it belongs to, which its `headers` are checked against
      * @return array ['valid' => bool, 'error' => string|null]
      */
-    private function validateEndpoint(array $endpoint): array {
+    private function validateEndpoint(array $endpoint, $apiAuth = []): array {
         // Required fields
         if (empty($endpoint['id'])) {
             return ['valid' => false, 'error' => 'Endpoint ID is required'];
@@ -850,6 +886,32 @@ class ApiEndpointManager {
                 'valid' => false,
                 'error' => 'Invalid callableFrom. Must be one of: ' . implode(', ', self::VALID_CALLABLE_FROM) . ' (or omit for auto-derive).'
             ];
+        }
+
+        // Validate `auth`: optional; a word (QS_API_ENDPOINT_AUTH_WORDS) or an auth object.
+        // Anything else would go out meaning nothing.
+        $endpointAuth = $endpoint['auth'] ?? null;
+        if (is_array($endpointAuth) && $endpointAuth !== []) {
+            $authValidation = $this->validateAuth($endpointAuth);
+            if (!$authValidation['valid']) {
+                return ['valid' => false, 'error' => 'Invalid endpoint auth: ' . $authValidation['error']];
+            }
+        } elseif ($endpointAuth !== null && $endpointAuth !== '' && $endpointAuth !== []
+            && !in_array($endpointAuth, QS_API_ENDPOINT_AUTH_WORDS, true)) {
+            return [
+                'valid' => false,
+                'error' => 'Invalid endpoint auth. Must be one of: ' . implode(', ', QS_API_ENDPOINT_AUTH_WORDS) . ', or an auth object (or omit to inherit).'
+            ];
+        }
+
+        // Validate `headers`: this writer is checked here, and every other way a registry
+        // arrives where a request is built.
+        $headerProblem = qs_api_header_map_problem(
+            $endpoint['headers'] ?? null,
+            qs_api_effective_auth($apiAuth, $endpointAuth) ?? []
+        );
+        if ($headerProblem !== null) {
+            return ['valid' => false, 'error' => $headerProblem];
         }
 
         // Validate `parameters` shape + cross-check against :placeholders in path
@@ -1106,6 +1168,15 @@ class ApiEndpointManager {
                         'method' => $endpoint['method'] ?? 'GET',
                         'description' => $endpoint['description'] ?? ''
                     ];
+
+                    // An endpoint whose own `auth` differs from its API's carries it, so the
+                    // browser sends what the server sends. A value that means nothing sends
+                    // nothing here, as the server refuses to call it.
+                    $apiAuthHere = $api['auth'] ?? ['type' => 'none'];
+                    $ownAuth = qs_api_effective_auth($apiAuthHere, $endpoint['auth'] ?? null) ?? ['type' => 'none'];
+                    if ($ownAuth !== $apiAuthHere) {
+                        $apiEndpoints[$endpointId]['auth'] = $ownAuth;
+                    }
 
                     // Include schema if defined (for visual editor hints)
                     if (!empty($endpoint['requestSchema'])) {

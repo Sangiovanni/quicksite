@@ -3467,7 +3467,7 @@ kbd {
 .admin-ai-goal-area,
 .admin-ai-goal-hints,
 .apis-auth-token-label,
-.apis-auth-config-warning {
+.apis-draft-notes {
     margin-top: var(--space-sm);
 }
 
@@ -4278,6 +4278,19 @@ kbd {
 
 .apis-test-details-content {
     padding-top: var(--space-sm);
+}
+
+.apis-test-draft-offer {
+    margin-top: var(--space-sm);
+}
+
+.apis-draft-notes ul {
+    margin: var(--space-xs) 0 0;
+    padding-left: var(--space-md);
+}
+
+.apis-draft-notes code {
+    overflow-wrap: anywhere;
 }
 
 .apis-test-response-body {

@@ -33,9 +33,9 @@
  *   - `none`   → no auth header.
  *   - `apiKey` → read the key from secure/admin/config/api-secrets.php
  *                (gitignored — copy from .example to set up). The key
- *                is looked up by the endpoint's apiId. The endpoint's
- *                tokenSource configures the header name
- *                (default 'header:X-API-Key').
+ *                is looked up by the endpoint's apiId. The tokenSource
+ *                names the header it is sent in (`header:<name>`); any
+ *                other source is refused, with nothing sent.
  *   - `bearer` → uses the user's session token from $context['session']
  *                ['token']. Without that, the call goes auth-less and
  *                will likely 401 — Tier 3 server-side session wiring
@@ -44,6 +44,11 @@
  *                $context['cookieHeader'] or $_SERVER['HTTP_COOKIE']).
  *                The auth API and the user's site must share an origin
  *                or have explicit cross-origin cookie config.
+ *
+ *   An endpoint's own `auth` decides which of these applies:
+ *   qs_api_effective_auth(). An endpoint's `headers` are checked before
+ *   anything is sent (qs_api_header_map_problem()), because a registry
+ *   can arrive by import or by hand.
  *
  *
  * Inputs handling:
@@ -230,18 +235,43 @@ function _serverFetchPrepare(string $endpointRef, array $inputs, array $context)
         $headers[] = 'Content-Type: application/json';
     }
 
-    // Auth resolution. Endpoint-level auth overrides API-level when set
-    // to anything other than 'inherit' (matching the convention in
-    // ApiEndpointManager + /admin/apis).
-    $auth = $endpoint['apiAuth'] ?? ['type' => 'none'];
-    if (isset($endpoint['auth']) && $endpoint['auth'] !== 'inherit') {
-        $auth = is_array($endpoint['auth'])
-            ? $endpoint['auth']
-            : ['type' => (string) $endpoint['auth']];
+    // What this endpoint's own `auth` means. A value that means nothing is
+    // refused here as it is when saved: a registry can arrive by import or by hand.
+    $auth = qs_api_effective_auth(($endpoint['apiAuth'] ?? []) ?: ['type' => 'none'], $endpoint['auth'] ?? null);
+    if ($auth === null) {
+        return ['state' => 'error', 'result' => [
+            'ok' => false,
+            'status' => 0,
+            'data' => null,
+            'error' => "Invalid auth on endpoint @{$endpointRef}: it is inherit, none, required or an auth object.",
+        ]];
     }
     $authType = $auth['type'] ?? 'none';
 
     if ($authType === 'apiKey') {
+        // The key goes in a request header and nowhere else: refused rather than
+        // sent bare, whatever a registry written by hand names.
+        $tokenSource = $auth['tokenSource'] ?? null;
+        $headerName = is_string($tokenSource) && strpos($tokenSource, 'header:') === 0 ? substr($tokenSource, 7) : null;
+        if ($headerName === null) {
+            return ['state' => 'error', 'result' => [
+                'ok' => false,
+                'status' => 0,
+                'data' => null,
+                'error' => "The tokenSource of API '{$endpoint['apiId']}' must be header:<name>: an API key is sent in a request header.",
+            ]];
+        }
+        // The name is sent verbatim, so it must be an RFC 7230 token. Saving an
+        // API refuses any other name, but an imported registry reaches this point
+        // without that check.
+        if (!qs_http_header_name_is_token($headerName)) {
+            return ['state' => 'error', 'result' => [
+                'ok' => false,
+                'status' => 0,
+                'data' => null,
+                'error' => "Invalid header name in the tokenSource of API '{$endpoint['apiId']}'.",
+            ]];
+        }
         // Pull the secret from secure/admin/config/api-secrets.php. The
         // file is gitignored — see api-secrets.php.example for the format
         // + the security disclosure. $context['apiSecrets'] allows tests
@@ -263,24 +293,15 @@ function _serverFetchPrepare(string $endpointRef, array $inputs, array $context)
             ]];
         }
         $keyValue = $apiSecrets[$apiIdForSecret];
-        $tokenSource = $auth['tokenSource'] ?? 'header:X-API-Key';
-        if (is_string($tokenSource) && strpos($tokenSource, 'header:') === 0) {
-            $headerName = substr($tokenSource, 7);
-            // The name is sent verbatim, so it must be an RFC 7230 token. Saving an
-            // API refuses any other name, but an endpoint's own auth object and an
-            // imported registry reach this point without that check.
-            if (!qs_http_header_name_is_token($headerName)) {
-                return ['state' => 'error', 'result' => [
-                    'ok' => false,
-                    'status' => 0,
-                    'data' => null,
-                    'error' => "Invalid header name in the tokenSource of API '{$apiIdForSecret}'.",
-                ]];
-            }
-            $headers[] = $headerName . ': ' . $keyValue;
+        if (!is_string($keyValue) || !qs_http_header_value_is_safe($keyValue)) {
+            return ['state' => 'error', 'result' => [
+                'ok' => false,
+                'status' => 0,
+                'data' => null,
+                'error' => "The apiKey of API '{$apiIdForSecret}' must be text with no line break or NUL.",
+            ]];
         }
-        // Future tokenSource variants (e.g. 'query:apikey') would slot in
-        // here. Keeping the v1 surface narrow until a real need surfaces.
+        $headers[] = $headerName . ': ' . $keyValue;
     } elseif ($authType === 'bearer') {
         // The user's session bearer token. Provided by the caller via
         // $context['session']['token'] — Tier 3 server-side session
@@ -312,11 +333,19 @@ function _serverFetchPrepare(string $endpointRef, array $inputs, array $context)
     }
     // authType === 'none' or anything unrecognised → no auth header.
 
-    // Endpoint-level extra headers (rare but supported).
-    if (!empty($endpoint['headers']) && is_array($endpoint['headers'])) {
-        foreach ($endpoint['headers'] as $key => $value) {
-            $headers[] = $key . ': ' . $value;
-        }
+    // Endpoint-level extra headers (rare but supported), each sent verbatim, so the
+    // map is checked as it is when saved: a registry can arrive by import or by hand.
+    $headerProblem = qs_api_header_map_problem($endpoint['headers'] ?? null, $auth);
+    if ($headerProblem !== null) {
+        return ['state' => 'error', 'result' => [
+            'ok' => false,
+            'status' => 0,
+            'data' => null,
+            'error' => "Endpoint @{$endpointRef} not called: {$headerProblem}",
+        ]];
+    }
+    foreach ($endpoint['headers'] ?? [] as $key => $value) {
+        $headers[] = $key . ': ' . $value;
     }
 
     // TODO: telemetry hook.

@@ -16,6 +16,13 @@ $qsApisI18n = [];
 foreach (['apis', 'common'] as $qsSubtree) {
     $qsApisI18n[$qsSubtree] = AdminTranslation::getInstance()->getRaw($qsSubtree) ?: new stdClass();
 }
+
+// Which auth types take a token location: the one list, read by the location options below.
+require_once SECURE_FOLDER_PATH . '/src/functions/apiRegistry.php';
+$qsLocationTypes = static fn(string $location): string => implode(' ', array_keys(array_filter(
+    QS_API_TOKEN_LOCATIONS,
+    static fn(array $locations): bool => in_array($location, $locations, true)
+)));
 ?>
 
 <script>
@@ -28,6 +35,7 @@ window.QS_COMPLEX_WIZARD_I18N = <?= qs_inline_script_json(['complexWizard' => ['
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/preview/contextual-complex/wizard-text.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/contextual-complex/wizard-text.js') ?>"></script>
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/preview/contextual-complex/storage-key-picker.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/contextual-complex/storage-key-picker.js') ?>"></script>
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/api-import/openapi-converter.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/api-import/openapi-converter.js') ?>"></script>
+<script src="<?= $baseUrl ?>/admin/assets/js/pages/api-import/response-draft.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/api-import/response-draft.js') ?>"></script>
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/apis.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/apis.js') ?>"></script>
 
 <div class="admin-page-header">
@@ -186,20 +194,16 @@ window.QS_COMPLEX_WIZARD_I18N = <?= qs_inline_script_json(['complexWizard' => ['
                     <div class="admin-form-group" id="auth-token-source-group" style="display: none;">
                         <label class="admin-label" for="api-token-source-prefix"><?= __admin('apis.form.storageLocation') ?></label>
                         <select class="admin-select" id="api-token-source-prefix">
-                            <option value="localStorage"><?= __admin('apis.form.storageLocalStorage') ?></option>
-                            <option value="sessionStorage"><?= __admin('apis.form.storageSessionStorage') ?></option>
-                            <option value="config"><?= __admin('apis.form.storageConfig') ?></option>
-                            <option value="header"><?= __admin('apis.form.storageHeader') ?></option>
+                            <option value="localStorage" data-auth-types="<?= $qsLocationTypes('localStorage') ?>"><?= __admin('apis.form.storageLocalStorage') ?></option>
+                            <option value="sessionStorage" data-auth-types="<?= $qsLocationTypes('sessionStorage') ?>"><?= __admin('apis.form.storageSessionStorage') ?></option>
+                            <option value="header" data-auth-types="<?= $qsLocationTypes('header') ?>"><?= __admin('apis.form.storageHeader') ?></option>
                         </select>
                         <label class="admin-label apis-auth-token-label" id="api-token-source-key-label" for="api-token-source-key"><?= __admin('apis.form.storageKeyName') ?></label>
                         <input type="text" class="admin-input apis-auth-token-input" id="api-token-source-key"
                                placeholder="authToken">
-                        <!-- A storage key is picked or created (apis.js, the shared picker); the other locations are typed above. -->
+                        <!-- A storage key is picked or created (apis.js, the shared picker); a header's name is typed above. -->
                         <div class="apis-auth-token-input" id="api-token-source-picker" style="display: none;"></div>
                         <p class="admin-hint" id="api-token-source-hint"><?= __admin('apis.form.storageKeyHint') ?></p>
-                        <div id="auth-config-warning" class="admin-alert admin-alert--warning apis-auth-config-warning" style="display: none;">
-                            <small><?= __admin('apis.form.configWarning') ?></small>
-                        </div>
                     </div>
 
                     <!-- Refresh (optional) — bearer-only. The collapsible
@@ -400,6 +404,8 @@ window.QS_COMPLEX_WIZARD_I18N = <?= qs_inline_script_json(['complexWizard' => ['
                         </div>
                         <textarea class="admin-input admin-input--code" id="endpoint-response-schema" rows="6"
                                   placeholder='<?= __admin('apis.form.responseSchemaPlaceholder') ?>'></textarea>
+                        <!-- What a draft from a test could not determine (apis.js). -->
+                        <div id="response-schema-draft" class="admin-alert admin-alert--info apis-draft-notes" style="display: none;"></div>
                     </div>
                 </fieldset>
             </div>
@@ -465,6 +471,8 @@ window.QS_COMPLEX_WIZARD_I18N = <?= qs_inline_script_json(['complexWizard' => ['
                     <div id="test-response-body" class="admin-code-block apis-test-response-body">
                         <span class="admin-text-muted"><?= __admin('apis.test.noResponse') ?></span>
                     </div>
+                    <!-- A draft response schema, offered after a 2xx JSON answer (apis.js). -->
+                    <div id="test-draft-offer" class="apis-test-draft-offer" style="display: none;"></div>
                 </div>
             </div>
         </div>

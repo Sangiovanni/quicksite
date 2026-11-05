@@ -48,9 +48,14 @@
     let pendingDelete = null;
     let tokenSource = null;         // the API form's two token sources (_tokenSourceField)
     let refreshTokenSource = null;
-    const AUTH_TOKEN_STORAGE_KEY = 'qs_api_auth_tokens';
-    // The prefixes that name a storage key. `config` and `header` name something else, and stay typed.
+    // The prefixes that name a storage key. `header` names something else, and stays typed.
     const STORAGE_PREFIXES = ['localStorage', 'sessionStorage'];
+    // The endpoint form's option for an endpoint that holds an auth object of its own.
+    const AUTH_OWN = '__own__';
+    // How many refused imports a toast names, one each.
+    const MAX_IMPORT_REFUSALS_SHOWN = 5;
+    // Each token location as apis.php renders it, with the auth types that read it. The list offers those.
+    let tokenLocations = [];
 
     // DOM Ready
     document.addEventListener('DOMContentLoaded', init);
@@ -75,7 +80,12 @@
         // API form
         document.getElementById('form-api')?.addEventListener('submit', handleApiSubmit);
         document.getElementById('api-auth-type')?.addEventListener('change', updateAuthFields);
-        document.getElementById('api-token-source-prefix')?.addEventListener('change', updateStorageWarning);
+        document.getElementById('api-token-source-prefix')?.addEventListener('change', updateTokenSourceWords);
+        tokenLocations = Array.from(document.getElementById('api-token-source-prefix')?.options || []).map((option) => ({
+            value: option.value,
+            label: option.textContent,
+            types: (option.getAttribute('data-auth-types') || '').split(' '),
+        }));
         tokenSource = _tokenSourceField('api-token-source-prefix', 'api-token-source-picker', 'api-token-source-key');
         refreshTokenSource = _tokenSourceField('api-refresh-token-source-prefix', 'api-refresh-token-source-picker');
 
@@ -425,21 +435,8 @@
             'DELETE': 'admin-badge--danger'
         }[endpoint.method] || 'admin-badge--default';
 
-        // Auth badge based on effective auth
-        // No auth property = public (none), like OpenAPI security: []
-        const api = apisData[apiId];
-        const apiAuthType = api?.auth?.type || 'none';
-        const endpointAuth = endpoint.auth || 'none'; // undefined = public
-        
-        let authLabel = null;
-        if (endpointAuth === 'required') {
-            // Explicitly requires auth
-            authLabel = apiAuthType !== 'none' ? apiAuthType : 'required';
-        } else if (endpointAuth === 'inherit' && apiAuthType !== 'none') {
-            // Inherits from API (and API has auth)
-            authLabel = apiAuthType;
-        }
-        // endpointAuth === 'none' is public: no badge.
+        // Auth badge based on what a call to it carries
+        const authLabel = _endpointAuthLabel(apisData[apiId], endpoint);
 
         const idCell = QSDom.el('td', null, [
             QSDom.el('code', { text: endpoint.id }),
@@ -478,6 +475,25 @@
                 ])
             ])
         ]);
+    }
+
+    /**
+     * What a call to this endpoint carries, as every runtime reads it (qs_api_effective_auth()): absent,
+     * `inherit` and `required` the API's auth, `none` nothing, an auth object itself.
+     * @returns {string} an auth type
+     */
+    function _endpointAuthType(api, endpoint) {
+        const own = endpoint?.auth;
+        if (own && typeof own === 'object') return own.type || 'none';
+        if (own === 'none') return 'none';
+        return api?.auth?.type || 'none';
+    }
+
+    /** The auth an endpoint shows, or null for a public one. `required` under an API with none still says so. */
+    function _endpointAuthLabel(api, endpoint) {
+        const type = _endpointAuthType(api, endpoint);
+        if (type !== 'none') return type;
+        return endpoint?.auth === 'required' ? 'required' : null;
     }
 
     /** One endpoint-row action button. @returns {HTMLElement} */
@@ -547,6 +563,7 @@
             document.getElementById('api-description').value = api.description || '';
             document.getElementById('api-auth-type').value = api.auth?.type || 'none';
 
+            _offerTokenLocations();
             tokenSource.load(api.auth?.tokenSource || '');
 
             populateRefreshEndpointDropdown(api.auth?.refreshEndpoint || '');
@@ -577,7 +594,7 @@
      * One token source of the API form: its prefix list, the shared picker for a storage key and,
      * where a prefix names something else, a typed field (the refresh token's source has none). A
      * prefix switched away and back finds what it held, and nothing is carried over to another: a
-     * config key is no header name, and it would save as one unnoticed. The two storage prefixes share
+     * storage key is no header name, and it would save as one unnoticed. The two storage prefixes share
      * their key, whose row says what is true of it under the other. A form opened reads the registry
      * afresh: the picker is mounted again by load().
      */
@@ -620,11 +637,17 @@
         });
 
         return {
-            /** What a saved source holds, its key everything after the first ':'; '' for none. */
+            /**
+             * What a saved source holds, its key everything after the first ':'; '' for none. A location
+             * the list does not offer holds nothing: it opens on the first one, and Save asks for a name.
+             */
             load(source) {
                 const at = source.indexOf(':');
-                if (at !== -1) prefix.value = source.slice(0, at);
-                const key = at !== -1 ? source.slice(at + 1) : '';
+                const location = at !== -1 ? source.slice(0, at) : '';
+                const offered = Array.from(prefix.options).some((option) => option.value === location);
+                if (offered) prefix.value = location;
+                else prefix.selectedIndex = 0;
+                const key = offered ? source.slice(at + 1) : '';
                 storageKey = namesStorageKey() ? key : '';
                 typedNames = namesStorageKey() ? {} : { [prefix.value]: key };
                 if (picker) {
@@ -646,13 +669,13 @@
         // 'cookie' (Pattern X — same-origin session cookies) doesn't
         // need a tokenSource; the browser owns the cookie. Treat it
         // like 'none' for the storage-location group's purposes.
-        const needsTokenSource = authType !== 'none' && authType !== 'cookie';
+        const needsTokenSource = _offerTokenLocations();
 
         if (!needsTokenSource) {
             tokenGroup.style.display = 'none';
         } else {
             tokenGroup.style.display = 'block';
-            updateStorageWarning();
+            updateTokenSourceWords();
         }
 
         // Refresh is meaningful only for bearer auth; collapse + hide
@@ -661,6 +684,25 @@
             refreshGroup.style.display = authType === 'bearer' ? 'block' : 'none';
             if (authType !== 'bearer') refreshGroup.open = false;
         }
+    }
+
+    /**
+     * The location list offers what this auth type reads, and nothing a runtime would ignore. A location
+     * no longer offered gives way to the first that is, which the source field follows by its own
+     * change listener.
+     * @returns {boolean} whether this auth type takes a location at all
+     */
+    function _offerTokenLocations() {
+        const authType = document.getElementById('api-auth-type').value;
+        const select = document.getElementById('api-token-source-prefix');
+        const offered = tokenLocations.filter((location) => location.types.includes(authType));
+        if (offered.length === 0) return false;
+        const current = select.value;
+        select.replaceChildren(...offered.map((location) => QSDom.el('option', { value: location.value, text: location.label })));
+        const kept = offered.some((location) => location.value === current);
+        select.value = kept ? current : offered[0].value;
+        if (!kept) select.dispatchEvent(new Event('change'));
+        return true;
     }
 
     /**
@@ -706,13 +748,9 @@
         }
     }
     
-    /** What the location chosen says: `config` its warning, a header's name its own words. */
-    function updateStorageWarning() {
+    /** What the location chosen says: a header's name its own words. */
+    function updateTokenSourceWords() {
         const prefix = document.getElementById('api-token-source-prefix').value;
-        const warning = document.getElementById('auth-config-warning');
-        if (warning) {
-            warning.style.display = prefix === 'config' ? 'block' : 'none';
-        }
         const isHeader = prefix === 'header';
         document.getElementById('api-token-source-key-label').textContent = t(isHeader ? 'apis.form.headerName' : 'apis.form.storageKeyName');
         document.getElementById('api-token-source-hint').textContent = t(isHeader ? 'apis.form.headerNameHint' : 'apis.form.storageKeyHint');
@@ -725,6 +763,8 @@
      * when type is "object". Catches the most common authoring mistake —
      * pasting the whole `{"responseSchema": {...}}` envelope instead of
      * the inner schema. Returns null when OK, or a user-facing error.
+     * An empty `properties` comes back from a save as an empty list, because
+     * PHP has one empty array, so that reads as the empty map it was.
      */
     function _validateSchemaShape(schema, label) {
         if (schema === null || typeof schema !== 'object' || Array.isArray(schema)) {
@@ -744,7 +784,9 @@
         }
         const isObjectType = schema.type === 'object'
             || (Array.isArray(schema.type) && schema.type.indexOf('object') !== -1);
-        if (isObjectType && (!schema.properties || typeof schema.properties !== 'object' || Array.isArray(schema.properties))) {
+        const propertiesIsEmptyList = Array.isArray(schema.properties) && schema.properties.length === 0;
+        if (isObjectType && !propertiesIsEmptyList
+            && (!schema.properties || typeof schema.properties !== 'object' || Array.isArray(schema.properties))) {
             return t('apis.schema.needsProperties', { label: label });
         }
         return null;
@@ -858,10 +900,13 @@
         document.getElementById('endpoint-edit-mode').value = mode;
         document.getElementById('endpoint-original-id').value = endpointId || '';
 
-        // Show auth option only if API has authentication configured
+        // Show auth option only if API has authentication configured, or the endpoint its own
         const api = apisData[apiId];
         const apiHasAuth = api?.auth?.type && api.auth.type !== 'none';
-        authGroup.style.display = apiHasAuth ? 'block' : 'none';
+        const editedEndpoint = mode === 'edit' ? (api?.endpoints || []).find(ep => ep.id === endpointId) : null;
+        const holdsOwnAuth = _showEndpointAuth(editedEndpoint?.auth);
+        authGroup.style.display = (apiHasAuth || holdsOwnAuth) ? 'block' : 'none';
+        _renderDraftNotes(null);
 
         // Clear parameter rows; populated either from existing endpoint or left empty.
         const paramRows = document.getElementById('endpoint-params-rows');
@@ -878,11 +923,6 @@
                 document.getElementById('endpoint-description').value = endpoint.description || '';
                 // An explicit callableFrom value, or empty for auto-derive.
                 document.getElementById('endpoint-callable-from').value = endpoint.callableFrom || '';
-                // An absent auth field means "inherit from API" -- that is how
-                // serverFetch and the manager normaliser read it -- so the
-                // picker shows 'inherit' for it. 'none' is saved literally, so
-                // an endpoint set to public stays public.
-                document.getElementById('endpoint-auth').value = endpoint.auth || 'inherit';
                 document.getElementById('endpoint-request-schema').value =
                     endpoint.requestSchema ? JSON.stringify(endpoint.requestSchema, null, 2) : '';
                 document.getElementById('endpoint-response-schema').value =
@@ -892,8 +932,6 @@
             }
         } else {
             title.textContent = t('apis.addEndpoint');
-            // Default to 'inherit' for new endpoints when API has auth
-            document.getElementById('endpoint-auth').value = 'inherit';
             // New endpoints default to auto-derive.
             document.getElementById('endpoint-callable-from').value = '';
         }
@@ -904,6 +942,24 @@
 
         openModal(modal);
         document.getElementById('endpoint-id').focus();
+    }
+
+    /**
+     * The form's auth list shows what the endpoint holds. Absent means "inherit from API", as every
+     * runtime reads it. An auth object has an option of its own, which Save keeps: the list has no
+     * other words for it. A value that means nothing, which no call goes out under, shows as `none`.
+     * @returns {boolean} whether the endpoint holds an auth object of its own
+     */
+    function _showEndpointAuth(auth) {
+        const select = document.getElementById('endpoint-auth');
+        Array.from(select.options).filter((option) => option.value === AUTH_OWN).forEach((option) => option.remove());
+        if (auth && typeof auth === 'object') {
+            select.appendChild(QSDom.el('option', { value: AUTH_OWN, text: t('apis.form.authOwn', { type: auth.type || '' }) }));
+            select.value = AUTH_OWN;
+            return true;
+        }
+        select.value = !auth ? 'inherit' : (['none', 'inherit', 'required'].includes(auth) ? auth : 'none');
+        return false;
     }
 
     /**
@@ -925,10 +981,14 @@
         // Read from the parent API's STORED auth type. The endpoint
         // modal carries the parent API id in a hidden field — read it
         // and look up the saved auth.type. Fallback to 'none' when the
-        // API has no auth declared (matches server-side default).
+        // API has no auth declared (matches server-side default). An
+        // endpoint's own auth object decides instead, as it does on the
+        // server (qs_api_effective_callable_from()).
         const apiId = document.getElementById('endpoint-api-id')?.value;
-        const apiAuth = (apiId && apisData && apisData[apiId]) ? apisData[apiId].auth : null;
-        const authType = apiAuth?.type || 'none';
+        const api = (apiId && apisData) ? apisData[apiId] : null;
+        const endpointId = document.getElementById('endpoint-original-id')?.value;
+        const ownAuth = (api?.endpoints || []).find(ep => ep.id === endpointId)?.auth;
+        const authType = ((ownAuth && typeof ownAuth === 'object') ? ownAuth.type : api?.auth?.type) || 'none';
         const derived  = (authType === 'apiKey') ? 'server' : 'both';
         valueEl.textContent = derived;
 
@@ -1030,11 +1090,13 @@
         const path = document.getElementById('endpoint-path').value.trim();
         const description = document.getElementById('endpoint-description').value.trim();
         
-        // Only get auth value if API has auth configured
+        // Only get auth value if API has auth configured. An auth object of its own is kept as it is.
         const api = apisData[apiId];
         const apiHasAuth = api?.auth?.type && api.auth.type !== 'none';
-        const auth = apiHasAuth ? document.getElementById('endpoint-auth').value : null;
-        
+        const authChoice = document.getElementById('endpoint-auth').value;
+        const keepsOwnAuth = authChoice === AUTH_OWN;
+        const auth = apiHasAuth ? authChoice : null;
+
         // Parse schemas
         let requestSchema = null;
         let responseSchema = null;
@@ -1101,6 +1163,7 @@
             // drops the key); explicit 'client'/'server'/'both' persists.
             callableFrom: document.getElementById('endpoint-callable-from').value || ''
         };
+        if (keepsOwnAuth) delete endpoint.auth;
 
         // Build editApi params
         const params = { apiId: apiId };
@@ -1210,21 +1273,10 @@
         }
 
         currentTestEndpoint = { apiId, endpointId, api, endpoint };
-        
-        // Determine effective auth for this endpoint
-        // No auth property = public (none), like OpenAPI security: []
-        const apiAuthType = api.auth?.type || 'none';
-        const endpointAuth = endpoint.auth || 'none'; // undefined = public
-        let effectiveAuth = null;
-        if (endpointAuth === 'none') {
-            // Public
-            effectiveAuth = null;
-        } else if (endpointAuth === 'required') {
-            effectiveAuth = apiAuthType !== 'none' ? apiAuthType : 'required';
-        } else if (endpointAuth === 'inherit' && apiAuthType !== 'none') {
-            effectiveAuth = apiAuthType;
-        }
-        
+
+        // What a call to this endpoint carries
+        const effectiveAuth = _endpointAuthLabel(api, endpoint);
+
         // Show request info
         const fullUrl = api.baseUrl.replace(/\/$/, '') + endpoint.path;
         const requestInfo = document.getElementById('test-request-info');
@@ -1267,6 +1319,7 @@
         _setResponseBody(QSDom.el('span', {
             class: 'admin-text-muted', text: t('apis.test.noResponse')
         }));
+        _renderDraftOffer(null);
 
         openModal(document.getElementById('modal-test'));
     }
@@ -1537,13 +1590,26 @@
      */
     function loadAuthToken(apiId) {
         try {
-            const tokens = JSON.parse(localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) || '{}');
-            return tokens[apiId] || '';
+            const key = _authTokensKey();
+            if (!key) return '';
+            const tokens = JSON.parse(localStorage.getItem(key) || '{}');
+            return Object.prototype.hasOwnProperty.call(tokens, apiId) ? (tokens[apiId] || '') : '';
         } catch (e) {
             return '';
         }
     }
     
+    /**
+     * Where the tokens typed for the Test panel are kept: under the edited project's prefix, like every
+     * key a project stores, so one project's test never sends a token typed for another's API of the
+     * same id. No project, no key: nothing is kept outside a project's namespace.
+     * @returns {?string}
+     */
+    function _authTokensKey() {
+        const project = window.QUICKSITE_CONFIG && window.QUICKSITE_CONFIG.currentProject;
+        return project ? QuickSiteUtils.storageKeyPrefix() + QuickSiteStorageKeys.apiAuthTokens : null;
+    }
+
     /**
      * Toggle token visibility in API card
      */
@@ -1576,15 +1642,20 @@
         const card = btn.closest('.api-card');
         const input = card.querySelector('.api-auth-token__input');
         const token = input.value.trim();
-        
+
         try {
-            const tokens = JSON.parse(localStorage.getItem(AUTH_TOKEN_STORAGE_KEY) || '{}');
+            const key = _authTokensKey();
+            if (!key) {
+                showToast(t('apis.toast.tokenSaveFailed'), 'error');
+                return;
+            }
+            const tokens = JSON.parse(localStorage.getItem(key) || '{}');
             if (token) {
                 tokens[apiId] = token;
             } else {
                 delete tokens[apiId];
             }
-            localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, JSON.stringify(tokens));
+            localStorage.setItem(key, JSON.stringify(tokens));
             showToast(t(token ? 'apis.toast.tokenSaved' : 'apis.toast.tokenCleared'), 'success');
         } catch (e) {
             showToast(t('apis.toast.tokenSaveFailed'), 'error');
@@ -1600,18 +1671,15 @@
         // Get auth token from API card (not test modal)
         const api = apisData[apiId];
         const endpoint = (api?.endpoints || []).find(ep => ep.id === endpointId);
-        const apiAuthType = api?.auth?.type || 'none';
-        const endpointAuth = endpoint?.auth || 'none'; // undefined = public
-        
-        // Determine if auth should be sent based on endpoint auth setting
-        // Only send auth if 'required', or 'inherit' with API having auth
+
+        // Send one only if a call to this endpoint would carry one
         let authToken = null;
-        if (endpointAuth === 'required' || (endpointAuth === 'inherit' && apiAuthType !== 'none')) {
+        if (_endpointAuthType(api, endpoint) !== 'none') {
             // Get token from API card's token input (if visible)
-            const apiCardTokenInput = document.querySelector(`#api-row-${apiId} .api-auth-token-input`);
+            const apiCardTokenInput = document.querySelector('.api-auth-token__input[data-api="' + _cssEscape(apiId) + '"]');
             authToken = apiCardTokenInput?.value.trim() || loadAuthToken(apiId) || '';
         }
-        
+
         // Parse body if present
         let body = null;
         const bodyText = document.getElementById('test-request-body').value.trim();
@@ -1638,6 +1706,7 @@
 
         QSDom.setButtonBusy(btn, t('apis.test.testing'));
 
+        _renderDraftOffer(null);
         QSDom.clear(document.getElementById('test-response-status'));
         document.getElementById('test-response-time').textContent = t('apis.test.executing');
         _setResponseBody(QSDom.el('span', {
@@ -1686,6 +1755,7 @@
                         class: 'admin-text-muted', text: t('apis.test.emptyResponse')
                     }));
                 }
+                _renderDraftOffer(testResult);
             } else {
                 _setResponseStatus(t('apis.test.errorBadge'), 'admin-badge--danger');
                 _setResponseBody(QSDom.el('pre', {
@@ -1705,6 +1775,112 @@
             btn.appendChild(QSDom.iconEl(QuickSiteUtils.ICON_PATHS.play, 16));
             btn.appendChild(document.createTextNode(' ' + t('apis.test.run')));
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // A test response becomes a draft response schema
+    // -------------------------------------------------------------------------
+
+    /**
+     * What the Test panel offers under an answer. A test that answered 2xx with a JSON body offers its
+     * draft; a failed call, an error's body and a non-JSON body offer nothing, because an error's
+     * shape is not the response's. A JSON answer with nothing to draft from says so.
+     *
+     * @param {?Object} testResult testApiEndpoint's data; null clears the offer
+     */
+    function _renderDraftOffer(testResult) {
+        const box = document.getElementById('test-draft-offer');
+        QSDom.clear(box);
+        box.style.display = 'none';
+        const response = testResult?.response;
+        if (!testResult?.success || response?.isJson !== true) return;
+        const draft = window.QSApiImport.draftResponseSchema(response.body);
+        box.style.display = '';
+        if (!draft.schema) {
+            box.appendChild(QSDom.el('p', { class: 'admin-hint', text: t('apis.draft.nothing') }));
+            return;
+        }
+        box.appendChild(QSDom.el('button', {
+            type: 'button',
+            class: 'admin-btn admin-btn--sm admin-btn--secondary',
+            id: 'btn-use-draft',
+            text: t('apis.draft.offer'),
+            onClick: () => _useDraft(draft)
+        }));
+        box.appendChild(QSDom.el('p', { class: 'admin-hint', text: t('apis.draft.offerHint') }));
+    }
+
+    /**
+     * Hand a draft from the test modal to the endpoint form: the test modal closes and the form opens
+     * with the draft in its response schema field, unsaved. Saving is the author's own act, through
+     * the form's own Save and checks; Cancel leaves everything as it was. A schema already saved is
+     * replaced in the field only on the author's yes; on a no, the test stays as it is.
+     */
+    async function _useDraft(draft) {
+        const { apiId, endpointId } = currentTestEndpoint;
+        const saved = (apisData[apiId]?.endpoints || []).find(ep => ep.id === endpointId)?.responseSchema;
+        if (saved) {
+            const replace = await QuickSiteUtils.confirm(t('apis.draft.replaceQuestion'), {
+                title: t('apis.draft.replaceTitle'),
+                confirmText: t('apis.draft.replaceConfirm')
+            });
+            if (!replace) return;
+        }
+        closeModal(document.getElementById('modal-test'));
+        openEndpointModal('edit', apiId, endpointId);
+        const field = document.getElementById('endpoint-response-schema');
+        field.value = JSON.stringify(draft.schema, null, 2);
+        validateJsonField(field, 'response-schema-status');
+        _renderDraftNotes(draft);
+        field.focus();
+    }
+
+    /** One line of a draft's notes: what it could not tell, then each path it could not tell it of. */
+    function _renderDraftNote(words, paths) {
+        const line = QSDom.el('li', null, [words]);
+        (paths || []).forEach((path, index) => {
+            line.appendChild(document.createTextNode(index === 0 ? ' ' : ', '));
+            line.appendChild(QSDom.el('code', { text: path === '' ? t('apis.draft.top') : path }));
+        });
+        return line;
+    }
+
+    /**
+     * What this draft could not determine, beside the field it landed in, each path named. The first
+     * lines hold for every draft: one response cannot tell them whatever it holds.
+     *
+     * @param {?Object} draft draftResponseSchema()'s answer; null clears the notes
+     */
+    function _renderDraftNotes(draft) {
+        const box = document.getElementById('response-schema-draft');
+        QSDom.clear(box);
+        box.style.display = 'none';
+        if (!draft) return;
+        const limits = window.QSApiImport.DRAFT_LIMITS;
+        const notes = draft.notes;
+        const list = QSDom.el('ul');
+        list.appendChild(_renderDraftNote(t('apis.draft.notRequired')));
+        list.appendChild(_renderDraftNote(t('apis.draft.public')));
+        if (draft.root === 'array' || draft.root === 'map') {
+            list.appendChild(_renderDraftNote(t('apis.draft.noFieldsAtTop')));
+        }
+        const reasons = [
+            ['empty', t('apis.draft.empty')],
+            ['nullOnly', t('apis.draft.nullOnly')],
+            ['sometimesNull', t('apis.draft.sometimesNull')],
+            ['sometimesAbsent', t('apis.draft.sometimesAbsent')],
+            ['mixed', t('apis.draft.mixed')],
+            ['map', t('apis.draft.map', { fields: limits.fields })],
+            ['unsafe', t('apis.draft.unsafe')],
+            ['sampled', t('apis.draft.sampled', { items: limits.items })],
+            ['deep', t('apis.draft.deep', { depth: limits.depth })],
+        ];
+        reasons.forEach(([reason, words]) => {
+            if (notes[reason] && notes[reason].length) list.appendChild(_renderDraftNote(words, notes[reason]));
+        });
+        box.appendChild(QSDom.el('strong', { text: t('apis.draft.title') }));
+        box.appendChild(list);
+        box.style.display = '';
     }
 
     /**
@@ -1997,7 +2173,7 @@
 
         if (format === 'openapi-3' && window.QSApiImport
                 && typeof window.QSApiImport.convertOpenApi === 'function') {
-            return window.QSApiImport.convertOpenApi(data);
+            return window.QSApiImport.convertOpenApi(data, t);
         }
 
         return null;
@@ -2009,6 +2185,39 @@
      */
     function _privSlug(label) {
         return String(label || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    }
+
+    /**
+     * The notes a token source gets when its key is not declared: under a consent layer an undeclared
+     * key is never stored or read, and declaring one needs a category only the author can choose. Every
+     * format is read the same way, so a pasted native API gets the note a converter's fixed key does.
+     *
+     * @returns {Promise<string[]>}
+     */
+    async function _importKeyNotes(apis) {
+        const sources = [];
+        for (const apiId of Object.keys(apis)) {
+            const auth = apis[apiId]?.auth || {};
+            [auth.tokenSource, auth.refreshTokenSource].forEach((source) => {
+                if (typeof source !== 'string') return;
+                const at = source.indexOf(':');
+                if (at > 0 && STORAGE_PREFIXES.includes(source.slice(0, at))) {
+                    sources.push({ api: apiId, key: source.slice(at + 1), location: source.slice(0, at) });
+                }
+            });
+        }
+        if (sources.length === 0) return [];
+        let items = null;
+        try {
+            const answer = await QuickSiteAdmin.apiRequest('listStorageItems', 'POST', {});
+            if (answer.ok && Array.isArray(answer.data?.data?.items)) items = answer.data.data.items;
+        } catch (e) {
+            items = null;
+        }
+        if (items === null) return [t('apis.importModal.keysUnchecked')];
+        const declared = new Set(items.map((item) => item.id));
+        return sources.filter((source) => !declared.has(source.key))
+            .map((source) => t('apis.importModal.keyUndeclared', source));
     }
 
     /**
@@ -2443,7 +2652,7 @@
     }
 
     /** Screen 1 → Screen 2: parse, detect, convert, render preview. */
-    function handleImportNext() {
+    async function handleImportNext() {
         const errBox = document.getElementById('import-parse-error');
         const raw = document.getElementById('import-json').value.trim();
         if (!raw) {
@@ -2484,7 +2693,8 @@
             return;
         }
         const converted = result.converted;
-        const notes = Array.isArray(result.notes) ? result.notes : [];
+        const notes = (Array.isArray(result.notes) ? result.notes : [])
+            .concat(await _importKeyNotes(converted.apis || {}));
         _importPending = { converted, format: fmt, notes };
         document.getElementById('import-preview-json').value = JSON.stringify(converted, null, 2);
         document.getElementById('import-preview-summary').replaceChildren(
@@ -2599,32 +2809,59 @@
 
         let imported = 0;
         let errors = 0;
+        const refusals = [];
+
+        // Strip any optional `privacy` block so it never lands in api-endpoints.json:
+        // it is applied to the privacy registry below.
+        const withoutPrivacy = (endpoint) => {
+            const clean = Object.assign({}, endpoint);
+            delete clean.privacy;
+            return clean;
+        };
 
         for (const [apiId, apiData] of Object.entries(apis)) {
             try {
-                // If the API already exists, delete it first so we get a clean replace.
-                if (apisData[apiId]) {
-                    await QuickSiteAdmin.apiRequest('deleteApi', 'POST', { apiId });
-                }
-                // Add the API shell (without endpoints — addApi rejects unknown fields).
-                const addRes = await QuickSiteAdmin.apiRequest('addApi', 'POST', {
+                const replaced = {
                     apiId,
                     name: apiData.name || apiId,
                     baseUrl: apiData.baseUrl,
-                    description: apiData.description,
-                    auth: apiData.auth
-                });
-                if (!addRes.ok) { errors++; continue; }
-                // Then attach endpoints one by one (validation runs per endpoint).
-                // Strip any optional `privacy` block so it never lands in
-                // api-endpoints.json — it is applied to the privacy registry below.
-                for (const endpoint of (apiData.endpoints || [])) {
-                    const epClean = Object.assign({}, endpoint);
-                    delete epClean.privacy;
-                    await QuickSiteAdmin.apiRequest('editApi', 'POST', {
-                        apiId,
-                        addEndpoint: epClean
-                    });
+                    description: apiData.description || '',
+                    auth: apiData.auth || { type: 'none' }
+                };
+                if (apisData[apiId]) {
+                    // An API that exists is replaced in one call, which the server takes whole or not at
+                    // all: a refused import leaves the API as it was, and an endpoint it keeps keeps
+                    // what refers to it.
+                    const answer = await QuickSiteAdmin.apiRequest('editApi', 'POST', Object.assign(replaced, {
+                        endpoints: (apiData.endpoints || []).map(withoutPrivacy)
+                    }));
+                    if (!answer.ok) {
+                        errors++;
+                        refusals.push(t('apis.toast.importRefused', { api: apiId, message: answer.data?.message || '' }));
+                        continue;
+                    }
+                } else {
+                    // Add the API shell (without endpoints — addApi rejects unknown fields).
+                    const addRes = await QuickSiteAdmin.apiRequest('addApi', 'POST', replaced);
+                    if (!addRes.ok) {
+                        errors++;
+                        refusals.push(t('apis.toast.importRefused', { api: apiId, message: addRes.data?.message || '' }));
+                        continue;
+                    }
+                    // Then attach endpoints one by one (validation runs per endpoint): a refused
+                    // one stays out of the API, and the author is told which and why.
+                    for (const endpoint of (apiData.endpoints || [])) {
+                        const answer = await QuickSiteAdmin.apiRequest('editApi', 'POST', {
+                            apiId,
+                            addEndpoint: withoutPrivacy(endpoint)
+                        });
+                        if (!answer.ok) {
+                            errors++;
+                            refusals.push(t('apis.toast.importEndpointRefused', {
+                                api: apiId, endpoint: endpoint.id || endpoint.name || '', message: answer.data?.message || ''
+                            }));
+                        }
+                    }
                 }
                 // Apply optional privacy blocks (collects + host + field mappings).
                 await _applyImportPrivacy(apiId, apiData);
@@ -2644,6 +2881,10 @@
             showToast(t('apis.toast.importedOk', { count: imported }), 'success');
         } else {
             showToast(t('apis.toast.importedWithErrors', { count: imported, errors: errors }), 'warning');
+        }
+        refusals.slice(0, MAX_IMPORT_REFUSALS_SHOWN).forEach((refusal) => showToast(refusal, 'error'));
+        if (refusals.length > MAX_IMPORT_REFUSALS_SHOWN) {
+            showToast(t('apis.toast.importMoreRefused', { count: refusals.length - MAX_IMPORT_REFUSALS_SHOWN }), 'error');
         }
     }
 
