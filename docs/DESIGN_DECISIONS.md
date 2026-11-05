@@ -805,7 +805,7 @@ catalog is small enough to live in one file).
 **Source**: `secure/src/functions/qsDataAttributeCatalog.php`.
 Behaviour: [ADMIN_PANEL.md §10](ADMIN_PANEL.md).
 
-### Reserved storage-key namespace (locked 2026-06-02)
+### Reserved storage-key namespace (locked 2026-06-02) (superseded 2026-11-05)
 
 **Decision**: Storage-key prefixes `qs_`, `qs-`, `quicksite_`, and
 `quicksite-` are reserved for QuickSite's internal use. The picker
@@ -15135,3 +15135,62 @@ miss); leaving it to the header's picker (the state that misled the run); the se
 selection would then move for an API caller too: the switch is the panel's, as it is for *Edit this project*).
 
 **Source**: Sangio, UX run, 2026-11-04; beta.12. `public/admin/assets/js/pages/memberships.js`.
+
+### A storage key is picked or created, never typed (locked 2026-11-04)
+
+**Decision**: The key of `data-storage-show`, `data-storage-value` and `data-auth-source` in the parameter editor, and of the
+Interactions tool's `storageKey` argument, comes from one shared picker (`QSComplexWizard.createStorageKeyPicker`): a searchable
+list of the declared local and session keys of the scope beside it, and a form that declares a new key with its scope and
+category. There is no free-text path to a key. `qsp_<projectId>_` is a grey fixed chip before the list, in both editors and on the
+Storage page's form, built in one place (`core/utils.js`) and never part of a stored value. A saved key is shown as it is and
+saved as it is, whatever the registry says: its row says undeclared, declared for the other scope or declared as a cookie. The
+widget composes nothing on render and nothing with no key. A role that may not run `addStorageItem` is not offered it.
+
+**Reasoning**: Under a consent layer an undeclared key is never stored or read, so a key typed by hand can be a typo the site
+silently ignores, and nothing told an author whether to type the prefix or not. Picking makes the mistake impossible and
+creating declares the key at the moment it is needed, with its scope and category. Two widgets asked for the same thing, one
+much better than the other; one picker gives one list, one cache, one set of words. Keeping a saved key whatever the registry
+says matters more than tidiness: a value the widget cleared would read as a removal in Edit Params' diff. The rows say what is
+true: a key declared for the other scope is not undeclared, because consent decides by the key's name, and the runtime uses the
+scope the attribute names, so it finds only what was stored there.
+
+**Alternatives considered**: a free-text escape beside the list (the typo above, one click away; an API call or a hand edit can
+still write any key, and the picker shows it honestly); a copy of the Interactions tool's picker for the parameter editor (two
+caches, so a key created in one is not offered by the other, and the words twice); the chip in the picker's own
+file with a script line on the Storage page (a whole picker loaded on a page that uses none of it); a registry read once per
+page, as the text-key picker does (a key made elsewhere reads as undeclared until a reload, which is exactly the claim the row
+must not make falsely).
+
+**Source**: Sangio, 2026-11-04, from a UX run of the consent work, with the points the code raised ruled the next day; beta.12.
+`public/admin/assets/js/pages/preview/contextual-complex/storage-key-picker.js`.
+
+### A site's storage key may have any name: the reserved namespace is gone (locked 2026-11-05)
+
+**Supersedes**: [Reserved storage-key namespace](#reserved-storage-key-namespace-locked-2026-06-02-superseded-2026-11-05)
+
+**Decision**: No command and no panel form refuses a storage key for starting `qs_`, `qs-`, `quicksite_` or `quicksite-`.
+`reservedStorageKeys.php` is gone, and `validation.reserved_key` with it. The registry's two refusals stay
+(`validateStorageItem()`: whitespace and `__proto__`), neither of them about the panel. The prefix is still composed by `qs.js`
+at the moment of use and stored nowhere: no command adds it, and none checks for it.
+
+**Reasoning**: The rule existed so a rendered page could not read or clear the admin panel's storage, which shares its origin.
+That was true when a page used a key under its own name. Since *Browser storage is namespaced per project, inside qs.js, always*,
+every read, write and remove goes through `_storageKey()`, so `qs_x` on a page is `qsp_<projectId>_qs_x` in the browser and cannot
+reach the panel's `qs_x`, whatever an author calls it. The real runtime, run with values seeded under the panel's own key names,
+confirms it: the three attributes read nothing of the panel's, the verbs write and remove only their own slot, and a page with no
+project id falls back to `qsp__<key>`, never the bare name. The rule had also stopped meaning what it said. It applied to six
+commands that write a structure and never to the verbs, an API's token source, the import or the registry, so a key could be
+declared and then refused at save, with a message about a collision that could no longer happen. An author who sees the fixed
+prefix rightly asks why a key about to be prefixed is reserved. The earlier entry's choice of `qsp_` over `qs_` stands: its
+paragraph on the guard is history, and a generated key must still not land in the panel's own namespace. **The boundary is now
+`_storageKey()` alone**, so that entry's warning weighs more: author JavaScript let back in would have nothing else in its way,
+though no name rule would have stopped it either.
+
+**Alternatives considered**: keeping the rule as a naming convention (a refusal whose reason is false, and the panel saying so);
+keeping only the server's check or only the panel's (the picker would create what the server refuses, or the reverse); a command
+that verifies a value is prefixed when it saves (at save the prefix does not exist: a stored prefix would bake in a project id, and
+an import under another id would match nothing. What needs verifying is the runtime's one path, and it is); dropping the `__proto__`
+refusal with it (the prefix does not reach that one: the problem is the page's consent map, written as an object literal, where
+that name makes no key).
+
+**Source**: Sangio, UX run of the storage-key picker, 2026-11-05; beta.12. `secure/src/runtime/qs.js` `_storageKey()`.

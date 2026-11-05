@@ -105,43 +105,20 @@
         return QSDom.el('span', { class: 'storage-pill storage-pill--' + kind, text: text });
     }
 
-    // The prefix qs.js writes browser-storage keys under. Kept in step with
-    // QS_STORAGE_PREFIX + _storageKey() in secure/src/runtime/qs.js: the
-    // declared id is the logical identity everywhere in this panel, and this is
-    // the only place the physical slot name is shown — so an author looking in
-    // devtools knows what to search for.
-    var PHYSICAL_KEY_PREFIX = 'qsp_';
-
     /** The slot qs.js actually writes, or null for scopes it does not write. */
     function _physicalKey(item) {
         if (item.scope !== 'localStorage' && item.scope !== 'sessionStorage') {
             return null;   // cookie items are declared here but written elsewhere
         }
-        var project = (window.QUICKSITE_CONFIG && window.QUICKSITE_CONFIG.currentProject) || '';
-        return PHYSICAL_KEY_PREFIX + project + '_' + item.id;
+        return QuickSiteUtils.storageKeyPrefix() + item.id;
     }
 
-    /**
-     * The non-editable `qsp_<project>_` chip that sits in front of the key
-     * input in the add/edit modal.
-     *
-     * ⚠ IT IS A <span>, NOT AN INPUT, AND DELIBERATELY SO. The registry stores
-     * the DECLARED key — what the author types, and nothing else. The prefix is
-     * composed at the moment it is used (here, on the card, in the generated
-     * cookie policy, and in qs.js) and is never persisted. Persisting it would
-     * bake a project id into the very field consent gating matches on, and an
-     * import into a project with a different id would then match nothing.
-     */
+    /** The prefix chip in front of the key input in the add/edit modal: never stored (core/utils.js). */
     function _renderKeyPrefixChip() {
-        var project = (window.QUICKSITE_CONFIG && window.QUICKSITE_CONFIG.currentProject) || '';
-        return QSDom.el('span', {
-            class: 'storage-keyfield__prefix',
-            text: PHYSICAL_KEY_PREFIX + project + '_',
-            title: 'Added automatically. Every project on this host shares one '
+        return QuickSiteUtils.renderStorageKeyPrefixChip('Added automatically. Every project on this host shares one '
                  + 'browser-storage origin, so qs.js prefixes each key with the '
                  + 'project id. You do not type this part, and the registry does '
-                 + 'not store it.',
-        });
+                 + 'not store it.');
     }
 
     /** The key field's hint, which changes with the scope. */

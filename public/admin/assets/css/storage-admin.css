@@ -305,8 +305,37 @@
 .qs-response-path-picker__select,
 .qs-response-path-picker__custom { width: 100%; box-sizing: border-box; }
 
-/* storageKey picker — in the interactions editor */
-.qs-storage-key-picker { display: flex; flex-direction: column; gap: 6px; }
+/* The storage-key picker (storage-key-picker.js) — in the parameter editor and the interactions
+   editor, both in the editor's sidebar, 177px wide at its default width. The chip and the list share
+   a line when there is room and wrap when there is not. The panel's global min-width on a searchable
+   select is more than the column holds, and would cut off the list's arrow. */
+.qs-storage-key-picker { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.qs-storage-key-picker__key {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 4px;
+    min-width: 0;
+}
+.qs-storage-key-picker__key .qs-searchable-select { flex: 1 1 120px; width: auto; min-width: 0; }
+/* The chip stands alone here, so it has all its borders and ends in an ellipsis on a long project id. */
+.qs-storage-key-picker__key .storage-keyfield__prefix {
+    display: block;
+    min-width: 0;
+    max-width: 100%;
+    padding: 6px 8px;
+    border-right: 1px solid var(--admin-border, #d0d0d0);
+    border-radius: 4px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 1;
+}
+.qs-storage-key-picker__note {
+    font-size: 0.72rem;
+    line-height: 1.3;
+    color: var(--admin-text-muted);
+}
+.qs-storage-key-picker__note[hidden] { display: none; }
 .qs-storage-key-picker__create {
     display: flex;
     flex-wrap: wrap;
@@ -316,12 +345,30 @@
     border: 0.5px dashed var(--admin-border);
     border-radius: 6px;
 }
+.qs-storage-key-picker__create[hidden] { display: none; }
 .qs-storage-key-picker__create .admin-input { flex: 1 1 auto; min-width: 110px; }
+.qs-storage-key-picker__create .qs-storage-key-picker__key { flex: 1 1 100%; }
+.qs-storage-key-picker__key .admin-input { flex: 1 1 120px; min-width: 0; }
 .qs-storage-key-picker__err {
     flex-basis: 100%;
     color: var(--admin-error);
     font-size: 12px;
 }
+.qs-storage-key-picker__err:empty { display: none; }
+
+/* A storage attribute's row in the parameter editor: the attribute's name and its × on the first
+   line, the widget on a line of its own under them. */
+.preview-contextual-form__param-row--storage { grid-template-columns: 1fr auto; }
+.preview-contextual-form__param-row--storage > .qs-storage-spec { grid-column: 1 / -1; grid-row: 2; }
+.qs-storage-spec { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.qs-storage-spec__controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+.qs-storage-spec__controls .admin-select { width: auto; max-width: 100%; }
+.qs-storage-spec__colon { color: var(--admin-text-muted); }
 
 /* Page-level "description language" selector (multilingual projects only). The
    language storage descriptions are authored in; changing it moves the values. */
@@ -362,7 +409,7 @@
     border: 1px solid var(--admin-border, #d0d0d0);
     border-right: none;
     border-radius: 4px 0 0 4px;
-    background: var(--admin-bg-muted, #f2f2f2);
+    background: var(--admin-bg-tertiary);
     color: var(--admin-text-muted, #666);
     font-family: var(--font-mono, ui-monospace, Menlo, Consolas, monospace);
     font-size: 13px;

@@ -100,7 +100,7 @@ File lists are grouped by role. Where useful, the entry point or main exported f
 | File | Purpose |
 |---|---|
 | `js/core/api.js` | `QuickSiteAPI.request` + `upload`; in-memory session token sent with the session cookie (`setTokenSource` seam for embedders); emits `quicksite:command-executed`; keeps the write allowance current from each answer's headers (`getWriteRate`, `countsAsWrite`) and emits `quicksite:write-rate`. A request still out when the page leaves, a reload included, answers `client.network_error` like any failed request, without a console error. |
-| `js/core/utils.js` | `QuickSiteUtils`: toasts, the panel's dialogs (`confirm()`, `prompt()`: *Dialogs* below), escaping, prefs storage, pending messages. |
+| `js/core/utils.js` | `QuickSiteUtils`: toasts, the panel's dialogs (`confirm()`, `prompt()`: *Dialogs* below), escaping, prefs storage, pending messages, a storage key's fixed prefix and its chip (`storageKeyPrefix()`, `renderStorageKeyPrefixChip()`: §9.10). |
 | `js/core/storage-keys.js` | Constants for every localStorage / sessionStorage key (`window.QuickSiteStorageKeys`). |
 | `js/core/dom.js` | `window.QSDom`: shared `el()` element factory + `svgIcon()` + `clear()` + `setSelectPlaceholder()` (resets a `<select>` to a single placeholder option) — the createElement/textContent idiom for dynamic DOM. Loaded in `<head>` so page scripts can use it at parse time. |
 | `js/core/bubble.js` + `css/bubble.css` | The panel's hover bubble: every `title` in the panel shows through it (*Tooltips* below). Loaded in `<head>`; exposes nothing — it listens on the document. |
@@ -247,16 +247,13 @@ Almost every localStorage / sessionStorage key is declared as a constant in `js/
 
 The panel and every project on the install share **one browser-storage origin** —
 a path is not part of an origin, so `/admin/` and `/p/<id>/` address the same
-store. Two rules keep the three parties apart in it:
+store. One rule keeps the three parties apart in it:
 
-- **The panel owns `quicksite_` / `quicksite-` / `qs_` / `qs-`.** A site key
-  matching any of those is refused, in the picker for UX and in
-  `secure/src/functions/reservedStorageKeys.php` for real, so a rendered page
-  cannot read or clear panel state.
-- **A site's keys are namespaced by project.** `qs.js` writes every author key as
-  `qsp_<projectId>_<key>`, so two projects on one host cannot collide on an
-  identically-named key (§9.10). `qsp_` clears the reservation above rather than
-  needing an exception carved into it.
+- **A site's keys are namespaced by project.** `qs.js` writes, reads and removes every
+  author key as `qsp_<projectId>_<key>`, so two projects on one host cannot collide on
+  an identically-named key (§9.10), and a page cannot reach the panel's own keys
+  (`quicksite_`, `quicksite-`, `qs_`, `qs-`) whatever an author calls a key: `qs_x` on a
+  page is `qsp_<projectId>_qs_x` in the browser.
 
 The prefix is never hidden from the author: `/admin/storage` shows it as a fixed
 chip in front of the key field while you type, each card carries a `stored as`
@@ -556,6 +553,7 @@ Same auto-discovery pattern client-side — `preview-config.php` globs
 |---|---|
 | `QSComplexWizard.createRowEditor` | Variable-cardinality row list with reorder/add/delete + keyboard nav. Used by every wizard that has a "list of N things" section (Select options, FormScaffold fields, List items). |
 | `QSComplexWizard.createTextKeyPicker` | Translation-key picker — searchable list of existing keys + inline "Create" form for new ones. Matches the component-variables panel UX. |
+| `QSComplexWizard.createStorageKeyPicker` | Storage-key picker — the declared keys, a form that declares a new one, the `qsp_<projectId>_` chip. Takes `getScope` and `setScope` from the field beside it; `setValue()` shows a key without reporting a change. The parameter editor's storage attributes and the Interactions tool's `storageKey` argument both use it (§9.10). |
 | `QSComplexWizard.t` / `codeText` / `requiredMark` | The wizards' words (`wizard-text.js`, loaded first). `t(key, params)` reads the `complexWizard` translations `preview-config.php` emits as `QS_COMPLEX_WIZARD_I18N`; a key the file lacks shows as its path (`complexWizard.<key>`). `codeText(text, codes)` turns a sentence's `{name}` markers into `<code>` elements, so a hint can name an attribute without markup in its translation. `requiredMark()` is the red asterisk of a required field's label. |
 
 **Built-in kinds**
@@ -2984,8 +2982,40 @@ group.
 `domain` / `path` / `secure` / `sameSite`. `consentRequired` is derived —
 `essential` never needs consent; everything else does. Commands:
 `listStorageItems` / `addStorageItem` / `editStorageItem` / `deleteStorageItem`.
-Storage-referencing fields elsewhere (e.g. `saveToken` / `QS.store` `key` args)
-use the `storageKey` picker, which selects a declared key or creates one inline.
+
+**The storage-key picker.** The fields of the visual editor that name a storage key
+take it from one picker, never as typed text: the `data-storage-show`,
+`data-storage-value` and `data-auth-source` attributes in the parameter editor (§10),
+and the `key` argument of `saveToken`, `clearToken` and `store` in the Interactions
+tool.
+
+- **The chip.** `qsp_<projectId>_` stands before the key as a grey fixed chip, as it
+  does on this page's form. It is not part of the value.
+- **The list** offers the declared `localStorage` and `sessionStorage` keys of the
+  scope chosen beside it: the attribute's own scope, the `storage` argument of the
+  verb (with no scope chosen there, both). A `cookie` entry is never offered: these
+  read and write browser storage, not cookies. The list has a search field. The
+  registry is read each time a picker opens, and a key created in one picker is
+  offered by the next without a reload.
+- **Create new key…**, or a search that finds nothing, opens a form: the key's name,
+  after the same chip, its scope (the one chosen beside it to start with), its category and an optional
+  description, in the project's default language. Creating declares the key with
+  `addStorageItem`, picks it, and moves the scope beside it to the new key's. What the
+  server refuses (a name already declared, whitespace, `__proto__`) is shown in the
+  server's words, and nothing changes. Only a role that may run `addStorageItem` is
+  offered any of this; every other role can still pick.
+- **A key already saved is shown as it is and saved as it is**, whatever the registry
+  says. What the row says of it, and what happens on the site:
+
+| The saved key | The row | On the site |
+|---|---|---|
+| Declared for this scope | the key | read and written normally, under its category |
+| Not in the registry | `(undeclared)` | with a consent layer on, never stored or read |
+| Declared for the other scope | `(declared for <scope>)` | used in the scope the attribute or argument names, under the category it was declared with: it finds only what was stored there |
+| Declared as a cookie | `(declared as a cookie)` | used in local or session storage, so it never sees the cookie |
+
+When the registry cannot be read, the row shows the key and claims nothing about it,
+nothing can be picked or created, and clicking the list tries again.
 
 **The declared id is the name you use; `qsp_<projectId>_<id>` is the name the
 browser holds.** Every project served on one host shares a single storage origin,
@@ -2999,9 +3029,10 @@ translation happens once, inside `qs.js`, at the point of the read or write.
 
 **Where you see the physical name.** Three places, so it is never a surprise:
 
-- **While you type.** The add/edit form shows `qsp_<projectId>_` as a fixed,
+- **While you type or pick.** The add/edit form shows `qsp_<projectId>_` as a fixed,
   non-editable chip immediately before the key box, so the whole browser name
-  reads left to right as you fill in the part you own. The chip disappears when
+  reads left to right as you fill in the part you own; the storage-key picker shows
+  the same chip. On the form, the chip disappears when
   you switch the scope to `cookie`: QuickSite does not write a cookie you
   declare here — your own code does — so it is stored under exactly the name you
   type. (The two cookies QuickSite writes for itself, the consent record and the
@@ -3703,9 +3734,16 @@ autocomplete + smart widgets, available on **both** the Add Element
 wizard's Advanced custom-params section AND the Edit Params surface
 (action panel button next to Add / Duplicate). The same picker —
 autocomplete dropdown, per-attribute description box, smart widgets
-(store/field cascader, enum select, storage-spec composer), reserved-
-storage-key blocking — applies whether you're authoring a new element OR
-editing an existing one's bindings.
+(store/field cascader, enum select, the storage attributes' widget) — applies
+whether you're authoring a new element OR editing an existing one's bindings.
+
+**The storage attributes' widget.** `data-storage-show`, `data-storage-value` and
+`data-auth-source` get it whether their name is picked from the dropdown or typed in
+full, on a line of its own under the name: `has` or `missing` for `data-storage-show`,
+the scope, then the storage-key picker (§9.10) with its fixed `qsp_<projectId>_` chip.
+It writes `<scope>:<key>`, or `has:<scope>:<key>` / `missing:<scope>:<key>`. Opening a
+saved element and saving it changes nothing: a value is composed only when you pick a
+key, or change the scope or the mode once there is a key.
 
 This section is the task-oriented index for those attributes. For
 per-feature deep-dives (semantics, edge cases, full examples), see the
@@ -3802,8 +3840,8 @@ Admin Panel → Visual Editor → Select mode
 #### Scenario D — Change an existing element's binding (`Edit Params`)
 
 Same picker, applied to existing elements instead of authoring new ones.
-The autocomplete, smart widgets, reserved-key blocking, and companion
-hints all behave the same as in Scenarios A–C.
+The autocomplete, smart widgets and companion hints all behave the same
+as in Scenarios A–C.
 
 ```
 Admin Panel → Visual Editor → Select mode

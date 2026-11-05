@@ -6,22 +6,29 @@
  * Helper functions for creating and manipulating ZIP archives.
  */
 
+require_once __DIR__ . '/FileSystem.php'; // qs_delete_tree_leads_elsewhere
+
 /**
- * Recursively add a directory and all its contents to a ZIP archive
- * 
+ * Recursively add a directory and all its contents to a ZIP archive. A link inside it
+ * (a Windows junction included) is left out, its target never read: a walker that
+ * follows one puts whatever it leads to in the archive.
+ *
  * @param ZipArchive $zip The ZIP archive object
  * @param string $dir Directory path to add
  * @param string $baseDir Base directory path for ZIP internal structure (optional)
  * @return void
  */
 function addDirectoryToZip(ZipArchive $zip, string $dir, string $baseDir = ''): void {
+    $realDir = realpath($dir);
     $files = scandir($dir);
     foreach ($files as $file) {
         if ($file === '.' || $file === '..') continue;
-        
+
         $filePath = $dir . '/' . $file;
         $zipPath = $baseDir . '/' . $file;
-        
+
+        if (qs_delete_tree_leads_elsewhere($dir, $file, $filePath, $realDir)) continue;
+
         if (is_dir($filePath)) {
             $zip->addEmptyDir($zipPath);
             addDirectoryToZip($zip, $filePath, $zipPath);

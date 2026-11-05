@@ -6,7 +6,6 @@ require_once SECURE_FOLDER_PATH . '/src/classes/JsonToHtmlRenderer.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/TagRegistry.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
-require_once SECURE_FOLDER_PATH . '/src/functions/reservedStorageKeys.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
@@ -77,19 +76,6 @@ function __command_addNode(array $params = [], array $urlParams = []): ApiRespon
     $position = $params['position'] ?? 'after';
     $tag = $params['tag'] ?? '';
     $nodeParams = $params['params'] ?? [];
-
-    // Reject reserved-namespace storage keys in data-storage-* / data-auth-source
-    // values (admin-token theft prevention). Mirrors the JS picker's
-    // client-side block; this is the security layer (a token-bearing client can
-    // POST directly here and skip the picker entirely).
-    if (is_array($nodeParams)) {
-        $rkErrors = findReservedKeysInParams($nodeParams);
-        if (!empty($rkErrors)) {
-            return ApiResponse::create(400, 'validation.reserved_key')
-                ->withMessage(RESERVED_STORAGE_KEY_MESSAGE)
-                ->withErrors(formatReservedKeyErrors($rkErrors));
-        }
-    }
 
     $textKey = $params['textKey'] ?? null;
     // Text-node mode params (only used when nodeKind === 'text'). When

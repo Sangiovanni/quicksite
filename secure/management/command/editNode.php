@@ -6,7 +6,6 @@ require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/JsonToHtmlRenderer.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/Translator.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
-require_once SECURE_FOLDER_PATH . '/src/functions/reservedStorageKeys.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
@@ -153,27 +152,6 @@ function __command_editNode(array $params = [], array $urlParams = []): ApiRespo
         return ApiResponse::create(400, 'validation.unsafe_param')
             ->withMessage($unsafeParam)
             ->withErrors([['field' => 'addParams', 'reason' => 'unsafe_value']]);
-    }
-
-    // SECURITY: Reject reserved-namespace storage keys in
-    // data-storage-* / data-auth-source values (admin-token theft
-    // prevention). Same regex as the JS picker; defence in
-    // depth (a token-bearing client can bypass the picker entirely).
-    $rkErrors = findReservedKeysInParams($addParams);
-    if (!empty($rkErrors)) {
-        // Rewrite the field path to addParams.* (helper defaults to params.*)
-        $errs = array_map(function ($e) {
-            return [
-                'field' => 'addParams.' . $e['param'],
-                'reason' => 'reserved_storage_key',
-                'value' => $e['value'],
-                'reservedKey' => $e['reservedKey'],
-                'hint' => RESERVED_STORAGE_KEY_MESSAGE,
-            ];
-        }, $rkErrors);
-        return ApiResponse::create(400, 'validation.reserved_key')
-            ->withMessage(RESERVED_STORAGE_KEY_MESSAGE)
-            ->withErrors($errs);
     }
 
     // Reject empty-value addParams entries — defence in depth for the

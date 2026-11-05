@@ -420,10 +420,14 @@
 
     // ─── In-row widget install / teardown ───────────────────────────
     var WIDGET_CLASS = 'qs-data-attr-widget';
+    // A storage attribute's row gives its widget a line of its own: the row's second cell is far
+    // narrower than the prefix chip and the key's list (css/storage-admin.css).
+    var STORAGE_ROW_CLASS = 'preview-contextual-form__param-row--storage';
 
     function installWidgetInRow(row, valueInput, widgetEl) {
         if (!row || !valueInput || !widgetEl) return;
         widgetEl.classList.add(WIDGET_CLASS);
+        row.classList.toggle(STORAGE_ROW_CLASS, widgetEl.classList.contains('qs-storage-spec'));
         // Hide the original input via CSS (keeps it in the DOM so the
         // form serialiser still reads `.preview-contextual-form__param-value`).
         valueInput.style.display = 'none';
@@ -433,7 +437,11 @@
     function removeWidgetFromRow(row, valueInput) {
         if (!row) return;
         var existing = row.querySelector('.' + WIDGET_CLASS);
-        if (existing) existing.remove();
+        if (existing) {
+            if (existing._qsWidgetDestroy) existing._qsWidgetDestroy();
+            existing.remove();
+        }
+        row.classList.remove(STORAGE_ROW_CLASS);
         if (valueInput) valueInput.style.display = '';
     }
 
@@ -739,7 +747,14 @@
     //   `localStorage:key` / `sessionStorage:key`              (data-storage-value, data-auth-source)
     //   `has:localStorage:key` / `missing:localStorage:key`    (data-storage-show)
     //
-    // The mode prefix is opt-in: detect by the entry's valuePlaceholder.
+    // The mode prefix is opt-in: detect by the entry's valuePlaceholder. The key is picked from the
+    // declared keys or created (storage-key-picker.js), never typed. Rendering composes nothing: a
+    // saved value stays exactly as it is until the author changes something here.
+
+    function _renderSpecSelect(values, label) {
+        return QSDom.el('select', { class: 'admin-select admin-select--sm', 'aria-label': label },
+            values.map(function (v) { return QSDom.el('option', { value: v, text: v }); }));
+    }
 
     function renderStorageSpecWidget(entry, valueInput) {
         // Detect the two flavours via the catalog's valuePlaceholder.
@@ -747,168 +762,62 @@
         // attribute uses the 3-part shape; otherwise it's the 2-part shape.
         var ph = entry.valuePlaceholder || '';
         var hasMode = ph.indexOf('has:') === 0 || ph.indexOf('missing:') === 0;
+        var words = window.QSComplexWizard;
 
-        // Outer vertical wrapper: controls row above, warning row below
-        // (warning hidden by default; shown when key collides with admin).
-        var outer = document.createElement('div');
-        outer.style.display = 'flex';
-        outer.style.flexDirection = 'column';
-        outer.style.gap = '4px';
-        outer.style.flex = '1 1 auto';
-
-        var wrap = document.createElement('div');
-        wrap.style.display = 'flex';
-        wrap.style.gap = '6px';
-        wrap.style.alignItems = 'center';
-        wrap.style.flexWrap = 'wrap';
-        outer.appendChild(wrap);
-
-        var modeSel = null;
-        if (hasMode) {
-            modeSel = document.createElement('select');
-            modeSel.className = 'admin-select admin-select--sm';
-            modeSel.style.maxWidth = '110px';
-            ['has', 'missing'].forEach(function (m) {
-                var o = document.createElement('option');
-                o.value = m;
-                o.textContent = m;
-                modeSel.appendChild(o);
-            });
-            wrap.appendChild(modeSel);
-
-            var colon1 = document.createElement('span');
-            colon1.textContent = ':';
-            colon1.style.color = 'var(--admin-text-muted, #888)';
-            wrap.appendChild(colon1);
-        }
-
-        var storageSel = document.createElement('select');
-        storageSel.className = 'admin-select admin-select--sm';
-        storageSel.style.maxWidth = '150px';
-        ['localStorage', 'sessionStorage'].forEach(function (s) {
-            var o = document.createElement('option');
-            o.value = s;
-            o.textContent = s;
-            storageSel.appendChild(o);
-        });
-        wrap.appendChild(storageSel);
-
-        var colon2 = document.createElement('span');
-        colon2.textContent = ':';
-        colon2.style.color = 'var(--admin-text-muted, #888)';
-        wrap.appendChild(colon2);
-
-        var keyInp = document.createElement('input');
-        keyInp.type = 'text';
-        keyInp.className = 'admin-input admin-input--sm';
-        keyInp.placeholder = 'key';
-        keyInp.style.maxWidth = '180px';
-        wrap.appendChild(keyInp);
-
-        // Warning element for admin-key collisions
-        var warningEl = document.createElement('div');
-        warningEl.style.fontSize = '0.72rem';
-        warningEl.style.lineHeight = '1.3';
-        warningEl.style.display = 'none';
-        outer.appendChild(warningEl);
+        var modeSel = hasMode ? _renderSpecSelect(['has', 'missing'], words.t('storageKeyPicker.modeLabel')) : null;
+        var storageSel = _renderSpecSelect(['localStorage', 'sessionStorage'], words.t('storageKeyPicker.scopeLabel'));
 
         // Parse existing valueInput value, if any
+        var savedKey = '';
         var current = valueInput.value || '';
         if (current) {
             var parts = current.split(':');
             if (hasMode && parts.length >= 3) {
                 if (['has', 'missing'].indexOf(parts[0]) >= 0) modeSel.value = parts[0];
                 if (['localStorage', 'sessionStorage'].indexOf(parts[1]) >= 0) storageSel.value = parts[1];
-                keyInp.value = parts.slice(2).join(':');  // permit colons in key (rare)
+                savedKey = parts.slice(2).join(':');  // permit colons in key (rare)
             } else if (!hasMode && parts.length >= 2) {
                 if (['localStorage', 'sessionStorage'].indexOf(parts[0]) >= 0) storageSel.value = parts[0];
-                keyInp.value = parts.slice(1).join(':');
+                savedKey = parts.slice(1).join(':');
             }
         }
 
-        function applyValidation() {
-            // Block any key matching a reserved admin-namespace prefix.
-            // Returns true when the key is OK to compose, false when blocked.
-            var v = keyInp.value;
-            if (v && isReservedStorageKey(v)) {
-                keyInp.style.borderColor = 'var(--admin-danger, #d44)';
-                keyInp.setAttribute('title', RESERVED_KEY_MESSAGE);
-                warningEl.style.color = 'var(--admin-danger, #d44)';
-                warningEl.textContent = '⛔ ' + RESERVED_KEY_MESSAGE;
-                warningEl.style.display = 'block';
-                return false;
-            }
-            keyInp.style.borderColor = '';
-            keyInp.removeAttribute('title');
-            warningEl.style.display = 'none';
-            return true;
+        var controls = QSDom.el('div', { class: 'qs-storage-spec__controls' });
+        if (modeSel) {
+            controls.appendChild(modeSel);
+            controls.appendChild(QSDom.el('span', { class: 'qs-storage-spec__colon', text: ':' }));
         }
+        controls.appendChild(storageSel);
+
+        var outer = QSDom.el('div', { class: 'qs-storage-spec' }, [controls]);
+
+        var picker = words.createStorageKeyPicker({
+            container: outer,
+            value: savedKey,
+            onChange: compose,
+            getScope: function () { return storageSel.value; },
+            setScope: function (scope) { storageSel.value = scope; },
+        });
+        outer._qsWidgetDestroy = picker.destroy;
 
         function compose() {
-            // Always run validation to keep the warning UI in sync, but
-            // ALWAYS compose the value too — even when the key is
-            // reserved. The server-side check
-            // (reservedStorageKeys.php) is the real defence; clearing
-            // valueInput here used to cause a silent-delete bug in the
-            // Edit-Params flow (the diff read the cleared value as "the
-            // user removed this param" and the server happily applied
-            // the removal, bypassing the reserved-key check entirely).
-            // Letting the bad value through means the server rejects
-            // with a clear 400, the form stays open, and the saved data
-            // is preserved untouched.
-            applyValidation();
-            var v;
-            if (hasMode) {
-                v = modeSel.value + ':' + storageSel.value + ':' + keyInp.value;
-            } else {
-                v = storageSel.value + ':' + keyInp.value;
-            }
-            valueInput.value = v;
+            // Never clear the value here: Edit Params' diff reads a cleared value as "the user
+            // removed this param" and saves the removal. No key yet: there is no value to compose,
+            // and what the row holds stays. A scope or a mode on its own would save an attribute
+            // naming no key, or overwrite a value this widget could not read.
+            var key = picker.getValue();
+            if (key === '') return;
+            valueInput.value = (hasMode ? modeSel.value + ':' : '') + storageSel.value + ':' + key;
             valueInput.dispatchEvent(new Event('input', { bubbles: true }));
         }
 
         if (modeSel) modeSel.addEventListener('change', compose);
-        storageSel.addEventListener('change', compose);
-        keyInp.addEventListener('input', compose);
-
-        // Pre-validate on render so a pre-existing bad key surfaces the
-        // warning immediately (not only on next keystroke).
-        applyValidation();
+        storageSel.addEventListener('change', function () {
+            picker.refresh();
+            compose();
+        });
 
         return outer;
-    }
-
-    // ─── Reserved storage-key namespace ─────────────────────────────
-    //
-    // The admin panel and the user's site share the browser's storage
-    // origin. If a user authors `data-storage-value="localStorage:<X>"`
-    // where <X> collides with an admin-side key (auth tokens, AI
-    // settings, etc.), the rendered page can READ or CLEAR the admin's
-    // state. To prevent this, we reserve four naming prefixes that the
-    // admin uses and BLOCK user keys matching them.
-    //
-    // Single regex, no per-key audit / drift. Catches:
-    //   quicksite_*  (snake)   e.g. quicksite_admin_token
-    //   quicksite-*  (kebab)   e.g. quicksite-tools-show-names
-    //   qs_*         (snake)   e.g. qs_api_auth_tokens
-    //   qs-*         (kebab)   e.g. qs-add-last-tab
-    //
-    // The user's site keys should use a project-specific prefix (their
-    // app's name) — there's no good reason to share namespace with the
-    // admin.
-    //
-    // SECURITY NOTE: this is the client-side check (UX). Defence in
-    // depth requires the SERVER to refuse the same patterns when
-    // writing structure params — see secure/src/functions/reservedStorageKeys.php.
-    // Without the server check, a user with a
-    // valid token can POST directly to addNode/editStructure and bypass
-    // this picker entirely.
-
-    var RESERVED_KEY_PATTERN = /^(quicksite[_-]|qs[_-])/i;
-    var RESERVED_KEY_MESSAGE = 'Reserved admin-namespace prefix (quicksite_ / quicksite- / qs_ / qs-). These are used by the admin panel and would collide with admin state. Pick a project-specific prefix.';
-
-    function isReservedStorageKey(key) {
-        return !!key && RESERVED_KEY_PATTERN.test(key);
     }
 
     // ─── State-store fetch helper (shared with paged-navigator pattern) ───
@@ -1009,6 +918,15 @@
             var d = ensureDropdown();
             fetchCatalog().then(function (catalog) {
                 if (currentInput !== keyInput) return; // raced; another input took over
+                // A storage attribute's whole name, typed rather than picked, gets its widget all
+                // the same: its key is never left to free text.
+                var typed = (catalog.entries || []).find(function (e) {
+                    return e.name === v && e.valueShape === 'storage-spec';
+                });
+                if (typed && keyInput.value === v && !(row && row.dataset.dataAttrPicked === v)) {
+                    pickEntry(typed);
+                    return;
+                }
                 // The query for filtering is the post-"data-" suffix. While
                 // the user is still typing toward "data-" (e.g. v = "data"),
                 // the query is empty so the dropdown shows ALL entries —

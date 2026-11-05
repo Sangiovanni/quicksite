@@ -5,7 +5,6 @@ require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/NodeNavigator.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/IframeSandbox.php';
-require_once SECURE_FOLDER_PATH . '/src/functions/reservedStorageKeys.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
 
@@ -212,20 +211,6 @@ if ($action !== 'delete' && !is_array($structure)) {
             ['field' => 'structure', 'reason' => 'invalid_type', 'expected' => 'object or array']
         ])
         ->send();
-}
-
-// SECURITY: walk the incoming structure recursively for reserved-namespace
-// storage keys in data-storage-* / data-auth-source values (admin-token
-// theft prevention). Each command that writes structure params
-// has its own hook; this is the catch-all for whole-tree writes.
-if ($structure !== null && is_array($structure)) {
-    $rkErrors = findReservedKeysInStructure($structure);
-    if (!empty($rkErrors)) {
-        ApiResponse::create(400, 'validation.reserved_key')
-            ->withMessage(RESERVED_STORAGE_KEY_MESSAGE)
-            ->withErrors(formatReservedKeyErrors($rkErrors))
-            ->send();
-    }
 }
 
 // Type validation - type must be string

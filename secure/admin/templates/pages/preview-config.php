@@ -901,6 +901,7 @@ window.QS_COMPLEX_WIZARD_I18N = <?= qs_inline_script_json(['complexWizard' => Ad
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/contextual-complex/wizard-text.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/contextual-complex/wizard-text.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/contextual-complex/wizard-row-editor.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/contextual-complex/wizard-row-editor.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/contextual-complex/text-key-picker.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/contextual-complex/text-key-picker.js') ?>"></script>
+<script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/contextual-complex/storage-key-picker.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/contextual-complex/storage-key-picker.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/contextual-complex/route-input.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/contextual-complex/route-input.js') ?>"></script>
 <script src="<?= rtrim(BASE_URL, '/') ?>/admin/assets/js/pages/preview/contextual-complex/data-attr-picker.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/contextual-complex/data-attr-picker.js') ?>"></script>
 <?php

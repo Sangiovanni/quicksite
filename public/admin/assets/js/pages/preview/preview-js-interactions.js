@@ -21,7 +21,6 @@
     // Project routes (loaded via getRoutes; stored WITHOUT
     // leading "/"). Used by the route inputType picker.
     let availableRoutes = [];
-    let availableStorageItems = [];  // storage registry items — storageKey picker
     // Bucketed events from listInteractions:
     //   { common: [...], lessCommon: [...], advanced: [...] }
     // The event picker offers common and lessCommon (populateEventDropdown).
@@ -808,6 +807,22 @@
     // ==================== Edit Interaction ====================
     
     /**
+     * Pre-fill an argument whose control is not the hidden input the collectors read: the
+     * translation key, the storage key, the response path. The row's picker shows the saved value,
+     * and an unknown one keeps it (a translation key's free text, a storage key the registry lacks,
+     * a path the schema does not list). Both editors' pre-fills come through here, or the field
+     * reads empty over a filled input. True when a picker took the value.
+     */
+    function _prefillHiddenArg(input, value) {
+        if (input.type !== 'hidden' || !input.parentElement) return false;
+        const wrap = input.parentElement;
+        const picker = wrap._qsTranslationKeyPicker || wrap._qsStorageKeyPicker || wrap._qsResponsePathPicker;
+        if (!picker) return false;
+        picker.setValue(value);
+        return true;
+    }
+
+    /**
      * Edit an interaction (opens form with pre-filled values)
      */
     async function editInteraction(eventName, index) {
@@ -1016,26 +1031,7 @@
                                 return;
                             }
                         }
-                        // translationKey picker — hidden input is
-                        // the form-input target; the wrapper carries the
-                        // _qsTranslationKeyPicker handle. Delegate so an
-                        // unknown / free-text saved value auto-swaps to
-                        // custom mode when allowFreeText is on.
-                        if (input.type === 'hidden' && input.dataset.inputType === 'translationKey') {
-                            const tkp = input.parentElement && input.parentElement._qsTranslationKeyPicker;
-                            if (tkp) {
-                                tkp.setValue(params[i]);
-                                return;
-                            }
-                        }
-                        // Storage registry picker — same hidden-input delegation.
-                        if (input.type === 'hidden' && input.dataset.inputType === 'storageKey') {
-                            const skp = input.parentElement && input.parentElement._qsStorageKeyPicker;
-                            if (skp) {
-                                skp.setValue(params[i]);
-                                return;
-                            }
-                        }
+                        if (_prefillHiddenArg(input, params[i])) return;
                         // For <select> form inputs (e.g. eventArg picker), if the
                         // saved value isn't in the options list, inject it as a
                         // "(legacy)" option so the user can still see/edit it.
@@ -1951,8 +1947,8 @@
             row.appendChild(tkWrap);
             tkWrap._qsTranslationKeyPicker.mount();
         } else if (inputType === 'storageKey') {
-            // Storage registry — <select> of declared keys + inline create.
-            var skWrap = _renderStorageKeyArgRow(arg, paramIndex, updateFn);
+            // The shared storage-key picker: a declared key, or one created there.
+            var skWrap = _renderStorageKeyArg(arg, paramIndex, updateFn);
             row.appendChild(skWrap);
             skWrap._qsStorageKeyPicker.mount();
         } else if (inputType === 'responsePath') {
@@ -2876,103 +2872,26 @@
         }
     }
 
-    // ==================== Storage registry (storageKey picker) ====================
+    // ==================== storageKey argument ====================
 
     /**
-     * Lazy-load the project storage registry into availableStorageItems.
-     * Mirrors fetchRoutes — raw fetch + Bearer, defensive envelope unwrap.
+     * storageKey inputType row — the shared storage-key picker over a hidden input, which is what
+     * the generic param collector reads. The wrapper exposes _qsStorageKeyPicker = { mount, setValue }.
+     * `arg.scopeFrom` names a sibling argument (saveToken's `storage`): its value filters the list,
+     * and a created key's scope sets it.
      */
-    async function fetchStorageItems() {
-        try {
-            const response = await QuickSiteAdmin.apiRequest('listStorageItems', 'POST', {});
-            if (!response.ok) throw new Error('Failed to fetch storage items');
-            const result = response.data || {};
-            const payload = (result && result.data && (result.data.data || result.data)) || {};
-            availableStorageItems = Array.isArray(payload.items) ? payload.items : [];
-        } catch (error) {
-            console.error('[PreviewJsInteractions] Failed to load storage items:', error);
-            availableStorageItems = [];
-        }
-    }
-
-    /**
-     * storageKey inputType row — a <select> of declared storage keys (filtered
-     * to localStorage / sessionStorage, the only scopes saveToken/clearToken
-     * write) plus an inline "Create new key" mini-form that calls
-     * addStorageItem. The hidden input carries the chosen key for the generic
-     * param collector; the wrapper exposes
-     * _qsStorageKeyPicker = { mount, setValue }.
-     */
-    function _renderStorageKeyArgRow(arg, paramIndex, updateFn) {
-        var CREATE_SENTINEL = '__create__';
-        var scopeFrom = arg.scopeFrom || null;  // sibling arg whose value constrains the scope
-        var skSearchPicker = null;              // QSSearchableSelect combobox wrapper
-
-        var wrap = document.createElement('div');
-        wrap.className = 'qs-storage-key-picker';
-
-        // Hidden input is the value target read by the generic param collector.
-        var hidden = document.createElement('input');
-        hidden.type = 'hidden';
-        hidden.className = 'preview-contextual-js-form-input';
-        hidden.dataset.paramIndex = paramIndex;
-        hidden.dataset.paramName = arg.name || '';
-        hidden.dataset.inputType = 'storageKey';
-        wrap.appendChild(hidden);
-
-        var select = document.createElement('select');
-        select.className = 'admin-input qs-storage-key-picker__select';
-        wrap.appendChild(select);
-
-        // Inline create mini-form (shown when the sentinel option is chosen).
-        var createForm = document.createElement('div');
-        createForm.className = 'qs-storage-key-picker__create';
-        createForm.style.display = 'none';
-
-        var nameInput = document.createElement('input');
-        nameInput.type = 'text';
-        nameInput.className = 'admin-input';
-        nameInput.placeholder = 'new key name, e.g. authToken';
-
-        var scopeSel = document.createElement('select');
-        scopeSel.className = 'admin-input';
-        ['localStorage', 'sessionStorage'].forEach(function (s) {
-            var o = document.createElement('option'); o.value = s; o.textContent = s; scopeSel.appendChild(o);
+    function _renderStorageKeyArg(arg, paramIndex, updateFn) {
+        var scopeFrom = arg.scopeFrom || null;
+        var picker = null;
+        var hidden = QSDom.el('input', {
+            type: 'hidden',
+            class: 'preview-contextual-js-form-input',
+            dataset: { paramIndex: paramIndex, paramName: arg.name || '', inputType: 'storageKey' },
         });
+        var wrap = QSDom.el('div', {}, [hidden]);
 
-        var catSel = document.createElement('select');
-        catSel.className = 'admin-input';
-        ['essential', 'functional', 'analytics', 'marketing'].forEach(function (c) {
-            var o = document.createElement('option'); o.value = c; o.textContent = c; catSel.appendChild(o);
-        });
-        catSel.value = 'functional';
-
-        // Optional description — capture it here so the author doesn't have to
-        // remember to fill it in later on /admin/storage.
-        var descInput = document.createElement('input');
-        descInput.type = 'text';
-        descInput.className = 'admin-input qs-storage-key-picker__desc';
-        descInput.placeholder = 'description (optional)';
-
-        var createBtn = document.createElement('button');
-        createBtn.type = 'button';
-        createBtn.className = 'admin-btn admin-btn--primary admin-btn--sm';
-        createBtn.textContent = 'Create key';
-
-        var errSpan = document.createElement('span');
-        errSpan.className = 'qs-storage-key-picker__err';
-
-        createForm.appendChild(nameInput);
-        createForm.appendChild(scopeSel);
-        createForm.appendChild(catSel);
-        createForm.appendChild(descInput);
-        createForm.appendChild(createBtn);
-        createForm.appendChild(errSpan);
-        wrap.appendChild(createForm);
-
-        // Find the sibling scope <select> (e.g. saveToken's 'storage' arg) by
-        // walking up to the shared form container. A concrete value filters the
-        // key list to that scope; empty (placeholder) → all local/session keys.
+        // Find the sibling scope <select> by walking up to the shared form container. A concrete
+        // value filters the key list to that scope; empty (placeholder) → all local/session keys.
         function findScopeSelect() {
             if (!scopeFrom) return null;
             var node = wrap.parentElement;
@@ -2984,153 +2903,42 @@
             return null;
         }
 
-        function repopulate(selectedKey) {
-            select.textContent = '';
-            var ph = document.createElement('option');
-            ph.value = ''; ph.textContent = '— pick a storage key —';
-            select.appendChild(ph);
-
-            var scopeSel = findScopeSelect();
-            var scopeFilter = (scopeSel && scopeSel.value) ? scopeSel.value : null;
-            var items = availableStorageItems.filter(function (it) {
-                if (!it) return false;
-                if (scopeFilter) return it.scope === scopeFilter;
-                return it.scope === 'localStorage' || it.scope === 'sessionStorage';
-            });
-            items.forEach(function (it) {
-                var o = document.createElement('option');
-                o.value = it.id;
-                o.textContent = it.id + '  (' + it.scope + ' · ' + it.category + ')';
-                select.appendChild(o);
-            });
-
-            var cur = (selectedKey != null) ? selectedKey : hidden.value;
-            if (cur && !items.some(function (it) { return it.id === cur; })) {
-                var o = document.createElement('option');
-                o.value = cur;
-                o.textContent = cur + '  (undeclared)';
-                select.appendChild(o);
-            }
-
-            var co = document.createElement('option');
-            co.value = CREATE_SENTINEL;
-            co.textContent = '➕ Create new key…';
-            select.appendChild(co);
-
-            select.value = cur || '';
-            if (skSearchPicker) skSearchPicker.refresh();
-        }
-
-        // Reveal the inline create form. `prefill` (from create-from-search) seeds
-        // the key name so the author doesn't retype what they just searched for.
-        function showCreateForm(prefill) {
-            createForm.style.display = '';
-            select.value = hidden.value || '';
-            if (skSearchPicker) skSearchPicker.refresh();
-            if (prefill != null && prefill !== '') {
-                nameInput.value = prefill;
-                createBtn.focus();
-            } else if (!nameInput.value) {
-                nameInput.focus();
-            }
-        }
-
-        select.addEventListener('change', function () {
-            if (select.value === CREATE_SENTINEL) {
-                showCreateForm();
-                return;
-            }
-            createForm.style.display = 'none';
-            hidden.value = select.value;
-            updateFn();
-        });
-
-        createBtn.addEventListener('click', async function () {
-            errSpan.textContent = '';
-            var id = nameInput.value.trim();
-            if (id === '' || /\s/.test(id)) {
-                errSpan.textContent = 'Key name required (no spaces).';
-                return;
-            }
-            createBtn.disabled = true;
-            var skBody = { id: id, scope: scopeSel.value, category: catSel.value };
-            var skDesc = descInput.value.trim();
-            if (skDesc) {
-                var skLang = (window.PreviewConfig && window.PreviewConfig.defaultLang) || 'en';
-                skBody.description = {};
-                skBody.description[skLang] = skDesc;
-            }
-            try {
-                var response = await QuickSiteAdmin.apiRequest('addStorageItem', 'POST', skBody);
-                var result = response.data || {};
-                if (!response.ok) {
-                    errSpan.textContent = (result && result.message) || (result && result.data && result.data.message) || 'Create failed';
-                    createBtn.disabled = false;
-                    return;
-                }
-                availableStorageItems.push({
-                    id: id, scope: scopeSel.value, category: catSel.value,
-                    consentRequired: catSel.value !== 'essential'
-                });
-                hidden.value = id;
-                // Align the sibling storage arg with the new key's scope, so the
-                // filter matches (and saveToken writes to the right storage).
-                var siblingStorage = findScopeSelect();
-                if (siblingStorage && siblingStorage.value !== scopeSel.value) {
-                    siblingStorage.value = scopeSel.value;
-                    siblingStorage.dispatchEvent(new Event('change'));
-                }
-                repopulate(id);
-                createForm.style.display = 'none';
-                nameInput.value = '';
-                descInput.value = '';
-                createBtn.disabled = false;
-                updateFn();
-            } catch (e) {
-                errSpan.textContent = (e && e.message) || 'Network error';
-                createBtn.disabled = false;
-            }
-        });
-
         wrap._qsStorageKeyPicker = {
             mount: function () {
-                repopulate();
-                // Searchable combobox (mirrors the function picker). refresh()
-                // re-reads the options after each repopulate.
-                if (window.QSSearchableSelect && !skSearchPicker) {
-                    try {
-                        skSearchPicker = new window.QSSearchableSelect(select, {
-                            placeholder: '— pick a storage key —',
-                            searchPlaceholder: (PreviewConfig.i18n && PreviewConfig.i18n.searchStorageKeys) || 'Search storage keys…',
-                            emptyText: (PreviewConfig.i18n && PreviewConfig.i18n.noStorageKeysMatch) || 'No keys match',
-                            // create-from-search: typing a new key name offers an
-                            // inline "➕ Create" that prefills the create form.
-                            createLabel: function (q) { return '➕ Create key "' + q + '"'; },
-                            onCreateFromSearch: function (q) { showCreateForm(q); },
-                        });
-                    } catch (e) {
-                        console.warn('[PreviewJsInteractions] QSSearchableSelect mount failed for storageKey:', e);
-                    }
-                }
-                // Bind the sibling scope arg AFTER the synchronous form build —
-                // during mount this row isn't attached to the container yet, so
-                // findScopeSelect() can't reach the 'storage' <select>. Defer one
-                // tick, then bind + apply the current filter.
+                picker = QSComplexWizard.createStorageKeyPicker({
+                    container: wrap,
+                    value: hidden.value,
+                    onChange: function (key) {
+                        hidden.value = key;
+                        updateFn();
+                    },
+                    getScope: function () {
+                        var sibling = findScopeSelect();
+                        return (sibling && sibling.value) || null;
+                    },
+                    // Align the sibling with the new key's scope, so the filter matches (and
+                    // saveToken writes to the right storage).
+                    setScope: function (scope) {
+                        var sibling = findScopeSelect();
+                        if (sibling && sibling.value !== scope) {
+                            sibling.value = scope;
+                            sibling.dispatchEvent(new Event('change'));
+                        }
+                    },
+                });
+                // Bind the sibling AFTER the synchronous form build: during mount this row isn't
+                // attached to the container yet, so findScopeSelect() can't reach it. Defer one
+                // tick, then bind and apply the current filter. A post-fetch action's row writes the
+                // hidden input straight after building the row, so that tick also shows what it holds.
                 setTimeout(function () {
-                    var scopeSel = findScopeSelect();
-                    if (scopeSel && !scopeSel._qsStorageScopeBound) {
-                        scopeSel._qsStorageScopeBound = true;
-                        scopeSel.addEventListener('change', function () { repopulate(); });
-                    }
-                    repopulate();
+                    var sibling = findScopeSelect();
+                    if (sibling) sibling.addEventListener('change', picker.refresh);
+                    picker.setValue(hidden.value);
                 }, 0);
-                if (availableStorageItems.length === 0) {
-                    fetchStorageItems().then(function () { repopulate(); });
-                }
             },
             setValue: function (v) {
                 hidden.value = v || '';
-                repopulate(v || '');
+                if (picker) picker.setValue(hidden.value);
             }
         };
 
@@ -3234,7 +3042,11 @@
 
         // Deferred so it runs AFTER the action-row pre-fill sets hidden.value.
         wrap._qsResponsePathPicker = {
-            mount: function () { setTimeout(function () { repopulate(); }, 0); }
+            mount: function () { setTimeout(function () { repopulate(); }, 0); },
+            setValue: function (v) {
+                hidden.value = v || '';
+                repopulate();
+            }
         };
         return wrap;
     }
@@ -4517,14 +4329,7 @@
                             return;
                         }
                     }
-                    // translationKey picker — same delegation.
-                    if (input.type === 'hidden' && input.dataset.inputType === 'translationKey') {
-                        var tkp = input.parentElement && input.parentElement._qsTranslationKeyPicker;
-                        if (tkp) {
-                            tkp.setValue(savedParams[idx]);
-                            return;
-                        }
-                    }
+                    if (_prefillHiddenArg(input, savedParams[idx])) return;
                     // For <select> inputs whose options were built from a
                     // catalogue (e.g. 'store' inputType): if the saved
                     // value isn't an option, inject a (legacy) row so the

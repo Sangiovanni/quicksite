@@ -25,10 +25,36 @@ if (!defined('SECURE_FOLDER_PATH')) {
 
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/storageHelpers.php';
-require_once SECURE_FOLDER_PATH . '/src/functions/reservedStorageKeys.php';
 
 const STORAGE_READ_ATTRS  = ['data-storage-value', 'data-storage-show', 'data-auth-source'];
 const STORAGE_WRITE_VERBS = ['saveToken', 'store'];
+
+/**
+ * The storage KEY of a `data-storage-*` / `data-auth-source` value, or null when the value
+ * has no key to read.
+ *
+ *   "localStorage:authToken"            → "authToken"
+ *   "sessionStorage:foo"                → "foo"
+ *   "has:localStorage:authToken"        → "authToken"
+ *   "missing:sessionStorage:foo"        → "foo"
+ *   "loc:key:with:colons"               → "key:with:colons"
+ */
+function extractStorageKeyFromValue(string $value): ?string {
+    if ($value === '') return null;
+    $parts = explode(':', $value);
+    if (count($parts) < 2) return null;
+
+    // 3-part shape: "has:loc:key" / "missing:loc:key"
+    if (in_array($parts[0], ['has', 'missing'], true) && count($parts) >= 3) {
+        // Re-join from index 2 so colons in keys (rare) survive.
+        return implode(':', array_slice($parts, 2));
+    }
+    // 2-part shape: "loc:key"
+    if (in_array($parts[0], ['localStorage', 'sessionStorage'], true)) {
+        return implode(':', array_slice($parts, 1));
+    }
+    return null;
+}
 
 /** Best-effort scope ('localStorage' / 'sessionStorage') from a ref string. */
 function _scopeFromStorageRef(string $value): ?string {
@@ -73,7 +99,7 @@ function _addStorageRef(array &$refs, string $key, string $bucket, string $locat
 function _walkStructureForStorage($node, string $location, array &$refs, int $depth = 0): void {
     if ($depth > 25 || !is_array($node)) return;
 
-    // List of nodes vs single node (mirrors reservedStorageKeys.php).
+    // List of nodes vs single node.
     if (!empty($node) && array_keys($node) === range(0, count($node) - 1)) {
         foreach ($node as $child) {
             _walkStructureForStorage($child, $location, $refs, $depth + 1);

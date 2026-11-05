@@ -38,7 +38,6 @@ require_once SECURE_FOLDER_PATH . '/src/classes/NodeNavigator.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/ComplexElementBuilder.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
-require_once SECURE_FOLDER_PATH . '/src/functions/reservedStorageKeys.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 
 require_once SECURE_FOLDER_PATH . '/src/classes/TagRegistry.php';
@@ -231,19 +230,6 @@ function __command_addComplexElement(array $params = [], array $urlParams = []):
         return ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage("Builder '$kind' emitted component reference '{$badRef}', which is not allowed (security restriction)")
             ->withErrors([qs_component_reference_error('config', $badRef)]);
-    }
-
-    // SECURITY: walk the builder's emitted subtree for reserved-namespace
-    // storage keys. Builders consume user-supplied `config` and
-    // could propagate hostile values into emitted nodes; this is the
-    // catch-all for that path. Treated as 400 (user-input rejected),
-    // not 500 (builder bug) — the violation is in the config, not the
-    // builder logic.
-    $rkErrors = findReservedKeysInStructure($newNode);
-    if (!empty($rkErrors)) {
-        return ApiResponse::create(400, 'validation.reserved_key')
-            ->withMessage(RESERVED_STORAGE_KEY_MESSAGE)
-            ->withErrors(formatReservedKeyErrors($rkErrors));
     }
 
     // ----- Load structure file -----

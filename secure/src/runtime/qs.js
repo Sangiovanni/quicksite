@@ -1098,10 +1098,12 @@
     // author-supplied JavaScript is ever reintroduced deliberately, this stops
     // being a boundary and becomes a naming convention.
     //
-    // THE PREFIX IS NOT `qs_`. reservedStorageKeys.php refuses author keys
-    // matching quicksite_ / quicksite- / qs_ / qs- precisely so a page cannot
-    // read or clear the ADMIN PANEL's own keys; generating `qs_<id>_<key>` would
-    // mean carving an exception into the guard that exists to block that shape.
+    // THE PREFIX IS NOT `qs_`, which with quicksite_ / quicksite- / qs- is the
+    // ADMIN PANEL's own namespace in this same origin. This prefix is what keeps a
+    // page out of the panel's keys, whatever an author calls a key: `qs_x` on a
+    // page is `qsp_<id>_qs_x` in the browser. No name is refused for that reason,
+    // so a read, a write or a remove of storage that skips _storageKey() is one
+    // this boundary does not reach.
     //
     // THE ID COMES FROM THE SERVER, NEVER FROM THE PATH. In development the id
     // is a URL segment of /p/<id>/; a BUILT site is served from its own root and

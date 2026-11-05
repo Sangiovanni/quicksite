@@ -213,6 +213,40 @@ window.QuickSiteUtils = (function() {
     }
 
     /**
+     * What qs.js puts before a declared storage key: `qsp_<project>_`, the edited
+     * project's. Kept in step with QS_STORAGE_PREFIX + _storageKey() in
+     * secure/src/runtime/qs.js. The declared id is the identity everywhere in this
+     * panel; this is what an author searches for in the browser's developer tools.
+     *
+     * @returns {string}
+     */
+    function storageKeyPrefix() {
+        const project = (window.QUICKSITE_CONFIG && window.QUICKSITE_CONFIG.currentProject) || '';
+        return 'qsp_' + project + '_';
+    }
+
+    /**
+     * The non-editable `qsp_<project>_` chip that sits in front of a storage key,
+     * on the Storage page's form and in the storage-key picker.
+     *
+     * ⚠ IT IS A <span>, NOT AN INPUT, AND DELIBERATELY SO. The registry and every
+     * attribute and verb argument store the DECLARED key, and nothing else. The
+     * prefix is composed at the moment it is used and is never persisted. Persisting
+     * it would bake a project id into the very field consent gating matches on, and
+     * an import into a project with a different id would then match nothing.
+     *
+     * @param {string} title  the tooltip, in the words of the page that shows it
+     * @returns {HTMLElement}
+     */
+    function renderStorageKeyPrefixChip(title) {
+        return QSDom.el('span', {
+            class: 'storage-keyfield__prefix',
+            text: storageKeyPrefix(),
+            title: title,
+        });
+    }
+
+    /**
      * Show a toast notification
      *
      * @param {string} message - Message to display
@@ -645,7 +679,11 @@ window.QuickSiteUtils = (function() {
         
         // The panel-wide words layout.php ships (the searchable select reads its own here)
         tCommon,
-        
+
+        // A storage key's fixed prefix: its text and its chip
+        storageKeyPrefix,
+        renderStorageKeyPrefixChip,
+
         // Toast Notifications
         showToast,
         

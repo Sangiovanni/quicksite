@@ -5130,7 +5130,7 @@
      * reselection mid-edit can't cross-write to a different node.
      *
      * Server validations we propagate as toasts:
-     *  - Reserved data-qs-* / admin-namespace storage keys
+     *  - Reserved data-qs-* attributes
      *  - Cannot remove a mandatory param
      *  - Missing mandatory param after the diff applies
      * On any 4xx/5xx the form stays open so the user can correct.
