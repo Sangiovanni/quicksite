@@ -83,6 +83,7 @@ Five custom events, each with one emitter:
 | `quicksite:command-executed` | `js/core/api.js`, after a successful non-GET command | `js/components/miniplayer.js` — reloads the floating preview iframe |
 | `quicksite:write-rate` | `js/core/api.js`, when a counted command's answer carries the write allowance | `admin.js` — the header's figure; `js/pages/preview/preview-ai-tools.js` — the kept steps' Run button |
 | `quicksite:workflow-complete` | `js/pages/preview/preview-ai-tools.js`, after a workflow batch runs | `js/components/miniplayer.js` |
+| `quicksite:routes-changed` | `js/pages/preview/preview.js` `refreshEditList()`, after a wizard's setup and after a phase of a run that changed something | the page's other copies of the routes: `preview-js-interactions.js` (the route pickers), `contextual-complex/route-input.js` (the links' suggestions), `contextual-complex/complex-oauth-button.js` |
 | `quicksite:memberships-changed` | the membership pages, after a roster or inbox action | `js/core/members-badge.js` — recomputes the counts |
 | `quicksite:membership-counts-updated` | `js/core/members-badge.js`, once counts are recomputed | `js/pages/dashboard-memberships.js` — fills the dashboard card |
 
@@ -365,9 +366,13 @@ The sidebar exposes eight modes, each backed by a `data-mode="..."` button. Sour
 
 ### 8.2 Context selectors
 
-The toolbar carries a **Page** dropdown (any route in `routes.php`) and a **Language** dropdown (any active language). Switching either reloads the iframe; in Text mode the language dropdown decides which translation file is being edited.
+The toolbar carries an **Edit** list (the menu and the footer, every route in `routes.php` then the `404` page when it has a structure, and the project's components) and a **Language** dropdown (any active language). Switching either reloads the iframe; in Text mode the language dropdown decides which translation file is being edited.
 
 While a page is the edit target, the toolbar's **Title** field holds that page's title in the language shown — on a one-language site, the title the page reads from `default.json`. **Enter**, or leaving the field, saves it through `editTitle`; **Escape**, or an emptied field, puts the saved title back; a refusal says why in a toast. Its placeholder is the title the preview shows: for a page with no title of its own, the last part of its address, readable — *Get started* for `get-started` (see [ARCHITECTURE.md](ARCHITECTURE.md) §6.3, *How captured params flow*). The field hides for the menu, the footer and a component.
+
+**The Edit list follows what changes under it.** A wizard that makes routes (the OAuth button) and a workflow run change the project without leaving the page, so the list is read again: after the wizard's setup, whether it finished or stopped half way, before its element is added; and after each phase of a run that changed something, before the preview reloads. `getRoutes` answers the Pages group, `listComponents` the Components group, and both are rebuilt whole. A new route or component is on the list at once, a deleted one is gone, and the target stays selected. A read that fails changes nothing and says nothing: its group stays as it was.
+
+**A target that no longer exists is left.** The list, the editor and the preview move together to the first page, or to the menu on a project with no page left, and a toast names both. A title being typed for it is dropped. Open forms close as on any other move through the list, except that the AI tools stay open, so a run's review and answer stay on screen. An element a wizard was about to add is not added. A phase names the page it writes to, so the move changes nothing of where the next phase writes. A route changed in another browser tab reaches the list at the next reload of the panel.
 
 ### 8.3 Device preview
 
@@ -553,7 +558,7 @@ Same auto-discovery pattern client-side — `preview-config.php` globs
 |---|---|
 | `QSComplexWizard.createRowEditor` | Variable-cardinality row list with reorder/add/delete + keyboard nav. Used by every wizard that has a "list of N things" section (Select options, FormScaffold fields, List items). |
 | `QSComplexWizard.createTextKeyPicker` | Translation-key picker — searchable list of existing keys + inline "Create" form for new ones. Matches the component-variables panel UX. |
-| `QSComplexWizard.createStorageKeyPicker` | Storage-key picker — the declared keys, a form that declares a new one, the `qsp_<projectId>_` chip. Takes `getScope` and `setScope` from the field beside it; `setValue()` shows a key without reporting a change. The parameter editor's storage attributes and the Interactions tool's `storageKey` argument both use it (§9.10). |
+| `QSComplexWizard.createStorageKeyPicker` | Storage-key picker — the declared keys, a form that declares a new one, the `qsp_<projectId>_` chip. Takes `getScope` and `setScope` from the field beside it; `setValue()` shows a key without reporting a change. The parameter editor's storage attributes, the Interactions tool's `storageKey` argument, a state store's start value and the API page's token sources all use it (§9.10). |
 | `QSComplexWizard.t` / `codeText` / `requiredMark` | The wizards' words (`wizard-text.js`, loaded first). `t(key, params)` reads the `complexWizard` translations `preview-config.php` emits as `QS_COMPLEX_WIZARD_I18N`; a key the file lacks shows as its path (`complexWizard.<key>`). `codeText(text, codes)` turns a sentence's `{name}` markers into `<code>` elements, so a hint can name an attribute without markup in its translation. `requiredMark()` is the red asterisk of a required field's label. |
 
 **Built-in kinds**
@@ -1050,6 +1055,14 @@ writes the project's own `public/scripts/qs-api-config.js` which exposes
 Pages get this script included automatically when at least one API
 is registered (see `PageManagement::render()`).
 
+**The token source** of an API with a bearer, API-key or basic auth type says where the token comes from, as `<location>:<name>`.
+For **localStorage** and **sessionStorage** the name is a storage key, taken from the storage-key picker (§9.10) with the location
+as its scope; the refresh token's source is always one of these two. **config** and **header** name something else and are typed:
+a public key in the page's config, and the request header the server sends the API's key in (`header:X-API-Key`). Switching the
+location away and back finds what it held, and nothing is carried over to another location, except a storage key between the two
+that name one. An API saved untouched keeps its source as it was; one with no name is not
+saved, and a toast says why.
+
 **Endpoint schema** (fields the modal exposes):
 
 | Field | Purpose |
@@ -1165,7 +1178,7 @@ that need authoring on top:
 
 - **Response bindings** (which fields feed which DOM selectors / state stores) are project-specific and authored in the visual editor — the imported schemas drive the binding picker, but no bindings are emitted.
 - **OAuth handler config** — when a security scheme is `oauth2` or `openIdConnect`, the converter sets the API auth to `bearer` (oauth2 yields a bearer token at runtime). Configure the OAuth handler details via the API edit form.
-- **Auth token storage** — the converter sets sensible `tokenSource` defaults (`localStorage:token` for bearer, `localStorage:basicAuth` for basic, `header:<name>` for apiKey). The actual token value is entered per-API in the registry card's Auth Token field.
+- **Auth token storage** — the converter sets sensible `tokenSource` defaults (`localStorage:token` for bearer, `localStorage:basicAuth` for basic, `header:<name>` for apiKey). The actual token value is entered per-API in the registry card's Auth Token field. A storage key the converter names is not declared by the import: the storage-key picker says so when the API is opened.
 - **Alternate security schemes** — endpoints flagged `auth: 'required'` (different scheme from the API default) need manual refinement. The preview's notes name which schemes were seen.
 
 ### 9.2 Component list binding
@@ -2167,9 +2180,12 @@ actions. Delete is read-modify-write — it re-saves the route's remaining store
   is the initial value** (leave it blank to use the default); the field *name* is
   the request parameter key, not `init`.
 - **`init` source kind** — a `<select>` (literal · URL query · URL path param ·
-  localStorage · sessionStorage) paired with a key input whose placeholder
-  swaps to match the kind ("value" for literal, "URL param name" for query,
-  "param name" for URL path param, "key name" for the storage kinds). On save
+  localStorage · sessionStorage). The typed kinds pair it with a key input whose
+  placeholder swaps to match the kind ("value" for literal, "URL param name" for
+  query, "param name" for URL path param). The storage kinds take the storage-key
+  picker (§9.10) on a line of its own, with the kind as its scope. Switching the
+  kind away and back finds what it held, and nothing is carried over to another
+  kind, except a storage key between the two storage kinds. On save
   the wizard composes the canonical storage string (`literal "Hello"` →
   `init: "Hello"`; `localStorage "authToken"` → `init: "localStorage:authToken"`;
   `URL path param "slug"` → `init: "param:slug"`; etc.). On edit it parses the
@@ -2983,23 +2999,25 @@ group.
 `essential` never needs consent; everything else does. Commands:
 `listStorageItems` / `addStorageItem` / `editStorageItem` / `deleteStorageItem`.
 
-**The storage-key picker.** The fields of the visual editor that name a storage key
-take it from one picker, never as typed text: the `data-storage-show`,
-`data-storage-value` and `data-auth-source` attributes in the parameter editor (§10),
-and the `key` argument of `saveToken`, `clearToken` and `store` in the Interactions
-tool.
+**The storage-key picker.** The fields of the panel that name a storage key take it
+from one picker, never as typed text: the `data-storage-show`, `data-storage-value`
+and `data-auth-source` attributes in the parameter editor (§10), the `key` argument of
+`saveToken`, `clearToken` and `store` in the Interactions tool, a state store's
+`localStorage` and `sessionStorage` start value (§9.6), and an API's token source and
+refresh token source (§9.1).
 
 - **The chip.** `qsp_<projectId>_` stands before the key as a grey fixed chip, as it
   does on this page's form. It is not part of the value.
 - **The list** offers the declared `localStorage` and `sessionStorage` keys of the
   scope chosen beside it: the attribute's own scope, the `storage` argument of the
-  verb (with no scope chosen there, both). A `cookie` entry is never offered: these
+  verb (with no scope chosen there, both), the start value's kind, the token source's
+  location. A `cookie` entry is never offered: these
   read and write browser storage, not cookies. The list has a search field. The
   registry is read each time a picker opens, and a key created in one picker is
   offered by the next without a reload.
 - **Create new key…**, or a search that finds nothing, opens a form: the key's name,
   after the same chip, its scope (the one chosen beside it to start with), its category and an optional
-  description, in the project's default language. Creating declares the key with
+  description, in the language the registry's descriptions are written in. Creating declares the key with
   `addStorageItem`, picks it, and moves the scope beside it to the new key's. What the
   server refuses (a name already declared, whitespace, `__proto__`) is shown in the
   server's words, and nothing changes. Only a role that may run `addStorageItem` is

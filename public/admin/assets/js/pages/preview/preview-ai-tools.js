@@ -2494,9 +2494,12 @@ window.PreviewAiTools = (function () {
         run.ok += res.ok;
         run.fail += res.fail;
         run.last = { name: phase.title, ok: res.ok, fail: res.fail, total: res.ok + res.fail };
-        // The preview shows what the phase changed before the next one is reviewed.
-        if (res.ok > 0 && window.PreviewManager && typeof window.PreviewManager.reload === 'function') {
-            try { window.PreviewManager.reload(); } catch (_e) { /* ignore */ }
+        // The preview shows what the phase changed before the next one is reviewed. The Edit list comes
+        // first, so the reload never lands on a route the phase deleted: leaving it has loaded the preview.
+        if (res.ok > 0 && window.PreviewManager) {
+            try {
+                if (!(await window.PreviewManager.refreshEditList())) window.PreviewManager.reload();
+            } catch (_e) { /* ignore */ }
         }
         if (res.stoppedAt >= 0) {
             return { stop: res.reason, phase: phase, from: res.stoppedAt, resolved: true, command: res.command };

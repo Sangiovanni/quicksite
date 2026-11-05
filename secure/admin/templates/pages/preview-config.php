@@ -128,6 +128,10 @@ window.PreviewConfig = {
     // preview.js reads this as TAG_INFO and keeps NO list of its own.
     tagInfo: <?= qs_inline_script_json(TagRegistry::editorPayload()) ?>,
 
+    // The special pages the Edit list holds beside the routes (preview.php): getRoutes does
+    // not answer them, and refreshEditList() rebuilds the Pages group whole.
+    specialPages: <?= qs_inline_script_json($specialPagesListed) ?>,
+
     // Per-route resolver sidecar (only routes with a resolver).
     // Used by the editor's emulation panel to know which variables exist
     // per page (resolver.expose keys → editable inputs).
@@ -242,6 +246,7 @@ window.PreviewConfig = {
         switchToPageConfirm: <?= qs_inline_script_json(__admin('preview.switchToPageConfirm')) ?>,
         pageTitleSaved: <?= qs_inline_script_json(__admin('preview.pageTitleSaved')) ?>,
         pageTitleSaveFailed: <?= qs_inline_script_json(__admin('preview.pageTitleSaveFailed')) ?>,
+        editTargetGone: <?= qs_inline_script_json(__admin('preview.editTargetGone')) ?>,
         positionInside: <?= qs_inline_script_json(__admin('preview.positionInside')) ?>,
         positionInsideEnd: <?= qs_inline_script_json(__admin('preview.positionInsideEnd')) ?>,
         snippetCssConfirm: <?= qs_inline_script_json(__admin('preview.snippetCssConfirm')) ?>,

@@ -15194,3 +15194,66 @@ refusal with it (the prefix does not reach that one: the problem is the page's c
 that name makes no key).
 
 **Source**: Sangio, UX run of the storage-key picker, 2026-11-05; beta.12. `secure/src/runtime/qs.js` `_storageKey()`.
+
+### The Edit list follows what changes under it, through one rebuild (locked 2026-11-05)
+
+**Decision**: `refreshEditList()` (`preview.js`) reads `getRoutes` and `listComponents` and rebuilds the Edit list's Pages and
+Components groups whole; the wizard's setup and each phase of a run that changed something call it, before the element is added
+and before the preview reloads. The target stays selected; a target that is gone is left through `navigateTo()` for the first page,
+or the menu when no page is left, with an info toast; a read that fails leaves its group as it was and says nothing. The call
+sends one signal, `quicksite:routes-changed`, which the page's three other copies of the routes listen to. The list spells every
+route as `flattenRoutes()` does, in the print and in the rebuild, which now answers text; the print's own flattener, which left out
+any route with a numeric-looking segment, is gone. The special pages the rebuild keeps are the ones the print listed, handed over
+as `PreviewConfig.specialPages`: today `404`. A move during a run keeps the AI tools open (`navigateTo(..., { keepMode: true })`),
+and code that sets the list's value goes through `showEditTarget()`, which also corrects the closed list.
+
+**Reasoning**: The list was printed once while two things on the page could change what it listed, so a route was missing until
+a reload and a deleted one left a 404 in the page. Reading before the reload is what removes the 404: the reload never lands on
+a route that is gone, because the move has already loaded the preview. One function keeps a third caller from being a third copy.
+A failed read is a background read, so it does not interrupt and it does not guess: an empty list would be worse than a stale one.
+The signal goes out whether or not the read answers, since a route may have changed either way and each copy reads again only
+when it needs to. A move in the AI tools must not switch tools, because the run goes on with its review and answer box out of
+sight; everywhere else the move closes forms exactly as a move through the list does, which is what stops an open form saving into
+the page shown next. A run's phases name their pages and read their parameters once, so nothing about the move reaches them.
+`SPECIAL_PAGES` was the natural source for the special pages and is the wrong one: `500`'s address renders the 404 page, and no
+command can make a `500` structure, so listing it would edit the wrong page.
+
+**Alternatives considered**: reloading the whole panel after a wizard or a run (loses a run's state and every open tool); listening
+to `quicksite:command-executed` for route commands (no call to forget, but it races the phase's reload, which is the 404 this
+exists to remove, and every command that changes a route would have to be named); reading only after a phase whose steps name a
+route command (a second list of commands, and a read is cheap and uncounted); rebuilding from `listPages` (it parses every page
+file, and it lists a structure with no route as well); a third literal list of special pages in the browser; dropping the routes
+the print skipped from the rebuild too (a real page the editor cannot reach, and a rule nobody could state).
+
+**Source**: Sangio, UX run of the build and consent fixes, 2026-11-04, with the points the code raised ruled the next day; beta.12.
+`public/admin/assets/js/pages/preview/preview.js`.
+
+### The last typed storage keys take the picker, and an API's token source must name something (locked 2026-11-05)
+
+**Decision**: A state store's `localStorage` and `sessionStorage` start value and an API's token source and refresh token source
+take `QSComplexWizard.createStorageKeyPicker`, with the kind or the location as the scope. This adds to *A storage key is picked or
+created, never typed*, whose "no free-text path to a key" was ahead of the code until now. What names something else stays typed:
+a literal, a URL query or path parameter, `config` and `header`. The API page's location list gains `header`, which the server
+accepts and the page's own import writes. `<prefix>:token`, what the page saved for an empty key, is gone: saving with no name is
+refused with a toast. The picker writes a description in the language the registry answers (`descLang`). The API page loads
+`wizard-text.js`, the picker and the picker's own words; the layout already gives it everything else.
+
+**Reasoning**: Under a consent layer an undeclared key is never stored or read, and these two fields are where such a key does
+the most harm: the sign-in token and a store's first value. The fallback was the same mistake as a typo with no typing involved,
+a key nobody chose. Refusing keeps the choice with the author, and an API that already holds `localStorage:token` keeps it, shown
+as undeclared. Without `header` the page could not save an API its own import had made: the location opened blank and the server
+refused what came back. Each kind and location keeps its own value, because a literal is no storage key and a config key is no header
+name: carried over, it would save as one unnoticed, or show as a row claiming a key nobody saved. The two storage scopes share theirs,
+since the same key under the other scope is what the picker's row can speak for. The language had to change for the picker to leave the visual editor: it read
+the editor's config, which the API page does not have, so every description there would have landed under `en`. The registry's
+own answer is right on both pages, and it is where the Storage page reads.
+
+**Alternatives considered**: keeping the fallback key and warning (a default that stays broken under a consent layer, on the
+field that signs people in); declaring `token` automatically (a declaration nobody asked for, in a category nobody chose); shipping
+the whole `complexWizard` subtree to the API page (every wizard's words for one picker's); a copy of the picker in `apis.js` (two
+caches, two sets of words); leaving `header` to the console (the panel keeps breaking what its own import made); changing the
+import's fixed keys now (it writes `localStorage:token`, `localStorage:authToken` and `localStorage:basicAuth`, and the picker says
+they are undeclared once opened; which key an import should name is a question of its own).
+
+**Source**: Sangio, 2026-11-05, on the flags raised by the storage-key picker's build; beta.12.
+`public/admin/assets/js/pages/apis.js`, `public/admin/assets/js/pages/preview/preview-js-interactions.js`.

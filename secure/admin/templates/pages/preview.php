@@ -10,6 +10,7 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/functions/projectLanguage.php'; // the edited project's languages
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // flattenRoutes()
 
 // Get auth token for API calls
 $token = $router->getToken();
@@ -53,31 +54,22 @@ $routesData = file_exists($routesFile) ? require $routesFile : null;
 // non-array and fatalled the whole editor page. Every other reader in the tree
 // already guards this way.
 if (is_array($routesData)) {
-    // Flatten routes
-    $flattenRoutes = function($routes, $prefix = '') use (&$flattenRoutes) {
-        $result = [];
-        foreach ($routes as $key => $value) {
-            if (is_numeric($key)) continue;
-            $path = $prefix ? "{$prefix}/{$key}" : $key;
-            $result[] = $path;
-            if (is_array($value) && !empty($value)) {
-                $result = array_merge($result, $flattenRoutes($value, $path));
-            }
-        }
-        return $result;
-    };
-    $routes = $flattenRoutes($routesData);
+    // The list getRoutes answers, so the browser's rebuild of the Edit list spells every route the same way.
+    $routes = flattenRoutes($routesData);
 }
 
-// Add special pages that exist as structure files but are not in routes (e.g. 404)
-$specialPages = ['404'];
-foreach ($specialPages as $sp) {
+// Add the special page that exists as a structure file but is not in routes: the one the editor can
+// show (SPECIAL_PAGES names others, whose address renders this one). The browser's rebuild of the
+// Edit list keeps it (PreviewConfig.specialPages): getRoutes does not answer it.
+$specialPagesListed = [];
+foreach (['404'] as $sp) {
     $spFolder = $editProjectPath . '/templates/model/json/pages/' . $sp . '/' . $sp . '.json';
     $spFlat = $editProjectPath . '/templates/model/json/pages/' . $sp . '.json';
     if (file_exists($spFolder) || file_exists($spFlat)) {
-        $routes[] = $sp;
+        $specialPagesListed[] = $sp;
     }
 }
+$routes = array_merge($routes, $specialPagesListed);
 
 // Get available components (from the EDITED project)
 $components = [];

@@ -1612,7 +1612,11 @@
         PreviewState.setCallback('hotReloadCss', hotReloadCss);
     }
 
-    function navigateTo(editType, editName) {
+    /**
+     * opts.keepMode: the tool stays open. For a move the author did not ask for, in the AI tools,
+     * where a run's review and answer box are.
+     */
+    function navigateTo(editType, editName, opts) {
         showLoading();
         startLoadingTimeout();
         overlayInjected = false;
@@ -1623,7 +1627,7 @@
         // Reset tool state: switch back to select mode and clear selection.
         // Preview mode is sticky across navigation (it's the "just look at
         // the site" mode — no reason to drop the user back into editor).
-        if (currentMode !== 'select' && currentMode !== 'preview') {
+        if (currentMode !== 'select' && currentMode !== 'preview' && !(opts && opts.keepMode)) {
             setMode('select');
         }
         hideNodePanel();
@@ -1656,6 +1660,137 @@
         }
     }
     
+    // ==================== The Edit list ====================
+
+    /** The list's value, on the closed list too: the searchable select reads its select only when told. */
+    function showEditTarget(value) {
+        targetSelect.value = value;
+        if (targetPicker) targetPicker.refresh();
+    }
+
+    /** The first page of the list, else the menu: where the panel opens on a project with no page. */
+    function navigateToFirstPage(opts) {
+        const firstPage = targetSelect.querySelector('option[value^="page:"]');
+        const value = firstPage ? firstPage.value : 'layout:menu';
+        showEditTarget(value);
+        const colonIdx = value.indexOf(':');
+        navigateTo(value.substring(0, colonIdx), value.substring(colonIdx + 1), opts);
+    }
+
+    /** The Components group. The toolbar prints it only on a project that has components. */
+    function editListComponentsGroup() {
+        return targetSelect.querySelector('optgroup[label*="🧩"]');
+    }
+
+    function _renderComponentsGroup() {
+        return QSDom.el('optgroup', { label: '🧩 ' + (PreviewConfig.i18n.components || 'Components') });
+    }
+
+    /** A new component's option, in its group, which is made for the first one. */
+    function addEditListComponent(name) {
+        const group = editListComponentsGroup() || targetSelect.appendChild(_renderComponentsGroup());
+        return group.appendChild(_renderOption('component:' + name, name));
+    }
+
+    /** One of the two lists the Edit list is built from, or null: a read that fails changes nothing. */
+    async function readEditListPart(command, field) {
+        try {
+            const result = await QuickSiteAdmin.apiRequest(command, 'GET');
+            const list = result.ok && result.data && result.data.data ? result.data.data[field] : null;
+            return Array.isArray(list) ? list : null;
+        } catch (error) {
+            console.warn('[Preview] ' + command + ' failed, the Edit list stays as it was:', error);
+            return null;
+        }
+    }
+
+    /** The Pages group whole: the routes, spelled as the toolbar prints them, then the special pages. */
+    function rebuildEditListPages(routes) {
+        const group = targetSelect.querySelector('optgroup[label*="📄"]');
+        if (!group) return;
+        const names = routes.concat(PreviewConfig.specialPages || []);
+        group.replaceChildren(...names.map((name) => _renderOption('page:' + name, name)));
+    }
+
+    /** The Components group whole, ordered as the toolbar prints it; none left, no group. */
+    function rebuildEditListComponents(components) {
+        const names = components.map((component) => component.name).sort();
+        let group = editListComponentsGroup();
+        if (names.length === 0) {
+            if (group) group.remove();
+            return;
+        }
+        if (!group) group = targetSelect.appendChild(_renderComponentsGroup());
+        group.replaceChildren(...names.map((name) => _renderOption('component:' + name, name)));
+    }
+
+    /**
+     * The target that is gone is left. A title typed for it goes with it: leaving the field later
+     * would save it on the page shown by then.
+     */
+    function leaveVanishedTarget() {
+        const gone = currentEditName;
+        if (pageTitleInput) {
+            pageTitleInput.value = pageTitleSaved;
+            pageTitleInput.blur();
+        }
+        navigateToFirstPage({ keepMode: currentMode === 'ai-tools' });
+        const shown = targetSelect.options[targetSelect.selectedIndex];
+        showToast(PreviewConfig.i18n.editTargetGone.replace('{name}', gone).replace('{now}', shown ? shown.textContent : ''), 'info');
+    }
+
+    /** One reading of the list. Answers whether the target was gone and the editor moved off it. */
+    async function rebuildEditList() {
+        const [routes, components] = await Promise.all([
+            readEditListPart('getRoutes', 'flat_routes'),
+            readEditListPart('listComponents', 'components'),
+        ]);
+        if (routes) rebuildEditListPages(routes);
+        if (components) rebuildEditListComponents(components);
+        const target = currentEditType + ':' + currentEditName;
+        if (Array.from(targetSelect.options).some((option) => option.value === target)) {
+            showEditTarget(target);
+            return false;
+        }
+        leaveVanishedTarget();
+        return true;
+    }
+
+    let editListReading = null;     // the reading under way: every caller waits for it
+    let editListChanged = false;    // something changed while it read, so it reads again
+
+    /**
+     * The Edit list follows what changed under it: the one rebuild, called by what changes a route or
+     * a component on this page without going through the list's own buttons (a wizard's setup, a
+     * workflow's phase), before the preview reloads. It tells the page's other copies of the routes
+     * (quicksite:routes-changed), and answers whether the editor moved off a target that is gone: the
+     * move has loaded the preview, so the caller does not reload it.
+     */
+    function refreshEditList() {
+        componentsLoaded = false;
+        window.dispatchEvent(new CustomEvent('quicksite:routes-changed'));
+        if (!targetSelect) return Promise.resolve(false);
+        if (editListReading) {
+            editListChanged = true;
+            return editListReading;
+        }
+        editListReading = (async () => {
+            let moved = false;
+            try {
+                do {
+                    editListChanged = false;
+                    moved = (await rebuildEditList()) || moved;
+                } while (editListChanged);
+            } catch (error) {
+                console.warn('[Preview] The Edit list could not be rebuilt:', error);
+            } finally {
+                editListReading = null;
+            }
+            return moved;
+        })();
+        return editListReading;
+    }
+
     // ==================== Component Warning Banner ====================
     
     /**
@@ -1822,14 +1957,8 @@
                         }
                     }
                     
-                    // Navigate to first page
-                    const firstPage = targetSelect.querySelector('option[value^="page:"]');
-                    if (firstPage) {
-                        targetSelect.value = firstPage.value;
-                        const colonIdx = firstPage.value.indexOf(':');
-                        navigateTo('page', firstPage.value.substring(colonIdx + 1));
-                    }
-                    
+                    navigateToFirstPage();
+
                     // Show warnings if any
                     const warnings = result.data?.data?.warnings;
                     if (warnings && warnings.length > 0) {
@@ -2093,21 +2222,8 @@
                 });
                 
                 if (result.ok) {
-                    // Add option to Components optgroup (create optgroup if needed)
-                    let componentsGroup = targetSelect.querySelector('optgroup[label*="Components"], optgroup[label*="🧩"]');
-                    if (!componentsGroup) {
-                        componentsGroup = document.createElement('optgroup');
-                        componentsGroup.label = '🧩 ' + (PreviewConfig.i18n.components || 'Components');
-                        targetSelect.appendChild(componentsGroup);
-                    }
-                    
-                    const newOption = document.createElement('option');
-                    newOption.value = 'component:' + trimmed;
-                    newOption.textContent = trimmed;
-                    componentsGroup.appendChild(newOption);
-                    
                     // Auto-select the new component
-                    targetSelect.value = newOption.value;
+                    showEditTarget(addEditListComponent(trimmed).value);
                     navigateTo('component', trimmed);
                     
                     showToast(PreviewConfig.i18n.componentCreated || 'Component created', 'success');
@@ -2892,8 +3008,7 @@
                 QuickSiteUtils.confirm(msg).then(ok => {
                     if (!ok) return;
                     // Switch dropdown and navigate to layout target
-                    const layoutValue = 'layout:' + clickedStruct;
-                    if (targetSelect) targetSelect.value = layoutValue;
+                    if (targetSelect) showEditTarget('layout:' + clickedStruct);
                     navigateTo('layout', clickedStruct);
                 });
                 // Either way, don't process this selection (it came from the wrong context)
@@ -2907,8 +3022,7 @@
             const msg = PreviewConfig.i18n.switchToPageConfirm.replace('{page}', routeName);
             QuickSiteUtils.confirm(msg).then(ok => {
                 if (!ok) return;
-                const pageValue = 'page:' + routeName;
-                if (targetSelect) targetSelect.value = pageValue;
+                if (targetSelect) showEditTarget('page:' + routeName);
                 navigateTo('page', routeName);
             });
             return;
@@ -7484,12 +7598,20 @@
         // to call addRoute x2 + setRouteResolver x2 before the button
         // is spliced in. Wizards that don't need it omit the hook.
         if (typeof addComplexController.preSubmit === 'function') {
+            let setupFailure = null;
             try {
                 await addComplexController.preSubmit();
             } catch (e) {
-                showToast(e && e.message ? e.message : 'Setup failed', 'error');
+                setupFailure = e;
+            }
+            // What the setup made before a failure stays, so the list is read either way. A target
+            // that turns out to be gone has been left, and the element has nowhere to go.
+            const moved = await refreshEditList();
+            if (setupFailure) {
+                showToast(setupFailure.message ? setupFailure.message : 'Setup failed', 'error');
                 return;
             }
+            if (moved) return;
         }
 
         const config = (typeof addComplexController.getConfig === 'function')
@@ -8179,21 +8301,8 @@
                 showToast(PreviewConfig.i18n.componentSaved || 'Component saved successfully!', 'success');
 
                 // Add to component dropdown in navigation if not already there
-                const tgtSelect = document.getElementById('preview-target');
-                if (tgtSelect) {
-                    const existingOption = tgtSelect.querySelector('option[value="component:' + name + '"]');
-                    if (!existingOption) {
-                        let componentsGroup = tgtSelect.querySelector('optgroup[label*="Components"], optgroup[label*="🧩"]');
-                        if (!componentsGroup) {
-                            componentsGroup = document.createElement('optgroup');
-                            componentsGroup.label = '🧩 ' + (PreviewConfig.i18n.components || 'Components');
-                            tgtSelect.appendChild(componentsGroup);
-                        }
-                        const newOption = document.createElement('option');
-                        newOption.value = 'component:' + name;
-                        newOption.textContent = name;
-                        componentsGroup.appendChild(newOption);
-                    }
+                if (targetSelect && !targetSelect.querySelector('option[value="component:' + name + '"]')) {
+                    addEditListComponent(name);
                 }
 
                 // Also add to the component select in add-node modal if present
@@ -10706,6 +10815,7 @@
     window.PreviewManager = {
         reload: reloadPreview,
         navigateTo: navigateTo,
+        refreshEditList: refreshEditList,
         setDevice: setDevice,
         setMode: setMode,
         getCurrentDevice: () => currentDevice,
@@ -10752,7 +10862,7 @@
             const selectValue = parsed.name ? `${parsed.type}:${parsed.name}` : `layout:${parsed.type}`;
             const option = targetSelect.querySelector(`option[value="${CSS.escape(selectValue)}"]`);
             if (option) {
-                targetSelect.value = selectValue;
+                showEditTarget(selectValue);
             }
         }
         // Clean URL without reloading
@@ -10769,7 +10879,7 @@
         if (value.startsWith('layout:')) {
             const firstPageOption = targetSelect.querySelector('option[value^="page:"]');
             if (firstPageOption) {
-                targetSelect.value = firstPageOption.value;
+                showEditTarget(firstPageOption.value);
                 value = firstPageOption.value;
             }
         }

@@ -46,7 +46,11 @@
     let apisData = {};
     let currentTestEndpoint = null;
     let pendingDelete = null;
+    let tokenSource = null;         // the API form's two token sources (_tokenSourceField)
+    let refreshTokenSource = null;
     const AUTH_TOKEN_STORAGE_KEY = 'qs_api_auth_tokens';
+    // The prefixes that name a storage key. `config` and `header` name something else, and stay typed.
+    const STORAGE_PREFIXES = ['localStorage', 'sessionStorage'];
 
     // DOM Ready
     document.addEventListener('DOMContentLoaded', init);
@@ -72,6 +76,8 @@
         document.getElementById('form-api')?.addEventListener('submit', handleApiSubmit);
         document.getElementById('api-auth-type')?.addEventListener('change', updateAuthFields);
         document.getElementById('api-token-source-prefix')?.addEventListener('change', updateStorageWarning);
+        tokenSource = _tokenSourceField('api-token-source-prefix', 'api-token-source-picker', 'api-token-source-key');
+        refreshTokenSource = _tokenSourceField('api-refresh-token-source-prefix', 'api-refresh-token-source-picker');
 
         // Endpoint form
         document.getElementById('form-endpoint')?.addEventListener('submit', handleEndpointSubmit);
@@ -123,6 +129,8 @@
         // Close modals on Escape
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
+                // In an open searchable list (the token sources' picker), Escape closes the list alone.
+                if (e.target.closest && e.target.closest('.qs-searchable-select__dropdown')) return;
                 const openModal = document.querySelector('.admin-modal[style*="flex"]');
                 if (openModal) closeModal(openModal);
             }
@@ -538,22 +546,14 @@
             document.getElementById('api-base-url').value = api.baseUrl || '';
             document.getElementById('api-description').value = api.description || '';
             document.getElementById('api-auth-type').value = api.auth?.type || 'none';
-            
-            if (api.auth?.tokenSource) {
-                const parts = api.auth.tokenSource.split(':');
-                document.getElementById('api-token-source-prefix').value = parts[0] || 'localStorage';
-                document.getElementById('api-token-source-key').value = parts.slice(1).join(':') || '';
-            }
+
+            tokenSource.load(api.auth?.tokenSource || '');
 
             populateRefreshEndpointDropdown(api.auth?.refreshEndpoint || '');
             if (api.auth?.refreshEndpoint) {
                 document.getElementById('api-refresh-endpoint').value = api.auth.refreshEndpoint;
             }
-            if (api.auth?.refreshTokenSource) {
-                const rParts = api.auth.refreshTokenSource.split(':');
-                document.getElementById('api-refresh-token-source-prefix').value = rParts[0] || 'localStorage';
-                document.getElementById('api-refresh-token-source-key').value = rParts.slice(1).join(':') || '';
-            }
+            refreshTokenSource.load(api.auth?.refreshTokenSource || '');
             document.getElementById('api-refresh-body-field').value = api.auth?.refreshTokenBodyField || '';
             document.getElementById('api-refresh-response-token-path').value = api.auth?.responseTokenPath || '';
             document.getElementById('api-refresh-response-refresh-token-path').value = api.auth?.responseRefreshTokenPath || '';
@@ -562,6 +562,8 @@
             document.getElementById('auth-refresh-group').open = !!api.auth?.refreshEndpoint;
         } else {
             title.textContent = t('apis.addApi');
+            tokenSource.load('');
+            refreshTokenSource.load('');
             populateRefreshEndpointDropdown('');
             document.getElementById('auth-refresh-group').open = false;
         }
@@ -569,6 +571,71 @@
         updateAuthFields();
         openModal(modal);
         document.getElementById('api-id').focus();
+    }
+
+    /**
+     * One token source of the API form: its prefix list, the shared picker for a storage key and,
+     * where a prefix names something else, a typed field (the refresh token's source has none). A
+     * prefix switched away and back finds what it held, and nothing is carried over to another: a
+     * config key is no header name, and it would save as one unnoticed. The two storage prefixes share
+     * their key, whose row says what is true of it under the other. A form opened reads the registry
+     * afresh: the picker is mounted again by load().
+     */
+    function _tokenSourceField(prefixId, pickerId, inputId) {
+        const prefix = document.getElementById(prefixId);
+        const holder = document.getElementById(pickerId);
+        const input = inputId ? document.getElementById(inputId) : null;
+        let typedNames = {};
+        let storageKey = '';
+        let picker = null;
+
+        const namesStorageKey = () => STORAGE_PREFIXES.includes(prefix.value);
+
+        function show() {
+            const usesPicker = namesStorageKey();
+            holder.style.display = usesPicker ? '' : 'none';
+            if (input) {
+                input.style.display = usesPicker ? 'none' : '';
+                input.value = typedNames[prefix.value] || '';
+            }
+            if (!usesPicker) return;
+            if (picker) {
+                picker.refresh();
+                return;
+            }
+            picker = window.QSComplexWizard.createStorageKeyPicker({
+                container: holder,
+                value: storageKey,
+                getScope: () => prefix.value,
+                setScope: (scope) => { prefix.value = scope; },
+                onChange: (key) => { storageKey = key; },
+            });
+        }
+
+        prefix.addEventListener('change', show);
+        input?.addEventListener('input', () => { typedNames[prefix.value] = input.value; });
+        // Enter in the picker's Create form stays there: this form would save the API.
+        holder.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && e.target.tagName === 'INPUT') e.preventDefault();
+        });
+
+        return {
+            /** What a saved source holds, its key everything after the first ':'; '' for none. */
+            load(source) {
+                const at = source.indexOf(':');
+                if (at !== -1) prefix.value = source.slice(0, at);
+                const key = at !== -1 ? source.slice(at + 1) : '';
+                storageKey = namesStorageKey() ? key : '';
+                typedNames = namesStorageKey() ? {} : { [prefix.value]: key };
+                if (picker) {
+                    picker.destroy();
+                    picker = null;
+                }
+                show();
+            },
+            prefix: () => prefix.value,
+            key: () => (namesStorageKey() ? storageKey : (typedNames[prefix.value] || '').trim()),
+        };
     }
 
     function updateAuthFields() {
@@ -639,12 +706,17 @@
         }
     }
     
+    /** What the location chosen says: `config` its warning, a header's name its own words. */
     function updateStorageWarning() {
         const prefix = document.getElementById('api-token-source-prefix').value;
         const warning = document.getElementById('auth-config-warning');
         if (warning) {
             warning.style.display = prefix === 'config' ? 'block' : 'none';
         }
+        const isHeader = prefix === 'header';
+        document.getElementById('api-token-source-key-label').textContent = t(isHeader ? 'apis.form.headerName' : 'apis.form.storageKeyName');
+        document.getElementById('api-token-source-hint').textContent = t(isHeader ? 'apis.form.headerNameHint' : 'apis.form.storageKeyHint');
+        document.getElementById('api-token-source-key').placeholder = isHeader ? 'X-API-Key' : 'authToken';
     }
 
     /**
@@ -694,9 +766,11 @@
         // no tokenSource, since the browser owns the session cookie.
         let auth = { type: authType };
         if (authType !== 'none' && authType !== 'cookie') {
-            const prefix = document.getElementById('api-token-source-prefix').value;
-            const key = document.getElementById('api-token-source-key').value.trim();
-            auth.tokenSource = key ? `${prefix}:${key}` : `${prefix}:token`;
+            if (!tokenSource.key()) {
+                showToast(t('apis.toast.tokenSourceMissing'), 'error');
+                return;
+            }
+            auth.tokenSource = `${tokenSource.prefix()}:${tokenSource.key()}`;
         }
 
         // Refresh config (Tier 2). Only collected when type === 'bearer'.
@@ -705,8 +779,7 @@
         // rotates the refresh token).
         if (authType === 'bearer') {
             const rEndpoint = document.getElementById('api-refresh-endpoint').value.trim();
-            const rPrefix = document.getElementById('api-refresh-token-source-prefix').value;
-            const rKey = document.getElementById('api-refresh-token-source-key').value.trim();
+            const rKey = refreshTokenSource.key();
             const rBody = document.getElementById('api-refresh-body-field').value.trim();
             const rPath = document.getElementById('api-refresh-response-token-path').value.trim();
             const rRefreshPath = document.getElementById('api-refresh-response-refresh-token-path').value.trim();
@@ -723,7 +796,7 @@
                     return;
                 }
                 auth.refreshEndpoint = rEndpoint;
-                auth.refreshTokenSource = `${rPrefix}:${rKey}`;
+                auth.refreshTokenSource = `${refreshTokenSource.prefix()}:${rKey}`;
                 auth.refreshTokenBodyField = rBody;
                 auth.responseTokenPath = rPath;
                 if (rRefreshPath) auth.responseRefreshTokenPath = rRefreshPath;

@@ -759,7 +759,8 @@ function flattenRoutes(array $routes, string $prefix = ''): array {
     $result = [];
     
     foreach ($routes as $name => $children) {
-        $path = $prefix === '' ? $name : $prefix . '/' . $name;
+        // A route named with digits only is an integer key once PHP has it: a path is always text.
+        $path = $prefix === '' ? (string) $name : $prefix . '/' . $name;
         $result[] = $path;
         
         if (is_array($children) && !empty($children)) {

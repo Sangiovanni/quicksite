@@ -55,12 +55,13 @@
         return _providersPromise;
     }
 
-    // Force a refresh on next render (preSubmit creates routes, so the
-    // cached setup status goes stale).
+    // Force a refresh on next render: the Edit list's refreshEditList() says the routes changed
+    // (this wizard's setup among the causes), so the cached setup status is stale.
     function invalidateProvidersCache() {
         _providersCache = null;
         _routesCache = null;
     }
+    window.addEventListener('quicksite:routes-changed', invalidateProvidersCache);
 
     /**
      * Load the project's literal routes for the "Redirect after login"
@@ -500,11 +501,8 @@
                     throw new Error('setRouteResolver ' + body.route + ': ' + msg);
                 }
             }
-
-            // After preSubmit succeeds the host calls addComplexElement;
-            // the new routes are immediately visible to subsequent picker
-            // renders, so dump the cache.
-            invalidateProvidersCache();
+            // After preSubmit, succeeded or not, the host reads the Edit list again and
+            // calls addComplexElement if it succeeded.
         }
 
         function destroy() {

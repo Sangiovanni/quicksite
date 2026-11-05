@@ -164,6 +164,9 @@
     // ==================== Initialization ====================
     
     function init() {
+        // The route pickers read the routes again at their next opening.
+        window.addEventListener('quicksite:routes-changed', function () { availableRoutes = []; });
+
         // Cache DOM references
         jsDefault = document.getElementById('contextual-js-default');
         jsInfo = document.getElementById('contextual-js-info');
@@ -4660,9 +4663,15 @@
         { value: 'literal',        label: PreviewConfig.i18n?.stateStoreInitKindLiteral        || 'literal',        prefix: null },
         { value: 'query',          label: PreviewConfig.i18n?.stateStoreInitKindQuery          || 'URL query',      prefix: 'query:' },
         { value: 'param',          label: PreviewConfig.i18n?.stateStoreInitKindPathParam      || 'URL path param', prefix: 'param:' },
-        { value: 'localStorage',   label: PreviewConfig.i18n?.stateStoreInitKindLocalStorage   || 'localStorage',   prefix: 'localStorage:' },
-        { value: 'sessionStorage', label: PreviewConfig.i18n?.stateStoreInitKindSessionStorage || 'sessionStorage', prefix: 'sessionStorage:' }
+        { value: 'localStorage',   label: PreviewConfig.i18n?.stateStoreInitKindLocalStorage   || 'localStorage',   prefix: 'localStorage:',   storage: true },
+        { value: 'sessionStorage', label: PreviewConfig.i18n?.stateStoreInitKindSessionStorage || 'sessionStorage', prefix: 'sessionStorage:', storage: true }
     ];
+
+    /** Whether a start value's kind names a storage key: the shared picker's, never typed. */
+    function _ssInitNamesStorageKey(kind) {
+        var def = SS_INIT_KINDS.find(function (k) { return k.value === kind; });
+        return !!(def && def.storage);
+    }
 
     /**
      * Parse a stored `init` string back into a {kind, key} pair for the
@@ -4983,13 +4992,11 @@
         row.appendChild(dirRow);
 
         // init + default (request / both).
-        // The init input used to be a single free-text field where the user
-        // had to know the `query:x` / `localStorage:x` prefix syntax — easy
-        // to mistype a literal as a prefix or vice-versa. It is now a kind
-        // <select> + key <input> pair, composed on save by _composeSsInit
-        // and parsed on edit by _parseSsInit. Storage format on disk is
-        // unchanged (still `query:x` etc.) so existing state-stores.json
-        // files round-trip cleanly.
+        // The init value is a kind <select> + key pair, composed on save by
+        // _composeSsInit and parsed on edit by _parseSsInit; on disk it is
+        // `query:x` etc. A storage kind's key comes from the shared picker,
+        // over the same input, which the collector reads and only the typed
+        // kinds show.
         //
         // Layout: the kind <select> sits on its own line at full width so
         // longer labels (e.g. "sessionStorage") aren't cropped; the key
@@ -5018,25 +5025,56 @@
         var initKeyInput = document.createElement('input');
         initKeyInput.type = 'text';
         initKeyInput.className = 'preview-contextual-js-form-input ss-field-init-key';
-        initKeyInput.value = parsedInit.key;
 
-        // Per-kind placeholder so the input meaning is unambiguous.
-        function _syncInitKeyPlaceholder() {
+        // What each kind holds, so a kind switched away and back finds it again. Nothing is carried over
+        // to another: a literal is no URL parameter and no storage key, and it would save as one unnoticed.
+        // The two storage kinds share their key, whose row says what is true of it under the other.
+        var initNamesKey = _ssInitNamesStorageKey(parsedInit.kind);
+        var typedInit = {};
+        if (!initNamesKey) typedInit[parsedInit.kind] = parsedInit.key;
+        var storageInit = initNamesKey ? parsedInit.key : '';
+        var initKeyPicker = null;
+        var initKeyPickerHolder = document.createElement('div');
+
+        /** The kind's field: the picker for a storage key, else the input with its own placeholder. */
+        function _syncInitKeyField() {
             var kind = initKindSelect.value;
-            var p;
-            if (kind === 'literal')      p = PreviewConfig.i18n?.stateStoreInitKeyLiteralPlaceholder || 'value (e.g. Hello)';
-            else if (kind === 'query')   p = PreviewConfig.i18n?.stateStoreInitKeyQueryPlaceholder   || 'URL param name (e.g. page)';
-            else if (kind === 'param')   p = PreviewConfig.i18n?.stateStoreInitKeyParamPlaceholder   || 'param name (e.g. slug)';
-            else                          p = PreviewConfig.i18n?.stateStoreInitKeyStoragePlaceholder || 'key name (e.g. authToken)';
-            initKeyInput.placeholder = p;
+            var namesKey = _ssInitNamesStorageKey(kind);
+            initKeyInput.value = namesKey ? storageInit : (typedInit[kind] || '');
+            initKeyInput.style.display = namesKey ? 'none' : '';
+            initKeyPickerHolder.style.display = namesKey ? '' : 'none';
+            if (!namesKey) {
+                var p;
+                if (kind === 'literal')      p = PreviewConfig.i18n?.stateStoreInitKeyLiteralPlaceholder || 'value (e.g. Hello)';
+                else if (kind === 'query')   p = PreviewConfig.i18n?.stateStoreInitKeyQueryPlaceholder   || 'URL param name (e.g. page)';
+                else                         p = PreviewConfig.i18n?.stateStoreInitKeyParamPlaceholder   || 'param name (e.g. slug)';
+                initKeyInput.placeholder = p;
+            } else if (initKeyPicker) {
+                initKeyPicker.refresh();
+            } else {
+                initKeyPicker = window.QSComplexWizard.createStorageKeyPicker({
+                    container: initKeyPickerHolder,
+                    value: storageInit,
+                    getScope: function () { return initKindSelect.value; },
+                    setScope: function (scope) { initKindSelect.value = scope; },
+                    onChange: function (key) {
+                        storageInit = key;
+                        initKeyInput.value = key;
+                        updateStateStorePreview();
+                    },
+                });
+            }
         }
-        _syncInitKeyPlaceholder();
+        _syncInitKeyField();
 
         initKindSelect.addEventListener('change', function () {
-            _syncInitKeyPlaceholder();
+            _syncInitKeyField();
             updateStateStorePreview();
         });
-        initKeyInput.addEventListener('input', updateStateStorePreview);
+        initKeyInput.addEventListener('input', function () {
+            typedInit[initKindSelect.value] = initKeyInput.value;
+            updateStateStorePreview();
+        });
 
         var defaultInput = document.createElement('input');
         defaultInput.type = 'text';
@@ -5048,6 +5086,9 @@
         // Sub-row 1: kind select alone, takes full width via parent's stretch
         // default. The class on the select itself sets the appearance.
         initRow.appendChild(initKindSelect);
+
+        // A storage key's picker takes a line of its own: the chip alone is wider than half the column.
+        initRow.appendChild(initKeyPickerHolder);
 
         // Sub-row 2: key + default, side-by-side via the existing
         // `.ss-field-init-row` styling (display:flex; gap; inputs flex:1).

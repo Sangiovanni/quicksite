@@ -307,8 +307,8 @@
 
 /* The storage-key picker (storage-key-picker.js) — in the parameter editor and the interactions
    editor, both in the editor's sidebar, 177px wide at its default width. The chip and the list share
-   a line when there is room and wrap when there is not. The panel's global min-width on a searchable
-   select is more than the column holds, and would cut off the list's arrow. */
+   a line when there is room and wrap when there is not. Without min-width: 0 a long key would hold the
+   list as wide as its text, past the column. */
 .qs-storage-key-picker { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .qs-storage-key-picker__key {
     display: flex;

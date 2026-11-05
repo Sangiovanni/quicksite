@@ -17,9 +17,10 @@
  *
  *   QSComplexWizard.invalidateRoutesDatalist()
  *     Drops the cache so the next ensureRoutesDatalist() refetches.
- *     Call this after addRoute / deleteRoute / renameRoute if the
- *     admin offers those during the same session (currently they
- *     reload the editor, so this is dormant).
+ *
+ * On quicksite:routes-changed (the Edit list's refreshEditList()), a datalist
+ * already in the page is read again in place: a wizard left open keeps its
+ * inputs' `list` attribute, which names the id.
  *
  * Design notes:
  *  - <datalist> is purely an autocomplete suggestion — the user can
@@ -71,7 +72,7 @@
         }
         if (_loadingPromise) return _loadingPromise;
 
-        _datalist = _buildDatalistEl();
+        var dl = _datalist = _buildDatalistEl();
         var api = window.QuickSiteAdmin;
         if (!api) {
             // No admin API → just return the empty datalist id; inputs
@@ -86,7 +87,7 @@
         _loadingPromise = api.apiRequest('getRoutes', 'GET').then(function (res) {
             var payload = (res && res.data && (res.data.data || res.data)) || {};
             var flat = Array.isArray(payload.flat_routes) ? payload.flat_routes : [];
-            _populate(_datalist, flat);
+            _populate(dl, flat);
             _loadingPromise = null;
             return DATALIST_ID;
         }).catch(function (err) {
@@ -104,6 +105,12 @@
         _datalist = null;
         _loadingPromise = null;
     }
+
+    window.addEventListener('quicksite:routes-changed', function () {
+        if (!_datalist) return;
+        invalidateRoutesDatalist();
+        ensureRoutesDatalist();
+    });
 
     window.QSComplexWizard = window.QSComplexWizard || {};
     window.QSComplexWizard.ensureRoutesDatalist = ensureRoutesDatalist;

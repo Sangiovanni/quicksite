@@ -301,6 +301,7 @@ code,
 .admin-project-picker .qs-searchable-select {
     display: inline-block;
     width: auto;
+    min-width: 200px;
     max-width: 16rem;
 }
 .admin-project-picker .qs-searchable-select__trigger {
@@ -5556,6 +5557,11 @@ kbd {
 }
 
 .preview-toolbar__group--grow {
+    min-width: 200px;
+}
+
+/* The Edit list: in the toolbar's row, without this its width would follow the target's name. */
+.preview-toolbar__group .qs-searchable-select {
     min-width: 200px;
 }
 
@@ -11449,9 +11455,6 @@ code.preview-contextual-info__value {
     gap: var(--space-xs, 6px);
     align-items: center;
     width: 100%;
-}
-.qs-searchable-select{
-    min-width: 200px;
 }
 .qs-route-picker > .qs-searchable-select {
     flex: 1;

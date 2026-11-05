@@ -21,6 +21,12 @@ foreach (['apis', 'common'] as $qsSubtree) {
 <script>
 window.QS_APIS_I18N = <?= json_encode($qsApisI18n, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
 </script>
+<script>
+// The storage-key picker's own words, and only them: this page uses one of the wizards' helpers.
+window.QS_COMPLEX_WIZARD_I18N = <?= qs_inline_script_json(['complexWizard' => ['storageKeyPicker' => AdminTranslation::getInstance()->getRaw('complexWizard.storageKeyPicker') ?: new stdClass()]]) ?>;
+</script>
+<script src="<?= $baseUrl ?>/admin/assets/js/pages/preview/contextual-complex/wizard-text.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/contextual-complex/wizard-text.js') ?>"></script>
+<script src="<?= $baseUrl ?>/admin/assets/js/pages/preview/contextual-complex/storage-key-picker.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/preview/contextual-complex/storage-key-picker.js') ?>"></script>
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/api-import/openapi-converter.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/api-import/openapi-converter.js') ?>"></script>
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/apis.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/apis.js') ?>"></script>
 
@@ -178,16 +184,19 @@ window.QS_APIS_I18N = <?= json_encode($qsApisI18n, JSON_HEX_TAG | JSON_HEX_AMP |
                     </div>
                     
                     <div class="admin-form-group" id="auth-token-source-group" style="display: none;">
-                        <label class="admin-label" for="api-token-source"><?= __admin('apis.form.storageLocation') ?></label>
+                        <label class="admin-label" for="api-token-source-prefix"><?= __admin('apis.form.storageLocation') ?></label>
                         <select class="admin-select" id="api-token-source-prefix">
                             <option value="localStorage"><?= __admin('apis.form.storageLocalStorage') ?></option>
                             <option value="sessionStorage"><?= __admin('apis.form.storageSessionStorage') ?></option>
                             <option value="config"><?= __admin('apis.form.storageConfig') ?></option>
+                            <option value="header"><?= __admin('apis.form.storageHeader') ?></option>
                         </select>
-                        <label class="admin-label apis-auth-token-label"><?= __admin('apis.form.storageKeyName') ?></label>
+                        <label class="admin-label apis-auth-token-label" id="api-token-source-key-label" for="api-token-source-key"><?= __admin('apis.form.storageKeyName') ?></label>
                         <input type="text" class="admin-input apis-auth-token-input" id="api-token-source-key"
                                placeholder="authToken">
-                        <p class="admin-hint"><?= __admin('apis.form.storageKeyHint') ?></p>
+                        <!-- A storage key is picked or created (apis.js, the shared picker); the other locations are typed above. -->
+                        <div class="apis-auth-token-input" id="api-token-source-picker" style="display: none;"></div>
+                        <p class="admin-hint" id="api-token-source-hint"><?= __admin('apis.form.storageKeyHint') ?></p>
                         <div id="auth-config-warning" class="admin-alert admin-alert--warning apis-auth-config-warning" style="display: none;">
                             <small><?= __admin('apis.form.configWarning') ?></small>
                         </div>
@@ -212,8 +221,7 @@ window.QS_APIS_I18N = <?= json_encode($qsApisI18n, JSON_HEX_TAG | JSON_HEX_AMP |
                                 <option value="sessionStorage"><?= __admin('apis.form.storageSessionStorage') ?></option>
                             </select>
                             <label class="admin-label apis-auth-token-label"><?= __admin('apis.form.refreshTokenKey') ?></label>
-                            <input type="text" class="admin-input apis-auth-token-input" id="api-refresh-token-source-key"
-                                   placeholder="refreshToken">
+                            <div class="apis-auth-token-input" id="api-refresh-token-source-picker"></div>
                             <p class="admin-hint"><?= __admin('apis.form.refreshTokenKeyHint') ?></p>
                         </div>
                         <div class="admin-form-group">

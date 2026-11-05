@@ -1,8 +1,8 @@
 /**
  * Storage-key picker — a key of the project's storage registry, picked or created, never typed.
- * One picker for the two editors that ask for a key: the parameter editor's storage attributes
- * (data-attr-picker.js) and the Interactions tool's `storageKey` argument
- * (preview-js-interactions.js).
+ * One picker for every field that asks for a key: the parameter editor's storage attributes
+ * (data-attr-picker.js), the Interactions tool's `storageKey` argument and a state store's start
+ * value (preview-js-interactions.js), and the API page's token sources (apis.js).
  *
  *   const picker = QSComplexWizard.createStorageKeyPicker({
  *     container: HTMLElement,        // required
@@ -30,8 +30,9 @@
  * The prefix chip is QuickSiteUtils.renderStorageKeyPrefixChip() (core/utils.js), which the Storage
  * page shows too. Its rules, like this picker's, are in css/storage-admin.css.
  *
- * Loaded by: secure/admin/templates/pages/preview-config.php, with the other shared wizard helpers.
- * preview-js-interactions.js loads before it, so it reaches this when it renders, not when it loads.
+ * Loaded by: secure/admin/templates/pages/preview-config.php, with the other shared wizard helpers
+ * (preview-js-interactions.js loads before it, so it reaches this when it renders, not when it
+ * loads), and secure/admin/templates/pages/apis.php, with wizard-text.js and only these words.
  */
 (function () {
     'use strict';
@@ -45,6 +46,7 @@
     // -------- module-scope cache (shared across all picker instances) -----
     let _items = null;          // every declared item, cookies included; null until a read answers
     let _categories = [];       // the registry's categories, from the same answer
+    let _descLang = 'en';       // the language the registry's descriptions are written in, likewise
     let _reading = null;        // the read in flight
     let _generation = 0;        // a created key makes an older read's answer out of date
 
@@ -66,6 +68,7 @@
                 if (generation === _generation) {
                     _items = _normalizeItems(payload.items);
                     _categories = Array.isArray(payload.categories) ? payload.categories : [];
+                    if (typeof payload.descLang === 'string' && payload.descLang) _descLang = payload.descLang;
                 }
             })
             .catch(function (err) {
@@ -255,7 +258,7 @@
             const description = descInput.value.trim();
             if (description) {
                 body.description = {};
-                body.description[(window.PreviewConfig && window.PreviewConfig.defaultLang) || 'en'] = description;
+                body.description[_descLang] = description;
             }
             createBtn.disabled = true;
             try {
