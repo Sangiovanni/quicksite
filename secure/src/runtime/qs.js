@@ -1161,7 +1161,7 @@
      * and production disagree — the mode split that was rejected for the
      * storage prefix too. One behaviour everywhere.
      *
-     * Mirrors qs_project_cookie_name() in secure/src/functions/storageHelpers.php.
+     * Mirrors qs_project_cookie_name() in secure/src/functions/requestRuntime.php.
      * @param {string} name Engine cookie name
      * @returns {string}
      */

@@ -107,7 +107,7 @@ function _oauthIsHttps(): bool {
  * so every site served from the same origin opens the same session file. Two
  * built sites deployed side by side therefore share this store. Isolation used
  * to rest entirely on each site reading only its own project-namespaced cookie
- * (`qsp_<id>_qs_oauth`): isolation by lookup key, never verified against the
+ * (`qsp_<id>_qs_oauth_user`): isolation by lookup key, never verified against the
  * record. Stamping the owner into the record and checking it on read gives that
  * boundary a second, explicit check.
  *

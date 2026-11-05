@@ -2894,7 +2894,7 @@
             "refreshNone": "(aucun — rafraîchissement non configuré)",
             "refreshTokenStorage": "Stockage du refresh token",
             "refreshTokenKey": "Nom de la clé du refresh token",
-            "refreshTokenKeyHint": "Emplacement où le refresh token est stocké à l'exécution. Limité au stockage navigateur — 'config' publierait le token à tous les visiteurs.",
+            "refreshTokenKeyHint": "Emplacement où le refresh token est stocké à l'exécution. Limité au stockage navigateur.",
             "refreshBodyField": "Nom du champ du body pour le refresh token",
             "refreshBodyFieldHint": "Le champ du body POST de l'endpoint de rafraîchissement qui transporte le refresh token (envoyé comme <code>{&lt;champ&gt;: &lt;valeur&gt;}</code>).",
             "refreshResponseTokenPath": "Chemin réponse : nouveau token d'accès",

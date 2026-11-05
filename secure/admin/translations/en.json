@@ -3587,7 +3587,7 @@
             "refreshNone": "(none — no refresh configured)",
             "refreshTokenStorage": "Refresh token storage",
             "refreshTokenKey": "Refresh token key name",
-            "refreshTokenKeyHint": "Where the refresh token is stored at runtime. Restricted to browser storage — 'config' would publish the token to every visitor.",
+            "refreshTokenKeyHint": "Where the refresh token is stored at runtime. Restricted to browser storage.",
             "refreshBodyField": "Body field name for refresh token",
             "refreshBodyFieldHint": "The field in the refresh endpoint's POST body that carries the stored refresh token (sent as <code>{&lt;field&gt;: &lt;value&gt;}</code>).",
             "refreshResponseTokenPath": "Response path: new access token",
