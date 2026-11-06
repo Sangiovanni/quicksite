@@ -13,11 +13,6 @@ window.QuickSiteAPI = (function() {
     // Configuration
     // ============================================
 
-    // Legacy pre-C5b storage keys — referenced ONLY to clean up entries left
-    // by older versions (tokens no longer touch browser storage).
-    const TOKEN_KEY = 'quicksite_admin_token';
-    const REMEMBER_KEY = 'quicksite_admin_remember';
-
     /**
      * Get configuration value
      * Falls back to data attributes on body element if QUICKSITE_CONFIG not available
@@ -126,17 +121,11 @@ window.QuickSiteAPI = (function() {
     }
 
     /**
-     * Clear the in-memory token (and any retired storage entries left by older
-     * versions — one-time upgrade hygiene).
+     * Clear the in-memory token.
      */
     function clearToken() {
         currentToken = null;
         if (window.QUICKSITE_CONFIG) window.QUICKSITE_CONFIG.token = '';
-        try {
-            localStorage.removeItem(TOKEN_KEY);
-            sessionStorage.removeItem(TOKEN_KEY);
-            localStorage.removeItem(REMEMBER_KEY);
-        } catch { /* storage may be unavailable; nothing to clean */ }
     }
 
     /**
@@ -248,12 +237,11 @@ window.QuickSiteAPI = (function() {
     // message: it is an unbounded HTML document, and panel code interpolates
     // `data.message` into the DOM.
     //
-    // 204 has no body by contract and is not an error — handled by the caller.
-    //
     // A SUCCESSFUL response is passed through exactly as before (parsed JSON, or
     // the raw text under `message`, or null for an empty body) — the synthesis
     // below applies only when the status already says the request failed, so no
-    // working call site changes shape.
+    // working call site changes shape. A caller that needs an answer tells a
+    // null apart itself, as request() does.
     async function readResponseBody(response) {
         const text = await response.text();
         if (text) {
@@ -442,21 +430,18 @@ window.QuickSiteAPI = (function() {
 
         try {
             const response = await watchedFetch(url, options);
-            
-            // Handle 204 No Content responses
-            let result = null;
-            if (response.status !== 204) {
-                result = await readResponseBody(response);
-            }
-
-            // For 204, create a success response
-            if (response.status === 204) {
-                result = { status: 204, code: 'operation.success', message: 'Operation completed successfully' };
-            }
+            const result = await readResponseBody(response);
 
             // What is left of the write rate, and its refusal in the panel's language
             noteWriteRate(response);
             localizeRateRefusal(result, response.status);
+
+            // Every command answers an envelope, so an empty 2xx (a 204 included) did not
+            // come from one. It is an error the caller can show: reading it as a success
+            // would report work nobody did, and `data: null` would throw in the caller.
+            if (result === null) {
+                return clientError('client.empty_response', nonJsonMessage(response.status), response.status);
+            }
 
             // Dispatch event for successful write operations (non-GET)
             // This allows miniplayer to auto-reload preview

@@ -1984,12 +1984,17 @@
         // Kind selector.
         const kindSelect = document.createElement('select');
         kindSelect.className = 'admin-input sitemap-resolver-input-row__kind';
-        [
+        const kinds = [
             { v: 'param',   l: t('resolverKindParam',   'param:') },
             { v: 'query',   l: t('resolverKindQuery',   'query:') },
-            { v: 'session', l: t('resolverKindSession', 'session:') },
             { v: 'literal', l: t('resolverKindLiteral', 'literal') },
-        ].forEach(({ v, l }) => {
+        ];
+        // A resolver is given no session, so `session:` always reads as nothing and is never offered. A row
+        // saved with it still shows what it holds, and saves as it was unless its author changes it.
+        if (initialKind === 'session') {
+            kinds.push({ v: 'session', l: t('resolverKindSession', 'session:') + ' ' + t('resolverKindSessionNothing') });
+        }
+        kinds.forEach(({ v, l }) => {
             const opt = document.createElement('option');
             opt.value = v;
             opt.textContent = l;

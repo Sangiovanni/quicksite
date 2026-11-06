@@ -17,7 +17,8 @@
  *   [data-consent-toggle="<category>"]       — per-category checkbox in the popup
  *
  * Visible copy uses translation keys (textKey) so the layer shows in the
- * visitor's language from day one.
+ * visitor's language from day one. Their words are in
+ * <secure>/src/translations/<lang>.json, read by key (qs_starting_words_seed()).
  */
 
 if (!defined('SECURE_FOLDER_PATH')) {
@@ -95,7 +96,7 @@ function buildConsentBannerStructure(?string $policyRoute): array {
             'id' => 'qs-consent-banner',
             'class' => 'qs-consent-banner',
             'role' => 'region',
-            'aria-label' => 'Cookie consent',
+            'aria-label' => 'consent.banner.aria_label',
             'hidden' => true,
         ], [
             _cNode('p', ['class' => 'qs-consent-banner__text'], $textChildren),
@@ -129,13 +130,13 @@ function buildConsentPopupStructure(array $categories): array {
             'class' => 'qs-consent-popup',
             'role' => 'dialog',
             'aria-modal' => 'true',
-            'aria-label' => 'Cookie preferences',
+            'aria-label' => 'consent.popup.aria_label',
             'hidden' => true,
         ], [
             _cNode('div', ['class' => 'qs-consent-popup__dialog'], [
                 _cNode('div', ['class' => 'qs-consent-popup__head'], [
                     _cNode('h2', ['class' => 'qs-consent-popup__title'], [_cText('consent.popup.title')]),
-                    _cNode('button', ['type' => 'button', 'class' => 'qs-consent-popup__close', 'data-consent-action' => 'close', 'aria-label' => 'Close'], [_cRaw('✕')]),
+                    _cNode('button', ['type' => 'button', 'class' => 'qs-consent-popup__close', 'data-consent-action' => 'close', 'aria-label' => 'consent.popup.close_label'], [_cRaw('✕')]),
                 ]),
                 _cNode('p', ['class' => 'qs-consent-popup__intro'], [_cText('consent.popup.intro')]),
                 _cNode('div', ['class' => 'qs-consent-popup__rows'], $rows),
@@ -185,9 +186,29 @@ function consentOAuthLinks(): array {
 }
 
 /**
+ * The cookies QuickSite itself sets for a visitor of this site, outside the registry and the consent
+ * rule, each named by what names it: the consent record, and, on a site that signs visitors in, the
+ * sign-in's state store and the signed-in session. A site signs visitors in when consentOAuthLinks()
+ * finds a provider through the one scan of its routes ($oauthLinks, its answer), so the rows and the
+ * sign-in section say the same thing.
+ *
+ * @return list<array{name: string, text: string}> `text` starts the row's two textKeys:
+ *         consent.policy.<text>_retention and consent.policy.<text>_description
+ */
+function consentEngineCookies(array $oauthLinks): array {
+    $cookies = [['name' => qs_project_cookie_name(QS_CONSENT_COOKIE), 'text' => 'record']];
+    if ($oauthLinks !== []) {
+        $cookies[] = ['name' => QS_OAUTH_SESSION_COOKIE, 'text' => 'oauth_session'];
+        $cookies[] = ['name' => qs_project_cookie_name(QS_OAUTH_COOKIE), 'text' => 'oauth_user'];
+    }
+    return $cookies;
+}
+
+/**
  * Cookie-policy page structure (array of nodes) — a button that reopens the
  * cookie preferences, a deterministic table built from the registry (and the
- * theme switch's key when the switch is on), an OAuth-provider privacy-link
+ * theme switch's key when the switch is on, and the cookies QuickSite itself
+ * sets: consentEngineCookies()), an OAuth-provider privacy-link
  * section and a legal note. Structural copy + per-key descriptions use textKeys
  * (translatable); name/scope/retention are baked from the registry and the
  * project's settings at generation time (re-generate to refresh).
@@ -259,6 +280,23 @@ function buildCookiePolicyStructure(array $items, array $oauthLinks): array {
             _cNode('td', [], [_cText('consent.policy.theme_description')]),
         ]);
     }
+
+    // The cookies QuickSite itself sets for a visitor, in the same row. They are outside the registry and
+    // the consent rule, and a visitor checking their cookies must find them here. Like every row, each is
+    // the setting at generation: the page is generated again after the site's sign-in routes change.
+    foreach (consentEngineCookies($oauthLinks) as $cookie) {
+        if (strpos($cookie['name'], 'qsp_') === 0) {
+            $anyPrefixed = true;
+        }
+        $bodyRows[] = _cNode('tr', [], [
+            _cNode('td', ['class' => 'qs-cookie-policy__key'], [_cRaw($cookie['name'])]),
+            _cNode('td', [], [_cRaw('cookie')]),
+            _cNode('td', [], [_cText('consent.category.essential')]),
+            _cNode('td', [], [_cText('consent.policy.' . $cookie['text'] . '_retention')]),
+            _cNode('td', [], [_cText('consent.policy.no')]),
+            _cNode('td', [], [_cText('consent.policy.' . $cookie['text'] . '_description')]),
+        ]);
+    }
     $table = _cNode('table', ['class' => 'qs-cookie-policy'], [$thead, _cNode('tbody', [], $bodyRows)]);
 
     // The way back to the cookie preferences, right under the intro: withdrawing consent must be
@@ -311,118 +349,4 @@ function buildCookiePolicyStructure(array $items, array $oauthLinks): array {
     $children[] = _cNode('p', ['class' => 'qs-cookie-policy__disclaimer'], [_cText('consent.policy.disclaimer')]);
 
     return [_cNode('main', ['class' => 'container qs-cookie-policy-page'], $children)];
-}
-
-/** Default EN/FR copy for the cookie-policy page textKeys. */
-function cookiePolicyTranslationSeed(): array {
-    return [
-        'en' => [
-            'consent.policy.title' => 'Cookie policy',
-            'consent.policy.intro' => 'This page lists the browser storage this site uses, generated from the site\'s storage registry.',
-            'consent.policy.change_preferences' => 'Change my cookie preferences',
-            'consent.policy.col_key' => 'Name in your browser',
-            'consent.policy.col_scope' => 'Storage',
-            'consent.policy.col_category' => 'Category',
-            'consent.policy.col_retention' => 'Retention',
-            'consent.policy.col_consent' => 'Needs consent',
-            'consent.policy.col_description' => 'Purpose',
-            'consent.policy.yes' => 'Yes',
-            'consent.policy.no' => 'No',
-            'consent.policy.oauth_title' => 'Third-party sign-in',
-            'consent.policy.oauth_intro' => 'This site offers sign-in via the following providers. See each provider\'s own privacy policy for what they collect.',
-            'consent.policy.provider_link' => 'Privacy policy',
-            'consent.policy.prefix_note' => 'Names in the first column include a short site prefix, because several sites can share one browser storage area — this is how each site keeps its own entries separate. It is the exact name you will find in your browser.',
-            'consent.policy.theme_retention' => 'Until you clear it',
-            'consent.policy.theme_description' => 'Remembers the light or dark theme you chose. It is set only when you click the theme switch.',
-            'consent.policy.disclaimer' => 'This summary is generated from the site\'s storage registry and is provided for transparency. It is not legal advice — obtain your own legal review.',
-        ],
-        'fr' => [
-            'consent.policy.title' => 'Politique des cookies',
-            'consent.policy.intro' => 'Cette page liste les données de stockage que ce site utilise, générée à partir du registre de stockage du site.',
-            'consent.policy.change_preferences' => 'Modifier mes préférences de cookies',
-            'consent.policy.col_key' => 'Nom dans votre navigateur',
-            'consent.policy.col_scope' => 'Stockage',
-            'consent.policy.col_category' => 'Catégorie',
-            'consent.policy.col_retention' => 'Conservation',
-            'consent.policy.col_consent' => 'Consentement requis',
-            'consent.policy.col_description' => 'Finalité',
-            'consent.policy.yes' => 'Oui',
-            'consent.policy.no' => 'Non',
-            'consent.policy.oauth_title' => 'Connexion tierce',
-            'consent.policy.oauth_intro' => 'Ce site propose la connexion via les fournisseurs suivants. Consultez la politique de confidentialité de chaque fournisseur pour savoir ce qu\'il collecte.',
-            'consent.policy.provider_link' => 'Politique de confidentialité',
-            'consent.policy.prefix_note' => 'Les noms de la première colonne comportent un court préfixe propre au site, car plusieurs sites peuvent partager un même espace de stockage du navigateur — c\'est ainsi que chaque site garde ses entrées séparées. C\'est exactement le nom que vous trouverez dans votre navigateur.',
-            'consent.policy.theme_retention' => 'Jusqu\'à ce que vous l\'effaciez',
-            'consent.policy.theme_description' => 'Mémorise le thème clair ou sombre que vous avez choisi. Il n\'est enregistré que lorsque vous cliquez sur le sélecteur de thème.',
-            'consent.policy.disclaimer' => 'Ce résumé est généré à partir du registre de stockage du site et fourni à titre de transparence. Il ne constitue pas un avis juridique — faites réaliser votre propre vérification juridique.',
-        ],
-    ];
-}
-
-/** Does a dot-notation key already resolve in a nested translation tree? */
-function _consentKeyExists(array $nested, string $dotKey): bool {
-    $cursor = $nested;
-    foreach (explode('.', $dotKey) as $part) {
-        if (!is_array($cursor) || !array_key_exists($part, $cursor)) {
-            return false;
-        }
-        $cursor = $cursor[$part];
-    }
-    return true;
-}
-
-/**
- * Filter a flat seed map down to keys NOT already present in translate/<lang>.json
- * — re-generating must never clobber the author's edited copy.
- */
-function consentFilterNewKeys(string $lang, array $flat): array {
-    $file = PROJECT_PATH . '/translate/' . $lang . '.json';
-    $existing = [];
-    if (file_exists($file)) {
-        $decoded = json_decode((string) @file_get_contents($file), true);
-        if (is_array($decoded)) $existing = $decoded;
-    }
-    $out = [];
-    foreach ($flat as $key => $val) {
-        if (!_consentKeyExists($existing, $key)) {
-            $out[$key] = $val;
-        }
-    }
-    return $out;
-}
-
-/** Default EN/FR copy for the seeded textKeys. Flat dot-notation maps. */
-function consentTranslationSeed(): array {
-    return [
-        'en' => [
-            'consent.banner.message' => 'We use cookies to improve your experience. You can accept, refuse, or customize your choices.',
-            'consent.banner.policy_link' => 'Cookie policy',
-            'consent.action.accept_all' => 'Accept all',
-            'consent.action.refuse_all' => 'Refuse all',
-            'consent.action.customize' => 'Customize',
-            'consent.action.save' => 'Save choices',
-            'consent.popup.title' => 'Cookie preferences',
-            'consent.popup.intro' => 'Choose which categories you allow. Essential cookies are always on.',
-            'consent.category.essential' => 'Essential',
-            'consent.category.essential_note' => 'Always on',
-            'consent.category.functional' => 'Functional',
-            'consent.category.analytics' => 'Analytics',
-            'consent.category.marketing' => 'Marketing',
-        ],
-        'fr' => [
-            'consent.banner.message' => 'Nous utilisons des cookies pour améliorer votre expérience. Vous pouvez accepter, refuser ou personnaliser vos choix.',
-            'consent.banner.policy_link' => 'Politique des cookies',
-            'consent.action.accept_all' => 'Tout accepter',
-            'consent.action.refuse_all' => 'Tout refuser',
-            'consent.action.customize' => 'Personnaliser',
-            'consent.action.save' => 'Enregistrer mes choix',
-            'consent.popup.title' => 'Préférences des cookies',
-            'consent.popup.intro' => 'Choisissez les catégories que vous autorisez. Les cookies essentiels sont toujours actifs.',
-            'consent.category.essential' => 'Essentiels',
-            'consent.category.essential_note' => 'Toujours actifs',
-            'consent.category.functional' => 'Fonctionnels',
-            'consent.category.analytics' => 'Analytique',
-            'consent.category.marketing' => 'Marketing',
-        ],
-    ];
 }

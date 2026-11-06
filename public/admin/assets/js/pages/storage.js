@@ -838,7 +838,7 @@
             ? String(status.policyRoute).replace(/^\/+/, '') : '';
 
         var cats = _declaredNonEssentialCategories();
-        content.appendChild(_renderHint('Generates (or refreshes) the cookie banner + preferences popup from your declared keys, seeds EN/FR default copy (new keys only), and enables the consent layer. Both render on every page and are editable in the visual editor.'));
+        content.appendChild(_renderHint(t('storage.consent.generateHint')));
         content.appendChild(QSDom.el('p', {
             class: 'admin-hint',
             text: cats.length
@@ -864,7 +864,7 @@
             content.appendChild(_renderGroup(_renderLabel('Cookie-policy page route'), routeInput,
                 _renderHint(staleRoute
                     ? 'The previous route "' + staleRoute + '" no longer exists — generate to recreate it, or type a different one.'
-                    : 'Optional. Generates a deterministic cookie-policy page at this route (the banner links to it).')));
+                    : t('storage.consent.routeHint'))));
         }
 
         // Asking every visitor again (the stored version bumped) is offered once the layer is on;
@@ -939,6 +939,7 @@
             //    route is only wired up when a page is actually created. If the
             //    user cancels an overwrite, nothing points at that route.
             var policyMsg = '';
+            var toastType = 'success';
             if (policyRoute) {
                 var pr = await api('generateCookiePolicy', 'POST', opts.isUpdate ? { route: policyRoute, overwrite: true } : { route: policyRoute });
                 var pd = (pr && pr.data && (pr.data.data || pr.data)) || {};
@@ -949,13 +950,18 @@
                     } else {
                         pr = null;
                         policyMsg = ' (Cookie-policy page skipped — route exists, not overwritten.)';
+                        toastType = 'warning';
                     }
                 }
                 if (pr && pr.ok) {
                     policyMsg = ' Cookie-policy page ' + (pd.overwritten ? 'updated' : 'created') + ' at ' + (pd.route || ('/' + policyRoute)) + '.';
                 } else if (pr) {
                     policyMsg = ' (Cookie-policy page failed: ' + ((pr.data && pr.data.message) || 'error') + '.)';
+                    toastType = 'warning';
                 }
+            } else {
+                policyMsg = ' ' + t('storage.consent.noPage');
+                toastType = 'warning';
             }
 
             // 2. Consent layer — banner reads the (now-updated) policy route.
@@ -974,6 +980,7 @@
                 (d.askedAgain ? ' ' + t('storage.consent.askedAgain') : '') +
                 policyMsg +
                 ' Preview a page to see the banner.';
+            QuickSiteUtils.showToast(msg, toastType);
             // Re-render from fresh status — flips to the locked route + Update/
             // Delete once a page exists, so a re-generate can't change the route.
             await _refreshConsentContent(opts.content, msg);

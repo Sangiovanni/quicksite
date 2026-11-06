@@ -56,7 +56,7 @@ function _oauthEnsureSession(): void {
     if (session_status() === PHP_SESSION_ACTIVE) {
         return;
     }
-    session_name('qs_oauth_session');
+    session_name(QS_OAUTH_SESSION_COOKIE);
     session_set_cookie_params([
         'lifetime' => 0,       // session cookie (cleared on browser close;
                                 // server-side TTL is independent and longer)

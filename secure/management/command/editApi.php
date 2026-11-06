@@ -104,6 +104,11 @@ function __command_editApi(array $params = [], array $urlParams = []): ApiRespon
         return qs_small_write_refused();
     }
     
+    if (!empty($result['saveFailed'])) {
+        return ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage('The API registry could not be saved. Nothing was changed.');
+    }
+
     if (!$result['success']) {
         $code = strpos($result['error'], 'not found') !== false ? 404 : 400;
         return ApiResponse::create($code, 'api.error.invalid_parameter')

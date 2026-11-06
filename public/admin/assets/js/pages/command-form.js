@@ -166,6 +166,62 @@ function _renderNotExecutableNotice(reasonKey) {
 }
 
 /**
+ * What stands where a command's fields and button would be, for a role that does not grant it:
+ * filterByPermissions() hides the form, and the documentation stays beside this. Not a security
+ * control: the command refuses the call whoever sends it.
+ *
+ * @returns {HTMLDivElement}
+ */
+function _renderNotPermittedNotice() {
+    const role = QuickSiteAdmin.permissions.role;
+    let reason = t('commandForm.notPermitted.noProject');
+    if (role === 'unknown' || role === 'error') {
+        reason = t('commandForm.notPermitted.unread');
+    } else if (role) {
+        reason = t('commandForm.notPermitted.role', { role: role });
+    }
+    return QSDom.el('div', { class: 'admin-alert admin-alert--warning', id: 'command-not-permitted' }, [
+        QSDom.el('strong', { text: t('commandForm.notPermitted.title') }),
+        _renderHint([reason])
+    ]);
+}
+
+/**
+ * The picker's value in the field it serves: that field is what the form sends, and its reader can
+ * still edit it. A picker emptied empties the field, so no date is sent, and an hour or a minute
+ * with no date fills nothing.
+ *
+ * @param {string} fieldId       the field's id; the picker's parts are named after it
+ * @param {boolean} includeTime  whether the value carries the hour and minute
+ */
+function _fillFromPicker(fieldId, includeTime) {
+    const dateInput = document.getElementById(fieldId + '-date');
+    const field = document.getElementById(fieldId);
+    if (!dateInput || !field) return;
+    let value = dateInput.value;
+    if (value && includeTime) {
+        const hour = document.getElementById(fieldId + '-hour');
+        const minute = document.getElementById(fieldId + '-min');
+        value = value + 'T' + (hour ? hour.value : '00') + ':' + (minute ? minute.value : '00') + ':00';
+    }
+    field.value = value;
+    field.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+/**
+ * Whether help's type for a parameter means JSON: `object`, `array`, or a choice between them
+ * (`object|array`), `null` beside them changing nothing. A type that also allows a string
+ * (`string|object`) does not: what the field holds is sent as text.
+ *
+ * @param {string} type
+ * @returns {boolean}
+ */
+function _isJsonType(type) {
+    const parts = String(type).split('|').map(part => part.trim()).filter(part => part !== 'null');
+    return parts.length > 0 && parts.every(part => part === 'object' || part === 'array');
+}
+
+/**
  * The centred placeholder line inside a component-data field area.
  * @param {string} text
  * @param {boolean} [isError]
@@ -281,6 +337,13 @@ function _renderComponentDataTable(variables, idPrefix, currentData) {
 // Load documentation immediately (init() already waits for DOM ready)
 loadCommandDocumentation();
 
+// A form this role cannot use is hidden: the reason stands in its place.
+(QuickSiteAdmin.permissionsReady || Promise.resolve()).then(() => {
+    const form = document.getElementById('command-form');
+    if (!form || !QuickSiteAdmin.permissions.loaded || QuickSiteAdmin.hasPermission(COMMAND_NAME)) return;
+    form.parentNode.insertBefore(_renderNotPermittedNotice(), form);
+});
+
 async function loadCommandDocumentation() {
     try {
         const result = await QuickSiteAdmin.apiRequest('help', 'GET', null, [COMMAND_NAME]);
@@ -327,7 +390,9 @@ async function loadCommandDocumentation() {
  * the URL marker") are both left as text boxes. A dropdown on either would
  * offer a choice that is refused if taken.
  *
- * `kind` picks the shape:
+ * `kind` picks the shape (the rows below name the other kinds):
+ *   'command'   a command name a filter reads -> the index's commands, searchable, blank
+ *               meaning all, and typing stays open for a command the log still holds.
  *   'select'    the route must already exist -> a real dropdown of routes.
  *   'suggest'   a valid value may be OUTSIDE the list -> keep the text input,
  *               hang a <datalist> on it and say so in a hint. Only three
@@ -443,6 +508,7 @@ function consoleRefusalKey(command) {
 }
 
 const FIELD_PICKERS = {
+    getCommandHistory:           { kind: 'command', param: 'command' },
     // --- the route must already exist: a real dropdown ---------------------
     setRouteResolver:            { kind: 'select', param: 'route', source: 'routes' },
     importStructureTranslations: [
@@ -925,6 +991,29 @@ async function _initRouteSuggest(form, cfg) {
         select.appendChild(group);
     }
     _syncPicker(select);
+}
+
+/**
+ * A command name: every command the index lists, in its groups, searchable. The page holds the
+ * list (QS_COMMAND_GROUPS, the index's own). Blank means all, and a name can still be typed, as
+ * a log keeps the name of a command that has since been removed.
+ *
+ * @param {HTMLFormElement} form
+ * @param {Object} cfg  a FIELD_PICKERS row
+ */
+function _initCommandPicker(form, cfg) {
+    const built = _initPickOrType(form, cfg.param, {
+        placeholder: t('commandForm.select.allCommands'),
+        sentinelText: t('commandForm.select.commandCustom'),
+        sentinelHint: t('commandForm.select.commandCustomHint'),
+        inputPlaceholder: t('commandForm.select.commandCustomPlaceholder')
+    });
+    if (!built) return;
+    (window.QS_COMMAND_GROUPS || []).forEach(group => {
+        built.select.appendChild(QSDom.el('optgroup', { label: group.label }, (group.commands || []).map(name =>
+            QSDom.el('option', { value: name, text: name }))));
+    });
+    _syncPicker(built.select);
 }
 
 /**
@@ -1677,6 +1766,8 @@ async function applyPagePickers() {
             await _initJsFunctionSelect(form, cfg);
         } else if (cfg.kind === 'language') {
             await _initLanguagePicker(form, cfg);
+        } else if (cfg.kind === 'command') {
+            _initCommandPicker(form, cfg);
         }
     }
 
@@ -1691,7 +1782,13 @@ async function applyPagePickers() {
 
 async function initEnhancedFeatures() {
     const form = document.getElementById('command-form');
-    
+
+    // The form's Reset changes its selects with no change event, and a searchable list shows its
+    // own label: without this it keeps naming a choice the form no longer holds.
+    form.addEventListener('reset', () => {
+        setTimeout(() => form.querySelectorAll('select').forEach(_syncPicker), 0);
+    });
+
     // Initialize JSON editors
     form.querySelectorAll('textarea[data-json-editor]').forEach(textarea => {
         QuickSiteAdmin.initJsonEditor(textarea);
@@ -2807,13 +2904,10 @@ async function initClearHistoryForm() {
     const form = document.getElementById('command-form');
 
     // `before` declares ui_type 'date' in help.php, so renderFormField has
-    // ALREADY built the date-picker widget: a date input, an Apply button, and
-    // the "Or enter manually" field that carries the submitted value.
-    //
-    // This function used to replace that manual field with a second date input.
-    // Two consequences: the Apply button wrote to an element id that no longer
-    // existed, so it silently did nothing; and a field labelled "enter manually"
-    // was itself a date picker. Enhance the picker the form already has instead.
+    // ALREADY built the date-picker widget: a date input that fills the
+    // "Or enter manually" field, which carries the submitted value. This
+    // enhances that picker: replacing the manual field with a second date input
+    // would leave the picker nothing to fill.
     const today = new Date().toISOString().split('T')[0];
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -2830,8 +2924,7 @@ async function initClearHistoryForm() {
         picker.max = today;            // nothing later than today is clearable
         picker.value = defaultDate;
     }
-    // Seed the submitted field too, so the form arrives ready to run — what the
-    // old conversion gave — and so Apply visibly changes something.
+    // Seed the submitted field too, so the form arrives ready to run.
     if (beforeInput && !beforeInput.value) {
         beforeInput.value = defaultDate;
     }
@@ -5078,7 +5171,9 @@ function renderFormField(rawName, param, required) {
         const today = new Date().toISOString().split('T')[0];
         const defaultExample = example || today;
 
-        const dateProps = { type: 'date', id: inputId + '-date', class: 'admin-input admin-input--date', value: today };
+        // Empty until someone picks: a date shown beforehand could not be picked, as choosing
+        // the value an input already holds fires no change.
+        const dateProps = { type: 'date', id: inputId + '-date', class: 'admin-input admin-input--date' };
         dateProps['data-datetime-date'] = inputId;
 
         const selectors = [
@@ -5097,21 +5192,12 @@ function renderFormField(rawName, param, required) {
                 _renderTwoDigitSelect(inputId + '-min', 'data-datetime-min', 60)
             ]));
         }
-        // A real listener, not an inline onclick attribute. An attribute is
-        // compiled in GLOBAL scope, and applyDateTimeToField lives inside this
-        // file's IIFE, so the attribute could never reach it — clicking Apply
-        // threw a ReferenceError and did nothing. QSDom.el turns a FUNCTION
-        // passed as `onclick` into an addEventListener, which closes over the
-        // function properly.
-        selectors.push(QSDom.el('button', {
-            type: 'button',
-            class: 'admin-btn admin-btn--small admin-btn--secondary',
-            onclick: () => applyDateTimeToField(inputId, includeTime),
-            text: t('commandForm.field.apply')
-        }));
-
         inputArea = QSDom.el('div', { class: 'admin-datetime-picker', 'data-target': inputId }, [
-            QSDom.el('div', { class: 'admin-datetime-picker__selectors' }, selectors),
+            // A change in any of them bubbles here: one listener fills the field.
+            QSDom.el('div', {
+                class: 'admin-datetime-picker__selectors',
+                onchange: () => _fillFromPicker(inputId, includeTime)
+            }, selectors),
             QSDom.el('div', { class: 'admin-form-group', style: 'margin-top: var(--space-sm);' }, [
                 _renderLabel(t('commandForm.field.orEnterManually'), 'admin-label admin-label--small'),
                 QSDom.el('input', _fieldProps({
@@ -5172,7 +5258,7 @@ function renderFormField(rawName, param, required) {
             QSDom.el('span', { text: description })
         ]);
     } else {
-        switch (type) {
+        switch (_isJsonType(type) && type !== 'array' ? 'object' : type) {
             case 'boolean': {
                 const select = QSDom.el('select', (function () {
                     const props = { name: name, id: inputId, class: 'admin-select' };
@@ -5205,6 +5291,7 @@ function renderFormField(rawName, param, required) {
                     ? (typeof example === 'string' ? example : JSON.stringify(example, null, 2))
                     : (type === 'array' ? '[]' : '{}');
                 const props = { name: name, id: inputId, class: 'admin-textarea', placeholder: placeholderValue };
+                if (type !== 'array' && type !== 'object') props.rows = '6';
                 props['data-json-editor'] = '';
                 if (isUrlParam) props['data-url-param'] = '';
                 inputArea = QSDom.el('textarea', props);
@@ -5398,65 +5485,6 @@ function renderCommandDocs(doc) {
     }
     sections.forEach(section => container.appendChild(section));
 }
-
-/**
- * Apply date/time picker values to the target input field
- * @param {string} fieldId - The ID of the target input field
- * @param {boolean} includeTime - Whether to include time in the value
- */
-function applyDateTimeToField(fieldId, includeTime = true) {
-    const dateInput = document.getElementById(fieldId + '-date');
-    const targetInput = document.getElementById(fieldId);
-    
-    if (!dateInput || !targetInput) return;
-    
-    let value = dateInput.value;
-    
-    if (!value) {
-        // Default to today
-        value = new Date().toISOString().split('T')[0];
-    }
-    
-    if (includeTime) {
-        const hourSelect = document.getElementById(fieldId + '-hour');
-        const minSelect = document.getElementById(fieldId + '-min');
-        
-        const hour = hourSelect ? hourSelect.value : '00';
-        const min = minSelect ? minSelect.value : '00';
-        
-        value = `${value}T${hour}:${min}:00`;
-    }
-    
-    targetInput.value = value;
-    targetInput.focus();
-    
-    // Trigger change event for any listeners
-    targetInput.dispatchEvent(new Event('change', { bubbles: true }));
-}
-
-/**
- * Initialize datetime pickers - set up auto-apply on change (optional)
- */
-function initDateTimePickers() {
-    document.querySelectorAll('.admin-datetime-picker').forEach(picker => {
-        const targetId = picker.dataset.target;
-        const dateInput = picker.querySelector('[data-datetime-date]');
-        
-        // Optional: auto-apply when date changes
-        if (dateInput) {
-            dateInput.addEventListener('change', () => {
-                // Only auto-apply if user has interacted with date picker
-                const targetInput = document.getElementById(targetId);
-                if (targetInput && !targetInput.value) {
-                    // Don't auto-apply if user hasn't clicked Apply yet
-                }
-            });
-        }
-    });
-}
-
-// Initialize datetime pickers (init() already ensures DOM is ready)
-initDateTimePickers();
     } // end init()
     
     // Initialize when DOM is ready

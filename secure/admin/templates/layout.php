@@ -775,6 +775,7 @@ $langNames = [
                     responseStatus: '<?= __adminJs('commands.responseStatus') ?>',
                     errorLoadingOptions: '<?= __adminJs('commands.errorLoadingOptions') ?>',
                     executedMsg: '<?= __adminJs('commands.executedMsg') ?>',
+                    notPermittedHint: '<?= __adminJs('commands.notPermittedHint') ?>',
                     failedMsg: '<?= __adminJs('commands.failedMsg') ?>',
                     errorPrefix: '<?= __adminJs('commands.errorPrefix') ?>',
                     downloadedPrefix: '<?= __adminJs('commands.downloadedPrefix') ?>',

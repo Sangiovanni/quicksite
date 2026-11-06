@@ -45,9 +45,13 @@ function __command_deleteApi(array $params = [], array $urlParams = []): ApiResp
         return qs_small_write_refused();
     }
     
+    if (!empty($result['saveFailed'])) {
+        return ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage('The API registry could not be saved. Nothing was removed.');
+    }
+
     if (!$result['success']) {
-        $code = strpos($result['error'], 'not found') !== false ? 404 : 400;
-        return ApiResponse::create($code, 'api.error.invalid_parameter')
+        return ApiResponse::create(404, 'api.error.invalid_parameter')
             ->withMessage($result['error']);
     }
     

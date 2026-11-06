@@ -268,7 +268,8 @@ class ApiEndpointManager {
         if (!$this->saveConfig($config)) {
             return [
                 'success' => false,
-                'error' => 'Failed to save configuration'
+                'error' => 'Failed to save configuration',
+                'saveFailed' => true
             ];
         }
         
@@ -526,7 +527,8 @@ class ApiEndpointManager {
         if (!$this->saveConfig($config)) {
             return [
                 'success' => false,
-                'error' => 'Failed to save configuration'
+                'error' => 'Failed to save configuration',
+                'saveFailed' => true
             ];
         }
 
@@ -562,7 +564,8 @@ class ApiEndpointManager {
         if (!$this->saveConfig($config)) {
             return [
                 'success' => false,
-                'error' => 'Failed to save configuration'
+                'error' => 'Failed to save configuration',
+                'saveFailed' => true
             ];
         }
         

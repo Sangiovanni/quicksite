@@ -110,6 +110,22 @@ if (!defined('QS_OAUTH_COOKIE')) {
     define('QS_OAUTH_COOKIE', 'qs_oauth_user');
 }
 
+/**
+ * The sign-in's state store: the one PHP session of the OAuth flow (oauthStateStore.php). It is one
+ * name on a host, not namespaced per project, and it lives here for the same reason.
+ */
+if (!defined('QS_OAUTH_SESSION_COOKIE')) {
+    define('QS_OAUTH_SESSION_COOKIE', 'qs_oauth_session');
+}
+
+/**
+ * The consent record's bare name, namespaced per project by qs_project_cookie_name(). qs.js writes
+ * and reads the cookie under its own QS_CONSENT_COOKIE, which holds the same name.
+ */
+if (!defined('QS_CONSENT_COOKIE')) {
+    define('QS_CONSENT_COOKIE', 'consent_prefs');
+}
+
 if (!function_exists('qs_project_cookie_name')) {
     /**
      * The physical name of an engine-owned cookie, namespaced by project.

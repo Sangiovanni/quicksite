@@ -13,9 +13,7 @@
 window.QuickSiteStorageKeys = Object.freeze({
     // Auth / session — nothing auth-related touches browser storage. The
     // session lives in an HttpOnly cookie the page cannot read, and the
-    // per-session token is in-memory + page-embedded. The old
-    // 'quicksite_admin_token' / 'quicksite_admin_remember' keys survive only as
-    // literals inside api.js clearToken() for one-time legacy cleanup.
+    // per-session token is in-memory + page-embedded.
     adminPrefs:          'quicksite_admin_prefs',
     pendingMessage:      'quicksite_pending_message',
 

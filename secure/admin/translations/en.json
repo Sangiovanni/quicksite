@@ -601,6 +601,7 @@
         "responseStatus": "Status",
         "errorLoadingOptions": "Error loading options",
         "executedMsg": "Command executed successfully.",
+        "notPermittedHint": "Your role in this project does not allow this command. Open it to read its documentation.",
         "failedMsg": "Command failed",
         "errorPrefix": "Error: ",
         "downloadedPrefix": "Downloaded: ",
@@ -711,6 +712,10 @@
             "endpointRef": "Select an endpoint (@api/endpoint)...",
             "snippet": "Select snippet...",
             "allRoutes": "All routes (leave empty)",
+            "allCommands": "All commands (leave empty)",
+            "commandCustom": "Type another command name\u2026",
+            "commandCustomHint": "A log can hold a command that has since been removed",
+            "commandCustomPlaceholder": "Type a command name",
             "page": "Select page...",
             "component": "Select component...",
             "route": "Select route...",
@@ -897,7 +902,6 @@
             "date": "Date",
             "hour": "Hour",
             "minute": "Min",
-            "apply": "Apply",
             "orEnterManually": "Or enter manually:",
             "showPassword": "Show password",
             "hidePassword": "Hide password",
@@ -907,6 +911,12 @@
             "examplesLabel": "Examples:"
         },
         "noDocumentation": "No additional documentation available.",
+        "notPermitted": {
+            "title": "Your role cannot run this command",
+            "role": "Your role in this project, :role, does not allow this command, so there are no fields and no button here. Its documentation is beside this.",
+            "noProject": "You have no role in an open project, so there are no fields and no button here. Open a project you belong to, or read this command's documentation beside this.",
+            "unread": "Your permissions could not be read, so there are no fields and no button here. Reload the page. This command's documentation is beside this."
+        },
         "notExecutable": {
             "title": "Documented here, run elsewhere",
             "login": "Signing in from this console would mint a second session on top of the one this panel is already using. The parameters and documentation below are complete \u2014 call it against the Management API instead.",
@@ -1337,6 +1347,7 @@
         }
     },
     "sitemapPage": {
+        "resolverKindSessionNothing": "(reads nothing: a resolver is given no session)",
         "title": "Sitemap",
         "subtitle": "Manage your site routes and navigation structure",
         "addRootRoute": "Add root route",
@@ -1628,7 +1639,10 @@
         "consent": {
             "askAgain": "Ask visitors again",
             "askAgainHint": "Every visitor's recorded choice stops counting: the banner shows again, and until they choose, nothing non-essential is kept. A change to a category's keys already asks again for that category.",
-            "askedAgain": "Every visitor is asked again."
+            "askedAgain": "Every visitor is asked again.",
+            "generateHint": "Generates (or refreshes) the cookie banner + preferences popup from your declared keys, writes their texts in every language your pages read (only where a key has none, so an edited text stays), and enables the consent layer. Both render on every page and are editable in the visual editor.",
+            "routeHint": "Optional. Generates a deterministic cookie-policy page at this route, and the banner links to it. Left empty, there is no page and the banner links to none. A route that already exists is overwritten only after you confirm.",
+            "noPage": "No cookie-policy page: the route was left empty, so the banner links to none. To add one, type a route and press Generate."
         }
     },
     "structure": {
@@ -2297,10 +2311,22 @@
         "aiToolsBatchAiPending": "Its commands appear when the AI answers.",
         "aiToolsConfirmAiAnnounce": "{name} (AI): the commands its AI answers change the site; a deletion among them is asked when the answer arrives.",
         "aiToolsConfirmRunChange": "Change and run",
+        "aiToolsConfirmRunAct": "Confirm and run",
         "aiToolsConfirmRunDelete": "Delete and run",
         "aiToolsConfirmTitleChange": "Change content?",
+        "aiToolsConfirmTitleAct": "Run these commands?",
         "aiToolsConfirmTitleDelete": "Delete content?",
         "aiToolsEffectChanges": "Changes",
+        "aiToolsEffectDeploys": "Deploys",
+        "aiToolsEffectDeploysLine": "Deploys the build to the target folder, over what is already there",
+        "aiToolsEffectRestores": "Restores",
+        "aiToolsEffectRestoresLine": "Puts a backup back, over the project's current state",
+        "aiToolsEffectTransfers": "Transfers",
+        "aiToolsEffectTransfersLine": "Hands the project to another member, who becomes its owner",
+        "aiToolsEffectSetsKeys": "Sets keys",
+        "aiToolsEffectSetsKeysLine": "Sets or clears the project's keys for a sign-in provider",
+        "aiToolsEffectRegenerates": "Regenerates",
+        "aiToolsEffectRegeneratesLine": "Writes the cookie banner and popup again, over what is there",
         "aiToolsEffectDeletes": "Deletes",
         "aiToolsEffectMore": "{items} and {n} more",
         "aiToolsExchangeFor": "AI exchange — {name}",
@@ -2317,6 +2343,7 @@
         "aiToolsReviewAwaiting": "{current} of {total}: {name} waits for its AI answer, in AI response below.",
         "aiToolsReviewContinue": "Continue",
         "aiToolsReviewContinueChange": "Change and continue",
+        "aiToolsReviewContinueAct": "Confirm and continue",
         "aiToolsReviewContinueDelete": "Delete and continue",
         "aiToolsReviewLast": "{name}: {ok} of {total} succeeded",
         "aiToolsReviewLastFailed": "{name}: {ok} of {total} succeeded, {fail} failed",
@@ -3538,6 +3565,7 @@
         "form": {
             "apiId": "API ID",
             "apiIdHint": "Unique identifier (letters, numbers, dashes, underscores)",
+            "apiIdFixed": "Fixed once saved: endpoints, pages and interactions refer to an API by this id. To use another id, add a new API.",
             "name": "Display Name",
             "baseUrl": "Base URL",
             "baseUrlHint": "The root URL for all endpoints (e.g., https://api.example.com)",
@@ -3744,6 +3772,7 @@
             "apiSaved": "API saved successfully",
             "apiSaveFailed": "Failed to save API",
             "apiSaveFailedDetail": "Failed to save API: :message",
+            "authKeysDropped": "This API's type changed, so what its old type held went with it: :list.",
             "invalidRequestSchema": "Invalid request schema JSON",
             "invalidResponseSchema": "Invalid response schema JSON",
             "endpointSaved": "Endpoint saved successfully",

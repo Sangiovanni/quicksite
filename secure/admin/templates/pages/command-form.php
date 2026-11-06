@@ -153,8 +153,16 @@ foreach (array_diff(TagRegistry::ALLOWED_TAGS, $qsTagsListed) as $qsTag) {
     // __admin() answers a missing key with the key itself: an empty fallback is no description
     $qsTagGroups['other']['tags'][] = ['value' => $qsTag, 'description' => __admin('preview.tagDesc.' . $qsTag, '')];
 }
+
+// The commands getCommandHistory's filter offers: the index's own groups, so the page keeps no
+// list of its own.
+$qsCommandGroups = [];
+foreach (getCommandCategories() as $qsCategory) {
+    $qsCommandGroups[] = ['label' => (string) $qsCategory['label'], 'commands' => array_values($qsCategory['commands'])];
+}
 ?>
 <script>
+    window.QS_COMMAND_GROUPS = <?= qs_inline_script_json($qsCommandGroups) ?>;
     window.QS_COMMAND_FORM_I18N = <?= json_encode($qsCommandFormI18n, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
     window.QS_CONSOLE_FLAGS = <?= json_encode($qsConsoleFlags, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
     window.QS_SNIPPET_CATEGORIES = <?= json_encode($qsSnippetCategories, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE) ?>;

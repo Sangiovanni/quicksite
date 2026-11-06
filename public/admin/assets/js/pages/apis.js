@@ -56,13 +56,26 @@
     const MAX_IMPORT_REFUSALS_SHOWN = 5;
     // Each token location as apis.php renders it, with the auth types that read it. The list offers those.
     let tokenLocations = [];
+    // What the API form shows of an `auth`. Anything else a saved one holds, no field shows, and a save keeps it.
+    const AUTH_FORM_KEYS = ['type', 'tokenSource', 'refreshEndpoint', 'refreshTokenSource',
+        'refreshTokenBodyField', 'responseTokenPath', 'responseRefreshTokenPath'];
 
     // DOM Ready
     document.addEventListener('DOMContentLoaded', init);
 
-    function init() {
+    async function init() {
         bindEvents();
+        // The cards hide what this account cannot run, so they are drawn once its permissions are known.
+        await (window.QuickSiteAdmin?.permissionsReady || Promise.resolve());
         loadApis();
+    }
+
+    /**
+     * Does this account hold `command`? It decides what the page shows and nothing else: the command's
+     * own refusal stays the authority. A page script runs with the panel's admin.js already there.
+     */
+    function canRun(command) {
+        return QuickSiteAdmin.hasPermission(command);
     }
 
     // =========================================================================
@@ -320,18 +333,33 @@
                 text: api.description
             }));
         }
-        if (hasAuth) body.appendChild(_renderAuthTokenRow(apiId, api.auth.type));
+        // The row feeds the Test panel alone.
+        const tokenType = canRun('testApiEndpoint') ? _tokenRowType(api) : null;
+        if (tokenType) body.appendChild(_renderAuthTokenRow(apiId, tokenType));
+        const headCells = [
+            QSDom.el('th', { style: 'width: 80px;', text: t('apis.form.method') }),
+            QSDom.el('th', { text: t('apis.columns.endpoint') }),
+            QSDom.el('th', { text: t('apis.form.path') })
+        ];
+        if (_endpointActionsShown()) {
+            headCells.push(QSDom.el('th', { style: 'width: 120px;', text: t('apis.columns.actions') }));
+        }
         body.appendChild(QSDom.el('table', { class: 'admin-table admin-table--striped' }, [
-            QSDom.el('thead', null, [
-                QSDom.el('tr', null, [
-                    QSDom.el('th', { style: 'width: 80px;', text: t('apis.form.method') }),
-                    QSDom.el('th', { text: t('apis.columns.endpoint') }),
-                    QSDom.el('th', { text: t('apis.form.path') }),
-                    QSDom.el('th', { style: 'width: 120px;', text: t('apis.columns.actions') })
-                ])
-            ]),
+            QSDom.el('thead', null, [QSDom.el('tr', null, headCells)]),
             tbody
         ]));
+
+        const headerActions = [];
+        if (canRun('editApi')) {
+            headerActions.push(_renderApiAction('add-endpoint', apiId, t('apis.addEndpoint'),
+                QuickSiteUtils.ICON_PATHS.plus));
+            headerActions.push(_renderApiAction('edit-api', apiId, t('apis.editApi'),
+                QuickSiteUtils.ICON_PATHS.edit));
+        }
+        if (canRun('deleteApi')) {
+            headerActions.push(_renderApiAction('delete-api', apiId, t('apis.deleteApi'),
+                QuickSiteUtils.ICON_PATHS.trash, 'admin-btn--danger-hover'));
+        }
 
         return QSDom.el('div', {
             class: 'admin-card api-card',
@@ -358,17 +386,32 @@
                         ])
                     ])
                 ]),
-                QSDom.el('div', { style: 'display: flex; gap: var(--space-xs);' }, [
-                    _renderApiAction('add-endpoint', apiId, t('apis.addEndpoint'),
-                        QuickSiteUtils.ICON_PATHS.plus),
-                    _renderApiAction('edit-api', apiId, t('apis.editApi'),
-                        QuickSiteUtils.ICON_PATHS.edit),
-                    _renderApiAction('delete-api', apiId, t('apis.deleteApi'),
-                        QuickSiteUtils.ICON_PATHS.trash, 'admin-btn--danger-hover')
-                ])
+                QSDom.el('div', { style: 'display: flex; gap: var(--space-xs);' }, headerActions)
             ]),
             body
         ]);
+    }
+
+    /**
+     * The auth type the card's token row is for, or null for none. A `cookie` call carries no token: the
+     * browser holds its credential and testApiEndpoint reads none. So a cookie API shows the row only for
+     * an endpoint of its own that takes one.
+     */
+    function _tokenRowType(api) {
+        const type = api.auth?.type || 'none';
+        if (type === 'none') return null;
+        if (_carriesToken(type)) return type;
+        return (api.endpoints || []).map((endpoint) => _endpointAuthType(api, endpoint)).find(_carriesToken) || null;
+    }
+
+    /** Does a call under this auth type carry a token? */
+    function _carriesToken(type) {
+        return type !== 'none' && type !== 'cookie';
+    }
+
+    /** Does this account see any action on an endpoint's row? */
+    function _endpointActionsShown() {
+        return canRun('testApiEndpoint') || canRun('editApi');
     }
 
     /** One card-header action button. @returns {HTMLElement} */
@@ -455,25 +498,35 @@
             class: 'admin-text-muted', text: endpoint.name || ''
         }));
 
-        return QSDom.el('tr', null, [
+        const cells = [
             QSDom.el('td', null, [
                 QSDom.el('span', {
                     class: 'admin-badge ' + methodClass, text: endpoint.method
                 })
             ]),
             idCell,
-            QSDom.el('td', null, [QSDom.el('code', { text: endpoint.path })]),
-            QSDom.el('td', null, [
-                QSDom.el('div', { style: 'display: flex; gap: var(--space-xs);' }, [
-                    _renderEndpointAction('test-endpoint', apiId, endpoint.id,
-                        t('apis.actions.test'), QuickSiteUtils.ICON_PATHS.play, 14),
-                    _renderEndpointAction('edit-endpoint', apiId, endpoint.id,
-                        t('common.edit'), QuickSiteUtils.ICON_PATHS.edit, 14),
-                    _renderEndpointAction('delete-endpoint', apiId, endpoint.id,
-                        t('common.delete'), QuickSiteUtils.ICON_PATHS.trash, 14,
-                        'admin-btn--danger-hover')
-                ])
-            ])
+            QSDom.el('td', null, [QSDom.el('code', { text: endpoint.path })])
+        ];
+        if (_endpointActionsShown()) cells.push(_renderEndpointActions(apiId, endpoint));
+        return QSDom.el('tr', null, cells);
+    }
+
+    /** An endpoint row's actions cell: what this account can run. Editing and deleting one are both editApi. @returns {HTMLElement} */
+    function _renderEndpointActions(apiId, endpoint) {
+        const actions = [];
+        if (canRun('testApiEndpoint')) {
+            actions.push(_renderEndpointAction('test-endpoint', apiId, endpoint.id,
+                t('apis.actions.test'), QuickSiteUtils.ICON_PATHS.play, 14));
+        }
+        if (canRun('editApi')) {
+            actions.push(_renderEndpointAction('edit-endpoint', apiId, endpoint.id,
+                t('common.edit'), QuickSiteUtils.ICON_PATHS.edit, 14));
+            actions.push(_renderEndpointAction('delete-endpoint', apiId, endpoint.id,
+                t('common.delete'), QuickSiteUtils.ICON_PATHS.trash, 14,
+                'admin-btn--danger-hover'));
+        }
+        return QSDom.el('td', null, [
+            QSDom.el('div', { style: 'display: flex; gap: var(--space-xs);' }, actions)
         ]);
     }
 
@@ -552,7 +605,9 @@
         
         form.reset();
         document.getElementById('api-edit-mode').value = mode;
-        document.getElementById('api-original-id').value = apiId || '';
+        // An API's id is fixed once saved: endpoints, pages and interactions refer to it by this id.
+        document.getElementById('api-id').readOnly = mode === 'edit';
+        document.getElementById('api-id-hint').textContent = t(mode === 'edit' ? 'apis.form.apiIdFixed' : 'apis.form.apiIdHint');
 
         if (mode === 'edit' && apiId && apisData[apiId]) {
             const api = apisData[apiId];
@@ -587,7 +642,7 @@
 
         updateAuthFields();
         openModal(modal);
-        document.getElementById('api-id').focus();
+        document.getElementById(mode === 'edit' ? 'api-name' : 'api-id').focus();
     }
 
     /**
@@ -796,7 +851,6 @@
         e.preventDefault();
         
         const mode = document.getElementById('api-edit-mode').value;
-        const originalId = document.getElementById('api-original-id').value;
         
         const apiId = document.getElementById('api-id').value.trim();
         const name = document.getElementById('api-name').value.trim();
@@ -804,10 +858,10 @@
         const description = document.getElementById('api-description').value.trim();
         const authType = document.getElementById('api-auth-type').value;
         
-        // Build auth config. 'cookie' goes as { type: 'cookie' } only —
-        // no tokenSource, since the browser owns the session cookie.
-        let auth = { type: authType };
-        if (authType !== 'none' && authType !== 'cookie') {
+        // Build auth config. 'cookie' takes no tokenSource, since the browser owns the session cookie.
+        const savedAuth = mode === 'edit' ? apisData[apiId]?.auth : null;
+        const auth = _authToSave(savedAuth, authType);
+        if (_carriesToken(authType)) {
             if (!tokenSource.key()) {
                 showToast(t('apis.toast.tokenSourceMissing'), 'error');
                 return;
@@ -848,9 +902,9 @@
         // Prepare command params. Always send `auth` — even { type: 'none' }.
         // editApi treats an OMITTED auth as "leave unchanged", so sending
         // undefined on None made a previously-set bearer/apiKey/etc stick
-        // (you couldn't switch an API back to None). auth is always built
-        // as { type: authType } above, and editApi does a full replacement,
-        // so this also drops stale tokenSource/refresh fields on downgrade.
+        // (you couldn't switch an API back to None). editApi replaces `auth`
+        // whole, and _authToSave() builds it from the form's fields, so this
+        // also drops stale tokenSource/refresh fields on downgrade.
         const params = {
             apiId: apiId,
             name: name,
@@ -862,11 +916,6 @@
         try {
             let response;
             if (mode === 'edit') {
-                // For edit, we need to handle ID change
-                if (originalId !== apiId) {
-                    // Delete old, create new
-                    await QuickSiteAdmin.apiRequest('deleteApi', 'POST', { apiId: originalId });
-                }
                 response = await QuickSiteAdmin.apiRequest('editApi', 'POST', params);
             } else {
                 response = await QuickSiteAdmin.apiRequest('addApi', 'POST', params);
@@ -874,6 +923,8 @@
 
             if (response.ok) {
                 showToast(response.data?.message || t('apis.toast.apiSaved'), 'success');
+                const gone = _authKeysLeft(savedAuth).filter((key) => !(key in auth));
+                if (gone.length > 0) showToast(t('apis.toast.authKeysDropped', { list: gone.join(', ') }), 'warning');
                 closeModal(document.getElementById('modal-api'));
                 loadApis();
             } else {
@@ -883,6 +934,24 @@
             console.error('Failed to save API:', error);
             showToast(t('apis.toast.apiSaveFailedDetail', { message: error.message }), 'error');
         }
+    }
+
+    /** What a saved `auth` holds that no field of the form shows. */
+    function _authKeysLeft(saved) {
+        return Object.keys(saved || {}).filter((key) => !AUTH_FORM_KEYS.includes(key));
+    }
+
+    /**
+     * The `auth` a save starts from, before the form's fields go on it. editApi replaces `auth` whole, so
+     * what no field shows is sent back as it was: a cookie API's `csrf`, for one. A new type takes none of
+     * it: those keys were written for the old type, and `csrf` under any type but `cookie` is refused.
+     */
+    function _authToSave(saved, type) {
+        const auth = { type: type };
+        if (saved?.type === type) {
+            _authKeysLeft(saved).forEach((key) => { auth[key] = saved[key]; });
+        }
+        return auth;
     }
 
     // =========================================================================
@@ -1674,7 +1743,7 @@
 
         // Send one only if a call to this endpoint would carry one
         let authToken = null;
-        if (_endpointAuthType(api, endpoint) !== 'none') {
+        if (_carriesToken(_endpointAuthType(api, endpoint))) {
             // Get token from API card's token input (if visible)
             const apiCardTokenInput = document.querySelector('.api-auth-token__input[data-api="' + _cssEscape(apiId) + '"]');
             authToken = apiCardTokenInput?.value.trim() || loadAuthToken(apiId) || '';

@@ -597,8 +597,7 @@ $GLOBALS['__help_commands'] = [
     'getCommandHistory' => [
         'description' => 'Retrieves command execution history with optional filtering and pagination. Useful for audit trails, debugging, and AI context.',
         'method' => 'GET',
-        'parameters' => [],
-        'query_parameters' => [
+        'parameters' => [
             'start_date' => [
                 'type' => 'string',
                 'required' => false,
@@ -626,8 +625,8 @@ $GLOBALS['__help_commands'] = [
             'status' => [
                 'type' => 'string',
                 'required' => false,
-                'description' => 'Filter by result status',
-                'allowed_values' => ['success', 'error'],
+                'description' => 'Filter by result status. The log keeps successes and refused permissions, so error finds the refusals.',
+                'validation' => 'success|error',
                 'example' => 'success'
             ],
             'token_name' => [
@@ -881,7 +880,7 @@ $GLOBALS['__help_commands'] = [
             ]
         ],
         'error_responses' => [],
-        'notes' => 'Returns both the nested route structure (routes), the flat list of all route paths (flat_routes) and the top-level ones (root_routes). A path in flat_routes and root_routes is always text, a route named with digits only included. Useful for validation before creating menu/footer links.'
+        'notes' => 'Returns both the nested route structure (routes), the flat list of all route paths (flat_routes) and the top-level ones (root_routes). A path in flat_routes and root_routes is always text, a route named with digits only included. In routes a level is a map of names, with one exception, which JSON makes: a level whose children are named 0, 1, 2 and so on, in that order arrives as a list, so its positions are the names and an empty level is []. Useful for validation before creating menu/footer links.'
     ],
     
     'getSiteMap' => [
@@ -6391,7 +6390,7 @@ $GLOBALS['__help_commands'] = [
     ],
 
     'generateConsentLayer' => [
-        'description' => 'Generate (or re-generate) the consent banner + popup structures from the registry and enable the consent layer (data/consent.json enabled=true). Writes templates/model/json/consent-banner.json + consent-popup.json — one popup toggle row per DECLARED non-essential category — and seeds default-language copy for the textKeys (NEW keys only, never clobbering edited copy; other languages are translated via the Translation Manager). The banner links to the cookie-policy route recorded in consent.json (owned by generateCookiePolicy). The structures render globally like menu/footer and are styleable/editable in the visual editor.',
+        'description' => 'Generate (or re-generate) the consent banner + popup structures from the registry and enable the consent layer (data/consent.json enabled=true). Writes templates/model/json/consent-banner.json + consent-popup.json — one popup toggle row per DECLARED non-essential category — and seeds the textKeys\' words in every language the site\'s pages read, only where a key has no text, so an edited text is never replaced (the words come from <secure>/src/translations/<lang>.json; a language with no file there takes English\'s). The banner links to the cookie-policy route recorded in consent.json (owned by generateCookiePolicy). The structures render globally like menu/footer and are styleable/editable in the visual editor.',
         'method' => 'POST',
         'destructive' => true,
         'parameters' => [
@@ -6407,7 +6406,7 @@ $GLOBALS['__help_commands'] = [
         'success_response' => [
             'status' => 200,
             'code' => 'success',
-            'data' => ['categories' => '[declared non-essential categories]', 'languagesSeeded' => '{lang: keysAdded}', 'policyRoute' => 'string|null', 'enabled' => true, 'version' => 'int (the consent version now)', 'askedAgain' => 'bool']
+            'data' => ['categories' => '[declared non-essential categories]', 'languagesSeeded' => '{lang: keysAdded}', 'languagesFailed' => '["fr"] (present only when a translation file could not be written; the layer is written)', 'policyRoute' => 'string|null', 'enabled' => true, 'version' => 'int (the consent version now)', 'askedAgain' => 'bool']
         ],
         'error_responses' => [
             '400.validation.invalid_type' => 'askAgain is not a boolean. Nothing was written.',
@@ -6420,7 +6419,7 @@ $GLOBALS['__help_commands'] = [
     ],
 
     'generateCookiePolicy' => [
-        'description' => 'Generate (or overwrite) the cookie-policy page at an author-chosen route — a "Change my cookie preferences" button that reopens the consent popup, a deterministic table built from the registry (one row per declared key), an OAuth-provider privacy-link section and a legal-review note. Seeds default-language structural copy (new keys only; other languages translate via the Translation Manager) and records the route in data/consent.json so the banner links to it. Per-item descriptions are not seeded here — they live in translate/ under storage.desc.<id>, authored via the storage registry and resolved live.',
+        'description' => 'Generate (or overwrite) the cookie-policy page at an author-chosen route — a "Change my cookie preferences" button that reopens the consent popup, a deterministic table built from the registry (one row per declared key) and one row per cookie QuickSite itself sets for a visitor, an OAuth-provider privacy-link section and a legal-review note. Seeds the page\'s words in every language the pages read, only where a key has no text, so an edited text is never replaced (the words come from <secure>/src/translations/<lang>.json; a language with no file there takes English\'s), and records the route in data/consent.json so the banner links to it. Per-item descriptions are not seeded here — they live in translate/ under storage.desc.<id>, authored via the storage registry and resolved live.',
         'method' => 'POST',
         'parameters' => [
             'route' => [
@@ -6441,7 +6440,7 @@ $GLOBALS['__help_commands'] = [
         'success_response' => [
             'status' => 200,
             'code' => 'success',
-            'data' => ['route' => '/cookies', 'overwritten' => false, 'rows' => 'int', 'languagesSeeded' => '{lang: keysAdded}']
+            'data' => ['route' => '/cookies', 'overwritten' => false, 'rows' => 'int (the registry keys listed)', 'languagesSeeded' => '{lang: keysAdded}', 'languagesFailed' => '["fr"] (present only when a translation file could not be written; the page is written)']
         ],
         'error_responses' => [
             '400.validation.required' => 'A route is required for the cookie-policy page.',
@@ -6452,7 +6451,7 @@ $GLOBALS['__help_commands'] = [
             '400.route.invalid' => 'Route must have 1-5 segments.',
             '400.route.invalid_segment' => 'A route segment is not a lowercase literal.'
         ],
-        'notes' => 'Creates the route (cascading parents) when missing; a route that exists is refused with 409, and with overwrite:true its structure is replaced. Pairs with generateConsentLayer (which links the banner to this route). The button is always on the page, right under the intro: withdrawing consent must be as easy as giving it. It is an ordinary node marked data-consent-action="customize", which qs.js answers on any page by reopening the consent popup (nothing happens on a page without one); a regeneration puts it back. The table lists every key the storage registry declares and, when the project\'s theme mode and its visitor toggle are both on (setThemeMode), the theme switch\'s own key qs-theme-<projectId> in local storage: essential, needing no consent, kept until the visitor clears it, set only by a click on the theme switch. The table is the registry and the settings when the page is generated: generate it again after either changes, the theme switch turned on or off included. The privacy-link section lists the OAuth providers the project\'s sign-in routes use - for a route that takes its provider from the address, every provider the installation offers that the project has keys for, in either set - each named as the installation\'s provider list names it and linked to its privacy_url (listed by name when it has none); a provider the list does not offer is not listed.'
+        'notes' => 'Creates the route (cascading parents) when missing; a route that exists is refused with 409, and with overwrite:true its structure is replaced. Pairs with generateConsentLayer (which links the banner to this route). The button is always on the page, right under the intro: withdrawing consent must be as easy as giving it. It is an ordinary node marked data-consent-action="customize", which qs.js answers on any page by reopening the consent popup (nothing happens on a page without one); a regeneration puts it back. The table lists every key the storage registry declares and, when the project\'s theme mode and its visitor toggle are both on (setThemeMode), the theme switch\'s own key qs-theme-<projectId> in local storage: essential, needing no consent, kept until the visitor clears it, set only by a click on the theme switch. It also lists the consent record, qsp_<projectId>_consent_prefs, and, when the privacy-link section below lists a provider, the sign-in\'s two cookies, qs_oauth_session and qsp_<projectId>_qs_oauth_user: essential, needing no consent, and written as they are named by the code that sets them. The table is the registry and the settings when the page is generated: generate it again after either changes, the theme switch turned on or off or a sign-in route added included. The privacy-link section lists the OAuth providers the project\'s sign-in routes use - for a route that takes its provider from the address, every provider the installation offers that the project has keys for, in either set - each named as the installation\'s provider list names it and linked to its privacy_url (listed by name when it has none); a provider the list does not offer is not listed.'
     ],
 
     'getConsentStatus' => [
@@ -6625,7 +6624,7 @@ $GLOBALS['__help_commands'] = [
         'notes' => 'Drives the /admin/privacy host-classification UI. name/privacyUrl are ignored for kind=self.'
     ],
     'generatePrivacyPolicy' => [
-        'description' => 'Generate (or overwrite) the privacy-policy page at an author-chosen route, deterministically from the privacy registry + API scan. Builds a "data we collect" table (collected-data label/purpose textKeys), a per-third-party "data sharing" section (derived from atom mappings + host classification), an OAuth sign-in section, a cookie cross-link (link if a cookie page exists / hint if not / omitted when cookieSection=omit), and a legal disclaimer. Records the route in data/privacy.json and seeds default-language structural copy.',
+        'description' => 'Generate (or overwrite) the privacy-policy page at an author-chosen route, deterministically from the privacy registry + API scan. Builds a "data we collect" table (collected-data label/purpose textKeys), a per-third-party "data sharing" section (derived from atom mappings + host classification), an OAuth sign-in section, a cookie cross-link (link if a cookie page exists / hint if not / omitted when cookieSection=omit), and a legal disclaimer. Records the route in data/privacy.json and seeds the page\'s words in every language the pages read, only where a key has no text, so an edited text is never replaced (the words come from <secure>/src/translations/<lang>.json; a language with no file there takes English\'s). The labels and purposes of collected data are the author\'s, and are not seeded.',
         'method' => 'POST',
         'parameters' => [
             'route' => ['required' => true, 'type' => 'string', 'description' => 'Route to host the page (1-5 lowercase literal segments). Existing route is overwritten with overwrite:true.', 'example' => 'privacy'],
@@ -6635,7 +6634,7 @@ $GLOBALS['__help_commands'] = [
         'success_response' => [
             'status' => 200,
             'code' => 'success',
-            'data' => ['route' => '/privacy', 'overwritten' => false, 'collected' => 3, 'thirdParties' => 1, 'cookieMode' => 'link', 'languagesSeeded' => '{lang: keysAdded}']
+            'data' => ['route' => '/privacy', 'overwritten' => false, 'collected' => 3, 'thirdParties' => 1, 'cookieMode' => 'link', 'languagesSeeded' => '{lang: keysAdded}', 'languagesFailed' => '["fr"] (present only when a translation file could not be written; the page is written)']
         ],
         'error_responses' => [
             '409.route.exists' => 'The route exists and overwrite is not true: re-send with overwrite:true. data holds route, exists and needsConfirm.',
@@ -6792,6 +6791,7 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.api.error.missing_parameter' => 'Missing required parameter (apiId, name, or baseUrl)',
             '400.api.error.invalid_parameter' => 'API with this ID already exists, or an invalid apiId, baseUrl or auth (a tokenSource its auth type does not read and a header name that is not an RFC 7230 token included); the message says which',
+            '500.server.file_write_failed' => 'The registry could not be saved. Nothing was added.',
             '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
             '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.'
         ],
@@ -6894,7 +6894,8 @@ $GLOBALS['__help_commands'] = [
             '400.api.error.invalid_parameter' => 'Endpoint already exists (when adding), invalid update operation, invalid callableFrom value (must be client/server/both or omitted for auto-derive), an endpoint path outside its character set, an invalid endpoint auth or headers map, a tokenSource its auth type does not read, or a tokenSource header name that is not an RFC 7230 token',
             '413.validation.size_limit_exceeded' => 'A file this command writes would pass the size cap for its kind (max_file_bytes.<kind> in <secure>/management/config/quota.php; a file already over a lowered cap may still shrink). data names the kind, the file, its size, the cap and the setting. Nothing was written.',
             '507.quota.storage_exceeded' => 'The project owner is already over their storage quota and this change makes files larger; a change that keeps their size or shrinks them is accepted. Charged to the owner, so the refusal is generic when the caller is not that owner. Nothing was written.',
-            '404.api.error.invalid_parameter' => 'No API or endpoint with this id: a 404 under this code, and the message says which.'
+            '404.api.error.invalid_parameter' => 'No API or endpoint with this id: a 404 under this code, and the message says which.',
+            '500.server.file_write_failed' => 'The registry could not be saved. Nothing was changed.'
         ],
         'notes' => 'Use ONE endpoint operation per request: endpoints (full replace), addEndpoint, editEndpoint, deleteEndpoint or renameEndpoint. **enumSync** says whether qs-enums.js was written again, with what it holds and any binding it could not resolve. **resolverCacheCleared** counts the cached answers of this API dropped by the edit. **cascadeCleanup** (an endpoint removed: pageEventsRemoved, interactionsRemoved, modifiedFiles, refusedFiles) and **cascadeRename** (an endpoint renamed: from, to, pageEventsUpdated, interactionsUpdated, modifiedFiles, refusedFiles) are present only then. A structure file the write check refuses keeps its old reference, is named in refusedFiles, and the message says so. Regenerates qs-api-config.js automatically (server-only endpoints are filtered out). **callableFrom**: per-endpoint marker — "client"/"server"/"both", or absent for auto-derive (apiKey → server, others → both). **countKeyWarnings**: advisory list of count-sentence bindings whose translation key does not resolve in every project language (empty array when all resolve). The edit is saved regardless. **auth.csrf**: optional on auth type "cookie" only — {"from": "cookie:XSRF-TOKEN", "to": "header:X-XSRF-TOKEN"} makes QS.fetch echo the named cookie into the named request header (the double-submit pattern used by the AUTHOR\'s own API, unrelated to QuickSite\'s session).'
     ],
@@ -6929,7 +6930,7 @@ $GLOBALS['__help_commands'] = [
         'error_responses' => [
             '400.api.error.missing_parameter' => 'Missing API ID',
             '404.api.error.invalid_parameter' => 'No API with this id: a 404 under this code.',
-            '400.api.error.invalid_parameter' => 'The registry could not be saved. Nothing was removed.'
+            '500.server.file_write_failed' => 'The registry could not be saved. Nothing was removed.'
         ],
         'notes' => 'Removes the API and all its endpoints from api-endpoints.json. Regenerates qs-api-config.js automatically. Also removes the page-event calls and interactions that refer to the API: a structure file the write check refuses keeps its reference, is named in cascadeCleanup.refusedFiles, and the message says so. Cannot be undone - use backupProject first if needed.'
     ],

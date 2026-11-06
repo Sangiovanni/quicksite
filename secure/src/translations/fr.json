@@ -3,5 +3,76 @@
         "oauthButton": {
             "label": "Se connecter avec {{provider}}"
         }
+    },
+    "consent": {
+        "banner": {
+            "message": "Nous utilisons des cookies pour améliorer votre expérience. Vous pouvez accepter, refuser ou personnaliser vos choix.",
+            "policy_link": "Politique des cookies",
+            "aria_label": "Consentement aux cookies"
+        },
+        "action": {
+            "accept_all": "Tout accepter",
+            "refuse_all": "Tout refuser",
+            "customize": "Personnaliser",
+            "save": "Enregistrer mes choix"
+        },
+        "popup": {
+            "title": "Préférences des cookies",
+            "intro": "Choisissez les catégories que vous autorisez. Les cookies essentiels sont toujours actifs.",
+            "aria_label": "Préférences des cookies",
+            "close_label": "Fermer"
+        },
+        "category": {
+            "essential": "Essentiels",
+            "essential_note": "Toujours actifs",
+            "functional": "Fonctionnels",
+            "analytics": "Analytique",
+            "marketing": "Marketing"
+        },
+        "policy": {
+            "title": "Politique des cookies",
+            "intro": "Cette page liste les données de stockage que ce site utilise, générée à partir du registre de stockage du site.",
+            "change_preferences": "Modifier mes préférences de cookies",
+            "col_key": "Nom dans votre navigateur",
+            "col_scope": "Stockage",
+            "col_category": "Catégorie",
+            "col_retention": "Conservation",
+            "col_consent": "Consentement requis",
+            "col_description": "Finalité",
+            "yes": "Oui",
+            "no": "Non",
+            "oauth_title": "Connexion tierce",
+            "oauth_intro": "Ce site propose la connexion via les fournisseurs suivants. Consultez la politique de confidentialité de chaque fournisseur pour savoir ce qu'il collecte.",
+            "provider_link": "Politique de confidentialité",
+            "prefix_note": "Les noms de la première colonne peuvent comporter un court préfixe propre au site, car plusieurs sites peuvent partager un même espace de stockage du navigateur : c'est ainsi que chaque site garde ses entrées séparées. C'est exactement le nom que vous trouverez dans votre navigateur.",
+            "theme_retention": "Jusqu'à ce que vous l'effaciez",
+            "theme_description": "Mémorise le thème clair ou sombre que vous avez choisi. Il n'est enregistré que lorsque vous cliquez sur le sélecteur de thème.",
+            "record_retention": "180 jours",
+            "record_description": "Mémorise les choix que vous avez faits au sujet des cookies, pour que le site les respecte et ne vous les redemande pas.",
+            "oauth_session_retention": "Jusqu'à la fermeture de votre navigateur",
+            "oauth_session_description": "Sécurise une connexion pendant son passage par le fournisseur, et conserve votre session de connexion sur le serveur.",
+            "oauth_user_retention": "14 jours, ou jusqu'à votre déconnexion",
+            "oauth_user_description": "Vous garde connecté après une connexion via un fournisseur. Il n'est enregistré que lorsque vous vous connectez.",
+            "disclaimer": "Ce résumé est généré à partir du registre de stockage du site et fourni à titre de transparence. Il ne constitue pas un avis juridique — faites réaliser votre propre vérification juridique."
+        }
+    },
+    "privacy": {
+        "policy": {
+            "title": "Politique de confidentialité",
+            "intro": "Cette page décrit les données personnelles que ce site collecte et avec qui elles sont partagées.",
+            "collect_title": "Données que nous collectons",
+            "col_data": "Donnée",
+            "col_purpose": "Finalité",
+            "sharing_title": "Partage de données",
+            "sharing_intro": "Ce site partage des données avec les tiers suivants. Consultez la politique de confidentialité de chacun pour savoir ce qu'ils en font.",
+            "provider_link": "Politique de confidentialité",
+            "oauth_title": "Connexion tierce",
+            "oauth_intro": "Ce site propose la connexion via les fournisseurs suivants. Consultez la politique de confidentialité de chaque fournisseur pour savoir ce qu'il collecte.",
+            "cookie_title": "Cookies",
+            "cookie_intro": "Ce site utilise du stockage navigateur et des cookies, décrits en détail dans la",
+            "cookie_link": "politique des cookies",
+            "cookie_hint": "Ce site peut utiliser des cookies. Envisagez de publier une politique des cookies qui les répertorie.",
+            "disclaimer": "Ce résumé est généré à partir de la configuration du site et fourni à titre de transparence. Il ne constitue pas un avis juridique — faites réaliser votre propre vérification juridique pour votre juridiction."
+        }
     }
 }

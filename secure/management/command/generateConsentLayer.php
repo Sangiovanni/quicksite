@@ -14,12 +14,12 @@
  * generateCookiePolicy / deleteCookiePolicy); a body cannot set it.
  *
  * Writes templates/model/json/consent-banner.json + consent-popup.json (one
- * popup toggle row per DECLARED non-essential category), seeds EN/FR default
- * copy for the textKeys (NEW keys only — never clobbers edited copy), and sets
- * data/consent.json enabled=true. Idempotent: re-running refreshes the
+ * popup toggle row per DECLARED non-essential category), seeds the textKeys'
+ * words in every language the pages read (NEW keys only — never clobbers edited
+ * copy), and sets data/consent.json enabled=true. Idempotent: re-running refreshes the
  * structures + re-enables, preserving existing translations.
  *
- * @return ApiResponse 200 { categories, languagesSeeded, policyRoute, enabled, version, askedAgain }
+ * @return ApiResponse 200 { categories, languagesSeeded, languagesFailed?, policyRoute, enabled, version, askedAgain }
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
@@ -30,6 +30,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/consentLayerHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/translationHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
+require_once SECURE_FOLDER_PATH . '/src/functions/startingTexts.php';
 
 // askAgain: every visitor is asked again. The stored version goes up by one, so
 // every category's fingerprint changes and no recorded choice holds
@@ -93,21 +94,9 @@ if (!$wroteBanner || !$wrotePopup) {
         ->send();
 }
 
-// 2. Seed default copy (NEW keys only) for the project DEFAULT language only.
-//    Other languages are translated via the Translation Manager (the textKeys
-//    surface there as missing). fr default → French map; otherwise English.
-$seed = consentTranslationSeed();
-$defaultLang = qs_project_default_language();
-$languagesSeeded = [];
-$flat = ($defaultLang === 'fr') ? $seed['fr'] : $seed['en'];
-$newOnly = consentFilterNewKeys($defaultLang, $flat);
-if (!empty($newOnly)) {
-    $res = writeTranslationsToFile($defaultLang, convertDotNotationToNested($newOnly), false);
-    qs_small_write_send_refusal();
-    if (!empty($res['ok'])) {
-        $languagesSeeded[$defaultLang] = $res['keysAdded'] ?? count($newOnly);
-    }
-}
+// 2. Seed the layer's words where a key has none, in every language the pages read
+//    (qs_starting_words_seed()): never clobbers edited copy.
+$seeded = qs_starting_words_seed(['consent.banner', 'consent.action', 'consent.popup', 'consent.category']);
 
 // 3. Enable the layer (policyRoute is left untouched — owned elsewhere), the
 //    version one higher when every visitor is asked again.
@@ -120,14 +109,18 @@ if ($askAgain) {
 saveConsentConfig(array_merge($config, $update));
 qs_small_write_send_refusal();
 
+$answer = [
+    'categories'      => $categories,
+    'languagesSeeded' => $seeded['languagesSeeded'],
+    'policyRoute'     => $policyRoute,
+    'enabled'         => true,
+    'version'         => $version,
+    'askedAgain'      => $askAgain,
+];
+if ($seeded['languagesFailed'] !== []) {
+    $answer['languagesFailed'] = $seeded['languagesFailed'];
+}
 ApiResponse::create(200, 'success')
     ->withMessage($askAgain ? 'Consent layer generated and enabled; every visitor is asked again' : 'Consent layer generated and enabled')
-    ->withData([
-        'categories'      => $categories,
-        'languagesSeeded' => $languagesSeeded,
-        'policyRoute'     => $policyRoute,
-        'enabled'         => true,
-        'version'         => $version,
-        'askedAgain'      => $askAgain,
-    ])
+    ->withData($answer)
     ->send();

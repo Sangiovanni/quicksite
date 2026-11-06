@@ -5377,15 +5377,13 @@ kbd {
     display: none !important;
 }
 
-/* Disabled state for restricted commands (shown in search with â‰¤3 results) */
+/* A command this role cannot run, shown in a search with few results: greyed, and still a link to its documentation */
 .admin-disabled-permission {
     opacity: 0.5;
-    pointer-events: none;
-    cursor: not-allowed;
 }
 
 .admin-disabled-permission::after {
-    content: 'ðŸ”’';
+    content: '\1F512';
     margin-left: var(--space-sm);
     font-size: var(--font-size-xs);
 }

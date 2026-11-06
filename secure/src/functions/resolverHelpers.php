@@ -548,7 +548,7 @@ function validateResolverConfig(array $config, ?ApiEndpointManager $apiManager =
                         'field'    => "resolver.inputs.{$name}",
                         'reason'   => 'invalid_type',
                         'expected' => 'string',
-                        'hint'     => "Use a source spec like 'param:slug' / 'query:lang' / 'session:userId', or a bare literal.",
+                        'hint'     => "Use a source spec like 'param:slug' / 'query:lang', or a bare literal.",
                     ];
                     continue;
                 }
@@ -570,7 +570,7 @@ function validateResolverConfig(array $config, ?ApiEndpointManager $apiManager =
                     $errors[] = [
                         'field'  => "resolver.inputs.{$name}",
                         'reason' => 'empty_value',
-                        'hint'   => 'Source spec cannot be empty. Use param:<segment>, query:<key>, session:<field>, or a literal value.',
+                        'hint'   => 'Source spec cannot be empty. Use param:<segment>, query:<key>, or a literal value.',
                     ];
                     continue;
                 }
@@ -579,7 +579,7 @@ function validateResolverConfig(array $config, ?ApiEndpointManager $apiManager =
                         'field'  => "resolver.inputs.{$name}",
                         'reason' => 'malformed_spec',
                         'value'  => $sourceSpec,
-                        'hint'   => "Source spec '{$sourceSpec}' is missing the value after the colon. Use e.g. 'param:slug' / 'query:lang' / 'session:userId'.",
+                        'hint'   => "Source spec '{$sourceSpec}' is missing the value after the colon. Use e.g. 'param:slug' / 'query:lang'.",
                     ];
                 }
             }

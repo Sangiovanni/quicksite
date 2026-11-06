@@ -11,14 +11,15 @@
  *   { "route": "cookies" }   required — the route to host the policy page
  *
  * Builds a page structure (a "Change my cookie preferences" button that reopens
- * the consent popup + one table row per declared key + a privacy-link section
+ * the consent popup + one table row per declared key and per cookie QuickSite
+ * itself sets for a visitor + a privacy-link section
  * for the OAuth providers the project's sign-in routes use, named and linked
  * from the installation's provider list + a legal-review note) and writes it at
  * the route. If the route already exists, its structure is OVERWRITTEN (warned).
- * Seeds EN/FR copy (new keys only) and records the route in data/consent.json so
- * the banner links to it.
+ * Seeds the page's words in every language the pages read (new keys only) and
+ * records the route in data/consent.json so the banner links to it.
  *
- * @return ApiResponse 200 { route, overwritten, rows, languagesSeeded }
+ * @return ApiResponse 200 { route, overwritten, rows, languagesSeeded, languagesFailed? }
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
@@ -32,6 +33,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/consentLayerHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/translationHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
+require_once SECURE_FOLDER_PATH . '/src/functions/startingTexts.php';
 
 $params = $trimParametersManagement->params();
 
@@ -61,7 +63,8 @@ if (storageMigrateInlineDescriptions($registry)) {
 // (qs_small_write_guard); a refusal takes back what it wrote and is answered.
 qs_small_write_send_refusal();
 $items = $registry['items'];
-$structure = buildCookiePolicyStructure($items, consentOAuthLinks());
+$oauthLinks = consentOAuthLinks();
+$structure = buildCookiePolicyStructure($items, $oauthLinks);
 
 // The page carries values the author set elsewhere, so it is checked before
 // any route or page is written.
@@ -98,35 +101,21 @@ if (!policyWriteLeaf($segments, $structure)) {
 saveConsentConfig(array_merge(loadConsentConfig(), ['policyRoute' => '/' . $route]));
 qs_small_write_send_refusal();
 
-// Seed structural copy (NEW keys only) for the project DEFAULT language only.
-// Other languages are translated via the Translation Manager (the textKeys
-// surface there as missing). Per-item descriptions are NOT seeded here — they
-// live independently in translate/ under storageDescKey(), authored via the
-// storage registry and resolved live.
-$seed = cookiePolicyTranslationSeed();
-$catSeed = consentTranslationSeed(); // category labels used by the table
-$defaultLang = qs_project_default_language();
-$languagesSeeded = [];
-$base = ($defaultLang === 'fr') ? $seed['fr'] : $seed['en'];
-$cats = ($defaultLang === 'fr') ? $catSeed['fr'] : $catSeed['en'];
-$catKeys = ['consent.category.essential', 'consent.category.functional', 'consent.category.analytics', 'consent.category.marketing'];
-$structural = $base;
-foreach ($catKeys as $ck) {
-    if (isset($cats[$ck])) $structural[$ck] = $cats[$ck];
-}
-$newOnly = consentFilterNewKeys($defaultLang, $structural);
-if (!empty($newOnly)) {
-    $res = writeTranslationsToFile($defaultLang, convertDotNotationToNested($newOnly), false);
-    qs_small_write_send_refusal();
-    if (!empty($res['ok'])) $languagesSeeded[$defaultLang] = $res['keysAdded'] ?? count($newOnly);
-}
+// Seed the page's words where a key has none, in every language the pages read (qs_starting_words_seed()).
+// Per-item descriptions are NOT seeded here: they live independently in translate/ under
+// storageDescKey(), authored via the storage registry and resolved live.
+$seeded = qs_starting_words_seed(['consent.policy', 'consent.category']);
 
+$answer = [
+    'route'           => '/' . $route,
+    'overwritten'     => $overwritten,
+    'rows'            => count($items),
+    'languagesSeeded' => $seeded['languagesSeeded'],
+];
+if ($seeded['languagesFailed'] !== []) {
+    $answer['languagesFailed'] = $seeded['languagesFailed'];
+}
 ApiResponse::create(200, 'success')
     ->withMessage($overwritten ? "Cookie-policy page regenerated at /$route (existing route overwritten)" : "Cookie-policy page created at /$route")
-    ->withData([
-        'route'           => '/' . $route,
-        'overwritten'     => $overwritten,
-        'rows'            => count($items),
-        'languagesSeeded' => $languagesSeeded,
-    ])
+    ->withData($answer)
     ->send();

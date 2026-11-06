@@ -52,7 +52,7 @@ window.QS_COMPLEX_WIZARD_I18N = <?= qs_inline_script_json(['complexWizard' => ['
 <!-- Actions Bar -->
 <div class="admin-toolbar apis-toolbar">
     <div class="admin-toolbar__left">
-        <button type="button" class="admin-btn admin-btn--primary" id="btn-add-api">
+        <button type="button" class="admin-btn admin-btn--primary" id="btn-add-api" data-requires-command="addApi">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                 <line x1="12" y1="5" x2="12" y2="19"/>
                 <line x1="5" y1="12" x2="19" y2="12"/>
@@ -68,7 +68,7 @@ window.QS_COMPLEX_WIZARD_I18N = <?= qs_inline_script_json(['complexWizard' => ['
         </button>
     </div>
     <div class="admin-toolbar__right">
-        <button type="button" class="admin-btn admin-btn--ghost" id="btn-import" title="<?= __admin('apis.importJson') ?>">
+        <button type="button" class="admin-btn admin-btn--ghost" id="btn-import" title="<?= __admin('apis.importJson') ?>" data-requires-command="addApi,editApi">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                 <polyline points="17 8 12 3 7 8"/>
@@ -124,7 +124,7 @@ window.QS_COMPLEX_WIZARD_I18N = <?= qs_inline_script_json(['complexWizard' => ['
         </svg>
         <h3 class="apis-empty__title"><?= __admin('apis.empty.title') ?></h3>
         <p class="admin-text-muted apis-empty__desc"><?= __admin('apis.empty.description') ?></p>
-        <button type="button" class="admin-btn admin-btn--primary" id="btn-add-api-empty">
+        <button type="button" class="admin-btn admin-btn--primary" id="btn-add-api-empty" data-requires-command="addApi">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                 <line x1="12" y1="5" x2="12" y2="19"/>
                 <line x1="5" y1="12" x2="19" y2="12"/>
@@ -148,14 +148,13 @@ window.QS_COMPLEX_WIZARD_I18N = <?= qs_inline_script_json(['complexWizard' => ['
         <form id="form-api">
             <div class="admin-modal__body">
                 <input type="hidden" id="api-edit-mode" value="add">
-                <input type="hidden" id="api-original-id">
                 
                 <div class="admin-form-group">
                     <label class="admin-label" for="api-id"><?= __admin('apis.form.apiId') ?> *</label>
                     <input type="text" class="admin-input" id="api-id" name="apiId" required 
                            pattern="[a-zA-Z0-9][a-zA-Z0-9\-_]*"
                            placeholder="main-backend">
-                    <p class="admin-hint"><?= __admin('apis.form.apiIdHint') ?></p>
+                    <p class="admin-hint" id="api-id-hint"><?= __admin('apis.form.apiIdHint') ?></p>
                 </div>
                 
                 <div class="admin-form-group">

@@ -64,6 +64,11 @@ function __command_addApi(array $params = [], array $urlParams = []): ApiRespons
         return qs_small_write_refused();
     }
     
+    if (!empty($result['saveFailed'])) {
+        return ApiResponse::create(500, 'server.file_write_failed')
+            ->withMessage('The API registry could not be saved. Nothing was added.');
+    }
+
     if (!$result['success']) {
         return ApiResponse::create(400, 'api.error.invalid_parameter')
             ->withMessage($result['error']);

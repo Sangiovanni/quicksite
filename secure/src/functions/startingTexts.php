@@ -13,7 +13,8 @@
  * file per language, its {{name}} markers filled — or a TEXT the builder gives as it is, the same
  * in every language (a form field's name). No code holds a word: a language with a file gets its
  * own, one without takes its base language's (`pt` for `pt-br`) when that has a file, and any
- * other gets English. A new language is a new file.
+ * other gets English. A new language is a new file. The commands that generate a whole page or the
+ * consent layer write trees of these words (qs_starting_words_seed()).
  *
  * Authoring only: nothing here travels into a build.
  */
@@ -25,6 +26,7 @@ if (!defined('SECURE_FOLDER_PATH')) {
 require_once SECURE_FOLDER_PATH . '/src/functions/jsonIo.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectLanguage.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/translationHelpers.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_guard
 require_once SECURE_FOLDER_PATH . '/src/classes/RegexPatterns.php';
 
 /** How a translation file is written (writeTranslationsToFile() writes the same bytes). */
@@ -212,4 +214,54 @@ function qs_starting_texts_write(array $plan): array
         }
     }
     return ['written' => $written, 'failed' => $failed];
+}
+
+/**
+ * Write whole trees of the word files, in every language the site's pages read, only where a key
+ * has no text. A key and its word are the same dot path, and the keys are the ones the English file
+ * holds under each of $trees, so no code holds a word or a list of them. Every file passes the size
+ * check first (qs_small_write_guard()), and a refusal is answered here. default.json counts under the
+ * default language when no file of that language did, as it is what a monolingual site reads.
+ *
+ * @param list<string> $trees dot paths in the word files: consent.banner, privacy.policy
+ * @return array{languagesSeeded: array<string, int>, languagesFailed: string[]}
+ */
+function qs_starting_words_seed(array $trees): array
+{
+    $entries = [];
+    $walk = static function (array $node, string $path) use (&$walk, &$entries): void {
+        foreach ($node as $name => $value) {
+            if (is_array($value)) {
+                $walk($value, $path . '.' . $name);
+            } else {
+                $entries[] = ['key' => $path . '.' . $name, 'word' => $path . '.' . $name];
+            }
+        }
+    };
+    foreach ($trees as $tree) {
+        $node = qs_starting_words_file('en');
+        foreach (explode('.', $tree) as $part) {
+            $node = is_array($node) ? ($node[$part] ?? null) : null;
+        }
+        if (is_array($node)) {
+            $walk($node, $tree);
+        }
+    }
+    $plan = qs_starting_texts_plan($entries);
+    foreach ($plan as $item) {
+        qs_small_write_guard($item['file'], $item['bytes']);
+    }
+    qs_small_write_send_refusal();
+    $written = qs_starting_texts_write($plan);
+    $seeded = [];
+    foreach ($written['written'] as $name => $keys) {
+        if ($name !== 'default') {
+            $seeded[$name] = count($keys);
+        }
+    }
+    $defaultLang = qs_project_default_language();
+    if (isset($written['written']['default']) && !isset($seeded[$defaultLang])) {
+        $seeded[$defaultLang] = count($written['written']['default']);
+    }
+    return ['languagesSeeded' => $seeded, 'languagesFailed' => $written['failed']];
 }

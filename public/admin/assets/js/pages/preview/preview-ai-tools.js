@@ -2621,8 +2621,52 @@ window.PreviewAiTools = (function () {
     var EFFECT_LIST_MAX = 8;
 
     /**
+     * What a command flagged destructive does, for one that deletes nothing: a short word for a step and a
+     * phase, and a line for a warning. Its step stops a run exactly as a deletion does, so `effect` stays
+     * 'delete' and every gate reads that; only what the run says about it comes from here. A flagged command
+     * with no entry here reads as a deletion, which is what cleanOrphanTranslations is.
+     */
+    var EFFECT_DOES = {
+        deployBuild: {
+            word: ['effectDeploys', 'Deploys'],
+            line: ['effectDeploysLine', 'Deploys the build to the target folder, over what is already there']
+        },
+        restoreBackup: {
+            word: ['effectRestores', 'Restores'],
+            line: ['effectRestoresLine', "Puts a backup back, over the project's current state"]
+        },
+        transferOwnership: {
+            word: ['effectTransfers', 'Transfers'],
+            line: ['effectTransfersLine', 'Hands the project to another member, who becomes its owner']
+        },
+        setOAuthCredentials: {
+            word: ['effectSetsKeys', 'Sets keys'],
+            line: ['effectSetsKeysLine', "Sets or clears the project's keys for a sign-in provider"]
+        },
+        generateConsentLayer: {
+            word: ['effectRegenerates', 'Regenerates'],
+            line: ['effectRegeneratesLine', 'Writes the cookie banner and popup again, over what is there']
+        }
+    };
+
+    /** What a warned step does in words of its own, or null when "Deletes" or "Changes" says it. */
+    function _effectDoes(e) {
+        return (e.effect === 'delete' && EFFECT_DOES[e.command]) || null;
+    }
+
+    /**
+     * The words a warning takes for these effects: 'delete' when one really deletes, 'act' when the only
+     * stopping steps do something else (EFFECT_DOES), 'change', or '' for none.
+     */
+    function _effectWord(effects) {
+        if (effects.some(function (e) { return e.effect === 'delete' && !_effectDoes(e); })) return 'delete';
+        if (effects.some(function (e) { return e.effect === 'delete'; })) return 'act';
+        return effects.length > 0 ? 'change' : '';
+    }
+
+    /**
      * The lines a warning lists: deletions first, then changes, one line per group, its targets named
-     * ("Deletes — Pages: about, services and 3 more").
+     * ("Deletes — Pages: about, services and 3 more"). A command that says what it does has a line of its own.
      */
     function _effectLines(effects) {
         var groups = [];
@@ -2630,18 +2674,22 @@ window.PreviewAiTools = (function () {
         ['delete', 'change'].forEach(function (kind) {
             effects.forEach(function (e) {
                 if (e.effect !== kind) return;
-                var key = kind + '|' + e.what;
+                var does = _effectDoes(e);
+                var key = does ? 'does|' + e.command : kind + '|' + e.what;
                 if (!byKey[key]) {
-                    byKey[key] = { effect: kind, what: e.what, targets: [] };
+                    byKey[key] = { effect: kind, what: e.what, does: does, targets: [] };
                     groups.push(byKey[key]);
                 }
-                if (e.target !== '' && byKey[key].targets.indexOf(e.target) === -1) byKey[key].targets.push(e.target);
+                // A step of no named group gives its command as its target: such a line already says it.
+                if (e.target !== '' && !(does && e.target === e.command) && byKey[key].targets.indexOf(e.target) === -1) {
+                    byKey[key].targets.push(e.target);
+                }
             });
         });
         return groups.map(function (g) {
             var what = EFFECT_WHAT[g.what] || EFFECT_WHAT.other;
             var verb = g.effect === 'delete' ? _t('effectDeletes', 'Deletes') : _t('effectChanges', 'Changes');
-            var line = verb + ' — ' + _t(what[0], what[1]);
+            var line = g.does ? _t(g.does.line[0], g.does.line[1]) : verb + ' — ' + _t(what[0], what[1]);
             if (g.targets.length > 0) {
                 var shown = g.targets.slice(0, EFFECT_LIST_MAX).join(', ');
                 if (g.targets.length > EFFECT_LIST_MAX) {
@@ -2661,12 +2709,11 @@ window.PreviewAiTools = (function () {
     function _confirmEffects(groups, aiPhases) {
         var utils = window.QuickSiteUtils;
         if (!utils || typeof utils.confirm !== 'function') return Promise.resolve(false);
-        var deletes = false;
+        var word = _effectWord(groups.reduce(function (all, g) { return all.concat(g.effects); }, []));
         var parts = [];
         groups.forEach(function (g) {
             var lines = _effectLines(g.effects);
             if (lines.length === 0) return;
-            lines.forEach(function (l) { if (l.effect === 'delete') deletes = true; });
             parts.push(g.phase.title + ':\n' + lines.map(function (l) { return '• ' + l.text; }).join('\n'));
         });
         aiPhases.forEach(function (p) {
@@ -2675,8 +2722,10 @@ window.PreviewAiTools = (function () {
         });
         return utils.confirm(parts.join('\n\n'), {
             type: 'danger',
-            title: deletes ? _t('confirmTitleDelete', 'Delete content?') : _t('confirmTitleChange', 'Change content?'),
-            confirmText: deletes ? _t('confirmRunDelete', 'Delete and run') : _t('confirmRunChange', 'Change and run')
+            title: word === 'delete' ? _t('confirmTitleDelete', 'Delete content?')
+                : (word === 'act' ? _t('confirmTitleAct', 'Run these commands?') : _t('confirmTitleChange', 'Change content?')),
+            confirmText: word === 'delete' ? _t('confirmRunDelete', 'Delete and run')
+                : (word === 'act' ? _t('confirmRunAct', 'Confirm and run') : _t('confirmRunChange', 'Change and run'))
         });
     }
 
@@ -2760,8 +2809,10 @@ window.PreviewAiTools = (function () {
         var go = document.createElement('button');
         go.type = 'button';
         go.className = 'admin-btn admin-btn--small ' + (deletes ? 'admin-btn--danger' : 'admin-btn--primary');
-        go.textContent = deletes ? _t('reviewContinueDelete', 'Delete and continue')
-            : (lines.length ? _t('reviewContinueChange', 'Change and continue') : _t('reviewContinue', 'Continue'));
+        var word = _effectWord(warned);
+        go.textContent = word === 'delete' ? _t('reviewContinueDelete', 'Delete and continue')
+            : (word === 'act' ? _t('reviewContinueAct', 'Confirm and continue')
+                : (lines.length ? _t('reviewContinueChange', 'Change and continue') : _t('reviewContinue', 'Continue')));
         var stop = document.createElement('button');
         stop.type = 'button';
         stop.className = 'admin-btn admin-btn--secondary admin-btn--small';
@@ -3509,8 +3560,16 @@ window.PreviewAiTools = (function () {
         if (phase.ai) parts.push(_t('kindAi', 'AI'));
         parts.push(_t('reviewSteps', '{n} steps').replace('{n}', String(steps.length)));
         var warned = _warnedEffects(effects);
-        if (warned.some(function (e) { return e.effect === 'delete'; })) parts.push(_t('effectDeletes', 'Deletes'));
-        else if (warned.length > 0) parts.push(_t('effectChanges', 'Changes'));
+        var warnWord = _effectWord(warned);
+        if (warnWord === 'delete') parts.push(_t('effectDeletes', 'Deletes'));
+        else if (warnWord === 'act') {
+            var seen = {};
+            warned.forEach(function (e) {
+                var does = _effectDoes(e);
+                if (does && !seen[e.command]) parts.push(_t(does.word[0], does.word[1]));
+                if (does) seen[e.command] = true;
+            });
+        } else if (warnWord === 'change') parts.push(_t('effectChanges', 'Changes'));
         meta.textContent = parts.join(' · ');
         header.appendChild(meta);
         var body = document.createElement('div');
@@ -3547,7 +3606,9 @@ window.PreviewAiTools = (function () {
         if (effect && (effect.effect === 'delete' || effect.effect === 'change')) {
             var tag = document.createElement('span');
             tag.className = 'preview-contextual-ai-tools__step-effect preview-contextual-ai-tools__step-effect--' + effect.effect;
-            tag.textContent = effect.effect === 'delete' ? _t('effectDeletes', 'Deletes') : _t('effectChanges', 'Changes');
+            var stepDoes = _effectDoes(effect);
+            tag.textContent = stepDoes ? _t(stepDoes.word[0], stepDoes.word[1])
+                : (effect.effect === 'delete' ? _t('effectDeletes', 'Deletes') : _t('effectChanges', 'Changes'));
             body.appendChild(tag);
         }
 
@@ -3770,8 +3831,10 @@ window.PreviewAiTools = (function () {
             _executeBtnEl.style.display = ready && (!_autoContinue() || _answerParts > 1) ? '' : 'none';
             var warned = _answerPhase ? _warnedEffects(_answerPhase.effects) : [];
             var deletes = warned.some(function (e) { return e.effect === 'delete'; });
-            _executeBtnEl.textContent = deletes ? _t('confirmRunDelete', 'Delete and run')
-                : (warned.length > 0 ? _t('confirmRunChange', 'Change and run') : _t('actionExecute', 'Execute commands'));
+            var word = _effectWord(warned);
+            _executeBtnEl.textContent = word === 'delete' ? _t('confirmRunDelete', 'Delete and run')
+                : (word === 'act' ? _t('confirmRunAct', 'Confirm and run')
+                    : (word === 'change' ? _t('confirmRunChange', 'Change and run') : _t('actionExecute', 'Execute commands')));
             _executeBtnEl.className = deletes
                 ? 'preview-contextual-ai-tools__action-btn--primary preview-contextual-ai-tools__action-btn--danger'
                 : 'preview-contextual-ai-tools__action-btn--primary';

@@ -35,6 +35,7 @@
                     
                     // Reset classes
                     link.classList.remove('admin-hidden-permission', 'admin-disabled-permission');
+                    link.removeAttribute('title');
                     
                     if (!matches) {
                         link.style.display = 'none';
@@ -42,6 +43,7 @@
                         // Will decide visibility after counting
                         link.style.display = '';
                         link.classList.add('admin-hidden-permission');
+                        link.setAttribute('aria-hidden', 'true');
                     } else {
                         link.style.display = '';
                         visibleCount++;
@@ -78,7 +80,9 @@
     }
 
     /**
-     * Show commands without permission as disabled when few results
+     * Show commands without permission as greyed links when few results: each says why in its
+     * bubble, and opens the command's page, which documents it and says the same where the form
+     * would be.
      */
     function showDisabledCommands(categories, query) {
         categories.forEach(category => {
@@ -89,6 +93,8 @@
                     // Show as disabled instead of hidden
                     link.classList.remove('admin-hidden-permission');
                     link.classList.add('admin-disabled-permission');
+                    link.removeAttribute('aria-hidden');
+                    link.title = QuickSiteAdmin.t('commands.notPermittedHint');
                     link.style.display = '';
                 }
             });

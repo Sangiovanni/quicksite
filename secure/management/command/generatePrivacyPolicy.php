@@ -14,9 +14,9 @@
  * party "data sharing" section (derived from atom mappings + host classification),
  * an OAuth sign-in section, a cookie cross-link (link / hint / omit per
  * cookieSection), and a legal disclaimer. Records the route in data/privacy.json
- * and seeds default-language structural copy.
+ * and seeds the page's words in every language the pages read (new keys only).
  *
- * @return ApiResponse 200 { route, overwritten, collected, thirdParties, languagesSeeded }
+ * @return ApiResponse 200 { route, overwritten, collected, thirdParties, languagesSeeded, languagesFailed? }
  *         | 409 route.exists | 400
  */
 
@@ -29,6 +29,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/privacyPageHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/translationHelpers.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/nodeParamPolicy.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_refusal / _guard
+require_once SECURE_FOLDER_PATH . '/src/functions/startingTexts.php';
 
 $params = $trimParametersManagement->params();
 
@@ -108,30 +109,26 @@ if (!policyWriteLeaf($segments, $structure)) {
         ->send();
 }
 
-// ---- Record the route + seed structural copy (default language only) ------
+// ---- Record the route + seed the page's words -----------------------------
 $reg['privacyRoute'] = '/' . $route;
 savePrivacyRegistry($reg);
 qs_small_write_send_refusal();
 
-$seed = privacyPolicyTranslationSeed();
-$defaultLang = qs_project_default_language();
-$languagesSeeded = [];
-$flat = ($defaultLang === 'fr') ? $seed['fr'] : $seed['en'];
-$newOnly = consentFilterNewKeys($defaultLang, $flat);
-if (!empty($newOnly)) {
-    $res = writeTranslationsToFile($defaultLang, convertDotNotationToNested($newOnly), false);
-    qs_small_write_send_refusal();
-    if (!empty($res['ok'])) $languagesSeeded[$defaultLang] = $res['keysAdded'] ?? count($newOnly);
-}
+// Where a key has none, in every language the pages read (qs_starting_words_seed()).
+$seeded = qs_starting_words_seed(['privacy.policy']);
 
+$answer = [
+    'route'           => '/' . $route,
+    'overwritten'     => $overwritten,
+    'collected'       => count($collected),
+    'thirdParties'    => count($sharing),
+    'cookieMode'      => $cookieMode,
+    'languagesSeeded' => $seeded['languagesSeeded'],
+];
+if ($seeded['languagesFailed'] !== []) {
+    $answer['languagesFailed'] = $seeded['languagesFailed'];
+}
 ApiResponse::create(200, 'success')
     ->withMessage($overwritten ? "Privacy-policy page regenerated at /$route (existing route overwritten)" : "Privacy-policy page created at /$route")
-    ->withData([
-        'route'           => '/' . $route,
-        'overwritten'     => $overwritten,
-        'collected'       => count($collected),
-        'thirdParties'    => count($sharing),
-        'cookieMode'      => $cookieMode,
-        'languagesSeeded' => $languagesSeeded,
-    ])
+    ->withData($answer)
     ->send();

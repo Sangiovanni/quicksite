@@ -3,5 +3,76 @@
         "oauthButton": {
             "label": "Sign in with {{provider}}"
         }
+    },
+    "consent": {
+        "banner": {
+            "message": "We use cookies to improve your experience. You can accept, refuse, or customize your choices.",
+            "policy_link": "Cookie policy",
+            "aria_label": "Cookie consent"
+        },
+        "action": {
+            "accept_all": "Accept all",
+            "refuse_all": "Refuse all",
+            "customize": "Customize",
+            "save": "Save choices"
+        },
+        "popup": {
+            "title": "Cookie preferences",
+            "intro": "Choose which categories you allow. Essential cookies are always on.",
+            "aria_label": "Cookie preferences",
+            "close_label": "Close"
+        },
+        "category": {
+            "essential": "Essential",
+            "essential_note": "Always on",
+            "functional": "Functional",
+            "analytics": "Analytics",
+            "marketing": "Marketing"
+        },
+        "policy": {
+            "title": "Cookie policy",
+            "intro": "This page lists the browser storage this site uses, generated from the site's storage registry.",
+            "change_preferences": "Change my cookie preferences",
+            "col_key": "Name in your browser",
+            "col_scope": "Storage",
+            "col_category": "Category",
+            "col_retention": "Retention",
+            "col_consent": "Needs consent",
+            "col_description": "Purpose",
+            "yes": "Yes",
+            "no": "No",
+            "oauth_title": "Third-party sign-in",
+            "oauth_intro": "This site offers sign-in via the following providers. See each provider's own privacy policy for what they collect.",
+            "provider_link": "Privacy policy",
+            "prefix_note": "Names in the first column can include a short site prefix, because several sites can share one browser storage area: this is how each site keeps its own entries separate. It is the exact name you will find in your browser.",
+            "theme_retention": "Until you clear it",
+            "theme_description": "Remembers the light or dark theme you chose. It is set only when you click the theme switch.",
+            "record_retention": "180 days",
+            "record_description": "Remembers the choices you made about cookies, so the site respects them and does not ask again.",
+            "oauth_session_retention": "Until you close your browser",
+            "oauth_session_description": "Keeps a sign-in safe while it goes through the provider, and holds your signed-in session on the server.",
+            "oauth_user_retention": "14 days, or until you sign out",
+            "oauth_user_description": "Keeps you signed in after you sign in with a provider. It is set only when you sign in.",
+            "disclaimer": "This summary is generated from the site's storage registry and is provided for transparency. It is not legal advice — obtain your own legal review."
+        }
+    },
+    "privacy": {
+        "policy": {
+            "title": "Privacy policy",
+            "intro": "This page describes the personal data this site collects and who it is shared with.",
+            "collect_title": "Data we collect",
+            "col_data": "Data",
+            "col_purpose": "Purpose",
+            "sharing_title": "Data sharing",
+            "sharing_intro": "This site shares data with the following third parties. See each one's own privacy policy for what they do with it.",
+            "provider_link": "Privacy policy",
+            "oauth_title": "Third-party sign-in",
+            "oauth_intro": "This site offers sign-in via the following providers. See each provider's own privacy policy for what they collect.",
+            "cookie_title": "Cookies",
+            "cookie_intro": "This site uses browser storage and cookies, described in detail on the",
+            "cookie_link": "cookie policy",
+            "cookie_hint": "This site may use cookies. Consider publishing a cookie policy that lists them.",
+            "disclaimer": "This summary is generated from the site's configuration and provided for transparency. It is not legal advice — obtain your own legal review for your jurisdiction."
+        }
     }
 }

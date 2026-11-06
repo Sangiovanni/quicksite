@@ -98,6 +98,11 @@
         return _routesPromise;
     }
 
+    /**
+     * The literal paths of getRoutes' nested `routes`. A level is a map of names, and it reaches here as a
+     * JSON list when its children are named 0, 1, 2…, because PHP encodes such an array as one: its keys
+     * are still the names, and an empty level, a list too, has none.
+     */
     function _flattenLiteralRoutes(routes, prefix) {
         const out = [];
         if (!routes || typeof routes !== 'object') return out;
@@ -106,10 +111,7 @@
             if (key.charAt(0) === ':') return;
             const path = (key === 'home' && prefix === '') ? '/' : (prefix + '/' + key);
             out.push(path);
-            const child = routes[key];
-            if (child && typeof child === 'object' && !Array.isArray(child)) {
-                _flattenLiteralRoutes(child, prefix + '/' + key).forEach(function (p) { out.push(p); });
-            }
+            _flattenLiteralRoutes(routes[key], prefix + '/' + key).forEach(function (p) { out.push(p); });
         });
         return out;
     }

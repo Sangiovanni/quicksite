@@ -100,7 +100,7 @@ File lists are grouped by role. Where useful, the entry point or main exported f
 
 | File | Purpose |
 |---|---|
-| `js/core/api.js` | `QuickSiteAPI.request` + `upload`; in-memory session token sent with the session cookie (`setTokenSource` seam for embedders); emits `quicksite:command-executed`; keeps the write allowance current from each answer's headers (`getWriteRate`, `countsAsWrite`) and emits `quicksite:write-rate`. A request still out when the page leaves, a reload included, answers `client.network_error` like any failed request, without a console error. |
+| `js/core/api.js` | `QuickSiteAPI.request` + `upload`; in-memory session token sent with the session cookie (`setTokenSource` seam for embedders); emits `quicksite:command-executed`; keeps the write allowance current from each answer's headers (`getWriteRate`, `countsAsWrite`) and emits `quicksite:write-rate`. A request still out when the page leaves, a reload included, answers `client.network_error` like any failed request, without a console error. A command answers an envelope, so an empty 2xx, a 204 included, answers `client.empty_response`: it came from something in between, and it is never read as a success. |
 | `js/core/utils.js` | `QuickSiteUtils`: toasts, the panel's dialogs (`confirm()`, `prompt()`: *Dialogs* below), escaping, prefs storage, pending messages, a storage key's fixed prefix and its chip (`storageKeyPrefix()`, `renderStorageKeyPrefixChip()`: §9.10). |
 | `js/core/storage-keys.js` | Constants for every localStorage / sessionStorage key (`window.QuickSiteStorageKeys`). |
 | `js/core/dom.js` | `window.QSDom`: shared `el()` element factory + `svgIcon()` + `clear()` + `setSelectPlaceholder()` (resets a `<select>` to a single placeholder option) — the createElement/textContent idiom for dynamic DOM. Loaded in `<head>` so page scripts can use it at parse time. |
@@ -262,7 +262,7 @@ line, and the generated cookie-policy page prints the full physical name a
 visitor will find in their browser. The registry itself stores only the declared
 key — see §9.10.
 
-Authentication uses **no browser storage**: the session lives in an HttpOnly cookie the page cannot read, and the per-session token is page-embedded and held in memory (`api.js`). (`api.js` still clears the retired `quicksite_admin_token` / `quicksite_admin_remember` keys on logout as one-time upgrade hygiene.)
+Authentication uses **no browser storage**: the session lives in an HttpOnly cookie the page cannot read, and the per-session token is page-embedded and held in memory (`api.js`).
 
 Two other cookies exist, both HttpOnly and neither readable by page scripts. `QSSESSID` carries the session. `qs_form_token` carries the CSRF token of the **unauthenticated** auth forms — login, register and first-run run before any session exists, so they cannot use the per-session token every other page embeds; the server plants this cookie and the same value as a hidden field, and accepts a POST only when the two match. It is scoped to the admin path and `SameSite=Strict`, so a cross-site POST carries neither half. Signing out is likewise a **POST** carrying the per-session token, not a link: the header renders it as a form, and a bare `GET /admin/logout` ends nothing.
 
@@ -971,7 +971,7 @@ After each phase that succeeded in at least one command, the iframe reloads via 
 A run goes through the workflow's **phases**: each pre-workflow, the workflow itself, then each post-workflow ([WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md) *Sub-Workflows*). The server answers them (`workflow-generate-steps`): the plan when the run starts, every phase resolved against the project as it is then, and each phase again when the run reaches it — so a phase reads what the earlier ones changed (`setup-languages` sets the languages a `fresh-start` before it removed; a language switch lists the languages added before it).
 
 - **The review** (Run without stopping off) — before each phase but the first (a phase of steps that has none passes without one: there is nothing in it to stop before), and before a first phase that deletes or changes content: `Next — 2 of 4: {name}`, its number of steps (an AI phase: `Its prompt is built from the project as it now is.`, with its Your prompt field), the last phase's result (`{name}: 21 of 23 succeeded, 2 failed`), what it deletes and changes, and **Continue** / **Stop**. When the phase deletes, Continue reads **Delete and continue** and is red; when it only changes, **Change and continue**. The Batch opens on its steps.
-- **What is warned** — the server reads each step (`WorkflowManager::stepEffect()`): a read (a command the write rate never counts) and a command that adds something (a name beginning `add`, `create`, `upload`, `insert`, `duplicate`) are never warned; a step **deletes** when its name begins `delete`, `remove`, `clear`, `reset` or `purge` (the console's own convention), when its command's help marks it destructive, when it deletes a node, or when it gives a component an empty structure (which deletes the component); any other write to the site's content **changes** it. A write outside the site's content is warned only when it deletes: not a build, while `deployBuild`, whose help marks it destructive, reads `Deletes — Other commands: deployBuild`. A warning names what each step touches: `Deletes — Pages: about, services`, `Changes — The stylesheet`, `Changes — Texts: en, default`. A keep option shows by its absence: kept assets are not in the list.
+- **What is warned** — the server reads each step (`WorkflowManager::stepEffect()`): a read (a command the write rate never counts) and a command that adds something (a name beginning `add`, `create`, `upload`, `insert`, `duplicate`) are never warned; a step **deletes** when its name begins `delete`, `remove`, `clear`, `reset` or `purge` (the console's own convention), when its command's help marks it destructive, when it deletes a node, or when it gives a component an empty structure (which deletes the component); any other write to the site's content **changes** it. A write outside the site's content is warned only when it deletes: not a build, while `deployBuild`, whose help marks it destructive, stops the run as a deletion does. A flagged command that deletes nothing says what it does, in the warning, on its step and on its phase (`Deploys the build to the target folder, over what is already there`), and the buttons and the dialog then say **Confirm**; one real deletion beside it brings **Delete** back. A warning names what each step touches: `Deletes — Pages: about, services`, `Changes — The stylesheet`, `Changes — Texts: en, default`. A keep option shows by its absence: kept assets are not in the list.
 - **The danger dialog** (Run without stopping on) — once, before anything runs, the panel's danger dialog (`Delete content?` or `Change content?`, the focus on Cancel) lists what every phase the plan knows deletes and changes, each phase named; an AI phase is announced (`{name} (AI): the commands its AI answers change the site; a deletion among them is asked when the answer arrives.`). It is not shown when nothing known deletes or changes anything. After it, only what it did not list asks again: a phase that, resolved when reached, deletes or changes more, and an AI answer that deletes.
 - **An AI phase** — its prompt is built when the run reaches it, from the project as it now is, the phase's request appended; it is sent with the connection's key, or shown and copied. The run then **waits for its answer whatever Run without stopping says** — without a key that is where it stops until the answer is pasted (`3 of 3: {name} waits for its AI answer, in AI response below.`, with **Stop**). With the switch off the answer runs from its Execute button.
 - **A cut answer** — while the run waits for an answer that cannot run, the bar offers a way on, by why it could not. Neither button is offered while a send is under way.
@@ -1069,6 +1069,21 @@ as its scope; the refresh token's source is always one of these two. For **heade
 and back finds what it held, and nothing is carried over to another location, except a storage key between the two that name one.
 An API saved untouched keeps its source as it was. A saved source its auth type does not read opens on the first location with no
 name, and an API with no name is not saved, and a toast says why.
+
+**What the form does not show, it keeps.** Save sends the whole `auth`, and `editApi` replaces it, so what no field shows goes back as
+it was: a cookie API's `csrf` (§9.5), for one. A new type takes none of it, because it was written for the old type, and the page says
+what went.
+
+**An API's id is fixed once it is saved.** Endpoints, pages and interactions refer to an API by its id, so the form shows it read-only on
+an edit. Another id is a new API.
+
+**The Auth Token row** on a card holds what the Test panel sends. A `cookie` call carries no token, so a cookie API shows no row, unless
+an endpoint of its own takes one, and then the row names that token.
+
+**What a rank sees.** The page opens for whoever may read the registry (`listApiEndpoints`, editor and up). **Add API**, **Import**, a
+card's add, edit and delete, an endpoint's test, edit and delete, and the token row show only to a rank that can run them (`addApi`,
+`editApi`, `deleteApi`, `testApiEndpoint`, admin and up), and with no action on a row there is no Actions column. This is what the page
+shows: the commands' own refusals stay the authority.
 
 **A token only ever comes from the project's own namespace.** `QS.fetch` reads a token's key under `qsp_<projectId>_`, whatever the
 source names, so a key written with no prefix or another project's slot named whole is never read, and a page that does not know its
@@ -1784,7 +1799,8 @@ the author's server set it under; a name starting `qsp_` is the engine's, and is
 refused when saved and ignored at a call. The block is optional and
 accepted on `type: "cookie"` only — every other auth shape puts its credential
 in a header the caller already controls, which is not forgeable cross-site in
-the first place.
+the first place. The API form has no field for it: a save keeps the pair while
+the type stays `cookie`, and a change of type drops it (§9.1).
 
 Nothing is invented when the cookie is not there: no header is sent, and the
 console says which cookie was missing and that the server marking it
@@ -2487,6 +2503,8 @@ authoring vocabulary, two consumers:
 "userId" => "session:userId"   // accepted; always reads as nothing, as a resolver is given no session
 "tag"    => "featured"         // bare literal (no recognised prefix)
 ```
+
+The resolver form offers `param:`, `query:` and a literal. A row saved with `session:` opens as it is, says it reads nothing, and saves as it was until its author changes it.
 
 Missing sources resolve to `null` and get dropped from the request
 entirely (the upstream's default applies), instead of being sent as an
@@ -3251,7 +3269,9 @@ deterministic policy page (`generateCookiePolicy`) — a **Change my cookie
 preferences** button right under its intro (withdrawing consent must be as easy as
 giving it; the button is a node marked `customize`, which a regeneration puts back),
 a table of every declared key (name / scope / category / retention / needs-consent
-/ purpose), a sign-in section listing the OAuth providers the project's sign-in
+/ purpose) and of the cookies QuickSite itself sets for a visitor (the consent record and, on a site whose
+sign-in routes can sign someone in, the sign-in's two cookies: essential, needing no consent, their texts in every
+language the site's pages read, in that language's words where QuickSite has them and in English where not), a sign-in section listing the OAuth providers the project's sign-in
 routes use — named as the installation's provider list names them and linked to
 their `privacy_url` (§9.5), a provider without one listed by name; a route that takes
 its provider from the address lists every provider the project has keys for, in
@@ -3259,7 +3279,8 @@ either set — and a legal-review note. The route is recorded in `consent.json`;
 exists the modal locks the route and offers **Update** + **Delete page**
 (`getConsentStatus` / `deleteCookiePolicy` drive this), so there is exactly one
 policy page and no accidental duplicates. Overwriting an existing route asks for
-confirmation.
+confirmation. Left empty, the layer is generated with no page and the banner links to
+none, and a yellow toast says so.
 
 **The theme switch's key in the policy.** When the project's theme mode and its
 visitor toggle are both on (`setThemeMode`), the table also lists the key the theme
@@ -3270,10 +3291,13 @@ visitor's own request to keep that choice — but a visitor checking their stora
 it in the table. Like every row, it is the setting when the page is generated: after
 turning the switch on or off, **Update** the page.
 
-**Languages.** Structural banner / popup / policy copy is seeded in the site's
-**default language** only (built-in en/fr wording, or English text when the
-default is another language); the remaining configured languages surface as
-missing in the Translation Manager for translation there. Per-key descriptions in
+**Languages.** The banner's, the popup's and the policy pages' texts, the labels a
+screen reader announces included, are written into every translation file the site's
+pages read, only where a key has no text, so an edited text stays. Each language's words
+come from `<secure>/src/translations/<lang>.json`, read by key: a language with no file
+there takes English's, and a new language is a new file there, with no code. A language
+added after a generation starts from the default language's texts (`addLang`), which a
+later generation leaves, as it leaves any text. Per-key descriptions in
 the policy table are rendered live from the registry's description language, so
 editing a description updates the page immediately — regeneration is only needed
 for data changes (new keys, category / retention edits).
@@ -3326,7 +3350,8 @@ and a legal-review note. The cookies section links the cookie-policy page when o
 exists, hints to create one when it doesn't, or is omitted when the author ticks
 *"Don't mention cookies on this page"* (`setPrivacyCookieSection`). Once a page
 exists the section offers **Update** + **Delete** (`deletePrivacyPolicy`) and the
-route is recorded in `privacy.json`. Descriptions render live from `translate/`;
+route is recorded in `privacy.json`. The page's own words reach every language as the
+cookie policy's do (§9.10); the labels and purposes of collected data are the author's. Descriptions render live from `translate/`;
 regeneration is only needed after data changes (new mappings, host
 re-classification).
 
@@ -3732,7 +3757,7 @@ Each field is built from the parameter's `help` entry:
 | `default` | Under the field as **Default:** — what the command uses when the field is left empty. |
 | `validation` | Under the field as **Validation:**. |
 
-A field starts empty, JSON boxes included, and a field left empty is not sent: an optional parameter the form was not given is absent from the request, so the command applies its own default.
+A parameter `help` types as `object`, `array` or a choice of the two (`object|array`) is a JSON box: what it holds is sent as JSON. A field starts empty, JSON boxes included, and a field left empty is not sent: an optional parameter the form was not given is absent from the request, so the command applies its own default.
 
 The fields come in up to three groups, by what `help` says of each parameter: **Required Parameters**, which the form will not send without; **Required in Some Cases** — `help` marks the parameter `conditional`, and its description says when it is needed (`addNode`'s `tag` for an element, `textKey` or `textValue` for a text) — which the form never requires, since a request of the other kind must leave it out; and **Optional Parameters**.
 
@@ -3789,6 +3814,12 @@ What turning it off removes is **discoverability and reach**: your users stop ho
 Withheld: the command index, the per-command form, and the panel's **Commands** navigation entry. `/admin/command` still answers `200` and says the operator turned the console off — deliberately not a `404`, because the page does exist, the gate is not a secret, and a `404` on a routed page sends the next person to debug routing.
 
 Not withheld: **command history**, which is a separate page at `/admin/history` with its own role gate (§9.18). History is a record of what ran, not a way to run anything, and commands run constantly from the panel's own pages whether or not this console exists — switching off the runner must not take the audit trail with it.
+
+A field `help` marks `ui_type` `date` has a date picker above **Or enter manually:**. The picker opens empty, and what is picked fills that field at once; emptying the picker empties it. The field is what the form sends, so a date can also be typed there. `getCommandHistory`'s `command` is a searchable list of the index's commands: blank means all of them, and its first entry opens a text box, as a log can hold a command that has since been removed.
+
+#### A command your role cannot run
+
+The index leaves it out, and a search with three matches or fewer shows it greyed with a lock, its bubble saying why. It is still a link: its page opens, its documentation renders, and where the fields and **Execute Command** would be, a notice says your role in this project does not allow the command. This is the panel reading your permissions and no boundary: the command refuses the call itself.
 
 #### Two commands are documented here but cannot be run here
 

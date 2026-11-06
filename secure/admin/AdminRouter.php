@@ -635,10 +635,6 @@ class AdminRouter {
      * integer on the user record, compared on every request. There is no session
      * index to walk and nothing to clean up afterwards.
      *
-     * Stale cookies from the retired token model (`qs_refresh`, `qs_preview`,
-     * `admin_token`) are expired here as one-time upgrade hygiene: they carried
-     * credentials, and a browser holding one should not keep it.
-     *
      * Recorded in the security trail as `auth.signout`, with the payload the
      * `logoutSession` command writes, while the caller's identity is still
      * resolved — before the session is destroyed.
@@ -662,11 +658,6 @@ class AdminRouter {
         }
 
         qs_session_destroy();
-        foreach (['qs_refresh' => '/admin', 'qs_preview' => '/', 'admin_token' => '/admin'] as $name => $path) {
-            if (isset($_COOKIE[$name])) {
-                setcookie($name, '', ['expires' => time() - 3600, 'path' => $path, 'httponly' => true, 'samesite' => 'Lax']);
-            }
-        }
     }
 
     /**
