@@ -1160,7 +1160,7 @@ $GLOBALS['__help_commands'] = [
                 'description' => 'What to do with the node nodeId names. Delete, insertBefore and insertAfter need a nodeId and are refused without one; with no nodeId, update is the full replacement.',
                 'default' => 'update',
                 'example' => 'update or delete or insertBefore or insertAfter',
-                'validation' => 'Must be: update (replace node), delete (remove node), insertBefore, insertAfter'
+                'validation' => 'Must be: update (replace node), delete (remove node), insertBefore, insertAfter. Anything else is refused, with or without a nodeId.'
             ]
         ],
         'example_patch' => 'PATCH /management/p/<projectId>/editStructure with body: {"type": "page", "name": "home", "structure": [{"tag": "h1", "children": [{"textKey": "home.title"}]}]} (the whole page) or {"type": "page", "name": "home", "nodeId": "0.2", "structure": {"tag": "p", "children": [{"textKey": "home.a"}]}} (one node) or {"type": "page", "name": "home", "nodeId": "0.2", "action": "delete"} (removes that node)',
@@ -1190,7 +1190,7 @@ $GLOBALS['__help_commands'] = [
             '400.operation.denied' => 'Cannot delete component: used by other components. data.used_by_components names them.',
             '400.validation.invalid_length' => 'The type parameter is longer than the longest allowed type name, or a page name exceeds 200 bytes.',
             '400.validation.invalid_type' => 'The structure parameter is not an object or array of objects, the type parameter is not a string, or the name parameter is neither a string nor a number. An integer or float name is accepted and used as its string form.',
-            '400.validation.invalid_value' => 'The type parameter is not one of menu, footer, page, component; or, in targeted mode, action is not one of update, delete, insertBefore, insertAfter. The allowed set is echoed in errors[].allowed.',
+            '400.validation.invalid_value' => 'The type parameter is not one of menu, footer, page, component; or action is not one of update, delete, insertBefore, insertAfter, in either mode. Nothing is written. The allowed set is echoed in errors[].allowed.',
             '400.validation.reserved_attribute' => 'A node carries an attribute starting with "data-qs-", which is reserved for QuickSite. Use a different prefix such as "data-custom-" or "data-app-". The offending attribute and its node are named in errors[].',
             '500.server.directory_create_failed' => 'Failed to create components directory.',
             '500.server.file_delete_failed' => 'Failed to delete component file.',
@@ -7206,7 +7206,7 @@ $GLOBALS['__help_commands'] = [
                 'example' => 'My Custom Navigation'
             ],
             'category' => [
-                'required' => true,
+                'required' => false,
                 'type' => 'string',
                 'description' => 'Category folder: nav, forms, cards, layouts, content, lists or other (default other)',
                 'example' => 'nav',

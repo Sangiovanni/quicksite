@@ -5,7 +5,7 @@
  * Parameters:
  * - name (optional): Custom build folder name. If omitted, auto-generates build_YYYYMMDD_HHMMSS.
  * - public (optional): Custom public folder name/path (max 5 levels, e.g., 'www/v1/public')
- * - secure (optional): Custom secure folder name (max 1 level, e.g., 'backend')
+ * - secure (optional): Custom secure folder name (max 5 levels, e.g., 'backend')
  * - space (optional): URL path prefix - creates subdirectory inside public folder (max 5 levels, e.g., '' or 'space')
  *                     When set, all public files are placed in: {public}/{space}/
  *                     This allows multiple sub-websites on the same domain (e.g., http://site.com/space/en/)

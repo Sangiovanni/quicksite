@@ -126,7 +126,9 @@ if (!function_exists('qs_first_unsafe_structure_param')) {
         if (!is_array($structure)) {
             return null;
         }
-        if (isset($structure['tag']) || isset($structure['component']) || isset($structure['textKey'])) {
+        // One node, whichever of its keys it holds: a root with only params or children is one too.
+        if (isset($structure['tag']) || isset($structure['component']) || isset($structure['textKey'])
+            || isset($structure['params']) || isset($structure['children'])) {
             return qs_first_unsafe_node_param($structure, 'root');
         }
         foreach ($structure as $index => $node) {

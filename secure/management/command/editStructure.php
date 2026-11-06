@@ -147,6 +147,16 @@ if (!isset($params['type'])) {
         ->send();
 }
 
+// An action outside these four is a mistake in either mode: read as a full replacement, it would
+// write the request over the whole file.
+$allowedActions = ['update', 'delete', 'insertBefore', 'insertAfter'];
+if (!in_array($action, $allowedActions, true)) {
+    ApiResponse::create(400, 'validation.invalid_value')
+        ->withMessage("Invalid action. Must be one of: " . implode(', ', $allowedActions))
+        ->withErrors([['field' => 'action', 'value' => $action, 'allowed' => $allowedActions]])
+        ->send();
+}
+
 // An action that names a place in a structure needs the node: with none, the full replacement
 // below would write the request over the whole file.
 if ($nodeId === null && in_array($action, ['delete', 'insertBefore', 'insertAfter'], true)) {
@@ -464,15 +474,6 @@ if ($nodeId !== null) {
         ApiResponse::create(400, 'validation.invalid_format')
             ->withMessage("Invalid nodeId format. Use dot notation like '0.2.1'")
             ->withErrors([RegexPatterns::validationError('node_id', 'nodeId', $nodeId)])
-            ->send();
-    }
-    
-    // Validate action
-    $allowedActions = ['update', 'delete', 'insertBefore', 'insertAfter'];
-    if (!in_array($action, $allowedActions, true)) {
-        ApiResponse::create(400, 'validation.invalid_value')
-            ->withMessage("Invalid action. Must be one of: " . implode(', ', $allowedActions))
-            ->withErrors([['field' => 'action', 'value' => $action, 'allowed' => $allowedActions]])
             ->send();
     }
     
