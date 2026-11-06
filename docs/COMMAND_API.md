@@ -114,7 +114,7 @@ Whenever the envelope names a file or directory — `data.file`, `data.path`, `d
 | Elsewhere in the installation | Relative to the installation root | `<secure>/projects/other-site`, `<secure>/snippets/core` |
 | The project root or installation root itself | A single dot | `.` |
 
-A rewritten path always uses `/` as its separator, on every platform. A path the **caller** supplied — a deploy target outside the installation, for instance — is left exactly as given, separators included, since it discloses nothing the caller did not already have.
+A rewritten path always uses `/` as its separator, on every platform. A path the **caller** supplied is left exactly as given, separators included, since it discloses nothing the caller did not already have.
 
 The rule applies to the whole envelope, not just to fields that look like paths: `data` at any depth (values *and* keys, so a payload keyed by filename is covered), `errors`, and the `message` string, which often interpolates a path into a sentence. It applies identically however a command's result leaves the engine — over HTTP, through the admin panel's internal relay, or through `CommandRunner`.
 
@@ -142,7 +142,7 @@ The work that succeeded is real and is not rolled back. `errors` names every mem
 
 ## Command catalogue
 
-The 150 commands group into the categories below. Use `GET /management/help` for the full per-command spec.
+The 149 commands group into the categories below. Use `GET /management/help` for the full per-command spec.
 
 > **AI is browser-direct (BYOK).** There is no `callAi` / `testAiKey` / `detectProvider` / `listAiProviders` server command — the admin panel calls AI providers directly from the browser using credentials stored in `aiConnectionsV3` (localStorage). The Management API only handles workflow specs and command execution.
 
@@ -162,7 +162,7 @@ Each row enumerates the commands in that category — comma-separated — follow
 | **Styles** | `getStyles`, `editStyles`, `listStyleRules`, `getStyleRule`, `setStyleRule`, `deleteStyleRule` — `style.css` blocks + scoped CSS rule management. `editStyles` replaces the whole sheet; an empty content empties it. |
 | **CSS variables** | `getRootVariables`, `setRootVariables`, `setThemeMode` — CSS custom-property registries used by the color picker and theme switcher. |
 | **Animations** | `listKeyframes`, `getKeyframes`, `setKeyframes`, `deleteKeyframes`, `getAnimatedSelectors` — named keyframes + per-element animation bindings. |
-| **Builds** | `build`, `getBuild`, `deleteBuild`, `downloadBuild`, `deployBuild` — compile a project to a self-contained deliverable under its own `qs_build/<name>/`, then inspect / download / delete / deploy it. **Deploying is refused unless the installation's operator enabled it** (`<secure>/management/config/deploy.php`; absent means no) — see *Self-deploy* below, which also covers the target allowlist and the route-collision check. **A build lives outside the project's `public/`**, which is the only directory `/p/<id>/` serves — so no URL reaches a build, on a public project or a private one, and `downloadBuild` is the only way to fetch one. It archives the folder on demand and streams it, so the download carries the same authentication as every other command and nothing stale is kept on disk, a transfer the client cuts included. A build made with the OAuth secrets downloads, and deletes, only for a role that may set the project's keys. **A project holds at most one build**: `build` answers `409 conflict.already_exists` while one exists rather than overwriting it, and its response names `downloadBuild` and `deleteBuild` as the way forward, or tells a role that may use neither who to ask. A build that fails — a fatal error included — removes its own partial directory; should that removal fail too, the leftover has no `build_manifest.json` (written last for exactly this reason) and `getBuild` reports `complete: false` — an incomplete build can be deleted, but not downloaded or deployed. `getBuild`, `deleteBuild` and `downloadBuild` therefore take **no parameters at all**, and `deployBuild`'s `name` is optional — supplying it asserts which build was meant rather than selecting between several. `build` copies a project's `style/` and `assets/` through a **publish allowlist**, so a file existing inside a project and a file being published to a web-served directory are two separate decisions — anything not publishable is left out of the build and reported in the response. The permitted extensions are configurable in `<secure>/management/config/import-policy.php` (see *Archive import limits* below). **A build that cannot serve is not reported as a success**: before answering, `build` walks the finished tree along the request path — the file its `.htaccess` funnels to, that file's parameters, `config.php` and `routes.php`, the runtime the compiled pages require, the menu and footer, every compiled route's page at the exact path routing will compute for it, and the 404 — and answers `500 server.internal_error` with `data.problems` naming what is missing, discarding the partial. The site it emits carries the project's REAL id, so a built site and the same project at `/p/<projectId>/` share one browser-storage namespace. **A build carries a project's OAuth client secrets only when asked** — `include_oauth_secrets`, which only the project's owner and admin may send; otherwise each provider's build keys keep their client id and the secret is a placeholder the deployed site reads as not set. `build_manifest.json` records whether the build carries **OAuth client secrets** and what the deployed site's sign-in has and lacks (`oauth`: the providers it carries — only those the project's sign-in routes use — with their build keys, never the preview keys; those with no build keys; those whose secret it left out; those the installation no longer offers), and `getBuild` reports both — the first changes what the deliverable is (a credential, not just a website) and the moment it matters is the download, long after `build`'s own response is gone. |
+| **Builds** | `build`, `getBuild`, `deleteBuild`, `downloadBuild` — compile a project to a self-contained deliverable under its own `qs_build/<name>/`, then inspect / download / delete it. Putting it on a server is the deployer's own act: the archive's `README.txt` says how. **A build lives outside the project's `public/`**, which is the only directory `/p/<id>/` serves — so no URL reaches a build, on a public project or a private one, and `downloadBuild` is the only way to fetch one. It archives the folder on demand and streams it, so the download carries the same authentication as every other command and nothing stale is kept on disk, a transfer the client cuts included. A build made with the OAuth secrets downloads, and deletes, only for a role that may set the project's keys. **A project holds at most one build**: `build` answers `409 conflict.already_exists` while one exists rather than overwriting it, and its response names `downloadBuild` and `deleteBuild` as the way forward, or tells a role that may use neither who to ask. A build that fails — a fatal error included — removes its own partial directory; should that removal fail too, the leftover has no `build_manifest.json` (written last for exactly this reason) and `getBuild` reports `complete: false` — an incomplete build can be deleted, but not downloaded. `getBuild`, `deleteBuild` and `downloadBuild` therefore take **no parameters at all**. `build` copies a project's `style/` and `assets/` through a **publish allowlist**, so a file existing inside a project and a file being published to a web-served directory are two separate decisions — anything not publishable is left out of the build and reported in the response. The permitted extensions are configurable in `<secure>/management/config/import-policy.php` (see *Archive import limits* below). **A build that cannot serve is not reported as a success**: before answering, `build` walks the finished tree along the request path — the file its `.htaccess` funnels to, that file's parameters, `config.php` and `routes.php`, the runtime the compiled pages require, the menu and footer, every compiled route's page at the exact path routing will compute for it, and the 404 — and answers `500 server.internal_error` with `data.problems` naming what is missing, discarding the partial. The site it emits carries the project's REAL id, so a built site and the same project at `/p/<projectId>/` share one browser-storage namespace. **A build carries a project's OAuth client secrets only when asked** — `include_oauth_secrets`, which only the project's owner and admin may send; otherwise each provider's build keys keep their client id and the secret is a placeholder the deployed site reads as not set. `build_manifest.json` records whether the build carries **OAuth client secrets** and what the deployed site's sign-in has and lacks (`oauth`: the providers it carries — only those the project's sign-in routes use — with their build keys, never the preview keys; those with no build keys; those whose secret it left out; those the installation no longer offers), and `getBuild` reports both — the first changes what the deliverable is (a credential, not just a website) and the moment it matters is the download, long after `build`'s own response is gone. |
 | **Projects** | `listProjects`, `createProject`, `cloneProject`, `renameProject`, `deleteProject`, `setProjectVisibility` — per-project CRUD under `<secure>/projects/`. No project is privileged, so none of these decides what a domain serves: that is a web-server mapping (see ARCHITECTURE.md). **A project has an id and a name.** The id is drawn when the project is made — by `createProject`, `cloneProject` and `importProject` alike, never taken from the request — and every one of them answers it as `data.project`: nine characters, a letter first, then lowercase letters and digits. It is the project's folder, its `/p/<projectId>/` address and the marker every project-scoped command takes, and it never changes. The name is the `name` parameter of the three: free text of 1 to 60 characters, no control character, stored in the project's `config/project.json` and answered as `data.name`; two projects may share one. A clone defaults to its source's name, an import to the archive's. A clone copies its source as it is except its backups, its build, its saved exports and its OAuth keys, and `data.oauth_keys_not_copied` names the providers whose keys must be created again. `renameProject` (**owner-only**) changes the name and nothing else — not the id, not the address, not the site's own `site.name` text. `listProjects` is membership-filtered: it returns only the caller's projects, each with its id (`project`), its `name` (its id when it has none) and `my_role`, sorted by name then id (no all-projects view). **Your storage total is not a command either**: "how much disk do my projects use" is a fact about an *account*, so it is served at `GET /admin/self/space-usage` (add `?refresh=1` to force a re-walk). It answers an owner-wide total, a category breakdown, and one row per project, aggregated across every project where the caller's role is `owner`; ownership is resolved per project from `members.json`, so it can only ever describe projects you own — owning nothing returns a zeroed report. Names of backups and exports are never returned, only sizes and counts. For one project in depth, use the project-scoped `getSizeInfo` command. **No command sets which project you are editing.** That pointer is panel state, written by the admin panel at `POST /admin/state/selected-project` (per-user, member-only), and it is the only project pointer there is: what a production domain serves is decided by the web server, so no command can publish a project at a domain root either (see [ARCHITECTURE.md §7](ARCHITECTURE.md)). Every command names the project it acts on in the URL marker instead. `createProject`'s `switch_to` sets only the creator's edited pointer, through the same writer. `setProjectVisibility` (`private`/`public`, **owner-only**) flips whether the project is served to the public internet via surface-B — a graver exposure decision than the admin-tier `setJoinPolicy`, so it sits at the delete/transfer tier; making a project private while its join policy is open re-creates the knockable-by-id state (an advisory note is returned). See [ARCHITECTURE.md §7](ARCHITECTURE.md). |
 | **Project members** | `listMembers`, `getProjectRoster`, `inviteMember`, `cancelInvitation`, `changeMemberRole`, `removeMember`, `transferOwnership`, `approveJoinRequest`, `denyJoinRequest`, `proposeMember`, `setJoinPolicy`, `reconcileMemberships` — the project's roster, on a consent model: `getProjectRoster` is the reduced roster for EVERY member rank — active members only (`{user_id, name, role, rank, is_owner}`, rank-descending), no pending queue, so any member can see who is on the project with them; the full `listMembers` (roster + pending invitations/requests) stays admin/owner. Otherwise: an admin/owner *invites* an existing account (by `user_id`, discovered with the panel's user lookup — see *What is deliberately not a command*) and membership materializes only when the invitee accepts. Incoming join requests and member proposals are adjudicated with `approveJoinRequest` (a self-request joins immediately, and the requester's inbox shows an approved notice until they dismiss it; a sponsored proposal converts into a real invitation carried by the approver's rank, `sponsored_by` kept — the approver may name the `role` to grant, defaulting to the requested/proposed one, so approval and role assignment are one atomic, rank-checked step) and `denyJoinRequest` (mandatory `note` — a refusal always carries its reason; a denied self-request leaves a dismissable `refused` notice, a denied proposal tells the never-engaged target nothing). `proposeMember` is the sponsor lane: ANY member — viewer included — vouches an outsider with a mandatory note, at a role no higher than the sponsor's own rank; nothing is granted and the person is told nothing until validation. `setJoinPolicy` (`open`/`closed`, default closed, admin+) gates only the self-service request door — proposals always reach the queue, and closing never purges pending requests. Rank rules throughout: you can only offer, change to, cancel, approve, deny, or remove roles of strictly lower rank than your own (nobody can veto what they could not grant); `cancelInvitation` withdraws invites only (requests are adjudicated, never silently cancelled); the owner's role is immutable except via `transferOwnership` (owner-only, member-only target, `confirm: true`, departing owner keeps `old_owner_role` — default `admin`). Members are referenced as `{user_id, name}` — the public display name and the opaque id; the private login username never appears. `reconcileMemberships` (admin/owner) is the maintenance sweep: it heals every member's users.php membership cache for the project against the authoritative members.json — rebuilding derivable statuses (member / pending) while **preserving** the non-derivable tombstones (`refused` / `removed` / `deleted`, which live only in the cache) and pruning stale positives; it aborts rather than wipe real memberships if the authority is unreadable. All are project-scoped on the URL marker (`/management/p/<projectId>/…`) and ignore any project named in the body. |
 | **Backups** | `backupProject`, `listBackups`, `restoreBackup`, `deleteBackup` — snapshot / restore (configurable scope). All are project-scoped on the URL marker and act only on the targeted project; a project named in the body must match the marker or the call is refused (`400 project.mismatch`). A backup holds what an export carries — `config.php`, `routes.php`, `config/`, `templates/`, `translate/`, `data/`, `snippets/` and `public/` — and always the project's OAuth keys, both sets, which an export carries only when asked; but never `config/members.json`, so a restore never touches membership, nor the project's name (`config/project.json`), so a restore never renames it. A backup that cannot be made completely is not kept and deletes no older backup (`500 backup.incomplete`). **`restoreBackup` overwrites and takes no snapshot unless you ask for one.** It replaces each of those items the named backup holds; `delete_backup: true` deletes the backup once the restore is complete. The *pre-restore backup* — a snapshot of the project's **current** state, taken before it is overwritten, so the restore itself can be undone by restoring that snapshot — is **opt-in**: pass `create_backup: true`. The default is `false`, in which case no snapshot is taken and the overwritten state is not recoverable through QuickSite. On success `data.pre_restore_backup` names the snapshot (`pre-restore_<timestamp>`) or is `null` when none was requested. The admin panel offers the snapshot as an unchecked box on its restore dialog; a direct API caller gets no prompt at all, so the parameter is the only safeguard. |
@@ -340,125 +340,6 @@ With several windows, the one named is the one that frees last. `write_rate.wait
 
 Copy `<secure>/management/config/quota.php.example` to `quota.php` to set the numbers. Every value is an integer; the example documents each default and how to turn each limit off.
 
-## Self-deploy
-
-`deployBuild` copies a finished build onto a filesystem path — the install's own root by default. It asks for no credentials: the installation writes to itself. That is a legitimate way to publish and it is also a capability the person who set the server up may not want to hand to the people who use it, so three independent gates stand in front of it. All three must pass, and none substitutes for another.
-
-| Gate | Where | Default |
-|---|---|---|
-| May anyone deploy at all? | `<secure>/management/config/deploy.php` → `allow_deploy` | **Absent means no.** |
-| May THIS caller? | `roles.php` — `deployBuild` is alone in the `deploy` category | Project admins and owners |
-| WHERE may a permitted deploy write? | `<secure>/management/config/deploy-roots.php` | The install root (`SERVER_ROOT`) only |
-
-**An absent `deploy.php` refuses.** So does an unreadable one, a syntax error, a file that is not PHP, a wrong return type, a missing key, and any value that is not boolean `true` — the string `"true"` and the number `1` included. Only a well-formed file saying exactly `true` opens the gate; a broken one is reported to the server error log rather than taking the request down. `setup.sh` / `setup.bat` offer this as a menu item, and `deploy.php.example` documents it.
-
-Turning it on widens nothing else. The role gate and the target allowlist are unchanged by it; it only lifts the flat refusal that comes before both.
-
-```json
-{
-  "status": 403,
-  "code": "deploy.disabled",
-  "message": "Deploying is disabled on this installation",
-  "data": {
-    "hint": "The operator enables it on the server: copy <secure>/management/config/deploy.php.example to deploy.php and set allow_deploy => true (setup.sh / setup.bat offers this). Building, downloading and deleting a build are unaffected."
-  }
-}
-```
-
-Building, downloading and deleting a build are unaffected on an install with deploy off. The archive can still be produced and fetched; what is closed is QuickSite writing the site onto a path itself.
-
-### Co-tenancy: one document root, several sites
-
-Deploying site B never damages site A. `deployBuild` enforces that with a subtree rule and three named refusals, none of which `overwrite` can answer.
-
-**A build owns its own subtree and nothing else.** That is `<public>/<space>/**` and `<secure>/**`. A spaced build also emits a `.htaccess` for the document root itself — `Options -Indexes` plus headers, no `FallbackResource` — and the document root is *outside* its subtree. Outside the subtree a deploy **creates but never overwrites**, and `overwrite: true` does not reach those paths. Skipped paths come back as `shared_paths_skipped`.
-
-Without that rule, a spaced build deployed over a root build would replace the root site's funnel: its home page would keep working (a real `index.php`) while every other route 404'd. The damage is order-dependent — root-then-spaced would break, spaced-then-root would not — so a single test can pass and the next deploy still break.
-
-#### The deployment marker
-
-On success `deployBuild` writes `<secure>/qs-deployment.json` naming the project, the build, the time, and **where the deployment landed** — the public folder name and the URL space. The secure folder is not web-reachable, so it can carry a project id; and it is the folder whose contents are at stake, which is what makes the check work when two sites use different *public* folder names — the multi-tenant case.
-
-The placement fields have a second reader: the nginx generator below, which has to tell a build sitting at the installation's document root from one sitting beside it. `qs-site.php` holds the same three fields and cannot be used for it — it answers 404 and exits unless the site's own entry point is booting.
-
-A build carries no such identity of its own: `qs-site.php` names the project but lives in the public folder, and `build_manifest.json` is never deployed. A site uploaded by hand from a downloaded archive therefore has no marker, and the first deploy over it reports an unknown owner. A marker written before the placement fields existed is treated as a marker with no placement: it still answers the ownership question, and the next deploy rewrites it.
-
-| At the target | Answer |
-|---|---|
-| Marker naming **this** project | `409 deploy.update_confirmation_required`, with `deployed_at` and `deployed_build`. `confirmUpdate: true` proceeds. The routine path. |
-| Marker naming a **different** project | `409 deploy.secure_folder_in_use`. `replaceDeployment: true` proceeds. |
-| Contents, **no** marker | `409 deploy.secure_folder_unmarked`. `adoptSecureFolder: true` proceeds. |
-| Empty or absent | Deploys, and the marker is written. |
-
-The two refusals about somebody else's folder say only that the name is not available. They do not name the project that holds it, its build, or when it was deployed — the same reasoning that keeps the installation's own path out of the panel.
-
-**Nothing is ever deleted.** Every path above writes the files the build produces and leaves everything else untouched, including in a folder the deployer chose to write over. Clearing a stale secure folder is a manual act on the server, deliberately: a command that could delete one is a command that can destroy a site by typo.
-
-```json
-{
-  "status": 409,
-  "code": "deploy.secure_folder_in_use",
-  "message": "The secure folder name \"app\" is not available at this target",
-  "data": {
-    "secure_folder": "app",
-    "hint": "Another deployment already owns this folder. Build with a different secure folder name, deploy to a different target, or set replaceDeployment=true to overwrite what is there. Nothing is deleted either way: files the new deployment does not write are left untouched."
-  }
-}
-```
-
-### Route collisions at the target
-
-The default deploy target is the installation's own web root, where QuickSite already serves `/admin`, `/management` and `/p`. A site's entry point funnels requests through a fallback that only applies when the URL is **not** a real file or directory — so a directory sitting beside that entry point permanently shadows a same-named route, silently.
-
-`deployBuild` checks for this **at deploy time**, when the target is known, by intersecting the build's top-level route segments with the directories that already exist beside where the site's entry point will land. It is derived from the target on disk, not from a list of reserved names, so it is correct for a target QuickSite has never seen — and it says nothing at all about a target that carries no such directory.
-
-A collision is refused with `409 conflict.route_collision`, naming each route, the segment that clashes and the directory that shadows it. `acceptRouteCollisions: true` deploys anyway; the success response then reports what was shadowed rather than staying quiet about it.
-
-```json
-{
-  "status": 409,
-  "code": "conflict.route_collision",
-  "message": "One of this site's routes is already a directory at the deploy target and would never be reachable",
-  "data": {
-    "collisions": [
-      { "route": "admin", "segment": "admin", "shadowed_by": ".../public/admin" }
-    ],
-    "hint": "A directory beside the site's entry point wins over its routing, so these pages would answer with the directory instead. Rename the route, deploy to a target that does not carry these directories, or set acceptRouteCollisions=true to deploy anyway and leave them unreachable."
-  }
-}
-```
-
-Route names are **not** reserved when a route is created: the names only clash in one of three deployment shapes (a site served at `/p/<id>/` and a build on its own domain have no conflict), so blocking them everywhere would constrain every author for a layout most never use.
-
-#### nginx routing, and PHP's compiled files
-
-An installation generates `<secure>/nginx/dynamic_routes.conf`, whose last block describes the document root. On an installation that root is deliberately **free** — `try_files $uri $uri/ =404;` — because the installation puts no front controller there and must not squat a domain it does not own. A deploy to that same root puts one there, so `deployBuild` **regenerates the file** from what is on disk:
-
-| On disk at the document root | The generated root block |
-|---|---|
-| No deployed build | `try_files $uri $uri/ =404;` — unchanged |
-| A build at the root (no URL space) | A funnel to that build's `index.php` |
-| A build under a URL space | Still `=404`, plus a funnel block for that space |
-
-Without it a deployed site serves only its home page — `index index.php` resolves the directory — while every other URL answers nginx's own 404. A server-level `try_files $uri $uri/ /index.php?$args;` in the vhost does not rescue it: server-level `try_files` runs only for requests matching no `location`, and `location /` matches everything.
-
-The response reports the outcome under `nginx`, and never claims a reload that did not happen:
-
-| `nginx.reload` | Meaning |
-|---|---|
-| `reloaded` | `nginx -t` passed and the running nginx took the new configuration. |
-| `pending` | The file was written, the reload failed. `.pending_reload` is left for the optional cron script; a manual `nginx -t && nginx -s reload` is still needed. |
-| `not_applicable` | Not an nginx server. Nothing was attempted and no flag was written — an Apache install generates the file and never reads it. |
-| `not_attempted` | The file could not be written at all (the `nginx/` directory could not be created, or the write failed), so there was nothing to reload. Always paired with `config_regenerated: false`. |
-
-`nginx.config_regenerated` reports whether the file itself was written; a failure there is a warning on a successful deploy, not a rollback, because the files are already copied and the deployer needs to be told rather than surprised.
-
-`php_opcache.files_invalidated` counts the deployed `.php` files this process invalidated. It is **best effort by nature**: a deployed site normally runs in a different php-fpm pool, and OPcache memory is per-pool, so the invalidation reaches the deploying process's cache rather than the site's. It is exactly right when the pool is shared and harmless when it is not. On a pool tuned with `opcache.validate_timestamps=0` — a normal production setting — a redeploy is otherwise a silent no-op until php-fpm is reloaded, which is why the response says so rather than leaving it to be discovered.
-
-### Parameters
-
-`deployBuild` takes an optional `name`. At one build per project the command finds the build on its own; supplying the name asserts *which* build was meant, and a name that is not the current build is a `404` rather than a silent substitution. `targetPath` defaults to `SERVER_ROOT`, `overwrite` (default false) governs existing files, and `acceptRouteCollisions` (default false) governs the check above. `confirmUpdate`, `replaceDeployment` and `adoptSecureFolder` (all default false) each answer exactly one co-tenancy refusal and nothing else — none of them is implied by `overwrite`, and none implies another. An incomplete build is refused: it carries no manifest, and a half-written site on a server is where a broken deliverable does damage.
-
 ## Archive import limits
 
 `importProject` treats an uploaded ZIP as untrusted input. Before a single byte is extracted it reads the archive's own central directory — the per-entry headers, which declare each entry's compressed and uncompressed size — and refuses the whole archive if any limit is exceeded. Nothing is decompressed to reach that decision, because decompressing is the cost being defended against.
@@ -612,7 +493,7 @@ curl -b jar -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: applicat
 ## Internals
 
 - Command handlers live in `<secure>/management/command/<command>.php`, one file per command.
-- The whitelist of valid commands is `<secure>/management/routes.php` (150 entries — this file is the single source of truth for which commands exist).
+- The whitelist of valid commands is `<secure>/management/routes.php` (149 entries — this file is the single source of truth for which commands exist).
 - Shared helpers live in `<secure>/src/functions/utilsManagement.php` (e.g., `varExportNested()`, `SPECIAL_PAGES`, role helpers).
 - An unknown command answers `404` with code `route.not_found` and echoes back the name that was requested, so a typo is diagnosable. It does **not** enumerate the commands that do exist — `help` is where the catalogue lives, and it is a deliberate decision to publish it there rather than from every mistyped call.
 - Internal callers (visual editor data gathering, workflow steps) bypass the HTTP layer and invoke commands through `<secure>/src/classes/CommandRunner.php`. CommandRunner carries a **hardcoded read-only allowlist** of 25 commands it will execute internally — reads and audits, mostly `get*` / `list*` but also `help` and the `analyze*` / `validate*` / `checkStructureMulti` inspectors. Membership and other mutating commands are not on it.

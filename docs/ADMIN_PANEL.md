@@ -26,7 +26,7 @@ public/admin/assets/js/lib/css-refiner/      → CSS analysis library
                                                (consumed by optimize.js)
 ```
 
-Three pages sit outside the authenticated shell: `/admin/login` (username + password form; POSTs to itself, verified through the shared server-side login gate), `/admin/register` (self-registration form: a public name and the password, typed twice — the server assigns the username, and the form says so before it is submitted; the page exists **only** while `auth.php` `registration.allow_self_registration` is true, otherwise it redirects to login; the login page shows a "create one" link under the same condition), and `/admin/setup` (the first-run page). A successful registration redirects to the login page, which shows the assigned username — pre-filled, in one box with a warning that it is private, must be saved now, and is shown for 24 hours at most — on every visit in that browser until a sign-in succeeds there. That sign-in drops it, and so does the login page once the note is 24 hours old, however often the page was visited in between. The note lives in a session id minted for it at registration, so no id the browser held before — or was handed by somebody else — can read it. Registering never logs you in by itself. Creating the first account on `/admin/setup` shows a one-shot "account created" banner instead. All three are plain server-rendered forms with no admin JS beyond a password-visibility toggle, and are served with `Cache-Control: no-store`. Under **Keep me signed in**, the login page states how long a session lasts unused — `auth.php`'s `idle_ttl` (setup's item 11 sets it); when `remember_ttl` is the shorter, it names both: ticked, the shorter, unticked, `idle_ttl` — each rounded to the nearest unit and said as *about*, since a session's last use is stamped at most once every tenth of the limit. A refused attempt says how long to wait in the largest unit that fits, rounded up (*try again in 2 minutes*): every attempt during a wait, and the wrong password that starts one, under its *invalid username or password*; the panel's languages carry the words for each unit. A sign-in (or a refused one), a sign-out, a registration and the first account's creation through them are written to the security trail exactly as the `login`, `logoutSession` and `register` commands write them ([COMMAND_API.md](COMMAND_API.md), *The security trail*).
+Three pages sit outside the authenticated shell: `/admin/login` (username + password form; POSTs to itself, verified through the shared server-side login gate), `/admin/register` (self-registration form: a public name and the password, typed twice — the server assigns the username, and the form says so before it is submitted; the page exists **only** while `auth.php` `registration.allow_self_registration` is true, otherwise it redirects to login; the login page shows a "create one" link under the same condition), and `/admin/setup` (the first-run page). A successful registration redirects to the login page, which shows the assigned username — pre-filled, in one box with a warning that it is private, must be saved now, and is shown for 24 hours at most — on every visit in that browser until a sign-in succeeds there. That sign-in drops it, and so does the login page once the note is 24 hours old, however often the page was visited in between. The note lives in a session id minted for it at registration, so no id the browser held before — or was handed by somebody else — can read it. Registering never logs you in by itself. Creating the first account on `/admin/setup` shows a one-shot "account created" banner instead. All three are plain server-rendered forms with no admin JS beyond a password-visibility toggle, and are served with `Cache-Control: no-store`. Under **Keep me signed in**, the login page states how long a session lasts unused — `auth.php`'s `idle_ttl` (setup's item 10 sets it); when `remember_ttl` is the shorter, it names both: ticked, the shorter, unticked, `idle_ttl` — each rounded to the nearest unit and said as *about*, since a session's last use is stamped at most once every tenth of the limit. A refused attempt says how long to wait in the largest unit that fits, rounded up (*try again in 2 minutes*): every attempt during a wait, and the wrong password that starts one, under its *invalid username or password*; the panel's languages carry the words for each unit. A sign-in (or a refused one), a sign-out, a registration and the first account's creation through them are written to the security trail exactly as the `login`, `logoutSession` and `register` commands write them ([COMMAND_API.md](COMMAND_API.md), *The security trail*).
 
 **First run.** QuickSite ships no account, so while the user registry is empty every admin URL renders `/admin/setup` instead. The page asks for a **setup token** along with a display name, a username and the password, twice — the two are compared before anything else is checked, so a slip costs no attempt. The token is 64 hex characters that the engine writes to `secure/management/config/setup-token.txt` on the page's first render — reading that file is the authorisation, which is why creating the first account needs neither a command line nor a shipped default password. It is written once and never regenerated, compared with a constant-time check, and destroyed the moment it is used. Attempts are rate-limited per caller with the same backoff as the login form, and any bad token — wrong, absent, or already used — is refused identically. As on the login page, the wrong token that starts a wait says so under its refusal (*try again in 30 seconds*), and every attempt during the wait says how long is left.
 
@@ -971,7 +971,7 @@ After each phase that succeeded in at least one command, the iframe reloads via 
 A run goes through the workflow's **phases**: each pre-workflow, the workflow itself, then each post-workflow ([WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md) *Sub-Workflows*). The server answers them (`workflow-generate-steps`): the plan when the run starts, every phase resolved against the project as it is then, and each phase again when the run reaches it — so a phase reads what the earlier ones changed (`setup-languages` sets the languages a `fresh-start` before it removed; a language switch lists the languages added before it).
 
 - **The review** (Run without stopping off) — before each phase but the first (a phase of steps that has none passes without one: there is nothing in it to stop before), and before a first phase that deletes or changes content: `Next — 2 of 4: {name}`, its number of steps (an AI phase: `Its prompt is built from the project as it now is.`, with its Your prompt field), the last phase's result (`{name}: 21 of 23 succeeded, 2 failed`), what it deletes and changes, and **Continue** / **Stop**. When the phase deletes, Continue reads **Delete and continue** and is red; when it only changes, **Change and continue**. The Batch opens on its steps.
-- **What is warned** — the server reads each step (`WorkflowManager::stepEffect()`): a read (a command the write rate never counts) and a command that adds something (a name beginning `add`, `create`, `upload`, `insert`, `duplicate`) are never warned; a step **deletes** when its name begins `delete`, `remove`, `clear`, `reset` or `purge` (the console's own convention), when its command's help marks it destructive, when it deletes a node, or when it gives a component an empty structure (which deletes the component); any other write to the site's content **changes** it. A write outside the site's content is warned only when it deletes: not a build, while `deployBuild`, whose help marks it destructive, stops the run as a deletion does. A flagged command that deletes nothing says what it does, in the warning, on its step and on its phase (`Deploys the build to the target folder, over what is already there`), and the buttons and the dialog then say **Confirm**; one real deletion beside it brings **Delete** back. A warning names what each step touches: `Deletes — Pages: about, services`, `Changes — The stylesheet`, `Changes — Texts: en, default`. A keep option shows by its absence: kept assets are not in the list.
+- **What is warned** — the server reads each step (`WorkflowManager::stepEffect()`): a read (a command the write rate never counts) and a command that adds something (a name beginning `add`, `create`, `upload`, `insert`, `duplicate`) are never warned; a step **deletes** when its name begins `delete`, `remove`, `clear`, `reset` or `purge` (the console's own convention), when its command's help marks it destructive, when it deletes a node, or when it gives a component an empty structure (which deletes the component); any other write to the site's content **changes** it. A write outside the site's content is warned only when it deletes: not a build, while `restoreBackup`, whose help marks it destructive, stops the run as a deletion does. A flagged command that deletes nothing says what it does, in the warning, on its step and on its phase (`Puts a backup back, over the project's current state`), and the buttons and the dialog then say **Confirm**; one real deletion beside it brings **Delete** back. A warning names what each step touches: `Deletes — Pages: about, services`, `Changes — The stylesheet`, `Changes — Texts: en, default`. A keep option shows by its absence: kept assets are not in the list.
 - **The danger dialog** (Run without stopping on) — once, before anything runs, the panel's danger dialog (`Delete content?` or `Change content?`, the focus on Cancel) lists what every phase the plan knows deletes and changes, each phase named; an AI phase is announced (`{name} (AI): the commands its AI answers change the site; a deletion among them is asked when the answer arrives.`). It is not shown when nothing known deletes or changes anything. After it, only what it did not list asks again: a phase that, resolved when reached, deletes or changes more, and an AI answer that deletes.
 - **An AI phase** — its prompt is built when the run reaches it, from the project as it now is, the phase's request appended; it is sent with the connection's key, or shown and copied. The run then **waits for its answer whatever Run without stopping says** — without a key that is where it stops until the answer is pasted (`3 of 3: {name} waits for its AI answer, in AI response below.`, with **Stop**). With the switch off the answer runs from its Execute button.
 - **A cut answer** — while the run waits for an answer that cannot run, the bar offers a way on, by why it could not. Neither button is offered while a send is under way.
@@ -3609,6 +3609,7 @@ Where a project becomes a site you can put on a server: build it, download the a
 | A build that did not finish | The same, marked **incomplete**, with a note saying it carries no manifest and can only be deleted. |
 | A build carrying OAuth client secrets | A warning that the archive is a credential, not just a website. To a role that may not set the project's OAuth keys (a developer, say), no **Download** and no **Delete** — here or in the dashboard's Manage Space — but a line saying that only a role that may set the keys can download or delete this build, and to ask the project's owner or an admin to build again. |
 | A build whose sign-in is not ready | A warning naming the providers it carries without build keys (their sign-in fails on the deployed site until the server sets the keys or the project's build keys are entered and the project built again), the providers whose client secret it left out (their sign-in fails until the secret is written into its `<secure>/data/oauth-secrets.json` on the server, `QS_OAUTH_<PROVIDER>_CLIENT_SECRET` is set there, or the project is built again with the secrets included), any provider a sign-in route names that the installation no longer offers, and a route that takes its provider from the address when no provider has build keys — with a link to the OAuth providers page for a role that can open it. |
+| A build you may download | Under the buttons, a line saying how it reaches a server: download it, and follow `README.txt` inside the archive. |
 
 #### Choosing the folder names and the URL space
 
@@ -3626,14 +3627,12 @@ The **public folder name is read-only until you unlock it**, behind an explicit 
 
 A rejected name comes back **into the form** with what was typed still in it and the disclosure opened, since the reason is almost certainly one of the three fields. Names are validated before the one-build-at-a-time refusal, so a bad name is answered as a bad name rather than sending you off to delete a build first.
 
-These names are what the deploy panel compares against the installation's own, so a build made with the defaults and deployed into the install root is the case it flags in red.
-
 #### Including the OAuth secrets
 
 Beside **Build now**, the project's owner and admin — the roles that may set its OAuth keys — see a box **Include the OAuth secrets**, in the warning style, unticked each time the page loads and again after a build. Its explanation says what each choice means:
 
 - **Unticked** (the default): better not to share real secrets. The build keeps each provider's **client id** as it is — it is public, every sign-in shows it to the browser — and writes a placeholder for its **secret** in its `<secure>/data/oauth-secrets.json`. The placeholder reads *REPLACE THIS VALUE with the client secret, or set QS_OAUTH_<PROVIDER>_CLIENT_SECRET on the server*; the deployed site reads it as not set, so its sign-in answers that it is not configured until the deployer writes the secret into that file on the server, or sets `QS_OAUTH_<PROVIDER>_CLIENT_SECRET` there (the sign-in reads the server first). The build's `README.txt` says the same, provider by provider.
-- **Ticked**: the real secrets go in, and the build is a credential (the warning above says so). A build you deploy from this page needs it for its sign-in to work.
+- **Ticked**: the real secrets go in, and the build is a credential (the warning above says so).
 
 A provider without a secret (a public client) carries none either way. The explanation names the build's own secure folder, as the folder-name field holds it. Another role does not see the box, and the server refuses the parameter from it.
 
@@ -3663,76 +3662,9 @@ Below the line the panel is silent. With no quota configured there is no ceiling
 
 The quota belongs to the project's **owner**. A member who is not the owner sees the build and its size but no quota figure — and is told whose it is, rather than being shown a blank.
 
-#### Deploying
-
-The page can copy the build onto a path on the server. The section is **absent** — not disabled, not greyed out — unless two independent things are both true:
-
-| | |
-|---|---|
-| The installation allows deploying at all | `secure/management/config/deploy.php`, an operator decision made on the server. Absent means no, and nothing in the panel can change it. |
-| This caller may deploy | `deployBuild` is alone in the `deploy` category, granted to project admins and owners. A developer who can build and download still cannot push. |
-
-Both are asked when the page is rendered, so a caller who fails either never receives the markup, and the filesystem paths below are never emitted to them.
-
-#### Before you press it: where the files go
-
-Deploying is a file copy and nothing else — it does not point a document root, edit a web server configuration, or restart anything. Since that is easy to misread as "publish", the panel names the two folders it will create before the button does anything:
-
-- `<target>/<public>/` — the document root
-- `<target>/<secure>/` — must stay **outside** it
-
-#### Where it goes
-
-**This installation's own root, and nowhere else.** There is no target field, and the installation's own path is never rendered into the page: the panel sends no target and the server fills in its own, so the path stays on the server.
-
-That is a deliberate narrowing rather than a missing control. On an installation with no deploy-roots configuration — the default — every path a deployer could type would be refused anyway, so the field could only ever fail; and free text in front of a destructive operation buys a typo, not a capability. Choosing a target is the **installer's** decision, made on the server, the same way enabling deploying at all is. `deployBuild` still accepts `targetPath` from API callers and still validates it against the allowlist — the panel simply does not offer it.
-
-The two folders are previewed relative — `public/`, `secure/` — with a line saying they are inside this installation's own root. That is where the two warnings live:
-
-- **The folder names match the installation's own** → the build's files would be copied *into* QuickSite's own `public/` and `secure/`. Shown in red.
-- **They differ** → they land beside QuickSite's own folders, where no web server is looking; the deploy reports success and the site is invisible until a document root points at it.
-
-Both warnings depend on the page knowing the target is the install, which is the only case it does know. An API caller deploying to a configured deploy root gets neither — the server's own co-tenancy refusals below cover that case, and they are the ones that matter.
-
-#### After: does it serve?
-
-Copying does not point a document root; only the deployer can. But when the target is a site that was set up earlier, the document root is *already* pointed and a deploy is a pure file copy, so the site serves the moment the copy finishes and there is nothing to do at all. The panel therefore leads with **check first** and treats configuration as the fallback:
-
-1. Ask for the site in a way **no cache can answer** — the panel prints a URL with a unique query string on it. A plain visit can be served from a cache in front of the site (Varnish on a hosting panel, a CDN, the browser's own), which shows the *previous* deploy and reads as success; reloading the web server clears none of those. Whoever can reach the web server directly, behind the caches, does not need the query string.
-2. Then ask for a URL that does not exist, with the same query string: it should answer with **your** 404 page, not the web server's grey one. If the home page works while every other URL gives the grey page, the root routing is the thing at fault.
-3. Only if it does not serve: point the site's document root at `<target>/<public>/`. That step is required, and it is the only required one.
-
-If a cache-proof request still returns the *previous* version, the cause is PHP rather than routing: a deployed site normally runs in its own php-fpm pool, and a pool tuned with `opcache.validate_timestamps=0` never re-reads a file from disk, so the redeploy is a no-op there until php-fpm is reloaded. Deploying invalidates the compiled files it can reach, which is not that pool.
-
-⚠ **Never point a document root at the folder above.** It contains `<secure>/` — the engine, the site's configuration and the source of every page — and a document root there serves all of it. Renaming the two folders is obscurity, not a control; the control is that `<secure>/` sits outside the document root. The panel says this where the document root is being chosen, not in a file somewhere.
-
-Per web server, and the distinction between them matters:
-
-- **Apache** — nothing to add. The build ships the `.htaccess` files that do the routing; they take effect once the document root is right, `mod_rewrite` is on, and the directory allows overrides.
-- **nginx** — `.htaccess` is not read, so the build ships a snippet at `<target>/<secure>/nginx_routes.conf`. **You may not need it**, and on a server that carries a QuickSite installation you should not use it: the installation regenerates its own `<secure>/nginx/dynamic_routes.conf` after every deploy so that its root block describes what is actually at the document root, and that already includes the funnel for a build deployed there. Including both files in one server block declares the same `location` twice, which is `[emerg] duplicate location` — nginx then refuses to load at all. The build's snippet is for deploying onto a server that has no QuickSite installation on it.
-
-  After a deploy the panel says which of three things happened to the installation's own nginx routing: the file was rewritten and **nginx was reloaded**; it was rewritten but the **reload could not be performed**, so the running nginx is still on the previous routing and the deployer must reload it; or the file **could not be rewritten** at all. A reload that did not happen is never reported as one that did. Nothing is said on an Apache install, where the file is generated but never read.
-
-#### Co-tenancy: deploying one site never damages another
-
-Several built sites can share one document root, separated by URL space. Three things make that safe, and all three refuse rather than ask a general question:
-
-| Refusal | What it means | The one control that answers it |
-|---|---|---|
-| *This target already holds this project* | A deployment of **this** project is already here. The routine update path. | **Update the existing deployment** |
-| *That secure folder name is taken* | The folder belongs to a **different** project's deployment. | **Write over it anyway** |
-| *That secure folder already exists* | The folder has contents and no QuickSite marker, so its owner cannot be established. | **Use it anyway** |
-| *Some pages would never be reachable* | A directory at the target shadows one of the site's routes. | **Deploy anyway, leaving them unreachable** |
-
-None of them is answered by *Replace files that already exist* — that checkbox governs only files inside the site's own folders. That separation is the point: one blunt replace-everything click is exactly how a deployer destroys a site they did not know was there.
-
-**A build owns its own subtree and nothing else.** With a URL space that is `<public>/<space>/` and `<secure>/`; the document root itself belongs to whatever else is served from it. Files outside the subtree are created if missing and never replaced, and a deploy that leaves some alone says so afterwards.
-
-**Nothing is ever deleted.** A deploy writes the files this build produces and leaves everything else where it is — including in a folder it was told to write over. Clearing out a stale deployment is a manual act on the server.
-
 #### Who sees what
 
-The page is open to every member of the project: viewing a build needs `getBuild`, which every role holds. Creating, downloading and deleting need the `build` category (developer and up), and deploying needs `deploy` (admin and owner) on top of the installation's own switch; those buttons are simply **not rendered** without them — a viewer gets the same information and a line explaining that their role cannot act on it. Non-members do not reach the page at all.
+The page is open to every member of the project: viewing a build needs `getBuild`, which every role holds. Creating, downloading and deleting need the `build` category (developer and up); those buttons are simply **not rendered** without them — a viewer gets the same information and a line explaining that their role cannot act on it. Non-members do not reach the page at all.
 
 #### Getting there
 
@@ -3782,7 +3714,6 @@ The flag is for a command whose name does not say so, and the test is what is lo
 | Flagged | What is lost |
 |---|---|
 | `cleanOrphanTranslations` | The translation files of languages the project no longer has. |
-| `deployBuild` | With `overwrite`, the deployed site's files, replaced by this build, and no command takes it back. |
 | `generateConsentLayer` | Any edit made to the banner and popup, which it writes again; and no command turns the layer off afterwards. |
 | `restoreBackup` | The project's current state, with no snapshot unless `create_backup` asks for one. |
 | `setOAuthCredentials` | A stored secret, when it clears a key set. A provider will not show it again. |
@@ -3803,7 +3734,7 @@ The prompt is a second look, not a control. A role sees no difference and the di
 | `'allow_console' => false` | withheld |
 | present but unreadable, broken, or holding any other value | withheld |
 
-`setup.sh` / `setup.bat` offer it as menu item 9, and `console.php.example` documents it. Turning it on needs no file at all: the switch exists to say no.
+`setup.sh` / `setup.bat` offer it as menu item 8, and `console.php.example` documents it. Turning it on needs no file at all: the switch exists to say no.
 
 ⚠ **It is not a security control, and it is worth being blunt about that.** Every command the console runs goes through exactly the same permission check as a direct `POST` to `/management/`. The console grants nothing — a signed-in user can already call every command it lists, by hand, on an installation where this is off. **`/management/` is deliberately not gated by it**, because the commands are the product's interface and gating them would break every headless caller and the panel's own operation.
 
@@ -3820,6 +3751,10 @@ A field `help` marks `ui_type` `date` has a date picker above **Or enter manuall
 #### A command your role cannot run
 
 The index leaves it out, and a search with three matches or fewer shows it greyed with a lock, its bubble saying why. It is still a link: its page opens, its documentation renders, and where the fields and **Execute Command** would be, a notice says your role in this project does not allow the command. This is the panel reading your permissions and no boundary: the command refuses the call itself.
+
+#### An address that names no command
+
+`/admin/command/<name>` with a name the engine does not route answers `404` and says **Command not found**, naming what was typed, with a link back to the index. There is no form and no `help` request behind it. With the console turned off, the page says that instead.
 
 #### Two commands are documented here but cannot be run here
 

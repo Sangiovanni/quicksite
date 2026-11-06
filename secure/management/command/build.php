@@ -1437,8 +1437,7 @@ if (!empty($servabilityProblems)) {
 // NO ZIP IS WRITTEN HERE, and that is the point. The folder is the build:
 // downloadBuild zips it on demand and streams the bytes without storing them, so
 // there is exactly one copy on disk and the download can never be out of date
-// against it, and deployBuild copies the expanded folder. A zip beside the folder
-// would pay disk for the deliverable twice and could go stale.
+// against it. A zip beside the folder would pay disk for the deliverable twice and could go stale.
 
 // The build passed its last check: it stays, and the shutdown hook stands down.
 $GLOBALS['__qs_build_partial'] = null;

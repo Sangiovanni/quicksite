@@ -232,9 +232,9 @@ if (!function_exists('qs_site_nginx_config')) {
         $notFnd = $prefix . '/nope';
         $date   = date('Y-m-d H:i:s');
 
-        // The location prefix THIS file declares. It is also the prefix an
-        // installation's own generated file declares for a site deployed into
-        // its document root — which is why including both is a duplicate.
+        // The location prefix THIS file declares. For a site at the root it is also
+        // the prefix an installation's own generated file declares for its document
+        // root — which is why including both is a duplicate.
         $rootShown = $prefix . '/';
 
         // The two example URLs are shown one above the other with their arrows
@@ -341,23 +341,21 @@ if (!function_exists('qs_site_nginx_config')) {
 # must not point this include at it: the site would get routing for namespaces
 # that are not here and none for the ones that are.
 #
-# ⚠ AND DO NOT INCLUDE BOTH FILES IN THE SAME SERVER BLOCK. That file emits
-# FIVE location blocks, not the three its own header names:
+# ⚠ AND DO NOT INCLUDE BOTH FILES IN THE SAME SERVER BLOCK. That file emits a
+# location for each of the installation's own namespaces, and one for its
+# DOCUMENT ROOT, which is always the free form, ending in `=404`:
 #
-#     /admin/api/    /management/    /admin/    /p/    and the DOCUMENT ROOT
+#     /admin/api/  /admin/self/  /admin/state/  /management/  /admin/  /p/  and the root
 #
-# — plus one funnel for each build deployed under a URL space. So it declares
-# `location {$rootShown}` in exactly the case that matters here: when this site was
-# deployed into that installation's own document root. Two location blocks with
-# the same prefix are `[emerg] duplicate location "{$rootShown}"`, and nginx then
+# So a site at the root of that server block is declared twice. Two location
+# blocks with the same prefix are `[emerg] duplicate location`, and nginx then
 # refuses to load AT ALL — taking down every site on that server, not just this
-# one. If your vhost already includes that file, adding this one stops nginx
+# one. If your vhost already includes that file, adding this one can stop nginx
 # starting.
 #
-# YOU DO NOT NEED BOTH, and on that server you do not need this one. The
-# installation regenerates its file after every deploy, from what is on its own
-# disk, so the funnel for this site is already in it. THIS file is for deploying
-# onto a server that has no QuickSite installation on it.
+# GIVE THIS SITE A SERVER BLOCK OF ITS OWN, with its own document root, and include
+# this file there. That is what this file is for, whether or not the server also
+# runs a QuickSite installation.
 #
 # ⚠ THE SYMPTOM, IF YOU EVER SEE IT: only "{$home}" serves, and every other URL
 # answers nginx's own grey 404 page rather than this site's 404 page. That is
@@ -372,10 +370,9 @@ if (!function_exists('qs_site_nginx_config')) {
 # Find the block that is winning with `nginx -T | grep -n "location {$rootShown}"`
 # and remove the one that is not this site's.
 #
-# QuickSite checks what it can SEE — the files on its own disk — and does. It
-# cannot see your vhost: it is not at a known path, and on a hosting panel it is
-# assembled from includes that only `nginx -T` resolves. So this is written down
-# rather than checked.
+# QuickSite cannot see your vhost: it is not at a known path, and on a hosting
+# panel it is assembled from includes that only `nginx -T` resolves. So this is
+# written down rather than checked.
 #
 # ⚠ nginx -t parses the configuration; it does not resolve it. It will report
 # "test is successful" for a setup that answers 500 on every page — a missing

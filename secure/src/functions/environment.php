@@ -74,13 +74,13 @@ function qs_is_development(): bool
     // window; on a production install running `opcache.validate_timestamps=0`
     // (a normal tuning) it never lets go at all short of a restart.
     //
-    // Measured on the deploy gate first, which has the identical shape:
+    // Measured on a switch of the identical shape:
     // rewriting the config and re-reading in the same second still returned the
     // previous answer, while DELETING the file worked — because absence is a
     // filesystem question and `require` is a compiled one.
     //
     // force=true, so it applies whether or not timestamp validation is on.
-    // loadRolesConfig() and qs_deploy_allowed() do the same thing for the same
+    // loadRolesConfig() and qs_console_allowed() do the same thing for the same
     // reason.
     qs_opcache_invalidate($path);
 

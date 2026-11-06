@@ -160,6 +160,19 @@ class AdminRouter {
     }
 
     /**
+     * Does the address name a command the engine routes? An address with no
+     * command asks for the index, which exists. The name comes off the URL as
+     * typed, so it is compared and never used to build a path.
+     */
+    public function commandExists(): bool {
+        if ($this->command === '') {
+            return true;
+        }
+        require_once SECURE_FOLDER_PATH . '/src/functions/AuthManagement.php';
+        return in_array($this->command, getAllCommands(), true);
+    }
+
+    /**
      * Get workflow ID (for /admin/workflows/{workflowId} routes)
      */
     public function getWorkflowId(): ?string {
@@ -258,7 +271,7 @@ class AdminRouter {
      * Does this installation offer the command console (console.php
      * allow_console)? Drives the /admin/command page's runner and the panel's
      * nav entry for it. Absent config means YES — see consolePolicy.php
-     * for why that is inverted from the deploy gate.
+     * for why.
      *
      * ⚠ It is NOT a permission. The console runs commands through the same
      * `hasPermission` check as a direct POST to /management/, and /management/
@@ -803,6 +816,14 @@ class AdminRouter {
             // The 404 template is rendered as the page, so the layout stops
             // reflecting the requested segment into <title> and data-page too.
             $this->page = '404';
+        }
+
+        // An address naming no command is not a page either, and the status says
+        // so before the layout writes a byte. command.php says which name. With the
+        // console off the page has nothing to say about a name, so it answers as it
+        // does for any.
+        if ($this->page === 'command' && $this->isConsoleEnabled() && !$this->commandExists()) {
+            http_response_code(404);
         }
 
         // Load the appropriate template

@@ -45,7 +45,7 @@ require_once __DIR__ . '/FileSystem.php';      // qs_copy_tree, qs_delete_tree_r
 
 /**
  * Path of the operator list. Gitignored, with a tracked `.example` sibling —
- * the same shape as environment.php and deploy-roots.php: operator-controlled
+ * the same shape as environment.php: operator-controlled
  * files the runtime reads and no command writes.
  */
 function qs_operator_path(): string {

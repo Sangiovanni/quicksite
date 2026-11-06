@@ -2627,10 +2627,6 @@ window.PreviewAiTools = (function () {
      * with no entry here reads as a deletion, which is what cleanOrphanTranslations is.
      */
     var EFFECT_DOES = {
-        deployBuild: {
-            word: ['effectDeploys', 'Deploys'],
-            line: ['effectDeploysLine', 'Deploys the build to the target folder, over what is already there']
-        },
         restoreBackup: {
             word: ['effectRestores', 'Restores'],
             line: ['effectRestoresLine', "Puts a backup back, over the project's current state"]

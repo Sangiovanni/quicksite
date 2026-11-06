@@ -62,7 +62,7 @@ return [
         'categories' => [
             'content.read', 'config.read', 'content.write', 'translation.write',
             'route.write', 'asset.write', 'interaction.write', 'privacy.manage',
-            'style.write', 'build', 'resolver.manage', 'deploy', 'api.manage',
+            'style.write', 'build', 'resolver.manage', 'api.manage',
             'oauth.manage', 'project.data', 'history',
             'project.settings', 'project.members', 'project.propose', 'project.roster',
         ],
@@ -74,7 +74,7 @@ return [
         'categories' => [
             'content.read', 'config.read', 'content.write', 'translation.write',
             'route.write', 'asset.write', 'interaction.write', 'privacy.manage',
-            'style.write', 'build', 'resolver.manage', 'deploy', 'api.manage',
+            'style.write', 'build', 'resolver.manage', 'api.manage',
             'oauth.manage', 'project.data', 'history',
             'project.settings', 'project.members', 'project.delete', 'project.ownership',
             'project.visibility', 'project.propose', 'project.roster',

@@ -25,14 +25,13 @@ REM   4. Environment          - production (default) or development
 REM   5. Self-registration    - may visitors create their own accounts?
 REM   6. Setup token          - read the first-run credential off disk
 REM   7. Storage quotas       - per-account size and upload-rate ceilings
-REM   8. Self-deploy          - may this install write a built site onto a path?
-REM   9. Command console      - offer the raw command runner at /admin/command?
-REM  10. Default language     - the language a new project starts in
-REM  11. Idle sign-out        - how long the panel may go unused before it signs
+REM   8. Command console      - offer the raw command runner at /admin/command?
+REM   9. Default language     - the language a new project starts in
+REM  10. Idle sign-out        - how long the panel may go unused before it signs
 REM                             you out
 REM
 REM Items 1-3 rewrite init.php constants and the .htaccess routing. Items 4-5
-REM and 7-11 write config files under the secure folder. Item 6 only reads.
+REM and 7-10 write config files under the secure folder. Item 6 only reads.
 REM
 REM Before anything else, it checks the PHP version: older than 8.3, it stops.
 REM
@@ -165,7 +164,6 @@ echo   URL space:          !SPACE_LABEL!
 echo   Environment:        !ENV_LABEL!
 echo   Self-registration:  !SELFREG_LABEL!
 echo   Storage quotas:     !QUOTA_LABEL!
-echo   Self-deploy:        !DEPLOY_LABEL!
 echo   Command console:    !CONSOLE_LABEL!
 echo   Default language:   !DEFLANG_LABEL!
 echo   Idle sign-out:      !IDLE_LABEL!
@@ -177,10 +175,9 @@ echo     4^) Switch environment (development / production)
 echo     5^) Turn self-registration on / off
 echo     6^) Show my setup token
 echo     7^) Storage quotas (per user)
-echo     8^) Allow / forbid deploying from this install
-echo     9^) Offer / withhold the command console ^(/admin/command^)
-echo    10^) Default language for new projects
-echo    11^) Idle sign-out ^(how long the panel may go unused^)
+echo     8^) Offer / withhold the command console ^(/admin/command^)
+echo     9^) Default language for new projects
+echo    10^) Idle sign-out ^(how long the panel may go unused^)
 echo     q^) Finish
 echo.
 set "CHOICE="
@@ -193,10 +190,9 @@ if "!CHOICE!"=="4" goto :go_env
 if "!CHOICE!"=="5" goto :go_selfreg
 if "!CHOICE!"=="6" goto :go_token
 if "!CHOICE!"=="7" goto :go_quota
-if "!CHOICE!"=="8" goto :go_deploy
-if "!CHOICE!"=="9" goto :go_console
-if "!CHOICE!"=="10" goto :go_deflang
-if "!CHOICE!"=="11" goto :go_idle
+if "!CHOICE!"=="8" goto :go_console
+if "!CHOICE!"=="9" goto :go_deflang
+if "!CHOICE!"=="10" goto :go_idle
 if /i "!CHOICE!"=="q" goto :finish
 if "!CHOICE!"=="" goto :finish
 echo   Unknown choice: !CHOICE!
@@ -241,11 +237,6 @@ call :item_quota
 call :pause_menu
 goto :menu
 
-:go_deploy
-call :item_deploy
-call :pause_menu
-goto :menu
-
 :go_console
 call :item_console
 call :pause_menu
@@ -278,7 +269,6 @@ echo   URL space:          !SPACE_LABEL!
 echo   Environment:        !ENV_LABEL!
 echo   Self-registration:  !SELFREG_LABEL!
 echo   Storage quotas:     !QUOTA_LABEL!
-echo   Self-deploy:        !DEPLOY_LABEL!
 echo   Command console:    !CONSOLE_LABEL!
 echo   Default language:   !DEFLANG_LABEL!
 echo   Idle sign-out:      !IDLE_LABEL!
@@ -456,29 +446,15 @@ if exist "!AUTH_FILE!" (
     findstr /c:"'allow_self_registration' => true" "!AUTH_FILE!" >nul 2>&1 && set "SELFREG_LABEL=on   (anyone may create an account at /admin/register)"
 )
 
-REM ABSENT MEANS DENIED here, the opposite of the quota reader above. deploy.php
-REM follows environment.php: an install nobody configured does not write a site
-REM onto a filesystem path. A missing file and 'false' behave identically.
-set "DEPLOY_FILE=!CONFIG_DIR!\deploy.php"
-set "DEPLOY_LABEL=off  (default - deploy.php not created yet)"
-if exist "!DEPLOY_FILE!" (
-    set "DEPLOY_LABEL=off  (value unreadable - check deploy.php)"
-    findstr /c:"    'allow_deploy' => false," "!DEPLOY_FILE!" >nul 2>&1 && set "DEPLOY_LABEL=off"
-    findstr /c:"    'allow_deploy' => true," "!DEPLOY_FILE!" >nul 2>&1 && set "DEPLOY_LABEL=on   (admins and owners may deploy a build onto this server)"
-)
-
-REM ABSENT MEANS ALLOWED here - the OPPOSITE of the deploy reader immediately
-REM above, and the only place in this file where two readers of the same shape
-REM default in opposite directions. The console writes nothing and grants
-REM nothing: every command it lists is already reachable at /management/ by any
-REM caller whose role allows it. So a fresh install nobody configured keeps its
-REM developer tooling, while a fresh install nobody configured does not deploy.
+REM ABSENT MEANS ALLOWED here. The console writes nothing and grants nothing:
+REM every command it lists is already reachable at /management/ by any caller
+REM whose role allows it. So a fresh install nobody configured keeps its
+REM developer tooling.
 REM
-REM Note the "value unreadable" branch says OFF, not the default. For deploy,
-REM absent and broken mean the same thing and one label covers both; here they
-REM are opposite answers, and a broken console.php leaves the console off - the
-REM only reason to create the file is to turn it off, so a typo must not
-REM silently re-open it. The engine reads it the same way.
+REM Note the "value unreadable" branch says OFF, not the default. Absent and
+REM broken are opposite answers here, and a broken console.php leaves the console
+REM off - the only reason to create the file is to turn it off, so a typo must
+REM not silently re-open it. The engine reads it the same way.
 set "CONSOLE_FILE=!CONFIG_DIR!\console.php"
 set "CONSOLE_LABEL=on   (default - console.php not created yet)"
 if exist "!CONSOLE_FILE!" (
@@ -1137,103 +1113,10 @@ if /i "!REG_VALUE!"=="true" (
 goto :eof
 
 REM ==========================================================
-REM Item 8 - self-deploy
+REM Item 8 - the command console
 REM ==========================================================
-REM ABSENT MEANS DENIED, which is the OPPOSITE of item 7. quota.php absent means
-REM "the defaults, no ceiling"; deploy.php absent means "nobody deploys". The two configs look
-REM alike and behave in opposite directions, so the reasoning is written down
-REM rather than left to be inferred: deploy is the one command that writes
-REM outside the project's own storage, and an install nobody configured must not
-REM do it. This follows environment.php (absent = production), not quota.php.
-:item_deploy
-call :read_state
-echo.
-echo Self-deploy
-echo.
-echo   May this installation copy a built site onto a filesystem path?
-echo.
-echo   off  nobody deploys. This is the default, and what a shared or
-echo        hosted install wants. Users can still build a site and
-echo        download the archive - they upload it themselves.
-echo   on   an admin or owner of a project may deploy its build into
-echo        this install's own root, or into a root you list in
-echo        deploy-roots.php.
-echo.
-echo   Currently: !DEPLOY_LABEL!
-echo.
-echo   Turning it on does NOT widen who may deploy: deployBuild is granted
-echo   to admin and owner only, and deploy-roots.php still decides where.
-echo   It only lifts the flat refusal in front of both.
-echo.
-
-set "ANSWER="
-set /p "ANSWER=  Allow deploying from this installation? [y/N]: "
-
-set "DEP_VALUE=false"
-if /i "!ANSWER!"=="y" set "DEP_VALUE=true"
-if /i "!ANSWER!"=="yes" set "DEP_VALUE=true"
-
-if not exist "!CONFIG_DIR!" (
-    echo   X Error: config folder not found: !CONFIG_DIR!
-    goto :eof
-)
-
-REM Declining when no file exists LEAVES IT ABSENT - absent already means
-REM denied, and writing a file to say so would turn an install that never opted
-REM in into one that opted out, which reads as a decision somebody made.
-if /i "!DEP_VALUE!"=="false" (
-    if not exist "!DEPLOY_FILE!" (
-        echo.
-        echo   + Deploy stays off - deploy.php left absent, which is what a
-        echo     fresh install has.
-        goto :eof
-    )
-)
-
-REM deploy.php.example is the shipped documentation and is never edited: the
-REM live file is a COPY with the value patched, so every explanatory comment
-REM survives into the file the deployer will actually read later.
-if not exist "!DEPLOY_FILE!" (
-    if not exist "!CONFIG_DIR!\deploy.php.example" (
-        echo   X Error: neither deploy.php nor deploy.php.example is present
-        echo     !CONFIG_DIR!
-        goto :eof
-    )
-    copy /y "!CONFIG_DIR!\deploy.php.example" "!DEPLOY_FILE!" >nul
-)
-
-set "PS_DEP_TEMP=%TEMP%\qs_setup_deploy.ps1"
-echo $f = '!DEPLOY_FILE!' > "%PS_DEP_TEMP%"
-echo $v = '!DEP_VALUE!' >> "%PS_DEP_TEMP%"
-echo $c = Get-Content $f -Raw -Encoding UTF8 >> "%PS_DEP_TEMP%"
-echo $c = $c -replace "'allow_deploy'\s*=>\s*\w+", ("'allow_deploy' => " + $v) >> "%PS_DEP_TEMP%"
-echo [IO.File]::WriteAllText($f, $c, (New-Object System.Text.UTF8Encoding $false)) >> "%PS_DEP_TEMP%"
-powershell -NoProfile -ExecutionPolicy Bypass -File "%PS_DEP_TEMP%" <nul >nul 2>&1
-del "%PS_DEP_TEMP%" 2>nul
-
-findstr /c:"    'allow_deploy' => !DEP_VALUE!," "!DEPLOY_FILE!" >nul 2>&1
-if errorlevel 1 (
-    echo   X Could not set the value automatically.
-    echo     Edit this file by hand and set 'allow_deploy' =^> !DEP_VALUE!:
-    echo     !DEPLOY_FILE!
-    goto :eof
-)
-if /i "!DEP_VALUE!"=="true" (
-    echo   + Self-deploy: on
-    echo   ^^! A project admin or owner can now write a built site into
-    echo     !SCRIPT_DIR!
-    echo     and into any root listed in deploy-roots.php.
-) else (
-    echo   + Self-deploy: off
-)
-goto :eof
-
-REM ==========================================================
-REM Item 9 - the command console
-REM ==========================================================
-REM ABSENT MEANS ALLOWED, the OPPOSITE of item 8 immediately above, so the
-REM "leave the file absent" shortcut inverts with it: item 8 declines to write
-REM a file when the answer is OFF, this one declines when the answer is ON.
+REM ABSENT MEANS ALLOWED, so this item declines to write a file when the answer
+REM is ON: the file exists only to say no.
 REM
 REM AND IT IS NOT A SECURITY CONTROL. Every command the console lists is
 REM already reachable at /management/ by any caller whose role allows it - the
@@ -1268,8 +1151,7 @@ echo.
 set "ANSWER="
 set /p "ANSWER=  Offer the command console on this installation? [Y/n]: "
 
-REM Enter accepts the SHIPPED DEFAULT, which here is on. Item 8's [y/N] does
-REM the same thing for a default of off - same rule, opposite letter.
+REM Enter accepts the SHIPPED DEFAULT, which here is on.
 set "CON_VALUE=true"
 if /i "!ANSWER!"=="n" set "CON_VALUE=false"
 if /i "!ANSWER!"=="no" set "CON_VALUE=false"
@@ -1282,7 +1164,7 @@ if not exist "!CONFIG_DIR!" (
 REM Accepting when no file exists LEAVES IT ABSENT - absent already means the
 REM console is offered, and writing a file to say so would turn an install that
 REM never opted out into one that opted in, which reads as a decision somebody
-REM made. Item 8 does this for its own default, which is the other answer.
+REM made.
 if /i "!CON_VALUE!"=="true" (
     if not exist "!CONSOLE_FILE!" (
         echo.
@@ -1333,7 +1215,7 @@ if /i "!CON_VALUE!"=="false" (
 goto :eof
 
 REM ==========================================================
-REM Item 10 - the default language for new projects
+REM Item 9 - the default language for new projects
 REM ==========================================================
 REM The language a NEW project starts in when nobody chooses one: createProject's
 REM default, what the panel's New Project dialog preselects, and what an
@@ -1344,7 +1226,7 @@ REM A free-text value, so Enter KEEPS what is there (items 1-3's rule), rather
 REM than resetting to the shipped default the way the yes/no items do.
 REM
 REM ABSENT MEANS 'en', and choosing 'en' when no file exists LEAVES IT ABSENT -
-REM item 9's rule: a file that says what the default already is would read as
+REM item 8's rule: a file that says what the default already is would read as
 REM a decision somebody made. A code that is not in the language list is
 REM refused here and nothing is written: the engine would ignore it (and log
 REM why) anyway.
@@ -1407,7 +1289,7 @@ if not exist "!DEFLANG_FILE!" (
 
 REM Anchored to the start of a line ((?m)^), so a commented-out line in the
 REM operator's own file is left alone. -Encoding UTF8 is load-bearing - see
-REM item 9.
+REM item 8.
 set "PS_DL_TEMP=%TEMP%\qs_setup_deflang.ps1"
 echo $f = '!DEFLANG_FILE!' > "%PS_DL_TEMP%"
 echo $v = '!DL_ANSWER!' >> "%PS_DL_TEMP%"
@@ -1429,16 +1311,16 @@ echo     Only projects created from now on start in it.
 goto :eof
 
 REM ==========================================================
-REM Item 11 - idle sign-out
+REM Item 10 - idle sign-out
 REM ==========================================================
 REM How long a session may go unused before the panel signs it out: auth.php's
 REM session.idle_ttl, in seconds. The login page states it under "Keep me signed
-REM in". A free-text value, so Enter KEEPS what is there (item 10's rule). The
+REM in". A free-text value, so Enter KEEPS what is there (item 9's rule). The
 REM answer is a number and m, h or d, at least 5 minutes - the engine's own
 REM minimum - and written as seconds.
 REM
 REM ABSENT MEANS 1 DAY, and choosing 1 day when auth.php does not exist yet
-REM LEAVES IT ABSENT (item 10's rule). Otherwise auth.php is created from its
+REM LEAVES IT ABSENT (item 9's rule). Otherwise auth.php is created from its
 REM .example as item 5 creates it, and only the number on the idle_ttl line
 REM changes.
 :item_idle
@@ -1465,7 +1347,7 @@ if not defined ID_ANSWER (
 
 REM One to four digits, then m, h or d, in either case. The answer is written to
 REM a file and matched there, never passed on a command line: an & typed at the
-REM prompt would run (item 10's reader says the same).
+REM prompt would run (item 9's reader says the same).
 set "ID_TMP=%TEMP%\qs_setup_idle.txt"
 > "!ID_TMP!" echo(!ID_ANSWER!
 findstr /r /x /i /c:"[0123456789][0123456789]*[mhd]" "!ID_TMP!" >nul 2>&1
@@ -1521,7 +1403,7 @@ if not exist "!AUTH_FILE!" (
 
 REM Anchored to the start of a line ((?m)^), and only the number changes: the
 REM key's spacing and the comment after it stay. -Encoding UTF8 is load-bearing
-REM - see item 9.
+REM - see item 8.
 set "PS_ID_TEMP=%TEMP%\qs_setup_idle.ps1"
 echo $f = '!AUTH_FILE!' > "%PS_ID_TEMP%"
 echo $v = '!ID_SECS!' >> "%PS_ID_TEMP%"

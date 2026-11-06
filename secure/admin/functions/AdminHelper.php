@@ -130,10 +130,10 @@ function getCommandCategories(): array {
             'icon' => 'settings',
             'commands' => ['editFavicon', 'editTitle']
         ],
-        'build_deployment' => [
-            'label' => 'Build & Deploy',
+        'builds' => [
+            'label' => 'Builds',
             'icon' => 'package',
-            'commands' => ['build', 'getBuild', 'deleteBuild', 'cleanResolverCache', 'deployBuild', 'downloadBuild']
+            'commands' => ['build', 'getBuild', 'deleteBuild', 'cleanResolverCache', 'downloadBuild']
         ],
         'project_management' => [
             'label' => 'Project Management',

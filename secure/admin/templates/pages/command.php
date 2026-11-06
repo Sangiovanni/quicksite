@@ -27,8 +27,12 @@ $selectedCommand = $router->getCommand();
 $consoleEnabled = $router->isConsoleEnabled();
 $categories = $consoleEnabled ? getCommandCategories() : [];
 
+// A name no command has gets no form: the form's own checks would read it as a
+// role's refusal, since it is in no role's list.
+$commandExists = $router->commandExists();
+
 // If a specific command is selected, show its page
-if ($consoleEnabled && $selectedCommand) {
+if ($consoleEnabled && $selectedCommand && $commandExists) {
     require_once __DIR__ . '/command-form.php';
     return;
 }
@@ -63,6 +67,18 @@ $baseUrl = rtrim(BASE_URL, '/');
     </svg>
     <h2 class="admin-empty__title"><?= __admin('commands.disabled.title', 'The command console is turned off') ?></h2>
     <p class="admin-empty__text"><?= __admin('commands.disabled.text', 'The operator of this installation chose not to offer it. This removes a page, not a permission: every command still answers on the Management API to any caller whose role allows it, and the panel\'s other pages are unaffected.') ?></p>
+</div>
+
+<?php elseif (!$commandExists): ?>
+<!-- ==================== A NAME NO COMMAND HAS ==================== -->
+<div class="admin-empty">
+    <svg class="admin-empty__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"/>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+    <h2 class="admin-empty__title"><?= __admin('commands.notFound.title', 'Command not found') ?></h2>
+    <p class="admin-empty__text"><code><?= adminEscape($selectedCommand) ?></code>: <?= __admin('commands.notFound.text', 'QuickSite has no command by this name. It may have been removed in an update, or the address may be mistyped.') ?></p>
+    <a href="<?= $router->url('command') ?>" class="admin-btn admin-btn--primary"><?= __admin('commands.notFound.back', 'All commands') ?></a>
 </div>
 
 <?php else: ?>

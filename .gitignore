@@ -82,6 +82,8 @@ secure/projects/quicksite/backups/
 secure/management/config/auth.php
 secure/management/config/users.php
 secure/management/config/roles.php
+# Nothing reads these two any more. Their lines stay: a leftover deploy-roots.php
+# holds an operator's server paths and must never be committed by accident.
 secure/management/config/deploy-roots.php
 secure/management/config/deploy.php
 secure/management/config/import-policy.php

@@ -5888,7 +5888,7 @@ enumeration of today's cloud providers).
 `secure/management/config/environment.php.example`. Behaviour:
 [ARCHITECTURE.md §9](ARCHITECTURE.md).
 
-### Deployment targets outside the installation must be declared (locked 2026-07-05)
+### Deployment targets outside the installation must be declared (locked 2026-07-05) (superseded 2026-11-06)
 
 **Decision**: `deployBuild` writes only inside the server root or into a
 directory listed in a deploy-roots configuration file. The default file is
@@ -9912,7 +9912,7 @@ quietly stops covering the case it was added for).
 **Source**: `secure/src/functions/contentSecurityPolicy.php`,
 `secure/src/runtime/site/index.php`.
 
-### Deploying is off until an operator turns it on — absent config means denied (locked 2026-08-28)
+### Deploying is off until an operator turns it on — absent config means denied (locked 2026-08-28) (superseded 2026-11-06)
 
 **Decision**: `deployBuild` is refused outright unless
 `secure/management/config/deploy.php` exists and says `allow_deploy => true`.
@@ -9960,7 +9960,7 @@ exactly where deploying is wanted).
 `secure/management/config/deploy.php.example`,
 `secure/management/command/deployBuild.php`, `setup.sh`, `setup.bat`.
 
-### Route collisions are checked at deploy time, not forbidden at route creation (locked 2026-08-28)
+### Route collisions are checked at deploy time, not forbidden at route creation (locked 2026-08-28) (superseded 2026-11-06)
 
 **Decision**: `deployBuild` refuses with `409 conflict.route_collision` when a
 route in the build is shadowed by a directory that already exists beside where
@@ -10012,7 +10012,7 @@ directories at the install root just as surely).
 **Source**: `secure/management/command/deployBuild.php`, ruling by Sangio
 2026-08-16.
 
-### Post-deploy guidance leads with "check first", not with the configuration (locked 2026-08-28)
+### Post-deploy guidance leads with "check first", not with the configuration (locked 2026-08-28) (superseded 2026-11-06)
 
 **Decision**: after a successful deploy the builds page states, in this order:
 open the site and see whether it already works; the check that actually
@@ -10065,7 +10065,7 @@ domain points at it, and a wrong answer here is worse than no answer).
 (`_renderServingGuidance`), `secure/admin/templates/pages/builds.php`,
 `secure/src/functions/buildSiteRuntime.php` (`qs_site_nginx_config`).
 
-### Deploying one site never damages another: a build owns its own subtree (locked 2026-08-29)
+### Deploying one site never damages another: a build owns its own subtree (locked 2026-08-29) (superseded 2026-11-06)
 
 **Decision**: a deployed build owns `<public>/<space>/**` and `<secure>/**`, and
 nothing else. Outside that subtree `deployBuild` may CREATE but never OVERWRITE,
@@ -10142,7 +10142,7 @@ deployed itself; an unmarked folder is honestly reported as unknown).
 `qs_site_root_htaccess`), `NOTES/tests/beta11/s38c_live_probe.sh`.
 
 
-### The nginx root block is derived from the disk, not fixed at install (locked 2026-08-30)
+### The nginx root block is derived from the disk, not fixed at install (locked 2026-08-30) (superseded 2026-11-06)
 
 **Decision**: `dynamic_routes.conf` is regenerated after every successful build
 deploy, and its last block — the document root — is derived from what the deploy
@@ -15472,3 +15472,29 @@ they are undeclared once opened; which key an import should name is a question o
 **Alternatives considered**: a short hash of the id as the prefix (it turns the guarantee that two projects never build the same key into a probability, moves every visitor's stored values and consent once, and hides little); a hash in built sites alone (the prefix would then differ between a preview and its build, which the entry on namespacing rules out).
 
 **Source**: Sangio, UX run of 2026-11-06, the recommendation accepted the same day; beta.12. `secure/src/runtime/qs.js`, `secure/src/functions/requestRuntime.php`.
+
+### Deploying leaves the engine: a person puts a build on a server (locked 2026-11-06)
+
+**Decision**: The `deployBuild` command and the `build-and-deploy` workflow are gone, and with them the `deploy` category, the two gates and their config files, the deployment marker, the Builds page's Deploy section and setup's *Self-deploy* item. `build`, `getBuild`, `deleteBuild`, `downloadBuild` and `cleanResolverCache` stay, and so does everything a build holds, but for comments: its `nginx_routes.conf`, which said an installation's generated file carried a funnel for the site, and the two engine files it carries, `environment.php` and `opcacheHygiene.php`, which named the gate. A build reaches a server by the deployer's own means: the Builds page points at the download and at the `README.txt` inside it. The root block of an installation's `dynamic_routes.conf` is always the free one, `try_files $uri $uri/ =404;`. Setup's menu reads 1 to 10: the console is item 8, the default language item 9, idle sign-out item 10.
+
+A leftover `deploy.php`, `deploy-roots.php` or `qs-deployment.json`, and a `roles.php` that still names the category, are read by nothing and warn of nothing. `.gitignore` keeps its lines for the two config files, since a leftover `deploy-roots.php` holds an operator's server paths and must never be committed by accident.
+
+**Supersedes**: *Deployment targets outside the installation must be declared* (locked 2026-07-05); *Deploying is off until an operator turns it on — absent config means denied* (locked 2026-08-28); *Route collisions are checked at deploy time, not forbidden at route creation* (locked 2026-08-28); *Post-deploy guidance leads with "check first", not with the configuration* (locked 2026-08-28); *Deploying one site never damages another: a build owns its own subtree* (locked 2026-08-29); *The nginx root block is derived from the disk, not fixed at install* (locked 2026-08-30). Of the route-collision entry, its second half stands: a route name is not reserved when a route is created.
+
+**Supersedes** (in part), each keeping its title because the rest of it stands: *A build lives outside the served directory, not behind a deny rule* (locked 2026-08-22), whose words that `deployBuild` copies the folder; *The command console is an install-time choice, default ON — and it is not a security control* (locked 2026-09-04), whose comparison with the deploy gate has nothing left to compare with, its reasoning and its default unchanged; *A build carries a project's OAuth secret only when asked…* (locked 2026-10-10), whose words on the one who deploys from this installation; *What a run deletes or changes is read from its commands and confirmed before it runs* (locked 2026-11-01), where a build is now the only write outside the content it names; *The runner honours a step's abortOnFail and its retries* (locked 2026-11-01), where no shipped workflow sets them any more and the runner still honours them; *What the `destructive` flag carries: what is lost if it runs by mistake* (locked 2026-11-05), whose list loses `deployBuild` and keeps its test.
+
+**Reasoning**: Sangio, in the UX run of 2026-11-06: "we must get rid of the deploy command and workflow after all. It's not suppose to be a part of this engine". QuickSite builds a site and hands it over; copying it onto a path is the deployer's act, on a server the engine may never see. A command that wrote generated PHP onto a filesystem path needed two gates, a target allowlist, an ownership marker, three named refusals and a nginx generator that read the disk, and all of that protected a step a person does better with their own tools. A hand copy has never written a marker, so its nginx behaviour does not change.
+
+**Alternatives considered**: keeping the workflow without the command (rejected — what is left of it is one step, `build`, which the Builds page and the console already run); keeping the marker's reader so an earlier deploy's root keeps its funnel (rejected — nothing would ever write a marker again, and code kept for files nothing writes is the code that rots; an installation holding one at its own root loses its funnel when the config is next written, and the release notes say so); a migration that removes the leftovers (rejected — they harm nothing, and `deploy-roots.php` is the operator's to delete).
+
+**Source**: Sangio, UX run of 2026-11-06, confirmed the same day with this scope; beta.12. `secure/src/functions/NginxConfig.php`, `secure/src/functions/buildSiteRuntime.php`, `secure/admin/templates/pages/builds.php`, `public/admin/assets/js/pages/builds.js`, `setup.sh`, `setup.bat`.
+
+### A console address that names no command says so (locked 2026-11-06)
+
+**Decision**: `/admin/command/<name>`, with a name the engine does not route, answers `404` and says **Command not found**, naming what was typed, with a link back to the index. The router sets the status and `command.php` draws the page; the form, its role notice and its `help` request never run for such a name. A command that exists and that the role does not grant keeps its notice.
+
+**Reasoning**: Sangio, in the UX run of 2026-11-06, on the address of the command that had just left: "Why don't we see a command not find or something like this? It should feel more relevant". The form had the answer and could not show it. Its `help` request got the 404 and wrote *Command documentation not found* inside the form, and `filterByPermissions()` then hid the form, since a command that does not exist is in no role's list; the notice beside it read that as the role's refusal. The router took the name from the address unchecked, so the page was drawn for anything. A name the engine does not route is known before any of that runs.
+
+**Alternatives considered**: telling the two cases apart in the page's script, from `help`'s 404 (rejected — it races the permissions' arrival, and it keeps a request and a form for a page that has neither to show); the panel's general 404 page (rejected — it says a page was not found and offers the dashboard, where the reader wants the commands); keeping the status at 200, as the page for a console turned off does (rejected — that page describes a real page an operator withheld, and this name is simply not there).
+
+**Source**: Sangio, UX run of 2026-11-06, the recommendation accepted the same day; beta.12. `secure/admin/AdminRouter.php`, `secure/admin/templates/pages/command.php`.

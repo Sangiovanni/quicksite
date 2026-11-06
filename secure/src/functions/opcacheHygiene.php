@@ -2,19 +2,19 @@
 /**
  * OPcache invalidation — the single application point.
  *
- * QuickSite keeps configuration in PHP files it also WRITES: `deploy.php`,
- * `environment.php`'s config, `roles.php`, `auth.php`, a project's `config.php`
- * and `routes.php`. Every one of those is read back with `require`, and
+ * QuickSite keeps configuration in PHP files it also WRITES: `environment.php`'s
+ * config, `roles.php`, `auth.php`, a project's `config.php` and `routes.php`.
+ * Every one of those is read back with `require`, and
  * `require` on a cached file returns what was COMPILED, not what is on disk.
  *
- * ⚠ THE STALE DIRECTION IS THE DANGEROUS ONE. An operator turning deploying
+ * ⚠ THE STALE DIRECTION IS THE DANGEROUS ONE. An operator turning the console
  * OFF, or moving an install from development BACK to production, is closing a
  * control — and the closed state is exactly the one the cache withholds. With
  * PHP's defaults that is a two-second window, which is already wrong for a
  * control somebody is deliberately closing. On a production install running
  * `opcache.validate_timestamps=0` — a normal tuning — it never lets go at all
- * short of a restart. Measured on the deploy gate: writing `allow_deploy =>
- * false` and immediately re-rendering still showed the deploy control, while
+ * short of a restart. Measured on a switch of this shape: writing it to false
+ * and immediately re-rendering still showed the control it closed, while
  * DELETING the file worked, because absence is a filesystem question and
  * `require` is a compiled one.
  *

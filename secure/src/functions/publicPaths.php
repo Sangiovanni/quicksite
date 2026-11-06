@@ -14,7 +14,7 @@
  *   2. elsewhere under the install root -> relative to the install root
  *                                   ("secure/logs/p/x.json", "public/build")
  *   3. a root itself -> "." — never the empty string, which reads as "missing"
- *   4. anything else (a caller-supplied deploy target, a system temp dir) is
+ *   4. anything else (a system temp dir) is
  *      left alone. It is not the install layout, and deciding by shape alone
  *      that a leading "/" is a filesystem path would rewrite every URL the
  *      product returns — route paths, asset paths and API endpoint paths all

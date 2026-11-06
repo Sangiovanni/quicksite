@@ -10,7 +10,6 @@
  */
 
 require_once __DIR__ . '/uploadLimits.php';      // qs_nginx_client_max_body_size
-require_once __DIR__ . '/deploymentMarker.php'; // qs_deployed_sites
 
 /**
  * Generate nginx location block content for QuickSite routing
@@ -22,9 +21,7 @@ require_once __DIR__ . '/deploymentMarker.php'; // qs_deployed_sites
  *   4. /prefix/management/   — Management API
  *   5. /prefix/admin/        — Admin panel
  *   6. /prefix/p/            — Project renderer (surface B, /p/<id>/)
- *   7. /prefix/              — Public root: FREE by default, a front-controller
- *                              funnel once a build is deployed there
- *   (+ one funnel per build deployed under a URL space)
+ *   7. /prefix/              — Public root: always FREE
  *
  * ── WHY THREE BLOCKS UNDER /admin/ AND NOT ONE ───────────────────────────────
  *
@@ -49,34 +46,23 @@ require_once __DIR__ . '/deploymentMarker.php'; // qs_deployed_sites
  * location block — so the omission is caught here rather than on
  * somebody's nginx.
  *
- * ── WHY THE ROOT BLOCK IS NOT A CONSTANT ─────────────────────────────────────
+ * ── WHY THE ROOT BLOCK IS FREE ───────────────────────────────────────────────
  *
- * The root block is derived from what is ON DISK at the document root, because
- * the two things it has to be are opposites and only the disk can say which:
+ * The root belongs to the operator's own site. QuickSite serves its projects at
+ * /p/ and must not squat /: a funnel here would claim every URL on a domain it
+ * does not own, and it would do so quietly.
  *
- *   nothing deployed  ->  try_files $uri $uri/ =404;
- *                         The root belongs to the operator's own site. QuickSite
- *                         serves its projects at /p/ and must not squat /.
- *
- *   a build deployed  ->  try_files $uri <entry>;
- *   at the root           The root now holds a front controller and every page
- *                         route has to reach it.
- *
- * Getting this wrong in either direction is severe, and they fail differently.
- * A `=404` over a deployed build is what it was: the home page serves, because
- * `index index.php` resolves the DIRECTORY, and every other URL hits the hard
- * `=404` — nginx's own grey 404, never the site's. A funnel over a free root is
- * worse and quieter: QuickSite claims every URL on a domain it does not own.
+ * So a built site does not belong at this root. It goes in a server block of its
+ * own, with the `nginx_routes.conf` it ships. Copied here by hand it serves its
+ * home page, because `index index.php` resolves the DIRECTORY, and every other URL
+ * hits the hard `=404`: nginx's own grey 404, never the site's.
  *
  * ⚠ AND A `location /` OUTRANKS A SERVER-LEVEL `try_files`. A vhost that already
  * carries `try_files $uri $uri/ /index.php?$args;` at server level — which is
  * what every panel generates, because it is what every front-controller app
- * needs — does NOT rescue the case: server-level try_files runs only for a
+ * needs — does NOT rescue that case: server-level try_files runs only for a
  * request that matched no location, and `location /` matches everything. So an
  * included `location /` shadows it completely. Measured on nginx 1.24.0.
- *
- * A build deployed under a URL SPACE gets its own funnel and leaves the root
- * alone: mounting a site at /shop/ is precisely the choice to leave / free.
  *
  * ── WHY /p/ IS THE ONLY BLOCK WITH `^~` ──────────────────────────────────────
  *
@@ -118,32 +104,15 @@ require_once __DIR__ . '/deploymentMarker.php'; // qs_deployed_sites
  * hand to the static file handler.
  *
  * @param string $publicFolderSpace URL prefix (e.g., 'quicksite/test' or '')
- * @param list<array{space:string,project:string}> $deployedSites Builds deployed
- *        into this installation's document root, from qs_deployed_sites(). Empty
- *        (the default) means the root stays free.
  * @param string $secureFolderName This installation's secure folder name. A
- *        parameter, like the two on write_nginx_dynamic_routes(), so the
- *        generator stays runnable against a scratch tree; and read from the
- *        caller rather than hardcoded as "secure" because the folder is
- *        renameable and the header below tells the operator which file to
- *        include.
+ *        parameter, so the generator stays runnable against a scratch tree; and
+ *        read from the caller rather than hardcoded as "secure" because the
+ *        folder is renameable and the header below tells the operator which
+ *        file to include.
  * @return string Nginx configuration content
  */
-function generate_nginx_config(string $publicFolderSpace, array $deployedSites = [], string $secureFolderName = 'secure'): string {
+function generate_nginx_config(string $publicFolderSpace, string $secureFolderName = 'secure'): string {
     $prefix = $publicFolderSpace !== '' ? '/' . trim($publicFolderSpace, '/') : '';
-
-    // Split the deployments into "owns the root" and "owns a subdirectory". At
-    // most one can own the root: two sites cannot both be `<public>/index.php`.
-    $rootSite   = null;
-    $spaceSites = [];
-    foreach ($deployedSites as $site) {
-        $space = trim((string) ($site['space'] ?? ''), '/');
-        if ($space === '') {
-            $rootSite = $site;
-        } else {
-            $spaceSites[] = ['space' => $space, 'project' => (string) ($site['project'] ?? '')];
-        }
-    }
 
     $date = date('Y-m-d H:i:s');
 
@@ -154,10 +123,8 @@ function generate_nginx_config(string $publicFolderSpace, array $deployedSites =
     $config .= "# Do NOT edit manually — rewritten whenever it is regenerated.\n";
     $config .= "#\n";
     $config .= "# WHEN THIS FILE IS WRITTEN: once, when it is absent (any page load\n";
-    $config .= "# creates it), and again after every successful build deploy — because\n";
-    $config .= "# deploying changes what is at the document root, and the last block in\n";
-    $config .= "# this file has to agree with that. Changing the URL space is handled by\n";
-    $config .= "# setup deleting this file so the next page load rebuilds it.\n";
+    $config .= "# creates it). Changing the URL space is handled by setup deleting this\n";
+    $config .= "# file so the next page load rebuilds it.\n";
     $config .= "#\n";
     $config .= "# Usage — TWO steps, both required:\n";
     $config .= "#   1. include /path/to/{$secureFolderName}/nginx/dynamic_routes.conf;   (in server {})\n";
@@ -284,68 +251,19 @@ function generate_nginx_config(string $publicFolderSpace, array $deployedSites =
     $config .= "# `could not find named location \"@quicksite_project\"`.\n";
     $config .= "# ----------------------------------------------------------------------------\n\n";
 
-    // A build deployed under a URL SPACE gets its own funnel, ABOVE the root block
-    // so the file reads most-specific-first. nginx picks the longest matching
-    // prefix regardless of order, so this is for the human, not for nginx.
-    foreach ($spaceSites as $site) {
-        $spacePath = $prefix . '/' . $site['space'];
-        $who = $site['project'] !== '' ? " (project \"{$site['project']}\")" : '';
-        $config .= "# Deployed site at {$spacePath}/{$who} — front controller funnel.\n";
-        $config .= "# The root below is untouched: mounting a site under a URL space is\n";
-        $config .= "# exactly the choice to leave the domain root free.\n";
-        $config .= "location {$spacePath}/ {\n";
-        $config .= "    # NO \$uri/ IN THIS LIST, DELIBERATELY — the same omission, for the\n";
-        $config .= "    # same reason, as the /admin/ block above. With \$uri/ present a\n";
-        $config .= "    # request for a directory resolves the directory, finds no index\n";
-        $config .= "    # file inside it, and answers 403 — including the site's home page.\n";
-        $config .= "    try_files \$uri {$spacePath}/index.php\$is_args\$args;\n";
-        $config .= "}\n\n";
-    }
-
-    // Public root. FREE BY DEFAULT — no fallback into QuickSite: the root serves real
-    // static files only (a user's own hand-made site), 404 otherwise. The renderer
-    // lives at /p/ above, and that is the only place a PROJECT is served from on this
-    // install.
-    //
-    // The exception is a BUILD deployed here, which puts a front controller at this
-    // exact path. Then the root is no longer free — this installation put a site
-    // there — and every page route has to reach that front controller.
+    // Public root. FREE — no fallback into QuickSite: the root serves real static
+    // files only (a user's own hand-made site), 404 otherwise. The renderer lives at
+    // /p/ above, and that is the only place a PROJECT is served from on this install.
     $locationPath = $prefix !== '' ? "{$prefix}/" : '/';
-    if ($rootSite !== null) {
-        $who = ((string) ($rootSite['project'] ?? '')) !== ''
-            ? " (project \"{$rootSite['project']}\")" : '';
-        $config .= "# Public root — a deployed QuickSite build serves here{$who}.\n";
-        $config .= "#\n";
-        $config .= "# ⚠ THIS BLOCK IS DERIVED FROM THE DISK. It became a funnel because a\n";
-        $config .= "# build was deployed to this document root and its front controller is\n";
-        $config .= "# there now. Deploy again after removing it and this returns to the\n";
-        $config .= "# free-root form (`try_files \$uri \$uri/ =404;`).\n";
-        $config .= "#\n";
-        $config .= "# ⚠ DO NOT ALSO INCLUDE THE BUILD'S OWN `nginx_routes.conf` IN THIS\n";
-        $config .= "# SERVER BLOCK. It declares the same funnel, and two location blocks\n";
-        $config .= "# with the same prefix are `[emerg] duplicate location` — nginx then\n";
-        $config .= "# refuses to load AT ALL, taking down every site on this server. This\n";
-        $config .= "# file already does that job here; the build's snippet is for deploying\n";
-        $config .= "# onto a server that has no QuickSite installation.\n";
-        $config .= "location {$locationPath} {\n";
-        $config .= "    # NO \$uri/ IN THIS LIST, DELIBERATELY — the same omission, for the\n";
-        $config .= "    # same reason, as the /admin/ block above. With \$uri/ present a\n";
-        $config .= "    # request for a directory resolves the directory, finds no index\n";
-        $config .= "    # file inside it, and answers 403 — including the site's home page.\n";
-        $config .= "    try_files \$uri {$locationPath}index.php\$is_args\$args;\n";
-        $config .= "}\n";
-    } else {
-        $config .= "# Public root — free for the user's own site (no QuickSite fallback)\n";
-        $config .= "#\n";
-        $config .= "# ⚠ THIS BLOCK IS DERIVED FROM THE DISK. It is the free-root form\n";
-        $config .= "# because no QuickSite build is deployed at this document root. Deploy\n";
-        $config .= "# one here and this becomes a front-controller funnel instead — a\n";
-        $config .= "# deployed site whose root stayed `=404` serves its home page and\n";
-        $config .= "# answers every other URL with nginx's own grey 404.\n";
-        $config .= "location {$locationPath} {\n";
-        $config .= "    try_files \$uri \$uri/ =404;\n";
-        $config .= "}\n";
-    }
+    $config .= "# Public root — free for the user's own site (no QuickSite fallback)\n";
+    $config .= "#\n";
+    $config .= "# ⚠ NOT FOR A BUILT SITE. A build copied to this document root serves its\n";
+    $config .= "# home page and answers every other URL with nginx's own grey 404, because\n";
+    $config .= "# this block ends in `=404`. A built site goes in a server block of its own,\n";
+    $config .= "# with the `nginx_routes.conf` it ships.\n";
+    $config .= "location {$locationPath} {\n";
+    $config .= "    try_files \$uri \$uri/ =404;\n";
+    $config .= "}\n";
 
     return $config;
 }
@@ -360,55 +278,31 @@ function generate_nginx_config(string $publicFolderSpace, array $deployedSites =
  * 
  * @param string $publicFolderSpace URL prefix (e.g., 'quicksite/test' or '')
  * @param string $secureFolderPath  Absolute path to the secure folder
- * @param string|null $serverRoot   Installation root; defaults to SERVER_ROOT.
- * @param string|null $publicFolderName Public folder name; defaults to PUBLIC_FOLDER_NAME.
- *        Both are parameters rather than constant reads so the generator can be
- *        exercised against a scratch tree without an installation around it.
- * @param list<string> $extraMarkerDirs Deployment folders the caller already
- *        knows about — `deployBuild` passes the one it has just written, so the
- *        deploy in progress is never subject to the marker scan's depth cap.
- * @return array{success: bool, config_path: string, nginx_reloaded: bool, reload_outcome: string, reload_note: string, deployed_sites: list<array<string,string>>, error?: string}
+ * @return array{success: bool, config_path: string, nginx_reloaded: bool, reload_outcome: string, reload_note: string, error?: string}
  */
-function write_nginx_dynamic_routes(
-    string $publicFolderSpace,
-    string $secureFolderPath,
-    ?string $serverRoot = null,
-    ?string $publicFolderName = null,
-    array $extraMarkerDirs = []
-): array {
+function write_nginx_dynamic_routes(string $publicFolderSpace, string $secureFolderPath): array {
     $nginxDir = $secureFolderPath . DIRECTORY_SEPARATOR . 'nginx';
     $configPath = $nginxDir . DIRECTORY_SEPARATOR . 'dynamic_routes.conf';
-
-    // What is actually deployed at the document root — the input the root block
-    // is derived from. Unknowable without both of these, in which case the root
-    // stays free, which is the safe direction: it never squats a domain.
-    $serverRoot = $serverRoot ?? (defined('SERVER_ROOT') ? SERVER_ROOT : null);
-    $publicFolderName = $publicFolderName ?? (defined('PUBLIC_FOLDER_NAME') ? PUBLIC_FOLDER_NAME : null);
-    $deployedSites = ($serverRoot !== null && $publicFolderName !== null)
-        ? qs_deployed_sites($serverRoot, $publicFolderName, $extraMarkerDirs)
-        : [];
 
     // Create nginx directory if it doesn't exist
     if (!is_dir($nginxDir)) {
         if (!mkdir($nginxDir, 0755, true)) {
-            // Same shape as every other return from this function. A caller
-            // reads `reload_outcome` and `deployed_sites` without checking
-            // `success` first — an error branch that omits them turns a failed
-            // mkdir into undefined-key warnings in the caller's response.
+            // Same shape as every other return from this function, so a caller
+            // that reads `reload_outcome` without checking `success` first gets
+            // no undefined-key warning from a failed mkdir.
             return [
                 'success' => false,
                 'config_path' => $configPath,
                 'nginx_reloaded' => false,
                 'reload_outcome' => 'not_attempted',
                 'reload_note' => 'the nginx directory could not be created, so nothing was written or reloaded',
-                'deployed_sites' => $deployedSites,
                 'error' => 'Failed to create nginx directory: ' . $nginxDir
             ];
         }
     }
 
     // Generate and write config
-    $content = generate_nginx_config($publicFolderSpace, $deployedSites, basename(rtrim($secureFolderPath, '/\\')));
+    $content = generate_nginx_config($publicFolderSpace, basename(rtrim($secureFolderPath, '/\\')));
 
     if (file_put_contents($configPath, $content, LOCK_EX) === false) {
         return [
@@ -417,7 +311,6 @@ function write_nginx_dynamic_routes(
             'nginx_reloaded' => false,
             'reload_outcome' => 'not_attempted',
             'reload_note' => 'the configuration was not written, so nothing was reloaded',
-            'deployed_sites' => $deployedSites,
             'error' => 'Failed to write nginx config: ' . $configPath
         ];
     }
@@ -431,7 +324,6 @@ function write_nginx_dynamic_routes(
         'nginx_reloaded' => $reloaded['reloaded'],
         'reload_outcome' => $reloaded['outcome'],
         'reload_note' => $reloaded['reason'],
-        'deployed_sites' => $deployedSites,
     ];
 }
 
@@ -483,8 +375,8 @@ function try_nginx_reload(string $nginxDir): array {
     // ⚠ ASKED FIRST, BEFORE ANY SHELL-OUT. This file is generated on Apache too
     // — writing it there is inert, because Apache never reads it and .htaccess
     // does the routing — but `sudo nginx -t` is NOT inert: on a Windows/Apache
-    // install it is a process spawn per deploy for a binary that is not there.
-    // An Apache deploy must behave exactly as it did before this ran at all.
+    // install it is a process spawn for a binary that is not there. An Apache
+    // install must behave exactly as it would if this had never run.
     if (!qs_server_is_nginx()) {
         return [
             'reloaded' => false,

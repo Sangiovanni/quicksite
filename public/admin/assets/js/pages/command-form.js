@@ -1866,13 +1866,6 @@ async function initEnhancedFeatures() {
         case 'setKeyframes':
             await initSetKeyframesForm();
             break;
-        // deployBuild ONLY. getBuild / deleteBuild / downloadBuild stopped
-        // taking a build name when retention went to one build per project:
-        // there is nothing to pick between, so they render with no name field
-        // and this picker would have had nothing to put in it.
-        case 'deployBuild':
-            await initBuildSelectForm();
-            break;
         case 'clearCommandHistory':
             await initClearHistoryForm();
             break;
@@ -2862,38 +2855,6 @@ async function initEditTitleForm() {
     }
     if (langSelect) {
         langSelect.addEventListener('change', loadCurrentTitle);
-    }
-}
-
-/**
- * Initialize the build-name select (deployBuild).
- *
- * At one build per project this is a 0-or-1 option list, and deployBuild is the
- * only command still named against a specific build.
- */
-async function initBuildSelectForm() {
-    const form = document.getElementById('command-form');
-    const nameInput = form.querySelector('[name="name"]');
-    
-    if (nameInput && nameInput.tagName !== 'SELECT') {
-        const nameSelect = document.createElement('select');
-        nameSelect.name = 'name';
-        nameSelect.className = 'admin-select';
-        nameSelect.required = nameInput.required;
-        // Preserve data-url-param attribute if present (for GET commands)
-        if (nameInput.dataset.urlParam !== undefined) {
-            nameSelect.dataset.urlParam = '';
-        }
-        nameInput.replaceWith(nameSelect);
-        await QuickSiteAdmin.populateSelect(nameSelect, 'builds', [], t('commandForm.select.build'));
-
-        // Refresh after a delete performed elsewhere in the panel.
-        form.addEventListener('command-success', async (e) => {
-            if (e.detail.command === 'deleteBuild') {
-                await QuickSiteAdmin.populateSelect(nameSelect, 'builds', [], t('commandForm.select.build'));
-                nameSelect.selectedIndex = 0;
-            }
-        });
     }
 }
 
@@ -4993,7 +4954,7 @@ function renderCommandForm(doc) {
     // isDestructiveCommand() and there is no second help fetch.
     //
     // The flag names only what a command's NAME does not already reveal
-    // (transferOwnership, restoreBackup, deployBuild …); the
+    // (transferOwnership, restoreBackup, setOAuthCredentials …); the
     // gate falls back to a delete/remove/clear/reset/purge naming convention,
     // so an obvious deleteFoo is covered whether or not anyone flagged it.
     if (doc.destructive === true) {

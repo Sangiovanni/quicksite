@@ -99,7 +99,6 @@ const QS_API_ARM_COMMANDS = [
     'routes'                   => ['getRoutes'],
     'languages'                => ['getLangList'],
     'assets'                   => ['listAssets'],
-    'builds'                   => ['getBuild'],
     'aliases'                  => ['listAliases'],
     'translation-keys'         => ['getTranslation'],
     'translation-full'         => ['getTranslation'],
@@ -400,36 +399,6 @@ switch ($action) {
         echo json_encode(['success' => true, 'data' => $__qsUpdate['data']]);
         break;
 
-    case 'builds':
-        // The project's build, as a 0-or-1 option list.
-        //
-        // Sourced from getBuild since retention went to one build per project and
-        // listBuilds was deleted. Only deployBuild still names a build, so this arm
-        // exists for that one picker; getBuild / deleteBuild / downloadBuild take no
-        // name at all any more. A 404 here means "no build yet", which is an empty
-        // list rather than an error the form should show.
-        $result = makeInternalApiCall('getBuild');
-        if ($result['success']) {
-            $build = $result['data'] ?? [];
-            $name  = is_array($build) ? ($build['name'] ?? null) : null;
-            $builds = [];
-            if ($name !== null) {
-                $sizeMb   = is_array($build) ? ($build['size_mb'] ?? null) : null;
-                $complete = is_array($build) ? ($build['complete'] ?? true) : true;
-                $label    = $name . ($sizeMb !== null ? ' (' . $sizeMb . ' MB)' : '');
-                if (!$complete) {
-                    $label .= ' - INCOMPLETE';
-                }
-                $builds[] = ['value' => $name, 'label' => $label];
-            }
-            echo json_encode(['success' => true, 'data' => $builds]);
-        } elseif (($result['status'] ?? 0) === 404) {
-            echo json_encode(['success' => true, 'data' => []]);
-        } else {
-            echo json_encode(['success' => false, 'error' => $result['error'] ?? 'Unknown error']);
-        }
-        break;
-        
     case 'aliases':
         // Return list of aliases for deleteAlias
         $result = makeInternalApiCall('listAliases');

@@ -149,10 +149,9 @@ re-run, so changing one setting later never means answering the others again:
 | **5** | Self-registration on / off | may visitors create their own accounts at `/admin/register`? Default off |
 | **6** | Show my setup token | reads the first-run credential off disk once it exists |
 | **7** | Storage quotas | per-account ceilings on total size and upload rate. Leave both blank for none, which is the default. The size cap on each kind of file and the write rate (1,000 commands an hour per account) apply either way, at the defaults `quota.php.example` documents |
-| **8** | Self-deploy on / off | may this installation copy a built site onto a filesystem path? **Default off** — building and downloading still work either way |
-| **9** | Command console on / off | should the panel offer the raw command runner at `/admin/command`? **Default on.** Turning it off removes reach and discoverability, not access — every command stays reachable at `/management/` to any caller whose role allows it, and the command history stays either way |
-| **10** | Default language for new projects | the language a new project starts in when nobody chooses one: the New Project dialog preselects it, and an imported archive that names none gets it. A code from the installation's language list; default `en` |
-| **11** | Idle sign-out | how long the admin panel may go unused before it signs you out: a number and `m`, `h` or `d` (`90m`, `2h`, `1d`), at least 5 minutes; default 1 day. *Keep me signed in* keeps a session across browser restarts, never past this limit, and the login page states it under that box |
+| **8** | Command console on / off | should the panel offer the raw command runner at `/admin/command`? **Default on.** Turning it off removes reach and discoverability, not access — every command stays reachable at `/management/` to any caller whose role allows it, and the command history stays either way |
+| **9** | Default language for new projects | the language a new project starts in when nobody chooses one: the New Project dialog preselects it, and an imported archive that names none gets it. A code from the installation's language list; default `en` |
+| **10** | Idle sign-out | how long the admin panel may go unused before it signs you out: a number and `m`, `h` or `d` (`90m`, `2h`, `1d`), at least 5 minutes; default 1 day. *Keep me signed in* keeps a session across browser restarts, never past this limit, and the login page states it under that box |
 
 The menu header always shows the values currently on disk, so nothing is
 guessed. Every item is optional — skip anything you do not need.
@@ -172,11 +171,11 @@ see *Create your first account* below for the order.
 
 Items 1–3 update `init.php` constants and the `.htaccess` routing, and drop the
 generated nginx routing config so the engine rebuilds it for the new layout on
-the next page load. Item 4 writes `environment.php`, and items 5 and 11 edit
-`auth.php`. Items 7 to 10 write a config file only when you ask for something
+the next page load. Item 4 writes `environment.php`, and items 5 and 10 edit
+`auth.php`. Items 7 to 9 write a config file only when you ask for something
 other than the default — accept the default and the file stays absent, which is
 already what it means, so an install that never opted out never looks as though
-somebody opted in; item 11 does the same while `auth.php` does not exist yet.
+somebody opted in; item 10 does the same while `auth.php` does not exist yet.
 Item 6 only reads.
 
 Outside the menu, the **first** run does one thing more: if the web root has no
@@ -335,10 +334,9 @@ nginx ignores `.htaccess` files. QuickSite handles this automatically:
    > Apache needs nothing here: `LimitRequestBody` is unlimited by default.
    >
    > **Already have a `dynamic_routes.conf`?** It is generated when absent and
-   > rewritten after every build deploy, but not in between — so an install that
-   > has never deployed is still serving the file it was first given, however
-   > long ago that was. Delete `secure/nginx/dynamic_routes.conf`, load any page
-   > to regenerate it, and reload nginx.
+   > otherwise left alone, so an install is still serving the file it was first
+   > given, however long ago that was. Delete `secure/nginx/dynamic_routes.conf`,
+   > load any page to regenerate it, and reload nginx.
 
    **Both blocks are required.** Project pages would still render without
    `@quicksite_project`, but every stylesheet, script and image would fail — and
@@ -426,8 +424,9 @@ Open `http://localhost:8000/admin/`. Clean URLs (`/about`, `/en/contact`) won't 
 **A project goes to production as a build.** One install can hold any number of
 projects, each edited and previewed at `/p/<projectId>/` on the install's own
 hostname for as long as it exists. When a site is ready for the public you
-**build** it (the `build` command, or **Builds** in the admin panel) and deploy
-that build to its own domain, with its own web root and its own vhost.
+**build** it (the `build` command, or **Builds** in the admin panel), download
+it, and put that build on its own domain, with its own web root and its own
+vhost. The `README.txt` inside the archive says how, for Apache and for nginx.
 
 A build is not a stripped-down copy. It is the project's pages precompiled to
 PHP, plus the runtime that serves them: a self-contained QuickSite serving
@@ -499,7 +498,7 @@ own.
 has nothing to overwrite them with: everything under
 `secure/management/config/` that is yours rather than shipped — `users.php`,
 `auth.php`, `roles.php`, `environment.php`, `operator.php`, `quota.php`,
-`console.php`, `deploy.php`, `deploy-roots.php`, `import-policy.php` — the
+`console.php`, `import-policy.php` — the
 server-side secrets in `secure/admin/config/`, your logs, and every project
 under `secure/projects/`. Git only knows tracked files, so it cannot reach any
 of them. What it *does* replace is the `.example` template beside each of those,

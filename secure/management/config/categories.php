@@ -130,12 +130,6 @@ return [
         'commands' => ['build', 'deleteBuild', 'cleanResolverCache', 'downloadBuild'],
     ],
 
-    // Push to production. admin+.
-    'deploy' => [
-        'scope' => 'project',
-        'commands' => ['deployBuild'],
-    ],
-
     // API registry writes — secrets + testApiEndpoint SSRF. admin+.
     'api.manage' => [
         'scope' => 'project',

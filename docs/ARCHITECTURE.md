@@ -13,7 +13,7 @@ QuickSite separates concerns into three top-level layers. Each one has a clear b
 | Layer | Folder | Audience | Purpose |
 |---|---|---|---|
 | **Project** | `public/p/` + `secure/projects/<projectId>/` | Site owner | The actual website data: routes, page structures (JSON), translations, components, interactions, styles, assets. The public half is a single entry point, `index.php`, through which every project is served. |
-| **Management** | `public/management/` + `secure/management/` | API client (admin panel, scripts) | The 150 commands that read or mutate project data. The public half is again a single entry point: every command enters through it. Session + role enforced. AI calls bypass this layer entirely (browser-direct). |
+| **Management** | `public/management/` + `secure/management/` | API client (admin panel, scripts) | The 149 commands that read or mutate project data. The public half is again a single entry point: every command enters through it. Session + role enforced. AI calls bypass this layer entirely (browser-direct). |
 | **Admin** | `public/admin/` + `secure/admin/` | Human operator | The browser UI that calls Management commands. Includes the visual editor, sitemap, theme editor, AI workspace, workflow runner. It also owns the things that are **not** about developing a project — the installation's update check, the panel's own per-user state, and everything to do with the signed-in account and its access to projects — which are served from its own JSON endpoints (`/admin/api`, `/admin/state`, `/admin/self`) rather than being commands. |
 
 ```
@@ -200,7 +200,7 @@ ApiResponse::create(201, 'route.created')
 
 **One command extends without new commands.** `addComplexElement` dispatches to a registry of **builders** auto-discovered from `secure/src/classes/complexElements/*.php` — each a `ComplexElementBuilder` subclass that turns a wizard config into a node spec (pure: config in, node out, no I/O), which the command splices into the structure under one lock using `addNode`'s insertion helper. A new wizard kind is therefore one PHP file drop: no `routes.php` / `roles.php` / `help.php` edit, no new command, because the dispatcher globs the directory at request time and registers each subclass by its declared `kind()`. What it emits is indistinguishable from a hand-built subtree, so nothing at render time knows the element came from a wizard. A translation key the element names that has no text yet gets the builder's starting text, written where the key has none, its words read by key from `secure/src/translations/<lang>.json`. See [ADMIN_PANEL.md §8.7](ADMIN_PANEL.md#87-complex-element-wizard) for the per-kind catalogue and the client-side half.
 
-The full list of 150 commands is registered in `secure/management/routes.php`. See [COMMAND_API.md](COMMAND_API.md) for the catalogue and a per-command reference (also obtainable at runtime via `GET /management/help`).
+The full list of 149 commands is registered in `secure/management/routes.php`. See [COMMAND_API.md](COMMAND_API.md) for the catalogue and a per-command reference (also obtainable at runtime via `GET /management/help`).
 
 ### Response shape
 
@@ -227,7 +227,6 @@ Everything true of the **installation** rather than of one project lives in one 
 | `categories.php` | every command's category, and each category's scope | ships fixed |
 | `environment.php` | `production` or `development` | setup |
 | `quota.php` | per-account disk ceiling, upload and write rates, small-file caps | setup |
-| `deploy.php` · `deploy-roots.php` | whether this install may write a built site, and where | setup, then by hand |
 | `console.php` | whether the raw command runner is offered at `/admin/command` | setup |
 | `import-policy.php` | archive-import limits and the publish allowlist | by hand |
 | `embed-policy.json` | the install-wide iframe embed sandbox policy | setup, then by hand |
@@ -235,7 +234,7 @@ Everything true of the **installation** rather than of one project lives in one 
 | `operator.php` | which accounts see operator notices; it grants nothing | the engine |
 | `setup-token.txt` | the first-run credential, destroyed on use | the engine |
 
-`auth.php` and `roles.php` are created from their `.example` on the first page load, so an install is never missing them. Anything a command must never rewrite — `environment.php`, `deploy-roots.php`, `operator.php` — is read by the runtime and written by nobody but the operator.
+`auth.php` and `roles.php` are created from their `.example` on the first page load, so an install is never missing them. Anything a command must never rewrite — `environment.php`, `operator.php` — is read by the runtime and written by nobody but the operator.
 
 ### Accounts — `users.php`
 
@@ -269,7 +268,7 @@ Nothing anywhere creates, disables, or deletes an account **for someone else**. 
 
 | `auth.php` key | Default | Means |
 |---|---|---|
-| `session.idle_ttl` | 86400 (1 day) | inactivity before a session stops being accepted, at least 300 (5 minutes); slides forward as the caller works. Setup's item 11 sets it, and the login page states it under *Keep me signed in* |
+| `session.idle_ttl` | 86400 (1 day) | inactivity before a session stops being accepted, at least 300 (5 minutes); slides forward as the caller works. Setup's item 10 sets it, and the login page states it under *Keep me signed in* |
 | `session.remember_ttl` | 2592000 (30 days) | how long a "remember me" cookie survives a browser restart; without it the cookie dies with the browser |
 | `session.sweep_divisor` | 10 | 1-in-N chance a login also sweeps the session store; `0` never sweeps |
 | `registration.allow_self_registration` | `false` | whether `/admin/register` and the `register` command exist at all |
@@ -316,7 +315,7 @@ The global set is deliberately small: `help`, `createProject`, `importProject`, 
 | `editor` | 2 | edit content, translations, routes, assets, interactions, privacy copy; read integration config |
 | `designer` | 3 | styles, CSS variables, animations, theme |
 | `developer` | 4 | builds + server-side route resolvers |
-| `admin` | 5 | deploy, API config, the project's OAuth keys, backup / export, command history; manage members (invite, adjudicate join requests, join policy) |
+| `admin` | 5 | API config, the project's OAuth keys, backup / export, command history; manage members (invite, adjudicate join requests, join policy) |
 | `owner` | 6 | set the project's visibility; rename the project; delete the project + transfer ownership; the single top of the project, cannot be removed by others |
 
 `rank` also governs role management: a granter may only assign a role strictly below their own, which is the self-escalation guard.
@@ -686,7 +685,7 @@ addRoute.php
   └── ApiResponse::create(201, 'route.created')->send()
 ```
 
-The same pattern — parse → validate → mutate files → `ApiResponse` — is used by all 150 commands.
+The same pattern — parse → validate → mutate files → `ApiResponse` — is used by all 149 commands.
 
 ### 6.3 Routing — exact and parameterised routes
 
@@ -1550,7 +1549,7 @@ instead of read. A URL space works the same way: the site answers under it, its
 `.htaccess` funnels only under it, and every link, asset and script URL the page
 emits carries it.
 
-Deploy is a separate command (`deployBuild`) that copies the build folder into a target path.
+A build reaches a server by the deployer's own means: `downloadBuild` zips the folder on demand, and the `README.txt` inside says where each folder goes.
 
 ### 11.5 Serving a build: Apache and nginx
 

@@ -697,7 +697,7 @@ const QuickSiteAdmin = {
      * names of which FIVE no longer existed: it gated 2 live commands while a
      * dozen genuinely destructive ones ran with no prompt. A convention cannot
      * rot that way: a removed command simply stops existing. The flag covers what
-     * a name does not reveal (transferOwnership, restoreBackup, deployBuild …).
+     * a name does not reveal (transferOwnership, restoreBackup, setOAuthCredentials …).
      *
      * Reading flag OR convention means forgetting the flag on an obvious
      * `deleteFoo` is harmless.

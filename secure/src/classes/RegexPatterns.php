@@ -82,12 +82,6 @@ class RegexPatterns
             'examples' => ['0%', '12.5%', '100%', 'from', 'to', '0%, 50%, 100%', 'from, to']
         ],
         
-        'build_name' => [
-            'pattern' => '/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/D',
-            'description' => 'Build folder name (auto-generated like build_YYYYMMDD_HHMMSS or custom name)',
-            'examples' => ['build_20241217_143052', 'v2-staging', 'my_production_build']
-        ],
-        
         // === HUMAN-READABLE TEXT (Unicode support) ===
         
         // A name in the installation's language list. A combining mark (a vowel
