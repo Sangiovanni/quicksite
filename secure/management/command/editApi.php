@@ -5,7 +5,7 @@
  * @method POST
  * @url /management/editApi
  * @auth required
- * @permission editor
+ * @permission admin
  * 
  * Body (JSON): {
  *     "apiId": "main-backend",           // Required: API to edit

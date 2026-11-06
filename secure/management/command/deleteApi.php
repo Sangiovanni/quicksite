@@ -5,7 +5,7 @@
  * @method DELETE
  * @url /management/deleteApi/{apiId}
  * @auth required
- * @permission editor
+ * @permission admin
  * 
  * URL Parameters:
  *     apiId - The API group to delete

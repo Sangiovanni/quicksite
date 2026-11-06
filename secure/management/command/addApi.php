@@ -5,7 +5,7 @@
  * @method POST
  * @url /management/addApi
  * @auth required
- * @permission editor
+ * @permission admin
  * 
  * Body (JSON): {
  *     "apiId": "main-backend",           // Required: Unique identifier (alphanumeric, dashes, underscores)
