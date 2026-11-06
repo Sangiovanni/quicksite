@@ -35,7 +35,7 @@ function __command_deleteApi(array $params = [], array $urlParams = []): ApiResp
     
     if (!$apiId || !is_string($apiId)) {
         return ApiResponse::create(400, 'api.error.missing_parameter')
-            ->withMessage('Missing API ID. Use: DELETE /management/deleteApi/{apiId}');
+            ->withMessage('Missing API ID. Use: DELETE /management/p/<projectId>/deleteApi/{apiId}');
     }
     
     $manager = new ApiEndpointManager();

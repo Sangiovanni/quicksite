@@ -29,7 +29,7 @@ require_once SECURE_FOLDER_PATH . '/src/functions/quota.php'; // qs_small_write_
 
 function __command_setStateStores(array $params = [], array $urlParams = []): ApiResponse {
     $route = $params['route'] ?? ($params['pageName'] ?? null);
-    if (!$route || !is_string($route)) {
+    if (!is_string($route) || $route === '') {
         return ApiResponse::create(400, 'validation.required')
             ->withMessage('Missing or invalid "route" parameter');
     }

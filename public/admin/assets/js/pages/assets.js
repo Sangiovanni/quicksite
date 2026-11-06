@@ -1337,7 +1337,7 @@
         try {
             const result = await QuickSiteAdmin.apiRequest('deleteAsset', 'POST', { filename });
             const listNotSaved = deletedButListNotSaved(result);
-            if (result.ok || result.status === 204 || listNotSaved) {
+            if (result.ok || listNotSaved) {
                 if (listNotSaved) {
                     QuickSiteAdmin.showToast(result.data.message || t('media.deleteFailed'), 'error');
                 } else {
@@ -1491,9 +1491,16 @@
         try {
             const result = await QuickSiteAdmin.apiRequest('deleteAsset', 'POST', { filenames });
             const listNotSaved = deletedButListNotSaved(result);
-            if (result.ok || result.status === 204 || listNotSaved) {
+            if (result.ok || listNotSaved) {
+                const failed = result.data?.data?.failed || [];
                 if (listNotSaved) {
                     QuickSiteAdmin.showToast(result.data.message || t('media.deleteFailed'), 'error');
+                } else if (failed.length > 0) {
+                    QuickSiteAdmin.showToast(t('media.deletedPartial', {
+                        deleted: filenames.length - failed.length,
+                        total: filenames.length,
+                        names: failed.map(f => f.filename).join(', ')
+                    }), 'warning');
                 } else {
                     QuickSiteAdmin.showToast(t(filenames.length !== 1
                         ? 'media.deletedManyMany'

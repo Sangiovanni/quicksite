@@ -696,9 +696,8 @@ const QuickSiteAdmin = {
      * The convention exists because the list this replaced was SEVEN command
      * names of which FIVE no longer existed: it gated 2 live commands while a
      * dozen genuinely destructive ones ran with no prompt. A convention cannot
-     * rot that way — a removed command simply stops existing — and it covers 24
-     * of the 153. The flag covers what a name does not reveal
-     * (transferOwnership, restoreBackup, importProject, deployBuild …).
+     * rot that way: a removed command simply stops existing. The flag covers what
+     * a name does not reveal (transferOwnership, restoreBackup, deployBuild …).
      *
      * Reading flag OR convention means forgetting the flag on an obvious
      * `deleteFoo` is harmless.
@@ -714,6 +713,27 @@ const QuickSiteAdmin = {
     isDestructiveCommand(command, form) {
         if (form && form.dataset.destructive === '1') return true;
         return /^(delete|remove|clear|reset|purge)/i.test(command || '');
+    },
+
+    /**
+     * Ask before a destructive command runs. A form that takes over the console's submit
+     * calls this too, or its command never asks.
+     *
+     * @param {string} command
+     * @param {HTMLFormElement} [form]  the submitting form, for the help flag
+     * @returns {Promise<boolean>} true when it may run: not destructive, or the user said yes
+     */
+    async confirmDestructiveCommand(command, form) {
+        if (!this.isDestructiveCommand(command, form)) return true;
+        return this.confirm(
+            String(this.t('commands.confirmDestructive.message')).replace(':command', command),
+            {
+                title: this.t('commands.confirmDestructive.title'),
+                type: 'warning',
+                confirmText: this.t('common.execute'),
+                confirmClass: 'primary'
+            }
+        );
     },
 
     /**
@@ -742,20 +762,8 @@ const QuickSiteAdmin = {
         const responseDiv = document.getElementById('command-response');
         
         // Check if this is a destructive command that needs confirmation
-        if (this.isDestructiveCommand(command, form)) {
-            const confirmed = await this.confirm(
-                String(this.t('commands.confirmDestructive.message')).replace(':command', command),
-                {
-                    title: this.t('commands.confirmDestructive.title'),
-                    type: 'warning',
-                    confirmText: this.t('common.execute'),
-                    confirmClass: 'primary'
-                }
-            );
-
-            if (!confirmed) {
-                return;
-            }
+        if (!(await this.confirmDestructiveCommand(command, form))) {
+            return;
         }
         
         // Collect form data

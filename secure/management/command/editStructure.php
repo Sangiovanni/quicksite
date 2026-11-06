@@ -104,47 +104,6 @@ function findComponentUsagesInternal(string $componentName): array {
 }
 
 /**
- * Recursively validate structure for blocked tags + unsafe params.
- *
- * The TAG half lives in qs_first_unrenderable_tag() in utilsManagement.php
- * so the other structure writers can enforce the identical
- * rule without copying this walk — CLAUDE.md centralize-shared-logic. The gate
- * itself is unchanged: TagRegistry::isRenderable, the same policy the renderer
- * and the compiler apply, and it still runs BEFORE the param check at the call
- * site so a tag error still wins over a param error.
- *
- * @param mixed $node Node to validate
- * @return string|null Error message if unsafe param found, null if valid
- */
-function validateStructureTags($node): ?string {
-    if (!is_array($node)) {
-        return null;
-    }
-
-    // Param safety: reject a malformed attribute NAME, a raw on* handler and a
-    // dangerous URL scheme on write (mirrors the renderer and the compiler).
-    // Same shared helper the single-node writers use.
-    if (isset($node['params']) && is_array($node['params'])) {
-        $paramError = firstUnsafeParam($node['params']);
-        if ($paramError !== null) {
-            return $paramError;
-        }
-    }
-
-    // Recursively check children
-    if (isset($node['children']) && is_array($node['children'])) {
-        foreach ($node['children'] as $child) {
-            $error = validateStructureTags($child);
-            if ($error !== null) {
-                return $error;
-            }
-        }
-    }
-    
-    return null;
-}
-
-/**
  * Normalize structure nodes: convert "text" keys to "textKey" with __RAW__ prefix.
  * AI models sometimes output {"text": "Hello"} instead of {"textKey": "__RAW__Hello"}.
  * This auto-corrects at save time so the renderer doesn't produce <!-- Unknown node type -->.
@@ -185,6 +144,15 @@ if (!isset($params['type'])) {
     ApiResponse::create(400, 'validation.required')
         ->withMessage('Missing required parameter: type')
         ->withErrors([['field' => 'type', 'reason' => 'missing']])
+        ->send();
+}
+
+// An action that names a place in a structure needs the node: with none, the full replacement
+// below would write the request over the whole file.
+if ($nodeId === null && in_array($action, ['delete', 'insertBefore', 'insertAfter'], true)) {
+    ApiResponse::create(400, 'validation.required')
+        ->withMessage("Missing required parameter: nodeId (required when action is {$action})")
+        ->withErrors([['field' => 'nodeId', 'reason' => "required for action={$action}"]])
         ->send();
 }
 
@@ -324,28 +292,8 @@ if ($structure !== null && is_array($structure)) {
             ->send();
     }
 
-    // Then params, which still walk per-shape.
-    // For pages/menu/footer (arrays of nodes)
-    if (isset($structure[0]) || empty($structure)) {
-        foreach ($structure as $node) {
-            $tagError = validateStructureTags($node);
-            if ($tagError !== null) {
-                ApiResponse::create(400, 'validation.blocked_tag')
-                    ->withMessage($tagError)
-                    ->withErrors([['field' => 'structure', 'reason' => 'blocked_tag']])
-                    ->send();
-            }
-        }
-    } else {
-        // For components (single object node)
-        $tagError = validateStructureTags($structure);
-        if ($tagError !== null) {
-            ApiResponse::create(400, 'validation.blocked_tag')
-                ->withMessage($tagError)
-                ->withErrors([['field' => 'structure', 'reason' => 'blocked_tag']])
-                ->send();
-        }
-    }
+    // Attributes are checked once, by the shared verifier, on exactly what each mode is about to
+    // write (below): a node edit's answer names the node where it would land.
 }
 
 // SECURITY: Validate no reserved data-qs-* attributes - skip for delete
@@ -455,7 +403,7 @@ if ($type === 'component' && is_array($structure) && empty($structure)) {
                 ->withData([
                     'component' => $name,
                     'used_by_components' => $usingComponents,
-                    'hint' => 'Remove references from these components first, or use force=true to delete anyway'
+                    'hint' => 'Remove references from these components first'
                 ])
                 ->send();
         }

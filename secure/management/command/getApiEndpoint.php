@@ -47,7 +47,7 @@ function __command_getApiEndpoint(array $params = [], array $urlParams = []): Ap
     
     if (!$endpointId || !is_string($endpointId)) {
         return ApiResponse::create(400, 'api.error.missing_parameter')
-            ->withMessage('Missing endpoint ID. Use: GET /management/getApiEndpoint/{endpointId}');
+            ->withMessage('Missing endpoint ID. Use: GET /management/p/<projectId>/getApiEndpoint/{endpointId}');
     }
     
     $manager = new ApiEndpointManager();

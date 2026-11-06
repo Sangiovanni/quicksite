@@ -2463,6 +2463,9 @@ async function initDeleteAssetForm() {
         e.preventDefault();
         e.stopPropagation();
 
+        // This submit runs in place of the console's, so it asks what the console's asks.
+        if (!(await QuickSiteAdmin.confirmDestructiveCommand(COMMAND_NAME, form))) return;
+
         const submitBtn = document.getElementById('submit-btn');
         submitBtn.disabled = true;
         // Hold the button's own child nodes so they go back verbatim, rather
@@ -2490,18 +2493,26 @@ async function initDeleteAssetForm() {
             QuickSiteAdmin.displayResponse(responseDiv, result);
 
             if (result.ok) {
-                // Remove deleted files from the checkbox list using the checked array
-                // (204 responses have no body, so we rely on what we sent)
-                checked.forEach(fname => {
+                // A batch can delete some and not others: a file the answer lists as failed stays listed.
+                const failed = (result.data?.data?.failed || []).map(f => f.filename);
+                checked.filter(fname => !failed.includes(fname)).forEach(fname => {
                     const cb = fileListEl.querySelector(`.delete-file-cb[value="${CSS.escape(fname)}"]`);
                     if (cb) cb.closest('.admin-checkbox-list__item')?.remove();
                 });
                 updateCount();
 
-                const msg = t(checked.length === 1
-                    ? 'commandForm.deleteAsset.deletedOne'
-                    : 'commandForm.deleteAsset.deletedMany', { count: checked.length });
-                QuickSiteAdmin.showToast(msg, 'success');
+                if (failed.length > 0) {
+                    QuickSiteAdmin.showToast(t('commandForm.deleteAsset.deletedPartial', {
+                        deleted: checked.length - failed.length,
+                        total: checked.length,
+                        names: failed.join(', ')
+                    }), 'warning');
+                } else {
+                    const msg = t(checked.length === 1
+                        ? 'commandForm.deleteAsset.deletedOne'
+                        : 'commandForm.deleteAsset.deletedMany', { count: checked.length });
+                    QuickSiteAdmin.showToast(msg, 'success');
+                }
             } else {
                 QuickSiteAdmin.showToast(
                     result.data?.message || t('commandForm.deleteAsset.deleteFailed'), 'error');
@@ -4889,7 +4900,7 @@ function renderCommandForm(doc) {
     // isDestructiveCommand() and there is no second help fetch.
     //
     // The flag names only what a command's NAME does not already reveal
-    // (transferOwnership, restoreBackup, importProject, deployBuild …); the
+    // (transferOwnership, restoreBackup, deployBuild …); the
     // gate falls back to a delete/remove/clear/reset/purge naming convention,
     // so an obvious deleteFoo is covered whether or not anyone flagged it.
     if (doc.destructive === true) {
@@ -5353,10 +5364,13 @@ function renderCommandDocs(doc) {
             QSDom.el('p', { text: doc.notes })));
     }
 
-    // Example
-    if (doc.example_get || doc.example_post) {
+    // Examples: every one the entry has, under whichever verb it names
+    const examples = Object.keys(doc)
+        .filter(key => key.startsWith('example') && typeof doc[key] === 'string')
+        .map(key => doc[key]);
+    if (examples.length > 0) {
         sections.push(_renderDocSection(t('commands.example'),
-            _renderCodeBlock(doc.example_get || doc.example_post)));
+            QSDom.el('div', null, examples.map(text => _renderCodeBlock(text)))));
     }
 
     // Success Response

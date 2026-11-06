@@ -72,7 +72,7 @@ function __command_downloadExport(array $params = [], array $urlParams = []): Ap
             ->withMessage('Export file not found')
             ->withData([
                 'filename' => $filename,
-                'hint' => 'Export may have expired or been deleted'
+                'hint' => 'Five newer exports replace an export, and clearExports removes them'
             ]);
     }
 

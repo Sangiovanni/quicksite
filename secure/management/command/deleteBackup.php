@@ -17,25 +17,9 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_format_size
 require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php'; // qs_delete_tree, getDirectorySize
 require_once SECURE_FOLDER_PATH . '/src/functions/spaceUsage.php'; // qs_invalidate_space_cache
-
-/**
- * Format size for display
- */
-if (!function_exists('delbackup_formatSize')) {
-    function delbackup_formatSize($bytes) {
-        if ($bytes >= 1073741824) {
-            return number_format($bytes / 1073741824, 2) . ' GB';
-        } elseif ($bytes >= 1048576) {
-            return number_format($bytes / 1048576, 2) . ' MB';
-        } elseif ($bytes >= 1024) {
-            return number_format($bytes / 1024, 2) . ' KB';
-        } else {
-            return $bytes . ' bytes';
-        }
-    }
-}
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -115,7 +99,7 @@ function __command_deleteBackup(array $params = [], array $urlParams = []): ApiR
             'project' => $projectName,
             'deleted_backup' => $backupName,
             'freed_space' => $backupSize,
-            'freed_space_formatted' => delbackup_formatSize($backupSize),
+            'freed_space_formatted' => qs_format_size((int) $backupSize),
             'remaining_backups' => count($remainingBackups)
         ]);
 }

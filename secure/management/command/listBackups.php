@@ -17,25 +17,9 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_format_size
 require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php'; // getDirectorySize, countDirectoryFiles
 require_once SECURE_FOLDER_PATH . '/src/functions/projectBackup.php'; // QS_BACKUP_ITEMS
-
-/**
- * Format size for display
- */
-if (!function_exists('listbackups_formatSize')) {
-    function listbackups_formatSize($bytes) {
-        if ($bytes >= 1073741824) {
-            return number_format($bytes / 1073741824, 2) . ' GB';
-        } elseif ($bytes >= 1048576) {
-            return number_format($bytes / 1048576, 2) . ' MB';
-        } elseif ($bytes >= 1024) {
-            return number_format($bytes / 1024, 2) . ' KB';
-        } else {
-            return $bytes . ' bytes';
-        }
-    }
-}
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -83,7 +67,7 @@ function __command_listBackups(array $params = [], array $urlParams = []): ApiRe
                 'backups' => [],
                 'count' => 0,
                 'total_size' => 0,
-                'total_size_formatted' => '0 bytes'
+                'total_size_formatted' => qs_format_size(0)
             ]);
     }
 
@@ -130,7 +114,7 @@ function __command_listBackups(array $params = [], array $urlParams = []): ApiRe
             'name' => $name,
             'type' => $type,
             'size' => $size,
-            'size_formatted' => listbackups_formatSize($size),
+            'size_formatted' => qs_format_size((int) $size),
             'files' => $fileCount,
             'contents' => $contents,
             'created' => $created,
@@ -153,7 +137,7 @@ function __command_listBackups(array $params = [], array $urlParams = []): ApiRe
             'backups' => $backups,
             'count' => count($backups),
             'total_size' => $totalSize,
-            'total_size_formatted' => listbackups_formatSize($totalSize)
+            'total_size_formatted' => qs_format_size((int) $totalSize)
         ]);
 }
 

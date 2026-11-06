@@ -99,7 +99,8 @@ function __command_duplicateComponent(array $params = [], array $urlParams = [])
     // would pass the structure cap or grow while the owner is over quota
     // (qs_small_write_refusal)
     $jsonFlags = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES;
-    $refusal = qs_small_write_refusal([$newFile => qs_json_size($structure, $jsonFlags)]);
+    $size = qs_json_size($structure, $jsonFlags);
+    $refusal = qs_small_write_refusal([$newFile => $size]);
     if ($refusal !== null) {
         return $refusal;
     }
@@ -115,7 +116,7 @@ function __command_duplicateComponent(array $params = [], array $urlParams = [])
             'source' => $sourceName,
             'name' => $newName,
             'file' => 'components/' . $newName . '.json',
-            'size' => strlen($newContent)
+            'size' => $size
         ]);
 }
 

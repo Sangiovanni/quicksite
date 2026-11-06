@@ -46,7 +46,7 @@ function __command_addApi(array $params = [], array $urlParams = []): ApiRespons
             ->withMessage('Missing or invalid "apiId" parameter');
     }
     
-    if (!$name || !is_string($name)) {
+    if (!is_string($name) || $name === '') {
         return ApiResponse::create(400, 'api.error.missing_parameter')
             ->withMessage('Missing or invalid "name" parameter');
     }

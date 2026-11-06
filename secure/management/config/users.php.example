@@ -15,7 +15,9 @@
  * (createProject) and becomes its owner.
  *
  * Generate a real userId with: php -r "echo 'usr_' . bin2hex(random_bytes(16));"
- * Generate a password hash with: php -r "echo password_hash('your-password', PASSWORD_DEFAULT);"
+ * Generate a password hash with: php -r "echo password_hash('your-password', PASSWORD_BCRYPT, ['cost' => 12]);"
+ * (The engine hashes with bcrypt at cost 12. A hash made otherwise still signs in, and the
+ * next successful sign-in rehashes it to that.)
  *
  * Fields:
  *   name             public display name (shown in the admin panel and to
@@ -76,7 +78,7 @@
 //       php -r "echo 'usr_' . bin2hex(random_bytes(16));"
 //   - set 'username' to your login name (see the rule above)
 //   - set 'password_hash' to a real hash:
-//       php -r "echo password_hash('your-password', PASSWORD_DEFAULT);"
+//       php -r "echo password_hash('your-password', PASSWORD_BCRYPT, ['cost' => 12]);"
 // Until password_hash is a real hash the entry cannot log in at all: null means
 // "externally managed account" (see the field notes above).
 return [

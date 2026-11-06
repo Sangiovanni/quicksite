@@ -24,7 +24,7 @@ $lang = $params['lang'] ?? null;
 $title = $params['title'] ?? null;
 
 // Validate route parameter is present
-if (empty($route)) {
+if ($route === null || $route === '') {
     ApiResponse::create(400, 'validation.missing_field')
         ->withMessage('route parameter is required')
         ->withData([

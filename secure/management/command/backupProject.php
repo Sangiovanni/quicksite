@@ -22,27 +22,11 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_format_size
 require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php'; // qs_delete_tree, getDirectorySize, qs_tree_measure
 require_once SECURE_FOLDER_PATH . '/src/functions/projectBackup.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/quota.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/spaceUsage.php'; // qs_invalidate_space_cache
-
-/**
- * Format size for display
- */
-if (!function_exists('backup_formatSize')) {
-    function backup_formatSize($bytes) {
-        if ($bytes >= 1073741824) {
-            return number_format($bytes / 1073741824, 2) . ' GB';
-        } elseif ($bytes >= 1048576) {
-            return number_format($bytes / 1048576, 2) . ' MB';
-        } elseif ($bytes >= 1024) {
-            return number_format($bytes / 1024, 2) . ' KB';
-        } else {
-            return $bytes . ' bytes';
-        }
-    }
-}
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -189,7 +173,7 @@ function __command_backupProject(array $params = [], array $urlParams = []): Api
                 'name' => $backupName,
                 'path' => $backupPath,
                 'size' => $measure['bytes'],
-                'size_formatted' => backup_formatSize($measure['bytes']),
+                'size_formatted' => qs_format_size((int) $measure['bytes']),
                 'files' => $measure['files'],
                 'items' => $copy['copied'],
                 'created' => $timestamp

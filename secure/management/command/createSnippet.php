@@ -62,7 +62,7 @@ function __command_createSnippet(array $params = [], array $urlParams = []): Api
             ->withMessage('Snippet ID is required');
     }
     
-    if (!$name) {
+    if (!$name && $name !== '0') {
         return ApiResponse::create(400, 'snippets.name_required')
             ->withMessage('Snippet name is required');
     }

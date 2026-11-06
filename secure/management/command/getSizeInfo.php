@@ -15,24 +15,8 @@
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_format_size
 require_once SECURE_FOLDER_PATH . '/src/functions/FileSystem.php'; // getDirectorySize, countDirectoryFiles
-
-/**
- * Format size for display
- */
-if (!function_exists('sizeinfo_formatSize')) {
-    function sizeinfo_formatSize($bytes) {
-        if ($bytes >= 1073741824) {
-            return number_format($bytes / 1073741824, 2) . ' GB';
-        } elseif ($bytes >= 1048576) {
-            return number_format($bytes / 1048576, 2) . ' MB';
-        } elseif ($bytes >= 1024) {
-            return number_format($bytes / 1024, 2) . ' KB';
-        } else {
-            return $bytes . ' B';
-        }
-    }
-}
 
 /**
  * Get folder info with size and file count
@@ -46,7 +30,7 @@ if (!function_exists('sizeinfo_getFolderInfo')) {
             'name' => $name ?? basename($path),
             'exists' => is_dir($path),
             'size' => $size,
-            'size_formatted' => sizeinfo_formatSize($size),
+            'size_formatted' => qs_format_size((int) $size),
             'files' => countDirectoryFiles($path)
         ];
     }
@@ -95,12 +79,12 @@ function __command_getSizeInfo(array $params = [], array $urlParams = []): ApiRe
     $public = [
         'total' => [
             'size' => $publicTotalSize,
-            'size_formatted' => sizeinfo_formatSize($publicTotalSize),
+            'size_formatted' => qs_format_size((int) $publicTotalSize),
             'files' => countDirectoryFiles($publicRoot)
         ],
         'root_files' => [
             'size' => $publicRootFilesSize,
-            'size_formatted' => sizeinfo_formatSize($publicRootFilesSize)
+            'size_formatted' => qs_format_size((int) $publicRootFilesSize)
         ],
         'folders' => $publicFolders
     ];
@@ -140,7 +124,7 @@ function __command_getSizeInfo(array $params = [], array $urlParams = []): ApiRe
             'name'           => 'project',
             'exists'         => is_dir($projectDir),
             'size'           => $projectSize,
-            'size_formatted' => sizeinfo_formatSize($projectSize),
+            'size_formatted' => qs_format_size((int) $projectSize),
             'files'          => countDirectoryFiles($projectDir),
         ],
         'projects' => [],
@@ -160,7 +144,7 @@ function __command_getSizeInfo(array $params = [], array $urlParams = []): ApiRe
             $backupsInfo['items'][] = [
                 'name' => $backupName,
                 'size' => $backupSize,
-                'size_formatted' => sizeinfo_formatSize($backupSize),
+                'size_formatted' => qs_format_size((int) $backupSize),
                 'is_pre_restore' => strpos($backupName, 'pre-restore') === 0
             ];
         }
@@ -176,12 +160,12 @@ function __command_getSizeInfo(array $params = [], array $urlParams = []): ApiRe
         'name' => $markerProject,
         'total' => [
             'size' => $projectSize,
-            'size_formatted' => sizeinfo_formatSize($projectSize),
+            'size_formatted' => qs_format_size((int) $projectSize),
             'files' => countDirectoryFiles($projectDir)
         ],
         'without_backups' => [
             'size' => $projectSizeWithoutBackups,
-            'size_formatted' => sizeinfo_formatSize($projectSizeWithoutBackups)
+            'size_formatted' => qs_format_size((int) $projectSizeWithoutBackups)
         ],
         'backups' => $backupsInfo
     ];
@@ -197,12 +181,12 @@ function __command_getSizeInfo(array $params = [], array $urlParams = []): ApiRe
     $secure = [
         'total' => [
             'size' => $secureTotalSize,
-            'size_formatted' => sizeinfo_formatSize($secureTotalSize),
+            'size_formatted' => qs_format_size((int) $secureTotalSize),
             'files' => countDirectoryFiles($secureRoot)
         ],
         'root_files' => [
             'size' => $secureRootFilesSize,
-            'size_formatted' => sizeinfo_formatSize($secureRootFilesSize)
+            'size_formatted' => qs_format_size((int) $secureRootFilesSize)
         ],
         'folders' => $secureFolders,
         'projects_detail' => $projectsData['projects']
@@ -262,47 +246,47 @@ function __command_getSizeInfo(array $params = [], array $urlParams = []): ApiRe
     $summary = [
         'total' => [
             'size' => $publicTotalSize + $secureTotalSize,
-            'size_formatted' => sizeinfo_formatSize($publicTotalSize + $secureTotalSize)
+            'size_formatted' => qs_format_size((int) ($publicTotalSize + $secureTotalSize))
         ],
         'by_category' => [
             'projects' => [
                 'size' => $projectSpace,
-                'size_formatted' => sizeinfo_formatSize($projectSpace),
+                'size_formatted' => qs_format_size((int) $projectSpace),
                 'description' => 'Project files (assets, styles, builds, project data)'
             ],
             'backups' => [
                 'size' => $totalBackupsSize,
-                'size_formatted' => sizeinfo_formatSize($totalBackupsSize),
+                'size_formatted' => qs_format_size((int) $totalBackupsSize),
                 'description' => 'All project backups'
             ],
             'builds' => [
                 'size' => $buildsSpace,
-                'size_formatted' => sizeinfo_formatSize($buildsSpace),
+                'size_formatted' => qs_format_size((int) $buildsSpace),
                 'description' => 'Production builds'
             ],
             'exports' => [
                 'size' => $exportsSpace,
-                'size_formatted' => sizeinfo_formatSize($exportsSpace),
+                'size_formatted' => qs_format_size((int) $exportsSpace),
                 'description' => 'Export ZIP archives'
             ],
             'logs' => [
                 'size' => $logsSpace,
-                'size_formatted' => sizeinfo_formatSize($logsSpace),
+                'size_formatted' => qs_format_size((int) $logsSpace),
                 'description' => "This project's command history"
             ],
             'admin' => [
                 'size' => $adminSpace,
-                'size_formatted' => sizeinfo_formatSize($adminSpace),
+                'size_formatted' => qs_format_size((int) $adminSpace),
                 'description' => 'Admin panel interface'
             ],
             'management' => [
                 'size' => $managementSpace,
-                'size_formatted' => sizeinfo_formatSize($managementSpace),
+                'size_formatted' => qs_format_size((int) $managementSpace),
                 'description' => 'API and command system'
             ],
             'core' => [
                 'size' => $coreSpace,
-                'size_formatted' => sizeinfo_formatSize($coreSpace),
+                'size_formatted' => qs_format_size((int) $coreSpace),
                 'description' => 'Core system files (src, config)'
             ]
         ],

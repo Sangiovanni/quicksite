@@ -59,7 +59,7 @@ function __command_editComponentToNode(array $params = [], array $urlParams = []
             ->withErrors([['field' => 'type', 'value' => $type, 'allowed' => $allowed_types]]);
     }
     
-    if (($type === 'page' || $type === 'component') && empty($name)) {
+    if (($type === 'page' || $type === 'component') && ($name === null || $name === '')) {
         return ApiResponse::create(400, 'validation.required')
             ->withMessage("Missing required parameter: name (required when type is {$type})")
             ->withErrors([['field' => 'name', 'reason' => "required for type={$type}"]]);

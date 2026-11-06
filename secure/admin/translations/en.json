@@ -787,6 +787,7 @@
             "deletingMany": "Deleting :count files...",
             "deletedOne": "File deleted!",
             "deletedMany": ":count files deleted!",
+            "deletedPartial": ":deleted of :total files deleted. Not deleted: :names",
             "deleteFailed": "Delete failed"
         },
         "uploadAsset": {
@@ -3954,7 +3955,8 @@
         "confirmDeleteManyOne": "Delete :count asset? This cannot be undone.",
         "confirmDeleteManyMany": "Delete :count assets? This cannot be undone.",
         "deletedManyOne": ":count file deleted ✓",
-        "deletedManyMany": ":count files deleted ✓"
+        "deletedManyMany": ":count files deleted ✓",
+        "deletedPartial": ":deleted of :total files deleted. Not deleted: :names"
     },
     "complexWizard": {
         "rowEditor": {

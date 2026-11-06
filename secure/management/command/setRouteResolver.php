@@ -151,7 +151,7 @@ if ($index !== null) {
 
 if (!routeExists($routePath, ROUTES)) {
     ApiResponse::create(404, 'route.not_found')
-        ->withMessage("Route '{$routePath}' does not exist — add it first via /management/addRoute.")
+        ->withMessage("Route '{$routePath}' does not exist — add it first with addRoute.")
         ->withData(['route' => $routePath])
         ->send();
 }

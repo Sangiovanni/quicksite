@@ -2092,7 +2092,7 @@ class WorkflowManager {
     
     /**
      * Resolve $each loops in params
-     * Used for generating arrays from config values like LANGUAGES_NAME or param values
+     * Used for generating arrays from fetched data (data.langData.languages) or param values
      */
     private function resolveEachLoops(array $params, array $context): array {
         foreach ($params as $key => $value) {

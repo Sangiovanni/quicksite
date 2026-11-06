@@ -27,7 +27,8 @@ function __command_getRoutes(array $params = [], array $urlParams = []): ApiResp
         ->withData([
             'routes' => ROUTES,           // Nested structure
             'flat_routes' => $flatRoutes, // Flat list of all route paths
-            'root_routes' => array_keys(ROUTES), // Top-level routes only
+            // A route named with digits only is an integer key once PHP has it: a path is always text.
+            'root_routes' => array_map('strval', array_keys(ROUTES)), // Top-level routes only
             'count' => count($flatRoutes)
         ]);
 }

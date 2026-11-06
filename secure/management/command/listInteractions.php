@@ -60,7 +60,7 @@ function __command_listInteractions(array $params = [], array $urlParams = []): 
     if (empty($urlParams) || !isset($urlParams[0])) {
         return ApiResponse::create(400, 'validation.required')
             ->withMessage('Missing required parameter: structType')
-            ->withErrors([['field' => 'structType', 'usage' => 'GET /management/listInteractions/{structType}/{nodeId}']]);
+            ->withErrors([['field' => 'structType', 'usage' => 'GET /management/p/<projectId>/listInteractions/{structType}/{nodeId}']]);
     }
     
     $structType = $urlParams[0];
@@ -76,7 +76,7 @@ function __command_listInteractions(array $params = [], array $urlParams = []): 
     if (!isset($urlParams[1])) {
         return ApiResponse::create(400, 'validation.required')
             ->withMessage('Missing required parameter: nodeId')
-            ->withErrors([['field' => 'nodeId', 'usage' => 'GET /management/listInteractions/{structType}/{nodeId}']]);
+            ->withErrors([['field' => 'nodeId', 'usage' => 'GET /management/p/<projectId>/listInteractions/{structType}/{nodeId}']]);
     }
     
     // For page type, we need to extract page name and nodeId separately
@@ -96,7 +96,7 @@ function __command_listInteractions(array $params = [], array $urlParams = []): 
         if ($tailIdx < 2 || !RegexPatterns::match('node_id', $urlParams[$tailIdx])) {
             return ApiResponse::create(400, 'validation.required')
                 ->withMessage('Missing required parameter: nodeId')
-                ->withErrors([['field' => 'nodeId', 'usage' => 'GET /management/listInteractions/page/{pageName}/{nodeId}']]);
+                ->withErrors([['field' => 'nodeId', 'usage' => 'GET /management/p/<projectId>/listInteractions/page/{pageName}/{nodeId}']]);
         }
         $pageName = implode('/', array_slice($urlParams, 1, $tailIdx - 1));
         $nodeId = $urlParams[$tailIdx];
@@ -121,7 +121,7 @@ function __command_listInteractions(array $params = [], array $urlParams = []): 
         if (!isset($urlParams[2])) {
             return ApiResponse::create(400, 'validation.required')
                 ->withMessage('Missing required parameter: nodeId')
-                ->withErrors([['field' => 'nodeId', 'usage' => 'GET /management/listInteractions/component/{componentName}/{nodeId}']]);
+                ->withErrors([['field' => 'nodeId', 'usage' => 'GET /management/p/<projectId>/listInteractions/component/{componentName}/{nodeId}']]);
         }
         
         $nodeId = implode('/', array_slice($urlParams, 2));

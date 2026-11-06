@@ -25,7 +25,7 @@ function __command_getStructure(array $params = [], array $urlParams = []): ApiR
     if (empty($urlParams) || !isset($urlParams[0])) {
         return ApiResponse::create(400, 'validation.required')
             ->withMessage("Type parameter missing from URL")
-            ->withErrors([['field' => 'type', 'reason' => 'missing', 'usage' => 'GET /management/getStructure/{type}/{name?}']]);
+            ->withErrors([['field' => 'type', 'reason' => 'missing', 'usage' => 'GET /management/p/<projectId>/getStructure/{type}/{name?}']]);
     }
 
     $type = $urlParams[0];
@@ -70,10 +70,10 @@ function __command_getStructure(array $params = [], array $urlParams = []): ApiR
 
 // For pages and components, name is from URL segments
     if ($type === 'page' || $type === 'component') {
-        if (!isset($urlParams[1]) || empty($urlParams[1])) {
+        if (!isset($urlParams[1]) || $urlParams[1] === '') {
             return ApiResponse::create(400, 'validation.required')
                 ->withMessage("Name required in URL for type={$type}")
-                ->withErrors([['field' => 'name', 'reason' => 'missing', 'usage' => "GET /management/getStructure/{$type}/{name}"]]);
+                ->withErrors([['field' => 'name', 'reason' => 'missing', 'usage' => "GET /management/p/<projectId>/getStructure/{$type}/{name}"]]);
         }
 
         // For pages, support nested routes: getStructure/page/guides/getting-started

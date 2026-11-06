@@ -24,7 +24,7 @@
  *           // endpoint placeholder/body input → source spec
  *           'id'        => 'param:slug',     // from QS.routeParams
  *           'lang'      => 'query:lang',     // from URL query string
- *           'userId'    => 'session:userId', // from server session
+ *           'userId'    => 'session:userId', // accepted; reads as nothing (below)
  *           'tag'       => 'featured',       // literal value
  *       ],
  *       'expose'   => [
@@ -41,8 +41,9 @@
  *
  *   Inputs accept the same prefixed-source convention used by client-side
  *   state stores' `init` — `param:NAME`,
- *   `query:NAME`, `session:NAME`, plus bare literals. A missing source
- *   resolves to `null`; the resolver lets that propagate to serverFetch
+ *   `query:NAME`, `session:NAME`, plus bare literals. A `session:` source is
+ *   accepted and always reads as nothing, as the runtime gives a resolver no
+ *   session (resolverRuntime.php). A missing source resolves to `null`; the resolver lets that propagate to serverFetch
  *   (which leaves missing path placeholders literal so the upstream 404
  *   surfaces the misconfig visibly) rather than silently substituting
  *   defaults.
@@ -52,9 +53,8 @@
  *
  *   - Caching (serverFetch caches, from the cacheTTL forwarded below)
  *   - Hydration handoff to the client
- *   - Authed-resolver session population (depends on Tier 3 server session
- *     wiring — context passes through, but the calling code is responsible
- *     for putting the session token in $context['session']['token']).
+ *   - Session population: the runtime passes an empty session, so nothing
+ *     reads one.
  */
 
 require_once __DIR__ . '/../functions/serverFetch.php';
@@ -67,7 +67,7 @@ class DataResolver {
      *
      *   'param:slug'    → $context['routeParams']['slug']
      *   'query:lang'    → $context['query']['lang']
-     *   'session:userId'→ $context['session']['userId']
+     *   'session:userId'→ $context['session']['userId'], empty from the runtime
      *   'red-vase'      → literal 'red-vase' (no recognised prefix)
      *
      * Returns null for missing values so the caller can drop the input

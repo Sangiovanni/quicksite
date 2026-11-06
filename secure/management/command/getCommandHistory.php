@@ -15,7 +15,7 @@
  *   - end_date: Filter to date (YYYY-MM-DD), default: today
  *   - command: Filter by specific command name
  *   - status: Filter by result status (success, error)
- *   - token_name: Filter by token name (partial match)
+ *   - token_name: Filter by the display name in publisher.token_name (partial match)
  *   - page: Page number (default: 1)
  *   - limit: Entries per page (default: 100, max: 500)
  *   - dates_only: If true, only return list of available log dates

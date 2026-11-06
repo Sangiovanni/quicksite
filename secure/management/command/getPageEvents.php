@@ -27,7 +27,7 @@ function __command_getPageEvents(array $params = [], array $urlParams = []): Api
     $segments = array_filter($urlParams, fn($s) => $s !== '');
     $pageName = !empty($segments) ? implode('/', $segments) : null;
     
-    if (!$pageName) {
+    if ($pageName === null) {
         return ApiResponse::create(400, 'validation.required')
             ->withMessage('Missing required parameter: pageName');
     }

@@ -971,7 +971,7 @@ After each phase that succeeded in at least one command, the iframe reloads via 
 A run goes through the workflow's **phases**: each pre-workflow, the workflow itself, then each post-workflow ([WORKFLOW_SYSTEM.md](WORKFLOW_SYSTEM.md) *Sub-Workflows*). The server answers them (`workflow-generate-steps`): the plan when the run starts, every phase resolved against the project as it is then, and each phase again when the run reaches it — so a phase reads what the earlier ones changed (`setup-languages` sets the languages a `fresh-start` before it removed; a language switch lists the languages added before it).
 
 - **The review** (Run without stopping off) — before each phase but the first (a phase of steps that has none passes without one: there is nothing in it to stop before), and before a first phase that deletes or changes content: `Next — 2 of 4: {name}`, its number of steps (an AI phase: `Its prompt is built from the project as it now is.`, with its Your prompt field), the last phase's result (`{name}: 21 of 23 succeeded, 2 failed`), what it deletes and changes, and **Continue** / **Stop**. When the phase deletes, Continue reads **Delete and continue** and is red; when it only changes, **Change and continue**. The Batch opens on its steps.
-- **What is warned** — the server reads each step (`WorkflowManager::stepEffect()`): a read (a command the write rate never counts) and a command that adds something (a name beginning `add`, `create`, `upload`, `insert`, `duplicate`) are never warned; a step **deletes** when its name begins `delete`, `remove`, `clear`, `reset` or `purge` (the console's own convention), when its command's help marks it destructive, when it deletes a node, or when it gives a component an empty structure (which deletes the component); any other write to the site's content **changes** it. A write outside the site's content (a build, a deploy) is warned only when it deletes. A warning names what each step touches: `Deletes — Pages: about, services`, `Changes — The stylesheet`, `Changes — Texts: en, default`. A keep option shows by its absence: kept assets are not in the list.
+- **What is warned** — the server reads each step (`WorkflowManager::stepEffect()`): a read (a command the write rate never counts) and a command that adds something (a name beginning `add`, `create`, `upload`, `insert`, `duplicate`) are never warned; a step **deletes** when its name begins `delete`, `remove`, `clear`, `reset` or `purge` (the console's own convention), when its command's help marks it destructive, when it deletes a node, or when it gives a component an empty structure (which deletes the component); any other write to the site's content **changes** it. A write outside the site's content is warned only when it deletes: not a build, while `deployBuild`, whose help marks it destructive, reads `Deletes — Other commands: deployBuild`. A warning names what each step touches: `Deletes — Pages: about, services`, `Changes — The stylesheet`, `Changes — Texts: en, default`. A keep option shows by its absence: kept assets are not in the list.
 - **The danger dialog** (Run without stopping on) — once, before anything runs, the panel's danger dialog (`Delete content?` or `Change content?`, the focus on Cancel) lists what every phase the plan knows deletes and changes, each phase named; an AI phase is announced (`{name} (AI): the commands its AI answers change the site; a deletion among them is asked when the answer arrives.`). It is not shown when nothing known deletes or changes anything. After it, only what it did not list asks again: a phase that, resolved when reached, deletes or changes more, and an AI answer that deletes.
 - **An AI phase** — its prompt is built when the run reaches it, from the project as it now is, the phase's request appended; it is sent with the connection's key, or shown and copied. The run then **waits for its answer whatever Run without stopping says** — without a key that is where it stops until the answer is pasted (`3 of 3: {name} waits for its AI answer, in AI response below.`, with **Stop**). With the switch off the answer runs from its Execute button.
 - **A cut answer** — while the run waits for an answer that cannot run, the bar offers a way on, by why it could not. Neither button is offered while a send is under way.
@@ -2484,7 +2484,7 @@ authoring vocabulary, two consumers:
 ```
 "id"     => "param:slug"       // URL path param (TrimParameters routeParams)
 "lang"   => "query:locale"     // URL query string
-"userId" => "session:userId"   // server-side session (depends on Tier 3 wiring)
+"userId" => "session:userId"   // accepted; always reads as nothing, as a resolver is given no session
 "tag"    => "featured"         // bare literal (no recognised prefix)
 ```
 
@@ -3563,6 +3563,8 @@ Clicking marks the card immediately and then reconciles against the server's ans
 
 `editFavicon` stores a **pointer** — it writes the asset's path into the project config and copies nothing. Renaming the chosen asset follows the pointer; deleting it clears the pointer. So the grid can never show a favicon that is no longer there, and choosing one does not leave duplicate or backup images cluttering the library.
 
+A batch delete can delete some files and not others: the answer lists both, and the page says so in a warning, *1 of 2 files deleted. Not deleted: logo.png*. A file that is gone leaves the grid as it reloads, and one that was not deleted stays.
+
 A delete is a delete once the file is gone. If the asset list (each file's description, alt text and star) cannot be saved after it, or the favicon setting still names a deleted image and cannot be cleared, `deleteAsset` answers `500 server.file_write_failed`: the page shows that answer's message as an error, then does what a delete does — the edit area of a deleted file closes, a selection is cleared, the grid reloads without the file. A rename or an edit whose asset list (or, for the favicon image, whose favicon setting) cannot be saved changes nothing, and an upload the asset list cannot record is not kept: each is an ordinary failure, its message shown.
 
 A page links its icon only when the icon's file exists: the chosen asset, or `assets/images/favicon.png` when none is chosen. The preview checks on every view, so an icon added while you work shows on the next one; a build decides once, for the files it copies, and a built page makes no check of its own.
@@ -3739,6 +3741,31 @@ The fields come in up to three groups, by what `help` says of each parameter: **
 A parameter `help` names in braces (`{lang}`, `{name}`) travels in the command's address, and its field says *(URL segment)*. The console encodes each piece between two slashes before sending it, so `#`, `?`, `+` and `%` reach the command as typed and a slash stays a separator: a nested page name (`guides/getting-started`, `products/:slug`) reaches `getStructure` and `getPageEvents`, which take it in several segments. `getStyleRule`'s selector and media query are each one segment encoded twice, because the command decodes them once more: a media query holding a `/` (`(min-aspect-ratio: 16/9)`) stays whole. The visual editor's readers of a rule (Edit Styles, Copy From…, Animate) send the two the same way, through `QuickSiteAdmin.styleRuleSegments()`.
 
 `getStyleRule`, `setStyleRule` and `deleteStyleRule` add a **CSS Selector Picker** above the fields, listing every rule of the stylesheet by scope. Choosing a rule fills the selector and the media query; in `setStyleRule` it also fills the styles with the rule's current declarations, one per line. The command merges what is sent into the rule: a property sent replaces that property, and the rule's other properties stay — a line deleted from the box is not a property removed, which is what `removeProperties` is for.
+
+`deleteAsset` has a form of its own: a checkbox per file, and after a batch that deleted only some, the files it could not delete stay listed and a warning names them.
+
+#### What the documentation beside the form shows
+
+**View Documentation** is the command's `help` entry, read as a card: its notes; **every example the entry holds**, each in a block of its own, under whichever verb it names (`example_get`, `example_delete`, `example_batch`…); its success response; its error responses. An entry holding several shows them in the order `help` writes them.
+
+#### A command that asks first
+
+Before it runs, the console asks about a command whose name begins `delete`, `remove`, `clear`, `reset` or `purge`, and about one whose `help` entry says `'destructive' => true`: *Confirm Action*, *You are about to execute "deleteAlias". This action may make permanent changes. Continue?*, with **Cancel** and **Execute**.
+
+The flag is for a command whose name does not say so, and the test is what is lost if it runs by mistake, not how alarming the name sounds:
+
+| Flagged | What is lost |
+|---|---|
+| `cleanOrphanTranslations` | The translation files of languages the project no longer has. |
+| `deployBuild` | With `overwrite`, the deployed site's files, replaced by this build, and no command takes it back. |
+| `generateConsentLayer` | Any edit made to the banner and popup, which it writes again; and no command turns the layer off afterwards. |
+| `restoreBackup` | The project's current state, with no snapshot unless `create_backup` asks for one. |
+| `setOAuthCredentials` | A stored secret, when it clears a key set. A provider will not show it again. |
+| `transferOwnership` | The caller's top role: only the new owner can give it back. |
+
+A command run many times in a sitting stays unflagged (`editStructure`, `editStyles`, `setTranslationKeys`, `editApi`), and so does one that already asks in its own way (`generateCookiePolicy` and `generatePrivacyPolicy` refuse an existing route without `overwrite`; `setStorageDescLang` and `setPrivacyDescLang` preview without `confirm`). A flag belongs to a command, not to one way of calling it, so it cannot ask only when `setRouteResolver` clears a route or `editApi` replaces every endpoint.
+
+The prompt is a second look, not a control. A role sees no difference and the dispatcher does not read the flag: a caller of `/management/` gets `destructive` in `help` and nothing else. The one other reader is a workflow run (§8.12), which warns of a flagged step as a delete.
 
 #### An installation can decline to offer it
 

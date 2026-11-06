@@ -87,7 +87,7 @@ Every command — success or failure — returns the same JSON envelope. Command
 
 | Field | Type | Notes |
 |---|---|---|
-| `status` | integer | HTTP-style status code (200, 201, 204, 207, 400, 401, 403, 404, 409, 422, 500…). Mirrors the actual HTTP response code. |
+| `status` | integer | HTTP-style status code (200, 201, 207, 400, 401, 403, 404, 409, 422, 500…). Mirrors the actual HTTP response code. |
 | `code` | string | Stable dotted identifier (`route.created`, `validation.required`, `auth.forbidden`…). Suitable for client-side branching and i18n. |
 | `message` | string | Human-readable summary, always written by the command itself — there is no per-code default, so the text describes what actually happened rather than what the code generally means. A refusal for a missing parameter names the parameter. Localized when called from the admin panel. |
 | `data` | object (optional) | Command-specific payload. **Omitted entirely when there is nothing to report** — read it as "absent or an object", not as "always present, sometimes null". |
@@ -136,7 +136,7 @@ A command that acts on a **set** — clearing a folder of export archives, sweep
 
 The work that succeeded is real and is not rolled back. `errors` names every member that did not complete. When **nothing** in the set succeeded, the command answers `5xx` instead — a total failure is not a partial success.
 
-`207` is a 2xx, so a client testing only "was this a 2xx" will read it as success. **Branch on `code`, or on `data.failed_count`, whenever a command can act on more than one thing.** Commands that use it: `clearExports`, `cleanOrphanTranslations`.
+`207` is a 2xx, so a client testing only "was this a 2xx" will read it as success. **Branch on `code`, or on `data.failed_count`, whenever a command can act on more than one thing.** Commands that use it: `clearExports`, `cleanOrphanTranslations`, `deleteAsset` (whose total failure is a `400`, since every refusal there is the caller's).
 
 `cleanOrphanTranslations` is the exception: it reports the same `operation.partial_success` code with `errors` populated, but keeps `status: 200`, because it runs as one phase of a longer chain that stops on a non-2xx.
 

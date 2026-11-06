@@ -17,6 +17,7 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_format_size
 
 /**
  * Command function for internal execution via CommandRunner or direct PHP call
@@ -95,7 +96,7 @@ function __command_clearExports(array $params = [], array $urlParams = []): ApiR
         'deleted_files' => $deleted,
         'failed_count' => count($failed),
         'failed_files' => $failed,
-        'freed_space' => formatClearExportsBytes($totalSize)
+        'freed_space' => qs_format_size((int) $totalSize)
     ];
 
     // The ENVELOPE must be as honest as the data payload. A run that fails to
@@ -129,19 +130,6 @@ function __command_clearExports(array $params = [], array $urlParams = []): ApiR
     return ApiResponse::create(200, 'operation.success')
         ->withMessage(count($deleted) . ' export file(s) deleted' . $forProject)
         ->withData($payload);
-}
-
-/**
- * Format bytes to human readable
- */
-function formatClearExportsBytes(int $bytes): string {
-    if ($bytes === 0) return '0 B';
-    
-    $units = ['B', 'KB', 'MB', 'GB'];
-    $exp = floor(log($bytes, 1024));
-    $exp = min($exp, count($units) - 1);
-    
-    return round($bytes / pow(1024, $exp), 2) . ' ' . $units[$exp];
 }
 
 // Execute command if called directly via API (not internal call)

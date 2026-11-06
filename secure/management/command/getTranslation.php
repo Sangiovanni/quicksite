@@ -23,7 +23,7 @@ function __command_getTranslation(array $params = [], array $urlParams = []): Ap
     if (empty($urlParams) || !isset($urlParams[0])) {
         return ApiResponse::create(400, 'validation.required')
             ->withMessage("Language code missing from URL")
-            ->withErrors([['field' => 'language', 'reason' => 'missing', 'usage' => 'GET /management/getTranslation/{lang}']]);
+            ->withErrors([['field' => 'language', 'reason' => 'missing', 'usage' => 'GET /management/p/<projectId>/getTranslation/{lang}']]);
     }
 
     $language = $urlParams[0];

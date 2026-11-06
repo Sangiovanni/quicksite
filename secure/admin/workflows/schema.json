@@ -405,7 +405,7 @@
       "properties": {
         "$each": {
           "type": "string",
-          "description": "Source to iterate over, e.g., {{config.LANGUAGES_NAME}}"
+          "description": "Source to iterate over, e.g., {{data.langData.languages}}"
         },
         "$item": {
           "type": "object",

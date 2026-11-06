@@ -315,7 +315,7 @@ function __command_insertSnippet(array $params = [], array $urlParams = []): Api
             ->withMessage('Invalid structure type. Must be: page, menu, footer, or component');
     }
     
-    if (($type === 'page' || $type === 'component') && !$name) {
+    if (($type === 'page' || $type === 'component') && ($name === null || $name === '')) {
         return ApiResponse::create(400, 'validation.name_required')
             ->withMessage('Name is required for page/component structures');
     }

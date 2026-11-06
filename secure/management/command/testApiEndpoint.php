@@ -14,11 +14,12 @@
  *     "queryParams": { ... },            // Optional: Query parameters for GET
  *     "headers": { ... },                // Optional: Additional headers
  *     "authToken": "...",                // Optional: Override auth token for testing
- *     "timeout": 30                      // Optional: Request timeout in seconds (default: 30)
+ *     "timeout": 30                      // Optional: Request timeout in seconds, 1 to 60 (default: 30)
  * }
  * 
  * Makes an actual HTTP request to the external API endpoint.
- * Returns the response status, headers, and body.
+ * Returns the response status, headers, and body. The request it reports shows the
+ * credential it sent masked.
  * 
  * ⚠️ Security: This endpoint makes server-side requests to external URLs.
  * Only registered endpoints can be tested - no arbitrary URLs allowed.
@@ -27,6 +28,9 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiEndpointManager.php';
 require_once SECURE_FOLDER_PATH . '/src/classes/OutboundUrlPolicy.php';
+
+/** The longest a test call may wait, in seconds. The help entry states the value. */
+const QS_API_TEST_TIMEOUT_MAX = 60;
 
 /**
  * Command function for internal execution
@@ -48,6 +52,14 @@ function __command_testApiEndpoint(array $params = [], array $urlParams = []): A
     if (!$endpointId || !is_string($endpointId)) {
         return ApiResponse::create(400, 'api.error.missing_parameter')
             ->withMessage('Missing "endpointId" parameter');
+    }
+
+    // Curl reads a timeout of 0 as no limit at all, and (int) reads text as 0, so anything
+    // but a whole number in range is refused before anything is sent.
+    if (!(is_int($timeout) || (is_string($timeout) && ctype_digit($timeout)))
+        || (int) $timeout < 1 || (int) $timeout > QS_API_TEST_TIMEOUT_MAX) {
+        return ApiResponse::create(400, 'api.error.invalid_parameter')
+            ->withMessage('timeout is a whole number of seconds from 1 to ' . QS_API_TEST_TIMEOUT_MAX . '.');
     }
     
     // Get endpoint from registry
@@ -110,6 +122,9 @@ function __command_testApiEndpoint(array $params = [], array $urlParams = []): A
 
     // Build headers
     $headers = [];
+    // The same headers as the answer reports them: a credential is masked, because the
+    // answer goes on to a screen and into whatever a client keeps of it.
+    $maskedHeaders = [];
     
     // Add Content-Type for requests with body
     $method = strtoupper($endpoint['method']);
@@ -135,6 +150,7 @@ function __command_testApiEndpoint(array $params = [], array $urlParams = []): A
         // Use provided test token
         if ($authType === 'bearer') {
             $headers['Authorization'] = 'Bearer ' . $authToken;
+            $maskedHeaders['Authorization'] = 'Bearer ***';
         } elseif ($authType === 'apiKey') {
             // Extract header name from tokenSource (format: header:X-API-Key)
             $tokenSource = $auth['tokenSource'] ?? '';
@@ -145,9 +161,11 @@ function __command_testApiEndpoint(array $params = [], array $urlParams = []): A
                         ->withMessage("Invalid header name in the tokenSource of API '{$endpoint['apiId']}'.");
                 }
                 $headers[$headerName] = $authToken;
+                $maskedHeaders[$headerName] = '***';
             }
         } elseif ($authType === 'basic') {
             $headers['Authorization'] = 'Basic ' . base64_encode($authToken);
+            $maskedHeaders['Authorization'] = 'Basic ***';
         }
     }
     // If no authToken provided, we skip auth - the test will likely fail but that's informative
@@ -265,7 +283,7 @@ function __command_testApiEndpoint(array $params = [], array $urlParams = []): A
                 'request' => [
                     'method' => $method,
                     'url' => $url,
-                    'headers' => $headers,
+                    'headers' => array_replace($headers, $maskedHeaders),
                     'body' => $testData
                 ],
                 'response' => [

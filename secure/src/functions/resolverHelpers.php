@@ -28,8 +28,8 @@
  * Source-spec convention for inputs:
  *   "param:<name>"   → URL path param from QS.routeParams
  *   "query:<name>"   → URL query string param
- *   "session:<name>" → server-side session field (depends on Tier 3
- *                      server session wiring)
+ *   "session:<name>" → accepted; always reads as nothing, as a resolver
+ *                      is given no session
  *   "<literal>"      → bare literal value (no recognised prefix)
  *
  * Dot-path convention for expose:

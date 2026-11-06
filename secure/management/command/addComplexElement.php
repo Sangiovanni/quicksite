@@ -157,7 +157,7 @@ function __command_addComplexElement(array $params = [], array $urlParams = []):
         return ApiResponse::create(400, 'validation.invalid_value')
             ->withMessage('Invalid structType. Must be: ' . implode(', ', $allowedTypes));
     }
-    if (($structType === 'page' || $structType === 'component') && empty($pageName)) {
+    if (($structType === 'page' || $structType === 'component') && ($pageName === null || $pageName === '')) {
         return ApiResponse::create(400, 'validation.required')
             ->withMessage("pageName is required when structType is '{$structType}'")
             ->withErrors([['field' => 'pageName', 'reason' => "required for structType={$structType}"]]);

@@ -211,7 +211,7 @@ if ($singleFilename !== null) {
         ])->send();
     }
 
-    ApiResponse::create(204, 'operation.success')
+    ApiResponse::create(200, 'operation.success')
         ->withMessage("File deleted successfully")
         ->withData([
             'filename' => $result['filename'],
@@ -266,17 +266,24 @@ if ($totalDeleted === 0) {
         ->send();
 }
 
-$message = "{$totalDeleted} file" . ($totalDeleted > 1 ? 's' : '') . " deleted successfully";
+$payload = [
+    'deleted' => $deleted,
+    'failed' => $failed,
+    'total_deleted' => $totalDeleted,
+    'total_failed' => $totalFailed
+];
+
+// Some went and some did not: what a command acting on a set answers, as clearExports does. What
+// went is not rolled back, and errors names each file that stayed.
 if ($totalFailed > 0) {
-    $message .= " ({$totalFailed} failed)";
+    ApiResponse::create(207, 'operation.partial_success')
+        ->withMessage("{$totalDeleted} of " . ($totalDeleted + $totalFailed) . " files deleted; {$totalFailed} could not be")
+        ->withData($payload)
+        ->withErrors(array_map(static fn(array $entry): array => ['file' => $entry['filename'], 'reason' => 'delete_failed'], $failed))
+        ->send();
 }
 
-ApiResponse::create(204, 'operation.success')
-    ->withMessage($message)
-    ->withData([
-        'deleted' => $deleted,
-        'failed' => $failed,
-        'total_deleted' => $totalDeleted,
-        'total_failed' => $totalFailed
-    ])
+ApiResponse::create(200, 'operation.success')
+    ->withMessage("{$totalDeleted} file" . ($totalDeleted > 1 ? 's' : '') . " deleted successfully")
+    ->withData($payload)
     ->send();

@@ -324,7 +324,7 @@ function __command_importProject(array $params = [], array $urlParams = []): Api
         'source_file' => $uploadedFile,
         'files_count' => $stats['files'],
         'directories_count' => $stats['directories'],
-        'total_size' => formatImportBytes($stats['total_size']),
+        'total_size' => qs_format_size((int) $stats['total_size']),
         'routes_count' => $projectInfo['routes_count'],
         'languages' => $projectInfo['languages'],
         'switched_to' => false,
@@ -1380,19 +1380,6 @@ function getUploadErrorMessage(int $errorCode): string {
     ];
     
     return $messages[$errorCode] ?? 'Unknown error';
-}
-
-/**
- * Format bytes to human readable
- */
-function formatImportBytes(int $bytes): string {
-    if ($bytes === 0) return '0 B';
-    
-    $units = ['B', 'KB', 'MB', 'GB'];
-    $exp = floor(log($bytes, 1024));
-    $exp = min($exp, count($units) - 1);
-    
-    return round($bytes / pow(1024, $exp), 2) . ' ' . $units[$exp];
 }
 
 // Execute command if called directly via API (not internal call)

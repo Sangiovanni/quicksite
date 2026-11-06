@@ -14,6 +14,7 @@
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 
 /**
  * Recursively scan a structure for lang-specific patterns
@@ -22,7 +23,7 @@ function scanForLangPatterns_check(array $structure, string $source, string $pat
     $findings = [];
     
     foreach ($structure as $key => $value) {
-        $currentPath = $path ? "{$path}.{$key}" : (string)$key;
+        $currentPath = $path !== '' ? "{$path}.{$key}" : (string)$key;
         
         if (is_array($value)) {
             // Recurse into nested structures
@@ -73,7 +74,7 @@ function scanJsonFile_check(string $filePath, string $sourceName): array {
     $content = file_get_contents($filePath);
     $structure = json_decode($content, true);
     
-    if ($structure === null) {
+    if (!is_array($structure)) {
         return [];
     }
     
@@ -91,16 +92,13 @@ function __command_checkStructureMulti(array $params = [], array $urlParams = []
     $allFindings = [];
     $scannedFiles = [];
 
-    // Scan pages
-    $pagesDir = PROJECT_PATH . '/templates/model/json/pages';
-    if (is_dir($pagesDir)) {
-        $pageFiles = glob($pagesDir . '/*.json');
-        foreach ($pageFiles as $pageFile) {
-            $pageName = basename($pageFile, '.json');
-            $findings = scanJsonFile_check($pageFile, "page:{$pageName}");
-            $allFindings = array_merge($allFindings, $findings);
-            $scannedFiles['pages'][] = $pageName;
-        }
+    // Scan pages: each lives in a folder of its own, nested and parameter routes included.
+    $pages = scanAllPageJsonFiles();
+    usort($pages, static fn($a, $b) => strcmp($a['route'], $b['route']));
+    foreach ($pages as $page) {
+        $findings = scanJsonFile_check($page['path'], "page:{$page['route']}");
+        $allFindings = array_merge($allFindings, $findings);
+        $scannedFiles['pages'][] = $page['route'];
     }
 
     // Scan menu

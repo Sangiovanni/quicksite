@@ -63,7 +63,7 @@ function __command_moveNode(array $params = [], array $urlParams = []): ApiRespo
     }
     
     // Name required for page/component
-    if (($type === 'page' || $type === 'component') && empty($name)) {
+    if (($type === 'page' || $type === 'component') && ($name === null || $name === '')) {
         return ApiResponse::create(400, 'validation.required')
             ->withMessage("Missing required parameter: name (required when type is {$type})")
             ->withErrors([['field' => 'name', 'reason' => "required for type={$type}"]]);

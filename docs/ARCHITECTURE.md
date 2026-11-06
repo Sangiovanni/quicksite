@@ -1186,21 +1186,21 @@ Multi-resolver semantics:
 The headline architectural payoff: state-store JSON and resolver JSON are
 **runtime-agnostic** — one shape, two executors. The same declaration that drives
 a client-side store can drive a server-side resolver with minor extensions (the
-`session:` source kind and the optional `cacheTTL` / `onMiss` keys).
+optional `cacheTTL` / `onMiss` keys; a `session:` source is accepted and always
+reads as nothing, because a resolver is given no session).
 
 **Auth gate vs auth data** — two distinct concepts that share a token/cookie
 but operate at different lifecycle positions:
 
 - The **auth gate** (yes/no decision: is this user allowed to access this
   route?) is framework-hardwired middleware running EARLIEST in the request
-  lifecycle — before any resolver. Produces the session context (`$_SESSION` /
-  cookie data) that downstream resolvers can read from via the `session:`
-  source kind.
+  lifecycle — before any resolver. No resolver reads the session it checks.
 - The **auth data fetch** (who is this user? populate `$user` for the
-  template) is just a regular resolver with `inputs: ['userId' => 'session:userId']`,
-  sitting in the standard resolver lifecycle position (AFTER auth gate,
-  BEFORE template render). It consumes the gate's session context to
-  fetch user info from the user-api.
+  template) is just a regular resolver, sitting in the standard resolver
+  lifecycle position (AFTER auth gate, BEFORE template render). It takes its
+  inputs from the address and the query string, or a literal: it does not read
+  the gate's session, and a `cookie` API's call carries the visitor's own
+  cookies.
 
 They share the token; they don't share the model. Treating both as
 user-configurable resolvers would have overloaded the resolver concept with

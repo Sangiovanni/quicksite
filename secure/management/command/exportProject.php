@@ -31,6 +31,7 @@
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/PathManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/projectContainment.php';
+require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php'; // qs_format_size
 require_once SECURE_FOLDER_PATH . '/src/functions/errorHygiene.php'; // qs_safe_error_message
 // The settings an export carries into config.json (security: no arbitrary PHP
 // execution) are QS_PROJECT_SETTING_KEYS — the one list importProject takes back.
@@ -306,14 +307,13 @@ function __command_exportProject(array $params = [], array $urlParams = []): Api
                 'project' => $projectName,
                 'filename' => $zipFileName,
                 'path' => SECURE_FOLDER_NAME . '/projects/' . $projectName . '/exports/' . $zipFileName,
-                'size' => formatExportBytes($zipSize),
+                'size' => qs_format_size((int) $zipSize),
                 'size_bytes' => $zipSize,
                 'files_count' => $stats['files'],
                 'directories_count' => $stats['directories'],
-                'original_size' => formatExportBytes($stats['total_size']),
+                'original_size' => qs_format_size((int) $stats['total_size']),
                 // downloadExport is project-scoped, so the URL carries the marker.
                 'download_url' => '/management/p/' . rawurlencode($projectName) . '/downloadExport?file=' . urlencode($zipFileName),
-                'expires' => date('Y-m-d H:i:s', time() + 86400), // 24 hours
                 'format' => 'v2.0-secure',
                 'note' => 'Secure format: PHP files excluded, will be rebuilt on import'
             ]);
@@ -696,19 +696,6 @@ function exportClaimName(string $exportDir, string $projectName, string $stamp):
         }
     }
     return null;
-}
-
-/**
- * Format bytes to human readable
- */
-function formatExportBytes(int $bytes): string {
-    if ($bytes === 0) return '0 B';
-    
-    $units = ['B', 'KB', 'MB', 'GB'];
-    $exp = floor(log($bytes, 1024));
-    $exp = min($exp, count($units) - 1);
-    
-    return round($bytes / pow(1024, $exp), 2) . ' ' . $units[$exp];
 }
 
 // Execute command if called directly via API (not internal call)

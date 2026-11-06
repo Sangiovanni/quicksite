@@ -15339,3 +15339,63 @@ they are undeclared once opened; which key an import should name is a question o
 **Alternatives considered**: refusing the bare name on a page (no name is refused: the prefix is the boundary); a key per account as well as per project (asked for per project; it stays in that browser like the panel's other keys); `_` before the project id (safe too, since the name before it is fixed; `:` is what the registry's other per-project key uses).
 
 **Source**: Sangio, 2026-11-05, told it departs from the words of his addition to keep what they were for: "Yes, as recommended"; beta.12. `public/admin/assets/js/pages/apis.js`, `public/admin/assets/js/core/storage-keys.js`.
+
+### What the `destructive` flag carries: what is lost if it runs by mistake (locked 2026-11-05)
+
+**Decision**: The flag goes on a command whose name does not say that it destroys or overwrites, judged by what is lost if it runs by mistake. `cleanOrphanTranslations`, `deployBuild`, `generateConsentLayer`, `restoreBackup` and `transferOwnership` join `setOAuthCredentials`. A command run many times in a sitting stays unflagged, and so does one that already asks through its own `confirm` or 409. The panel's gate stays flag OR naming convention, and a run's warning reads the same flag.
+
+**Reasoning**: The earlier list named `build` and `importProject` by how they sound, and neither loses anything: a build refuses while one exists, an import makes a new project. The commands that do lose something are not the alarming ones alone: `generateConsentLayer` writes over the banner and popup an author may have edited, and no command turns the layer off again. A prompt on what runs twenty times a sitting teaches people to click through it, which costs the prompts that matter. The flag belongs to a command, so it cannot ask only when `setRouteResolver` clears a route or `editApi` replaces every endpoint; flagging those would call every ordinary save a delete. The cost it does carry is named: a flagged step in a run reads `Deletes — Other commands: deployBuild`, where a deploy overwrites and never deletes, and "Run without stopping" stops on it when an AI phase emits it.
+
+**Alternatives considered**: a flag per parameter shape (a second schema for a safety net that is not a control); flagging `backupProject`, which prunes past five (the safety action is the last one to put a question in front of, and what it drops is what the setting says); flagging `testApiEndpoint`, which really calls the author's API (it is run over and over while authoring, and its help says so); renaming the commands so the convention catches them (breaks every client for a prompt).
+
+**Source**: the judgement pass over every command the convention misses, Sangio, 2026-11-05: "Yes, as recommended"; beta.12. `secure/management/command/help.php`, `public/admin/assets/admin.js` `isDestructiveCommand()`, `secure/src/classes/WorkflowManager.php` `stepEffect()`.
+
+### A command's card shows every example its entry holds (locked 2026-11-05)
+
+**Decision**: The console's card and `help`'s `commandsList` read any key of an entry starting `example` that holds a string, whichever verb it names. The card shows each in a block of its own; `commandsList` carries the first. An example that shows several forms keeps the word "or" between them, and every example is a request a reader could send.
+
+**Reasoning**: The card read `example_get` and `example_post` only, so a command documented under its real verb (`example_delete`, `example_patch`, `example_request`) showed no example at all, and the commands most in need of one, `deleteRoute`, `editStructure` and `uploadAsset` among them, had none on screen. Teaching the entries to carry the form the card reads would have made a `DELETE` command document itself as a `POST`.
+
+**Alternatives considered**: renaming every example to `example_post` (a false verb in a public document, with no panel change); adding `example_post` beside each (a second copy that drifts); a single `example` key (renames 150 entries for what one reader can do).
+
+**Source**: Sangio, 2026-11-05: "Yes, as recommended"; beta.12. `public/admin/assets/js/pages/command-form.js`, `secure/management/command/help.php`.
+
+### A node action names its node, and a bad attribute has one code (locked 2026-11-05)
+
+**Decision**: `editStructure` refuses `delete`, `insertBefore` and `insertAfter` with no `nodeId`: 400 `validation.required`, nothing written. `validateStructureTags()` is gone: a tag still answers `validation.blocked_tag`, and an attribute is checked once, by the shared verifier, on what each mode is about to write, and answers `validation.unsafe_param` like every other structure writer, naming the node.
+
+**Reasoning**: A delete with no node answered success and wrote `null` into the file. The early walk answered a bad attribute with `blocked_tag`, a code that means a tag, and it read the request where the verifier reads what is about to be written, which is what a client needs named.
+
+**Alternatives considered**: treating a missing `nodeId` as the whole structure (one forgotten field empties a page); keeping the early check as a fast path (two answers to one refusal is the defect).
+
+**Source**: Sangio, 2026-11-03 for the refusal and 2026-11-05 for the rest: "Yes, as recommended"; beta.12. `secure/management/command/editStructure.php`.
+
+### A test's answer masks the credential it sent, and waits at most a minute (locked 2026-11-05)
+
+**Decision**: `testApiEndpoint` reports the credential it added masked in `request.headers` (`Bearer ***`, `Basic ***`, `***`), while the request carries the real value. `timeout` is a whole number of seconds from 1 to 60, and anything else is refused. `response` stays as the API answered it, unmasked.
+
+**Reasoning**: The help said tokens were masked and the answer echoed them. The answer goes on to a screen and into whatever a client keeps of it; the command log was already clear of it. A timeout with no ceiling let one call hold a PHP worker for as long as the caller liked, and `0`, a negative or a word were accepted and meant no limit, or some other one. What an API sends back is the point of a test, and a server that echoes a token is that server's behaviour to see.
+
+**Alternatives considered**: correcting the help to say the token is echoed (the words were right, and the code was not); masking `response` too (it would hide what the test is for, and no rule could find every shape of a token); a higher cap (a test that takes more than a minute is a failed test).
+
+**Source**: Sangio, 2026-11-05: "Yes, as recommended"; beta.12. `secure/management/command/testApiEndpoint.php`.
+
+### One size formatter, and a saved export promises no expiry (locked 2026-11-05)
+
+**Decision**: Every `*_formatted` size goes through `qs_format_size()`; the seven private formatters in the export, import, backup and size commands are gone. A saved export's answer no longer carries `expires`. `getRoutes`' `root_routes` holds strings, and a page or route named `0` is a name in every command that tests one.
+
+**Reasoning**: The private formatters wrote different words for one size, depending on the command, and nothing in the panel or the workflows parses them. Nothing enforced `expires`: a saved export leaves when five newer ones replace it or `clearExports` removes it, so the field promised what no code did. A route named `0` read as a number from `array_keys()`, and as missing from `empty()`: `getStructure/page/0` answered `validation.required` for a page that serves.
+
+**Alternatives considered**: enforcing the expiry (a sweep nobody asked for, over files a limit already bounds); keeping the field and saying it is not enforced (a field that says nothing).
+
+**Source**: Sangio, 2026-11-05: "Yes, as recommended"; beta.12. `secure/src/functions/utilsManagement.php`, `secure/management/command/exportProject.php`, `secure/management/command/getRoutes.php`.
+
+### A delete says what it deleted, in an answer that arrives (locked 2026-11-05)
+
+**Decision**: `deleteAsset` answers 200 with its data, one file or a batch, and no command answers 204. A batch that deleted only some answers 207 `operation.partial_success` with `errors`, as every command acting on a set does; a batch that deleted none stays 400, since every refusal there is the caller's. The two panel screens that delete assets read `data.failed`: a file that was not deleted stays listed, and a warning names it. The console's delete form asks before it deletes, through the one method the console's own submit uses. `checkStructureMulti` scans what `scanAllPageJsonFiles()` finds, so its `clean` covers the pages.
+
+**Reasoning**: A 204 carries no body, and Apache drops one a script writes, so a batch's `deleted` and `failed` reached no client, and a partial failure read as a success on every screen. PHP's own server passes the body, so every probe over `php -S` saw an answer no deployed client ever got. The panel made up a success for a 204 and counted what it had sent. With the answer arriving, a 200 and a success code over a partial failure would have read wrongly to a client following `COMMAND_API.md`'s rule to branch on the code. The delete form took over the submit, so the question every other delete asks was never reached: it deleted with none. `checkStructureMulti` looked for page files directly in the pages folder, where a page's file sits in a folder of its own, so it scanned none and said "You can safely use setMultilingual" over a page full of language links, which is the one thing it exists to warn of.
+
+**Alternatives considered**: keeping 204 and documenting that the batch fields never arrive (the command would hold data no one can read); removing `api.js`'s 204 branch (a server in front of the panel may answer one).
+
+**Source**: Sangio, 2026-11-05: "Yes, fix both", then on the two rows the fix turned up, "Yes, all of it"; beta.12. `secure/management/command/deleteAsset.php`, `public/admin/assets/js/pages/assets.js`, `public/admin/assets/js/pages/command-form.js`, `public/admin/assets/admin.js`, `secure/management/command/checkStructureMulti.php`.
