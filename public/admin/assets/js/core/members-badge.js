@@ -1,7 +1,7 @@
 /**
  * Membership counts + nav badge.
  *
- * Computes, asynchronously, the numbers the Members nav badge and the
+ * Computes, asynchronously, the numbers the Members nav badges and the
  * dashboard memberships card show — derived ENTIRELY from existing reads
  * (no new storage, no polling):
  *   - awaiting me: my pending invitations + undismissed notices
@@ -75,14 +75,26 @@
         });
     }
 
-    function paintBadge(counts) {
-        var badge = document.getElementById('members-nav-badge');
+    // Always refresh the text (never leave a stale number behind) and let the
+    // hidden attribute — backed by a [hidden] CSS guard — do the hiding.
+    function paintOne(id, n) {
+        var badge = document.getElementById(id);
         if (!badge) return;
-        var n = counts ? counts.total : 0;
-        // Always refresh the text (never leave a stale number behind) and let the
-        // hidden attribute — now backed by a [hidden] CSS guard — do the hiding.
         badge.textContent = String(n);
         badge.hidden = (n === 0);
+    }
+
+    // The Members group holds the total; each of its entries holds its own share, so the
+    // group says something waits and the entry says where: My memberships what waits for
+    // me, Project members the requests waiting for my validation.
+    function paintBadge(counts) {
+        var n = counts ? counts.total : 0;
+        paintOne('members-nav-badge', n);
+        paintOne('members-nav-badge-mine', counts ? counts.awaitingMe : 0);
+        paintOne('members-nav-badge-queue', counts ? counts.adjudication : 0);
+        // On a phone the badges sit inside the closed panel, so the menu button says it too.
+        var dot = document.getElementById('admin-header-menu-dot');
+        if (dot) dot.hidden = (n === 0);
     }
 
     function refresh() {

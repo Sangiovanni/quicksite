@@ -102,6 +102,16 @@
     overflow: hidden;
 }
 
+/* The chosen option, whole, above the search (the currentOnTop option). */
+.qs-searchable-select__current {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--admin-border);
+    color: var(--admin-text);
+    font-size: 13px;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+}
+
 .qs-searchable-select__search {
     width: 100%;
     padding: 8px 10px;

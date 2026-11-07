@@ -32,38 +32,45 @@
         overflow-wrap: anywhere;
     }
 
-    /* The header */
+    /* The header: a smaller gutter, room for a finger, and a project name that gives way */
     .admin-header {
-        flex-wrap: wrap;
-        height: auto;
-        padding: var(--space-md);
-        gap: var(--space-sm);
+        padding: 0 var(--space-md);
+        column-gap: var(--space-sm);
     }
-    .admin-header__brand {
-        flex: 0 0 auto;
-        margin-right: auto;
+    .admin-nav__link,
+    .admin-nav__group-toggle,
+    .admin-user-badge {
+        box-sizing: border-box;
+        min-height: 2.75rem;
     }
-    .admin-nav {
-        order: 3;
-        flex: 0 0 100%;
-        width: 100%;
-        margin-top: var(--space-sm);
-        justify-content: center;
-        flex-wrap: wrap;
-        gap: var(--space-xs);
+    .admin-nav > .admin-nav__link {
+        padding-inline: var(--space-sm);
     }
-    .admin-header__actions {
-        order: 2;
-        flex: 0 0 auto;
+    .admin-nav__group-toggle {
+        padding: var(--space-sm) 0 var(--space-sm) var(--space-sm);
     }
-    .admin-header__actions .admin-btn span {
-        display: none;
+    .admin-nav__group-arrow-btn {
+        min-width: 2.75rem;
+        min-height: 2.75rem;
+        padding: 0;
     }
     .admin-header__actions .admin-btn {
         padding: var(--space-sm);
     }
-    .admin-nav__group-dropdown {
-        transform: translateX(-50%);
+    .admin-project-badge {
+        flex: 1 1 8rem;
+        max-width: 12.5rem;
+    }
+    .admin-project-picker .qs-searchable-select {
+        width: 100%;
+        min-width: 0;
+        max-width: none;
+    }
+    .admin-project-badge > span {
+        max-width: none;
+    }
+    .admin-header__back > span {
+        display: none;
     }
 
     /* The editor */
@@ -99,9 +106,126 @@
         grid-template-columns: 1fr;
     }
 
-    /* The header: the mark alone */
+    /* The header: one row, the mark, the actions, the account menu and the menu button. The
+       project's name gives way first, down to a few letters. */
+    :root {
+        --admin-header-height: 3.5rem;
+    }
+    .admin-header {
+        display: flex;
+        align-items: center;
+        gap: var(--space-xs);
+        box-sizing: border-box;
+        min-height: 3.5rem;
+    }
     .admin-header__wordmark {
         display: none;
+    }
+    .admin-header__brand {
+        margin-right: auto;
+    }
+    .admin-header__actions {
+        flex: 0 1 auto;
+        flex-wrap: nowrap;
+        gap: var(--space-xs);
+        padding-block: 0;
+    }
+    .admin-header__actions .admin-btn {
+        flex-shrink: 0;
+        gap: var(--space-xs);
+        padding-inline: var(--space-xs);
+    }
+    .admin-project-badge > .admin-btn__icon,
+    .admin-user-badge > .admin-nav__group-arrow {
+        display: none;
+    }
+    .admin-write-rate__figure {
+        display: none;
+    }
+    .admin-write-rate__left {
+        display: inline;
+    }
+    .admin-header__actions .admin-project-badge {
+        flex: 0 1 auto;
+        max-width: none;
+    }
+    .admin-project-picker .qs-searchable-select__chevron {
+        margin-left: var(--space-xs);
+    }
+    .admin-user-badge > .admin-user-badge__name,
+    .admin-user-badge > .admin-user-badge__role {
+        display: none;
+    }
+    .admin-user-badge {
+        min-width: 2.75rem;
+        justify-content: center;
+    }
+    .admin-account__who {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--space-xs) var(--space-sm);
+        padding: var(--space-sm) var(--space-md);
+        border-bottom: 1px solid var(--admin-border);
+        margin-bottom: var(--space-xs);
+    }
+    .admin-account__who .admin-user-badge__name {
+        max-width: none;
+        overflow-wrap: anywhere;
+        white-space: normal;
+    }
+    .admin-header__menu-button {
+        display: inline-flex;
+        flex-shrink: 0;
+    }
+
+    /* The panel the menu button opens: over the page, so the row keeps its height, and scrolling
+       inside itself when it is taller than the screen */
+    .admin-header__panel {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        flex-direction: column;
+        gap: var(--space-sm);
+        box-sizing: border-box;
+        padding: var(--space-sm) var(--space-md);
+        max-height: calc(100vh - var(--admin-header-height));
+        max-height: calc(100dvh - var(--admin-header-height));
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        background: var(--admin-bg-secondary);
+        border-bottom: 1px solid var(--admin-border);
+        box-shadow: 0 4px 12px #0000004d;
+    }
+    .admin-header__panel--open {
+        display: flex;
+    }
+    .admin-nav {
+        flex-direction: column;
+        flex-wrap: nowrap;
+        align-items: stretch;
+        padding-bottom: 0;
+    }
+    .admin-nav__group {
+        flex-wrap: wrap;
+    }
+    .admin-nav__group-toggle {
+        flex: 1 1 0;
+        min-width: 0;
+    }
+    .admin-nav__group-dropdown {
+        position: static;
+        flex: 0 0 100%;
+        box-sizing: border-box;
+        width: auto;
+        min-width: 0;
+        max-width: none;
+        padding: 0 0 0 var(--space-lg);
+        background: transparent;
+        border: none;
+        box-shadow: none;
     }
 
     /* The editor */

@@ -924,7 +924,7 @@
         "notExecutable": {
             "title": "Documented here, run elsewhere",
             "login": "Signing in from this console would mint a second session on top of the one this panel is already using. The parameters and documentation below are complete \u2014 call it against the Management API instead.",
-            "logoutSession": "Running this from the console would end the session this panel is using and sign you out mid-page. Use Logout in the sidebar instead. The parameters and documentation below are complete.",
+            "logoutSession": "Running this from the console would end the session this panel is using and sign you out mid-page. Use Logout in the account menu instead. The parameters and documentation below are complete.",
             "registerDisabled": "This installation does not accept self-registration (registration.allow_self_registration is off), so this command answers 403 to every caller \u2014 the console included. The parameters and documentation below are complete, and describe what it does where the setting is on."
         }
     },
@@ -1214,6 +1214,10 @@
         "switchProjectFailed": "Could not switch project: ",
         "logoutEverywhere": "Logout everywhere",
         "logoutEverywhereHint": "Signs you out of this browser and ends every other session of your account.",
+        "accountMenu": "Account menu",
+        "menu": "Menu",
+        "menuWaiting": "Something waits for you",
+        "groupMenu": "Menu:",
         "build": "Build",
         "builds": "Builds",
         "inspect": "Inspect",

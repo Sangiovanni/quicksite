@@ -4,7 +4,7 @@
  * admin-stat…); this file only adds the membership-specific pieces.
  */
 
-/* ---- Nav count badge (Members group toggle) ---- */
+/* ---- Nav count badges (the Members group and its two entries) ---- */
 .admin-nav__count-badge {
     display: inline-flex;
     align-items: center;

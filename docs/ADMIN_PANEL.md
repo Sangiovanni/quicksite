@@ -47,7 +47,7 @@ The requirement lives at the shared account-creation path rather than in the pag
 7. `core/api.js` → defines `window.QuickSiteAPI` (`request()`, `upload()`; emits `quicksite:command-executed` after every successful write). Holds the session token in memory and sends it with every call alongside the session cookie. There is nothing to refresh or expire client-side: a session ends by signing out, by going idle, or by the account's session generation being bumped, and all three surface as a `401` that sends the user to the login page. `setTokenSource(fn)` lets an embedding platform plug its own token provider, and that is the only case with a transparent retry.
 8. `core/utils.js` → defines `window.QuickSiteUtils` (toasts, the panel's dialogs `confirm()` and `prompt()`, escaping, prefs, pending messages).
 9. `core/members-badge.js` → the membership counts behind the Members nav badge.
-10. `admin.js` → defines `window.QuickSiteAdmin` (singleton: permissions load, user badge, nav, page utility delegation).
+10. `admin.js` → defines `window.QuickSiteAdmin` (singleton: permissions load, user badge, the header's menus and height, page utility delegation).
 11. `core/update-notice.js` → emitted **only** for an account named in `operator.php`, so nobody else downloads it. After `api.js`, which is where its helper call comes from.
 12. Inline `<script>` sets `QUICKSITE_CONFIG.apiUrl` (skipped on the login page).
 13. The page template loads its page-specific module(s). For preview pages, `preview-config.php` runs first and exposes `window.PreviewConfig`.
@@ -105,10 +105,10 @@ File lists are grouped by role. Where useful, the entry point or main exported f
 | `js/core/storage-keys.js` | Constants for every localStorage / sessionStorage key (`window.QuickSiteStorageKeys`). |
 | `js/core/dom.js` | `window.QSDom`: shared `el()` element factory + `svgIcon()` + `tableWrapper()` (the scroller of a table of the panel) + `clear()` + `setSelectPlaceholder()` (resets a `<select>` to a single placeholder option) — the createElement/textContent idiom for dynamic DOM. Loaded in `<head>` so page scripts can use it at parse time. |
 | `js/core/bubble.js` + `css/bubble.css` | The panel's hover bubble: every `title` in the panel shows through it (*Tooltips* below). Loaded in `<head>`; exposes nothing — it listens on the document. |
-| `js/core/members-badge.js` | Membership counts (inbox awaiting me + queue awaiting my adjudication) → the Members nav badge; publishes `window.QSMembershipCounts` + the `quicksite:membership-counts-updated` event; recomputes on `quicksite:memberships-changed`. |
+| `js/core/members-badge.js` | Membership counts (inbox awaiting me + queue awaiting my adjudication) → the Members nav badge, and each share on its entry (My memberships, Project members); publishes `window.QSMembershipCounts` + the `quicksite:membership-counts-updated` event; recomputes on `quicksite:memberships-changed`. |
 | `js/core/searchable-select.js` | Type-ahead select widget for long option lists; loaded by `layout.php` and used by every project list in the panel and the visual editor's pickers. Named by its select's label, which opens it; an option's description shows as a line under it and, whole, in the bubble (§9.9.2). |
 | `js/core/update-notice.js` | The operator update banner (§9.14). Loaded **only** for an account named in `operator.php`; calls the `update-check` helper arm, throttles to one call per six hours, and renders a dismissible notice. |
-| `admin.js` | Singleton `QuickSiteAdmin`: permissions, user badge, nav, delegation. |
+| `admin.js` | Singleton `QuickSiteAdmin`: permissions, user badge, the header's menus and height, delegation. |
 
 **Tooltips: the panel's bubble.** A tooltip in the panel is a plain `title` attribute, in a
 template or written by a script; `bubble.js` shows it instead of the browser. It shows on mouse
@@ -137,6 +137,39 @@ query; tablet, at `64rem` and under; phone, at `40rem` and under (1024 and 640 p
 browser's default text size, so someone with a larger text size reaches the narrower view sooner).
 Every media query of the panel is in `css/responsive.css`, the last stylesheet the layout links,
 the tablet block before the phone block.
+
+**The header.** A computer and a tablet have two bands. Band one holds the brand, then the write
+rate, the project and Back to site, then the account menu; on a tablet Back to site is its icon
+alone. Band two holds the menu, whose entries keep their words on one line and wrap between
+entries. A phone has one row: the mark, the write rate (what is left, alone), the project (as much
+of its name as the row leaves, then `…`), Back to site's icon, the account menu and a menu button.
+The button opens a panel over the page holding the menu, so the row keeps its height; the panel
+scrolls inside itself when it is taller than the screen, and a dot on the button says a count waits
+inside it. One set of elements serves the three views: `.admin-header__panel` holds the menu, as
+band two above `40rem` (`display: contents`) and as the panel at `40rem` and under. The page holds
+the header's parts in the order the eye reads them, so the keyboard walks them that way in every
+view. The header sticks at the top of the window all the way down the page, in every view.
+
+A group's word is a link to its page. Its arrow, a button of its own, opens its entries, from a
+tap, the keyboard or a click. A mouse also opens a group on hover, and leaving closes it. A click
+pins a menu open, so a mouse straying off it does not close it: a click on the arrow of a group
+hover opened leaves it open, and the next click closes it. While a menu is pinned, hover opens no
+other. In the phone's panel a group expands in place and has no hover; it closes when another group
+opens, with the panel, by its arrow or on Escape, never on the way to a press elsewhere in the
+panel, which would move the next entry from under the finger. The **account menu**, which
+your name and role open, holds My account, Log out and Log out everywhere, and on a phone says
+your name and role as its first line. One helper opens and closes all three kinds of menu
+(`QuickSiteAdmin.initHeaderMenus()`), so they close by the same rules: one at a time, but for a
+group inside the open panel; on Escape, which puts the focus back on what opened it; on a click or
+tap outside; when the focus leaves; and when the page changes. A menu's box stays inside the
+window at any width. The **Members** group's count is everything that waits; its two entries each
+show their share: **My memberships** what waits for you (invitations and notices), **Project
+members** the join requests waiting for your validation, across the projects you run.
+
+`--admin-header-height` follows the header's real height at every width, in any language and at
+any text size: `admin.js` writes it on `:root` from a `ResizeObserver`, and `admin.css` and
+`css/responsive.css` hold a value per view for the first paint. The sticky notices, the toasts, the
+editor's height and the Optimize page's sidebar read it. The header itself never does.
 
 **What is wider than the screen.** A table of the panel sits in `.admin-table-wrapper`
 (`QSDom.tableWrapper()`), which scrolls by itself and takes the keyboard's focus. A shadow at its
@@ -340,9 +373,9 @@ The panel edits one project at a time — the user's **selected project** (a per
 
 This pointer is **not** a command. Which project a person has open is a fact about the panel, not about any project, so it is panel state — the command API names its project in the URL marker instead and has no notion of a current one. The endpoint is POST-only, takes `{"project": "<id>"}`, and refuses a project the caller is not a member of (`403 authz.not_a_member`), so the panel can never open a project it cannot edit. The value is a UX default and never an authorization input: every request is re-authorized against the target project's `members.json`.
 
-**The header's menu.** It is the panel's searchable dropdown (§9.9.2): type a part of a project's name or its id, and only the matching projects stay. The account's **starred** projects come first, each with ★ before its name, then the others by name. The header sets no star — the ☆ beside the dashboard's Project Manager selector does, and so does the one on each row of My Memberships → *My projects*; a star set there re-orders this menu at once. With one project the header shows a plain badge. A switch the server refuses, or one that fails, puts the menu back on the edited project, under the error toast; choosing the edited project again sends nothing.
+**The header's project list.** It is the panel's searchable dropdown (§9.9.2): its first line is the edited project's name, whole, which the header may cut; under the search are the other projects. Type a part of a project's name or its id, and only the matching projects stay. The account's **starred** projects come first, each with ★ before its name, then the others by name. The header sets no star — the ☆ beside the dashboard's Project Manager selector does, and so does the one on each row of My Memberships → *My projects*; a star set there re-orders this list at once. With one project the header shows a plain badge. A switch the server refuses, or one that fails, puts the list back on the edited project, under the error toast; choosing the edited project again sends nothing.
 
-**Where the menu reads from.** The menu lists the account's own copy of its memberships, kept in its `users.php` entry (`projects`): drawing a page header reads no project folder. Each project's `members.json` stays the authority — it decides every access, and the dashboard's lists read it (`listProjects`). The two can drift (a membership whose copy was not written, a roster edited by hand), so the copy is **repaired from the authority**: by the **dashboard**'s load, which reads every project's `members.json` before the header is drawn and rewrites the account's entries when they differ, and by a **switch**, which writes the project it opens as a membership in the same write as the selection. The dashboard's repair is kept five minutes per account and dropped by any membership change anywhere, so a burst of reloads costs one scan and your own join or leave shows on the next load. It follows `reconcileMemberships`' rule: a project whose roster lists you (as a member, an invitee or with your own pending request) gets its entry, its date kept; an entry the roster contradicts goes, and so does a member or pending entry of a project that no longer exists; a refused, removed or deleted notice stays; a project whose roster cannot be read is left as it is.
+**Where the list reads from.** It shows the account's own copy of its memberships, kept in its `users.php` entry (`projects`): drawing a page header reads no project folder. Each project's `members.json` stays the authority — it decides every access, and the dashboard's lists read it (`listProjects`). The two can drift (a membership whose copy was not written, a roster edited by hand), so the copy is **repaired from the authority**: by the **dashboard**'s load, which reads every project's `members.json` before the header is drawn and rewrites the account's entries when they differ, and by a **switch**, which writes the project it opens as a membership in the same write as the selection. The dashboard's repair is kept five minutes per account and dropped by any membership change anywhere, so a burst of reloads costs one scan and your own join or leave shows on the next load. It follows `reconcileMemberships`' rule: a project whose roster lists you (as a member, an invitee or with your own pending request) gets its entry, its date kept; an entry the roster contradicts goes, and so does a member or pending entry of a project that no longer exists; a refused, removed or deleted notice stays; a project whose roster cannot be read is left as it is.
 
 **Starring** is panel state too: `POST /admin/state/project-star` with `{"project": "<id>", "starred": true}` (or `false`; any other value is `400 validation.invalid_type`) writes the account's `starred_projects` in `users.php`. Starring a project you are not a member of is refused as selecting one is (`403 authz.not_a_member`); unstarring always goes through; every write drops the stars of the projects you no longer belong to. A star decides nothing but the order of your own lists. The page receives the stars as `QUICKSITE_CONFIG.starredProjects`; `QuickSiteAdmin.orderProjectSelect()` orders a project dropdown from them and `starredFirst()` a list of rows, each again whenever a star changes (`quicksite:stars-changed`).
 
@@ -2882,7 +2915,7 @@ reusable combobox primitive at
 `public/admin/assets/js/core/searchable-select.js`. So are the event of an
 element's interaction (each event's explanation as its description),
 the Complex tab's kind picker (§8.7), every project list in the panel
-(the header's menu, the dashboard's Project Manager selector and its
+(the header's project list, the dashboard's Project Manager selector and its
 Delete list; §8.0) and a workflow parameter marked searchable (§8.12).
 Behaviours:
 
@@ -2891,6 +2924,9 @@ Behaviours:
   inspects `<option>` data-attributes keeps working.
 - Trigger button shows the current value + chevron; clicking opens a
   dropdown with a search input at the top.
+- **`currentOnTop`**: the chosen option's text is the dropdown's first
+  line, whole, above the search, and the list under it holds the others.
+  The header's project list sets it, as its badge may cut a long name.
 - **Named by its select.** The trigger takes the select's name — its
   `aria-labelledby`, else its `aria-label`, else the `<label for>` that
   points at it — with the value after it, as a native select reads
@@ -3529,8 +3565,8 @@ textContent); static structure and all labels live in the PHP templates
 
 ### 9.13 My account (/admin/account)
 
-The signed-in account's own self-service surface, reached by clicking your name
-in the header. Every command it drives is global-scope with `access: 'any'`, so
+The signed-in account's own self-service surface, reached from the account menu,
+which your name in the header opens. Every command it drives is global-scope with `access: 'any'`, so
 the page is open to **every authenticated user** — including one who belongs to
 no project — and carries no role gate.
 

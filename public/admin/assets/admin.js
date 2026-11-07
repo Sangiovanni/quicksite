@@ -109,6 +109,7 @@ const QuickSiteAdmin = {
             nameEl.textContent = this.t('nav.notLoggedIn');
             roleEl.textContent = '';
             roleEl.removeAttribute('data-role');
+            this._copyBadgeToAccountMenu(nameEl.textContent, roleEl);
             return;
         }
 
@@ -124,6 +125,24 @@ const QuickSiteAdmin = {
         } else {
             roleEl.textContent = this.t('nav.noProject');
             roleEl.removeAttribute('data-role');
+        }
+        this._copyBadgeToAccountMenu(name, roleEl);
+    },
+
+    /**
+     * The account menu's first line: your name and role where a phone's row has no room for
+     * them. The badge stays the one the page writes, and this line copies it, the name whole.
+     */
+    _copyBadgeToAccountMenu(name, roleEl) {
+        const nameCopy = document.getElementById('admin-account-name');
+        const roleCopy = document.getElementById('admin-account-role');
+        if (!nameCopy || !roleCopy) return;
+        nameCopy.textContent = name;
+        roleCopy.textContent = roleEl.textContent;
+        if (roleEl.hasAttribute('data-role')) {
+            roleCopy.setAttribute('data-role', roleEl.getAttribute('data-role'));
+        } else {
+            roleCopy.removeAttribute('data-role');
         }
     },
 
@@ -190,13 +209,15 @@ const QuickSiteAdmin = {
      * Initialize the admin panel
      */
     init() {
-        this.initNavGroups();
+        this.initHeaderMenus();
         this.initCategoryToggles();
         this.initForms();
         this.initCopyButtons();
         this.initKeyboardShortcuts();
         this.checkPendingMessage();
         this.initWriteRate();
+        // Last: the write rate's figure takes room in the header it measures.
+        this.initHeaderHeight();
 
         // Permissions are already loading (started at parse time via QuickSiteAdmin.permissionsReady).
         // filterByPermissions() and updateUserBadge() will be called when that fetch resolves.
@@ -214,6 +235,7 @@ const QuickSiteAdmin = {
         const api = window.QuickSiteAPI;
         if (!el || !api || typeof api.getWriteRate !== 'function') return;
         const figure = el.querySelector('.admin-write-rate__figure');
+        const left = el.querySelector('.admin-write-rate__left');
         let timer = null;
 
         const render = () => {
@@ -230,6 +252,8 @@ const QuickSiteAdmin = {
             figure.textContent = api.rateText('figure', '{remaining} / {max}', {
                 remaining: tightest.remaining, max: tightest.max, period: api.periodText(tightest.period)
             });
+            // What a phone's row shows in its place: what is left, alone.
+            if (left) left.textContent = String(tightest.remaining);
             el.title = [api.rateText('titleHead', 'Changes you can still make on this server:')]
                 .concat(state.windows.map(w => w.remaining >= w.max
                     // A whole window has not opened yet: nothing to wait for.
@@ -251,62 +275,153 @@ const QuickSiteAdmin = {
     },
 
     /**
-     * Initialize collapsible navigation groups (hover-based)
+     * --admin-header-height follows the header, whose rows wrap at any width, in a longer
+     * language and at a larger text size. What sits under it reads the variable. The header
+     * itself never does, or it would feed itself, and the phone's panel is out of the flow, so
+     * opening it changes nothing here.
      */
-    initNavGroups() {
-        const groups = document.querySelectorAll('.admin-nav__group');
-        let closeTimeout = null;
-        
-        groups.forEach(group => {
-            const toggle = group.querySelector('.admin-nav__group-toggle');
-            if (!toggle) return;
-            
-            // Open on hover
-            group.addEventListener('mouseenter', () => {
-                // Clear any pending close
-                if (closeTimeout) {
-                    clearTimeout(closeTimeout);
-                    closeTimeout = null;
-                }
-                
-                // Close other groups immediately
-                groups.forEach(other => {
-                    if (other !== group) {
-                        other.classList.remove('admin-nav__group--open');
-                    }
-                });
-                
-                // Open this group
-                group.classList.add('admin-nav__group--open');
+    initHeaderHeight() {
+        const header = document.querySelector('.admin-header');
+        if (!header) return;
+        const write = () => {
+            document.documentElement.style.setProperty('--admin-header-height', header.getBoundingClientRect().height + 'px');
+        };
+        write();
+        if (window.ResizeObserver) new ResizeObserver(write).observe(header);
+    },
+
+    /**
+     * The header's menus: a group of the menu, the account menu, and the panel a phone's menu
+     * button opens. One helper opens and closes the three, so they close by the same rules. One
+     * is open at a time, but for a group inside the open panel. Each closes on Escape, which puts
+     * the focus back on what opened it; on a click or tap outside; when the focus leaves it; and
+     * when the page changes. A group the panel shows in place is the exception: it closes with
+     * the panel, or when another group opens.
+     *
+     * A group's arrow opens it from a touch and from the keyboard, and a mouse also opens it on
+     * hover. Only a mouse: a tap fires an emulated mouseenter before its click, so a hover that
+     * opens and a click that toggles would shut what the tap had just opened.
+     *
+     * A click pins a menu open, so a mouse straying off it does not close it. A click on the arrow
+     * of a group that hover opened pins it and leaves it open, and the next click closes it. While
+     * a menu is pinned, hover opens nothing. A group the panel shows in place has no hover at all:
+     * it would move the entries under the pointer.
+     */
+    initHeaderMenus() {
+        const header = document.querySelector('.admin-header');
+        if (!header) return;
+
+        const menu = (owner, trigger, box, openClass) => ({ owner, trigger, box, openClass, pinned: false, closeTimer: null });
+        const groups = Array.from(header.querySelectorAll('.admin-nav__group')).map((group) => menu(
+            group,
+            group.querySelector('.admin-nav__group-arrow-btn'),
+            group.querySelector('.admin-nav__group-dropdown'),
+            'admin-nav__group--open'
+        ));
+        const accountEl = header.querySelector('.admin-account');
+        const account = menu(accountEl, accountEl.querySelector('#admin-user-badge'), accountEl.querySelector('#admin-account-menu'), 'admin-account--open');
+        const panelEl = header.querySelector('#admin-header-panel');
+        const panel = menu(panelEl, header.querySelector('#admin-header-menu-button'), panelEl, 'admin-header__panel--open');
+        // Innermost first: Escape closes the first one open.
+        const menus = [...groups, account, panel];
+
+        const isOpen = (m) => m.owner.classList.contains(m.openClass);
+        const inside = (m, el) => m.owner.contains(el) || m.trigger.contains(el);
+        const shownInPlace = (m) => getComputedStyle(m.box).position !== 'absolute';
+        // A group the panel shows in place closes with the panel, when another group opens, or by
+        // its own arrow and Escape. Closing it on the way to a click would move what is under the
+        // pointer before the click lands: the press meant for the next arrow fell on whatever slid
+        // there, or on the page once the panel had shrunk.
+        const closesFromOutside = (m) => !(groups.includes(m) && shownInPlace(m));
+
+        // A box stays inside the header, which is as wide as the window: nothing here reads a width.
+        const place = (m) => {
+            m.box.style.transform = '';
+            if (m === panel || shownInPlace(m)) return;
+            const edge = header.getBoundingClientRect();
+            const box = m.box.getBoundingClientRect();
+            const margin = 8;
+            let shift = 0;
+            if (box.right > edge.right - margin) shift = edge.right - margin - box.right;
+            if (box.left + shift < edge.left + margin) shift = edge.left + margin - box.left;
+            if (shift) m.box.style.transform = 'translateX(' + shift + 'px)';
+        };
+        const close = (m) => {
+            clearTimeout(m.closeTimer);
+            m.owner.classList.remove(m.openClass);
+            m.trigger.setAttribute('aria-expanded', 'false');
+            m.box.style.transform = '';
+            m.pinned = false;
+            if (m === panel) groups.forEach(close);
+        };
+        const open = (m, pinned) => {
+            clearTimeout(m.closeTimer);
+            menus.forEach((other) => {
+                const holdsIt = other === panel && groups.includes(m);
+                if (other !== m && !holdsIt && isOpen(other)) close(other);
             });
-            
-            // Close on mouse leave (with small delay for better UX)
-            group.addEventListener('mouseleave', () => {
-                closeTimeout = setTimeout(() => {
-                    group.classList.remove('admin-nav__group--open');
-                }, 150); // Small delay to prevent accidental close
-            });
-            
-            // For anchor toggles, allow click to navigate (don't prevent default)
-            // For button toggles (mobile), toggle the dropdown
-            toggle.addEventListener('click', (e) => {
-                if (toggle.tagName === 'BUTTON') {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    group.classList.toggle('admin-nav__group--open');
-                }
-                // Anchor clicks will navigate naturally
+            m.owner.classList.add(m.openClass);
+            m.trigger.setAttribute('aria-expanded', 'true');
+            m.pinned = pinned;
+            place(m);
+        };
+
+        menus.forEach((m) => {
+            m.trigger.addEventListener('click', () => {
+                if (isOpen(m) && m.pinned) close(m);
+                else open(m, true);
             });
         });
-        
-        // Close on escape key
+
+        groups.forEach((m) => {
+            m.owner.addEventListener('pointerenter', (e) => {
+                if (e.pointerType !== 'mouse') return;
+                clearTimeout(m.closeTimer);
+                if (isOpen(m) || menus.some((other) => isOpen(other) && other.pinned) || shownInPlace(m)) return;
+                open(m, false);
+            });
+            m.owner.addEventListener('pointerleave', (e) => {
+                if (e.pointerType !== 'mouse' || m.pinned || !isOpen(m)) return;
+                m.closeTimer = setTimeout(() => close(m), 150); // leaves time to cross a small gap
+            });
+        });
+
+        const closeOutside = (e) => {
+            menus.forEach((m) => { if (isOpen(m) && closesFromOutside(m) && !inside(m, e.target)) close(m); });
+        };
+        document.addEventListener('pointerup', closeOutside);
+        document.addEventListener('click', closeOutside);
+
+        // No relatedTarget: the window lost the focus, or a click landed on nothing focusable, which closeOutside answers.
+        document.addEventListener('focusout', (e) => {
+            if (!e.relatedTarget) return;
+            menus.forEach((m) => {
+                if (isOpen(m) && closesFromOutside(m) && inside(m, e.target) && !inside(m, e.relatedTarget)) close(m);
+            });
+        });
+
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                groups.forEach(group => {
-                    group.classList.remove('admin-nav__group--open');
-                });
-            }
+            if (e.key !== 'Escape') return;
+            // Inside the project list, Escape is the list's own.
+            if (e.target.closest && e.target.closest('.qs-searchable-select__dropdown')) return;
+            const m = menus.find(isOpen);
+            if (!m) return;
+            const focus = document.activeElement;
+            const focusNear = !focus || focus === document.body || inside(m, focus);
+            close(m);
+            if (focusNear) m.trigger.focus();
         });
+
+        // A page kept for the back button comes back as it left.
+        window.addEventListener('pagehide', () => menus.forEach(close));
+
+        // The window changed: an open box is kept inside it, and a panel with no button left to close it goes.
+        if (window.ResizeObserver) {
+            new ResizeObserver(() => {
+                menus.filter(isOpen).forEach(place);
+                if (isOpen(panel) && getComputedStyle(panelEl).display === 'contents') close(panel);
+            }).observe(header);
+        }
     },
 
     /**

@@ -15,6 +15,10 @@
  * trigger, so a click on the label opens the list; destroy() points it back.
  * A label that wraps the select already has the trigger as its control.
  *
+ * With the option currentOnTop, the chosen option's text is the dropdown's first
+ * line, whole, above the search field, and the list under it holds the others:
+ * the header's project list, whose badge may cut a long name.
+ *
  * Its words are the panel's (common.selectPlaceholder, common.search,
  * common.noResults, common.noMatchesFor, common.createFromSearch, which
  * layout.php ships on every page); a caller's own option wins.
@@ -261,6 +265,9 @@
             this.dropdownEl.style.width = width + 'px';
             this.dropdownEl.style.maxWidth = width + 'px';
 
+            const chosen = this.options.currentOnTop ? this.nativeSelect.selectedOptions[0] : null;
+            if (chosen && chosen.value !== '') this.dropdownEl.appendChild(this._renderCurrent(chosen));
+
             this.searchInputEl = document.createElement('input');
             this.searchInputEl.type = 'search';
             this.searchInputEl.className = 'qs-searchable-select__search';
@@ -417,11 +424,14 @@
             this.listEl.textContent = '';
             this.allItemEls = [];
 
+            // With currentOnTop, the chosen option is the line above the search, not a row of the list.
+            const current = this.options.currentOnTop ? this.nativeSelect.value : null;
+            const listed = (o) => o.value !== '' && o.value !== current;
             const children = Array.from(this.nativeSelect.children);
             children.forEach((child) => {
                 if (child.tagName === 'OPTGROUP') {
                     const opts = Array.from(child.children)
-                        .filter((o) => o.tagName === 'OPTION' && o.value !== '');
+                        .filter((o) => o.tagName === 'OPTION' && listed(o));
                     const filtered = opts.filter((o) => this._matches(o, filterLower));
                     if (filtered.length === 0) return;
 
@@ -433,7 +443,7 @@
                     groupEl.appendChild(label);
                     filtered.forEach((o) => groupEl.appendChild(this._renderItem(o)));
                     this.listEl.appendChild(groupEl);
-                } else if (child.tagName === 'OPTION' && child.value !== '' && this._matches(child, filterLower)) {
+                } else if (child.tagName === 'OPTION' && listed(child) && this._matches(child, filterLower)) {
                     this.listEl.appendChild(this._renderItem(child));
                 }
             });
@@ -481,6 +491,14 @@
             return value.indexOf(filterLower) !== -1
                 || text.indexOf(filterLower) !== -1
                 || desc.indexOf(filterLower) !== -1;
+        }
+
+        /** The chosen option, whole, as the dropdown's first line (currentOnTop). */
+        _renderCurrent(optionEl) {
+            const line = document.createElement('div');
+            line.className = 'qs-searchable-select__current';
+            line.textContent = optionEl.textContent;
+            return line;
         }
 
         _renderItem(optionEl) {

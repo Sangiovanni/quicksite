@@ -717,7 +717,7 @@ class AdminRouter {
      */
     public function dispatch(): void {
         // Handle logout. `everywhere=1` also ends the account's OTHER sessions
-        // (the header offers it as a second action next to the plain logout).
+        // (the account menu offers it as a second action next to the plain logout).
         //
         // POST + the per-session token, not a GET link: ending a session is a
         // state change, and as a GET any foreign page could spend one <img> tag

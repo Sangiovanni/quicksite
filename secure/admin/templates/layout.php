@@ -74,11 +74,11 @@ if (!$isLoginPage) {
     require_once SECURE_FOLDER_PATH . '/src/functions/firstRun.php';
     $__pkAuth = qs_session_auth();
     if (!empty($__pkAuth['valid'])) {
-        // The header's menu reads the account's users.php copy of its memberships (fast);
+        // The header's project list reads the account's users.php copy of its memberships (fast);
         // the dashboard lists every project from its own members.json (the authority). So
         // the dashboard's load repairs the copy first, at most once in
-        // QS_MEMBERSHIP_REPAIR_TTL unless a membership changes, and the menu drawn below
-        // lists the repaired copy.
+        // QS_MEMBERSHIP_REPAIR_TTL unless a membership changes, and the list drawn below
+        // shows the repaired copy.
         if ($currentPage === 'dashboard') {
             $__pkRepair = qs_membership_repair_account((string)$__pkAuth['userId']);
             $__pkFresh = $__pkRepair['written'] ? (loadUsersConfig()['users'][$__pkAuth['userId']] ?? null) : null;
@@ -215,253 +215,19 @@ $langNames = [
             $isAssetsActive = ($currentPage === 'media');
             $isComplianceActive = in_array($currentPage, $compliancePages);
             $isMembersActive = in_array($currentPage, $membersPages);
+
+            // A group's arrow, a button of its own beside the word, which stays a link to its page: a touch
+            // and a key have no hover to open a group with. Its dropdown is admin-nav-menu-<group>.
+            $navGroupArrow = static function (string $group, string $name): string {
+                $label = __admin('nav.groupMenu', 'Menu:') . ' ' . $name;
+                return '<button type="button" class="admin-nav__group-arrow-btn" aria-expanded="false"'
+                    . ' aria-controls="admin-nav-menu-' . adminAttr($group) . '" aria-label="' . adminAttr($label) . '">'
+                    . '<svg class="admin-nav__group-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">'
+                    . '<polyline points="6 9 12 15 18 9"/></svg></button>';
+            };
         ?>
-        <nav class="admin-nav">
-            <a href="<?= $router->url('dashboard') ?>" 
-               class="admin-nav__link<?= $currentPage === 'dashboard' ? ' admin-nav__link--active' : '' ?>">
-                <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="3" y="3" width="7" height="7"/>
-                    <rect x="14" y="3" width="7" height="7"/>
-                    <rect x="14" y="14" width="7" height="7"/>
-                    <rect x="3" y="14" width="7" height="7"/>
-                </svg>
-                <span><?= __admin('nav.dashboard') ?></span>
-            </a>
-            
-            <!-- Build Tools Group - Click goes to Visual Editor -->
-            <div class="admin-nav__group<?= $isBuildActive ? ' admin-nav__group--has-active' : '' ?>" data-nav-group="build" data-requires-command="editStructure">
-                <a href="<?= $router->url('preview') ?>" class="admin-nav__group-toggle" data-requires-command="editStructure">
-                    <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
-                    </svg>
-                    <span><?= __admin('nav.build') ?></span>
-                    <svg class="admin-nav__group-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="6 9 12 15 18 9"/>
-                    </svg>
-                </a>
-                <div class="admin-nav__group-dropdown">
-                    <a href="<?= $router->url('preview') ?>" 
-                       class="admin-nav__link<?= $currentPage === 'preview' ? ' admin-nav__link--active' : '' ?>">
-                        <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
-                            <line x1="8" y1="21" x2="16" y2="21"/>
-                            <line x1="12" y1="17" x2="12" y2="21"/>
-                        </svg>
-                        <span><?= __admin('nav.visualEditor') ?></span>
-                    </a>
-                    <?php /* An installation can decline to offer the command console
-                             (console.php; absent means it is offered). Gated here on the
-                             SERVER so the entry is never emitted: the panel's own
-                             data-requires-command filter only ever hides elements it finds,
-                             so a client-side rule could not have removed this one on an
-                             install where the operator said no. The page itself refuses
-                             independently — this only stops us advertising it. */ ?>
-                    <?php if ($router->isConsoleEnabled()): ?>
-                    <a href="<?= $router->url('command') ?>"
-                       class="admin-nav__link<?= $currentPage === 'command' ? ' admin-nav__link--active' : '' ?>">
-                        <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="16 18 22 12 16 6"/>
-                            <polyline points="8 6 2 12 8 18"/>
-                        </svg>
-                        <span><?= __admin('nav.commands') ?></span>
-                    </a>
-                    <?php endif; ?>
-                    <?php /* Command history — its own page, not a
-                             tab on the console. Not gated on the console: the trail is
-                             independent of the runner, and stays reachable when the
-                             operator turns the console off. data-requires-command hides
-                             it for ranks below admin, which is chrome-hiding only — the
-                             page itself is gated server-side in PAGE_PERMISSIONS. */ ?>
-                    <a href="<?= $router->url('history') ?>"
-                       class="admin-nav__link<?= $currentPage === 'history' ? ' admin-nav__link--active' : '' ?>"
-                       data-requires-command="getCommandHistory">
-                        <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="10"/>
-                            <polyline points="12 6 12 12 16 14"/>
-                        </svg>
-                        <span><?= __admin('nav.history', 'History') ?></span>
-                    </a>
-                    <a href="<?= $router->url('apis') ?>"
-                       class="admin-nav__link<?= $currentPage === 'apis' ? ' admin-nav__link--active' : '' ?>"
-                       data-requires-command="listApiEndpoints">
-                        <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-                            <polyline points="22 6 12 13 2 6"/>
-                        </svg>
-                        <span><?= __admin('nav.apiEndpoints') ?></span>
-                    </a>
-                    <a href="<?= $router->url('builds') ?>"
-                       class="admin-nav__link<?= $currentPage === 'builds' ? ' admin-nav__link--active' : '' ?>"
-                       data-requires-command="getBuild">
-                        <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-                            <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-                            <line x1="12" y1="22.08" x2="12" y2="12"/>
-                        </svg>
-                        <span><?= __admin('nav.builds', 'Builds') ?></span>
-                    </a>
-                </div>
-            </div>
-
-            <!-- Media - Top-level tab -->
-            <a href="<?= $router->url('media') ?>" 
-               class="admin-nav__link<?= $isAssetsActive ? ' admin-nav__link--active' : '' ?>"
-               data-requires-command="listAssets">
-                <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                </svg>
-                <span><?= __admin('nav.assets', 'Media') ?></span>
-            </a>
-            
-            <!-- Sitemap - Top-level tab -->
-            <a href="<?= $router->url('sitemap') ?>"
-               class="admin-nav__link<?= $currentPage === 'sitemap' ? ' admin-nav__link--active' : '' ?>"
-               data-requires-command="getSiteMap">
-                <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-                </svg>
-                <span><?= __admin('nav.sitemap') ?></span>
-            </a>
-
-            <!-- Authentication - Top-level tab. Links to the OAuth providers page, the panel's only authentication surface. -->
-            <a href="<?= $router->url('oauth-providers') ?>"
-               class="admin-nav__link<?= $currentPage === 'oauth-providers' ? ' admin-nav__link--active' : '' ?>"
-               data-requires-command="listOAuthProviders">
-                <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                </svg>
-                <span><?= __admin('nav.authentication') ?></span>
-            </a>
-
-            <!-- Members Group — My Memberships (any authenticated user) + Project Members
-                 (any member rank of the EDITED project; link hidden without proposeMember).
-                 The group toggle deliberately targets the ALWAYS-accessible memberships page.
-                 No data-requires-command on the group: a 0-membership user still has an inbox. -->
-            <div class="admin-nav__group<?= $isMembersActive ? ' admin-nav__group--has-active' : '' ?>" data-nav-group="members">
-                <a href="<?= $router->url('memberships') ?>" class="admin-nav__group-toggle">
-                    <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                        <circle cx="9" cy="7" r="4"/>
-                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-                    </svg>
-                    <span><?= __admin('nav.members', 'Members') ?></span>
-                    <span class="admin-nav__count-badge" id="members-nav-badge" hidden>0</span>
-                    <svg class="admin-nav__group-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="6 9 12 15 18 9"/>
-                    </svg>
-                </a>
-                <div class="admin-nav__group-dropdown">
-                    <a href="<?= $router->url('memberships') ?>"
-                       class="admin-nav__link<?= $currentPage === 'memberships' ? ' admin-nav__link--active' : '' ?>">
-                        <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                            <circle cx="12" cy="7" r="4"/>
-                        </svg>
-                        <span><?= __admin('nav.myMemberships', 'My memberships') ?></span>
-                    </a>
-                    <a href="<?= $router->url('members') ?>"
-                       class="admin-nav__link<?= $currentPage === 'members' ? ' admin-nav__link--active' : '' ?>"
-                       data-requires-command="proposeMember">
-                        <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                            <circle cx="9" cy="7" r="4"/>
-                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-                        </svg>
-                        <span><?= __admin('nav.projectMembers', 'Project members') ?></span>
-                    </a>
-                </div>
-            </div>
-
-            <!-- Compliance Group - Storage + Privacy (data layer + data sharing) -->
-            <div class="admin-nav__group<?= $isComplianceActive ? ' admin-nav__group--has-active' : '' ?>" data-nav-group="compliance" data-requires-command="listStorageItems">
-                <a href="<?= $router->url('storage') ?>" class="admin-nav__group-toggle" data-requires-command="listStorageItems">
-                    <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/>
-                    </svg>
-                    <span><?= __admin('nav.compliance', 'Compliance') ?></span>
-                    <svg class="admin-nav__group-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="6 9 12 15 18 9"/>
-                    </svg>
-                </a>
-                <div class="admin-nav__group-dropdown">
-                    <a href="<?= $router->url('storage') ?>"
-                       class="admin-nav__link<?= $currentPage === 'storage' ? ' admin-nav__link--active' : '' ?>"
-                       data-requires-command="listStorageItems">
-                        <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/>
-                        </svg>
-                        <span><?= __admin('nav.storage', 'Storage') ?></span>
-                    </a>
-                    <a href="<?= $router->url('privacy') ?>"
-                       class="admin-nav__link<?= $currentPage === 'privacy' ? ' admin-nav__link--active' : '' ?>"
-                       data-requires-command="getPrivacyStatus">
-                        <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/><path d="M9 12l2 2 4-4"/>
-                        </svg>
-                        <span><?= __admin('nav.privacy', 'Privacy') ?></span>
-                    </a>
-                </div>
-            </div>
-
-            <!-- Optimize - Top-level tab -->
-            <a href="<?= $router->url('optimize') ?>" 
-               class="admin-nav__link<?= $currentPage === 'optimize' ? ' admin-nav__link--active' : '' ?>"
-               data-requires-command="getStyles">
-                <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-                </svg>
-                <span><?= __admin('nav.optimize') ?></span>
-            </a>
-            
-            <!-- Settings Group - Click goes to Project Settings -->
-            <!-- No data-requires-command on this group. It used to name getMyPermissions,
-                 which was a global any-auth command every signed-in account held, so the
-                 gate never hid anything; that command left the surface
-                 (reading your own role is an ACCOUNT fact, served by /admin/self), and
-                 keeping the attribute would have hidden Settings from everyone. The
-                 entries inside carry their own gates where they need one. -->
-            <div class="admin-nav__group<?= $isSettingsActive ? ' admin-nav__group--has-active' : '' ?>" data-nav-group="settings">
-                <a href="<?= $router->url('settings') ?>" class="admin-nav__group-toggle">
-                    <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="3"/>
-                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
-                    </svg>
-                    <span><?= __admin('nav.settings') ?></span>
-                    <svg class="admin-nav__group-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polyline points="6 9 12 15 18 9"/>
-                    </svg>
-                </a>
-                <div class="admin-nav__group-dropdown">
-                    <a href="<?= $router->url('settings') ?>" 
-                       class="admin-nav__link<?= $currentPage === 'settings' ? ' admin-nav__link--active' : '' ?>">
-                        <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="3"/>
-                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4"/>
-                        </svg>
-                        <span><?= __admin('nav.projectSettings') ?></span>
-                    </a>
-                    <a href="<?= $router->url('ai-connections') ?>"
-                       class="admin-nav__link<?= ($currentPage === 'ai-connections' || $currentPage === 'ai-settings') ? ' admin-nav__link--active' : '' ?>">
-                        <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/>
-                            <circle cx="7.5" cy="14.5" r="1.5"/><circle cx="16.5" cy="14.5" r="1.5"/>
-                        </svg>
-                        <span><?= __admin('nav.ai') ?></span>
-                    </a>
-                    <a href="<?= $router->url('embed-security') ?>" 
-                       class="admin-nav__link<?= $currentPage === 'embed-security' ? ' admin-nav__link--active' : '' ?>"
-                       data-requires-command="getIframeSandbox">
-                        <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                        </svg>
-                        <span><?= __admin('nav.embedSecurity') ?></span>
-                    </a>
-                </div>
-            </div>
-        </nav>
-        
+        <!-- The actions, on band one, and on a phone's row: there the write rate shows only what is left,
+             the project as much of its name as the row leaves, Back to Site its icon. -->
         <div class="admin-header__actions">
             <?php
             // EDITED-project picker: which project this user is authoring right now
@@ -476,6 +242,7 @@ $langNames = [
                     <path d="M12 14l4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/>
                 </svg>
                 <span class="admin-write-rate__figure"></span>
+                <span class="admin-write-rate__left"></span>
             </span>
             <?php endif; ?>
             <?php if (!empty($myProjectIds) && count($myProjectIds) > 1): ?>
@@ -509,7 +276,8 @@ $langNames = [
             if ($editingProject):
                 $siteUrl = $router->projectSiteBase() . '/';
             ?>
-            <a href="<?= $siteUrl ?>" id="back-to-site-btn" class="admin-btn admin-btn--ghost" target="_blank">
+            <a href="<?= $siteUrl ?>" id="back-to-site-btn" class="admin-btn admin-btn--ghost admin-header__back" target="_blank"
+               title="<?= adminAttr(__admin('common.backToSite')) ?>">
                 <svg class="admin-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
                     <polyline points="15 3 21 3 21 9"/>
@@ -518,53 +286,334 @@ $langNames = [
                 <span><?= __admin('common.backToSite') ?></span>
             </a>
             <?php endif; ?>
+        </div>
 
-            <!-- Current User Role Badge — also the way in to My Account
-                 (password, sign out everywhere, delete account). Clicking your
-                 own name is where people look for account settings. -->
-            <a href="<?= adminAttr($router->url('account')) ?>"
-               class="admin-user-badge<?= $currentPage === 'account' ? ' admin-user-badge--active' : '' ?>"
-               id="admin-user-badge"
-               title="<?= adminAttr(__admin('account.navHint', 'Your account settings')) ?>">
-                <svg class="admin-user-badge__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <!-- The account menu. Your name and role open it. On a phone the row has no room for them, so its
+             first line says them, copied from the badge when the badge is written. -->
+        <div class="admin-account">
+            <button type="button"
+                    class="admin-user-badge<?= $currentPage === 'account' ? ' admin-user-badge--active' : '' ?>"
+                    id="admin-user-badge"
+                    aria-expanded="false"
+                    aria-controls="admin-account-menu"
+                    aria-label="<?= adminAttr(__admin('nav.accountMenu', 'Account menu')) ?>">
+                <svg class="admin-user-badge__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                     <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
                     <circle cx="12" cy="7" r="4"/>
                 </svg>
                 <span class="admin-user-badge__name" id="admin-user-name">...</span>
                 <span class="admin-user-badge__role" id="admin-user-role"></span>
-            </a>
-            
-            <!-- Both logouts POST and carry the per-session token: signing
-                 somebody out is a state change, and as GET links any foreign
-                 page could spend one <img> tag doing it. The router refuses
-                 anything that is not that pair. -->
-            <form method="POST" action="<?= adminAttr($router->url('logout')) ?>" class="admin-logout-form">
-                <input type="hidden" name="session_token" value="<?= adminAttr((string)$router->getToken()) ?>">
-                <button type="submit" class="admin-btn admin-btn--outline">
-                    <svg class="admin-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-                        <polyline points="16 17 21 12 16 7"/>
-                        <line x1="21" y1="12" x2="9" y2="12"/>
+                <svg class="admin-nav__group-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <polyline points="6 9 12 15 18 9"/>
+                </svg>
+            </button>
+            <div class="admin-account__menu" id="admin-account-menu">
+                <div class="admin-account__who">
+                    <span class="admin-user-badge__name" id="admin-account-name"></span>
+                    <span class="admin-user-badge__role" id="admin-account-role"></span>
+                </div>
+                <a href="<?= adminAttr($router->url('account')) ?>"
+                   class="admin-nav__link<?= $currentPage === 'account' ? ' admin-nav__link--active' : '' ?>"
+                   title="<?= adminAttr(__admin('account.navHint', 'Your account settings')) ?>">
+                    <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                        <circle cx="12" cy="7" r="4"/>
                     </svg>
-                    <span><?= __admin('nav.logout') ?></span>
-                </button>
-            </form>
+                    <span><?= __admin('nav.account') ?></span>
+                </a>
 
-            <!-- Ends every session of this account, not just this browser. -->
-            <form method="POST" action="<?= adminAttr($router->url('logout')) ?>" class="admin-logout-form">
-                <input type="hidden" name="session_token" value="<?= adminAttr((string)$router->getToken()) ?>">
-                <input type="hidden" name="everywhere" value="1">
-                <button type="submit" class="admin-btn admin-btn--outline"
-                        title="<?= adminAttr(__admin('nav.logoutEverywhereHint')) ?>">
-                    <svg class="admin-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-                        <polyline points="16 17 21 12 16 7"/>
-                        <line x1="21" y1="12" x2="9" y2="12"/>
-                        <circle cx="18" cy="6" r="3"/>
+                <!-- Both logouts POST and carry the per-session token: signing
+                     somebody out is a state change, and as GET links any foreign
+                     page could spend one <img> tag doing it. The router refuses
+                     anything that is not that pair. -->
+                <form method="POST" action="<?= adminAttr($router->url('logout')) ?>" class="admin-logout-form">
+                    <input type="hidden" name="session_token" value="<?= adminAttr((string)$router->getToken()) ?>">
+                    <button type="submit" class="admin-nav__link admin-account__action">
+                        <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                            <polyline points="16 17 21 12 16 7"/>
+                            <line x1="21" y1="12" x2="9" y2="12"/>
+                        </svg>
+                        <span><?= __admin('nav.logout') ?></span>
+                    </button>
+                </form>
+
+                <!-- Ends every session of this account, not just this browser. -->
+                <form method="POST" action="<?= adminAttr($router->url('logout')) ?>" class="admin-logout-form">
+                    <input type="hidden" name="session_token" value="<?= adminAttr((string)$router->getToken()) ?>">
+                    <input type="hidden" name="everywhere" value="1">
+                    <button type="submit" class="admin-nav__link admin-account__action"
+                            title="<?= adminAttr(__admin('nav.logoutEverywhereHint')) ?>">
+                        <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                            <polyline points="16 17 21 12 16 7"/>
+                            <line x1="21" y1="12" x2="9" y2="12"/>
+                            <circle cx="18" cy="6" r="3"/>
+                        </svg>
+                        <span><?= __admin('nav.logoutEverywhere') ?></span>
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- A phone's way to the panel below: CSS shows it at the phone's width. The dot says a count
+             waits inside the closed panel (js/core/members-badge.js). -->
+        <button type="button" class="admin-header__menu-button" id="admin-header-menu-button"
+                aria-expanded="false" aria-controls="admin-header-panel">
+            <svg class="admin-header__menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <line x1="3" y1="6" x2="21" y2="6"/>
+                <line x1="3" y1="12" x2="21" y2="12"/>
+                <line x1="3" y1="18" x2="21" y2="18"/>
+            </svg>
+            <span class="admin-header__menu-label"><?= __admin('nav.menu', 'Menu') ?></span>
+            <span class="admin-header__menu-dot" id="admin-header-menu-dot" hidden>
+                <span class="admin-header__menu-label"><?= __admin('nav.menuWaiting', 'Something waits for you') ?></span>
+            </span>
+        </button>
+
+        <!-- The menu, one set of elements for the three views. display: contents above the phone's width, so
+             the menu is the header's second band; at the phone's width it is the panel the button opens.
+             Nothing moves it, and no script reads a width. -->
+        <div class="admin-header__panel" id="admin-header-panel">
+            <nav class="admin-nav">
+                <a href="<?= $router->url('dashboard') ?>" 
+                   class="admin-nav__link<?= $currentPage === 'dashboard' ? ' admin-nav__link--active' : '' ?>">
+                    <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="7"/>
+                        <rect x="14" y="3" width="7" height="7"/>
+                        <rect x="14" y="14" width="7" height="7"/>
+                        <rect x="3" y="14" width="7" height="7"/>
                     </svg>
-                    <span><?= __admin('nav.logoutEverywhere') ?></span>
-                </button>
-            </form>
+                    <span><?= __admin('nav.dashboard') ?></span>
+                </a>
+            
+                <!-- Build Tools Group - Click goes to Visual Editor -->
+                <div class="admin-nav__group<?= $isBuildActive ? ' admin-nav__group--has-active' : '' ?>" data-nav-group="build" data-requires-command="editStructure">
+                    <a href="<?= $router->url('preview') ?>" class="admin-nav__group-toggle" data-requires-command="editStructure">
+                        <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+                        </svg>
+                        <span><?= __admin('nav.build') ?></span>
+                    </a>
+                    <?= $navGroupArrow('build', __admin('nav.build')) ?>
+                    <div class="admin-nav__group-dropdown" id="admin-nav-menu-build">
+                        <a href="<?= $router->url('preview') ?>" 
+                           class="admin-nav__link<?= $currentPage === 'preview' ? ' admin-nav__link--active' : '' ?>">
+                            <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+                                <line x1="8" y1="21" x2="16" y2="21"/>
+                                <line x1="12" y1="17" x2="12" y2="21"/>
+                            </svg>
+                            <span><?= __admin('nav.visualEditor') ?></span>
+                        </a>
+                        <?php /* An installation can decline to offer the command console
+                                 (console.php; absent means it is offered). Gated here on the
+                                 SERVER so the entry is never emitted: the panel's own
+                                 data-requires-command filter only ever hides elements it finds,
+                                 so a client-side rule could not have removed this one on an
+                                 install where the operator said no. The page itself refuses
+                                 independently — this only stops us advertising it. */ ?>
+                        <?php if ($router->isConsoleEnabled()): ?>
+                        <a href="<?= $router->url('command') ?>"
+                           class="admin-nav__link<?= $currentPage === 'command' ? ' admin-nav__link--active' : '' ?>">
+                            <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="16 18 22 12 16 6"/>
+                                <polyline points="8 6 2 12 8 18"/>
+                            </svg>
+                            <span><?= __admin('nav.commands') ?></span>
+                        </a>
+                        <?php endif; ?>
+                        <?php /* Command history — its own page, not a
+                                 tab on the console. Not gated on the console: the trail is
+                                 independent of the runner, and stays reachable when the
+                                 operator turns the console off. data-requires-command hides
+                                 it for ranks below admin, which is chrome-hiding only — the
+                                 page itself is gated server-side in PAGE_PERMISSIONS. */ ?>
+                        <a href="<?= $router->url('history') ?>"
+                           class="admin-nav__link<?= $currentPage === 'history' ? ' admin-nav__link--active' : '' ?>"
+                           data-requires-command="getCommandHistory">
+                            <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <polyline points="12 6 12 12 16 14"/>
+                            </svg>
+                            <span><?= __admin('nav.history', 'History') ?></span>
+                        </a>
+                        <a href="<?= $router->url('apis') ?>"
+                           class="admin-nav__link<?= $currentPage === 'apis' ? ' admin-nav__link--active' : '' ?>"
+                           data-requires-command="listApiEndpoints">
+                            <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                                <polyline points="22 6 12 13 2 6"/>
+                            </svg>
+                            <span><?= __admin('nav.apiEndpoints') ?></span>
+                        </a>
+                        <a href="<?= $router->url('builds') ?>"
+                           class="admin-nav__link<?= $currentPage === 'builds' ? ' admin-nav__link--active' : '' ?>"
+                           data-requires-command="getBuild">
+                            <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                                <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                                <line x1="12" y1="22.08" x2="12" y2="12"/>
+                            </svg>
+                            <span><?= __admin('nav.builds', 'Builds') ?></span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Media - Top-level tab -->
+                <a href="<?= $router->url('media') ?>" 
+                   class="admin-nav__link<?= $isAssetsActive ? ' admin-nav__link--active' : '' ?>"
+                   data-requires-command="listAssets">
+                    <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                    </svg>
+                    <span><?= __admin('nav.assets', 'Media') ?></span>
+                </a>
+            
+                <!-- Sitemap - Top-level tab -->
+                <a href="<?= $router->url('sitemap') ?>"
+                   class="admin-nav__link<?= $currentPage === 'sitemap' ? ' admin-nav__link--active' : '' ?>"
+                   data-requires-command="getSiteMap">
+                    <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                    </svg>
+                    <span><?= __admin('nav.sitemap') ?></span>
+                </a>
+
+                <!-- Authentication - Top-level tab. Links to the OAuth providers page, the panel's only authentication surface. -->
+                <a href="<?= $router->url('oauth-providers') ?>"
+                   class="admin-nav__link<?= $currentPage === 'oauth-providers' ? ' admin-nav__link--active' : '' ?>"
+                   data-requires-command="listOAuthProviders">
+                    <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    </svg>
+                    <span><?= __admin('nav.authentication') ?></span>
+                </a>
+
+                <!-- Members Group — My Memberships (any authenticated user) + Project Members
+                     (any member rank of the EDITED project; link hidden without proposeMember).
+                     The group toggle deliberately targets the ALWAYS-accessible memberships page.
+                     No data-requires-command on the group: a 0-membership user still has an inbox. -->
+                <div class="admin-nav__group<?= $isMembersActive ? ' admin-nav__group--has-active' : '' ?>" data-nav-group="members">
+                    <a href="<?= $router->url('memberships') ?>" class="admin-nav__group-toggle">
+                        <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                            <circle cx="9" cy="7" r="4"/>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                        </svg>
+                        <span><?= __admin('nav.members', 'Members') ?></span>
+                        <span class="admin-nav__count-badge" id="members-nav-badge" hidden>0</span>
+                    </a>
+                    <?= $navGroupArrow('members', __admin('nav.members', 'Members')) ?>
+                    <div class="admin-nav__group-dropdown" id="admin-nav-menu-members">
+                        <a href="<?= $router->url('memberships') ?>"
+                           class="admin-nav__link<?= $currentPage === 'memberships' ? ' admin-nav__link--active' : '' ?>">
+                            <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                                <circle cx="12" cy="7" r="4"/>
+                            </svg>
+                            <span><?= __admin('nav.myMemberships', 'My memberships') ?></span>
+                            <span class="admin-nav__count-badge" id="members-nav-badge-mine" hidden>0</span>
+                        </a>
+                        <a href="<?= $router->url('members') ?>"
+                           class="admin-nav__link<?= $currentPage === 'members' ? ' admin-nav__link--active' : '' ?>"
+                           data-requires-command="proposeMember">
+                            <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                                <circle cx="9" cy="7" r="4"/>
+                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                            </svg>
+                            <span><?= __admin('nav.projectMembers', 'Project members') ?></span>
+                            <span class="admin-nav__count-badge" id="members-nav-badge-queue" hidden>0</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Compliance Group - Storage + Privacy (data layer + data sharing) -->
+                <div class="admin-nav__group<?= $isComplianceActive ? ' admin-nav__group--has-active' : '' ?>" data-nav-group="compliance" data-requires-command="listStorageItems">
+                    <a href="<?= $router->url('storage') ?>" class="admin-nav__group-toggle" data-requires-command="listStorageItems">
+                        <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/>
+                        </svg>
+                        <span><?= __admin('nav.compliance', 'Compliance') ?></span>
+                    </a>
+                    <?= $navGroupArrow('compliance', __admin('nav.compliance', 'Compliance')) ?>
+                    <div class="admin-nav__group-dropdown" id="admin-nav-menu-compliance">
+                        <a href="<?= $router->url('storage') ?>"
+                           class="admin-nav__link<?= $currentPage === 'storage' ? ' admin-nav__link--active' : '' ?>"
+                           data-requires-command="listStorageItems">
+                            <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/>
+                            </svg>
+                            <span><?= __admin('nav.storage', 'Storage') ?></span>
+                        </a>
+                        <a href="<?= $router->url('privacy') ?>"
+                           class="admin-nav__link<?= $currentPage === 'privacy' ? ' admin-nav__link--active' : '' ?>"
+                           data-requires-command="getPrivacyStatus">
+                            <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/><path d="M9 12l2 2 4-4"/>
+                            </svg>
+                            <span><?= __admin('nav.privacy', 'Privacy') ?></span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Optimize - Top-level tab -->
+                <a href="<?= $router->url('optimize') ?>" 
+                   class="admin-nav__link<?= $currentPage === 'optimize' ? ' admin-nav__link--active' : '' ?>"
+                   data-requires-command="getStyles">
+                    <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                    </svg>
+                    <span><?= __admin('nav.optimize') ?></span>
+                </a>
+            
+                <!-- Settings Group - Click goes to Project Settings -->
+                <!-- No data-requires-command on this group. It used to name getMyPermissions,
+                     which was a global any-auth command every signed-in account held, so the
+                     gate never hid anything; that command left the surface
+                     (reading your own role is an ACCOUNT fact, served by /admin/self), and
+                     keeping the attribute would have hidden Settings from everyone. The
+                     entries inside carry their own gates where they need one. -->
+                <div class="admin-nav__group<?= $isSettingsActive ? ' admin-nav__group--has-active' : '' ?>" data-nav-group="settings">
+                    <a href="<?= $router->url('settings') ?>" class="admin-nav__group-toggle">
+                        <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3"/>
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                        </svg>
+                        <span><?= __admin('nav.settings') ?></span>
+                    </a>
+                    <?= $navGroupArrow('settings', __admin('nav.settings')) ?>
+                    <div class="admin-nav__group-dropdown" id="admin-nav-menu-settings">
+                        <a href="<?= $router->url('settings') ?>" 
+                           class="admin-nav__link<?= $currentPage === 'settings' ? ' admin-nav__link--active' : '' ?>">
+                            <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="3"/>
+                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4"/>
+                            </svg>
+                            <span><?= __admin('nav.projectSettings') ?></span>
+                        </a>
+                        <a href="<?= $router->url('ai-connections') ?>"
+                           class="admin-nav__link<?= ($currentPage === 'ai-connections' || $currentPage === 'ai-settings') ? ' admin-nav__link--active' : '' ?>">
+                            <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1v1a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1H2a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-.99-1-1.73a2 2 0 0 1 2-2z"/>
+                                <circle cx="7.5" cy="14.5" r="1.5"/><circle cx="16.5" cy="14.5" r="1.5"/>
+                            </svg>
+                            <span><?= __admin('nav.ai') ?></span>
+                        </a>
+                        <a href="<?= $router->url('embed-security') ?>" 
+                           class="admin-nav__link<?= $currentPage === 'embed-security' ? ' admin-nav__link--active' : '' ?>"
+                           data-requires-command="getIframeSandbox">
+                            <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                            </svg>
+                            <span><?= __admin('nav.embedSecurity') ?></span>
+                        </a>
+                    </div>
+                </div>
+            </nav>
         </div>
     </header>
     <?php endif; ?>
@@ -899,7 +948,8 @@ $langNames = [
             // header sets no star: the dashboard and My Memberships do, and a star set
             // on the page re-orders this list too.
             QuickSiteAdmin.orderProjectSelect(picker);
-            picker._qsPicker = new QSSearchableSelect(picker, { minWidth: 288 });
+            // The badge may cut a long name: the list says it whole on its first line.
+            picker._qsPicker = new QSSearchableSelect(picker, { minWidth: 288, currentOnTop: true });
             document.addEventListener('quicksite:stars-changed', function () {
                 QuickSiteAdmin.orderProjectSelect(picker);
             });
