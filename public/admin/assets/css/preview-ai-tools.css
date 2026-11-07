@@ -139,7 +139,7 @@
 }
 .preview-contextual-ai-tools__tag-mode--active {
     background: var(--admin-accent);
-    color: #fff;
+    color: var(--admin-on-accent);
     border-color: var(--admin-accent);
 }
 
@@ -205,7 +205,7 @@
 }
 .preview-contextual-ai-tools__tag--active {
     background: var(--admin-accent);
-    color: #fff;
+    color: var(--admin-on-accent);
     border-color: var(--admin-accent);
 }
 
@@ -719,7 +719,7 @@
     flex: 1;
     padding: 9px 12px;
     background: var(--admin-accent);
-    color: #fff;
+    color: var(--admin-on-accent);
     border: 1px solid var(--admin-accent);
     border-radius: 4px;
     font-size: 13px;
@@ -838,7 +838,7 @@
 }
 .preview-contextual-ai-tools__small-btn--primary {
     background: var(--admin-accent);
-    color: #fff;
+    color: var(--admin-on-accent);
     border-color: var(--admin-accent);
 }
 
@@ -954,7 +954,7 @@
     width: 100%;
     padding: 8px 12px;
     background: var(--admin-accent);
-    color: #fff;
+    color: var(--admin-on-accent);
     border: 1px solid var(--admin-accent);
     border-radius: 4px;
     font-size: 13px;

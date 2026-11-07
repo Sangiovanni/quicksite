@@ -344,10 +344,10 @@
         if (_endpointActionsShown()) {
             headCells.push(QSDom.el('th', { style: 'width: 120px;', text: t('apis.columns.actions') }));
         }
-        body.appendChild(QSDom.el('table', { class: 'admin-table admin-table--striped' }, [
+        body.appendChild(QSDom.tableWrapper(QSDom.el('table', { class: 'admin-table admin-table--striped' }, [
             QSDom.el('thead', null, [QSDom.el('tr', null, headCells)]),
             tbody
-        ]));
+        ])));
 
         const headerActions = [];
         if (canRun('editApi')) {

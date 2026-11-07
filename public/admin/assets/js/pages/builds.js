@@ -290,10 +290,8 @@
 
             if (locked) {
                 input.setAttribute('readonly', 'readonly');
-                input.className = 'admin-input builds-options__locked';
                 var unlock = _renderButton(T.optUnlock || '', null, 'ghost', function () {
                     input.removeAttribute('readonly');
-                    input.className = 'admin-input';
                     unlock.remove();
                 });
                 children.push(el('div', { class: 'builds-options__unlock' }, [unlock]));

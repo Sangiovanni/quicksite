@@ -25,8 +25,13 @@ window.QS_EMBED_SECURITY_I18N = <?= json_encode($qsEmbedSecurityI18n, JSON_HEX_T
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/embed-security.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/embed-security.js') ?>"></script>
 
 <div class="admin-page-header">
-    <h1><?= __admin('embedSecurity.title') ?></h1>
-    <p class="admin-subtitle"><?= __admin('embedSecurity.subtitle') ?></p>
+    <h1 class="admin-page-header__title">
+        <svg class="admin-page-header__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+        <?= __admin('embedSecurity.title') ?>
+    </h1>
+    <p class="admin-page-header__subtitle"><?= __admin('embedSecurity.subtitle') ?></p>
 </div>
 
 <!-- Read-only notice: where the policy lives and who can change it -->

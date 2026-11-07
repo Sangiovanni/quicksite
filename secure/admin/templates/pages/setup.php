@@ -94,15 +94,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <!-- Intrinsic size as well as the CSS one. This is the first page a
              deployer ever sees, sometimes on an install whose assets do not
              resolve yet (a misconfigured DocumentRoot 404s admin.css). Without
-             a width/height the browser falls back to the default replaced-element
-             size and the logo swallows the page, pushing the token instructions
-             and any error message below the fold. The CSS rule still wins when
-             it loads, so nothing changes on a healthy install. -->
-        <svg class="admin-login__logo" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-            <path d="M2 17l10 5 10-5"/>
-            <path d="M2 12l10 5 10-5"/>
-        </svg>
+             a width/height the wordmark takes its own 1025 pixel width and the logo
+             swallows the page, pushing the token instructions and any error message
+             below the fold, and a 404 of the images shows the alt at this size too.
+             The CSS rule still wins when it loads, so nothing changes on a healthy
+             install. -->
+        <img class="admin-login__mark" src="<?= $baseUrl ?>/admin/assets/images/logo.svg" alt="" width="69" height="64">
+        <img class="admin-login__wordmark" src="<?= $baseUrl ?>/admin/assets/images/quicksite.svg" alt="<?= __admin('common.appName') ?>" width="140" height="44">
         <h1 class="admin-login__title"><?= __admin('setup.title', 'Create your first account') ?></h1>
         <p class="admin-login__subtitle"><?= __admin('setup.subtitle', 'This installation has no accounts yet.') ?></p>
     </div>

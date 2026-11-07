@@ -53,6 +53,7 @@
             "oauth_session_description": "Keeps a sign-in safe while it goes through the provider, and holds your signed-in session on the server.",
             "oauth_user_retention": "14 days, or until you sign out",
             "oauth_user_description": "Keeps you signed in after you sign in with a provider. It is set only when you sign in.",
+            "none": "This site's storage registry declares no browser storage.",
             "disclaimer": "This summary is generated from the site's storage registry and is provided for transparency. It is not legal advice — obtain your own legal review."
         }
     },

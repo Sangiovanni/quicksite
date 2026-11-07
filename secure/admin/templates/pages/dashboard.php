@@ -15,7 +15,15 @@ $baseUrl = rtrim(BASE_URL, '/');
 <script src="<?= $baseUrl ?>/admin/assets/js/pages/dashboard-memberships.js?v=<?= filemtime(ADMIN_ASSET_ROOT . '/admin/assets/js/pages/dashboard-memberships.js') ?>"></script>
 
 <div class="admin-page-header">
-    <h1 class="admin-page-header__title"><?= __admin('dashboard.title') ?></h1>
+    <h1 class="admin-page-header__title">
+        <svg class="admin-page-header__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7"/>
+            <rect x="14" y="3" width="7" height="7"/>
+            <rect x="14" y="14" width="7" height="7"/>
+            <rect x="3" y="14" width="7" height="7"/>
+        </svg>
+        <?= __admin('dashboard.title') ?>
+    </h1>
     <p class="admin-page-header__subtitle"><?= __admin('dashboard.subtitle') ?></p>
 </div>
 

@@ -15510,3 +15510,47 @@ A leftover `deploy.php`, `deploy-roots.php` or `qs-deployment.json`, and a `role
 **Alternatives considered**: testing `consentLayerGenerated()` when the policy is generated (one line, and the row is lost on the path everyone uses, with no way back from the policy until someone generates again); not writing the banner's file on such a site (it could not come back by itself, and the editor could not style it); keeping the rows baked at generation (the new category's banner would have nothing to choose); gating `QS.openConsent()` too (an author's own code calling it is the author's choice, and it records nothing); an `askAgain`-style prompt when the key arrives (it would make the author do what the registry already says); an off switch (refused by the entry above, for the reason above).
 
 **Source**: Sangio, UX run of 2026-11-06, refined the same day; beta.12. `secure/src/functions/consentHelpers.php` (`qs_consent_asks()`), `consentLayerHelpers.php`, `secure/src/runtime/qs.js` (`_consentNeedsChoice()`, `_consentFollowRegistry()`), `secure/management/command/generateConsentLayer.php`, `getConsentStatus.php`, `public/admin/assets/js/pages/storage.js`.
+
+### The admin panel has three views, in one responsive file (locked 2026-11-06)
+
+**Supersedes**: the standard *Admin panel deprioritizes mobile*, which lived in `CLAUDE.md` and is rewritten there.
+
+**Decision**: The panel has three views and only three: normal, a computer, with no media query; tablet, `@media (max-width: 64rem)`; phone, `@media (max-width: 40rem)`. Every media query of the panel is in `public/admin/assets/css/responsive.css`, the last stylesheet the layout links, one block each, the tablet block before the phone block, so a phone reads both and states only what differs. No other width is allowed anywhere in the panel's CSS, and no `matchMedia` in its scripts. A layout wraps first, and needs no width where it can avoid one.
+
+**Reasoning**: Sangio, in his page-by-page review: "we still need to compact all those in at most 2 media query : no media query : normal view (casual computer), media-query tablet : for tablet view, and media query phone : for phone view … any other media query properties must then reach any of those for those already existing." Eight blocks at seven widths had grown one rule at a time, and he named a threshold of his own on the dashboard's project buttons. Rem and not pixels was his question and his yes ("Maybe we should go with rem over pixel too for our phone and tablet rules ?"): at the default text size the two are exactly 1024 and 640, and someone with a larger browser text size reaches the narrower view sooner, which is what they need, as the panel's text and spacing are in rem. A media query's rem reads the browser's own default size, and the panel sets none on `html`, so the two agree. Loaded last, a rule beats a rule of the same specificity in every other stylesheet, so moving the blocks would have woken what never applied: declarations that had always lost to a later rule were removed, as dead code, rather than brought to life.
+
+**Alternatives considered**: a CSS variable holding the width (a media query cannot read one); a preprocessor (it breaks the dependency rule); pixels (a larger text size would keep the wide layout with less room for it); several files, one per page (the check would have nothing to hold, and the rule that this is the one place would go).
+
+**Source**: Sangio's review of 2026-11-06, ruled the same day; beta.12. `public/admin/assets/css/responsive.css`, `secure/admin/templates/layout.php`, `CLAUDE.md`.
+
+### A site with nothing to ask keeps no consent record (locked 2026-11-07)
+
+**Supersedes** (in part): *A site with nothing to ask shows no banner unless its author asks for one* (locked 2026-11-06), for what its alternatives say of `QS.openConsent()` recording nothing: a *Save* there is now gone at the next page load. The rest of it stands.
+
+**Decision**: At each page load, when the page's `asks` is strictly false and the engine's consent record exists, `qs.js` removes that cookie, under the name and Path `QS.setConsent()` writes. No event fires. And when the record's row is the policy table's only row, the table follows it (`data-consent-asks`), and one line beside it, valued `false` and written hidden, says the site's storage registry declares no browser storage while the site has nothing to ask.
+
+**Reasoning**: Sangio ruled it on 2026-11-07, on the two corrections the banner's work left. A visitor who chose kept that cookie for up to 180 days after a site's last non-essential key left, while the page no longer listed it: a narrow gap, in a page whose whole point is to list what a visitor's browser holds. Every way to the record is the engine's own, and a `customize` control there shows the locked Essential row alone, so nothing is lost. The one case with something to lose is an author's own script that calls `QS.setConsent()` and gates on `QS.hasConsent()` on a site declaring no non-essential key: that choice lasts until the next load and fails towards no consent, and declaring the key is what the registry is for. A consent system of the author's own, with its own cookie, is untouched. The line says *declares* on purpose: third-party embeds and hand-written scripts are not in the registry, so the page cannot say the site stores nothing. It is written hidden, so with the layer off and with no script the table shows as it does anywhere else.
+
+**Alternatives considered**: the record's row following the cookie, so a visitor who holds it still sees it listed (it leaves data on a device for a site that no longer uses it); leaving the empty table (a header with no row reads as a defect); a line that says the site stores nothing (the page cannot know that).
+
+**Source**: the flags of the banner's slice, ruled 2026-11-07; beta.12. `secure/src/runtime/qs.js` (`_consentDropRecord()`, `_consentFollowRegistry()`), `secure/src/functions/consentLayerHelpers.php`, `secure/src/functions/qsDataAttributeCatalog.php`.
+
+### The page is Media, and the commands keep their names (locked 2026-11-06)
+
+**Decision**: The menu entry and the page's title say *Media*. The commands (`listAssets`, `uploadAsset`, `editAsset`, `deleteAsset`), their category and their `help` keep the word *asset*, and so does a word on the page that names one file. The translation keys keep their names for now.
+
+**Reasoning**: Sangio, in his review: "should we rename it media in the menu and the page already ?" The address was already `/admin/media`, and the menu and the title were the only places still saying otherwise. Commands are the public API, so renaming them breaks every client for a word.
+
+**Alternatives considered**: renaming the commands too (a breaking change to the public API, for no behaviour); leaving it (a menu entry and an address that disagree).
+
+**Source**: Sangio's review of 2026-11-06, ruled the same day; beta.12. `secure/admin/translations/en.json`, `docs/ADMIN_PANEL.md`.
+
+### The panel's accent comes from the logo (locked 2026-11-07)
+
+**Decision**: The panel's accent moves to the logo's orange, `#e18c30`, hover `#e59634`, with its family derived from it, and the muted text to the wordmark's tan, `#cdb8a0`. Text on an accent background reads one new variable, `--admin-on-accent`, which is dark. The variables of the family that rules read and nothing defined (`--admin-accent-rgb`, `--admin-accent-bg`, `--admin-accent-light`, `--admin-accent-subtle`) are defined. Backgrounds and the success, warning, error and info colours stay.
+
+**Reasoning**: Sangio, 2026-11-07, having seen the logos: "it might be worth to adapt the design a little to those logo. It' already really good design but I don't mind some little change to make it better." The panel is already warm, so this is a nudge and not a redesign, and it is one block of variables to put back. The trap is the text on it: `--admin-text` on the accent read about 3.4:1 before and about 2.4:1 on this orange, while a dark text reads about 6.8:1, so every rule that puts text on an accent background reads the new variable. The accent used as text on a dark background gets better by the same move, from about 4.9:1 to about 6.8:1. An editor default or placeholder that names a colour for an author's own site is not the panel's colour, and stays.
+
+**Alternatives considered**: keeping white text on the orange (it fails even the large-text threshold); a darker orange to keep white text (it would no longer be the logo's); restyling beyond the colours (not asked for, and the desktop view changes only where Sangio asked).
+
+**Source**: Sangio, 2026-11-07; beta.12. `public/admin/assets/admin.css` (`:root`), `public/admin/assets/css/members-admin.css`, `public/admin/assets/css/preview-ai-tools.css`, `public/admin/assets/images/logo.svg`, `public/admin/assets/images/quicksite.svg`.

@@ -61,7 +61,7 @@ window.QS_OAUTH_I18N = <?= qs_inline_script_json([
 
 <div class="admin-page-header">
     <h1 class="admin-page-header__title">
-        <svg class="admin-page-header__icon oauth-providers-header__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg class="admin-page-header__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
         </svg>
         <?= htmlspecialchars(__admin('oauthProviders.title')) ?>

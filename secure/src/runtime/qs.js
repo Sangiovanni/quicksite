@@ -1436,6 +1436,22 @@
         });
     }
 
+    /**
+     * A site with nothing to ask keeps no consent record: its policy page no longer lists that
+     * cookie, and the fingerprints would ask again should a key be declared later. Removes the
+     * engine's own record, under the name and Path QS.setConsent() writes, and nothing else.
+     * `asks` is compared strictly, as _consentNeedsChoice() does: no QS_CONSENT or a payload without
+     * it touches nothing. No event fires, as no choice was made.
+     */
+    function _consentDropRecord() {
+        var cfg = _consentConfig();
+        if (!cfg || cfg.asks !== false) return;
+        var name = _cookieName(QS_CONSENT_COOKIE);
+        if (_readCookie(name) === null) return;
+        var secure = (location.protocol === 'https:') ? '; Secure' : '';
+        document.cookie = name + '=; Max-Age=0; Path=/; SameSite=Lax' + secure;
+    }
+
     function _consentBlocked(key, category) {
         try {
             document.dispatchEvent(new CustomEvent('qs:consent:blocked', {
@@ -1572,15 +1588,17 @@
 
     /**
      * What a generated page shows follows the registry, with no generation again. Every
-     * [data-consent-asks] shows only on a site that asks its visitors anything, and a popup row shows
-     * exactly while its category has a declared key: a key declared later brings the banner back and
-     * its row with it. With no window.QS_CONSENT (the editor, a layer that is off) nothing moves.
+     * [data-consent-asks] shows only on a site that asks its visitors anything, one valued "false"
+     * only on a site with nothing to ask, and a popup row shows exactly while its category has a
+     * declared key: a key declared later brings the banner back and its row with it. With no
+     * window.QS_CONSENT (the editor, a layer that is off) nothing moves. A missing `asks` reads as
+     * asking.
      */
     function _consentFollowRegistry() {
         var cfg = _consentConfig();
         if (!cfg) return;
         document.querySelectorAll('[data-consent-asks]').forEach(function (el) {
-            el.hidden = cfg.asks === false;
+            el.hidden = el.getAttribute('data-consent-asks') === 'false' ? cfg.asks !== false : cfg.asks === false;
         });
         var popup = document.getElementById('qs-consent-popup');
         if (!popup) return;
@@ -3020,6 +3038,7 @@
     // window.QS_CONSENT is written after this file.
     function _qsAuthAndConsentInit() {
         _consentRemoveRefused();
+        _consentDropRecord();
         applyAuthState();
         _initConsentBanner();
     }

@@ -109,7 +109,7 @@
             <!-- Generated declaration preview -->
             <div class="add-transition-modal__preview">
                 <span class="add-transition-modal__preview-label"><?= __admin('preview.addTransitionPreviewLabel', 'Preview') ?>:</span>
-                <code class="add-transition-modal__preview-value" id="add-transition-preview-value">transition: opacity 300ms ease;</code>
+                <code class="admin-table-wrapper add-transition-modal__preview-value" tabindex="0" id="add-transition-preview-value">transition: opacity 300ms ease;</code>
             </div>
         </div>
         <div class="add-transition-modal__footer">

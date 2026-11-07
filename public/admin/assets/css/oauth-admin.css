@@ -87,12 +87,6 @@
  * /admin/oauth-providers — provider cards, how-to, key forms
  * ==================================================================== */
 
-.oauth-providers-header__icon {
-    width: 32px;
-    height: 32px;
-    margin-right: 8px;
-}
-
 .oauth-providers-list {
     display: flex;
     flex-direction: column;

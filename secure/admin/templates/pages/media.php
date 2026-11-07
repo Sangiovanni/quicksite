@@ -1,6 +1,6 @@
 <?php
 /**
- * Admin Asset Management Page
+ * Admin Media Page
  * 
  * Dedicated page for managing project assets: upload, browse, edit, delete.
  * Multi-file upload, visual grid with previews, inline rename, batch delete.
@@ -27,7 +27,12 @@ window.QS_MEDIA_I18N = <?= json_encode($qsMediaI18n, JSON_HEX_TAG | JSON_HEX_AMP
 
     <!-- Page Header -->
     <div class="admin-page-header">
-        <h1 class="admin-page-header__title"><?= __admin('media.title') ?></h1>
+        <h1 class="admin-page-header__title">
+            <svg class="admin-page-header__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+            </svg>
+            <?= __admin('media.title') ?>
+        </h1>
         <p class="admin-page-header__subtitle"><?= __admin('media.subtitle') ?></p>
     </div>
 

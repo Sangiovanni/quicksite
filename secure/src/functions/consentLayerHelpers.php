@@ -19,7 +19,9 @@
  *                                              category has a declared key
  *   [data-consent-asks]                      — on the cookie-policy page: shown only
  *                                              on a site that asks its visitors
- *                                              anything (qs_consent_asks())
+ *                                              anything (qs_consent_asks()); valued
+ *                                              "false", only on a site with nothing
+ *                                              to ask
  *
  * Visible copy uses translation keys (textKey) so the layer shows in the
  * visitor's language from day one. Their words are in
@@ -308,7 +310,11 @@ function buildCookiePolicyStructure(array $items, array $oauthLinks): array {
     // The prefix note explains a name a visitor can see: when the consent record is the only name
     // holding the prefix, the note follows that row.
     $prefixOnlyWhenAsking = false;
+    $onlyWhenAskingRows = 0;
     foreach (consentEngineCookies($oauthLinks) as $cookie) {
+        if ($cookie['onlyWhenAsking']) {
+            $onlyWhenAskingRows++;
+        }
         if (strpos($cookie['name'], 'qsp_') === 0) {
             if ($cookie['onlyWhenAsking']) {
                 $prefixOnlyWhenAsking = true;
@@ -325,7 +331,17 @@ function buildCookiePolicyStructure(array $items, array $oauthLinks): array {
             _cNode('td', [], [_cText('consent.policy.' . $cookie['text'] . '_description')]),
         ]);
     }
-    $table = _cNode('table', ['class' => 'qs-cookie-policy'], [$thead, _cNode('tbody', [], $bodyRows)]);
+    // When the consent record's row is the table's only row, the table follows it: on a site with
+    // nothing to ask it would show a header alone. The line beside it says so instead, written hidden,
+    // so with the layer off, with no script and in the editor the table shows as ever. It says
+    // "declares" on purpose: an embed or a hand-written script is not in the registry, so the page
+    // cannot say the site stores nothing.
+    $onlyTheRecord = $onlyWhenAskingRows > 0 && count($bodyRows) === $onlyWhenAskingRows;
+    $tableParams = ['class' => 'qs-cookie-policy'];
+    if ($onlyTheRecord) {
+        $tableParams['data-consent-asks'] = true;
+    }
+    $table = _cNode('table', $tableParams, [$thead, _cNode('tbody', [], $bodyRows)]);
 
     // The way back to the cookie preferences, right under the intro: withdrawing consent must be
     // as easy as giving it, and a visitor reading the policy has often come to change their choice.
@@ -345,6 +361,9 @@ function buildCookiePolicyStructure(array $items, array $oauthLinks): array {
         $preferences,
         $table,
     ];
+    if ($onlyTheRecord) {
+        $children[] = _cNode('p', ['class' => 'qs-cookie-policy__none', 'data-consent-asks' => 'false', 'hidden' => true], [_cText('consent.policy.none')]);
+    }
 
     // One sentence explaining the prefix, and only when there is a prefixed key
     // to explain. A visitor comparing this table against their browser sees a

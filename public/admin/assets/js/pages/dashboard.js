@@ -461,7 +461,7 @@
         const body = QSDom.el('tbody');
         entries.forEach(entry => body.appendChild(_renderRecentCommandRow(entry, common)));
 
-        return QSDom.el('table', { class: 'admin-table' }, [head, body]);
+        return QSDom.tableWrapper(QSDom.el('table', { class: 'admin-table' }, [head, body]));
     }
 
     async function loadRecentCommands() {

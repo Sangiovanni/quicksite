@@ -636,7 +636,7 @@
             tbody.appendChild(row);
         });
         table.appendChild(tbody);
-        section.appendChild(table);
+        section.appendChild(QSDom.tableWrapper(table));
         return section;
     }
 

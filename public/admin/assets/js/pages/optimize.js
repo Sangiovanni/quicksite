@@ -461,7 +461,7 @@
             text: t('optimize.cssRefiner.diff')
         }));
         item.appendChild(QSDom.el('div', {
-            class: 'optimize-suggestion__diff', style: 'display:none'
+            class: 'admin-table-wrapper optimize-suggestion__diff', tabindex: '0', style: 'display:none'
         }));
         if (isDesignToken) item.appendChild(_renderDesignTokenRow(s));
 

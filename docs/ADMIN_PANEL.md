@@ -103,7 +103,7 @@ File lists are grouped by role. Where useful, the entry point or main exported f
 | `js/core/api.js` | `QuickSiteAPI.request` + `upload`; in-memory session token sent with the session cookie (`setTokenSource` seam for embedders); emits `quicksite:command-executed`; keeps the write allowance current from each answer's headers (`getWriteRate`, `countsAsWrite`) and emits `quicksite:write-rate`. A request still out when the page leaves, a reload included, answers `client.network_error` like any failed request, without a console error. A command answers an envelope, so an empty 2xx, a 204 included, answers `client.empty_response`: it came from something in between, and it is never read as a success. |
 | `js/core/utils.js` | `QuickSiteUtils`: toasts, the panel's dialogs (`confirm()`, `prompt()`: *Dialogs* below), escaping, prefs storage, pending messages, a storage key's fixed prefix and its chip (`storageKeyPrefix()`, `renderStorageKeyPrefixChip()`: §9.10). |
 | `js/core/storage-keys.js` | Constants for every localStorage / sessionStorage key (`window.QuickSiteStorageKeys`). |
-| `js/core/dom.js` | `window.QSDom`: shared `el()` element factory + `svgIcon()` + `clear()` + `setSelectPlaceholder()` (resets a `<select>` to a single placeholder option) — the createElement/textContent idiom for dynamic DOM. Loaded in `<head>` so page scripts can use it at parse time. |
+| `js/core/dom.js` | `window.QSDom`: shared `el()` element factory + `svgIcon()` + `tableWrapper()` (the scroller of a table of the panel) + `clear()` + `setSelectPlaceholder()` (resets a `<select>` to a single placeholder option) — the createElement/textContent idiom for dynamic DOM. Loaded in `<head>` so page scripts can use it at parse time. |
 | `js/core/bubble.js` + `css/bubble.css` | The panel's hover bubble: every `title` in the panel shows through it (*Tooltips* below). Loaded in `<head>`; exposes nothing — it listens on the document. |
 | `js/core/members-badge.js` | Membership counts (inbox awaiting me + queue awaiting my adjudication) → the Members nav badge; publishes `window.QSMembershipCounts` + the `quicksite:membership-counts-updated` event; recomputes on `quicksite:memberships-changed`. |
 | `js/core/searchable-select.js` | Type-ahead select widget for long option lists; loaded by `layout.php` and used by every project list in the panel and the visual editor's pickers. Named by its select's label, which opens it; an option's description shows as a line under it and, whole, in the bubble (§9.9.2). |
@@ -131,6 +131,21 @@ with `aria-disabled="true"` while it still answers a click (AI tools' **Run them
 allowance is back), is dimmed with a not-allowed cursor: one rule in `admin.css` for the whole
 panel. Hovering it keeps its colour, and its title still shows. The danger and success variants
 dim their own way; a button that is not an admin button keeps its own rule.
+
+**The three views.** The panel has three views and only three: normal, a computer, with no media
+query; tablet, at `64rem` and under; phone, at `40rem` and under (1024 and 640 pixels at the
+browser's default text size, so someone with a larger text size reaches the narrower view sooner).
+Every media query of the panel is in `css/responsive.css`, the last stylesheet the layout links,
+the tablet block before the phone block.
+
+**What is wider than the screen.** A table of the panel sits in `.admin-table-wrapper`
+(`QSDom.tableWrapper()`), which scrolls by itself and takes the keyboard's focus. A shadow at its
+edge says there is more on that side, and goes when the end is reached; no script is involved. A
+dialog fits the screen at any width: its body scrolls, its header and its buttons stay, and its
+buttons wrap.
+
+**A field that cannot be edited.** An `.admin-input` marked read-only, such as an API's fixed id,
+reads muted with a not-allowed cursor.
 
 **Dialogs: the panel's own.** The panel never calls the browser's `confirm()`, `prompt()` or
 `alert()`. It asks with `QuickSiteUtils.confirm(message, options)`, a promise of `true` or `false`,
@@ -1034,7 +1049,7 @@ The AI call is browser-direct via `QSAiCall.call(...)` (see `public/admin/assets
 | **Settings** (`settings.js`) | System information, the caller's permissions, admin preferences (keyboard shortcuts, toast duration), AI configuration status. |
 | **My account** (`account.js`) | The caller's own account — change password, sign out everywhere, delete the account. See §9.13. Commands: `logoutSession`. The password change and the deletion are not commands — they go to `/admin/self/change-password` and `/admin/self/delete`. |
 | **APIs** (`apis.js`) | External API registry — see §9.1. Commands: `listApiEndpoints`, `addApi`, `editApi`, `deleteApi`, `getApiEndpoint`, `testApiEndpoint`. |
-| **Assets** (`assets.js`) | Asset browser + uploader — see §9.15. Commands: `listAssets`, `uploadAsset`, `editAsset`, `deleteAsset`, `editFavicon`. |
+| **Media** (`assets.js`) | Asset browser + uploader — see §9.15. Commands: `listAssets`, `uploadAsset`, `editAsset`, `deleteAsset`, `editFavicon`. |
 | **Sitemap** (`sitemap.js`) | Route tree, reachability, ordering. |
 | **Builds** (`builds.js`) | The project's single build — create, download, delete, and how much room is left for the next one. See §9.16. Commands: `getBuild`, `build`, `downloadBuild`, `deleteBuild`. The storage figure comes from `/admin/self/space-usage`, not from a command. |
 | **Embed security** (`embed-security.js`) | Read-only view of the install-wide iframe embed policy via `getIframeSandbox`. The policy is set at deployment (`<secure>/management/config/embed-policy.json`), not from the panel. |
@@ -3307,6 +3322,22 @@ both back with no generation again. The new key's own row waits for **Update**, 
 row. `QS.openConsent()`, and an element of your own marked `customize`, keep working on such
 a site: only what carries the attribute hides.
 
+Such a site keeps no consent record either: at each page load `qs.js` removes it, as the page no
+longer lists that cookie. Every way to the record is the engine's own, and a `customize` control
+there opens a popup showing the locked Essential row alone, so nothing is lost. The one case with
+something to lose is a script of your own that calls `QS.setConsent()` and gates on
+`QS.hasConsent()` on a site declaring no non-essential key: that choice lasts until the next page
+load, and it fails towards no consent. Declaring the key, which is what the registry is for, or
+**Create a banner anyway** keeps it. A consent system of your own, with its own cookie, is
+untouched.
+
+On a site with no key, no theme switch and no sign-in, the consent record's row is the table's
+only row, so the table follows it, and one line beside it says the site's storage registry declares
+no browser storage. It says *declares*: third-party embeds and hand-written scripts are not in the
+registry, so the page cannot say the site stores nothing. That line is written hidden, so with the
+layer off and in the editor the table shows as it does anywhere else; a key declared later brings
+the table and the record's row back and hides the line, with no generation again.
+
 **The theme switch's key in the policy.** When the project's theme mode and its
 visitor toggle are both on (`setThemeMode`), the table also lists the key the theme
 switch keeps a visitor's choice under, `qs-theme-<projectId>`: local storage,
@@ -3889,7 +3920,7 @@ deep-dive.
 | `data-consent-show` | consent | `granted:<cat>` / `denied:<cat>` | Show/hide on cookie-consent state for a category (e.g. `granted:analytics`) | §9.10 |
 | `data-consent-action` | consent | `customize` / `accept-all` / `refuse-all` / `save` / `close` | A consent control: every action inside the banner and the popup; anywhere else only `customize`, which reopens the cookie preferences | §9.10 |
 | `data-consent-toggle` | consent | `functional` / `analytics` / `marketing` | The checkbox of one cookie category in the popup, ticked from the visitor's choice when the preferences open; its row shows while the category has a declared key | §9.10 |
-| `data-consent-asks` | consent | `true` | Shows the element only on a site that asks its visitors anything, followed at each page load; left alone with the layer off and in the visual editor. The generated cookie policy puts it on its preferences button's paragraph and the consent record's row | §9.10 |
+| `data-consent-asks` | consent | `true` / `false` | Shows the element only on a site that asks its visitors anything, or with `false` only on a site with nothing to ask, followed at each page load; left alone with the layer off and in the visual editor. The generated cookie policy puts it on its preferences button's paragraph and the consent record's row, and when that row is the table's only row on the table, with a line valued `false` beside it | §9.10 |
 | `data-bind` | template | field name | Per-item template field (inside `data-state-list` OR componentList) | §9.2 |
 | `data-bind-attr` | template | attribute name | Variant of `data-bind` — sets the named attribute instead of textContent | §9.2 |
 | `data-list-template` | template | `true` | Marks a hidden element as the per-item template for componentList | §9.2 |

@@ -282,10 +282,10 @@ function qsDataAttributeCatalog(): array {
         ],
         [
             'name' => 'data-consent-asks',
-            'description' => 'Show this element only on a site that asks its visitors anything: a non-essential key is declared, or the author asked for a banner on a site with only essential keys. It follows the registry at each page load, with no generation again. The generated cookie policy puts it on the paragraph holding its preferences button and on the consent record\'s row. With the consent layer off, or in the visual editor, the element is left as it is.',
+            'description' => 'Show this element only on a site that asks its visitors anything: a non-essential key is declared, or the author asked for a banner on a site with only essential keys. The value false is the other way round: the element shows only on a site with nothing to ask. It follows the registry at each page load, with no generation again. The generated cookie policy puts it on the paragraph holding its preferences button and on the consent record\'s row, and when that row is the table\'s only row on the table, with a line valued false beside it. With the consent layer off, or in the visual editor, the element is left as it is.',
             'category' => 'consent',
             'valueShape' => 'boolean-string',
-            'valueOptions' => ['true'],
+            'valueOptions' => ['true', 'false'],
             'valuePlaceholder' => 'true',
             'tagsAllowed' => ['*'],
             'docAnchor' => 'ADMIN_PANEL.md#910-storage-registry--cookie-consent-adminstorage',

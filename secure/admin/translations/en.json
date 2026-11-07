@@ -802,7 +802,7 @@
         "uploadAsset": {
             "or": "or",
             "multiFileTip": "Need to upload multiple files? Use the :link page.",
-            "assetManagement": "Assets",
+            "assetManagement": "Media",
             "allowedExtensions": "Allowed: :list · Category auto-detected from extension"
         },
         "keyGroup": {
@@ -1220,7 +1220,7 @@
         "interactions": "Interactions",
         "sitemap": "Sitemap",
         "optimize": "Optimize",
-        "assets": "Assets",
+        "assets": "Media",
         "authentication": "Authentication",
         "compliance": "Compliance",
         "storage": "Storage",
@@ -1859,7 +1859,7 @@
                 "params": {
                     "includeAssets": {
                         "label": "Include my starred assets in the prompt",
-                        "help": "The AI will use your starred assets (images, fonts, etc.) instead of placeholders. Star assets in the Asset Management page first."
+                        "help": "The AI will use your starred assets (images, fonts, etc.) instead of placeholders. Star them on the Media page first."
                     },
                     "includeFavicon": {
                         "label": "Include favicon documentation",
@@ -3820,7 +3820,7 @@
         "selectOn": "☑ Select",
         "selectOff": "☐ Select",
         "fontSpecimen": "AaBbCc",
-        "title": "Assets",
+        "title": "Media",
         "subtitle": "Upload, browse, and manage your project files",
         "uploadTitle": "Upload",
         "dropHere": "Drop files here or :browse",

@@ -16,7 +16,7 @@
         <div class="preview-keyframe-modal__body animation-preview__body">
             <!-- Preview Stage -->
             <div class="animation-preview__stage" id="animation-preview-stage">
-                <img src="<?= $baseUrl ?>/admin/assets/images/favicon.png" alt="Preview" class="animation-preview__logo" id="animation-preview-logo">
+                <img src="<?= $baseUrl ?>/admin/assets/images/logo.svg" alt="Preview" class="animation-preview__logo" id="animation-preview-logo" width="80" height="80">
             </div>
             
             <!-- Animation Controls -->

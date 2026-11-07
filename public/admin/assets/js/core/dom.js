@@ -70,6 +70,16 @@ window.QSDom = (function () {
         return svg;
     }
 
+    /**
+     * The one scroller of a table of the panel: .admin-table-wrapper's edge shadow says there
+     * is more, and the keyboard reaches it.
+     * @param {HTMLElement} table
+     * @returns {HTMLElement}
+     */
+    function tableWrapper(table) {
+        return el('div', { class: 'admin-table-wrapper', tabindex: '0' }, [table]);
+    }
+
     /** Remove every child of a node (textContent-free list reset). */
     function clear(node) {
         while (node.firstChild) {
@@ -207,6 +217,7 @@ window.QSDom = (function () {
         el: el,
         svgIcon: svgIcon,
         iconEl: iconEl,
+        tableWrapper: tableWrapper,
         clear: clear,
         setSelectPlaceholder: setSelectPlaceholder,
         setButtonBusy: setButtonBusy

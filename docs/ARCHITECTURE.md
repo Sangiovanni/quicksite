@@ -1238,7 +1238,7 @@ PHP and the browser runtime:
 |---|---|
 | `qs-route-schema.js` | `window.QS_ROUTES` — the project's route table: every pattern and its params |
 | `window.QS_PROJECT`, `window.QS_ROUTE` | the project id every browser-storage key is prefixed with; the route the server resolved for this request (pattern, captured values, found) and the base the page is served under, which `qs.js` exposes as `QS.routePath` / `QS.routeParams` / `QS.routeFound` / `QS.basePath` (§6.3) |
-| `window.QS_CONSENT` | the key→category map and one fingerprint per category a visitor chooses: what `qs.js` writes, reads and keeps only while its category is consented; and `asks`, whether the site asks its visitors anything, which decides whether a banner shows |
+| `window.QS_CONSENT` | the key→category map and one fingerprint per category a visitor chooses: what `qs.js` writes, reads and keeps only while its category is consented; and `asks`, whether the site asks its visitors anything, which decides whether a banner shows and whether a visitor's recorded choice is kept |
 | `qs.js` | the runtime itself |
 | theme wiring | `[data-theme-toggle]` behaviour, keyed per project |
 | `qs-api-config.js` | `window.QS_API_ENDPOINTS` |

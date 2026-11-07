@@ -265,9 +265,7 @@
 
         clearNode(historyContent);
         historyContent.appendChild(
-            el('div', { class: 'admin-table-wrapper' }, [
-                el('table', { class: 'admin-table' }, [head, body])
-            ])
+            QSDom.tableWrapper(el('table', { class: 'admin-table' }, [head, body]))
         );
     }
 

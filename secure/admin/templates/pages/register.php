@@ -53,15 +53,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <div class="admin-login">
     <div class="admin-login__header">
-        <!-- Intrinsic width/height so the mark stays 64px even if admin.css fails to
-             load; without them an SVG with only a viewBox fills its container and pushes
-             the form below the fold. The CSS rule still wins when it loads, so nothing
-             changes on a healthy install. -->
-        <svg class="admin-login__logo" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-            <path d="M2 17l10 5 10-5"/>
-            <path d="M2 12l10 5 10-5"/>
-        </svg>
+        <!-- Intrinsic width/height so the logo keeps its size even if admin.css fails to
+             load, and so does its alt when the images 404 with it; without them an SVG
+             takes its own 1025 pixel width and pushes the form below the fold. The CSS
+             rule still wins when it loads, so nothing changes on a healthy install. -->
+        <img class="admin-login__mark" src="<?= $baseUrl ?>/admin/assets/images/logo.svg" alt="" width="69" height="64">
+        <img class="admin-login__wordmark" src="<?= $baseUrl ?>/admin/assets/images/quicksite.svg" alt="<?= __admin('common.appName') ?>" width="140" height="44">
         <h1 class="admin-login__title"><?= __admin('register.title') ?></h1>
         <p class="admin-login__subtitle"><?= __admin('register.subtitle') ?></p>
     </div>

@@ -1328,7 +1328,7 @@
                 "params": {
                     "includeAssets": {
                         "label": "Inclure mes assets favoris dans le prompt",
-                        "help": "L'IA utilisera vos assets favoris (images, polices, etc.) au lieu de placeholders. Ajoutez des étoiles aux assets dans la page Gestion des Assets d'abord."
+                        "help": "L'IA utilisera vos assets favoris (images, polices, etc.) au lieu de placeholders. Ajoutez des étoiles aux assets dans la page Media d'abord."
                     },
                     "includeFavicon": {
                         "label": "Inclure la documentation favicon",

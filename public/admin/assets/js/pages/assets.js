@@ -1,5 +1,5 @@
 /**
- * Asset Management Page JavaScript
+ * Media Page JavaScript
  * 
  * Full-featured asset manager: upload zone, browser grid, edit area, batch delete.
  * Uses existing API commands: listAssets, uploadAsset, editAsset, deleteAsset.

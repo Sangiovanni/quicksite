@@ -53,6 +53,7 @@
             "oauth_session_description": "Sécurise une connexion pendant son passage par le fournisseur, et conserve votre session de connexion sur le serveur.",
             "oauth_user_retention": "14 jours, ou jusqu'à votre déconnexion",
             "oauth_user_description": "Vous garde connecté après une connexion via un fournisseur. Il n'est enregistré que lorsque vous vous connectez.",
+            "none": "Le registre de stockage de ce site ne déclare aucune donnée de stockage.",
             "disclaimer": "Ce résumé est généré à partir du registre de stockage du site et fourni à titre de transparence. Il ne constitue pas un avis juridique — faites réaliser votre propre vérification juridique."
         }
     },

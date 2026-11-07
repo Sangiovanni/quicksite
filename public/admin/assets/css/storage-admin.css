@@ -1,7 +1,6 @@
 /* Storage registry admin page. Structure mirrors oauth-admin.css.
    All colors use the --admin-* variables defined in admin.css (theme-aware). */
 
-.storage-header-icon { width: 28px; height: 28px; flex-shrink: 0; }
 
 .storage-list {
     display: flex;
@@ -119,14 +118,25 @@
     border-radius: 10px;
     width: 100%;
     max-width: 560px;
-    padding: 18px 20px 20px;
+    /* The backdrop's padding, top and bottom: the dialog scrolls inside the screen. */
+    max-height: calc(100vh - 96px);
+    overflow-y: auto;
+    overflow-wrap: break-word;
+    padding: 0 20px;
     box-shadow: 0 12px 48px rgba(0, 0, 0, 0.35);
 }
+/* The header and the buttons stay while the rest scrolls. Each holds the dialog's padding at
+   its end, so a field never shows above or below it. */
 .storage-modal-header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
     display: flex;
     align-items: center;
     justify-content: space-between;
     margin-bottom: 12px;
+    padding-top: 18px;
+    background: var(--admin-bg-secondary);
 }
 .storage-modal-header__title { margin: 0; font-size: 17px; color: var(--admin-text); }
 .storage-modal-header__close { padding: 6px; }
@@ -146,14 +156,20 @@
     padding-top: 10px;
 }
 .storage-cookie-secure,
-.storage-consent-ask-again { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: var(--admin-text); }
+.storage-consent-check { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; color: var(--admin-text); }
 
 .storage-modal-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: flex-end;
     gap: 8px;
     margin-top: 16px;
+    padding-bottom: 20px;
+    background: var(--admin-bg-secondary);
 }
 .storage-modal-actions__error {
     flex: 1;
@@ -165,6 +181,9 @@
     border-color: var(--admin-error);
     color: #fff;
 }
+
+/* The warning on a site that declares no non-essential key: its block's padding is its top margin. */
+.storage-consent-offer > p:first-child { margin-top: 0; }
 
 /* Locked cookie-policy route display in the generate modal */
 .storage-consent-policy { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }

@@ -229,12 +229,6 @@
 /* A field that is read-only until deliberately unlocked. Reads as a value, not
    as a disabled control: the deployed site's document-root folder name is
    usually the host's decision, not the author's. */
-.builds-options__locked {
-    background: var(--admin-bg-tertiary);
-    color: var(--admin-text-muted);
-    cursor: default;
-}
-
 .builds-options__unlock {
     margin-top: var(--space-xs);
 }

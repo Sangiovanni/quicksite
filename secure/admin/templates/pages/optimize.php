@@ -62,7 +62,12 @@ window.QS_OPTIMIZE_I18N = <?= json_encode($qsOptimizeI18n, JSON_HEX_TAG | JSON_H
 
     <!-- Page Header -->
     <div class="admin-page-header">
-        <h1 class="admin-page-header__title"><?= __admin('optimize.title') ?></h1>
+        <h1 class="admin-page-header__title">
+            <svg class="admin-page-header__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            </svg>
+            <?= __admin('optimize.title') ?>
+        </h1>
         <p class="admin-page-header__subtitle"><?= __admin('optimize.subtitle') ?></p>
     </div>
 

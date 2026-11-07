@@ -145,7 +145,8 @@ $langNames = [
     <title><?= __admin('common.appName') ?> - <?= adminEscape($pageTitle) ?></title>
     
     <!-- Favicon -->
-    <link rel="icon" type="image/png" href="<?= $baseUrl ?>/admin/assets/images/favicon.png">
+    <link rel="icon" type="image/png" sizes="64x64" href="<?= $baseUrl ?>/admin/assets/images/favicon.png">
+    <link rel="icon" type="image/svg+xml" sizes="any" href="<?= $baseUrl ?>/admin/assets/images/logo.svg">
     
     <!-- Early language redirect from localStorage -->
     <script>
@@ -177,6 +178,8 @@ $langNames = [
     <link rel="stylesheet" href="<?= $versionedAsset('/css/searchable-select.css') ?>">
     <link rel="stylesheet" href="<?= $versionedAsset('/css/bubble.css') ?>">
     <link rel="stylesheet" href="<?= $versionedAsset('/css/preview-ai-tools.css') ?>">
+    <!-- The three views: every media query of the panel. Stays the last stylesheet. -->
+    <link rel="stylesheet" href="<?= $versionedAsset('/css/responsive.css') ?>">
     <!-- Storage key registry — must load before any page script that references QuickSiteStorageKeys -->
     <script src="<?= $versionedAsset('/js/core/storage-keys.js') ?>"></script>
     <!-- Shared DOM factory — must load before any page script that references QSDom -->
@@ -193,12 +196,8 @@ $langNames = [
     <header class="admin-header">
         <div class="admin-header__brand">
             <a href="<?= $router->url('dashboard') ?>" class="admin-header__logo">
-                <svg class="admin-header__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-                    <path d="M2 17l10 5 10-5"/>
-                    <path d="M2 12l10 5 10-5"/>
-                </svg>
-                <span><?= __admin('common.appName') ?></span>
+                <img class="admin-header__mark" src="<?= $baseUrl ?>/admin/assets/images/logo.svg" alt="" width="28" height="26">
+                <img class="admin-header__wordmark" src="<?= $baseUrl ?>/admin/assets/images/quicksite.svg" alt="<?= __admin('common.appName') ?>" width="76" height="24">
             </a>
         </div>
         
@@ -304,14 +303,14 @@ $langNames = [
                 </div>
             </div>
 
-            <!-- Assets - Top-level tab -->
+            <!-- Media - Top-level tab -->
             <a href="<?= $router->url('media') ?>" 
                class="admin-nav__link<?= $isAssetsActive ? ' admin-nav__link--active' : '' ?>"
                data-requires-command="listAssets">
                 <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                 </svg>
-                <span><?= __admin('nav.assets') ?></span>
+                <span><?= __admin('nav.assets', 'Media') ?></span>
             </a>
             
             <!-- Sitemap - Top-level tab -->
@@ -381,7 +380,7 @@ $langNames = [
                     <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/>
                     </svg>
-                    <span><?= __admin('nav.compliance') ?></span>
+                    <span><?= __admin('nav.compliance', 'Compliance') ?></span>
                     <svg class="admin-nav__group-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <polyline points="6 9 12 15 18 9"/>
                     </svg>
@@ -393,7 +392,7 @@ $langNames = [
                         <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/>
                         </svg>
-                        <span><?= __admin('nav.storage') ?></span>
+                        <span><?= __admin('nav.storage', 'Storage') ?></span>
                     </a>
                     <a href="<?= $router->url('privacy') ?>"
                        class="admin-nav__link<?= $currentPage === 'privacy' ? ' admin-nav__link--active' : '' ?>"
@@ -401,7 +400,7 @@ $langNames = [
                         <svg class="admin-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/><path d="M9 12l2 2 4-4"/>
                         </svg>
-                        <span><?= __admin('nav.privacy') ?></span>
+                        <span><?= __admin('nav.privacy', 'Privacy') ?></span>
                     </a>
                 </div>
             </div>

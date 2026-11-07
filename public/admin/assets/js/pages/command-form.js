@@ -2658,7 +2658,7 @@ async function initListAssetsForm() {
 
 /**
  * Initialize uploadAsset form — single file upload (atomic command).
- * For multi-file upload, use the dedicated Asset Management page (/admin/assets).
+ * For multi-file upload, use the dedicated Media page (/admin/media).
  * Category is auto-detected from file extension (no category select needed).
  */
 async function initUploadAssetForm() {
@@ -2722,15 +2722,16 @@ async function initUploadAssetForm() {
         }
     }
     
-    // Add link to Asset Management page for multi-file uploads
+    // Add link to the Media page for multi-file uploads
     const pageHeader = document.querySelector('.admin-page-header');
     if (pageHeader) {
         const tip = _renderHint([
             _renderRich(t('commandForm.uploadAsset.multiFileTip'), {
-                // The asset page is routed 'media', NOT 'assets' — a directory
+                // The Media page is routed 'media', NOT 'assets' — a directory
                 // named 'assets' would shadow it, and public/admin/assets/ is a
                 // real one. See AdminRouter::$validPages.
                 link: QSDom.el('a', {
+                    class: 'admin-link',
                     href: (window.QUICKSITE_CONFIG?.adminBase || '/admin') + '/media',
                     text: t('commandForm.uploadAsset.assetManagement')
                 })

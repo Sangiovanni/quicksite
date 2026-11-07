@@ -14,7 +14,7 @@
     padding: 0 5px;
     border-radius: 9px;
     background: var(--admin-accent);
-    color: var(--admin-text);
+    color: var(--admin-on-accent);
     font-size: 11px;
     font-weight: 700;
     line-height: 1;

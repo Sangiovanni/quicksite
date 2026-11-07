@@ -38,7 +38,7 @@ class AdminRouter {
      * and looked perfectly healthy. It survived that long precisely because
      * the dev machine runs Apache.
      *
-     * That is why the Asset Management page is routed as `media`. The same
+     * That is why the Media page is routed as `media`. The same
      * reserved-name idea already exists for project aliases — see
      * $reservedPaths in secure/management/command/createAlias.php.
      *
@@ -70,7 +70,7 @@ class AdminRouter {
         'memberships', // My Memberships — inbox / requests / proposals / notices (any authenticated user)
         'members',     // Project Members — roster / queue / invite / policy for the EDITED project
         'account',     // My Account — password, sign out everywhere, delete account (any authenticated user)
-        'media',       // Asset Management page. ⚠ NOT 'assets' — see the
+        'media',       // Media page. ⚠ NOT 'assets' — see the
                        //   reserved-segment note above.
         'sitemap',     // Visual Sitemap & Route Management
         'builds',      // Builds — build / download / delete the project's single build

@@ -22,7 +22,7 @@ window.QS_PRIVACY_I18N = <?= qs_inline_script_json(['privacy' => AdminTranslatio
 
 <div class="admin-page-header">
     <h1 class="admin-page-header__title">
-        <svg class="admin-page-header__icon privacy-header-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg class="admin-page-header__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z"/><path d="M9 12l2 2 4-4"/>
         </svg>
         Privacy helper

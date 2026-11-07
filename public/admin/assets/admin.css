@@ -52,13 +52,21 @@
     --admin-surface: #3a322a;
     --admin-surface-hover: #453c32;
     --admin-border: rgba(250, 246, 241, 0.1);
-    --admin-border-focus: rgba(194, 112, 62, 0.5);
+    --admin-border-focus: rgba(225, 140, 48, 0.5);
     --admin-text: #faf6f1;
-    --admin-text-muted: #b5a899;
+    --admin-text-muted: #cdb8a0;
     --admin-text-light: #8a7a68;
-    --admin-accent: #c2703e;
-    --admin-accent-hover: #d4865a;
-    --admin-accent-muted: rgba(194, 112, 62, 0.2);
+    /* The accent comes from the logo, and so does its family. To put the old colours
+       back, restore this block and the two values above it. */
+    --admin-accent: #e18c30;
+    --admin-accent-hover: #e59634;
+    --admin-accent-muted: rgba(225, 140, 48, 0.2);
+    --admin-accent-rgb: 225, 140, 48;
+    --admin-accent-bg: var(--admin-accent-muted);
+    --admin-accent-light: var(--admin-accent-muted);
+    --admin-accent-subtle: rgba(225, 140, 48, 0.12);
+    /* Text on an accent background: dark, as light text reads at 2.4:1 on this orange. */
+    --admin-on-accent: var(--admin-bg);
     --admin-success: #6b8e5c;
     --admin-success-bg: rgba(107, 142, 92, 0.15);
     --admin-warning: #d4a84b;
@@ -222,10 +230,17 @@ code,
     font-size: var(--font-size-lg);
 }
 
-.admin-header__icon {
-    width: 24px;
-    height: 24px;
-    color: var(--admin-accent);
+.admin-header__mark {
+    display: block;
+    width: auto;
+    height: 1.625rem;
+    flex-shrink: 0;
+}
+
+.admin-header__wordmark {
+    display: block;
+    width: auto;
+    height: 1.5rem;
 }
 
 /* =============================================================================
@@ -377,7 +392,7 @@ code,
 
 .admin-btn--primary {
     background: var(--admin-accent);
-    color: var(--admin-text);
+    color: var(--admin-on-accent);
 }
 
 .admin-btn--primary:hover:where(:not(:disabled, [aria-disabled="true"])),
@@ -501,7 +516,7 @@ code,
 .admin-footer__lang-btn--active {
     background: var(--admin-primary);
     border-color: var(--admin-primary);
-    color: var(--admin-bg-primary);
+    color: var(--admin-on-accent);
     cursor: default;
 }
 
@@ -593,6 +608,12 @@ code,
     box-shadow: 0 0 0 3px var(--admin-accent-muted);
 }
 
+/* A field that cannot be edited does not look as if it could. */
+.admin-input[readonly] {
+    color: var(--admin-text-muted);
+    cursor: not-allowed;
+}
+
 .admin-input::placeholder,
 .asset-dropzone svg {
     color: var(--admin-text-light);
@@ -653,11 +674,18 @@ input.admin-checkbox {
     margin-bottom: var(--space-2xl);
 }
 
-.admin-login__logo {
-    width: 64px;
-    height: 64px;
-    color: var(--admin-accent);
-    margin-bottom: var(--space-md);
+.admin-login__mark {
+    display: block;
+    width: auto;
+    height: 4rem;
+    margin: 0 auto var(--space-sm);
+}
+
+.admin-login__wordmark {
+    display: block;
+    width: auto;
+    height: 2.75rem;
+    margin: 0 auto var(--space-md);
 }
 
 .admin-login__title {
@@ -708,10 +736,20 @@ input.admin-checkbox {
 }
 
 .admin-page-header__title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
     margin: 0;
     font-size: var(--font-size-3xl);
     font-weight: var(--font-weight-bold);
     color: var(--admin-text);
+}
+
+/* One size on every page. */
+.admin-page-header__icon {
+    width: 1.75rem;
+    height: 1.75rem;
+    flex-shrink: 0;
 }
 
 .admin-page-header__subtitle {
@@ -801,160 +839,6 @@ input.admin-checkbox {
     grid-template-columns: repeat(4, 1fr);
 }
 
-@media (max-width: 1024px) {
-    .admin-grid--cols-4,
-.admin-grid--cols-3 {
-        grid-template-columns: repeat(2, 1fr);
-    }
-    .admin-modal--apis .admin-modal__content {
-        width: 90%;
-    }
-    .preview-sidebar {
-        width: 56px;
-    }
-    .preview-sidebar__tools,
-.preview-sidebar__options,
-.preview-contextual-area--sidebar .preview-contextual-content {
-        padding: var(--space-xs);
-    }
-    .preview-sidebar-tool {
-        justify-content: center;
-        padding: var(--space-sm);
-    }
-    .preview-sidebar-tool span {
-        display: none;
-    }
-    .preview-sidebar-tool svg {
-        width: 20px;
-        height: 20px;
-    }
-    .preview-sidebar__divider {
-        margin: var(--space-xs);
-    }
-    .preview-toolbar--row1 {
-        padding: var(--space-xs) var(--space-sm);
-        gap: var(--space-sm);
-    }
-    .preview-toolbar__select {
-        max-width: 200px;
-    }
-}
-
-@media (max-width: 768px) {
-    .admin-grid--cols-2,
-.admin-grid--cols-3,
-.admin-grid--cols-4 {
-        grid-template-columns: 1fr;
-    }
-    .admin-detail-grid {
-        grid-template-columns: repeat(2, 1fr);
-    }
-    .admin-body[data-page="preview"] .admin-main {
-        height: calc(100vh - var(--admin-header-height) - var(--admin-mobile-toolbar-height));
-    }
-    .preview-toolbar {
-        padding: var(--space-sm);
-        gap: var(--space-sm);
-    }
-    .preview-toolbar__group--grow {
-        order: -1;
-        width: 100%;
-        flex: none;
-    }
-    .preview-container {
-        min-height: 400px;
-    }
-    .preview-frame-wrapper {
-        height: 400px;
-    }
-    .preview-workspace,
-.preview-contextual-info,
-.preview-contextual-info__main,
-.asset-edit-area__content {
-        flex-direction: column;
-    }
-    .preview-sidebar,
-.preview-contextual-area,
-.preview-toolbar__label,
-.preview-device-row {
-        display: none;
-    }
-    .preview-workspace[data-mode="add"] .preview-sidebar {
-        display: block !important;
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 60px;
-        z-index: 1000;
-        width: 100% !important;
-        max-width: none !important;
-        overflow-y: auto;
-    }
-    .preview-workspace[data-mode="add"] .preview-sidebar__tools,
-    .preview-workspace[data-mode="add"] .preview-sidebar__divider,
-    .preview-workspace[data-mode="add"] .preview-sidebar__resize {
-        display: none !important;
-    }
-    .preview-main {
-        width: 100%;
-        flex: 1;
-        min-height: 0;
-    }
-    .preview-mobile-toolbar,
-.preview-mobile-sections {
-        display: flex !important;
-    }
-    .preview-workspace[data-mode="add"] .preview-contextual-area {
-        display: block !important;
-    }
-    .preview-toolbar--row1 {
-        padding: var(--space-xs);
-        gap: var(--space-xs);
-    }
-    .preview-toolbar__left,
-    .preview-toolbar__right {
-        gap: var(--space-xs);
-    }
-    .preview-toolbar__select {
-        max-width: 150px;
-        width: 100%;
-        font-size: var(--font-size-xs);
-        padding: var(--space-xs);
-    }
-    .preview-element-info__toggle,
-.preview-element-info__details {
-        padding: var(--space-xs) var(--space-sm);
-    }
-    .preview-page {
-        padding-bottom: 60px;
-    }
-    .preview-contextual-content {
-        padding: var(--space-sm);
-    }
-    .preview-page--miniplayer .preview-container,
-.global-miniplayer {
-        width: 280px;
-        height: 200px;
-        bottom: var(--space-md);
-        right: var(--space-md);
-    }
-    .asset-edit-area__preview {
-        width: 100%;
-        max-height: 160px;
-    }
-    .asset-browser__toolbar {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    .asset-search__input {
-        width: 100%;
-    }
-    .asset-grid {
-        grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-    }
-}
-
 /* =============================================================================
    SEARCH BAR (Command page)
    ============================================================================= */
@@ -1004,8 +888,24 @@ input.admin-checkbox {
     flex: 0 0 auto;
 }
 
+/* What holds a table or another wide block: it scrolls sideways by itself, and an edge
+   shadow says there is more. Two covers that scroll with the content sit over two shadows
+   that stay at the edges, so a shadow shows only while there is more to reach on its side.
+   No script. It all paints under the content: a cell with an opaque background hides it,
+   which is why a row's hover below is translucent. Something on another surface sets
+   --admin-scroll-cover to that surface. */
 .admin-table-wrapper {
+    --admin-scroll-cover: var(--admin-bg-secondary);
     overflow-x: auto;
+    background-image:
+        linear-gradient(to right, var(--admin-scroll-cover) 1.5rem, transparent),
+        linear-gradient(to left, var(--admin-scroll-cover) 1.5rem, transparent),
+        linear-gradient(to right, rgba(var(--admin-accent-rgb), 0.3), transparent),
+        linear-gradient(to left, rgba(var(--admin-accent-rgb), 0.3), transparent);
+    background-position: left center, right center, left center, right center;
+    background-size: 3rem 100%, 3rem 100%, 1rem 100%, 1rem 100%;
+    background-repeat: no-repeat;
+    background-attachment: local, local, scroll, scroll;
 }
 
 .admin-pagination {
@@ -1072,6 +972,8 @@ input.admin-checkbox {
 
 .admin-modal__body {
     padding: var(--space-lg);
+    flex: 1 1 auto;
+    min-height: 0;
     overflow-y: auto;
 }
 
@@ -1178,9 +1080,13 @@ input.admin-checkbox {
 
 .admin-tree__row:hover,
 .sitemap__lang-header:hover,
-.admin-table tr:hover td,
 .preview-theme-color:hover {
     background: var(--admin-bg-tertiary);
+}
+
+/* Translucent, so the edge shadow of .admin-table-wrapper still shows through it. */
+.admin-table tr:hover td {
+    background: color-mix(in srgb, var(--admin-text) 4%, transparent);
 }
 
 .admin-tree__row--selected {
@@ -1292,7 +1198,7 @@ input.admin-checkbox {
     width: 24px;
     height: 24px;
     background: var(--admin-primary);
-    color: #ffffff;
+    color: var(--admin-on-accent);
     border-radius: 50%;
     display: flex;
     align-items: center;
@@ -1432,7 +1338,7 @@ input.admin-checkbox {
 .snippet-selector__category.active {
     background: var(--admin-primary);
     border-color: var(--admin-primary);
-    color: #ffffff;
+    color: var(--admin-on-accent);
 }
 
 .ai-browser__tag-btn--active:hover {
@@ -1570,7 +1476,7 @@ input.admin-checkbox {
     font-size: var(--font-size-xs);
     padding: 2px 6px;
     background: var(--admin-accent);
-    color: #ffffff;
+    color: var(--admin-on-accent);
     border-radius: var(--radius-sm);
     margin-left: var(--space-xs);
 }
@@ -1762,6 +1668,24 @@ kbd {
     color: #ffc107;
 }
 
+/* Every dialog's overlay spans the screen and no more: on a page wider than the screen a
+   fixed box takes the page's width and a height to match, and what it centres goes with it. */
+.admin-modal,
+.admin-modal-overlay,
+.preview-keyframe-modal,
+.apply-keyframe-modal,
+.add-transition-modal,
+.preview-translate-csv-modal,
+.sitemap-edit-title-modal,
+.sitemap-resolver-modal,
+.sitemap-resolver-list-modal,
+.storage-modal-backdrop,
+.privacy-modal-backdrop {
+    box-sizing: border-box;
+    max-width: 100vw;
+    max-height: 100vh;
+}
+
 .admin-modal {
     position: fixed;
     top: 0;
@@ -1790,12 +1714,28 @@ kbd {
     box-shadow: var(--shadow-lg);
     width: 90%;
     max-height: 90vh;
-    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    overflow-wrap: break-word;
+}
+
+/* The body scrolls; the header and the footer stay. A form holds the body and the footer. */
+.admin-modal__content > form {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.admin-modal__header,
+.admin-modal__footer {
+    flex-shrink: 0;
 }
 
 /* API Page Modals - Unified sizing */
 .admin-modal--apis .admin-modal__content {
-    width: 65%;
+    /* 65% of a computer's window, and on a narrower one as much as a form needs. */
+    width: max(65%, min(90%, 32rem));
     max-width: none;
 }
 
@@ -1830,6 +1770,7 @@ kbd {
 
 .admin-modal__footer {
     display: flex;
+    flex-wrap: wrap;
     justify-content: flex-end;
     gap: var(--space-sm);
     padding: var(--space-md);
@@ -2120,8 +2061,7 @@ kbd {
 
 /* Param routes: accent the ':name' segment + count badge so
    variable routes (e.g. /products/:slug) read distinctly from static ones.
-   Uses --admin-accent (the project's defined warm-copper accent token,
-   #c2703e) directly; --admin-primary is an alias of it. */
+   Uses --admin-accent directly; --admin-primary is an alias of it. */
 .sitemap__route-path-segment--param {
     color: var(--admin-accent);
     font-weight: var(--font-weight-medium);
@@ -2522,55 +2462,6 @@ kbd {
     padding: var(--space-sm) var(--space-md);
     display: flex;
     justify-content: flex-end;
-}
-
-/* Responsive sitemap */
-@media (max-width: 640px) {
-    .sitemap__summary {
-        flex-wrap: wrap;
-        gap: var(--space-xs);
-    }
-    .sitemap__route-path,
-.admin-header__brand span {
-        display: none;
-    }
-    .sitemap-generator__row {
-        flex-direction: column;
-    }
-    .sitemap-layout-toggles {
-        display: none;
-    }
-    .project-manager__select-row,
-.project-manager__quick-actions {
-        flex-direction: column;
-    }
-    .project-manager__quick-actions .admin-btn {
-        min-width: auto;
-    }
-    .storage-overview__header {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: var(--space-xs);
-    }
-    .storage-overview__legend {
-        gap: var(--space-sm) var(--space-md);
-    }
-    .admin-nav {
-        justify-content: space-around;
-    }
-    .admin-shortcuts-grid,
-.admin-grid--cols-2,
-.admin-grid--cols-3 {
-        grid-template-columns: 1fr;
-    }
-    .admin-tabs {
-        flex-wrap: wrap;
-    }
-    .admin-tabs__tab {
-        flex: 1;
-        justify-content: center;
-        min-width: 100px;
-    }
 }
 
 /* Project Manager Styles */
@@ -3239,7 +3130,7 @@ kbd {
     align-items: center;
     justify-content: center;
     background: var(--admin-accent);
-    color: #000000;
+    color: var(--admin-on-accent);
     border-radius: 50%;
     font-weight: var(--font-weight-bold);
     font-size: var(--font-size-sm);
@@ -3327,7 +3218,7 @@ kbd {
 .admin-ai-tag--active {
     background: var(--admin-accent);
     border-color: var(--admin-accent);
-    color: #000000;
+    color: var(--admin-on-accent);
 }
 
 /* Section */
@@ -3519,7 +3410,7 @@ kbd {
 
 .admin-ai-import-section--highlight {
     border-color: var(--admin-accent);
-    box-shadow: 0 0 0 3px rgba(var(--admin-accent-rgb, 255, 215, 0), 0.2);
+    box-shadow: 0 0 0 3px rgba(var(--admin-accent-rgb), 0.2);
 }
 
 .admin-ai-import-hint {
@@ -3800,45 +3691,6 @@ kbd {
     margin-top: var(--space-sm);
 }
 
-@media (max-width: 900px) {
-    .admin-header {
-        flex-wrap: wrap;
-        height: auto;
-        padding: var(--space-md);
-        gap: var(--space-sm);
-    }
-    .admin-header__brand {
-        flex: 0 0 auto;
-        margin-right: auto;
-    }
-    .admin-nav {
-        order: 3;
-        flex: 0 0 100%;
-        width: 100%;
-        margin-top: var(--space-sm);
-        justify-content: center;
-        flex-wrap: wrap;
-        gap: var(--space-xs);
-    }
-    .admin-header__actions {
-        order: 2;
-        flex: 0 0 auto;
-    }
-    .admin-header__actions .admin-btn span {
-        display: none;
-    }
-    .admin-header__actions .admin-btn {
-        padding: var(--space-sm);
-    }
-    .admin-nav__group-dropdown {
-        position: fixed;
-        top: auto;
-        left: 50%;
-        transform: translateX(-50%);
-        min-width: 200px;
-    }
-}
-
 .asset-page {
     display: flex;
     flex-direction: column;
@@ -3915,7 +3767,7 @@ kbd {
 .preview-contextual-form__tab.active,
 .admin-tabs__tab--active {
     background: var(--admin-primary);
-    color: #ffffff;
+    color: var(--admin-on-accent);
 }
 
 /* Error state */
@@ -4267,6 +4119,13 @@ kbd {
     padding: var(--space-xl);
 }
 
+/* A long message scrolls; the icon, the title and the buttons stay. */
+.admin-modal-dialog__content {
+    display: flex;
+    flex-direction: column;
+    max-height: 90vh;
+}
+
 .apis-empty__icon {
     opacity: 0.3;
     margin-bottom: var(--space-md);
@@ -4440,7 +4299,7 @@ kbd {
 
 .qs-textkey-picker__item:last-child { border-bottom: none; }
 .qs-textkey-picker__item:hover { background: var(--admin-hover, #f0f0f0); }
-.qs-textkey-picker__item--selected { background: var(--admin-accent-light, #e8f0fe); }
+.qs-textkey-picker__item--selected { background: var(--admin-accent-light); }
 
 .qs-textkey-picker__item-key {
     font-family: var(--font-mono, monospace);
@@ -4943,6 +4802,7 @@ kbd {
     border-radius: var(--radius-lg);
     max-width: 480px;
     width: 90%;
+    overflow-wrap: break-word;
     transform: scale(0.9);
     transition: transform 0.3s ease;
 }
@@ -4973,6 +4833,8 @@ kbd {
 
 .admin-modal-dialog__message {
     margin: 0 0 var(--space-xl);
+    min-height: 0;
+    overflow-y: auto;
     color: var(--admin-text-muted);
     /* A message keeps its line breaks, as the browser's dialog kept them. */
     white-space: pre-line;
@@ -4993,6 +4855,8 @@ kbd {
 
 .admin-modal-dialog__actions {
     display: flex;
+    flex-wrap: wrap;
+    flex-shrink: 0;
     gap: var(--space-md);
     justify-content: center;
 }
@@ -5465,7 +5329,7 @@ kbd {
     letter-spacing: 0.5px;
     border-radius: var(--radius-sm);
     background: var(--admin-primary);
-    color: var(--admin-primary-text);
+    color: var(--admin-on-accent);
 }
 
 /* Role-specific colors */
@@ -6248,7 +6112,7 @@ kbd {
     margin-left: auto;
     padding: 2px 6px;
     background: var(--admin-primary);
-    color: var(--admin-primary-text);
+    color: var(--admin-on-accent);
     border-radius: var(--radius-sm);
     font-size: 10px;
     font-weight: var(--font-weight-medium);
@@ -7516,7 +7380,7 @@ code.preview-contextual-info__value {
 
 .preview-theme-scope__btn--active {
     background: var(--admin-primary);
-    color: #fff;
+    color: var(--admin-on-accent);
 }
 
 .preview-theme-scope__btn:not(.preview-theme-scope__btn--active):hover {
@@ -7613,7 +7477,7 @@ code.preview-contextual-info__value {
 
 .preview-toolbar__seg-btn--active {
     background: var(--admin-primary);
-    color: #fff;
+    color: var(--admin-on-accent);
 }
 
 .preview-toolbar__seg-btn:not(.preview-toolbar__seg-btn--active):hover {
@@ -8100,7 +7964,7 @@ code.preview-contextual-info__value {
 
 .qs-easing-picker__curve {
     fill: none;
-    stroke: var(--admin-accent, #c2703e);
+    stroke: var(--admin-accent);
     stroke-width: 2.5;
     stroke-linecap: round;
 }
@@ -8123,7 +7987,7 @@ code.preview-contextual-info__value {
 }
 
 .qs-easing-picker__handle {
-    fill: var(--admin-accent, #c2703e);
+    fill: var(--admin-accent);
     stroke: var(--admin-bg-secondary);
     stroke-width: 2;
     pointer-events: none;  /* handled by the hit-area circle */
@@ -8156,7 +8020,7 @@ code.preview-contextual-info__value {
 .qs-easing-picker__preset--active {
     color: var(--admin-text);
     background: var(--admin-bg);
-    border-color: var(--admin-accent, #c2703e);
+    border-color: var(--admin-accent);
 }
 
 .qs-easing-picker__inputs {
@@ -8230,7 +8094,7 @@ code.preview-contextual-info__value {
     width: 12px;
     height: 12px;
     border-radius: 50%;
-    background: var(--admin-accent, #c2703e);
+    background: var(--admin-accent);
 }
 
 /* The dot animates by sliding `left` from 0 to (bar width − dot width).
@@ -8503,7 +8367,7 @@ code.preview-contextual-info__value {
 .add-transition-modal__chip--active {
     color: var(--admin-text);
     background: var(--admin-bg);
-    border-color: var(--admin-accent, #c2703e);
+    border-color: var(--admin-accent);
 }
 
 .add-transition-modal__property-input {
@@ -8576,6 +8440,7 @@ code.preview-contextual-info__value {
 }
 
 .add-transition-modal__preview-value {
+    --admin-scroll-cover: var(--admin-bg);
     flex: 1;
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
     font-size: 0.8rem;
@@ -13592,7 +13457,7 @@ code.preview-contextual-info__value {
     border: 1px solid var(--admin-border);
     border-radius: var(--radius-sm);
     background: var(--admin-primary);
-    color: #ffffff;
+    color: var(--admin-on-accent);
     cursor: pointer;
     white-space: nowrap;
     transition: opacity 0.15s;
@@ -13892,7 +13757,7 @@ code.preview-contextual-info__value {
     margin-left: 4px;
     border-radius: 3px;
     background: var(--admin-accent);
-    color: #fff;
+    color: var(--admin-on-accent);
     vertical-align: middle;
     line-height: 1.3;
 }
@@ -13999,16 +13864,6 @@ code.preview-contextual-info__value {
 .tag-selector__category-label,
 .preview-page--miniplayer .preview-miniplayer-text--expand {
     display: inline;
-}
-
-/* Hide labels on narrow screens */
-@media (max-width: 500px) {
-    .tag-selector__category-label {
-        display: none;
-    }
-    .tag-selector__category {
-        padding: 8px;
-    }
 }
 
 /* Tag Panels */
@@ -14182,7 +14037,7 @@ code.preview-contextual-info__value {
 }
 
 .optimize-tool-nav__item--active {
-    background: var(--admin-accent-subtle, rgba(99,102,241,0.12));
+    background: var(--admin-accent-subtle);
     color: var(--admin-accent, #6366f1);
     font-weight: 600;
 }
@@ -14335,9 +14190,10 @@ code.preview-contextual-info__value {
 }
 
 .optimize-suggestion__diff {
+    --admin-scroll-cover: var(--admin-bg);
     width: 100%;
     margin-top: var(--space-xs);
-    background: var(--admin-bg);
+    background-color: var(--admin-bg);
     border: 1px solid var(--admin-border);
     border-radius: var(--radius-sm);
     padding: var(--space-sm);
@@ -14395,17 +14251,6 @@ code.preview-contextual-info__value {
 
 .optimize-modal-row:last-child {
     border-bottom: none;
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-    .optimize-layout {
-        grid-template-columns: 1fr;
-    }
-
-    .optimize-sidebar {
-        position: static;
-    }
 }
 
 .tag-selector__preview-tag {
@@ -14523,8 +14368,6 @@ code.preview-contextual-info__value {
     display: grid; grid-template-columns: repeat(4, 1fr);
     gap: var(--space-sm); margin-top: var(--space-sm);
 }
-@media (max-width: 800px) { .qsac-kinds { grid-template-columns: repeat(3, 1fr); } }
-@media (max-width: 600px) { .qsac-kinds { grid-template-columns: repeat(2, 1fr); } }
 .qsac-kinds-heading {
     margin: var(--space-md) 0 0;
     font-size: 0.8rem; font-weight: 700;
@@ -15295,7 +15138,7 @@ body[data-page="preview"] .global-miniplayer {
 
 .admin-mode-toggle__btn--active {
     background: var(--admin-accent);
-    color: #ffffff;
+    color: var(--admin-on-accent);
     box-shadow: 0 2px 4px #00000026;
 }
 
@@ -15498,7 +15341,7 @@ body[data-page="preview"] .global-miniplayer {
 }
 
 /* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-   ASSET MANAGEMENT PAGE
+   MEDIA PAGE
    â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 
 /* --- Dropzone --- */
@@ -16051,7 +15894,7 @@ body[data-page="preview"] .global-miniplayer {
 
 .asset-audio-player__btn:hover {
     background: var(--admin-accent);
-    color: #ffffff;
+    color: var(--admin-on-accent);
 }
 
 .asset-audio-player__bar {

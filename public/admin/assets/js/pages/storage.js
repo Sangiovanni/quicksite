@@ -841,10 +841,10 @@
      * tick box, which the caller reads when it generates.
      */
     function _renderEssentialBannerOffer(box) {
-        var offer = QSDom.el('div', { class: 'admin-alert admin-alert--warning' });
+        var offer = QSDom.el('div', { class: 'admin-alert admin-alert--warning storage-consent-offer' });
         offer.appendChild(QSDom.el('p', { text: _word('storage.consent.essentialOnly', 'Only essential keys are declared, so there is nothing to ask a visitor and no banner shows. The consent rule stays on, and a banner appears by itself once a functional, analytics or marketing key is declared.') }));
         offer.appendChild(QSDom.el('p', { text: _word('storage.consent.essentialOnlyLimit', 'No banner does not mean nothing to disclose: third-party embeds and scripts you wrote yourself are not in the registry, and a banner never gated them. That is a reason to keep a cookie-policy page.') }));
-        var label = QSDom.el('label', { class: 'storage-consent-ask-again' });
+        var label = QSDom.el('label', { class: 'storage-consent-check' });
         label.appendChild(box);
         label.appendChild(document.createTextNode(' ' + _word('storage.consent.essentialBanner', 'Create a banner anyway (it is not mandatory)')));
         offer.appendChild(label);
@@ -900,7 +900,7 @@
         var askAgainCb = null;
         if (status && status.enabled && status.asks !== false) {
             askAgainCb = QSDom.el('input', { type: 'checkbox' });
-            var askAgainLabel = QSDom.el('label', { class: 'storage-consent-ask-again' });
+            var askAgainLabel = QSDom.el('label', { class: 'storage-consent-check' });
             askAgainLabel.appendChild(askAgainCb);
             askAgainLabel.appendChild(document.createTextNode(' ' + t('storage.consent.askAgain')));
             content.appendChild(_renderGroup(null, askAgainLabel, _renderHint(t('storage.consent.askAgainHint'))));
