@@ -280,6 +280,18 @@ function qsDataAttributeCatalog(): array {
             'examplePayload' => '<input type="checkbox" data-consent-toggle="analytics">',
             'since' => 'v1.0.0-beta.9'
         ],
+        [
+            'name' => 'data-consent-asks',
+            'description' => 'Show this element only on a site that asks its visitors anything: a non-essential key is declared, or the author asked for a banner on a site with only essential keys. It follows the registry at each page load, with no generation again. The generated cookie policy puts it on the paragraph holding its preferences button and on the consent record\'s row. With the consent layer off, or in the visual editor, the element is left as it is.',
+            'category' => 'consent',
+            'valueShape' => 'boolean-string',
+            'valueOptions' => ['true'],
+            'valuePlaceholder' => 'true',
+            'tagsAllowed' => ['*'],
+            'docAnchor' => 'ADMIN_PANEL.md#910-storage-registry--cookie-consent-adminstorage',
+            'examplePayload' => '<p data-consent-asks="true"><button type="button" data-consent-action="customize">Cookie settings</button></p>',
+            'since' => 'v1.0.0-beta.12'
+        ],
 
         // ─── TEMPLATE / BINDING PRIMITIVES ───
         [

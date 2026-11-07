@@ -1588,9 +1588,13 @@
             "askAgain": "Ask visitors again",
             "askAgainHint": "Every visitor's recorded choice stops counting: the banner shows again, and until they choose, nothing non-essential is kept. A change to a category's keys already asks again for that category.",
             "askedAgain": "Every visitor is asked again.",
-            "generateHint": "Generates (or refreshes) the cookie banner + preferences popup from your declared keys, writes their texts in every language your pages read (only where a key has none, so an edited text stays), and enables the consent layer. Both render on every page and are editable in the visual editor.",
-            "routeHint": "Optional. Generates a deterministic cookie-policy page at this route, and the banner links to it. Left empty, there is no page and the banner links to none. A route that already exists is overwritten only after you confirm.",
-            "noPage": "No cookie-policy page: the route was left empty, so the banner links to none. To add one, type a route and press Generate."
+            "generateHint": "Generates (or refreshes) the cookie banner + preferences popup from your declared keys, writes their texts in every language your pages read (only where a key has none, so an edited text stays), and enables the consent layer. Both are on every page and editable in the visual editor, and the banner shows to a visitor only while the site has something to ask.",
+            "routeHint": "Optional. Generates a deterministic cookie-policy page at this route, and the banner, when one shows, links to it. Left empty, there is no page and a banner links to none. A route that already exists is overwritten only after you confirm.",
+            "noPage": "No cookie-policy page: the route was left empty, so a banner links to none. To add one, type a route and press Generate.",
+            "essentialOnly": "Only essential keys are declared, so there is nothing to ask a visitor and no banner shows. The consent rule stays on, and a banner appears by itself once a functional, analytics or marketing key is declared.",
+            "essentialOnlyLimit": "No banner does not mean nothing to disclose: third-party embeds and scripts you wrote yourself are not in the registry, and a banner never gated them. That is a reason to keep a cookie-policy page.",
+            "essentialBanner": "Create a banner anyway (it is not mandatory)",
+            "noBanner": "No banner was created: only essential keys are declared, so there is nothing to ask a visitor. A banner appears by itself once a functional, analytics or marketing key is declared."
         }
     },
     "structure": {

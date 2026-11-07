@@ -14,7 +14,12 @@
  *                                              customize, which reopens the
  *                                              preferences (the cookie-policy
  *                                              page carries one)
- *   [data-consent-toggle="<category>"]       — per-category checkbox in the popup
+ *   [data-consent-toggle="<category>"]       — per-category checkbox in the popup;
+ *                                              qs.js shows its row while the
+ *                                              category has a declared key
+ *   [data-consent-asks]                      — on the cookie-policy page: shown only
+ *                                              on a site that asks its visitors
+ *                                              anything (qs_consent_asks())
  *
  * Visible copy uses translation keys (textKey) so the layer shows in the
  * visitor's language from day one. Their words are in
@@ -109,7 +114,14 @@ function buildConsentBannerStructure(?string $policyRoute): array {
     ];
 }
 
-/** Popup structure (array of one root node). $categories = declared non-essential. */
+/**
+ * Popup structure (array of one root node). $categories = declared non-essential.
+ *
+ * One row per category a visitor can choose, whether or not it has a key now: a category declared
+ * later brings the banner back by itself, and its row must be there to choose. A category with no
+ * declared key is marked hidden. On a page, qs.js shows a row exactly while its category has a key;
+ * with no window.QS_CONSENT (the editor) the rows stay as written here.
+ */
 function buildConsentPopupStructure(array $categories): array {
     $rows = [];
     // Essential is always-on, shown locked.
@@ -118,8 +130,12 @@ function buildConsentPopupStructure(array $categories): array {
         _cNode('span', ['class' => 'qs-consent-row__note'], [_cText('consent.category.essential_note')]),
         _cNode('input', ['type' => 'checkbox', 'class' => 'qs-consent-row__toggle', 'checked' => true, 'disabled' => true]),
     ]);
-    foreach ($categories as $cat) {
-        $rows[] = _cNode('label', ['class' => 'qs-consent-row'], [
+    foreach (CONSENT_TOGGLE_CATEGORIES as $cat) {
+        $rowParams = ['class' => 'qs-consent-row'];
+        if (!in_array($cat, $categories, true)) {
+            $rowParams['hidden'] = true;
+        }
+        $rows[] = _cNode('label', $rowParams, [
             _cNode('span', ['class' => 'qs-consent-row__name'], [_cText('consent.category.' . $cat)]),
             _cNode('input', ['type' => 'checkbox', 'class' => 'qs-consent-row__toggle', 'data-consent-toggle' => $cat]),
         ]);
@@ -192,14 +208,19 @@ function consentOAuthLinks(): array {
  * finds a provider through the one scan of its routes ($oauthLinks, its answer), so the rows and the
  * sign-in section say the same thing.
  *
- * @return list<array{name: string, text: string}> `text` starts the row's two textKeys:
- *         consent.policy.<text>_retention and consent.policy.<text>_description
+ * The consent record is set only by a visitor's choice, so its row follows the same rule as the
+ * policy's button (`onlyWhenAsking`): both are always written and carry data-consent-asks, so they
+ * follow the registry at run time. Testing the rule here instead would lose the row on the path
+ * everyone uses, since the panel generates the policy before the layer.
+ *
+ * @return list<array{name: string, text: string, onlyWhenAsking: bool}> `text` starts the row's two
+ *         textKeys: consent.policy.<text>_retention and consent.policy.<text>_description
  */
 function consentEngineCookies(array $oauthLinks): array {
-    $cookies = [['name' => qs_project_cookie_name(QS_CONSENT_COOKIE), 'text' => 'record']];
+    $cookies = [['name' => qs_project_cookie_name(QS_CONSENT_COOKIE), 'text' => 'record', 'onlyWhenAsking' => true]];
     if ($oauthLinks !== []) {
-        $cookies[] = ['name' => QS_OAUTH_SESSION_COOKIE, 'text' => 'oauth_session'];
-        $cookies[] = ['name' => qs_project_cookie_name(QS_OAUTH_COOKIE), 'text' => 'oauth_user'];
+        $cookies[] = ['name' => QS_OAUTH_SESSION_COOKIE, 'text' => 'oauth_session', 'onlyWhenAsking' => false];
+        $cookies[] = ['name' => qs_project_cookie_name(QS_OAUTH_COOKIE), 'text' => 'oauth_user', 'onlyWhenAsking' => false];
     }
     return $cookies;
 }
@@ -284,11 +305,18 @@ function buildCookiePolicyStructure(array $items, array $oauthLinks): array {
     // The cookies QuickSite itself sets for a visitor, in the same row. They are outside the registry and
     // the consent rule, and a visitor checking their cookies must find them here. Like every row, each is
     // the setting at generation: the page is generated again after the site's sign-in routes change.
+    // The prefix note explains a name a visitor can see: when the consent record is the only name
+    // holding the prefix, the note follows that row.
+    $prefixOnlyWhenAsking = false;
     foreach (consentEngineCookies($oauthLinks) as $cookie) {
         if (strpos($cookie['name'], 'qsp_') === 0) {
-            $anyPrefixed = true;
+            if ($cookie['onlyWhenAsking']) {
+                $prefixOnlyWhenAsking = true;
+            } else {
+                $anyPrefixed = true;
+            }
         }
-        $bodyRows[] = _cNode('tr', [], [
+        $bodyRows[] = _cNode('tr', $cookie['onlyWhenAsking'] ? ['data-consent-asks' => true] : [], [
             _cNode('td', ['class' => 'qs-cookie-policy__key'], [_cRaw($cookie['name'])]),
             _cNode('td', [], [_cRaw('cookie')]),
             _cNode('td', [], [_cText('consent.category.essential')]),
@@ -301,8 +329,9 @@ function buildCookiePolicyStructure(array $items, array $oauthLinks): array {
 
     // The way back to the cookie preferences, right under the intro: withdrawing consent must be
     // as easy as giving it, and a visitor reading the policy has often come to change their choice.
-    // qs.js opens the preferences from any element marked customize.
-    $preferences = _cNode('p', ['class' => 'qs-cookie-policy__preferences'], [
+    // qs.js opens the preferences from any element marked customize. The paragraph carries
+    // data-consent-asks, not the button, so a site with nothing to ask keeps no empty gap.
+    $preferences = _cNode('p', ['class' => 'qs-cookie-policy__preferences', 'data-consent-asks' => true], [
         _cNode('button', [
             'type' => 'button',
             'class' => 'qs-consent-btn qs-consent-btn--primary',
@@ -320,8 +349,12 @@ function buildCookiePolicyStructure(array $items, array $oauthLinks): array {
     // One sentence explaining the prefix, and only when there is a prefixed key
     // to explain. A visitor comparing this table against their browser sees a
     // name they did not choose; saying why turns an oddity into a disclosure.
-    if ($anyPrefixed) {
-        $children[] = _cNode('p', ['class' => 'qs-cookie-policy__prefix-note'], [_cText('consent.policy.prefix_note')]);
+    if ($anyPrefixed || $prefixOnlyWhenAsking) {
+        $noteParams = ['class' => 'qs-cookie-policy__prefix-note'];
+        if (!$anyPrefixed) {
+            $noteParams['data-consent-asks'] = true;
+        }
+        $children[] = _cNode('p', $noteParams, [_cText('consent.policy.prefix_note')]);
     }
 
     // OAuth provider privacy-policy links (only when providers exist).

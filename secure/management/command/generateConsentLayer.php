@@ -8,18 +8,23 @@
  * @auth   required (write permission)
  *
  * Body (all optional):
- *   { "askAgain": true }   // ask every visitor again: the stored version goes up by one
+ *   { "askAgain": true }          // ask every visitor again: the stored version goes up by one
+ *   { "essentialBanner": true }   // a banner on a site that declares only essential keys; absent keeps the stored answer
  *
  * The banner links to the cookie-policy route consent.json records (owned by
  * generateCookiePolicy / deleteCookiePolicy); a body cannot set it.
  *
  * Writes templates/model/json/consent-banner.json + consent-popup.json (one
- * popup toggle row per DECLARED non-essential category), seeds the textKeys'
- * words in every language the pages read (NEW keys only — never clobbers edited
- * copy), and sets data/consent.json enabled=true. Idempotent: re-running refreshes the
- * structures + re-enables, preserving existing translations.
+ * popup row per category a visitor can choose, a category with no declared key
+ * marked hidden; qs.js shows a row while its category has a key), seeds the
+ * textKeys' words in every language the pages read (NEW keys only — never clobbers
+ * edited copy), and sets data/consent.json enabled=true. Both files are written
+ * whether or not the site asks its visitors anything (qs_consent_asks()), so the
+ * banner is there to come back by itself once a non-essential key is declared.
+ * Idempotent: re-running refreshes the structures + re-enables, preserving existing
+ * translations.
  *
- * @return ApiResponse 200 { categories, languagesSeeded, languagesFailed?, policyRoute, enabled, version, askedAgain }
+ * @return ApiResponse 200 { categories, languagesSeeded, languagesFailed?, policyRoute, enabled, version, askedAgain, asks, essentialBanner }
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
@@ -44,6 +49,25 @@ if (array_key_exists('askAgain', $params)) {
         ApiResponse::create(400, 'validation.invalid_type')
             ->withMessage('askAgain must be a boolean')
             ->withErrors([['field' => 'askAgain', 'reason' => 'invalid_type', 'expected' => 'boolean']])
+            ->send();
+    }
+}
+
+// essentialBanner: the author's answer for a site that declares only essential
+// keys. True and false both write; absent keeps what is stored, so running this
+// again from the console drops nothing. Read before any write, like askAgain.
+// filter_var() reads null and an empty string as false, which would erase the
+// stored answer with a value nobody chose, so those two are refused as well.
+$essentialBanner = null;
+if (array_key_exists('essentialBanner', $params)) {
+    $essentialBannerRaw = $params['essentialBanner'];
+    if ($essentialBannerRaw !== null && $essentialBannerRaw !== '') {
+        $essentialBanner = filter_var($essentialBannerRaw, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+    }
+    if ($essentialBanner === null) {
+        ApiResponse::create(400, 'validation.invalid_type')
+            ->withMessage('essentialBanner must be a boolean')
+            ->withErrors([['field' => 'essentialBanner', 'reason' => 'invalid_type', 'expected' => 'boolean']])
             ->send();
     }
 }
@@ -106,9 +130,14 @@ if ($askAgain) {
     $version++;
     $update['version'] = $version;
 }
-saveConsentConfig(array_merge($config, $update));
+if ($essentialBanner !== null) {
+    $update['essentialBanner'] = $essentialBanner;
+}
+$saved = array_merge($config, $update);
+saveConsentConfig($saved);
 qs_small_write_send_refusal();
 
+$asks = qs_consent_asks($saved, consentCategoryMap());
 $answer = [
     'categories'      => $categories,
     'languagesSeeded' => $seeded['languagesSeeded'],
@@ -116,11 +145,19 @@ $answer = [
     'enabled'         => true,
     'version'         => $version,
     'askedAgain'      => $askAgain,
+    'asks'            => $asks,
+    'essentialBanner' => !empty($saved['essentialBanner']),
 ];
 if ($seeded['languagesFailed'] !== []) {
     $answer['languagesFailed'] = $seeded['languagesFailed'];
 }
+$message = 'Consent layer generated and enabled';
+if (!$asks) {
+    $message .= '; only essential keys are declared, so there is nothing to ask a visitor and no banner shows';
+} elseif ($askAgain) {
+    $message .= '; every visitor is asked again';
+}
 ApiResponse::create(200, 'success')
-    ->withMessage($askAgain ? 'Consent layer generated and enabled; every visitor is asked again' : 'Consent layer generated and enabled')
+    ->withMessage($message)
     ->withData($answer)
     ->send();

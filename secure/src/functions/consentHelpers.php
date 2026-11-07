@@ -6,19 +6,22 @@
  * The consent layer is OFF until the author generates + enables it.
  * Per-project config lives in data/consent.json (author website data → JSON):
  *
- *   { "enabled": false, "policyRoute": null, "version": 1 }
+ *   { "enabled": false, "policyRoute": null, "version": 1, "essentialBanner": false }
  *
- *   enabled      — is the consent rule + the banner active for this project
- *   policyRoute  — route the generated cookie-policy page lives at
- *   version      — a bump asks every visitor again (generateConsentLayer's
- *                  askAgain); a change to a category's declared keys asks again
- *                  for that category by itself (qs_consent_fingerprints())
+ *   enabled         — is the consent rule active for this project
+ *   policyRoute     — route the generated cookie-policy page lives at
+ *   version         — a bump asks every visitor again (generateConsentLayer's
+ *                     askAgain); a change to a category's declared keys asks again
+ *                     for that category by itself (qs_consent_fingerprints())
+ *   essentialBanner — the author asked for a banner on a site that declares only
+ *                     essential keys (qs_consent_asks())
  *
- * When enabled, the page emits window.QS_CONSENT carrying the key→category map
- * and one fingerprint per non-essential category, so qs.js reads, writes and
- * keeps a non-essential key only while the visitor consents to its category
- * under that category's fingerprint now (the consent cookie records the
- * fingerprints a choice was made under).
+ * When enabled, the page emits window.QS_CONSENT carrying the key→category map,
+ * one fingerprint per non-essential category and whether the site asks its
+ * visitors anything, so qs.js reads, writes and keeps a non-essential key only
+ * while the visitor consents to its category under that category's fingerprint
+ * now (the consent cookie records the fingerprints a choice was made under), and
+ * shows the banner only on a site that asks.
  */
 
 if (!defined('SECURE_FOLDER_PATH')) {
@@ -28,7 +31,7 @@ if (!defined('SECURE_FOLDER_PATH')) {
 require_once SECURE_FOLDER_PATH . '/src/functions/utilsManagement.php';
 require_once SECURE_FOLDER_PATH . '/src/functions/storageHelpers.php';
 
-const CONSENT_CONFIG_DEFAULTS = ['enabled' => false, 'policyRoute' => null, 'version' => 1];
+const CONSENT_CONFIG_DEFAULTS = ['enabled' => false, 'policyRoute' => null, 'version' => 1, 'essentialBanner' => false];
 
 function getConsentConfigPath(): string {
     return PROJECT_PATH . '/data/consent.json';
@@ -90,7 +93,7 @@ function consentCategoryMap(): array {
  * author edits the consent config or the registry, so the build computes it
  * once and ships the result as data.
  *
- * @return array{enabled: bool, version: int, categories: array<string,string>, fingerprints: array<string,string>}|null
+ * @return array{enabled: bool, version: int, categories: array<string,string>, fingerprints: array<string,string>, asks: bool}|null
  */
 function qs_consent_payload(): ?array
 {
@@ -105,7 +108,32 @@ function qs_consent_payload(): ?array
         'version'      => $version,
         'categories'   => $categories,
         'fingerprints' => qs_consent_fingerprints($version, $categories),
+        'asks'         => qs_consent_asks($cfg, $categories),
     ];
+}
+
+/**
+ * Whether this site asks its visitors anything, the one place that says so: true when a declared
+ * key's category is not essential, or when the author asked for a banner anyway (essentialBanner).
+ * A site that declares only essential keys has nothing to ask, so it shows no banner unless asked.
+ * The answer governs that case alone: declaring a non-essential key brings the asking back, whatever
+ * the author answered. It is not an off switch: the consent rule holds on such a site as on any
+ * other, and an undeclared key is still refused.
+ *
+ * @param array                 $cfg        data/consent.json (loadConsentConfig())
+ * @param array<string,string>  $categories key → category (consentCategoryMap())
+ */
+function qs_consent_asks(array $cfg, array $categories): bool
+{
+    if (!empty($cfg['essentialBanner'])) {
+        return true;
+    }
+    foreach ($categories as $category) {
+        if ($category !== 'essential') {
+            return true;
+        }
+    }
+    return false;
 }
 
 /**

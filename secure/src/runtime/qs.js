@@ -1260,7 +1260,8 @@
     //
     // Reads the consent cookie (`qsp_<projectId>_consent_prefs`) and window.QS_CONSENT,
     // emitted server-side ONLY when the project enabled the consent layer: the
-    // key→category map and one fingerprint per non-essential category. When the
+    // key→category map, one fingerprint per non-essential category and whether the
+    // site asks its visitors anything (`asks`). When the
     // layer is off, all of it is dormant. When on, a value QuickSite stores is
     // written, read and kept only while its category is consented: an essential
     // key always; a declared non-essential key while the visitor consents to its
@@ -1334,11 +1335,13 @@
     };
 
     /**
-     * Whether the visitor has a choice to make: the layer is on, and no choice is recorded or a
-     * category's consent no longer holds. The banner shows while this is true.
+     * Whether the visitor has a choice to make: the layer is on, the site has something to ask, and
+     * no choice is recorded or a category's consent no longer holds. The banner shows while this is
+     * true. `asks` is compared strictly on purpose: a payload without it keeps asking.
      */
     function _consentNeedsChoice() {
-        if (!_consentConfig()) return false;
+        var cfg = _consentConfig();
+        if (!cfg || cfg.asks === false) return false;
         var prefs = _readConsentCookie();
         if (!prefs) return true;
         for (var i = 0; i < CONSENT_TOGGLE_CATS.length; i++) {
@@ -1476,18 +1479,24 @@
      *  Authors override via their own stylesheet (later: seed into style.css). */
     function _consentInjectStyles() {
         if (document.getElementById('qs-consent-styles')) return;
-        if (!document.getElementById('qs-consent-banner') && !document.getElementById('qs-consent-popup')) return;
+        if (!document.getElementById('qs-consent-banner') && !document.getElementById('qs-consent-popup')
+            && !(_consentConfig() && document.querySelector('[data-consent-asks]'))) return;
         var css =
             // Respect the `hidden` attribute — a class selector's display would
             // otherwise override the UA [hidden]{display:none}, so both layers
             // would always show. This rule (higher specificity) wins.
             '.qs-consent-banner[hidden],.qs-consent-popup[hidden]{display:none}' +
+            // What follows the registry hides whatever an author's own stylesheet
+            // says of its display: a row or a button left showing would offer a
+            // choice the site does not have.
+            '.qs-consent-row[hidden],[data-consent-asks][hidden]{display:none!important}' +
             '.qs-consent-banner{position:fixed;left:0;right:0;bottom:0;z-index:9999;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;background:#1d1f23;color:#f3f4f6;box-shadow:0 -2px 16px rgba(0,0,0,.25);font-size:14px}' +
             '.qs-consent-banner__text{margin:0;flex:1 1 320px;line-height:1.45}' +
             '.qs-consent-banner__policy{color:#9ecbff;margin-left:6px}' +
             '.qs-consent-banner__actions{display:flex;flex-wrap:wrap;gap:8px}' +
             '.qs-consent-btn{cursor:pointer;border:1px solid transparent;border-radius:6px;padding:8px 14px;font-size:14px;font-weight:600}' +
-            '.qs-consent-btn--ghost{background:transparent;border-color:#4b5563;color:#f3f4f6}' +
+            // Inherits: the same button sits on the dark banner and on the popup's white dialog.
+            '.qs-consent-btn--ghost{background:transparent;border-color:#4b5563;color:inherit}' +
             '.qs-consent-btn--primary{background:#2563eb;color:#fff}' +
             '.qs-consent-popup{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.5)}' +
             '.qs-consent-popup__dialog{background:#fff;color:#1d1f23;border-radius:12px;max-width:440px;width:100%;padding:20px 22px;box-shadow:0 12px 48px rgba(0,0,0,.35)}' +
@@ -1561,10 +1570,31 @@
         }
     }
 
-    function _initConsentBanner() {
-        var banner = document.getElementById('qs-consent-banner');
+    /**
+     * What a generated page shows follows the registry, with no generation again. Every
+     * [data-consent-asks] shows only on a site that asks its visitors anything, and a popup row shows
+     * exactly while its category has a declared key: a key declared later brings the banner back and
+     * its row with it. With no window.QS_CONSENT (the editor, a layer that is off) nothing moves.
+     */
+    function _consentFollowRegistry() {
+        var cfg = _consentConfig();
+        if (!cfg) return;
+        document.querySelectorAll('[data-consent-asks]').forEach(function (el) {
+            el.hidden = cfg.asks === false;
+        });
         var popup = document.getElementById('qs-consent-popup');
-        if (!banner && !popup) return;
+        if (!popup) return;
+        var cats = (cfg.categories && typeof cfg.categories === 'object') ? cfg.categories : {};
+        popup.querySelectorAll('[data-consent-toggle]').forEach(function (cb) {
+            var category = cb.getAttribute('data-consent-toggle');
+            var row = cb.closest('.qs-consent-row') || cb;
+            row.hidden = !Object.keys(cats).some(function (key) { return cats[key] === category; });
+        });
+    }
+
+    function _initConsentBanner() {
+        // Before anything else: a page can hold a [data-consent-asks] with neither the banner nor the popup.
+        _consentFollowRegistry();
         _consentInjectStyles();
         // Auto-show the banner when the layer is enabled (live site) and the
         // visitor has a choice to make: none recorded yet, or a category's
@@ -1572,7 +1602,7 @@
         // QS_CONSENT is emitted live-only, so the banner never auto-pops in the
         // editor (the toolbar toggle shows it).
         if (_consentNeedsChoice()) {
-            _consentShow(banner);
+            _consentShow(document.getElementById('qs-consent-banner'));
         }
     }
 

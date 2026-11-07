@@ -35,6 +35,13 @@
         return node;
     }
 
+    // A word only `en.json` holds so far, with its English beside it: t() answers a key it cannot
+    // resolve with the key itself.
+    function _word(path, fallback) {
+        var word = t(path);
+        return word === path ? fallback : word;
+    }
+
     /** A failure the user must see: the panel's error toast. */
     function showError(text) {
         QuickSiteUtils.showToast(text, 'error');
@@ -829,6 +836,21 @@
         _renderConsentContent(content, status, message);
     }
 
+    /**
+     * A site that declares no non-essential key: the warning, its limit and the offer. `box` is the
+     * tick box, which the caller reads when it generates.
+     */
+    function _renderEssentialBannerOffer(box) {
+        var offer = QSDom.el('div', { class: 'admin-alert admin-alert--warning' });
+        offer.appendChild(QSDom.el('p', { text: _word('storage.consent.essentialOnly', 'Only essential keys are declared, so there is nothing to ask a visitor and no banner shows. The consent rule stays on, and a banner appears by itself once a functional, analytics or marketing key is declared.') }));
+        offer.appendChild(QSDom.el('p', { text: _word('storage.consent.essentialOnlyLimit', 'No banner does not mean nothing to disclose: third-party embeds and scripts you wrote yourself are not in the registry, and a banner never gated them. That is a reason to keep a cookie-policy page.') }));
+        var label = QSDom.el('label', { class: 'storage-consent-ask-again' });
+        label.appendChild(box);
+        label.appendChild(document.createTextNode(' ' + _word('storage.consent.essentialBanner', 'Create a banner anyway (it is not mandatory)')));
+        offer.appendChild(label);
+        return offer;
+    }
+
     function _renderConsentContent(content, status, message) {
         content.textContent = '';
 
@@ -839,12 +861,17 @@
 
         var cats = _declaredNonEssentialCategories();
         content.appendChild(_renderHint(t('storage.consent.generateHint')));
-        content.appendChild(QSDom.el('p', {
-            class: 'admin-hint',
-            text: cats.length
-                ? 'Popup toggle rows: ' + cats.join(', ') + ' (Essential is always-on, locked).'
-                : 'No non-essential keys declared yet — the popup shows only the locked Essential row.',
-        }));
+        var essentialBannerBox = null;
+        if (cats.length) {
+            content.appendChild(QSDom.el('p', {
+                class: 'admin-hint',
+                text: 'Popup toggle rows: ' + cats.join(', ') + ' (Essential is always-on, locked).',
+            }));
+        } else {
+            essentialBannerBox = QSDom.el('input', { type: 'checkbox' });
+            essentialBannerBox.checked = !!(status && status.essentialBanner);
+            content.appendChild(_renderEssentialBannerOffer(essentialBannerBox));
+        }
 
         // Policy-page section: locked (display only) when a page exists, an
         // input otherwise — so an existing page can't be duplicated by a typo.
@@ -867,10 +894,11 @@
                     : t('storage.consent.routeHint'))));
         }
 
-        // Asking every visitor again (the stored version bumped) is offered once the layer is on;
-        // a change to a category's keys asks again for that category by itself.
+        // Asking every visitor again (the stored version bumped) is offered once the layer is on and
+        // the site asks its visitors anything; a change to a category's keys asks again for that
+        // category by itself.
         var askAgainCb = null;
-        if (status && status.enabled) {
+        if (status && status.enabled && status.asks !== false) {
             askAgainCb = QSDom.el('input', { type: 'checkbox' });
             var askAgainLabel = QSDom.el('label', { class: 'storage-consent-ask-again' });
             askAgainLabel.appendChild(askAgainCb);
@@ -923,6 +951,7 @@
             _runConsentGenerate({
                 policyRoute: policyRoute, isUpdate: hasPage,
                 askAgain: !!(askAgainCb && askAgainCb.checked),
+                essentialBanner: essentialBannerBox ? essentialBannerBox.checked : null,
                 content: content, genBtn: genBtn, resultBox: resultBox, errBox: errBox,
             });
         });
@@ -965,7 +994,11 @@
             }
 
             // 2. Consent layer — banner reads the (now-updated) policy route.
-            var r = await api('generateConsentLayer', 'POST', opts.askAgain ? { askAgain: true } : {});
+            // The author's answer goes only when the offer was on screen: absent keeps what is stored.
+            var layerBody = {};
+            if (opts.askAgain) layerBody.askAgain = true;
+            if (opts.essentialBanner !== null) layerBody.essentialBanner = opts.essentialBanner;
+            var r = await api('generateConsentLayer', 'POST', layerBody);
             if (!r || !r.ok) {
                 errBox.hidden = false;
                 errBox.textContent = (r && r.data && r.data.message) || 'Generation failed';
@@ -978,8 +1011,10 @@
             var msg = 'Consent layer ' + (opts.isUpdate ? 'updated' : 'generated and enabled') + '.' +
                 (langs.length ? ' Seeded copy: ' + langs.join(', ') + '.' : '') +
                 (d.askedAgain ? ' ' + t('storage.consent.askedAgain') : '') +
-                policyMsg +
-                ' Preview a page to see the banner.';
+                policyMsg + ' ' +
+                (d.asks === false
+                    ? _word('storage.consent.noBanner', 'No banner was created: only essential keys are declared, so there is nothing to ask a visitor. A banner appears by itself once a functional, analytics or marketing key is declared.')
+                    : 'Preview a page to see the banner.');
             QuickSiteUtils.showToast(msg, toastType);
             // Re-render from fresh status — flips to the locked route + Update/
             // Delete once a page exists, so a re-generate can't change the route.

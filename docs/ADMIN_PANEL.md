@@ -3199,7 +3199,9 @@ registry into four buckets:
 **Generate the consent layer.** The **Generate consent layer** button (modal)
 runs `generateConsentLayer`, which seeds two global structures —
 `consent-banner.json` + `consent-popup.json` — from the registry (one popup
-toggle row per *declared* non-essential category; Essential is always-on, locked)
+toggle row per category a visitor can choose, shown on a page exactly while that
+category has a declared key, so a category declared later brings its row with no
+generation again; Essential is always-on, locked)
 and turns the consent rule on (below). They render on every page via `renderConsentLayer()`
 (the menu/footer pattern), are styleable in the stylesheet editor and editable in
 the visual editor, and `qs.js` wires the **Accept all / Refuse all / Customize**
@@ -3211,7 +3213,8 @@ recorded choice, and only that action works there: no element outside the banner
 and the popup can record a choice for the visitor. On a page without the popup it
 does nothing, and a link keeps its own address. The visual editor toolbar gains two preview-only **Cookie banner** /
 **Cookie popup** toggles beside Menu/Footer (they reveal the layers in the canvas
-for styling; they don't persist).
+for styling, a banner no visitor would see included; they don't persist). In the canvas
+the rows stay as generated, a category with no key keeping its row hidden.
 
 **The consent rule.** Once the layer is on, a value QuickSite stores is written,
 read and kept only while the visitor consents to its key's category:
@@ -3264,6 +3267,21 @@ refreshes the banner and the popup from the registry and leaves the layer on. A 
 that declares a functional, analytics or marketing key keeps asking its visitors — an
 off switch would let it stop asking while it still stores what needs their consent.
 
+**A site with nothing to ask shows no banner.** A site whose registry declares only
+essential keys has no choice to offer a visitor, so no banner shows there and no consent
+cookie is written. It is not an off switch: the consent rule stays on, so an undeclared
+key is still refused; both structure files are still written; and a functional, analytics
+or marketing key brings the banner back by itself at the next page load, with no
+generation again (a build at its next build). On such a site the modal shows a warning in
+place of the popup's rows line, and a **Create a banner anyway** box, which is not
+mandatory (`generateConsentLayer`'s `essentialBanner`, kept in `consent.json`, default off):
+ticked, the banner shows with the locked Essential row alone. The box governs that case
+alone: while a non-essential key is declared a banner shows whatever it says. **Ask
+visitors again** is hidden while no banner shows, and the result line and the toast say
+that no banner was created and why. *No banner* does not mean *nothing to disclose*:
+third-party embeds and scripts you wrote yourself are not in the registry and a banner
+never gated them, which is a reason to keep the policy page.
+
 **Cookie-policy page.** In the same modal, an optional route field generates a
 deterministic policy page (`generateCookiePolicy`) — a **Change my cookie
 preferences** button right under its intro (withdrawing consent must be as easy as
@@ -3279,8 +3297,15 @@ either set — and a legal-review note. The route is recorded in `consent.json`;
 exists the modal locks the route and offers **Update** + **Delete page**
 (`getConsentStatus` / `deleteCookiePolicy` drive this), so there is exactly one
 policy page and no accidental duplicates. Overwriting an existing route asks for
-confirmation. Left empty, the layer is generated with no page and the banner links to
+confirmation. Left empty, the layer is generated with no page and a banner links to
 none, and a yellow toast says so.
+
+The button's paragraph and the consent record's row are always written and carry
+`data-consent-asks`, which `qs.js` follows at each page load: on a site with nothing to ask
+both hide, as that cookie is set only by a visitor's choice, and a key declared later brings
+both back with no generation again. The new key's own row waits for **Update**, like every
+row. `QS.openConsent()`, and an element of your own marked `customize`, keep working on such
+a site: only what carries the attribute hides.
 
 **The theme switch's key in the policy.** When the project's theme mode and its
 visitor toggle are both on (`setThemeMode`), the table also lists the key the theme
@@ -3863,7 +3888,8 @@ deep-dive.
 | `data-storage-value` | storage | `localStorage:key` | Element text = the stored value | §9.5 |
 | `data-consent-show` | consent | `granted:<cat>` / `denied:<cat>` | Show/hide on cookie-consent state for a category (e.g. `granted:analytics`) | §9.10 |
 | `data-consent-action` | consent | `customize` / `accept-all` / `refuse-all` / `save` / `close` | A consent control: every action inside the banner and the popup; anywhere else only `customize`, which reopens the cookie preferences | §9.10 |
-| `data-consent-toggle` | consent | `functional` / `analytics` / `marketing` | The checkbox of one cookie category in the popup, ticked from the visitor's choice when the preferences open | §9.10 |
+| `data-consent-toggle` | consent | `functional` / `analytics` / `marketing` | The checkbox of one cookie category in the popup, ticked from the visitor's choice when the preferences open; its row shows while the category has a declared key | §9.10 |
+| `data-consent-asks` | consent | `true` | Shows the element only on a site that asks its visitors anything, followed at each page load; left alone with the layer off and in the visual editor. The generated cookie policy puts it on its preferences button's paragraph and the consent record's row | §9.10 |
 | `data-bind` | template | field name | Per-item template field (inside `data-state-list` OR componentList) | §9.2 |
 | `data-bind-attr` | template | attribute name | Variant of `data-bind` — sets the named attribute instead of textContent | §9.2 |
 | `data-list-template` | template | `true` | Marks a hidden element as the per-item template for componentList | §9.2 |

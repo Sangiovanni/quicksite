@@ -8,7 +8,7 @@
  * @route  /management/getConsentStatus
  * @auth   required (read permission)
  *
- * @return ApiResponse 200 { enabled, generated, policyRoute, policyRouteExists }
+ * @return ApiResponse 200 { enabled, generated, policyRoute, policyRouteExists, asks, essentialBanner }
  */
 
 require_once SECURE_FOLDER_PATH . '/src/classes/ApiResponse.php';
@@ -29,5 +29,7 @@ ApiResponse::create(200, 'success')
         'generated'         => consentLayerGenerated(),
         'policyRoute'       => $policyRoute,
         'policyRouteExists' => $policyRouteExists,
+        'asks'              => qs_consent_asks($cfg, consentCategoryMap()),
+        'essentialBanner'   => !empty($cfg['essentialBanner']),
     ])
     ->send();
